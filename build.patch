@@ -1,0 +1,13 @@
+diff --git a/config/compiler/BUILD.gn b/config/compiler/BUILD.gn
+index d777d71..286f6f9 100644
+--- a/config/compiler/BUILD.gn
++++ b/config/compiler/BUILD.gn
+@@ -1532,7 +1532,7 @@ config("chromium_code") {
+   } else {
+     cflags = [ "-Wall" ]
+     if (treat_warnings_as_errors) {
+-      cflags += [ "-Werror" ]
++      #cflags += [ "-Werror" ]
+ 
+       # The compiler driver can sometimes (rarely) emit warnings before calling
+       # the actual linker.  Make sure these warnings are treated as errors as
