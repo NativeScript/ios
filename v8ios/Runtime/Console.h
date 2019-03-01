@@ -6,15 +6,13 @@
 #include "v8.h"
 #pragma clang diagnostic pop
 
-using namespace v8;
-
 namespace tns {
 
 class Console {
 public:
-    static void Init(Isolate* isolate);
+    static void Init(v8::Isolate* isolate);
 private:
-    static void LogCallback(const FunctionCallbackInfo<Value>& args);
+    static void LogCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 };
 
 }

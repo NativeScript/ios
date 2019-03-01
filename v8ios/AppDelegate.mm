@@ -10,7 +10,6 @@
 
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-
     NSString* resourcePath = [[NSBundle mainBundle] resourcePath];
     tns::Runtime* runtime = new tns::Runtime();
     std::string baseDir = [resourcePath UTF8String];

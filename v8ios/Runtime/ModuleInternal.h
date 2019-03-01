@@ -7,24 +7,22 @@
 #include "v8.h"
 #pragma clang diagnostic pop
 
-using namespace v8;
-
 namespace tns {
 
 class ModuleInternal {
 public:
     ModuleInternal();
-    void Init(Isolate* isolate, const std::string& baseDir);
+    void Init(v8::Isolate* isolate, const std::string& baseDir);
 private:
-    static void RequireCallback(const FunctionCallbackInfo<Value>& args);
-    Local<Function> GetRequireFunction(const std::string& dirName);
-    Local<Object> LoadImpl(const std::string& moduleName, const std::string& baseDir);
-    Local<Script> LoadScript(const std::string& moduleName, const std::string& baseDir);
-    Local<String> WrapModuleContent(const std::string& path);
-    Isolate* isolate_;
-    Persistent<Function>* requireFunction_;
-    Persistent<Function>* requireFactoryFunction_;
-    std::map<std::string, Persistent<Object>*> loadedModules_;
+    static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+    v8::Local<v8::Function> GetRequireFunction(const std::string& dirName);
+    v8::Local<v8::Object> LoadImpl(const std::string& moduleName, const std::string& baseDir);
+    v8::Local<v8::Script> LoadScript(const std::string& moduleName, const std::string& baseDir);
+    v8::Local<v8::String> WrapModuleContent(const std::string& path);
+    v8::Isolate* isolate_;
+    v8::Persistent<v8::Function>* requireFunction_;
+    v8::Persistent<v8::Function>* requireFactoryFunction_;
+    std::map<std::string, v8::Persistent<v8::Object>*> loadedModules_;
 };
 
 }

@@ -1,5 +1,7 @@
 #include "Console.h"
 
+using namespace v8;
+
 namespace tns {
 
 void Console::Init(Isolate* isolate) {
