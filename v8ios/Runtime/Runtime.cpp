@@ -1,29 +1,34 @@
-#include "TargetConditionals.h"
 #include <string>
 #include <chrono>
 #include "Runtime.h"
 #include "Console.h"
+#include "SetTimeout.h"
+#include "MetadataBuilder.h"
 
-#if TARGET_OS_SIMULATOR
-#include "natives_blob.x64.h"
-#include "snapshot_blob.x64.h"
+#if defined __arm64 && __arm64__
+#include "natives_blob.arm64.h"
+#include "snapshot_blob.arm64.h"
+#elif defined __x86_64__ && __x86_64__
+#include "natives_blob.x86_64.h"
+#include "snapshot_blob.x86_64.h"
 #else
-#include "natives_blob.h"
-#include "snapshot_blob.h"
+#error Unknown CPU architecture. Only ARM, ARM64 and X86_64 architectures are supported
 #endif
 
 using namespace v8;
+using namespace std;
 
 namespace tns {
 
 Runtime::Runtime() {
 }
 
-void Runtime::Init(const std::string& baseDir) {
+void Runtime::Init(const string& baseDir) {
+    MetadataBuilder::Load(baseDir);
     isolate_ = InitInternal(baseDir);
 }
 
-Isolate* Runtime::InitInternal(const std::string& baseDir) {
+Isolate* Runtime::InitInternal(const string& baseDir) {
     platform_ = platform::NewDefaultPlatform().release();
     V8::InitializePlatform(platform_);
     V8::Initialize();
@@ -55,29 +60,31 @@ Isolate* Runtime::InitInternal(const std::string& baseDir) {
     DefineGlobalObject(context);
     DefinePerformanceObject(context);
     Console::Init(isolate);
+    SetTimeout::Init(isolate);
     moduleInternal_.Init(isolate, baseDir);
+    metadataBuilder_.Init(isolate);
 
     return isolate;
 }
 
-void Runtime::RunScript(std::string file) {
+void Runtime::RunScript(string file) {
     Isolate* isolate = isolate_;
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
-    std::string source = Runtime::ReadText(baseDir_ + "/" + file);
-    Local<String> script_source = String::NewFromUtf8(isolate, source.c_str(), NewStringType::kNormal).ToLocalChecked();
+    string source = Runtime::ReadText(baseDir_ + "/" + file);
+    Local<v8::String> script_source = v8::String::NewFromUtf8(isolate, source.c_str(), NewStringType::kNormal).ToLocalChecked();
     Local<Script> script;
     TryCatch tc(isolate);
     if (!Script::Compile(context, script_source).ToLocal(&script) && tc.HasCaught()) {
-        printf("%s\n", *String::Utf8Value(isolate_, tc.Exception()));
+        printf("%s\n", *v8::String::Utf8Value(isolate_, tc.Exception()));
         assert(false);
     }
 
     Local<Value> result;
     if (!script->Run(context).ToLocal(&result)) {
         if (tc.HasCaught()) {
-            printf("%s\n", *String::Utf8Value(isolate_, tc.Exception()));
+            printf("%s\n", *v8::String::Utf8Value(isolate_, tc.Exception()));
         }
         assert(false);
     }
@@ -86,14 +93,14 @@ void Runtime::RunScript(std::string file) {
 void Runtime::DefineGlobalObject(Local<Context> context) {
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
-    if (!global->DefineOwnProperty(context, String::NewFromUtf8(context->GetIsolate(), "global"), global, readOnlyFlags).FromMaybe(false)) {
+    if (!global->DefineOwnProperty(context, v8::String::NewFromUtf8(context->GetIsolate(), "global"), global, readOnlyFlags).FromMaybe(false)) {
         assert(false);
     }
 }
 
 void Runtime::DefinePerformanceObject(Local<Context> context) {
     Local<Object> global = context->Global();
-    Local<String> performancePropertyName = String::NewFromUtf8(context->GetIsolate(), "performance");
+    Local<v8::String> performancePropertyName = v8::String::NewFromUtf8(context->GetIsolate(), "performance");
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     if (!global->DefineOwnProperty(context, performancePropertyName, global, readOnlyFlags).FromMaybe(false)) {
         assert(false);
@@ -104,11 +111,11 @@ void Runtime::DefinePerformanceObject(Local<Context> context) {
         assert(false);
     }
 
-    Local<Function> nowFunc;
+    Local<v8::Function> nowFunc;
     if (!Function::New(context, PerformanceNowCallback).ToLocal(&nowFunc)) {
         assert(false);
     }
-    performance->ToObject(context).ToLocalChecked()->Set(String::NewFromUtf8(context->GetIsolate(), "now"), nowFunc);
+    performance->ToObject(context).ToLocalChecked()->Set(v8::String::NewFromUtf8(context->GetIsolate(), "now"), nowFunc);
 }
 
 void Runtime::PerformanceNowCallback(const FunctionCallbackInfo<Value>& args) {

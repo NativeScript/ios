@@ -23,6 +23,7 @@ class OS {
 public:
     static void SignalCodeMovingGC();
     static TimezoneCache* CreateTimezoneCache();
+    static bool ArmUsingHardFloat();
     
     struct SharedLibraryAddress {
         SharedLibraryAddress(const std::string& library_path, uintptr_t start,

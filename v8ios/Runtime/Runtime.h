@@ -7,8 +7,7 @@
 #pragma clang diagnostic pop
 #include "libplatform/libplatform.h"
 #include "ModuleInternal.h"
-
-using namespace v8;
+#include "MetadataBuilder.h"
 
 namespace tns {
 
@@ -19,12 +18,13 @@ public:
     void RunScript(std::string file);
     static std::string ReadText(const std::string& file);
 private:
-    Isolate* InitInternal(const std::string& baseDir);
-    void DefineGlobalObject(Local<Context> context);
-    void DefinePerformanceObject(Local<Context> context);
-    static void PerformanceNowCallback(const FunctionCallbackInfo<Value>& args);
-    Platform* platform_;
-    Isolate* isolate_;
+    v8::Isolate* InitInternal(const std::string& baseDir);
+    void DefineGlobalObject(v8::Local<v8::Context> context);
+    void DefinePerformanceObject(v8::Local<v8::Context> context);
+    static void PerformanceNowCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+    v8::Platform* platform_;
+    v8::Isolate* isolate_;
+    MetadataBuilder metadataBuilder_;
     ModuleInternal moduleInternal_;
     std::string baseDir_;
 };

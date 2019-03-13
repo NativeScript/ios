@@ -17,6 +17,10 @@ std::vector<OS::SharedLibraryAddress> OS::GetSharedLibraryAddresses() {
     return result;
 }
     
+bool OS::ArmUsingHardFloat() {
+    return true;
+}
+
 const char* PosixDefaultTimezoneCache::LocalTimezone(double time) {
     if (std::isnan(time)) return "";
     time_t tv = static_cast<time_t>(std::floor(time / msPerSecond));
@@ -56,6 +60,9 @@ private:
     FILE* const file_;
     void* const memory_;
     size_t const size_;
+
+
+
 };
 
     

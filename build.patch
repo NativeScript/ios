@@ -1,8 +1,8 @@
 diff --git a/config/compiler/BUILD.gn b/config/compiler/BUILD.gn
-index d777d71..286f6f9 100644
+index 03dab6d..cf88653 100644
 --- a/config/compiler/BUILD.gn
 +++ b/config/compiler/BUILD.gn
-@@ -1532,7 +1532,7 @@ config("chromium_code") {
+@@ -1542,7 +1542,7 @@ config("chromium_code") {
    } else {
      cflags = [ "-Wall" ]
      if (treat_warnings_as_errors) {
@@ -11,3 +11,18 @@ index d777d71..286f6f9 100644
  
        # The compiler driver can sometimes (rarely) emit warnings before calling
        # the actual linker.  Make sure these warnings are treated as errors as
+diff --git a/config/ios/BUILD.gn b/config/ios/BUILD.gn
+index 47d36fc..5e786f4 100644
+--- a/config/ios/BUILD.gn
++++ b/config/ios/BUILD.gn
+@@ -86,6 +86,10 @@ config("runtime_library") {
+     common_flags += [ "-miphoneos-version-min=$ios_deployment_target" ]
+   }
+ 
++  if (current_cpu == "arm") {
++    common_flags += [ "-D__ARM_EABI__" ]
++  }
++
+   if (use_xcode_clang && enable_ios_bitcode && !use_ios_simulator) {
+     if (is_debug) {
+       common_flags += [ "-fembed-bitcode-marker" ]
