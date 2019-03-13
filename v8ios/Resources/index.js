@@ -1,5 +1,5 @@
 var f = () => {
-    for (var i = 0; i < 1000000; i++) {
+    for (var i = 0; i < 10000000; i++) {
         //var obj = new NSObject();
         //var obj = new NSMutableString();
         var date = NSDate.date();
@@ -11,15 +11,16 @@ var f = () => {
 //obj.appendString("foo");
 //NSURLRequest.requestWithURL();
 
-var url = NSURL.URLWithString("http://example.com");
-console.log(url);
+//var url = NSURL.URLWithString("http://example.com");
+//console.log(url);
 //var date = NSDate.date();
 //console.log(date);
 
-//var formatter = new NSDateFormatter();
-//var date = NSDate.date();
-//var formattedDate = formatter.stringFromDate(date);
-//console.log(formattedDate);
+var formatter = new NSDateFormatter();
+formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z";
+var date = NSDate.date();
+var formattedDate = formatter.stringFromDate(date);
+console.log(formattedDate);
 
 //f();
 //console.log("Finished allocating objects");

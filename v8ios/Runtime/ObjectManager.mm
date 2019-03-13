@@ -22,7 +22,6 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
     if (obj->InternalFieldCount() > 0) {
         Local<External> ext = obj->GetInternalField(0).As<External>();
         MethodCallbackData* callbackData = reinterpret_cast<MethodCallbackData*>(ext->Value());
-        CFBridgingRelease(callbackData->data_);
         delete callbackData;
     }
     obj->SetInternalField(0, v8::Undefined(isolate));
