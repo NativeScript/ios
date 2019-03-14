@@ -130,12 +130,12 @@ void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, con
     }
 }
 
-void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& args) {
-    assert(args.Length() == 0);
+void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
+    assert(info.Length() == 0);
 
     @autoreleasepool {
-        Isolate* isolate = args.GetIsolate();
-        CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(args.Data().As<External>()->Value());
+        Isolate* isolate = info.GetIsolate();
+        CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
         const InterfaceMeta* meta = item->meta_;
 
         NSString* className = [NSString stringWithUTF8String:meta->jsName()];
@@ -144,185 +144,99 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
         MethodCallbackData* data = new MethodCallbackData(obj);
 
         Local<External> ext = External::New(isolate, data);
-        Local<Object> thiz = args.This();
+        Local<Object> thiz = info.This();
         thiz->SetInternalField(0, ext);
 
         item->builder_->objectManager_.Register(isolate, thiz);
     }
 }
 
-void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& args) {
+void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
     @autoreleasepool {
-        CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(args.Data().As<External>()->Value());
-        const MethodMeta* meta = item->meta_;
-        MetadataBuilder* thiz = item->builder_;
-
-        NSString* className = [NSString stringWithUTF8String:item->interfaceMeta_->jsName()];
-        Class klass = NSClassFromString(className);
-
-        Local<Object> receiver = args.This();
-        bool isInstanceMethod = receiver->InternalFieldCount() > 0;
-        SEL selector = meta->selector();
-        NSMethodSignature* signature = isInstanceMethod
-            ? [klass instanceMethodSignatureForSelector:selector]
-            : [klass methodSignatureForSelector:selector];
-        NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
-        [invocation setSelector:selector];
-
-        Isolate* isolate = args.GetIsolate();
-
-        for (int i = 0; i < args.Length(); i++) {
-            Local<Value> v8Arg = args[i];
-            id arg = thiz->ConvertArgument(isolate, v8Arg);
-            [invocation setArgument:&arg atIndex:i+2];
+        Isolate* isolate = info.GetIsolate();
+        CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(info.Data().As<External>()->Value());
+        SEL selector = item->meta_->selector();
+        bool instanceMethod = info.This()->InternalFieldCount() > 0;
+        std::vector<Local<Value>> args;
+        for (int i = 0; i < info.Length(); i++) {
+            args.push_back(info[i]);
         }
 
-        if (isInstanceMethod) {
-            Local<External> ext = receiver->GetInternalField(0).As<External>();
-            MethodCallbackData* methodCallbackData = reinterpret_cast<MethodCallbackData*>(ext->Value());
-            id target = methodCallbackData->data_;
-            [invocation invokeWithTarget:target];
-        } else {
-            [invocation setTarget:klass];
-            [invocation invoke];
-        }
+        Local<Value> result = instanceMethod
+            ? item->builder_->InvokeMethod(isolate, item, info.This(), selector, args)
+            : item->builder_->InvokeMethod(isolate, item, Local<Object>(), selector, args);
 
-        const TypeEncoding* encoding = meta->encodings()[0].first();
-        if (encoding != nullptr && encoding->type != VoidEncoding) {
-            id result = nil;
-            [invocation getReturnValue:&result];
-            if (result) {
-                CFBridgingRetain(result);
-                thiz->SetReturnValue(result, args);
-            }
+        if (!result.IsEmpty()) {
+            info.GetReturnValue().Set(result);
         }
     }
 }
 
 void MetadataBuilder::PropertyGetterCallback(Local<v8::String> name, const PropertyCallbackInfo<Value> &info) {
     @autoreleasepool {
+        Isolate* isolate = info.GetIsolate();
         CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-
-        NSString* className = [NSString stringWithUTF8String:item->interfaceMeta_->jsName()];
-        Class klass = NSClassFromString(className);
-
-        Local<Object> receiver = info.This();
         SEL selector = item->meta_->getter()->selector();
-        NSMethodSignature* signature = [klass instanceMethodSignatureForSelector:selector];
-        NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
-        [invocation setSelector:selector];
-
-        Local<External> ext = receiver->GetInternalField(0).As<External>();
-        MethodCallbackData* methodCallbackData = reinterpret_cast<MethodCallbackData*>(ext->Value());
-        id target = methodCallbackData->data_;
-        [invocation invokeWithTarget:target];
-
-        id result = nil;
-        [invocation getReturnValue:&result];
-        if (result) {
-            CFBridgingRetain(result);
-            item->builder_->SetReturnValue(result, info);
+        Local<Object> receiver = info.This();
+        Local<Value> result = item->builder_->InvokeMethod(isolate, item, receiver, selector, { });
+        if (!result.IsEmpty()) {
+            info.GetReturnValue().Set(result);
         }
     }
 }
 
 void MetadataBuilder::PropertySetterCallback(Local<v8::String> name, Local<Value> value, const PropertyCallbackInfo<void> &info) {
     @autoreleasepool {
-        CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-
-        NSString* className = [NSString stringWithUTF8String:item->interfaceMeta_->jsName()];
-        Class klass = NSClassFromString(className);
-
-        Local<Object> receiver = info.This();
-        SEL selector = item->meta_->setter()->selector();
-        NSMethodSignature* signature = [klass instanceMethodSignatureForSelector:selector];
-        NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
-        [invocation setSelector:selector];
-
         Isolate* isolate = info.GetIsolate();
-
-        id arg = item->builder_->ConvertArgument(isolate, value);
-        [invocation setArgument:&arg atIndex:2];
-
-        Local<External> ext = receiver->GetInternalField(0).As<External>();
-        MethodCallbackData* methodCallbackData = reinterpret_cast<MethodCallbackData*>(ext->Value());
-        id target = methodCallbackData->data_;
-        [invocation invokeWithTarget:target];
+        CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+        SEL selector = item->meta_->setter()->selector();
+        Local<Object> receiver = info.This();
+        item->builder_->InvokeMethod(isolate, item, receiver, selector, { value });
     }
 }
 
 void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const PropertyCallbackInfo<Value> &info) {
     @autoreleasepool {
+        Isolate* isolate = info.GetIsolate();
         CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-
-        NSString* className = [NSString stringWithUTF8String:item->interfaceMeta_->jsName()];
-        Class klass = NSClassFromString(className);
-
         SEL selector = item->meta_->getter()->selector();
-        NSMethodSignature* signature = [klass methodSignatureForSelector:selector];
-        NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
-        [invocation setSelector:selector];
-
-        [invocation setTarget:klass];
-        [invocation invoke];
-
-        id result = nil;
-        [invocation getReturnValue:&result];
-        if (result) {
-            CFBridgingRetain(result);
-            item->builder_->SetReturnValue(result, info);
+        Local<Value> result = item->builder_->InvokeMethod(isolate, item, Local<Object>(), selector, { });
+        if (!result.IsEmpty()) {
+            info.GetReturnValue().Set(result);
         }
     }
 }
 
 void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<void> &info) {
     @autoreleasepool {
-        CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-
-        NSString* className = [NSString stringWithUTF8String:item->interfaceMeta_->jsName()];
-        Class klass = NSClassFromString(className);
-
-        SEL selector = item->meta_->setter()->selector();
-        NSMethodSignature* signature = [klass methodSignatureForSelector:selector];
-        NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
-        [invocation setSelector:selector];
-
         Isolate* isolate = info.GetIsolate();
-
-        id arg = item->builder_->ConvertArgument(isolate, value);
-        [invocation setArgument:&arg atIndex:2];
-
-        [invocation setTarget:klass];
-        [invocation invoke];
+        CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+        SEL selector = item->meta_->setter()->selector();
+        item->builder_->InvokeMethod(isolate, item, Local<Object>(), selector, { value });
     }
 }
 
-template<class T, class Args>
-void MetadataBuilder::MethodCallbackInternal(CacheItem<T>* item, const Args& args) {
+template<class T>
+Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, CacheItem<T>* item, Local<Object> receiver, SEL selector, const std::vector<Local<Value>> args) {
     static_assert(std::is_base_of<Meta, T>::value, "Derived not derived from Meta");
-    const T* meta = item->meta_;
 
     NSString* className = [NSString stringWithUTF8String:item->interfaceMeta_->jsName()];
     Class klass = NSClassFromString(className);
 
-    Local<Object> receiver = args.This();
-    bool isInstanceMethod = receiver->InternalFieldCount() > 0;
-    SEL selector = meta->selector();
-    NSMethodSignature* signature = isInstanceMethod
+    bool instanceMethod = !receiver.IsEmpty();
+    NSMethodSignature* signature = instanceMethod
         ? [klass instanceMethodSignatureForSelector:selector]
         : [klass methodSignatureForSelector:selector];
     NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
     [invocation setSelector:selector];
 
-    Isolate* isolate = args.GetIsolate();
-
-    for (int i = 0; i < args.Length(); i++) {
+    for (int i = 0; i < args.size(); i++) {
         Local<Value> v8Arg = args[i];
         id arg = ConvertArgument(isolate, v8Arg);
         [invocation setArgument:&arg atIndex:i+2];
     }
 
-    if (isInstanceMethod) {
+    if (instanceMethod) {
         Local<External> ext = receiver->GetInternalField(0).As<External>();
         MethodCallbackData* methodCallbackData = reinterpret_cast<MethodCallbackData*>(ext->Value());
         id target = methodCallbackData->data_;
@@ -332,15 +246,19 @@ void MetadataBuilder::MethodCallbackInternal(CacheItem<T>* item, const Args& arg
         [invocation invoke];
     }
 
-    const TypeEncoding* encoding = meta->encodings()[0].first();
-    if (encoding != nullptr && encoding->type != VoidEncoding) {
+    Method m = class_getInstanceMethod(klass, selector);
+    char type[128];
+    method_getReturnType(m, type, sizeof(type));
+    if (strcmp(type, "v") != 0) {
         id result = nil;
         [invocation getReturnValue:&result];
         if (result) {
             CFBridgingRetain(result);
-            SetReturnValue(result, args);
+            return GetReturnValue(isolate, result);
         }
     }
+
+    return Local<Value>();
 }
 
 id MetadataBuilder::ConvertArgument(Isolate* isolate, v8::Local<v8::Value> arg) {
@@ -365,15 +283,13 @@ id MetadataBuilder::ConvertArgument(Isolate* isolate, v8::Local<v8::Value> arg) 
     assert(false);
 }
 
-template<class Args>
-void MetadataBuilder::SetReturnValue(id obj, const Args& args) {
-    Isolate* isolate = args.GetIsolate();
+Local<Value> MetadataBuilder::GetReturnValue(Isolate* isolate, id obj) {
     if ([obj isKindOfClass:[NSString class]]) {
         const char* str = [obj UTF8String];
         Local<v8::String> res = v8::String::NewFromUtf8(isolate, str);
-        args.GetReturnValue().Set(res);
+        return res;
     } else if ([obj isKindOfClass:[NSNumber class]]) {
-        args.GetReturnValue().Set(Number::New(isolate, [obj doubleValue]));
+        return Number::New(isolate, [obj doubleValue]);
     } else if ([obj isKindOfClass:[NSDate class]]) {
         Local<Context> context = isolate->GetCurrentContext();
         double time = [obj timeIntervalSince1970] * 1000.0;
@@ -381,24 +297,23 @@ void MetadataBuilder::SetReturnValue(id obj, const Args& args) {
         if (!Date::New(context, time).ToLocal(&date)) {
             assert(false);
         }
-        args.GetReturnValue().Set(date);
-    } else {
-        MethodCallbackData* data = new MethodCallbackData(obj);
-        Local<External> ext = External::New(isolate, data);
-
-        Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-        objTemplate->SetInternalFieldCount(1);
-        Local<Context> context = isolate->GetCurrentContext();
-        Local<Object> jsResult;
-        if (!objTemplate->NewInstance(context).ToLocal(&jsResult)) {
-            assert(false);
-        }
-
-        jsResult->SetInternalField(0, ext);
-        objectManager_.Register(isolate, jsResult);
-
-        args.GetReturnValue().Set(jsResult);
+        return date;
     }
+    MethodCallbackData* data = new MethodCallbackData(obj);
+    Local<External> ext = External::New(isolate, data);
+
+    Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
+    objTemplate->SetInternalFieldCount(1);
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> jsResult;
+    if (!objTemplate->NewInstance(context).ToLocal(&jsResult)) {
+        assert(false);
+    }
+
+    jsResult->SetInternalField(0, ext);
+    objectManager_.Register(isolate, jsResult);
+
+    return jsResult;
 }
 
 }
