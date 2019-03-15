@@ -37,7 +37,7 @@ namespace tns {
     }
 
     const InterfaceMeta* GlobalTable::findInterfaceMeta(const char* identifierString) const {
-        unsigned hash = 5;
+        unsigned hash = calculateHash(identifierString);
         return this->findInterfaceMeta(identifierString, strlen(identifierString), hash);
     }
 
@@ -69,7 +69,7 @@ namespace tns {
     }
 
     const ProtocolMeta* GlobalTable::findProtocol(const char* identifierString) const {
-        unsigned hash = 5;
+        unsigned hash = calculateHash(identifierString);
         return this->findProtocol(identifierString, strlen(identifierString), hash);
     }
 
@@ -84,7 +84,7 @@ namespace tns {
     }
 
     const Meta* GlobalTable::findMeta(const char* identifierString, bool onlyIfAvailable) const {
-        unsigned hash = 5;
+        unsigned hash = calculateHash(identifierString);
         return this->findMeta(identifierString, strlen(identifierString), hash, onlyIfAvailable);
     }
 

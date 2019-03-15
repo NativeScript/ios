@@ -10,41 +10,74 @@ MetadataBuilder::MetadataBuilder() {
 
 void MetadataBuilder::Init(Isolate* isolate) {
     isolate_ = isolate;
-
-    Local<Context> context = isolate->GetCurrentContext();
+    Local<Context> context = isolate_->GetCurrentContext();
     Local<Object> global = context->Global();
 
-    MetaFile* metaFile = MetaFile::instance();
-    auto globalTable = metaFile->globalTable();
+    MetaFile* metaFile = MetaFile::instance();auto globalTable = metaFile->globalTable();
     for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
-        const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(*it);
-        if (baseMeta->type() == MetaType::Interface) {
-            const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
-            Local<FunctionTemplate> ctorFuncTemplate = RegisterConstructor(interfaceMeta);
-            RegisterInstanceMethods(ctorFuncTemplate, interfaceMeta);
-            RegisterInstanceProperties(ctorFuncTemplate, interfaceMeta);
+        const BaseClassMeta* meta = static_cast<const BaseClassMeta*>(*it);
 
-            Local<v8::Function> ctorFunc;
-            if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-                assert(false);
-            }
-
-            if (!global->Set(v8::String::NewFromUtf8(isolate_, interfaceMeta->name()), ctorFunc)) {
-                assert(false);
-            }
-
-            RegisterStaticMethods(ctorFunc, interfaceMeta);
-            RegisterStaticProperties(ctorFunc, interfaceMeta);
+        if (meta->type() != MetaType::Interface) {
+            // Currently only classes are supported
+            continue;
         }
+
+        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+        const InterfaceMeta* baseMeta = interfaceMeta->baseMeta();
+
+        Local<FunctionTemplate> ctorFuncTemplate = GetOrCreateConstructor(interfaceMeta);
+        if (baseMeta != nullptr) {
+            Local<FunctionTemplate> parentCtorFuncTemplate = GetOrCreateConstructor(baseMeta);
+            ctorFuncTemplate->Inherit(parentCtorFuncTemplate);
+        }
+    }
+
+    // TODO: Try to avoid the second pass through the metadata. Instantiating the FunctionTemplate should be done
+    // only once all the prototype inheritance is configured between the classes
+    for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
+        const BaseClassMeta* meta = static_cast<const BaseClassMeta*>(*it);
+
+        if (meta->type() != MetaType::Interface) {
+            // Currently only classes are supported
+            continue;
+        }
+
+        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+        Local<FunctionTemplate> ctorFuncTemplate = GetOrCreateConstructor(interfaceMeta);
+
+        Local<v8::Function> ctorFunc;
+        if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
+            assert(false);
+        }
+
+        if (!global->Set(v8::String::NewFromUtf8(isolate_, interfaceMeta->name()), ctorFunc)) {
+            assert(false);
+        }
+
+        RegisterStaticMethods(ctorFunc, interfaceMeta);
+        RegisterStaticProperties(ctorFunc, interfaceMeta);
     }
 }
 
-Local<FunctionTemplate> MetadataBuilder::RegisterConstructor(const InterfaceMeta* interfaceMeta) {
-    CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, nullptr, this);
-    Local<External> ext = External::New(isolate_, item);
+Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructor(const InterfaceMeta* interfaceMeta) {
+    Local<FunctionTemplate> ctorFuncTemplate;
 
-    Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate_, ClassConstructorCallback, ext);
-    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    auto it = constructorsCache_.find(interfaceMeta);
+    if (it != constructorsCache_.end()) {
+        Persistent<FunctionTemplate>* poCtorFuncTemplate = it->second;
+        ctorFuncTemplate = Local<FunctionTemplate>::New(isolate_, *poCtorFuncTemplate);
+    } else {
+        CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, nullptr, this);
+        Local<External> ext = External::New(isolate_, item);
+
+        ctorFuncTemplate = FunctionTemplate::New(isolate_, ClassConstructorCallback, ext);
+        ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+
+        RegisterInstanceMethods(ctorFuncTemplate, interfaceMeta);
+        RegisterInstanceProperties(ctorFuncTemplate, interfaceMeta);
+
+        constructorsCache_.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
+    }
 
     return ctorFuncTemplate;
 }

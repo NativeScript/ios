@@ -76,6 +76,7 @@
 		C28B7B2C22241270007DE2BA /* Runtime.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Runtime.cpp; sourceTree = "<group>"; };
 		C28B7B5822252431007DE2BA /* ModuleInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ModuleInternal.h; sourceTree = "<group>"; };
 		C28B7B5922252432007DE2BA /* ModuleInternal.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ModuleInternal.cpp; sourceTree = "<group>"; };
+		C2AAE9C8223BA685006FB9D3 /* StringHasher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
 		C2B12E9C22269B43000F6AFC /* richards.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = richards.js; sourceTree = "<group>"; };
 		C2B12E9D22269B43000F6AFC /* base.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = base.js; sourceTree = "<group>"; };
 		C2B12EB02226BA2E000F6AFC /* deltablue.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = deltablue.js; sourceTree = "<group>"; };
@@ -170,6 +171,7 @@
 				C2764AF7222E80AC008F674F /* MetadataBuilder.mm */,
 				C2764AFB223644B3008F674F /* ObjectManager.h */,
 				C2764AFA223644B3008F674F /* ObjectManager.mm */,
+				C2AAE9C8223BA685006FB9D3 /* StringHasher.h */,
 			);
 			path = Runtime;
 			sourceTree = "<group>";

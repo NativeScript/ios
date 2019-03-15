@@ -9,10 +9,17 @@
 #include <unordered_set>
 #include <set>
 #include <vector>
+#include "StringHasher.h"
 
 namespace tns {
 
     static const int MetaTypeMask = 0b00000111;
+
+    static const unsigned int calculateHash(const char* data) {
+        StringHasher hasher;
+        hasher.addCharactersAssumingAligned(data);
+        return hasher.hashWithTop8BitsMasked();
+    }
 
     template <typename V>
     static const V& getProperFunctionFromContainer(const std::vector<V>& container, int argsCount, std::function<int(const V&)> paramsCounter) {

@@ -8,6 +8,7 @@
 
 #include <CoreFoundation/CFBase.h>
 #include <string>
+#include <map>
 #include "Metadata.h"
 #include "ObjectManager.h"
 
@@ -33,6 +34,7 @@ private:
 
     v8::Isolate* isolate_;
     ObjectManager objectManager_;
+    std::map<const InterfaceMeta*, v8::Persistent<v8::FunctionTemplate>*> constructorsCache_;
 
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -43,7 +45,7 @@ private:
     template<class T>
     v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, CacheItem<T>* item, v8::Local<v8::Object> receiver, SEL selector, const std::vector<v8::Local<v8::Value>> args);
 
-    v8::Local<v8::FunctionTemplate> RegisterConstructor(const InterfaceMeta* interfaceMeta);
+    v8::Local<v8::FunctionTemplate> GetOrCreateConstructor(const InterfaceMeta* interfaceMeta);
     void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta);
     void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
