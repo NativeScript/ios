@@ -37,7 +37,7 @@ namespace tns {
     }
 
     const InterfaceMeta* GlobalTable::findInterfaceMeta(const char* identifierString) const {
-        unsigned hash = calculateHash(identifierString);
+        unsigned hash = WTF::StringHasher::computeHashAndMaskTop8Bits<LChar>(reinterpret_cast<const LChar*>(identifierString));
         return this->findInterfaceMeta(identifierString, strlen(identifierString), hash);
     }
 
@@ -69,7 +69,7 @@ namespace tns {
     }
 
     const ProtocolMeta* GlobalTable::findProtocol(const char* identifierString) const {
-        unsigned hash = calculateHash(identifierString);
+        unsigned hash = WTF::StringHasher::computeHashAndMaskTop8Bits<LChar>(reinterpret_cast<const LChar*>(identifierString));
         return this->findProtocol(identifierString, strlen(identifierString), hash);
     }
 
@@ -79,12 +79,12 @@ namespace tns {
         // in UIKit which contained members that have existed in UIScrollView since iOS 2.0)
 
         auto meta = this->findMeta(identifierString, length, hash, /*onlyIfAvailable*/ false);
-        assert(!meta || meta->type() == ProtocolType);
+        ASSERT(!meta || meta->type() == ProtocolType);
         return static_cast<const ProtocolMeta*>(meta);
     }
 
     const Meta* GlobalTable::findMeta(const char* identifierString, bool onlyIfAvailable) const {
-        unsigned hash = calculateHash(identifierString);
+        unsigned hash = WTF::StringHasher::computeHashAndMaskTop8Bits<LChar>(reinterpret_cast<const LChar*>(identifierString));
         return this->findMeta(identifierString, strlen(identifierString), hash, onlyIfAvailable);
     }
 
@@ -147,14 +147,14 @@ namespace tns {
             id sampleInstance = it->second;
             return [sampleInstance respondsToSelector:this->selector()];
         }
-         **/
+        **/
     }
 
     // BaseClassMeta
     const MemberMeta* BaseClassMeta::member(const char* identifier, size_t length, MemberType type, bool includeProtocols, bool onlyIfAvailable) const {
 
         MembersCollection members = this->members(identifier, length, type, includeProtocols, onlyIfAvailable);
-        assert(members.size() <= 1);
+        ASSERT(members.size() <= 1);
         return members.size() == 1 ? *members.begin() : nullptr;
     }
 

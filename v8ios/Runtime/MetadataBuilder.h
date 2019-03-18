@@ -34,7 +34,8 @@ private:
 
     v8::Isolate* isolate_;
     ObjectManager objectManager_;
-    std::map<const InterfaceMeta*, v8::Persistent<v8::FunctionTemplate>*> constructorsCache_;
+    std::map<const InterfaceMeta*, v8::Persistent<v8::FunctionTemplate>*> ctorTemplatesCache_;
+    std::map<const InterfaceMeta*, v8::Persistent<v8::Function>*> ctorsCache_;
 
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -42,16 +43,17 @@ private:
     static void PropertySetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
     static void PropertyNameGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
     static void PropertyNameSetterCallback(v8::Local<v8::Name> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void> &info);
-    template<class T>
-    v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, CacheItem<T>* item, v8::Local<v8::Object> receiver, SEL selector, const std::vector<v8::Local<v8::Value>> args);
+    v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, const char* containingClass);
 
     v8::Local<v8::FunctionTemplate> GetOrCreateConstructor(const InterfaceMeta* interfaceMeta);
     void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta);
     void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta);
-    id ConvertArgument(v8::Isolate* isolate, v8::Local<v8::Value> arg);
-    v8::Local<v8::Value> GetReturnValue(v8::Isolate* isolate, id obj);
+    const void* ConvertArgument(v8::Isolate* isolate, v8::Local<v8::Value> arg, const TypeEncoding* typeEncoding, bool& shouldRelease);
+    v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
+    v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj);
+    const InterfaceMeta* GetInterfaceMeta(id obj);
 
     MetadataBuilder(const std::string& baseDir) {
         std::string fileName = baseDir + "/metadata-x86_64.bin";

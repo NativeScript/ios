@@ -49,7 +49,7 @@ void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
     global->Set(v8::String::NewFromUtf8(isolate, "require"), globalRequire);
 }
 
-    Local<v8::Function> ModuleInternal::GetRequireFunction(const std::string& dirName) {
+Local<v8::Function> ModuleInternal::GetRequireFunction(const std::string& dirName) {
     Local<v8::Function> requireFuncFactory = Local<v8::Function>::New(isolate_, *requireFactoryFunction_);
     Local<Context> context = isolate_->GetCurrentContext();
     Local<v8::Function> requireInternalFunc = Local<v8::Function>::New(isolate_, *requireFunction_);
@@ -62,7 +62,7 @@ void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
     bool success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
     assert(success && !result.IsEmpty() && result->IsFunction());
 
-        return result.As<v8::Function>();
+    return result.As<v8::Function>();
 }
 
 void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& args) {
@@ -137,7 +137,7 @@ Local<Script> ModuleInternal::LoadScript(const std::string& moduleName, const st
     return maybeScript.ToLocalChecked();
 }
 
-    Local<v8::String> ModuleInternal::WrapModuleContent(const std::string& path) {
+Local<v8::String> ModuleInternal::WrapModuleContent(const std::string& path) {
     std::string content = Runtime::ReadText(path);
     std::string result("(function(module, exports, require, __filename, __dirname) { ");
     result.reserve(content.length() + 1024);

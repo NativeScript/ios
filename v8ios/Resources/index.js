@@ -6,21 +6,22 @@ var f = () => {
     }
 };
 
-//console.log(NSURLRequest.requestWithURL);
-//var obj = new NSMutableString();
-//obj.appendString("foo");
-//NSURLRequest.requestWithURL();
-
-//var url = NSURL.URLWithString("http://example.com");
-//console.log(url);
-//var date = NSDate.date();
-//console.log(date);
-
+/**
 var formatter = new NSDateFormatter();
 formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z";
 var date = NSDate.date();
 var formattedDate = formatter.stringFromDate(date);
 console.log(formattedDate);
+**/
+
+//NSTimer.scheduledTimerWithTimeInterval(2, null, "hideManual", null, false);
+
+var url = NSURL.URLWithString("https://example.com");
+var request = NSURLRequest.requestWithURL(url);
+var queue = new NSOperationQueue();
+NSURLConnection.sendAsynchronousRequestQueueCompletionHandler(request, queue, (response, data, connectionError) => {
+    console.log(response);
+});
 
 //f();
 //console.log("Finished allocating objects");

@@ -13,7 +13,8 @@ void MetadataBuilder::Init(Isolate* isolate) {
     Local<Context> context = isolate_->GetCurrentContext();
     Local<Object> global = context->Global();
 
-    MetaFile* metaFile = MetaFile::instance();auto globalTable = metaFile->globalTable();
+    MetaFile* metaFile = MetaFile::instance();
+    auto globalTable = metaFile->globalTable();
     for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
         const BaseClassMeta* meta = static_cast<const BaseClassMeta*>(*it);
 
@@ -56,14 +57,17 @@ void MetadataBuilder::Init(Isolate* isolate) {
 
         RegisterStaticMethods(ctorFunc, interfaceMeta);
         RegisterStaticProperties(ctorFunc, interfaceMeta);
+
+        Persistent<v8::Function>* poCtorFunc = new Persistent<v8::Function>(isolate_, ctorFunc);
+        ctorsCache_.insert(std::make_pair(interfaceMeta, poCtorFunc));
     }
 }
 
 Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructor(const InterfaceMeta* interfaceMeta) {
     Local<FunctionTemplate> ctorFuncTemplate;
 
-    auto it = constructorsCache_.find(interfaceMeta);
-    if (it != constructorsCache_.end()) {
+    auto it = ctorTemplatesCache_.find(interfaceMeta);
+    if (it != ctorTemplatesCache_.end()) {
         Persistent<FunctionTemplate>* poCtorFuncTemplate = it->second;
         ctorFuncTemplate = Local<FunctionTemplate>::New(isolate_, *poCtorFuncTemplate);
     } else {
@@ -72,11 +76,12 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructor(const InterfaceM
 
         ctorFuncTemplate = FunctionTemplate::New(isolate_, ClassConstructorCallback, ext);
         ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+        ctorFuncTemplate->SetClassName(v8::String::NewFromUtf8(isolate_, interfaceMeta->jsName()));
 
         RegisterInstanceMethods(ctorFuncTemplate, interfaceMeta);
         RegisterInstanceProperties(ctorFuncTemplate, interfaceMeta);
 
-        constructorsCache_.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
+        ctorTemplatesCache_.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
     }
 
     return ctorFuncTemplate;
@@ -188,7 +193,7 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
     @autoreleasepool {
         Isolate* isolate = info.GetIsolate();
         CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(info.Data().As<External>()->Value());
-        SEL selector = item->meta_->selector();
+
         bool instanceMethod = info.This()->InternalFieldCount() > 0;
         std::vector<Local<Value>> args;
         for (int i = 0; i < info.Length(); i++) {
@@ -196,8 +201,8 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
         }
 
         Local<Value> result = instanceMethod
-            ? item->builder_->InvokeMethod(isolate, item, info.This(), selector, args)
-            : item->builder_->InvokeMethod(isolate, item, Local<Object>(), selector, args);
+            ? item->builder_->InvokeMethod(isolate, item->meta_, info.This(), args, item->interfaceMeta_->jsName())
+            : item->builder_->InvokeMethod(isolate, item->meta_, Local<Object>(), args, item->interfaceMeta_->jsName());
 
         if (!result.IsEmpty()) {
             info.GetReturnValue().Set(result);
@@ -209,9 +214,8 @@ void MetadataBuilder::PropertyGetterCallback(Local<v8::String> name, const Prope
     @autoreleasepool {
         Isolate* isolate = info.GetIsolate();
         CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-        SEL selector = item->meta_->getter()->selector();
         Local<Object> receiver = info.This();
-        Local<Value> result = item->builder_->InvokeMethod(isolate, item, receiver, selector, { });
+        Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->interfaceMeta_->jsName());
         if (!result.IsEmpty()) {
             info.GetReturnValue().Set(result);
         }
@@ -222,9 +226,8 @@ void MetadataBuilder::PropertySetterCallback(Local<v8::String> name, Local<Value
     @autoreleasepool {
         Isolate* isolate = info.GetIsolate();
         CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-        SEL selector = item->meta_->setter()->selector();
         Local<Object> receiver = info.This();
-        item->builder_->InvokeMethod(isolate, item, receiver, selector, { value });
+        item->builder_->InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->interfaceMeta_->jsName());
     }
 }
 
@@ -232,8 +235,7 @@ void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const Propert
     @autoreleasepool {
         Isolate* isolate = info.GetIsolate();
         CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-        SEL selector = item->meta_->getter()->selector();
-        Local<Value> result = item->builder_->InvokeMethod(isolate, item, Local<Object>(), selector, { });
+        Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), Local<Object>(), { }, item->interfaceMeta_->jsName());
         if (!result.IsEmpty()) {
             info.GetReturnValue().Set(result);
         }
@@ -244,17 +246,14 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
     @autoreleasepool {
         Isolate* isolate = info.GetIsolate();
         CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-        SEL selector = item->meta_->setter()->selector();
-        item->builder_->InvokeMethod(isolate, item, Local<Object>(), selector, { value });
+        item->builder_->InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->interfaceMeta_->jsName());
     }
 }
 
-template<class T>
-Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, CacheItem<T>* item, Local<Object> receiver, SEL selector, const std::vector<Local<Value>> args) {
-    static_assert(std::is_base_of<Meta, T>::value, "Derived not derived from Meta");
-
-    NSString* className = [NSString stringWithUTF8String:item->interfaceMeta_->jsName()];
+Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, const char* containingClass) {
+    NSString* className = [NSString stringWithUTF8String:containingClass];
     Class klass = NSClassFromString(className);
+    SEL selector = meta->selector();
 
     bool instanceMethod = !receiver.IsEmpty();
     NSMethodSignature* signature = instanceMethod
@@ -263,9 +262,19 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, CacheItem<T>* item,
     NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
     [invocation setSelector:selector];
 
+    const TypeEncoding* typeEncoding = meta->encodings()->first();
     for (int i = 0; i < args.size(); i++) {
         Local<Value> v8Arg = args[i];
-        id arg = ConvertArgument(isolate, v8Arg);
+        if (typeEncoding != nullptr) {
+            typeEncoding = typeEncoding->next();
+        } else {
+            assert(false);
+        }
+        bool shouldRelease = false;
+        const void* arg = ConvertArgument(isolate, v8Arg, typeEncoding, shouldRelease);
+        if (shouldRelease) {
+            CFBridgingRelease(arg);
+        }
         [invocation setArgument:&arg atIndex:i+2];
     }
 
@@ -279,44 +288,103 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, CacheItem<T>* item,
         [invocation invoke];
     }
 
-    Method m = class_getInstanceMethod(klass, selector);
-    char type[128];
-    method_getReturnType(m, type, sizeof(type));
-    if (strcmp(type, "v") != 0) {
+    const char* returnType = signature.methodReturnType;
+    if (strcmp(returnType, "v") != 0) {
         id result = nil;
         [invocation getReturnValue:&result];
         if (result) {
             CFBridgingRetain(result);
-            return GetReturnValue(isolate, result);
+            return ConvertArgument(isolate, result);
         }
     }
 
     return Local<Value>();
 }
 
-id MetadataBuilder::ConvertArgument(Isolate* isolate, v8::Local<v8::Value> arg) {
+const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg, const TypeEncoding* typeEncoding, bool& shouldRelease) {
+    if (arg->IsNull()) {
+        return nil;
+    }
+
+    shouldRelease = false;
+    if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
+        Local<v8::String> strArg = arg.As<v8::String>();
+        v8::String::Utf8Value str(isolate, strArg);
+        NSString* selector = [NSString stringWithUTF8String:*str];
+        SEL res = NSSelectorFromString(selector);
+        return res;
+    }
+
     Local<Context> context = isolate->GetCurrentContext();
+    shouldRelease = true;
     if (arg->IsString()) {
         Local<v8::String> strArg = arg.As<v8::String>();
         v8::String::Utf8Value str(isolate, strArg);
         NSString* result = [NSString stringWithUTF8String:*str];
-        return result;
+        return CFBridgingRetain(result);
     } else if (arg->IsNumber() || arg->IsDate()) {
         double res;
         if (!arg->NumberValue(context).To(&res)) {
             assert(false);
         }
         if (arg->IsNumber()) {
-            return [NSNumber numberWithDouble:res];
+            return CFBridgingRetain([NSNumber numberWithDouble:res]);
         } else {
-            return [NSDate dateWithTimeIntervalSince1970:res / 1000.0];
+            return CFBridgingRetain([NSDate dateWithTimeIntervalSince1970:res / 1000.0]);
+        }
+    } else if (arg->IsFunction() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
+        Local<v8::Function> callback = arg.As<v8::Function>();
+        Persistent<v8::Function>* poCallback = new Persistent<v8::Function>(isolate, callback);
+
+        id block = ^(id first, ...) {
+            va_list args;
+            int argsCount = typeEncoding->details.block.signature.count - 1;
+            std::vector<id> arguments;
+            for (int i = 0; i < argsCount; i++) {
+                id val;
+                if (i == 0) {
+                    va_start(args, first);
+                    val = first;
+                } else {
+                    val = va_arg(args, id);
+                }
+                arguments.push_back(val);
+            }
+            va_end(args);
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                Local<Value> res;
+                HandleScope handle_scope(isolate);
+                Local<Context> ctx = isolate->GetCurrentContext();
+                Local<v8::Function> callback = Local<v8::Function>::New(isolate, *poCallback);
+
+                std::vector<Local<Value>> v8Args;
+                for (int i = 0; i < argsCount; i++) {
+                    Local<Value> jsWrapper = ConvertArgument(isolate, arguments[i]);
+                    v8Args.push_back(jsWrapper);
+                }
+
+                if (!callback->Call(ctx, ctx->Global(), argsCount, v8Args.data()).ToLocal(&res)) {
+                    assert(false);
+                }
+
+                delete poCallback;
+            });
+        };
+        return CFBridgingRetain(block);
+    } else if (arg->IsObject()) {
+        Local<Object> obj = arg.As<Object>();
+        if (obj->InternalFieldCount() > 0) {
+            Local<External> ext = obj->GetInternalField(0).As<External>();
+            MethodCallbackData* methodCallbackData = reinterpret_cast<MethodCallbackData*>(ext->Value());
+            return CFBridgingRetain(methodCallbackData->data_);
         }
     }
 
     assert(false);
 }
 
-Local<Value> MetadataBuilder::GetReturnValue(Isolate* isolate, id obj) {
+Local<Value> MetadataBuilder::ConvertArgument(Isolate* isolate, id obj) {
     if ([obj isKindOfClass:[NSString class]]) {
         const char* str = [obj UTF8String];
         Local<v8::String> res = v8::String::NewFromUtf8(isolate, str);
@@ -332,6 +400,12 @@ Local<Value> MetadataBuilder::GetReturnValue(Isolate* isolate, id obj) {
         }
         return date;
     }
+
+    Local<Object> jsObject = CreateJsWrapper(isolate, obj);
+    return jsObject;
+}
+
+Local<Object> MetadataBuilder::CreateJsWrapper(Isolate* isolate, id obj) {
     MethodCallbackData* data = new MethodCallbackData(obj);
     Local<External> ext = External::New(isolate, data);
 
@@ -343,10 +417,46 @@ Local<Value> MetadataBuilder::GetReturnValue(Isolate* isolate, id obj) {
         assert(false);
     }
 
+    const InterfaceMeta* meta = GetInterfaceMeta(obj);
+    if (meta != nullptr) {
+        auto it = ctorsCache_.find(meta);
+        if (it != ctorsCache_.end()) {
+            Persistent<v8::Function>* poCtorFunc = it->second;
+            Local<v8::Function> ctorFunc = Local<v8::Function>::New(isolate, *poCtorFunc);
+            bool success;
+            if (!jsResult->SetPrototype(context, ctorFunc->Get(v8::String::NewFromUtf8(isolate, "prototype"))).To(&success) || !success) {
+                assert(false);
+            }
+        }
+    }
+
     jsResult->SetInternalField(0, ext);
     objectManager_.Register(isolate, jsResult);
 
     return jsResult;
+}
+
+const InterfaceMeta* MetadataBuilder::GetInterfaceMeta(id obj) {
+    if (obj == nullptr) {
+        return nullptr;
+    }
+
+    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+    Class klass = [obj class];
+    while (true) {
+        NSString* className = NSStringFromClass(klass);
+        const InterfaceMeta* result = globalTable->findInterfaceMeta([className UTF8String]);
+        if (result != nullptr) {
+            return result;
+        }
+
+        klass = class_getSuperclass(klass);
+        if (klass == nullptr) {
+            break;
+        }
+    }
+
+    return nullptr;
 }
 
 }
