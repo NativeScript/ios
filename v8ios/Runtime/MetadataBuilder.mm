@@ -55,11 +55,13 @@ void MetadataBuilder::Init(Isolate* isolate) {
             assert(false);
         }
 
+        RegisterAllocMethod(ctorFunc, interfaceMeta);
         RegisterStaticMethods(ctorFunc, interfaceMeta);
         RegisterStaticProperties(ctorFunc, interfaceMeta);
 
-        Persistent<v8::Function>* poCtorFunc = new Persistent<v8::Function>(isolate_, ctorFunc);
-        ctorsCache_.insert(std::make_pair(interfaceMeta, poCtorFunc));
+        Local<Value> prototype = ctorFunc->Get(v8::String::NewFromUtf8(isolate, "prototype"));
+        Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
+        prototypesCache_.insert(std::make_pair(interfaceMeta, poPrototype));
     }
 }
 
@@ -87,6 +89,18 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructor(const InterfaceM
     return ctorFuncTemplate;
 }
 
+void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {
+    Local<Context> context = isolate_->GetCurrentContext();
+    CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, nullptr, this);
+    Local<External> ext = External::New(isolate_, item);
+    Local<FunctionTemplate> allocFuncTemplate = FunctionTemplate::New(isolate_, AllocCallback, ext);
+    Local<v8::Function> allocFunc;
+    if (!allocFuncTemplate->GetFunction(context).ToLocal(&allocFunc)) {
+        assert(false);
+    }
+    ctorFunc->Set(v8::String::NewFromUtf8(isolate_, "alloc"), allocFunc);
+}
+
 void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {
     Local<Context> context = isolate_->GetCurrentContext();
     for (auto methodIt = interfaceMeta->staticMethods->begin(); methodIt != interfaceMeta->staticMethods->end(); methodIt++) {
@@ -95,7 +109,7 @@ void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const 
         Local<External> ext = External::New(isolate_, item);
         Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate_, MethodCallback, ext);
         Local<v8::Function> staticMethod;
-        if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)){
+        if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
             assert(false);
         }
         ctorFunc->Set(v8::String::NewFromUtf8(isolate_, methodMeta->jsName()), staticMethod);
@@ -179,13 +193,23 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
         NSString* className = [NSString stringWithUTF8String:meta->jsName()];
         Class klass = NSClassFromString(className);
         id obj = [[klass alloc] init];
-        MethodCallbackData* data = new MethodCallbackData(obj);
 
-        Local<External> ext = External::New(isolate, data);
-        Local<Object> thiz = info.This();
-        thiz->SetInternalField(0, ext);
+        item->builder_->CreateJsWrapper(isolate, obj, info.This());
+    }
+}
 
-        item->builder_->objectManager_.Register(isolate, thiz);
+void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
+    assert(info.Length() == 0);
+
+    @autoreleasepool {
+        Isolate* isolate = info.GetIsolate();
+        CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
+        const InterfaceMeta* meta = item->meta_;
+
+        NSString* className = [NSString stringWithUTF8String:meta->jsName()];
+        id obj = [NSClassFromString(className) alloc];
+        Local<Object> result = item->builder_->CreateJsWrapper(isolate, obj, Local<Object>());
+        info.GetReturnValue().Set(result);
     }
 }
 
@@ -322,7 +346,9 @@ const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg,
         v8::String::Utf8Value str(isolate, strArg);
         NSString* result = [NSString stringWithUTF8String:*str];
         return CFBridgingRetain(result);
-    } else if (arg->IsNumber() || arg->IsDate()) {
+    }
+
+    if (arg->IsNumber() || arg->IsDate()) {
         double res;
         if (!arg->NumberValue(context).To(&res)) {
             assert(false);
@@ -332,7 +358,9 @@ const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg,
         } else {
             return CFBridgingRetain([NSDate dateWithTimeIntervalSince1970:res / 1000.0]);
         }
-    } else if (arg->IsFunction() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
+    }
+
+    if (arg->IsFunction() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
         Local<v8::Function> callback = arg.As<v8::Function>();
         Persistent<v8::Function>* poCallback = new Persistent<v8::Function>(isolate, callback);
 
@@ -372,7 +400,9 @@ const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg,
             });
         };
         return CFBridgingRetain(block);
-    } else if (arg->IsObject()) {
+    }
+
+    if (arg->IsObject()) {
         Local<Object> obj = arg.As<Object>();
         if (obj->InternalFieldCount() > 0) {
             Local<External> ext = obj->GetInternalField(0).As<External>();
@@ -385,7 +415,9 @@ const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg,
 }
 
 Local<Value> MetadataBuilder::ConvertArgument(Isolate* isolate, id obj) {
-    if ([obj isKindOfClass:[NSString class]]) {
+    if (obj == nullptr) {
+        return Null(isolate);
+    } else if ([obj isKindOfClass:[NSString class]]) {
         const char* str = [obj UTF8String];
         Local<v8::String> res = v8::String::NewFromUtf8(isolate, str);
         return res;
@@ -401,39 +433,40 @@ Local<Value> MetadataBuilder::ConvertArgument(Isolate* isolate, id obj) {
         return date;
     }
 
-    Local<Object> jsObject = CreateJsWrapper(isolate, obj);
+    Local<Object> jsObject = CreateJsWrapper(isolate, obj, Local<Object>());
     return jsObject;
 }
 
-Local<Object> MetadataBuilder::CreateJsWrapper(Isolate* isolate, id obj) {
-    MethodCallbackData* data = new MethodCallbackData(obj);
-    Local<External> ext = External::New(isolate, data);
-
-    Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-    objTemplate->SetInternalFieldCount(1);
+Local<Object> MetadataBuilder::CreateJsWrapper(Isolate* isolate, id obj, Local<Object> receiver) {
     Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> jsResult;
-    if (!objTemplate->NewInstance(context).ToLocal(&jsResult)) {
-        assert(false);
+
+    if (receiver.IsEmpty()) {
+        Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
+        objTemplate->SetInternalFieldCount(1);
+        if (!objTemplate->NewInstance(context).ToLocal(&receiver)) {
+            assert(false);
+        }
     }
 
     const InterfaceMeta* meta = GetInterfaceMeta(obj);
     if (meta != nullptr) {
-        auto it = ctorsCache_.find(meta);
-        if (it != ctorsCache_.end()) {
-            Persistent<v8::Function>* poCtorFunc = it->second;
-            Local<v8::Function> ctorFunc = Local<v8::Function>::New(isolate, *poCtorFunc);
+        auto it = prototypesCache_.find(meta);
+        if (it != prototypesCache_.end()) {
+            Persistent<Value>* poPrototype = it->second;
+            Local<Value> prototype = Local<Value>::New(isolate, *poPrototype);
             bool success;
-            if (!jsResult->SetPrototype(context, ctorFunc->Get(v8::String::NewFromUtf8(isolate, "prototype"))).To(&success) || !success) {
+            if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
                 assert(false);
             }
         }
     }
 
-    jsResult->SetInternalField(0, ext);
-    objectManager_.Register(isolate, jsResult);
+    MethodCallbackData* data = new MethodCallbackData(obj);
+    Local<External> ext = External::New(isolate, data);
+    receiver->SetInternalField(0, ext);
+    objectManager_.Register(isolate, receiver);
 
-    return jsResult;
+    return receiver;
 }
 
 const InterfaceMeta* MetadataBuilder::GetInterfaceMeta(id obj) {
