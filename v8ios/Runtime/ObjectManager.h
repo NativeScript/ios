@@ -6,8 +6,6 @@
 #include "v8.h"
 #pragma clang diagnostic pop
 
-#include <map>
-
 namespace tns {
 
 class ObjectManager {
@@ -15,7 +13,6 @@ public:
     void Register(v8::Isolate* isolate, const v8::Local<v8::Object> obj);
 private:
     struct ObjectWeakCallbackState;
-    std::map<int, v8::Persistent<v8::Object>*> cache_;
     static void FinalizerCallback(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
 
     struct ObjectWeakCallbackState {

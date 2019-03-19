@@ -185,93 +185,79 @@ void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, con
 void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.Length() == 0);
 
-    @autoreleasepool {
-        Isolate* isolate = info.GetIsolate();
-        CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
-        const InterfaceMeta* meta = item->meta_;
+    Isolate* isolate = info.GetIsolate();
+    CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
+    const InterfaceMeta* meta = item->meta_;
 
-        NSString* className = [NSString stringWithUTF8String:meta->jsName()];
-        Class klass = NSClassFromString(className);
-        id obj = [[klass alloc] init];
+    NSString* className = [NSString stringWithUTF8String:meta->jsName()];
+    Class klass = NSClassFromString(className);
+    id obj = [[klass alloc] init];
 
-        item->builder_->CreateJsWrapper(isolate, obj, info.This());
-    }
+    item->builder_->CreateJsWrapper(isolate, obj, info.This());
 }
 
 void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.Length() == 0);
 
-    @autoreleasepool {
-        Isolate* isolate = info.GetIsolate();
-        CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
-        const InterfaceMeta* meta = item->meta_;
+    Isolate* isolate = info.GetIsolate();
+    CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
+    const InterfaceMeta* meta = item->meta_;
 
-        NSString* className = [NSString stringWithUTF8String:meta->jsName()];
-        id obj = [NSClassFromString(className) alloc];
-        Local<Object> result = item->builder_->CreateJsWrapper(isolate, obj, Local<Object>());
+    NSString* className = [NSString stringWithUTF8String:meta->jsName()];
+    id obj = [NSClassFromString(className) alloc];
+    Local<Object> result = item->builder_->CreateJsWrapper(isolate, obj, Local<Object>());
+    info.GetReturnValue().Set(result);
+}
+
+void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(info.Data().As<External>()->Value());
+
+    bool instanceMethod = info.This()->InternalFieldCount() > 0;
+    std::vector<Local<Value>> args;
+    for (int i = 0; i < info.Length(); i++) {
+        args.push_back(info[i]);
+    }
+
+    Local<Value> result = instanceMethod
+        ? item->builder_->InvokeMethod(isolate, item->meta_, info.This(), args, item->interfaceMeta_->jsName())
+        : item->builder_->InvokeMethod(isolate, item->meta_, Local<Object>(), args, item->interfaceMeta_->jsName());
+
+    if (!result.IsEmpty()) {
         info.GetReturnValue().Set(result);
     }
 }
 
-void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
-    @autoreleasepool {
-        Isolate* isolate = info.GetIsolate();
-        CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(info.Data().As<External>()->Value());
-
-        bool instanceMethod = info.This()->InternalFieldCount() > 0;
-        std::vector<Local<Value>> args;
-        for (int i = 0; i < info.Length(); i++) {
-            args.push_back(info[i]);
-        }
-
-        Local<Value> result = instanceMethod
-            ? item->builder_->InvokeMethod(isolate, item->meta_, info.This(), args, item->interfaceMeta_->jsName())
-            : item->builder_->InvokeMethod(isolate, item->meta_, Local<Object>(), args, item->interfaceMeta_->jsName());
-
-        if (!result.IsEmpty()) {
-            info.GetReturnValue().Set(result);
-        }
-    }
-}
-
 void MetadataBuilder::PropertyGetterCallback(Local<v8::String> name, const PropertyCallbackInfo<Value> &info) {
-    @autoreleasepool {
-        Isolate* isolate = info.GetIsolate();
-        CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-        Local<Object> receiver = info.This();
-        Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->interfaceMeta_->jsName());
-        if (!result.IsEmpty()) {
-            info.GetReturnValue().Set(result);
-        }
+    Isolate* isolate = info.GetIsolate();
+    CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+    Local<Object> receiver = info.This();
+    Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->interfaceMeta_->jsName());
+    if (!result.IsEmpty()) {
+        info.GetReturnValue().Set(result);
     }
 }
 
 void MetadataBuilder::PropertySetterCallback(Local<v8::String> name, Local<Value> value, const PropertyCallbackInfo<void> &info) {
-    @autoreleasepool {
-        Isolate* isolate = info.GetIsolate();
-        CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-        Local<Object> receiver = info.This();
-        item->builder_->InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->interfaceMeta_->jsName());
-    }
+    Isolate* isolate = info.GetIsolate();
+    CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+    Local<Object> receiver = info.This();
+    item->builder_->InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->interfaceMeta_->jsName());
 }
 
 void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const PropertyCallbackInfo<Value> &info) {
-    @autoreleasepool {
-        Isolate* isolate = info.GetIsolate();
-        CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-        Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), Local<Object>(), { }, item->interfaceMeta_->jsName());
-        if (!result.IsEmpty()) {
-            info.GetReturnValue().Set(result);
-        }
+    Isolate* isolate = info.GetIsolate();
+    CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+    Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), Local<Object>(), { }, item->interfaceMeta_->jsName());
+    if (!result.IsEmpty()) {
+        info.GetReturnValue().Set(result);
     }
 }
 
 void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<void> &info) {
-    @autoreleasepool {
-        Isolate* isolate = info.GetIsolate();
-        CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-        item->builder_->InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->interfaceMeta_->jsName());
-    }
+    Isolate* isolate = info.GetIsolate();
+    CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+    item->builder_->InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->interfaceMeta_->jsName());
 }
 
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, const char* containingClass) {
@@ -294,11 +280,7 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* m
         } else {
             assert(false);
         }
-        bool shouldRelease = false;
-        const void* arg = ConvertArgument(isolate, v8Arg, typeEncoding, shouldRelease);
-        if (shouldRelease) {
-            CFBridgingRelease(arg);
-        }
+        const void* arg = ConvertArgument(isolate, v8Arg, typeEncoding);
         [invocation setArgument:&arg atIndex:i+2];
     }
 
@@ -325,12 +307,11 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* m
     return Local<Value>();
 }
 
-const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg, const TypeEncoding* typeEncoding, bool& shouldRelease) {
+const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg, const TypeEncoding* typeEncoding) {
     if (arg->IsNull()) {
         return nil;
     }
 
-    shouldRelease = false;
     if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
         Local<v8::String> strArg = arg.As<v8::String>();
         v8::String::Utf8Value str(isolate, strArg);
@@ -340,7 +321,6 @@ const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg,
     }
 
     Local<Context> context = isolate->GetCurrentContext();
-    shouldRelease = true;
     if (arg->IsString()) {
         Local<v8::String> strArg = arg.As<v8::String>();
         v8::String::Utf8Value str(isolate, strArg);

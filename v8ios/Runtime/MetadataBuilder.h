@@ -52,7 +52,7 @@ private:
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta);
     void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta);
-    const void* ConvertArgument(v8::Isolate* isolate, v8::Local<v8::Value> arg, const TypeEncoding* typeEncoding, bool& shouldRelease);
+    const void* ConvertArgument(v8::Isolate* isolate, v8::Local<v8::Value> arg, const TypeEncoding* typeEncoding);
     v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
     v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj, v8::Local<v8::Object> receiver);
     const InterfaceMeta* GetInterfaceMeta(id obj);

@@ -11,8 +11,6 @@ void ObjectManager::Register(Isolate* isolate, const v8::Local<v8::Object> obj) 
     Persistent<Object>* objectHandle = new Persistent<Object>(isolate, obj);
     ObjectWeakCallbackState* state = new ObjectWeakCallbackState(this, objectHandle);
     objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
-    int objectId = obj->GetIdentityHash();
-    cache_.insert(make_pair(objectId, objectHandle));
 }
 
 void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackState>& data) {
