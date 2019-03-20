@@ -21,8 +21,8 @@
 		C27E279322202665009C10A3 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.m */; };
 		C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF122214A4D007DE2BA /* platform-ios.cpp */; };
 		C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */; };
-		C28B7B2D22241270007DE2BA /* Runtime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B2C22241270007DE2BA /* Runtime.cpp */; };
-		C28B7B5A22252432007DE2BA /* ModuleInternal.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B5922252432007DE2BA /* ModuleInternal.cpp */; };
+		C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B2C22241270007DE2BA /* Runtime.mm */; };
+		C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B5922252432007DE2BA /* ModuleInternal.mm */; };
 		C2B12E9E22269B43000F6AFC /* richards.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9C22269B43000F6AFC /* richards.js */; };
 		C2B12E9F22269B43000F6AFC /* base.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9D22269B43000F6AFC /* base.js */; };
 		C2B12EB12226BA2E000F6AFC /* deltablue.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EB02226BA2E000F6AFC /* deltablue.js */; };
@@ -73,9 +73,9 @@
 		C28B7AF522215528007DE2BA /* stack_trace.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stack_trace.h; sourceTree = "<group>"; };
 		C28B7B0E2223E6C0007DE2BA /* timezone-cache.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "timezone-cache.h"; sourceTree = "<group>"; };
 		C28B7B2B22241122007DE2BA /* Runtime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Runtime.h; sourceTree = "<group>"; };
-		C28B7B2C22241270007DE2BA /* Runtime.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Runtime.cpp; sourceTree = "<group>"; };
+		C28B7B2C22241270007DE2BA /* Runtime.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Runtime.mm; sourceTree = "<group>"; };
 		C28B7B5822252431007DE2BA /* ModuleInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ModuleInternal.h; sourceTree = "<group>"; };
-		C28B7B5922252432007DE2BA /* ModuleInternal.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ModuleInternal.cpp; sourceTree = "<group>"; };
+		C28B7B5922252432007DE2BA /* ModuleInternal.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ModuleInternal.mm; sourceTree = "<group>"; };
 		C2AAE9C8223BA685006FB9D3 /* StringHasher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
 		C2B12E9C22269B43000F6AFC /* richards.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = richards.js; sourceTree = "<group>"; };
 		C2B12E9D22269B43000F6AFC /* base.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = base.js; sourceTree = "<group>"; };
@@ -158,9 +158,9 @@
 			isa = PBXGroup;
 			children = (
 				C28B7B2B22241122007DE2BA /* Runtime.h */,
-				C28B7B2C22241270007DE2BA /* Runtime.cpp */,
+				C28B7B2C22241270007DE2BA /* Runtime.mm */,
 				C28B7B5822252431007DE2BA /* ModuleInternal.h */,
-				C28B7B5922252432007DE2BA /* ModuleInternal.cpp */,
+				C28B7B5922252432007DE2BA /* ModuleInternal.mm */,
 				C24F39182225859D0027977A /* Console.h */,
 				C24F39192225859D0027977A /* Console.cpp */,
 				C2B12EE12227C606000F6AFC /* SetTimeout.h */,
@@ -332,10 +332,10 @@
 				C2764AF6222BE705008F674F /* Metadata.mm in Sources */,
 				C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */,
 				C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */,
-				C28B7B2D22241270007DE2BA /* Runtime.cpp in Sources */,
+				C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */,
 				C2764AFC223644B3008F674F /* ObjectManager.mm in Sources */,
 				C24F391A2225859D0027977A /* Console.cpp in Sources */,
-				C28B7B5A22252432007DE2BA /* ModuleInternal.cpp in Sources */,
+				C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */,
 				C27E278522202664009C10A3 /* AppDelegate.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -6,7 +6,7 @@
 #include "v8.h"
 #pragma clang diagnostic pop
 
-#include <CoreFoundation/CFBase.h>
+#include <Foundation/NSInvocation.h>
 #include <string>
 #include <map>
 #include "Metadata.h"
@@ -14,9 +14,12 @@
 
 namespace tns {
 
-struct MethodCallbackData {
-    MethodCallbackData(id data): data_(data) {}
+struct DataWrapper {
+public:
+    DataWrapper(id data): data_(data), meta_(nullptr) {}
+    DataWrapper(id data, const Meta* meta): data_(data), meta_(meta) {}
     id data_;
+    const Meta* meta_;
 };
 
 class MetadataBuilder {
@@ -52,10 +55,12 @@ private:
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta);
     void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta);
-    const void* ConvertArgument(v8::Isolate* isolate, v8::Local<v8::Value> arg, const TypeEncoding* typeEncoding);
+    void SetArgument(NSInvocation* invocation, int index, v8::Isolate* isolate, v8::Local<v8::Value> arg, const TypeEncoding* typeEncoding);
     v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
     v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj, v8::Local<v8::Object> receiver);
     const InterfaceMeta* GetInterfaceMeta(id obj);
+    v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);
+    void SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding);
 
     MetadataBuilder(const std::string& baseDir) {
         std::string fileName = baseDir + "/metadata-x86_64.bin";

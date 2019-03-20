@@ -3,7 +3,6 @@
 #include "Runtime.h"
 #include "Console.h"
 #include "SetTimeout.h"
-#include "MetadataBuilder.h"
 
 #if defined __arm64 && __arm64__
 #include "natives_blob.arm64.h"

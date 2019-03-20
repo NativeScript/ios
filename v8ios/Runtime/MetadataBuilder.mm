@@ -16,7 +16,18 @@ void MetadataBuilder::Init(Isolate* isolate) {
     MetaFile* metaFile = MetaFile::instance();
     auto globalTable = metaFile->globalTable();
     for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
-        const BaseClassMeta* meta = static_cast<const BaseClassMeta*>(*it);
+        const Meta* meta = static_cast<const Meta*>(*it);
+
+        if (meta->type() == MetaType::JsCode) {
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Object> global = context->Global();
+            DataWrapper* wrapper = new DataWrapper(nullptr, meta);
+            Local<Object> enumValue = CreateEmptyObject(context);
+            Local<External> ext = External::New(isolate, wrapper);
+            enumValue->SetInternalField(0, ext);
+            global->Set(v8::String::NewFromUtf8(isolate, meta->jsName()), enumValue);
+            continue;
+        }
 
         if (meta->type() != MetaType::Interface) {
             // Currently only classes are supported
@@ -280,14 +291,13 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* m
         } else {
             assert(false);
         }
-        const void* arg = ConvertArgument(isolate, v8Arg, typeEncoding);
-        [invocation setArgument:&arg atIndex:i+2];
+        SetArgument(invocation, i + 2, isolate, v8Arg, typeEncoding);
     }
 
     if (instanceMethod) {
         Local<External> ext = receiver->GetInternalField(0).As<External>();
-        MethodCallbackData* methodCallbackData = reinterpret_cast<MethodCallbackData*>(ext->Value());
-        id target = methodCallbackData->data_;
+        DataWrapper* wrapper = reinterpret_cast<DataWrapper*>(ext->Value());
+        id target = wrapper->data_;
         [invocation invokeWithTarget:target];
     } else {
         [invocation setTarget:klass];
@@ -307,9 +317,11 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* m
     return Local<Value>();
 }
 
-const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg, const TypeEncoding* typeEncoding) {
+void MetadataBuilder::SetArgument(NSInvocation* invocation, int index, Isolate* isolate, Local<Value> arg, const TypeEncoding* typeEncoding) {
     if (arg->IsNull()) {
-        return nil;
+        id nullArg = nil;
+        [invocation setArgument:&nullArg atIndex:index];
+        return;
     }
 
     if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
@@ -317,7 +329,8 @@ const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg,
         v8::String::Utf8Value str(isolate, strArg);
         NSString* selector = [NSString stringWithUTF8String:*str];
         SEL res = NSSelectorFromString(selector);
-        return res;
+        [invocation setArgument:&res atIndex:index];
+        return;
     }
 
     Local<Context> context = isolate->GetCurrentContext();
@@ -325,18 +338,22 @@ const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg,
         Local<v8::String> strArg = arg.As<v8::String>();
         v8::String::Utf8Value str(isolate, strArg);
         NSString* result = [NSString stringWithUTF8String:*str];
-        return CFBridgingRetain(result);
+        [invocation setArgument:&result atIndex:index];
+        return;
     }
 
     if (arg->IsNumber() || arg->IsDate()) {
-        double res;
-        if (!arg->NumberValue(context).To(&res)) {
+        double value;
+        if (!arg->NumberValue(context).To(&value)) {
             assert(false);
         }
-        if (arg->IsNumber()) {
-            return CFBridgingRetain([NSNumber numberWithDouble:res]);
+
+        if (arg->IsNumber() || arg->IsNumberObject()) {
+            SetNumericArgument(invocation, index, value, typeEncoding);
+            return;
         } else {
-            return CFBridgingRetain([NSDate dateWithTimeIntervalSince1970:res / 1000.0]);
+            NSDate* date = [NSDate dateWithTimeIntervalSince1970:value / 1000.0];
+            [invocation setArgument:&date atIndex:index];
         }
     }
 
@@ -379,15 +396,43 @@ const void* MetadataBuilder::ConvertArgument(Isolate* isolate, Local<Value> arg,
                 delete poCallback;
             });
         };
-        return CFBridgingRetain(block);
+        const void* ptr = CFBridgingRetain(block);
+        [invocation setArgument:&ptr atIndex:index];
+        return;
     }
 
     if (arg->IsObject()) {
         Local<Object> obj = arg.As<Object>();
         if (obj->InternalFieldCount() > 0) {
             Local<External> ext = obj->GetInternalField(0).As<External>();
-            MethodCallbackData* methodCallbackData = reinterpret_cast<MethodCallbackData*>(ext->Value());
-            return CFBridgingRetain(methodCallbackData->data_);
+            DataWrapper* wrapper = reinterpret_cast<DataWrapper*>(ext->Value());
+            const Meta* meta = wrapper->meta_;
+            if (meta != nullptr && meta->type() == MetaType::JsCode) {
+                const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
+                const char* jsCode = jsCodeMeta->jsCode();
+
+                Local<Script> script;
+                if (!Script::Compile(context, v8::String::NewFromUtf8(isolate, jsCode)).ToLocal(&script)) {
+                    assert(false);
+                }
+                assert(!script.IsEmpty());
+
+                Local<Value> result;
+                if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
+                    assert(false);
+                }
+
+                assert(result->IsNumber());
+
+                double value = result.As<Number>()->Value();
+                SetNumericArgument(invocation, index, value, typeEncoding);
+                return;
+            }
+
+            if (wrapper->data_ != nullptr) {
+                [invocation setArgument:&wrapper->data_ atIndex:index];
+                return;
+            }
         }
     }
 
@@ -421,11 +466,7 @@ Local<Object> MetadataBuilder::CreateJsWrapper(Isolate* isolate, id obj, Local<O
     Local<Context> context = isolate->GetCurrentContext();
 
     if (receiver.IsEmpty()) {
-        Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-        objTemplate->SetInternalFieldCount(1);
-        if (!objTemplate->NewInstance(context).ToLocal(&receiver)) {
-            assert(false);
-        }
+        receiver = CreateEmptyObject(context);
     }
 
     const InterfaceMeta* meta = GetInterfaceMeta(obj);
@@ -441,8 +482,8 @@ Local<Object> MetadataBuilder::CreateJsWrapper(Isolate* isolate, id obj, Local<O
         }
     }
 
-    MethodCallbackData* data = new MethodCallbackData(obj);
-    Local<External> ext = External::New(isolate, data);
+    DataWrapper* wrapper = new DataWrapper(obj);
+    Local<External> ext = External::New(isolate, wrapper);
     receiver->SetInternalField(0, ext);
     objectManager_.Register(isolate, receiver);
 
@@ -470,6 +511,78 @@ const InterfaceMeta* MetadataBuilder::GetInterfaceMeta(id obj) {
     }
 
     return nullptr;
+}
+
+Local<Object> MetadataBuilder::CreateEmptyObject(Local<Context> context) {
+    Local<ObjectTemplate> tmpl = ObjectTemplate::New(context->GetIsolate());
+    tmpl->SetInternalFieldCount(1);
+    Local<Object> result;
+    if (!tmpl->NewInstance(context).ToLocal(&result)) {
+        assert(false);
+    }
+    return result;
+}
+
+void MetadataBuilder::SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding) {
+    switch (typeEncoding->type) {
+        case BinaryTypeEncodingType::ShortEncoding: {
+            short arg = (short)value;
+            [invocation setArgument:&arg atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::UShortEncoding: {
+            ushort arg = (ushort)value;
+            [invocation setArgument:&arg atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::IntEncoding: {
+            int arg = (int)value;
+            [invocation setArgument:&arg atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::UIntEncoding: {
+            uint arg = (uint)value;
+            [invocation setArgument:&arg atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::LongEncoding: {
+            long arg = (long)value;
+            [invocation setArgument:&arg atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::ULongEncoding: {
+            unsigned long arg = (unsigned long)value;
+            [invocation setArgument:&arg atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::LongLongEncoding: {
+            long long arg = (long long)value;
+            [invocation setArgument:&arg atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::ULongLongEncoding: {
+            unsigned long long arg = (unsigned long long)value;
+            [invocation setArgument:&arg atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::FloatEncoding: {
+            float arg = (float)value;
+            [invocation setArgument:&arg atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::DoubleEncoding: {
+            [invocation setArgument:&value atIndex:index];
+            break;
+        }
+        case BinaryTypeEncodingType::IdEncoding: {
+            [invocation setArgument:&value atIndex:index];
+            break;
+        }
+        default: {
+            assert(false);
+            break;
+        }
+    }
 }
 
 }

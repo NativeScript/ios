@@ -19,8 +19,8 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
     Local<Object> obj = state->target_->Get(isolate);
     if (obj->InternalFieldCount() > 0) {
         Local<External> ext = obj->GetInternalField(0).As<External>();
-        MethodCallbackData* callbackData = reinterpret_cast<MethodCallbackData*>(ext->Value());
-        delete callbackData;
+        DataWrapper* wrapper = reinterpret_cast<DataWrapper*>(ext->Value());
+        delete wrapper;
     }
     obj->SetInternalField(0, v8::Undefined(isolate));
     state->target_->Reset();
