@@ -51,6 +51,7 @@ private:
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+    static void CFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void PropertyGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void PropertySetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
     static void PropertyNameGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
@@ -59,11 +60,12 @@ private:
 
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     v8::Local<v8::FunctionTemplate> GetOrCreateConstructor(const InterfaceMeta* interfaceMeta);
-    void RegisterAllocMethod(v8::Local<v8::Function> ctorFuncm, const InterfaceMeta* interfaceMeta);
-    void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
-    void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta);
-    void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
-    void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta);
+    void RegisterCFunction(const FunctionMeta* funcMeta);
+    void RegisterAllocMethod(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
+    void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta);
+    void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta);
+    void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
+    void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
     void SetArgument(NSInvocation* invocation, int index, v8::Isolate* isolate, v8::Local<v8::Value> arg, const TypeEncoding* typeEncoding);
     v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
     v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj, v8::Local<v8::Object> receiver);
@@ -93,12 +95,12 @@ private:
 
     template<class T>
     struct CacheItem {
-        CacheItem(const T* meta, const InterfaceMeta* interfaceMeta, MetadataBuilder* builder)
-        : meta_(meta), interfaceMeta_(interfaceMeta), builder_(builder) {
+        CacheItem(const T* meta, const BaseClassMeta* classMeta, MetadataBuilder* builder)
+        : meta_(meta), classMeta_(classMeta), builder_(builder) {
             static_assert(std::is_base_of<Meta, T>::value, "Derived not derived from Meta");
         }
         const T* meta_;
-        const InterfaceMeta* interfaceMeta_;
+        const BaseClassMeta* classMeta_;
         MetadataBuilder* builder_;
     };
 };

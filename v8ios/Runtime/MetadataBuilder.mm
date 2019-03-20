@@ -21,6 +21,12 @@ void MetadataBuilder::Init(Isolate* isolate) {
     for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
         const Meta* meta = static_cast<const Meta*>(*it);
 
+        if (meta->type() == MetaType::Function) {
+            const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
+            RegisterCFunction(funcMeta);
+            continue;
+        }
+
         if (meta->type() == MetaType::JsCode) {
             Local<Context> context = isolate->GetCurrentContext();
             Local<Object> global = context->Global();
@@ -38,7 +44,6 @@ void MetadataBuilder::Init(Isolate* isolate) {
         }
 
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
-        const InterfaceMeta* baseMeta = interfaceMeta->baseMeta();
 
         auto itMetaCache = metadataCache_.find(interfaceMeta->jsName());
         if (itMetaCache == metadataCache_.end()) {
@@ -46,6 +51,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
         }
 
         Local<FunctionTemplate> ctorFuncTemplate = GetOrCreateConstructor(interfaceMeta);
+        const InterfaceMeta* baseMeta = interfaceMeta->baseMeta();
         if (baseMeta != nullptr) {
             Local<FunctionTemplate> parentCtorFuncTemplate = GetOrCreateConstructor(baseMeta);
             ctorFuncTemplate->Inherit(parentCtorFuncTemplate);
@@ -108,6 +114,19 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructor(const InterfaceM
     return ctorFuncTemplate;
 }
 
+void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {
+    Local<Context> context = isolate_->GetCurrentContext();
+    Local<Object> global = context->Global();
+
+    Local<v8::Function> func;
+    CacheItem<FunctionMeta>* item = new CacheItem<FunctionMeta>(funcMeta, nullptr, this);
+    Local<External> ext = External::New(isolate_, item);
+    if (!v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func)) {
+        assert(false);
+    }
+    global->Set(v8::String::NewFromUtf8(isolate_, funcMeta->jsName()), func);
+}
+
 void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {
     Local<Context> context = isolate_->GetCurrentContext();
     CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, nullptr, this);
@@ -120,38 +139,23 @@ void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const In
     ctorFunc->Set(v8::String::NewFromUtf8(isolate_, "alloc"), allocFunc);
 }
 
-void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {
-    Local<Context> context = isolate_->GetCurrentContext();
-    for (auto methodIt = interfaceMeta->staticMethods->begin(); methodIt != interfaceMeta->staticMethods->end(); methodIt++) {
-        const MethodMeta* methodMeta = (*methodIt).valuePtr();
-        CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, interfaceMeta, this);
-        Local<External> ext = External::New(isolate_, item);
-        Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate_, MethodCallback, ext);
-        Local<v8::Function> staticMethod;
-        if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
-            assert(false);
-        }
-        ctorFunc->Set(v8::String::NewFromUtf8(isolate_, methodMeta->jsName()), staticMethod);
-    }
-}
-
-void MetadataBuilder::RegisterInstanceMethods(Local<FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta) {
+void MetadataBuilder::RegisterInstanceMethods(Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta) {
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
-    for (auto methodIt = interfaceMeta->instanceMethods->begin(); methodIt != interfaceMeta->instanceMethods->end(); methodIt++) {
-        const MethodMeta* methodMeta = (*methodIt).valuePtr();
-        CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, interfaceMeta, this);
+    for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
+        const MethodMeta* methodMeta = (*it).valuePtr();
+        CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta, this);
         Local<External> ext = External::New(isolate_, item);
         Local<FunctionTemplate> instanceMethodTemplate = FunctionTemplate::New(isolate_, MethodCallback, ext);
         proto->Set(v8::String::NewFromUtf8(isolate_, methodMeta->jsName()), instanceMethodTemplate);
     }
 }
 
-void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta) {
+void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta) {
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
-    for (auto propIt = interfaceMeta->instanceProps->begin(); propIt != interfaceMeta->instanceProps->end(); propIt++) {
-        const PropertyMeta* propMeta = (*propIt).valuePtr();
+    for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
+        const PropertyMeta* propMeta = (*it).valuePtr();
 
         AccessorGetterCallback getter = nullptr;
         AccessorSetterCallback setter = nullptr;
@@ -164,7 +168,7 @@ void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFun
         }
 
         if (getter || setter) {
-            CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, interfaceMeta, this);
+            CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, meta, this);
             Local<External> ext = External::New(isolate_, item);
             Local<v8::String> propName = v8::String::NewFromUtf8(isolate_, propMeta->jsName());
             proto->SetAccessor(propName, getter, setter, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
@@ -172,9 +176,24 @@ void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFun
     }
 }
 
-void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {
-    for (auto propIt = interfaceMeta->staticProps->begin(); propIt != interfaceMeta->staticProps->end(); propIt++) {
-        const PropertyMeta* propMeta = (*propIt).valuePtr();
+void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const BaseClassMeta* meta) {
+    Local<Context> context = isolate_->GetCurrentContext();
+    for (auto it = meta->staticMethods->begin(); it != meta->staticMethods->end(); it++) {
+        const MethodMeta* methodMeta = (*it).valuePtr();
+        CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta, this);
+        Local<External> ext = External::New(isolate_, item);
+        Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate_, MethodCallback, ext);
+        Local<v8::Function> staticMethod;
+        if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
+            assert(false);
+        }
+        ctorFunc->Set(v8::String::NewFromUtf8(isolate_, methodMeta->jsName()), staticMethod);
+    }
+}
+
+void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, const BaseClassMeta* meta) {
+    for (auto it = meta->staticProps->begin(); it != meta->staticProps->end(); it++) {
+        const PropertyMeta* propMeta = (*it).valuePtr();
 
         AccessorNameGetterCallback getter = nullptr;
         AccessorNameSetterCallback setter = nullptr;
@@ -187,7 +206,7 @@ void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, con
         }
 
         if (getter || setter) {
-            CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, interfaceMeta, this);
+            CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, meta, this);
             Local<External> ext = External::New(isolate_, item);
 
             Local<v8::String> propName = v8::String::NewFromUtf8(isolate_, propMeta->jsName());
@@ -238,19 +257,25 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
     }
 
     Local<Value> result = instanceMethod
-        ? item->builder_->InvokeMethod(isolate, item->meta_, info.This(), args, item->interfaceMeta_->jsName())
-        : item->builder_->InvokeMethod(isolate, item->meta_, Local<Object>(), args, item->interfaceMeta_->jsName());
+        ? item->builder_->InvokeMethod(isolate, item->meta_, info.This(), args, item->classMeta_->jsName())
+        : item->builder_->InvokeMethod(isolate, item->meta_, Local<Object>(), args, item->classMeta_->jsName());
 
     if (!result.IsEmpty()) {
         info.GetReturnValue().Set(result);
     }
 }
 
+void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info) {
+    //Isolate* isolate = info.GetIsolate();
+    //CacheItem<FunctionMeta>* item = static_cast<CacheItem<FunctionMeta>*>(info.Data().As<External>()->Value());
+    // TODO: libffi to call the function
+}
+
 void MetadataBuilder::PropertyGetterCallback(Local<v8::String> name, const PropertyCallbackInfo<Value> &info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
     Local<Object> receiver = info.This();
-    Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->interfaceMeta_->jsName());
+    Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->classMeta_->jsName());
     if (!result.IsEmpty()) {
         info.GetReturnValue().Set(result);
     }
@@ -260,13 +285,13 @@ void MetadataBuilder::PropertySetterCallback(Local<v8::String> name, Local<Value
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
     Local<Object> receiver = info.This();
-    item->builder_->InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->interfaceMeta_->jsName());
+    item->builder_->InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->classMeta_->jsName());
 }
 
 void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const PropertyCallbackInfo<Value> &info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-    Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), Local<Object>(), { }, item->interfaceMeta_->jsName());
+    Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), Local<Object>(), { }, item->classMeta_->jsName());
     if (!result.IsEmpty()) {
         info.GetReturnValue().Set(result);
     }
@@ -275,7 +300,7 @@ void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const Propert
 void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<void> &info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-    item->builder_->InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->interfaceMeta_->jsName());
+    item->builder_->InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->classMeta_->jsName());
 }
 
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, const char* containingClass) {
