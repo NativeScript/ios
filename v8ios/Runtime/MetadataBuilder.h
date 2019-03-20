@@ -67,7 +67,8 @@ private:
     void SetArgument(NSInvocation* invocation, int index, v8::Isolate* isolate, v8::Local<v8::Value> arg, const TypeEncoding* typeEncoding);
     v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
     v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj, v8::Local<v8::Object> receiver);
-    const InterfaceMeta* GetInterfaceMeta(id obj);
+    const InterfaceMeta* FindInterfaceMeta(id obj);
+    const InterfaceMeta* GetInterfaceMeta(const char* className);
     v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);
     void SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding);
 

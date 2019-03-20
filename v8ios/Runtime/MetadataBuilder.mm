@@ -475,7 +475,7 @@ Local<Object> MetadataBuilder::CreateJsWrapper(Isolate* isolate, id obj, Local<O
         receiver = CreateEmptyObject(context);
     }
 
-    const InterfaceMeta* meta = GetInterfaceMeta(obj);
+    const InterfaceMeta* meta = FindInterfaceMeta(obj);
     if (meta != nullptr) {
         auto it = prototypesCache_.find(meta);
         if (it != prototypesCache_.end()) {
@@ -496,23 +496,25 @@ Local<Object> MetadataBuilder::CreateJsWrapper(Isolate* isolate, id obj, Local<O
     return receiver;
 }
 
-const InterfaceMeta* MetadataBuilder::GetInterfaceMeta(id obj) {
+const InterfaceMeta* MetadataBuilder::FindInterfaceMeta(id obj) {
     if (obj == nullptr) {
         return nullptr;
     }
 
-    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
     Class klass = [obj class];
-    while (true) {
-        const char* className = class_getName(klass);
-        auto it = metadataCache_.find(className);
-        if (it != metadataCache_.end()) {
-            return it->second;
-        }
 
-        const InterfaceMeta* result = globalTable->findInterfaceMeta(className);
+    const char* origClassName = class_getName(klass);
+    auto it = metadataCache_.find(origClassName);
+    if (it != metadataCache_.end()) {
+        return it->second;
+    }
+
+    const char* className = origClassName;
+
+    while (true) {
+        const InterfaceMeta* result = GetInterfaceMeta(className);
         if (result != nullptr) {
-            metadataCache_.insert(std::make_pair(className, result));
+            metadataCache_.insert(std::make_pair(origClassName, result));
             return result;
         }
 
@@ -520,9 +522,21 @@ const InterfaceMeta* MetadataBuilder::GetInterfaceMeta(id obj) {
         if (klass == nullptr) {
             break;
         }
+
+        className = class_getName(klass);
     }
 
     return nullptr;
+}
+
+const InterfaceMeta* MetadataBuilder::GetInterfaceMeta(const char* className) {
+    auto it = metadataCache_.find(className);
+    if (it != metadataCache_.end()) {
+        return it->second;
+    }
+
+    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+    return globalTable->findInterfaceMeta(className);
 }
 
 Local<Object> MetadataBuilder::CreateEmptyObject(Local<Context> context) {
