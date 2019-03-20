@@ -10,7 +10,10 @@ MetadataBuilder::MetadataBuilder() {
 
 void MetadataBuilder::Init(Isolate* isolate) {
     isolate_ = isolate;
-    Local<Context> context = isolate_->GetCurrentContext();
+
+    poEmptyObjCtorFunc_ = new Persistent<v8::Function>(isolate, CreateEmptyObjectFunction(isolate));
+
+    Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
 
     MetaFile* metaFile = MetaFile::instance();
@@ -36,6 +39,11 @@ void MetadataBuilder::Init(Isolate* isolate) {
 
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
         const InterfaceMeta* baseMeta = interfaceMeta->baseMeta();
+
+        auto itMetaCache = metadataCache_.find(interfaceMeta->jsName());
+        if (itMetaCache == metadataCache_.end()) {
+            metadataCache_.insert(std::make_pair(interfaceMeta->jsName(), interfaceMeta));
+        }
 
         Local<FunctionTemplate> ctorFuncTemplate = GetOrCreateConstructor(interfaceMeta);
         if (baseMeta != nullptr) {
@@ -213,9 +221,8 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
     const InterfaceMeta* meta = item->meta_;
-
-    NSString* className = [NSString stringWithUTF8String:meta->jsName()];
-    id obj = [NSClassFromString(className) alloc];
+    Class klass = objc_getClass(meta->jsName());
+    id obj = [klass alloc];
     Local<Object> result = item->builder_->CreateJsWrapper(isolate, obj, Local<Object>());
     info.GetReturnValue().Set(result);
 }
@@ -272,8 +279,7 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
 }
 
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, const char* containingClass) {
-    NSString* className = [NSString stringWithUTF8String:containingClass];
-    Class klass = NSClassFromString(className);
+    Class klass = objc_getClass(containingClass);
     SEL selector = meta->selector();
 
     bool instanceMethod = !receiver.IsEmpty();
@@ -498,9 +504,15 @@ const InterfaceMeta* MetadataBuilder::GetInterfaceMeta(id obj) {
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
     Class klass = [obj class];
     while (true) {
-        NSString* className = NSStringFromClass(klass);
-        const InterfaceMeta* result = globalTable->findInterfaceMeta([className UTF8String]);
+        const char* className = class_getName(klass);
+        auto it = metadataCache_.find(className);
+        if (it != metadataCache_.end()) {
+            return it->second;
+        }
+
+        const InterfaceMeta* result = globalTable->findInterfaceMeta(className);
         if (result != nullptr) {
+            metadataCache_.insert(std::make_pair(className, result));
             return result;
         }
 
@@ -514,12 +526,13 @@ const InterfaceMeta* MetadataBuilder::GetInterfaceMeta(id obj) {
 }
 
 Local<Object> MetadataBuilder::CreateEmptyObject(Local<Context> context) {
-    Local<ObjectTemplate> tmpl = ObjectTemplate::New(context->GetIsolate());
-    tmpl->SetInternalFieldCount(1);
-    Local<Object> result;
-    if (!tmpl->NewInstance(context).ToLocal(&result)) {
+    Isolate* isolate = context->GetIsolate();
+    Local<v8::Function> emptyObjCtorFunc = Local<v8::Function>::New(isolate, *poEmptyObjCtorFunc_);
+    Local<Value> value;
+    if (!emptyObjCtorFunc->CallAsConstructor(context, 0, nullptr).ToLocal(&value) || value.IsEmpty() || !value->IsObject()) {
         assert(false);
     }
+    Local<Object> result = value.As<Object>();
     return result;
 }
 
@@ -583,6 +596,16 @@ void MetadataBuilder::SetNumericArgument(NSInvocation* invocation, int index, do
             break;
         }
     }
+}
+
+Local<v8::Function> MetadataBuilder::CreateEmptyObjectFunction(Isolate* isolate) {
+    Local<FunctionTemplate> emptyObjCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
+    emptyObjCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    Local<v8::Function> emptyObjCtorFunc;
+    if (!emptyObjCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyObjCtorFunc)) {
+        assert(false);
+    }
+    return emptyObjCtorFunc;
 }
 
 }

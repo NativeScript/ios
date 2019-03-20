@@ -35,10 +35,18 @@ private:
     template<class T>
     struct CacheItem;
 
+    struct cmp_str {
+        bool operator()(char const *a, char const *b) const {
+            return std::strcmp(a, b) < 0;
+        }
+    };
+
     v8::Isolate* isolate_;
     ObjectManager objectManager_;
     std::map<const InterfaceMeta*, v8::Persistent<v8::FunctionTemplate>*> ctorTemplatesCache_;
     std::map<const InterfaceMeta*, v8::Persistent<v8::Value>*> prototypesCache_;
+    std::map<const char*, const InterfaceMeta*, cmp_str> metadataCache_;
+    v8::Persistent<v8::Function>* poEmptyObjCtorFunc_;
 
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -49,6 +57,7 @@ private:
     static void PropertyNameSetterCallback(v8::Local<v8::Name> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void> &info);
     v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, const char* containingClass);
 
+    v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     v8::Local<v8::FunctionTemplate> GetOrCreateConstructor(const InterfaceMeta* interfaceMeta);
     void RegisterAllocMethod(v8::Local<v8::Function> ctorFuncm, const InterfaceMeta* interfaceMeta);
     void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
