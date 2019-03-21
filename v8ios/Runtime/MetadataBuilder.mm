@@ -11,91 +11,105 @@ MetadataBuilder::MetadataBuilder() {
 void MetadataBuilder::Init(Isolate* isolate) {
     isolate_ = isolate;
 
-    poEmptyObjCtorFunc_ = new Persistent<v8::Function>(isolate, CreateEmptyObjectFunction(isolate));
+    argConverter_.Init(isolate, objectManager_);
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
+    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
 
-    MetaFile* metaFile = MetaFile::instance();
-    auto globalTable = metaFile->globalTable();
+    std::map<const Meta*, Local<FunctionTemplate>> constructorFunctionTemplates = GetConstructorFunctionTemplates();
+
     for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
-        const Meta* meta = static_cast<const Meta*>(*it);
+        const Meta* meta = (*it);
 
-        if (meta->type() == MetaType::Function) {
+        switch (meta->type()) {
+        case MetaType::Function: {
             const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
             RegisterCFunction(funcMeta);
-            continue;
+            break;
         }
-
-        if (meta->type() == MetaType::JsCode) {
-            Local<Context> context = isolate->GetCurrentContext();
-            Local<Object> global = context->Global();
+        case MetaType::JsCode: {
             DataWrapper* wrapper = new DataWrapper(nullptr, meta);
-            Local<Object> enumValue = CreateEmptyObject(context);
+            Local<Object> enumValue = argConverter_.CreateEmptyObject(context);
             Local<External> ext = External::New(isolate, wrapper);
             enumValue->SetInternalField(0, ext);
             global->Set(v8::String::NewFromUtf8(isolate, meta->jsName()), enumValue);
+            break;
+        }
+        case MetaType::ProtocolType: {
+            break;
+        }
+        case MetaType::Interface: {
+            auto ctorFuncTemplateIt = constructorFunctionTemplates.find(meta);
+            if (ctorFuncTemplateIt == constructorFunctionTemplates.end()) {
+                continue;
+            }
+
+            const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+            Local<FunctionTemplate> ctorFuncTemplate = ctorFuncTemplateIt->second;
+
+            Local<v8::Function> ctorFunc;
+            if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
+                assert(false);
+            }
+
+            if (!global->Set(v8::String::NewFromUtf8(isolate_, interfaceMeta->jsName()), ctorFunc)) {
+                assert(false);
+            }
+
+            RegisterAllocMethod(ctorFunc, interfaceMeta);
+            RegisterStaticMethods(ctorFunc, interfaceMeta);
+            RegisterStaticProperties(ctorFunc, interfaceMeta);
+
+            Local<Value> prototype = ctorFunc->Get(v8::String::NewFromUtf8(isolate, "prototype"));
+            Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
+            Caches::Prototypes.insert(std::make_pair(interfaceMeta, poPrototype));
+
+            break;
+        }
+        default: {
             continue;
         }
-
-        if (meta->type() != MetaType::Interface) {
-            // Currently only classes are supported
-            continue;
         }
-
-        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
-
-        auto itMetaCache = metadataCache_.find(interfaceMeta->jsName());
-        if (itMetaCache == metadataCache_.end()) {
-            metadataCache_.insert(std::make_pair(interfaceMeta->jsName(), interfaceMeta));
-        }
-
-        Local<FunctionTemplate> ctorFuncTemplate = GetOrCreateConstructor(interfaceMeta);
-        const InterfaceMeta* baseMeta = interfaceMeta->baseMeta();
-        if (baseMeta != nullptr) {
-            Local<FunctionTemplate> parentCtorFuncTemplate = GetOrCreateConstructor(baseMeta);
-            ctorFuncTemplate->Inherit(parentCtorFuncTemplate);
-        }
-    }
-
-    // TODO: Try to avoid the second pass through the metadata. Instantiating the FunctionTemplate should be done
-    // only once all the prototype inheritance is configured between the classes
-    for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
-        const BaseClassMeta* meta = static_cast<const BaseClassMeta*>(*it);
-
-        if (meta->type() != MetaType::Interface) {
-            // Currently only classes are supported
-            continue;
-        }
-
-        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
-        Local<FunctionTemplate> ctorFuncTemplate = GetOrCreateConstructor(interfaceMeta);
-
-        Local<v8::Function> ctorFunc;
-        if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-            assert(false);
-        }
-
-        if (!global->Set(v8::String::NewFromUtf8(isolate_, interfaceMeta->name()), ctorFunc)) {
-            assert(false);
-        }
-
-        RegisterAllocMethod(ctorFunc, interfaceMeta);
-        RegisterStaticMethods(ctorFunc, interfaceMeta);
-        RegisterStaticProperties(ctorFunc, interfaceMeta);
-
-        Local<Value> prototype = ctorFunc->Get(v8::String::NewFromUtf8(isolate, "prototype"));
-        Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
-        prototypesCache_.insert(std::make_pair(interfaceMeta, poPrototype));
     }
 }
 
-Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructor(const InterfaceMeta* interfaceMeta) {
+std::map<const Meta*, Local<FunctionTemplate>> MetadataBuilder::GetConstructorFunctionTemplates() {
+    std::map<const Meta*, Local<FunctionTemplate>> result;
+    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+
+    for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
+        const Meta* meta = *it;
+        if (meta->type() != MetaType::Interface) {
+            continue;
+        }
+
+        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+        auto itMetaCache = Caches::Metadata.find(interfaceMeta->jsName());
+        if (itMetaCache == Caches::Metadata.end()) {
+            Caches::Metadata.insert(std::make_pair(interfaceMeta->jsName(), interfaceMeta));
+        }
+
+        Local<FunctionTemplate> ctorFuncTemplate = GetOrCreateConstructorFunctionTemplate(interfaceMeta);
+        const InterfaceMeta* baseMeta = interfaceMeta->baseMeta();
+        if (baseMeta != nullptr) {
+            Local<FunctionTemplate> parentCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
+            ctorFuncTemplate->Inherit(parentCtorFuncTemplate);
+        }
+
+        result.insert(std::make_pair(meta, ctorFuncTemplate));
+    }
+
+    return result;
+}
+
+Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta) {
     Local<FunctionTemplate> ctorFuncTemplate;
+    Persistent<FunctionTemplate>* poCtorFuncTemplate;
 
     auto it = ctorTemplatesCache_.find(interfaceMeta);
     if (it != ctorTemplatesCache_.end()) {
-        Persistent<FunctionTemplate>* poCtorFuncTemplate = it->second;
+        poCtorFuncTemplate = it->second;
         ctorFuncTemplate = Local<FunctionTemplate>::New(isolate_, *poCtorFuncTemplate);
     } else {
         CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, nullptr, this);
@@ -108,7 +122,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructor(const InterfaceM
         RegisterInstanceMethods(ctorFuncTemplate, interfaceMeta);
         RegisterInstanceProperties(ctorFuncTemplate, interfaceMeta);
 
-        ctorTemplatesCache_.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
+        poCtorFuncTemplate = new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate);
+        ctorTemplatesCache_.insert(std::make_pair(interfaceMeta, poCtorFuncTemplate));
     }
 
     return ctorFuncTemplate;
@@ -231,7 +246,7 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
     Class klass = NSClassFromString(className);
     id obj = [[klass alloc] init];
 
-    item->builder_->CreateJsWrapper(isolate, obj, info.This());
+    item->builder_->argConverter_.CreateJsWrapper(isolate, obj, info.This());
 }
 
 void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
@@ -242,7 +257,7 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
     const InterfaceMeta* meta = item->meta_;
     Class klass = objc_getClass(meta->jsName());
     id obj = [klass alloc];
-    Local<Object> result = item->builder_->CreateJsWrapper(isolate, obj, Local<Object>());
+    Local<Object> result = item->builder_->argConverter_.CreateJsWrapper(isolate, obj, Local<Object>());
     info.GetReturnValue().Set(result);
 }
 
@@ -322,7 +337,7 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* m
         } else {
             assert(false);
         }
-        SetArgument(invocation, i + 2, isolate, v8Arg, typeEncoding);
+        argConverter_.SetArgument(invocation, i + 2, isolate, v8Arg, typeEncoding);
     }
 
     if (instanceMethod) {
@@ -341,310 +356,11 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* m
         [invocation getReturnValue:&result];
         if (result) {
             CFBridgingRetain(result);
-            return ConvertArgument(isolate, result);
+            return argConverter_.ConvertArgument(isolate, result);
         }
     }
 
     return Local<Value>();
-}
-
-void MetadataBuilder::SetArgument(NSInvocation* invocation, int index, Isolate* isolate, Local<Value> arg, const TypeEncoding* typeEncoding) {
-    if (arg->IsNull()) {
-        id nullArg = nil;
-        [invocation setArgument:&nullArg atIndex:index];
-        return;
-    }
-
-    if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
-        Local<v8::String> strArg = arg.As<v8::String>();
-        v8::String::Utf8Value str(isolate, strArg);
-        NSString* selector = [NSString stringWithUTF8String:*str];
-        SEL res = NSSelectorFromString(selector);
-        [invocation setArgument:&res atIndex:index];
-        return;
-    }
-
-    Local<Context> context = isolate->GetCurrentContext();
-    if (arg->IsString()) {
-        Local<v8::String> strArg = arg.As<v8::String>();
-        v8::String::Utf8Value str(isolate, strArg);
-        NSString* result = [NSString stringWithUTF8String:*str];
-        [invocation setArgument:&result atIndex:index];
-        return;
-    }
-
-    if (arg->IsNumber() || arg->IsDate()) {
-        double value;
-        if (!arg->NumberValue(context).To(&value)) {
-            assert(false);
-        }
-
-        if (arg->IsNumber() || arg->IsNumberObject()) {
-            SetNumericArgument(invocation, index, value, typeEncoding);
-            return;
-        } else {
-            NSDate* date = [NSDate dateWithTimeIntervalSince1970:value / 1000.0];
-            [invocation setArgument:&date atIndex:index];
-        }
-    }
-
-    if (arg->IsFunction() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
-        Local<v8::Function> callback = arg.As<v8::Function>();
-        Persistent<v8::Function>* poCallback = new Persistent<v8::Function>(isolate, callback);
-
-        id block = ^(id first, ...) {
-            va_list args;
-            int argsCount = typeEncoding->details.block.signature.count - 1;
-            std::vector<id> arguments;
-            for (int i = 0; i < argsCount; i++) {
-                id val;
-                if (i == 0) {
-                    va_start(args, first);
-                    val = first;
-                } else {
-                    val = va_arg(args, id);
-                }
-                arguments.push_back(val);
-            }
-            va_end(args);
-
-            dispatch_async(dispatch_get_main_queue(), ^{
-                Local<Value> res;
-                HandleScope handle_scope(isolate);
-                Local<Context> ctx = isolate->GetCurrentContext();
-                Local<v8::Function> callback = Local<v8::Function>::New(isolate, *poCallback);
-
-                std::vector<Local<Value>> v8Args;
-                for (int i = 0; i < argsCount; i++) {
-                    Local<Value> jsWrapper = ConvertArgument(isolate, arguments[i]);
-                    v8Args.push_back(jsWrapper);
-                }
-
-                if (!callback->Call(ctx, ctx->Global(), argsCount, v8Args.data()).ToLocal(&res)) {
-                    assert(false);
-                }
-
-                delete poCallback;
-            });
-        };
-        const void* ptr = CFBridgingRetain(block);
-        [invocation setArgument:&ptr atIndex:index];
-        return;
-    }
-
-    if (arg->IsObject()) {
-        Local<Object> obj = arg.As<Object>();
-        if (obj->InternalFieldCount() > 0) {
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            DataWrapper* wrapper = reinterpret_cast<DataWrapper*>(ext->Value());
-            const Meta* meta = wrapper->meta_;
-            if (meta != nullptr && meta->type() == MetaType::JsCode) {
-                const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
-                const char* jsCode = jsCodeMeta->jsCode();
-
-                Local<Script> script;
-                if (!Script::Compile(context, v8::String::NewFromUtf8(isolate, jsCode)).ToLocal(&script)) {
-                    assert(false);
-                }
-                assert(!script.IsEmpty());
-
-                Local<Value> result;
-                if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
-                    assert(false);
-                }
-
-                assert(result->IsNumber());
-
-                double value = result.As<Number>()->Value();
-                SetNumericArgument(invocation, index, value, typeEncoding);
-                return;
-            }
-
-            if (wrapper->data_ != nullptr) {
-                [invocation setArgument:&wrapper->data_ atIndex:index];
-                return;
-            }
-        }
-    }
-
-    assert(false);
-}
-
-Local<Value> MetadataBuilder::ConvertArgument(Isolate* isolate, id obj) {
-    if (obj == nullptr) {
-        return Null(isolate);
-    } else if ([obj isKindOfClass:[NSString class]]) {
-        const char* str = [obj UTF8String];
-        Local<v8::String> res = v8::String::NewFromUtf8(isolate, str);
-        return res;
-    } else if ([obj isKindOfClass:[NSNumber class]]) {
-        return Number::New(isolate, [obj doubleValue]);
-    } else if ([obj isKindOfClass:[NSDate class]]) {
-        Local<Context> context = isolate->GetCurrentContext();
-        double time = [obj timeIntervalSince1970] * 1000.0;
-        Local<Value> date;
-        if (!Date::New(context, time).ToLocal(&date)) {
-            assert(false);
-        }
-        return date;
-    }
-
-    Local<Object> jsObject = CreateJsWrapper(isolate, obj, Local<Object>());
-    return jsObject;
-}
-
-Local<Object> MetadataBuilder::CreateJsWrapper(Isolate* isolate, id obj, Local<Object> receiver) {
-    Local<Context> context = isolate->GetCurrentContext();
-
-    if (receiver.IsEmpty()) {
-        receiver = CreateEmptyObject(context);
-    }
-
-    const InterfaceMeta* meta = FindInterfaceMeta(obj);
-    if (meta != nullptr) {
-        auto it = prototypesCache_.find(meta);
-        if (it != prototypesCache_.end()) {
-            Persistent<Value>* poPrototype = it->second;
-            Local<Value> prototype = Local<Value>::New(isolate, *poPrototype);
-            bool success;
-            if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
-                assert(false);
-            }
-        }
-    }
-
-    DataWrapper* wrapper = new DataWrapper(obj);
-    Local<External> ext = External::New(isolate, wrapper);
-    receiver->SetInternalField(0, ext);
-    objectManager_.Register(isolate, receiver);
-
-    return receiver;
-}
-
-const InterfaceMeta* MetadataBuilder::FindInterfaceMeta(id obj) {
-    if (obj == nullptr) {
-        return nullptr;
-    }
-
-    Class klass = [obj class];
-
-    const char* origClassName = class_getName(klass);
-    auto it = metadataCache_.find(origClassName);
-    if (it != metadataCache_.end()) {
-        return it->second;
-    }
-
-    const char* className = origClassName;
-
-    while (true) {
-        const InterfaceMeta* result = GetInterfaceMeta(className);
-        if (result != nullptr) {
-            metadataCache_.insert(std::make_pair(origClassName, result));
-            return result;
-        }
-
-        klass = class_getSuperclass(klass);
-        if (klass == nullptr) {
-            break;
-        }
-
-        className = class_getName(klass);
-    }
-
-    return nullptr;
-}
-
-const InterfaceMeta* MetadataBuilder::GetInterfaceMeta(const char* className) {
-    auto it = metadataCache_.find(className);
-    if (it != metadataCache_.end()) {
-        return it->second;
-    }
-
-    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-    return globalTable->findInterfaceMeta(className);
-}
-
-Local<Object> MetadataBuilder::CreateEmptyObject(Local<Context> context) {
-    Isolate* isolate = context->GetIsolate();
-    Local<v8::Function> emptyObjCtorFunc = Local<v8::Function>::New(isolate, *poEmptyObjCtorFunc_);
-    Local<Value> value;
-    if (!emptyObjCtorFunc->CallAsConstructor(context, 0, nullptr).ToLocal(&value) || value.IsEmpty() || !value->IsObject()) {
-        assert(false);
-    }
-    Local<Object> result = value.As<Object>();
-    return result;
-}
-
-void MetadataBuilder::SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding) {
-    switch (typeEncoding->type) {
-        case BinaryTypeEncodingType::ShortEncoding: {
-            short arg = (short)value;
-            [invocation setArgument:&arg atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::UShortEncoding: {
-            ushort arg = (ushort)value;
-            [invocation setArgument:&arg atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::IntEncoding: {
-            int arg = (int)value;
-            [invocation setArgument:&arg atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::UIntEncoding: {
-            uint arg = (uint)value;
-            [invocation setArgument:&arg atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::LongEncoding: {
-            long arg = (long)value;
-            [invocation setArgument:&arg atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::ULongEncoding: {
-            unsigned long arg = (unsigned long)value;
-            [invocation setArgument:&arg atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::LongLongEncoding: {
-            long long arg = (long long)value;
-            [invocation setArgument:&arg atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::ULongLongEncoding: {
-            unsigned long long arg = (unsigned long long)value;
-            [invocation setArgument:&arg atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::FloatEncoding: {
-            float arg = (float)value;
-            [invocation setArgument:&arg atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::DoubleEncoding: {
-            [invocation setArgument:&value atIndex:index];
-            break;
-        }
-        case BinaryTypeEncodingType::IdEncoding: {
-            [invocation setArgument:&value atIndex:index];
-            break;
-        }
-        default: {
-            assert(false);
-            break;
-        }
-    }
-}
-
-Local<v8::Function> MetadataBuilder::CreateEmptyObjectFunction(Isolate* isolate) {
-    Local<FunctionTemplate> emptyObjCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
-    emptyObjCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-    Local<v8::Function> emptyObjCtorFunc;
-    if (!emptyObjCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyObjCtorFunc)) {
-        assert(false);
-    }
-    return emptyObjCtorFunc;
 }
 
 }

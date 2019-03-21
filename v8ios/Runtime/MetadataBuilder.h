@@ -6,21 +6,12 @@
 #include "v8.h"
 #pragma clang diagnostic pop
 
-#include <Foundation/NSInvocation.h>
-#include <string>
 #include <map>
 #include "Metadata.h"
 #include "ObjectManager.h"
+#include "ArgConverter.h"
 
 namespace tns {
-
-struct DataWrapper {
-public:
-    DataWrapper(id data): data_(data), meta_(nullptr) {}
-    DataWrapper(id data, const Meta* meta): data_(data), meta_(meta) {}
-    id data_;
-    const Meta* meta_;
-};
 
 class MetadataBuilder {
 public:
@@ -35,18 +26,10 @@ private:
     template<class T>
     struct CacheItem;
 
-    struct cmp_str {
-        bool operator()(char const *a, char const *b) const {
-            return std::strcmp(a, b) < 0;
-        }
-    };
-
     v8::Isolate* isolate_;
     ObjectManager objectManager_;
+    ArgConverter argConverter_;
     std::map<const InterfaceMeta*, v8::Persistent<v8::FunctionTemplate>*> ctorTemplatesCache_;
-    std::map<const InterfaceMeta*, v8::Persistent<v8::Value>*> prototypesCache_;
-    std::map<const char*, const InterfaceMeta*, cmp_str> metadataCache_;
-    v8::Persistent<v8::Function>* poEmptyObjCtorFunc_;
 
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -58,21 +41,15 @@ private:
     static void PropertyNameSetterCallback(v8::Local<v8::Name> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void> &info);
     v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, const char* containingClass);
 
+    std::map<const Meta*, v8::Local<v8::FunctionTemplate>> GetConstructorFunctionTemplates();
+    v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
-    v8::Local<v8::FunctionTemplate> GetOrCreateConstructor(const InterfaceMeta* interfaceMeta);
     void RegisterCFunction(const FunctionMeta* funcMeta);
     void RegisterAllocMethod(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta);
     void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta);
     void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
     void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
-    void SetArgument(NSInvocation* invocation, int index, v8::Isolate* isolate, v8::Local<v8::Value> arg, const TypeEncoding* typeEncoding);
-    v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
-    v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj, v8::Local<v8::Object> receiver);
-    const InterfaceMeta* FindInterfaceMeta(id obj);
-    const InterfaceMeta* GetInterfaceMeta(const char* className);
-    v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);
-    void SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding);
 
     MetadataBuilder(const std::string& baseDir) {
         std::string fileName = baseDir + "/metadata-x86_64.bin";

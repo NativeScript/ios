@@ -23,6 +23,8 @@
 		C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */; };
 		C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B2C22241270007DE2BA /* Runtime.mm */; };
 		C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B5922252432007DE2BA /* ModuleInternal.mm */; };
+		C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */; };
+		C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9CC224391A3006FB9D3 /* Caches.cpp */; };
 		C2B12E9E22269B43000F6AFC /* richards.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9C22269B43000F6AFC /* richards.js */; };
 		C2B12E9F22269B43000F6AFC /* base.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9D22269B43000F6AFC /* base.js */; };
 		C2B12EB12226BA2E000F6AFC /* deltablue.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EB02226BA2E000F6AFC /* deltablue.js */; };
@@ -77,6 +79,10 @@
 		C28B7B5822252431007DE2BA /* ModuleInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ModuleInternal.h; sourceTree = "<group>"; };
 		C28B7B5922252432007DE2BA /* ModuleInternal.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ModuleInternal.mm; sourceTree = "<group>"; };
 		C2AAE9C8223BA685006FB9D3 /* StringHasher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
+		C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ArgConverter.mm; sourceTree = "<group>"; };
+		C2AAE9CA2243789A006FB9D3 /* ArgConverter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArgConverter.h; sourceTree = "<group>"; };
+		C2AAE9CC224391A3006FB9D3 /* Caches.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Caches.cpp; sourceTree = "<group>"; };
+		C2AAE9CD224391A3006FB9D3 /* Caches.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Caches.h; sourceTree = "<group>"; };
 		C2B12E9C22269B43000F6AFC /* richards.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = richards.js; sourceTree = "<group>"; };
 		C2B12E9D22269B43000F6AFC /* base.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = base.js; sourceTree = "<group>"; };
 		C2B12EB02226BA2E000F6AFC /* deltablue.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = deltablue.js; sourceTree = "<group>"; };
@@ -157,20 +163,24 @@
 		C24F391E222598C60027977A /* Runtime */ = {
 			isa = PBXGroup;
 			children = (
-				C28B7B2B22241122007DE2BA /* Runtime.h */,
-				C28B7B2C22241270007DE2BA /* Runtime.mm */,
-				C28B7B5822252431007DE2BA /* ModuleInternal.h */,
-				C28B7B5922252432007DE2BA /* ModuleInternal.mm */,
+				C2AAE9CA2243789A006FB9D3 /* ArgConverter.h */,
+				C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */,
+				C2AAE9CD224391A3006FB9D3 /* Caches.h */,
+				C2AAE9CC224391A3006FB9D3 /* Caches.cpp */,
 				C24F39182225859D0027977A /* Console.h */,
 				C24F39192225859D0027977A /* Console.cpp */,
-				C2B12EE12227C606000F6AFC /* SetTimeout.h */,
-				C2B12EE22227C606000F6AFC /* SetTimeout.cpp */,
 				C2764AF5222BE705008F674F /* Metadata.h */,
 				C2764AF4222BE705008F674F /* Metadata.mm */,
 				C2764AF8222E80AC008F674F /* MetadataBuilder.h */,
 				C2764AF7222E80AC008F674F /* MetadataBuilder.mm */,
+				C28B7B5822252431007DE2BA /* ModuleInternal.h */,
+				C28B7B5922252432007DE2BA /* ModuleInternal.mm */,
 				C2764AFB223644B3008F674F /* ObjectManager.h */,
 				C2764AFA223644B3008F674F /* ObjectManager.mm */,
+				C28B7B2B22241122007DE2BA /* Runtime.h */,
+				C28B7B2C22241270007DE2BA /* Runtime.mm */,
+				C2B12EE12227C606000F6AFC /* SetTimeout.h */,
+				C2B12EE22227C606000F6AFC /* SetTimeout.cpp */,
 				C2AAE9C8223BA685006FB9D3 /* StringHasher.h */,
 			);
 			path = Runtime;
@@ -334,6 +344,8 @@
 				C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */,
 				C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */,
 				C2764AFC223644B3008F674F /* ObjectManager.mm in Sources */,
+				C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */,
+				C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */,
 				C24F391A2225859D0027977A /* Console.cpp in Sources */,
 				C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */,
 				C27E278522202664009C10A3 /* AppDelegate.mm in Sources */,
