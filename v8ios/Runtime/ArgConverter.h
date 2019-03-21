@@ -36,7 +36,7 @@ private:
     v8::Persistent<v8::Function>* poEmptyObjCtorFunc_;
 
     const InterfaceMeta* FindInterfaceMeta(id obj);
-    const InterfaceMeta* GetInterfaceMeta(const char* className);
+    const InterfaceMeta* GetInterfaceMeta(std::string className);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     void SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding);
 };

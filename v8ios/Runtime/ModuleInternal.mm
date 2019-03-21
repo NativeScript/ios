@@ -1,6 +1,7 @@
 #include <string>
 #include "ModuleInternal.h"
 #include "Runtime.h"
+#include "Strings.h"
 
 using namespace v8;
 
@@ -27,15 +28,15 @@ void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
     Local<Object> global = context->Global();
     Local<Script> script;
     TryCatch tc(isolate);
-    if (!Script::Compile(context, v8::String::NewFromUtf8(isolate, requireFactoryScript.c_str())).ToLocal(&script) && tc.HasCaught()) {
-        printf("%s\n", *v8::String::Utf8Value(isolate_, tc.Exception()));
+    if (!Script::Compile(context, Strings::ToV8String(isolate, requireFactoryScript.c_str())).ToLocal(&script) && tc.HasCaught()) {
+        printf("%s\n", Strings::ToString(isolate_, tc.Exception()).c_str());
         assert(false);
     }
     assert(!script.IsEmpty());
 
     Local<Value> result;
     if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
-        printf("%s\n", *v8::String::Utf8Value(isolate_, tc.Exception()));
+        printf("%s\n", Strings::ToString(isolate_, tc.Exception()).c_str());
         assert(false);
     }
     assert(!result.IsEmpty() && result->IsFunction());
@@ -46,7 +47,7 @@ void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
     requireFunction_ = new Persistent<v8::Function>(isolate, requireFuncTemplate->GetFunction(context).ToLocalChecked());
 
     Local<v8::Function> globalRequire = GetRequireFunction(baseDir);
-    global->Set(v8::String::NewFromUtf8(isolate, "require"), globalRequire);
+    global->Set(Strings::ToV8String(isolate, "require"), globalRequire);
 }
 
 Local<v8::Function> ModuleInternal::GetRequireFunction(const std::string& dirName) {
@@ -54,7 +55,7 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(const std::string& dirNam
     Local<Context> context = isolate_->GetCurrentContext();
     Local<v8::Function> requireInternalFunc = Local<v8::Function>::New(isolate_, *requireFunction_);
     Local<Value> args[2] {
-        requireInternalFunc, v8::String::NewFromUtf8(isolate_, dirName.c_str())
+        requireInternalFunc, Strings::ToV8String(isolate_, dirName.c_str())
     };
 
     Local<Value> result;
@@ -69,11 +70,11 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& args) {
     ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(args.Data().As<External>()->Value());
     Isolate* isolate = moduleInternal->isolate_;
 
-    std::string moduleName = *v8::String::Utf8Value(isolate, args[0].As<v8::String>());
-    std::string callingModuleDirName = *v8::String::Utf8Value(isolate, args[1].As<v8::String>());
+    std::string moduleName = Strings::ToString(isolate, args[0].As<v8::String>());
+    std::string callingModuleDirName = Strings::ToString(isolate, args[1].As<v8::String>());
     Local<Object> moduleObj = moduleInternal->LoadImpl(moduleName, callingModuleDirName);
 
-    Local<Value> exportsObj = moduleObj->Get(v8::String::NewFromUtf8(isolate, "exports"));
+    Local<Value> exportsObj = moduleObj->Get(Strings::ToV8String(isolate, "exports"));
     args.GetReturnValue().Set(exportsObj);
 }
 
@@ -88,7 +89,7 @@ Local<Object> ModuleInternal::LoadImpl(const std::string& moduleName, const std:
 
     Local<Object> moduleObj = Object::New(isolate_);
     Local<Object> exportsObj = Object::New(isolate_);
-    moduleObj->Set(v8::String::NewFromUtf8(isolate_, "exports"), exportsObj);
+    moduleObj->Set(Strings::ToV8String(isolate_, "exports"), exportsObj);
 
     Local<Script> script = LoadScript(moduleName, baseDir);
     Local<Context> context = isolate_->GetCurrentContext();
@@ -96,22 +97,22 @@ Local<Object> ModuleInternal::LoadImpl(const std::string& moduleName, const std:
     TryCatch tc(isolate_);
     Local<v8::Function> moduleFunc = script->Run(context).ToLocalChecked().As<v8::Function>();
     if (tc.HasCaught()) {
-        printf("%s\n", *v8::String::Utf8Value(isolate_, tc.Exception()));
+        printf("%s\n", Strings::ToString(isolate_, tc.Exception()).c_str());
         assert(false);
     }
 
     Local<v8::Function> require = GetRequireFunction(baseDir);
     Local<Value> requireArgs[4] {
-        moduleObj, exportsObj, require, v8::String::NewFromUtf8(isolate_, baseDir.c_str())
+        moduleObj, exportsObj, require, Strings::ToV8String(isolate_, baseDir.c_str())
     };
 
-    moduleObj->Set(v8::String::NewFromUtf8(isolate_, "require"), require);
+    moduleObj->Set(Strings::ToV8String(isolate_, "require"), require);
 
     Local<Object> thiz = Object::New(isolate_);
     Local<Value> result;
     if (!moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs).ToLocal(&result)) {
         if (tc.HasCaught()) {
-            printf("%s\n", *v8::String::Utf8Value(isolate_, tc.Exception()));
+            printf("%s\n", Strings::ToString(isolate_, tc.Exception()).c_str());
         }
         assert(false);
     }
@@ -123,14 +124,14 @@ Local<Object> ModuleInternal::LoadImpl(const std::string& moduleName, const std:
 }
 
 Local<Script> ModuleInternal::LoadScript(const std::string& moduleName, const std::string& baseDir) {
-    ScriptOrigin origin(v8::String::NewFromUtf8(isolate_, ("file://" + moduleName + ".js").c_str()));
+    ScriptOrigin origin(Strings::ToV8String(isolate_, ("file://" + moduleName + ".js").c_str()));
     Local<v8::String> scriptText = WrapModuleContent(baseDir + "/" + moduleName + ".js");
     ScriptCompiler::Source source(scriptText, origin);
     TryCatch tc(isolate_);
     MaybeLocal<Script> maybeScript = ScriptCompiler::Compile(isolate_->GetCurrentContext(), &source, ScriptCompiler::kNoCompileOptions);
     if (maybeScript.IsEmpty() || tc.HasCaught()) {
         if (tc.HasCaught()) {
-            printf("%s\n", *v8::String::Utf8Value(isolate_, tc.Exception()));
+            printf("%s\n", Strings::ToString(isolate_, tc.Exception()).c_str());
         }
         assert(false);
     }
@@ -143,7 +144,7 @@ Local<v8::String> ModuleInternal::WrapModuleContent(const std::string& path) {
     result.reserve(content.length() + 1024);
     result += content;
     result += "\n})";
-    return v8::String::NewFromUtf8(isolate_, result.c_str());
+    return Strings::ToV8String(isolate_, result.c_str());
 }
 
 }

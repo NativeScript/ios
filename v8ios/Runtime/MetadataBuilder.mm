@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "MetadataBuilder.h"
+#include "Strings.h"
 
 using namespace v8;
 
@@ -33,7 +34,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
             Local<Object> enumValue = argConverter_.CreateEmptyObject(context);
             Local<External> ext = External::New(isolate, wrapper);
             enumValue->SetInternalField(0, ext);
-            global->Set(v8::String::NewFromUtf8(isolate, meta->jsName()), enumValue);
+            global->Set(Strings::ToV8String(isolate, meta->jsName()), enumValue);
             break;
         }
         case MetaType::ProtocolType: {
@@ -53,7 +54,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
                 assert(false);
             }
 
-            if (!global->Set(v8::String::NewFromUtf8(isolate_, interfaceMeta->jsName()), ctorFunc)) {
+            if (!global->Set(Strings::ToV8String(isolate_, interfaceMeta->jsName()), ctorFunc)) {
                 assert(false);
             }
 
@@ -61,7 +62,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
             RegisterStaticMethods(ctorFunc, interfaceMeta);
             RegisterStaticProperties(ctorFunc, interfaceMeta);
 
-            Local<Value> prototype = ctorFunc->Get(v8::String::NewFromUtf8(isolate, "prototype"));
+            Local<Value> prototype = ctorFunc->Get(Strings::ToV8String(isolate, "prototype"));
             Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
             Caches::Prototypes.insert(std::make_pair(interfaceMeta, poPrototype));
 
@@ -117,7 +118,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 
         ctorFuncTemplate = FunctionTemplate::New(isolate_, ClassConstructorCallback, ext);
         ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-        ctorFuncTemplate->SetClassName(v8::String::NewFromUtf8(isolate_, interfaceMeta->jsName()));
+        ctorFuncTemplate->SetClassName(Strings::ToV8String(isolate_, interfaceMeta->jsName()));
 
         RegisterInstanceMethods(ctorFuncTemplate, interfaceMeta);
         RegisterInstanceProperties(ctorFuncTemplate, interfaceMeta);
@@ -139,7 +140,7 @@ void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {
     if (!v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func)) {
         assert(false);
     }
-    global->Set(v8::String::NewFromUtf8(isolate_, funcMeta->jsName()), func);
+    global->Set(Strings::ToV8String(isolate_, funcMeta->jsName()), func);
 }
 
 void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {
@@ -151,7 +152,7 @@ void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const In
     if (!allocFuncTemplate->GetFunction(context).ToLocal(&allocFunc)) {
         assert(false);
     }
-    ctorFunc->Set(v8::String::NewFromUtf8(isolate_, "alloc"), allocFunc);
+    ctorFunc->Set(Strings::ToV8String(isolate_, "alloc"), allocFunc);
 }
 
 void MetadataBuilder::RegisterInstanceMethods(Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta) {
@@ -162,7 +163,7 @@ void MetadataBuilder::RegisterInstanceMethods(Local<FunctionTemplate> ctorFuncTe
         CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta, this);
         Local<External> ext = External::New(isolate_, item);
         Local<FunctionTemplate> instanceMethodTemplate = FunctionTemplate::New(isolate_, MethodCallback, ext);
-        proto->Set(v8::String::NewFromUtf8(isolate_, methodMeta->jsName()), instanceMethodTemplate);
+        proto->Set(Strings::ToV8String(isolate_, methodMeta->jsName()), instanceMethodTemplate);
     }
 }
 
@@ -185,7 +186,7 @@ void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFun
         if (getter || setter) {
             CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, meta, this);
             Local<External> ext = External::New(isolate_, item);
-            Local<v8::String> propName = v8::String::NewFromUtf8(isolate_, propMeta->jsName());
+            Local<v8::String> propName = Strings::ToV8String(isolate_, propMeta->jsName());
             proto->SetAccessor(propName, getter, setter, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
         }
     }
@@ -202,7 +203,7 @@ void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const 
         if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
             assert(false);
         }
-        ctorFunc->Set(v8::String::NewFromUtf8(isolate_, methodMeta->jsName()), staticMethod);
+        ctorFunc->Set(Strings::ToV8String(isolate_, methodMeta->jsName()), staticMethod);
     }
 }
 
@@ -224,7 +225,7 @@ void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, con
             CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, meta, this);
             Local<External> ext = External::New(isolate_, item);
 
-            Local<v8::String> propName = v8::String::NewFromUtf8(isolate_, propMeta->jsName());
+            Local<v8::String> propName = Strings::ToV8String(isolate_, propMeta->jsName());
             Local<Context> context = isolate_->GetCurrentContext();
             bool success;
             Maybe<bool> maybeSuccess = ctorFunc->SetAccessor(context, propName, getter, setter, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
@@ -318,8 +319,8 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
     item->builder_->InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->classMeta_->jsName());
 }
 
-Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, const char* containingClass) {
-    Class klass = objc_getClass(containingClass);
+    Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass) {
+    Class klass = objc_getClass(containingClass.c_str());
     SEL selector = meta->selector();
 
     bool instanceMethod = !receiver.IsEmpty();

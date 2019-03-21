@@ -1,4 +1,5 @@
 #include "Console.h"
+#include "Strings.h"
 
 using namespace v8;
 
@@ -16,7 +17,7 @@ void Console::Init(Isolate* isolate) {
         return;
     }
 
-    Local<String> logFuncName = String::NewFromUtf8(isolate, "log");
+    Local<String> logFuncName = Strings::ToV8String(isolate, "log");
     func->SetName(logFuncName);
     if (!console->CreateDataProperty(context, logFuncName, func).FromMaybe(false)) {
         assert(false);
@@ -24,7 +25,7 @@ void Console::Init(Isolate* isolate) {
 
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
-    if (!global->DefineOwnProperty(context, String::NewFromUtf8(isolate, "console"), console, readOnlyFlags).FromMaybe(false)) {
+    if (!global->DefineOwnProperty(context, Strings::ToV8String(isolate, "console"), console, readOnlyFlags).FromMaybe(false)) {
         assert(false);
     }
 }
@@ -32,8 +33,8 @@ void Console::Init(Isolate* isolate) {
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     Local<Value> value = args[0];
     Isolate* isolate = args.GetIsolate();
-    String::Utf8Value str(isolate, value);
-    printf("%s", *str);
+    std::string str = Strings::ToString(isolate, value);
+    printf("%s", str.c_str());
 }
 
 }

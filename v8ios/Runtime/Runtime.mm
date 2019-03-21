@@ -3,6 +3,7 @@
 #include "Runtime.h"
 #include "Console.h"
 #include "SetTimeout.h"
+#include "Strings.h"
 
 #if defined __arm64 && __arm64__
 #include "natives_blob.arm64.h"
@@ -76,14 +77,14 @@ void Runtime::RunScript(string file) {
     Local<Script> script;
     TryCatch tc(isolate);
     if (!Script::Compile(context, script_source).ToLocal(&script) && tc.HasCaught()) {
-        printf("%s\n", *v8::String::Utf8Value(isolate_, tc.Exception()));
+        printf("%s\n", Strings::ToString(isolate_, tc.Exception()).c_str());
         assert(false);
     }
 
     Local<Value> result;
     if (!script->Run(context).ToLocal(&result)) {
         if (tc.HasCaught()) {
-            printf("%s\n", *v8::String::Utf8Value(isolate_, tc.Exception()));
+            printf("%s\n", Strings::ToString(isolate_, tc.Exception()).c_str());
         }
         assert(false);
     }

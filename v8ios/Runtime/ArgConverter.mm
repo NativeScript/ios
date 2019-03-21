@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "ArgConverter.h"
+#include "Strings.h"
 
 using namespace v8;
 using namespace std;
@@ -21,9 +22,8 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
     }
 
     if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
-        Local<v8::String> strArg = arg.As<v8::String>();
-        v8::String::Utf8Value str(isolate, strArg);
-        NSString* selector = [NSString stringWithUTF8String:*str];
+        std::string str = Strings::ToString(isolate, arg);
+        NSString* selector = [NSString stringWithUTF8String:str.c_str()];
         SEL res = NSSelectorFromString(selector);
         [invocation setArgument:&res atIndex:index];
         return;
@@ -31,9 +31,8 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
 
     Local<Context> context = isolate->GetCurrentContext();
     if (arg->IsString()) {
-        Local<v8::String> strArg = arg.As<v8::String>();
-        v8::String::Utf8Value str(isolate, strArg);
-        NSString* result = [NSString stringWithUTF8String:*str];
+        std::string str = Strings::ToString(isolate, arg);
+        NSString* result = [NSString stringWithUTF8String:str.c_str()];
         [invocation setArgument:&result atIndex:index];
         return;
     }
@@ -108,7 +107,7 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
                 const char* jsCode = jsCodeMeta->jsCode();
 
                 Local<Script> script;
-                if (!Script::Compile(context, v8::String::NewFromUtf8(isolate, jsCode)).ToLocal(&script)) {
+                if (!Script::Compile(context, Strings::ToV8String(isolate, jsCode)).ToLocal(&script)) {
                     assert(false);
                 }
                 assert(!script.IsEmpty());
@@ -140,7 +139,7 @@ Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, id obj) {
         return Null(isolate);
     } else if ([obj isKindOfClass:[NSString class]]) {
         const char* str = [obj UTF8String];
-        Local<v8::String> res = v8::String::NewFromUtf8(isolate, str);
+        Local<v8::String> res = Strings::ToV8String(isolate, str);
         return res;
     } else if ([obj isKindOfClass:[NSNumber class]]) {
         return Number::New(isolate, [obj doubleValue]);
@@ -284,14 +283,14 @@ const InterfaceMeta* ArgConverter::FindInterfaceMeta(id obj) {
     return nullptr;
 }
 
-const InterfaceMeta* ArgConverter::GetInterfaceMeta(const char* className) {
+    const InterfaceMeta* ArgConverter::GetInterfaceMeta(std::string className) {
     auto it = Caches::Metadata.find(className);
     if (it != Caches::Metadata.end()) {
         return it->second;
     }
 
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-    return globalTable->findInterfaceMeta(className);
+    return globalTable->findInterfaceMeta(className.c_str());
 }
 
 Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {
