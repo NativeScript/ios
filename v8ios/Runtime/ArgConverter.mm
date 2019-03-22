@@ -104,7 +104,7 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
             const Meta* meta = wrapper->meta_;
             if (meta != nullptr && meta->type() == MetaType::JsCode) {
                 const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
-                const char* jsCode = jsCodeMeta->jsCode();
+                std::string jsCode = jsCodeMeta->jsCode();
 
                 Local<Script> script;
                 if (!Script::Compile(context, Strings::ToV8String(isolate, jsCode)).ToLocal(&script)) {
@@ -134,27 +134,37 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
     assert(false);
 }
 
+Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, NSInvocation* invocation, std::string returnType) {
+    if (returnType == "@") {
+        id result = nil;
+        [invocation getReturnValue:&result];
+        if (result != nil) {
+            CFBridgingRetain(result);
+            return ConvertArgument(isolate, result);
+        }
+    }
+
+    if (returnType == "*" || returnType == "r*") {
+        // char* or const char*
+        char* result = nullptr;
+        [invocation getReturnValue:&result];
+        if (result != nullptr) {
+            return Strings::ToV8String(isolate, result);
+        }
+    }
+
+    // TODO: Handle all the possible return types https://nshipster.com/type-encodings/
+
+    return Local<Value>();
+}
+
 Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, id obj) {
     if (obj == nullptr) {
         return Null(isolate);
-    } else if ([obj isKindOfClass:[NSString class]]) {
-        const char* str = [obj UTF8String];
-        Local<v8::String> res = Strings::ToV8String(isolate, str);
-        return res;
-    } else if ([obj isKindOfClass:[NSNumber class]]) {
-        return Number::New(isolate, [obj doubleValue]);
-    } else if ([obj isKindOfClass:[NSDate class]]) {
-        Local<Context> context = isolate->GetCurrentContext();
-        double time = [obj timeIntervalSince1970] * 1000.0;
-        Local<Value> date;
-        if (!Date::New(context, time).ToLocal(&date)) {
-            assert(false);
-        }
-        return date;
     }
 
-    Local<Object> jsObject = CreateJsWrapper(isolate, obj, Local<Object>());
-    return jsObject;
+    Local<Value> result = CreateJsWrapper(isolate, obj, Local<Object>());
+    return result;
 }
 
 void ArgConverter::SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding) {
@@ -233,9 +243,6 @@ Local<Object> ArgConverter::CreateJsWrapper(Isolate* isolate, id obj, Local<Obje
             Persistent<Value>* poPrototype = it->second;
             Local<Value> prototype = Local<Value>::New(isolate, *poPrototype);
             bool success;
-            if (prototype.IsEmpty()) {
-                NSLog(@"oops");
-            }
             if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
                 assert(false);
             }
@@ -257,13 +264,13 @@ const InterfaceMeta* ArgConverter::FindInterfaceMeta(id obj) {
 
     Class klass = [obj class];
 
-    const char* origClassName = class_getName(klass);
+    std::string origClassName = class_getName(klass);
     auto it = Caches::Metadata.find(origClassName);
     if (it != Caches::Metadata.end()) {
         return it->second;
     }
 
-    const char* className = origClassName;
+    std::string className = origClassName;
 
     while (true) {
         const InterfaceMeta* result = GetInterfaceMeta(className);
@@ -283,7 +290,7 @@ const InterfaceMeta* ArgConverter::FindInterfaceMeta(id obj) {
     return nullptr;
 }
 
-    const InterfaceMeta* ArgConverter::GetInterfaceMeta(std::string className) {
+const InterfaceMeta* ArgConverter::GetInterfaceMeta(std::string className) {
     auto it = Caches::Metadata.find(className);
     if (it != Caches::Metadata.end()) {
         return it->second;

@@ -18,8 +18,6 @@ void MetadataBuilder::Init(Isolate* isolate) {
     Local<Object> global = context->Global();
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
 
-    std::map<const Meta*, Local<FunctionTemplate>> constructorFunctionTemplates = GetConstructorFunctionTemplates();
-
     for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
         const Meta* meta = (*it);
 
@@ -41,31 +39,13 @@ void MetadataBuilder::Init(Isolate* isolate) {
             break;
         }
         case MetaType::Interface: {
-            auto ctorFuncTemplateIt = constructorFunctionTemplates.find(meta);
-            if (ctorFuncTemplateIt == constructorFunctionTemplates.end()) {
-                continue;
-            }
-
             const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
-            Local<FunctionTemplate> ctorFuncTemplate = ctorFuncTemplateIt->second;
+            GetOrCreateConstructorFunctionTemplate(interfaceMeta);
 
-            Local<v8::Function> ctorFunc;
-            if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-                assert(false);
+            auto itMetaCache = Caches::Metadata.find(interfaceMeta->jsName());
+            if (itMetaCache == Caches::Metadata.end()) {
+                Caches::Metadata.insert(std::make_pair(interfaceMeta->jsName(), interfaceMeta));
             }
-
-            if (!global->Set(Strings::ToV8String(isolate_, interfaceMeta->jsName()), ctorFunc)) {
-                assert(false);
-            }
-
-            RegisterAllocMethod(ctorFunc, interfaceMeta);
-            RegisterStaticMethods(ctorFunc, interfaceMeta);
-            RegisterStaticProperties(ctorFunc, interfaceMeta);
-
-            Local<Value> prototype = ctorFunc->Get(Strings::ToV8String(isolate, "prototype"));
-            Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
-            Caches::Prototypes.insert(std::make_pair(interfaceMeta, poPrototype));
-
             break;
         }
         default: {
@@ -75,57 +55,66 @@ void MetadataBuilder::Init(Isolate* isolate) {
     }
 }
 
-std::map<const Meta*, Local<FunctionTemplate>> MetadataBuilder::GetConstructorFunctionTemplates() {
-    std::map<const Meta*, Local<FunctionTemplate>> result;
-    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-
-    for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
-        const Meta* meta = *it;
-        if (meta->type() != MetaType::Interface) {
-            continue;
-        }
-
-        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
-        auto itMetaCache = Caches::Metadata.find(interfaceMeta->jsName());
-        if (itMetaCache == Caches::Metadata.end()) {
-            Caches::Metadata.insert(std::make_pair(interfaceMeta->jsName(), interfaceMeta));
-        }
-
-        Local<FunctionTemplate> ctorFuncTemplate = GetOrCreateConstructorFunctionTemplate(interfaceMeta);
-        const InterfaceMeta* baseMeta = interfaceMeta->baseMeta();
-        if (baseMeta != nullptr) {
-            Local<FunctionTemplate> parentCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
-            ctorFuncTemplate->Inherit(parentCtorFuncTemplate);
-        }
-
-        result.insert(std::make_pair(meta, ctorFuncTemplate));
-    }
-
-    return result;
-}
-
 Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta) {
     Local<FunctionTemplate> ctorFuncTemplate;
-    Persistent<FunctionTemplate>* poCtorFuncTemplate;
-
-    auto it = ctorTemplatesCache_.find(interfaceMeta);
-    if (it != ctorTemplatesCache_.end()) {
-        poCtorFuncTemplate = it->second;
-        ctorFuncTemplate = Local<FunctionTemplate>::New(isolate_, *poCtorFuncTemplate);
-    } else {
-        CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, nullptr, this);
-        Local<External> ext = External::New(isolate_, item);
-
-        ctorFuncTemplate = FunctionTemplate::New(isolate_, ClassConstructorCallback, ext);
-        ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-        ctorFuncTemplate->SetClassName(Strings::ToV8String(isolate_, interfaceMeta->jsName()));
-
-        RegisterInstanceMethods(ctorFuncTemplate, interfaceMeta);
-        RegisterInstanceProperties(ctorFuncTemplate, interfaceMeta);
-
-        poCtorFuncTemplate = new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate);
-        ctorTemplatesCache_.insert(std::make_pair(interfaceMeta, poCtorFuncTemplate));
+    auto it = ctorFuncTemplatesCache_.find(interfaceMeta);
+    if (it != ctorFuncTemplatesCache_.end()) {
+        ctorFuncTemplate = Local<FunctionTemplate>::New(isolate_, *it->second);
+        return ctorFuncTemplate;
     }
+
+    CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, nullptr, this);
+    Local<External> ext = External::New(isolate_, item);
+
+    ctorFuncTemplate = FunctionTemplate::New(isolate_, ClassConstructorCallback, ext);
+    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    ctorFuncTemplate->SetClassName(Strings::ToV8String(isolate_, interfaceMeta->jsName()));
+    Local<v8::Function> baseCtorFunc;
+
+    while (true) {
+        const InterfaceMeta* baseMeta = interfaceMeta->baseMeta();
+        if (baseMeta != nullptr) {
+            Local<FunctionTemplate> baseCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
+            ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
+            auto it = ctorFuncsCache_.find(baseMeta);
+            if (it != ctorFuncsCache_.end()) {
+                baseCtorFunc = Local<v8::Function>::New(isolate_, *it->second);
+            }
+        }
+        break;
+    }
+
+    RegisterInstanceMethods(ctorFuncTemplate, interfaceMeta);
+    RegisterInstanceProperties(ctorFuncTemplate, interfaceMeta);
+    RegisterInstanceProtocols(ctorFuncTemplate, interfaceMeta);
+
+    Local<Context> context = isolate_->GetCurrentContext();
+    Local<v8::Function> ctorFunc;
+    if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
+        assert(false);
+    }
+
+    ctorFuncsCache_.insert(std::make_pair(interfaceMeta, new Persistent<v8::Function>(isolate_, ctorFunc)));
+    Local<Object> global = context->Global();
+    global->Set(Strings::ToV8String(isolate_, interfaceMeta->jsName()), ctorFunc);
+
+    if (!baseCtorFunc.IsEmpty()) {
+        bool success;
+        if (!ctorFunc->SetPrototype(context, baseCtorFunc).To(&success) || !success) {
+            assert(false);
+        }
+    }
+
+    RegisterAllocMethod(ctorFunc, interfaceMeta);
+    RegisterStaticMethods(ctorFunc, interfaceMeta);
+    RegisterStaticProperties(ctorFunc, interfaceMeta);
+    RegisterStaticProtocols(ctorFunc, interfaceMeta);
+
+    ctorFuncTemplatesCache_.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
+
+    Local<Value> prototype = ctorFunc->Get(Strings::ToV8String(isolate_, "prototype"));
+    Persistent<Value>* poPrototype = new Persistent<Value>(isolate_, prototype);
+    Caches::Prototypes.insert(std::make_pair(interfaceMeta, poPrototype));
 
     return ctorFuncTemplate;
 }
@@ -192,6 +181,22 @@ void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFun
     }
 }
 
+void MetadataBuilder::RegisterInstanceProtocols(Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta) {
+    if (meta->type() == MetaType::ProtocolType) {
+        RegisterInstanceMethods(ctorFuncTemplate, meta);
+        RegisterInstanceProperties(ctorFuncTemplate, meta);
+    }
+
+    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+    for (auto itProto = meta->protocols->begin(); itProto != meta->protocols->end(); itProto++) {
+        std::string protocolName = (*itProto).valuePtr();
+        const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName.c_str());
+        if (protoMeta != nullptr) {
+            RegisterInstanceProtocols(ctorFuncTemplate, protoMeta);
+        }
+    }
+}
+
 void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const BaseClassMeta* meta) {
     Local<Context> context = isolate_->GetCurrentContext();
     for (auto it = meta->staticMethods->begin(); it != meta->staticMethods->end(); it++) {
@@ -232,6 +237,22 @@ void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, con
             if (!maybeSuccess.To(&success) || !success) {
                 assert(false);
             }
+        }
+    }
+}
+
+void MetadataBuilder::RegisterStaticProtocols(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta) {
+    if (meta->type() == MetaType::ProtocolType) {
+        RegisterStaticMethods(ctorFunc, meta);
+        //RegisterStaticProperties(ctorFunc, meta);
+    }
+
+    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+    for (auto itProto = meta->protocols->begin(); itProto != meta->protocols->end(); itProto++) {
+        std::string protocolName = (*itProto).valuePtr();
+        const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName.c_str());
+        if (protoMeta != nullptr) {
+            RegisterStaticProtocols(ctorFunc, protoMeta);
         }
     }
 }
@@ -319,7 +340,7 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
     item->builder_->InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->classMeta_->jsName());
 }
 
-    Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass) {
+Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass) {
     Class klass = objc_getClass(containingClass.c_str());
     SEL selector = meta->selector();
 
@@ -351,17 +372,7 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
         [invocation invoke];
     }
 
-    const char* returnType = signature.methodReturnType;
-    if (strcmp(returnType, "v") != 0) {
-        id result = nil;
-        [invocation getReturnValue:&result];
-        if (result) {
-            CFBridgingRetain(result);
-            return argConverter_.ConvertArgument(isolate, result);
-        }
-    }
-
-    return Local<Value>();
+    return argConverter_.ConvertArgument(isolate, invocation, signature.methodReturnType);
 }
 
 }

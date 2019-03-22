@@ -27,7 +27,7 @@ class ArgConverter {
 public:
     void Init(v8::Isolate* isolate, ObjectManager objectManager);
     void SetArgument(NSInvocation* invocation, int index, v8::Isolate* isolate, v8::Local<v8::Value> arg, const TypeEncoding* typeEncoding);
-    v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
+    v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, NSInvocation* invocation, std::string returnType);
     v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj, v8::Local<v8::Object> receiver);
     v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);
 private:
@@ -39,6 +39,7 @@ private:
     const InterfaceMeta* GetInterfaceMeta(std::string className);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     void SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding);
+    v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
 };
 
 }

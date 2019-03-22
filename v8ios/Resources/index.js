@@ -25,11 +25,10 @@ var request = NSURLRequest.requestWithURL(url);
 var queue = new NSOperationQueue();
 NSURLConnection.sendAsynchronousRequestQueueCompletionHandler(request, queue, (response, data, connectionError) => {
     var res = NSString.alloc().initWithDataEncoding(data, NSUTF8StringEncoding);
-    console.log(res);
+    console.log(res.UTF8String);
 });
 
-//var a = NSMutableString.alloc().init();
- 
+
 //f();
 //gc();
 //console.log("Finished allocating objects");
@@ -37,15 +36,6 @@ NSURLConnection.sendAsynchronousRequestQueueCompletionHandler(request, queue, (r
 //var aString = new NSMutableString.alloc().init();
 //var hasAppend = aString.respondsToSelector("appendString:");
 //console.log(hasAppend);
-
-/**
-var a = NSURL.alloc();
-var b = a.init();
-//console.log(Object.getOwnPropertyNames(a.__proto__));
-//console.log("\n--------\n");
-//console.log(Object.getOwnPropertyNames(b.__proto__));
-console.log(a.__proto__ == b.__proto__);
- **/
 
 /**
 var array = new NSMutableArray();
@@ -76,5 +66,5 @@ BenchmarkSuite.RunSuites({
     NotifyResult : (name, result) => console.log(`Result of ${name}: ${result}\n`),
     NotifyScore : score => console.log(`Octane benchmark score: ${score}`)
 }, []);
-**/
+ **/
 
