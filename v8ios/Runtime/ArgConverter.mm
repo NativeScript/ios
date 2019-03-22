@@ -21,6 +21,13 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
         return;
     }
 
+    if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
+        std::string str = Strings::ToString(isolate, arg);
+        const char* s = str.c_str();
+        [invocation setArgument:&s atIndex:index];
+        return;
+    }
+
     if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
         std::string str = Strings::ToString(isolate, arg);
         NSString* selector = [NSString stringWithUTF8String:str.c_str()];
@@ -145,12 +152,77 @@ Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, NSInvocation* invoc
     }
 
     if (returnType == "*" || returnType == "r*") {
-        // char* or const char*
         char* result = nullptr;
         [invocation getReturnValue:&result];
         if (result != nullptr) {
             return Strings::ToV8String(isolate, result);
         }
+    }
+
+    if (returnType == "i") {
+        int result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "I") {
+        unsigned int result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "s") {
+        short result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "S") {
+        unsigned short result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "l") {
+        long result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "L") {
+        unsigned long result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "q") {
+        long long result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "Q") {
+        unsigned long long result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "f") {
+        float result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "d") {
+        double result;
+        [invocation getReturnValue:&result];
+        return Number::New(isolate, result);
+    }
+
+    if (returnType == "B") {
+        bool result;
+        [invocation getReturnValue:&result];
+        return v8::Boolean::New(isolate, result);
     }
 
     // TODO: Handle all the possible return types https://nshipster.com/type-encodings/
