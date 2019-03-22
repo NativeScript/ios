@@ -36,6 +36,14 @@ void MetadataBuilder::Init(Isolate* isolate) {
             break;
         }
         case MetaType::ProtocolType: {
+            const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
+            Local<Object> proto = argConverter_.CreateEmptyObject(context);
+
+            DataWrapper* wrapper = new DataWrapper(nil, protoMeta);
+            Local<External> ext = External::New(isolate, wrapper);
+            proto->SetInternalField(0, ext);
+
+            global->Set(Strings::ToV8String(isolate, meta->jsName()), proto);
             break;
         }
         case MetaType::Interface: {

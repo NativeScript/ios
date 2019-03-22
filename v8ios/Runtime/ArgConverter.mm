@@ -21,6 +21,15 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
         return;
     }
 
+    if (arg->IsObject() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
+        Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
+        DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
+        std::string protocolName = wrapper->meta_->name();
+        Protocol* protocol = objc_getProtocol(protocolName.c_str());
+        [invocation setArgument:&protocol atIndex:index];
+        return;
+    }
+
     if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
         std::string str = Strings::ToString(isolate, arg);
         const char* s = str.c_str();
