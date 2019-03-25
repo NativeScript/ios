@@ -10,6 +10,7 @@
 #include "Metadata.h"
 #include "ObjectManager.h"
 #include "ArgConverter.h"
+#include "ClassBuilder.h"
 
 namespace tns {
 
@@ -23,14 +24,10 @@ public:
     }
 
 private:
-    template<class T>
-    struct CacheItem;
-
     v8::Isolate* isolate_;
     ObjectManager objectManager_;
     ArgConverter argConverter_;
-    std::map<const InterfaceMeta*, v8::Persistent<v8::FunctionTemplate>*> ctorFuncTemplatesCache_;
-    std::map<const InterfaceMeta*, v8::Persistent<v8::Function>*> ctorFuncsCache_;
+    ClassBuilder classBuilder_;
 
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

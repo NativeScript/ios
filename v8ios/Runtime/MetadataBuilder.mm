@@ -13,6 +13,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
     isolate_ = isolate;
 
     argConverter_.Init(isolate, objectManager_);
+    classBuilder_.Init(argConverter_, objectManager_);
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
@@ -65,8 +66,8 @@ void MetadataBuilder::Init(Isolate* isolate) {
 
 Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta) {
     Local<FunctionTemplate> ctorFuncTemplate;
-    auto it = ctorFuncTemplatesCache_.find(interfaceMeta);
-    if (it != ctorFuncTemplatesCache_.end()) {
+    auto it = Caches::CtorFuncTemplates.find(interfaceMeta);
+    if (it != Caches::CtorFuncTemplates.end()) {
         ctorFuncTemplate = Local<FunctionTemplate>::New(isolate_, *it->second);
         return ctorFuncTemplate;
     }
@@ -84,8 +85,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         if (baseMeta != nullptr) {
             Local<FunctionTemplate> baseCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
             ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
-            auto it = ctorFuncsCache_.find(baseMeta);
-            if (it != ctorFuncsCache_.end()) {
+            auto it = Caches::CtorFuncs.find(baseMeta);
+            if (it != Caches::CtorFuncs.end()) {
                 baseCtorFunc = Local<v8::Function>::New(isolate_, *it->second);
             }
         }
@@ -102,7 +103,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         assert(false);
     }
 
-    ctorFuncsCache_.insert(std::make_pair(interfaceMeta, new Persistent<v8::Function>(isolate_, ctorFunc)));
+    Caches::CtorFuncs.insert(std::make_pair(interfaceMeta, new Persistent<v8::Function>(isolate_, ctorFunc)));
     Local<Object> global = context->Global();
     global->Set(Strings::ToV8String(isolate_, interfaceMeta->jsName()), ctorFunc);
 
@@ -118,7 +119,10 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     RegisterStaticProperties(ctorFunc, interfaceMeta);
     RegisterStaticProtocols(ctorFunc, interfaceMeta);
 
-    ctorFuncTemplatesCache_.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
+    Local<v8::Function> extendFunc = classBuilder_.GetExtendFunction(context, interfaceMeta);
+    ctorFunc->Set(Strings::ToV8String(isolate_, "extend"), extendFunc);
+
+    Caches::CtorFuncTemplates.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
 
     Local<Value> prototype = ctorFunc->Get(Strings::ToV8String(isolate_, "prototype"));
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate_, prototype);

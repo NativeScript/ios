@@ -26,6 +26,7 @@
 		C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */; };
 		C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9CC224391A3006FB9D3 /* Caches.cpp */; };
 		C2AAE9D12243992C006FB9D3 /* Strings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9CF2243992C006FB9D3 /* Strings.cpp */; };
+		C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */; };
 		C2B12E9E22269B43000F6AFC /* richards.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9C22269B43000F6AFC /* richards.js */; };
 		C2B12E9F22269B43000F6AFC /* base.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9D22269B43000F6AFC /* base.js */; };
 		C2B12EB12226BA2E000F6AFC /* deltablue.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EB02226BA2E000F6AFC /* deltablue.js */; };
@@ -86,6 +87,8 @@
 		C2AAE9CD224391A3006FB9D3 /* Caches.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Caches.h; sourceTree = "<group>"; };
 		C2AAE9CF2243992C006FB9D3 /* Strings.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Strings.cpp; sourceTree = "<group>"; };
 		C2AAE9D02243992C006FB9D3 /* Strings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Strings.h; sourceTree = "<group>"; };
+		C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ClassBuilder.mm; sourceTree = "<group>"; };
+		C2AAE9D3224902FD006FB9D3 /* ClassBuilder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClassBuilder.h; sourceTree = "<group>"; };
 		C2B12E9C22269B43000F6AFC /* richards.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = richards.js; sourceTree = "<group>"; };
 		C2B12E9D22269B43000F6AFC /* base.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = base.js; sourceTree = "<group>"; };
 		C2B12EB02226BA2E000F6AFC /* deltablue.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = deltablue.js; sourceTree = "<group>"; };
@@ -170,6 +173,8 @@
 				C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */,
 				C2AAE9CD224391A3006FB9D3 /* Caches.h */,
 				C2AAE9CC224391A3006FB9D3 /* Caches.cpp */,
+				C2AAE9D3224902FD006FB9D3 /* ClassBuilder.h */,
+				C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */,
 				C24F39182225859D0027977A /* Console.h */,
 				C24F39192225859D0027977A /* Console.cpp */,
 				C2764AF5222BE705008F674F /* Metadata.h */,
@@ -354,6 +359,7 @@
 				C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */,
 				C24F391A2225859D0027977A /* Console.cpp in Sources */,
 				C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */,
+				C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */,
 				C27E278522202664009C10A3 /* AppDelegate.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

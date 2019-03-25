@@ -21,6 +21,12 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
         return;
     }
 
+    if (arg->IsBoolean() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
+        bool value = arg.As<v8::Boolean>()->Value();
+        [invocation setArgument:&value atIndex:index];
+        return;
+    }
+    
     if (arg->IsObject() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
         Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
         DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
@@ -104,6 +110,7 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
                     assert(false);
                 }
 
+                poCallback->Reset();
                 delete poCallback;
             });
         };
