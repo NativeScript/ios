@@ -1,6 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "MetadataBuilder.h"
-#include "Strings.h"
+#include "Helpers.h"
 
 using namespace v8;
 
@@ -33,7 +33,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
             Local<Object> enumValue = argConverter_.CreateEmptyObject(context);
             Local<External> ext = External::New(isolate, wrapper);
             enumValue->SetInternalField(0, ext);
-            global->Set(Strings::ToV8String(isolate, meta->jsName()), enumValue);
+            global->Set(tns::ToV8String(isolate, meta->jsName()), enumValue);
             break;
         }
         case MetaType::ProtocolType: {
@@ -44,7 +44,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
             Local<External> ext = External::New(isolate, wrapper);
             proto->SetInternalField(0, ext);
 
-            global->Set(Strings::ToV8String(isolate, meta->jsName()), proto);
+            global->Set(tns::ToV8String(isolate, meta->jsName()), proto);
             break;
         }
         case MetaType::Interface: {
@@ -77,7 +77,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 
     ctorFuncTemplate = FunctionTemplate::New(isolate_, ClassConstructorCallback, ext);
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-    ctorFuncTemplate->SetClassName(Strings::ToV8String(isolate_, interfaceMeta->jsName()));
+    ctorFuncTemplate->SetClassName(tns::ToV8String(isolate_, interfaceMeta->jsName()));
     Local<v8::Function> baseCtorFunc;
 
     while (true) {
@@ -103,9 +103,12 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         assert(false);
     }
 
+    Local<External> ctorFuncExtData = External::New(isolate_, new DataWrapper(nullptr, interfaceMeta));
+    tns::SetPrivateValue(isolate_, ctorFunc, tns::ToV8String(isolate_, "metadata"), ctorFuncExtData);
+
     Caches::CtorFuncs.insert(std::make_pair(interfaceMeta, new Persistent<v8::Function>(isolate_, ctorFunc)));
     Local<Object> global = context->Global();
-    global->Set(Strings::ToV8String(isolate_, interfaceMeta->jsName()), ctorFunc);
+    global->Set(tns::ToV8String(isolate_, interfaceMeta->jsName()), ctorFunc);
 
     if (!baseCtorFunc.IsEmpty()) {
         bool success;
@@ -120,11 +123,11 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     RegisterStaticProtocols(ctorFunc, interfaceMeta);
 
     Local<v8::Function> extendFunc = classBuilder_.GetExtendFunction(context, interfaceMeta);
-    ctorFunc->Set(Strings::ToV8String(isolate_, "extend"), extendFunc);
+    ctorFunc->Set(tns::ToV8String(isolate_, "extend"), extendFunc);
 
     Caches::CtorFuncTemplates.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
 
-    Local<Value> prototype = ctorFunc->Get(Strings::ToV8String(isolate_, "prototype"));
+    Local<Value> prototype = ctorFunc->Get(tns::ToV8String(isolate_, "prototype"));
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate_, prototype);
     Caches::Prototypes.insert(std::make_pair(interfaceMeta, poPrototype));
 
@@ -141,7 +144,7 @@ void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {
     if (!v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func)) {
         assert(false);
     }
-    global->Set(Strings::ToV8String(isolate_, funcMeta->jsName()), func);
+    global->Set(tns::ToV8String(isolate_, funcMeta->jsName()), func);
 }
 
 void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {
@@ -153,7 +156,7 @@ void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const In
     if (!allocFuncTemplate->GetFunction(context).ToLocal(&allocFunc)) {
         assert(false);
     }
-    ctorFunc->Set(Strings::ToV8String(isolate_, "alloc"), allocFunc);
+    ctorFunc->Set(tns::ToV8String(isolate_, "alloc"), allocFunc);
 }
 
 void MetadataBuilder::RegisterInstanceMethods(Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta) {
@@ -164,7 +167,7 @@ void MetadataBuilder::RegisterInstanceMethods(Local<FunctionTemplate> ctorFuncTe
         CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta, this);
         Local<External> ext = External::New(isolate_, item);
         Local<FunctionTemplate> instanceMethodTemplate = FunctionTemplate::New(isolate_, MethodCallback, ext);
-        proto->Set(Strings::ToV8String(isolate_, methodMeta->jsName()), instanceMethodTemplate);
+        proto->Set(tns::ToV8String(isolate_, methodMeta->jsName()), instanceMethodTemplate);
     }
 }
 
@@ -187,7 +190,7 @@ void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFun
         if (getter || setter) {
             CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, meta, this);
             Local<External> ext = External::New(isolate_, item);
-            Local<v8::String> propName = Strings::ToV8String(isolate_, propMeta->jsName());
+            Local<v8::String> propName = tns::ToV8String(isolate_, propMeta->jsName());
             proto->SetAccessor(propName, getter, setter, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
         }
     }
@@ -220,7 +223,7 @@ void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const 
         if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
             assert(false);
         }
-        ctorFunc->Set(Strings::ToV8String(isolate_, methodMeta->jsName()), staticMethod);
+        ctorFunc->Set(tns::ToV8String(isolate_, methodMeta->jsName()), staticMethod);
     }
 }
 
@@ -242,7 +245,7 @@ void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, con
             CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, meta, this);
             Local<External> ext = External::New(isolate_, item);
 
-            Local<v8::String> propName = Strings::ToV8String(isolate_, propMeta->jsName());
+            Local<v8::String> propName = tns::ToV8String(isolate_, propMeta->jsName());
             Local<Context> context = isolate_->GetCurrentContext();
             bool success;
             Maybe<bool> maybeSuccess = ctorFunc->SetAccessor(context, propName, getter, setter, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);

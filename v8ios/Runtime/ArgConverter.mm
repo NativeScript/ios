@@ -1,6 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "ArgConverter.h"
-#include "Strings.h"
+#include "Helpers.h"
 
 using namespace v8;
 using namespace std;
@@ -26,7 +26,7 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
         [invocation setArgument:&value atIndex:index];
         return;
     }
-    
+
     if (arg->IsObject() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
         Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
         DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
@@ -37,14 +37,14 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
     }
 
     if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
-        std::string str = Strings::ToString(isolate, arg);
+        std::string str = tns::ToString(isolate, arg);
         const char* s = str.c_str();
         [invocation setArgument:&s atIndex:index];
         return;
     }
 
     if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
-        std::string str = Strings::ToString(isolate, arg);
+        std::string str = tns::ToString(isolate, arg);
         NSString* selector = [NSString stringWithUTF8String:str.c_str()];
         SEL res = NSSelectorFromString(selector);
         [invocation setArgument:&res atIndex:index];
@@ -53,7 +53,7 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
 
     Local<Context> context = isolate->GetCurrentContext();
     if (arg->IsString()) {
-        std::string str = Strings::ToString(isolate, arg);
+        std::string str = tns::ToString(isolate, arg);
         NSString* result = [NSString stringWithUTF8String:str.c_str()];
         [invocation setArgument:&result atIndex:index];
         return;
@@ -130,7 +130,7 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
                 std::string jsCode = jsCodeMeta->jsCode();
 
                 Local<Script> script;
-                if (!Script::Compile(context, Strings::ToV8String(isolate, jsCode)).ToLocal(&script)) {
+                if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
                     assert(false);
                 }
                 assert(!script.IsEmpty());
@@ -171,7 +171,7 @@ Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, NSInvocation* invoc
         char* result = nullptr;
         [invocation getReturnValue:&result];
         if (result != nullptr) {
-            return Strings::ToV8String(isolate, result);
+            return tns::ToV8String(isolate, result);
         }
     }
 

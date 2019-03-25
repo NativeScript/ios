@@ -1,6 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "ClassBuilder.h"
-#include "Strings.h"
+#include "Helpers.h"
 #include "Caches.h"
 
 using namespace v8;
@@ -35,7 +35,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
 
     Local<Object> implementationObject = info[0].As<Object>();
     Local<v8::Function> baseFunc = info.This().As<v8::Function>();
-    std::string name = Strings::ToString(isolate, baseFunc->GetName());
+    std::string name = tns::ToString(isolate, baseFunc->GetName());
 
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
     const InterfaceMeta* interfaceMeta = globalTable->findInterfaceMeta(name.c_str());
@@ -60,14 +60,14 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     }
 
     bool success;
-    if (!implementationObject->SetPrototype(context, baseCtorFunc->Get(Strings::ToV8String(isolate, "prototype"))).To(&success) || !success) {
+    if (!implementationObject->SetPrototype(context, baseCtorFunc->Get(tns::ToV8String(isolate, "prototype"))).To(&success) || !success) {
         assert(false);
     }
-    if (!implementationObject->SetAccessor(context, Strings::ToV8String(isolate, "super"), SuperAccessorGetterCallback, nullptr, ext).To(&success) || !success) {
+    if (!implementationObject->SetAccessor(context, tns::ToV8String(isolate, "super"), SuperAccessorGetterCallback, nullptr, ext).To(&success) || !success) {
         assert(false);
     }
 
-    Local<Object> extendFuncPrototype = extendClassCtorFunc->Get(Strings::ToV8String(isolate, "prototype")).As<Object>();
+    Local<Object> extendFuncPrototype = extendClassCtorFunc->Get(tns::ToV8String(isolate, "prototype")).As<Object>();
     if (!extendFuncPrototype->SetPrototype(context, implementationObject).To(&success) || !success) {
         assert(false);
     }
@@ -96,7 +96,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 }
 
 void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
-    Local<Value> exposedMethods = nativeSignature->Get(Strings::ToV8String(isolate, "exposedMethods"));
+    Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
     if (!exposedMethods.IsEmpty() && exposedMethods->IsObject()) {
         Local<Context> context = isolate->GetCurrentContext();
         Local<v8::Array> methodNames;
@@ -118,7 +118,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
 
             SEL selector;
             uint32_t argsCount;
-            std::string typeInfo = GetMethodTypeInfo(isolate, exposedMethods.As<Object>()->Get(methodName).As<Object>(), Strings::ToString(isolate, methodName), selector, argsCount);
+            std::string typeInfo = GetMethodTypeInfo(isolate, exposedMethods.As<Object>()->Get(methodName).As<Object>(), tns::ToString(isolate, methodName), selector, argsCount);
 
             id block = ^(id self, id first...) {
                 va_list args;
@@ -190,7 +190,7 @@ std::string ClassBuilder::GetMethodTypeInfo(Isolate* isolate, Local<Object> meth
     std::string result = "v@:";
     argCount = 0;
 
-    Local<Value> params = methodSignature->Get(Strings::ToV8String(isolate, "params"));
+    Local<Value> params = methodSignature->Get(tns::ToV8String(isolate, "params"));
     if (params.IsEmpty() || !params->IsArray() || params.As<v8::Array>()->Length() < 1) {
         selector = NSSelectorFromString([NSString stringWithUTF8String:methodName.c_str()]);
         return result;
@@ -201,13 +201,20 @@ std::string ClassBuilder::GetMethodTypeInfo(Isolate* isolate, Local<Object> meth
     for (int i = 0; i < paramsArray->Length(); i++) {
         Local<Value> param = paramsArray->Get(i);
         if (param->IsFunction()) {
-            if (i == 0) {
-                selectorStr += ":";
-            } else {
-                selectorStr += ":and";
+            Local<Value> val = tns::GetPrivateValue(isolate, param.As<v8::Function>(), tns::ToV8String(isolate, "metadata"));
+            if (!val.IsEmpty()) {
+                if (i == 0) {
+                    selectorStr += ":";
+                } else {
+                    selectorStr += ":and";
+                }
+                result += "@";
             }
-            result += "@";
+            continue;
         }
+
+        // TODO: handle the interop.types primitives (https://docs.nativescript.org/core-concepts/ios-runtime/how-to/ObjC-Subclassing)
+        assert(false);
     }
 
     selector = NSSelectorFromString([NSString stringWithUTF8String:selectorStr.c_str()]);

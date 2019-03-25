@@ -1,5 +1,5 @@
 #include "Console.h"
-#include "Strings.h"
+#include "Helpers.h"
 
 using namespace v8;
 
@@ -17,7 +17,7 @@ void Console::Init(Isolate* isolate) {
         return;
     }
 
-    Local<String> logFuncName = Strings::ToV8String(isolate, "log");
+    Local<String> logFuncName = tns::ToV8String(isolate, "log");
     func->SetName(logFuncName);
     if (!console->CreateDataProperty(context, logFuncName, func).FromMaybe(false)) {
         assert(false);
@@ -25,7 +25,7 @@ void Console::Init(Isolate* isolate) {
 
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
-    if (!global->DefineOwnProperty(context, Strings::ToV8String(isolate, "console"), console, readOnlyFlags).FromMaybe(false)) {
+    if (!global->DefineOwnProperty(context, tns::ToV8String(isolate, "console"), console, readOnlyFlags).FromMaybe(false)) {
         assert(false);
     }
 }
@@ -33,7 +33,7 @@ void Console::Init(Isolate* isolate) {
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     Local<Value> value = args[0];
     Isolate* isolate = args.GetIsolate();
-    std::string str = Strings::ToString(isolate, value);
+    std::string str = tns::ToString(isolate, value);
     printf("%s", str.c_str());
 }
 
