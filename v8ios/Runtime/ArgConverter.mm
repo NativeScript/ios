@@ -75,45 +75,12 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
     }
 
     if (arg->IsFunction() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
-        Local<v8::Function> callback = arg.As<v8::Function>();
-        Persistent<v8::Function>* poCallback = new Persistent<v8::Function>(isolate, callback);
+        Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, arg.As<Object>());
+        ObjectWeakCallbackState* state = new ObjectWeakCallbackState(poCallback);
+        poCallback->SetWeak(state, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
 
-        id block = ^(id first, ...) {
-            va_list args;
-            int argsCount = typeEncoding->details.block.signature.count - 1;
-            std::vector<id> arguments;
-            for (int i = 0; i < argsCount; i++) {
-                id val;
-                if (i == 0) {
-                    va_start(args, first);
-                    val = first;
-                } else {
-                    val = va_arg(args, id);
-                }
-                arguments.push_back(val);
-            }
-            va_end(args);
-
-            dispatch_async(dispatch_get_main_queue(), ^{
-                Local<Value> res;
-                HandleScope handle_scope(isolate);
-                Local<Context> ctx = isolate->GetCurrentContext();
-                Local<v8::Function> callback = Local<v8::Function>::New(isolate, *poCallback);
-
-                std::vector<Local<Value>> v8Args;
-                for (int i = 0; i < argsCount; i++) {
-                    Local<Value> jsWrapper = ConvertArgument(isolate, arguments[i]);
-                    v8Args.push_back(jsWrapper);
-                }
-
-                if (!callback->Call(ctx, ctx->Global(), argsCount, v8Args.data()).ToLocal(&res)) {
-                    assert(false);
-                }
-
-                poCallback->Reset();
-                delete poCallback;
-            });
-        };
+        int argsCount = typeEncoding->details.block.signature.count - 1;
+        MethodCallback block = WrapCallback(isolate, poCallback, argsCount, false);
         const void* ptr = CFBridgingRetain(block);
         [invocation setArgument:&ptr atIndex:index];
         return;
@@ -253,6 +220,84 @@ Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, id obj) {
 
     Local<Value> result = CreateJsWrapper(isolate, obj, Local<Object>());
     return result;
+}
+
+MethodCallback ArgConverter::WrapCallback(Isolate* isolate, const Persistent<v8::Object>* poCallback, const uint8_t argsCount, const bool skipFirstArg) {
+    return ^(id first, ...) {
+        va_list args;
+        std::vector<id> arguments;
+        for (int i = 0; i < argsCount; i++) {
+            id val;
+            if (i == 0) {
+                va_start(args, first);
+                if (skipFirstArg) {
+                    val = va_arg(args, id);
+                } else {
+                    val = first;
+                }
+            } else {
+                val = va_arg(args, id);
+            }
+
+            arguments.push_back(val);
+        }
+        va_end(args);
+
+        Local<Value> (^cb)() = ^Local<Value>() {
+            EscapableHandleScope handle_scope(isolate);
+            Local<Context> ctx = isolate->GetCurrentContext();
+            Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
+
+            std::vector<Local<Value>> v8Args;
+            for (int i = 0; i < argsCount; i++) {
+                Local<Value> jsWrapper = ConvertArgument(isolate, arguments[i]);
+                v8Args.push_back(jsWrapper);
+            }
+
+            Local<Value> result;
+            if (!callback->Call(ctx, ctx->Global(), argsCount, v8Args.data()).ToLocal(&result)) {
+                assert(false);
+            }
+
+            return handle_scope.Escape(result);
+        };
+
+        HandleScope handle_scope(isolate);
+
+        if ([NSThread isMainThread]) {
+            Local<Value> result = cb();
+            if (!result.IsEmpty() && !result->IsUndefined()) {
+                return result;
+            }
+            return Local<Value>();
+        }
+
+        Persistent<Value>* __block poResult = nullptr;
+        dispatch_group_t group = dispatch_group_create();
+        dispatch_group_enter(group);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            HandleScope handle_scope(isolate);
+            Local<Value> localRes = cb();
+            if (!localRes.IsEmpty() && !localRes->IsUndefined()) {
+                poResult = new Persistent<Value>(isolate, localRes);
+            }
+            dispatch_group_leave(group);
+        });
+
+        if (dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC)) != 0) {
+            // TODO: Handle timeout
+            assert(false);
+        }
+
+        Local<Value> result;
+        if (poResult != nullptr) {
+            result = Local<Value>::New(isolate, *poResult);
+            poResult->Reset();
+            delete poResult;
+        }
+
+        return result;
+    };
 }
 
 void ArgConverter::SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding) {

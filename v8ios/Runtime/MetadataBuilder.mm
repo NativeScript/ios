@@ -379,7 +379,7 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* m
 
     if (instanceMethod) {
         Local<External> ext = receiver->GetInternalField(0).As<External>();
-        DataWrapper* wrapper = reinterpret_cast<DataWrapper*>(ext->Value());
+        DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
         id target = wrapper->data_;
         [invocation invokeWithTarget:target];
     } else {

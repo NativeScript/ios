@@ -15,6 +15,8 @@
 
 namespace tns {
 
+typedef v8::Local<v8::Value> (^MethodCallback)(id first...);
+
 struct DataWrapper {
 public:
     DataWrapper(id data): data_(data), meta_(nullptr) {}
@@ -31,6 +33,7 @@ public:
     v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
     v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj, v8::Local<v8::Object> receiver);
     v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);
+    MethodCallback WrapCallback(v8::Isolate* isolate, const v8::Persistent<v8::Object>* callback, const uint8_t argsCount, const bool skipFirstArg);
 private:
     v8::Isolate* isolate_;
     ObjectManager objectManager_;

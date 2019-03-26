@@ -113,47 +113,13 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
                 assert(false);
             }
 
-            // TODO: think of a proper way to free this handle. The native method can be called multiple times
-            Persistent<v8::Function>* poCallback = new Persistent<v8::Function>(isolate, method.As<v8::Function>());
-
             SEL selector;
             uint32_t argsCount;
             std::string typeInfo = GetMethodTypeInfo(isolate, exposedMethods.As<Object>()->Get(methodName).As<Object>(), tns::ToString(isolate, methodName), selector, argsCount);
+            Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
+            MethodCallback callback = argConverter_.WrapCallback(isolate, poCallback, argsCount, true);
 
-            id block = ^(id self, id first...) {
-                va_list args;
-                std::vector<id> arguments;
-                for (int i = 0; i < argsCount; i++) {
-                    id val;
-                    if (i == 0) {
-                        va_start(args, first);
-                        val = first;
-                    } else {
-                        val = va_arg(args, id);
-                    }
-                    arguments.push_back(val);
-                }
-                va_end(args);
-
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    HandleScope handle_scope(isolate);
-                    Local<v8::Function> callback = Local<v8::Function>::New(isolate, *poCallback);
-                    Local<Context> ctx = isolate->GetCurrentContext();
-
-                    std::vector<Local<Value>> v8Args;
-                    for (int i = 0; i < argsCount; i++) {
-                        Local<Value> jsWrapper = argConverter_.ConvertArgument(isolate, arguments[i]);
-                        v8Args.push_back(jsWrapper);
-                    }
-
-                    Local<Value> res;
-                    if (!callback->Call(ctx, ctx->Global(), argsCount, v8Args.data()).ToLocal(&res)) {
-                        assert(false);
-                    }
-                });
-            };
-
-            IMP body = imp_implementationWithBlock(block);
+            IMP body = imp_implementationWithBlock(callback);
             class_addMethod(extendedClass, selector, body, typeInfo.c_str());
         }
     }

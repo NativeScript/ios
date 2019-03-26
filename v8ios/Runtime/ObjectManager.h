@@ -8,19 +8,18 @@
 
 namespace tns {
 
+class ObjectManager;
+
+struct ObjectWeakCallbackState {
+    ObjectWeakCallbackState(v8::Persistent<v8::Object>* target) : target_(target) { }
+    v8::Persistent<v8::Object>* target_;
+};
+
 class ObjectManager {
 public:
     void Register(v8::Isolate* isolate, const v8::Local<v8::Object> obj);
-private:
-    struct ObjectWeakCallbackState;
     static void FinalizerCallback(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
-
-    struct ObjectWeakCallbackState {
-        ObjectWeakCallbackState(ObjectManager* objectManager, v8::Persistent<v8::Object>* target)
-        : objectManager_(objectManager), target_(target) { }
-        ObjectManager* objectManager_;
-        v8::Persistent<v8::Object>* target_;
-    };
+private:
 };
 
 }

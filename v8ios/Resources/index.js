@@ -18,16 +18,70 @@ var formattedDate = formatter.stringFromDate(date);
 console.log(formattedDate);
 **/
 
-//NSTimer.scheduledTimerWithTimeInterval(2, null, "hideManual", null, false);
-
-var url = NSURL.URLWithString("https://example.com");
-var request = NSURLRequest.requestWithURL(url);
-var queue = new NSOperationQueue();
-NSURLConnection.sendAsynchronousRequestQueueCompletionHandler(request, queue, (response, data, connectionError) => {
-    var res = NSString.alloc().initWithDataEncoding(data, NSUTF8StringEncoding);
-    console.log(res.UTF8String);
+var TimerTarget = NSObject.extend({
+    tick: (timer) => {
+        console.log(timer.userInfo.UTF8String);
+    }
+}, {
+    exposedMethods: {
+        tick: {
+            returns: "v",
+            params: [ NSTimer ]
+        }
+    }
 });
+var target = new TimerTarget();
+NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(2.0, target, "tick:", "my user info", false);
 
+//var url = NSURL.URLWithString("https://example.com");
+//var request = NSURLRequest.requestWithURL(url);
+//var queue = new NSOperationQueue();
+//var cb = (response, data, connectionError) => {
+//    var res = NSString.alloc().initWithDataEncoding(data, NSUTF8StringEncoding);
+//    console.log(res.UTF8String);
+//};
+//NSURLConnection.sendAsynchronousRequestQueueCompletionHandler(request, queue, cb);
+
+
+//var MyViewController = UIViewController.extend({
+//   // Override an existing method from the base class.
+//   // We will obtain the method signature from the protocol.
+//   viewDidLoad: function () {
+//        console.log("AAAA");
+//       // Call super using the prototype:
+//       //UIViewController.prototype.viewDidLoad.apply(this, arguments);
+//       // or the super property:
+//       this.super.viewDidLoad();
+//       
+//       // Add UI to the view here...
+//   },
+////   shouldAutorotate: function () { return false; },
+////
+////   // You can override existing properties
+////   get modalInPopover() { return this.super.modalInPopover; },
+////   set modalInPopover(x) { this.super.modalInPopover = x; },
+////
+////   // Additional JavaScript instance methods or properties that are not accessible from Objective-C code.
+////   myMethod: function() { },
+////
+//   get myProperty() { return true; },
+//   set myProperty(x) { },
+//   myMethod: function() {
+//    console.log("aaaa");
+//   }
+//}, {
+//   name: "MyViewController"
+//});
+//
+//var abc = new MyViewController();
+//abc.viewDidLoad();
+//abc.myMethod();
+//console.log(abc.myMethod);
+//console.log("\n");
+//console.log(abc.myProperty);
+//console.log("\n");
+//console.log(abc.isFirstResponder);
+//console.log("\n");
 
 //f();
 //gc();

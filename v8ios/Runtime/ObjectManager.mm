@@ -9,7 +9,7 @@ namespace tns {
 
 void ObjectManager::Register(Isolate* isolate, const v8::Local<v8::Object> obj) {
     Persistent<Object>* objectHandle = new Persistent<Object>(isolate, obj);
-    ObjectWeakCallbackState* state = new ObjectWeakCallbackState(this, objectHandle);
+    ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
     objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
 }
 
