@@ -117,10 +117,9 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
             uint32_t argsCount;
             std::string typeInfo = GetMethodTypeInfo(isolate, exposedMethods.As<Object>()->Get(methodName).As<Object>(), tns::ToString(isolate, methodName), selector, argsCount);
             Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
-            MethodCallback callback = argConverter_.WrapCallback(isolate, poCallback, argsCount, true);
-
-            IMP body = imp_implementationWithBlock(callback);
-            class_addMethod(extendedClass, selector, body, typeInfo.c_str());
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, &argConverter_);
+            IMP methodBody = interop_.CreateMethod(2, argsCount, ArgConverter::MethodCallback, userData);
+            class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str());
         }
     }
 }
@@ -153,7 +152,7 @@ Class ClassBuilder::GetExtendedClass(std::string baseClassName) {
 }
 
 std::string ClassBuilder::GetMethodTypeInfo(Isolate* isolate, Local<Object> methodSignature, std::string methodName, SEL& selector, uint32_t& argCount) {
-    std::string result = "v@:";
+    std::string result = std::string(@encode(void)) + std::string(@encode(id)) + std::string(@encode(SEL));
     argCount = 0;
 
     Local<Value> params = methodSignature->Get(tns::ToV8String(isolate, "params"));
@@ -174,7 +173,7 @@ std::string ClassBuilder::GetMethodTypeInfo(Isolate* isolate, Local<Object> meth
                 } else {
                     selectorStr += ":and";
                 }
-                result += "@";
+                result += std::string(@encode(id));
             }
             continue;
         }

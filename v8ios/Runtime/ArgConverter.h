@@ -11,11 +11,12 @@
 #include <map>
 #include "Metadata.h"
 #include "ObjectManager.h"
+#include "Interop.h"
 #include "Caches.h"
 
 namespace tns {
 
-typedef v8::Local<v8::Value> (^MethodCallback)(id first...);
+class ArgConverter;
 
 struct DataWrapper {
 public:
@@ -23,6 +24,17 @@ public:
     DataWrapper(id data, const Meta* meta): data_(data), meta_(meta) {}
     id data_;
     const Meta* meta_;
+};
+
+struct MethodCallbackWrapper {
+public:
+    MethodCallbackWrapper(v8::Isolate* isolate, const v8::Persistent<v8::Object>* callback, const uint8_t initialParamIndex, const uint8_t paramsCount, ArgConverter* argConverter)
+        : isolate_(isolate), callback_(callback), initialParamIndex_(initialParamIndex), paramsCount_(paramsCount), argConverter_(argConverter) {}
+    v8::Isolate* isolate_;
+    const v8::Persistent<v8::Object>* callback_;
+    const uint8_t initialParamIndex_;
+    const uint8_t paramsCount_;
+    ArgConverter* argConverter_;
 };
 
 class ArgConverter {
@@ -33,10 +45,11 @@ public:
     v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
     v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj, v8::Local<v8::Object> receiver);
     v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);
-    MethodCallback WrapCallback(v8::Isolate* isolate, const v8::Persistent<v8::Object>* callback, const uint8_t argsCount, const bool skipFirstArg);
+    static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData);
 private:
     v8::Isolate* isolate_;
     ObjectManager objectManager_;
+    Interop interop_;
     v8::Persistent<v8::Function>* poEmptyObjCtorFunc_;
 
     const InterfaceMeta* FindInterfaceMeta(id obj);

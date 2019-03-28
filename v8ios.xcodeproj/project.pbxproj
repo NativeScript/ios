@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C2335B70224CADD50071048C /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2335B6E224CADD50071048C /* Interop.mm */; };
+		C2335B74224CEAFA0071048C /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2335B73224CEAFA0071048C /* libffi.a */; };
+		C245885E224A4913000D147A /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C245885D224A4913000D147A /* libtorque_generated_initializers.a */; };
 		C24F3915222576D00027977A /* index.js in Resources */ = {isa = PBXBuildFile; fileRef = C24F3914222576D00027977A /* index.js */; };
 		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
 		C2764AF3222BDFDE008F674F /* metadata-x86_64.bin in Resources */ = {isa = PBXBuildFile; fileRef = C2764AF2222BDFDE008F674F /* metadata-x86_64.bin */; };
@@ -43,13 +46,16 @@
 		C2B12F0222297FD7000F6AFC /* libv8_init.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFA22297FD2000F6AFC /* libv8_init.a */; };
 		C2B12F0322297FD7000F6AFC /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFB22297FD2000F6AFC /* libv8_external_snapshot.a */; };
 		C2B12F0422297FD7000F6AFC /* libv8_base.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFC22297FD5000F6AFC /* libv8_base.a */; };
-		C2B12F0522297FD7000F6AFC /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFD22297FD7000F6AFC /* libtorque_generated_initializers.a */; };
 		C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */; };
 		C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */; };
 		C2E5F77D223796C400A3A68F /* regexp.js in Resources */ = {isa = PBXBuildFile; fileRef = C2E5F77C223796C300A3A68F /* regexp.js */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C2335B6E224CADD50071048C /* Interop.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Interop.mm; sourceTree = "<group>"; };
+		C2335B6F224CADD50071048C /* Interop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Interop.h; sourceTree = "<group>"; };
+		C2335B73224CEAFA0071048C /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
+		C245885D224A4913000D147A /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
 		C24F3914222576D00027977A /* index.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = index.js; sourceTree = "<group>"; };
 		C24F39182225859D0027977A /* Console.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Console.h; sourceTree = "<group>"; };
 		C24F39192225859D0027977A /* Console.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
@@ -110,7 +116,6 @@
 		C2B12EFA22297FD2000F6AFC /* libv8_init.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_init.a; sourceTree = "<group>"; };
 		C2B12EFB22297FD2000F6AFC /* libv8_external_snapshot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_external_snapshot.a; sourceTree = "<group>"; };
 		C2B12EFC22297FD5000F6AFC /* libv8_base.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base.a; sourceTree = "<group>"; };
-		C2B12EFD22297FD7000F6AFC /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
 		C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
 		C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
 		C2E5F77C223796C300A3A68F /* regexp.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = regexp.js; sourceTree = "<group>"; };
@@ -123,9 +128,10 @@
 			files = (
 				C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */,
 				C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */,
+				C2335B74224CEAFA0071048C /* libffi.a in Frameworks */,
 				C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */,
 				C2B12F0422297FD7000F6AFC /* libv8_base.a in Frameworks */,
-				C2B12F0522297FD7000F6AFC /* libtorque_generated_initializers.a in Frameworks */,
+				C245885E224A4913000D147A /* libtorque_generated_initializers.a in Frameworks */,
 				C2B12F0222297FD7000F6AFC /* libv8_init.a in Frameworks */,
 				C2B12F0322297FD7000F6AFC /* libv8_external_snapshot.a in Frameworks */,
 				C2B12F0022297FD7000F6AFC /* libv8_initializers.a in Frameworks */,
@@ -179,6 +185,8 @@
 				C24F39192225859D0027977A /* Console.cpp */,
 				C2AAE9D622490F50006FB9D3 /* Helpers.h */,
 				C2AAE9D522490F50006FB9D3 /* Helpers.cpp */,
+				C2335B6F224CADD50071048C /* Interop.h */,
+				C2335B6E224CADD50071048C /* Interop.mm */,
 				C2764AF5222BE705008F674F /* Metadata.h */,
 				C2764AF4222BE705008F674F /* Metadata.mm */,
 				C2764AF8222E80AC008F674F /* MetadataBuilder.h */,
@@ -249,7 +257,8 @@
 		C27E279922202720009C10A3 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				C2B12EFD22297FD7000F6AFC /* libtorque_generated_initializers.a */,
+				C2335B73224CEAFA0071048C /* libffi.a */,
+				C245885D224A4913000D147A /* libtorque_generated_initializers.a */,
 				C2B12EFC22297FD5000F6AFC /* libv8_base.a */,
 				C2B12EFB22297FD2000F6AFC /* libv8_external_snapshot.a */,
 				C2B12EFA22297FD2000F6AFC /* libv8_init.a */,
@@ -355,6 +364,7 @@
 				C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */,
 				C2764AFC223644B3008F674F /* ObjectManager.mm in Sources */,
 				C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */,
+				C2335B70224CADD50071048C /* Interop.mm in Sources */,
 				C2AAE9D722490F50006FB9D3 /* Helpers.cpp in Sources */,
 				C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */,
 				C24F391A2225859D0027977A /* Console.cpp in Sources */,

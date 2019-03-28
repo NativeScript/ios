@@ -52,7 +52,7 @@ NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(2.0, target,
 //       //UIViewController.prototype.viewDidLoad.apply(this, arguments);
 //       // or the super property:
 //       this.super.viewDidLoad();
-//       
+//
 //       // Add UI to the view here...
 //   },
 ////   shouldAutorotate: function () { return false; },
