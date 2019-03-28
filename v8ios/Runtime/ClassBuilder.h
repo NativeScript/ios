@@ -28,7 +28,6 @@ private:
     static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
     Class GetExtendedClass(std::string baseClassName);
-    std::string GetMethodTypeInfo(v8::Isolate* isolate, v8::Local<v8::Object> methodSignature, std::string methodName, SEL& selector, uint32_t& argCount);
     void ExposeDynamicMembers(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
 
     struct CacheItem {

@@ -113,12 +113,21 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
                 assert(false);
             }
 
-            SEL selector;
-            uint32_t argsCount;
-            std::string typeInfo = GetMethodTypeInfo(isolate, exposedMethods.As<Object>()->Get(methodName).As<Object>(), tns::ToString(isolate, methodName), selector, argsCount);
+            // TODO: Prepare the TypeEncoding* from the v8 arguments and return type
+            const InterfaceMeta* interfaceMeta = argConverter_.FindInterfaceMeta(extendedClass);
+            std::string typeInfo = "v@:@";
+            int argsCount = 1;
+            std::string methodNameStr = tns::ToString(isolate, methodName);
+            SEL selector = NSSelectorFromString([NSString stringWithUTF8String:(methodNameStr + ":").c_str()]);
+
+            TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc(2, sizeof(TypeEncoding)));
+            typeEncoding->type = BinaryTypeEncodingType::VoidEncoding;
+            TypeEncoding* next = reinterpret_cast<TypeEncoding*>(reinterpret_cast<char*>(typeEncoding) + sizeof(BinaryTypeEncodingType));
+            next->type = BinaryTypeEncodingType::InterfaceDeclarationReference;
+
             Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
-            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, &argConverter_);
-            IMP methodBody = interop_.CreateMethod(2, argsCount, ArgConverter::MethodCallback, userData);
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding, &argConverter_);
+            IMP methodBody = interop_.CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
             class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str());
         }
     }
@@ -149,43 +158,6 @@ Class ClassBuilder::GetExtendedClass(std::string baseClassName) {
 
     clazz = objc_allocateClassPair(baseClass, name.c_str(), 0);
     return clazz;
-}
-
-std::string ClassBuilder::GetMethodTypeInfo(Isolate* isolate, Local<Object> methodSignature, std::string methodName, SEL& selector, uint32_t& argCount) {
-    std::string result = std::string(@encode(void)) + std::string(@encode(id)) + std::string(@encode(SEL));
-    argCount = 0;
-
-    Local<Value> params = methodSignature->Get(tns::ToV8String(isolate, "params"));
-    if (params.IsEmpty() || !params->IsArray() || params.As<v8::Array>()->Length() < 1) {
-        selector = NSSelectorFromString([NSString stringWithUTF8String:methodName.c_str()]);
-        return result;
-    }
-
-    std::string selectorStr = methodName;
-    Local<v8::Array> paramsArray = params.As<v8::Array>();
-    for (int i = 0; i < paramsArray->Length(); i++) {
-        Local<Value> param = paramsArray->Get(i);
-        if (param->IsFunction()) {
-            Local<Value> val = tns::GetPrivateValue(isolate, param.As<v8::Function>(), tns::ToV8String(isolate, "metadata"));
-            if (!val.IsEmpty()) {
-                if (i == 0) {
-                    selectorStr += ":";
-                } else {
-                    selectorStr += ":and";
-                }
-                result += std::string(@encode(id));
-            }
-            continue;
-        }
-
-        // TODO: handle the interop.types primitives (https://docs.nativescript.org/core-concepts/ios-runtime/how-to/ObjC-Subclassing)
-        assert(false);
-    }
-
-    selector = NSSelectorFromString([NSString stringWithUTF8String:selectorStr.c_str()]);
-    argCount = paramsArray->Length();
-
-    return result;
 }
 
 unsigned long long ClassBuilder::classNameCounter_ = 0;

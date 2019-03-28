@@ -28,12 +28,13 @@ public:
 
 struct MethodCallbackWrapper {
 public:
-    MethodCallbackWrapper(v8::Isolate* isolate, const v8::Persistent<v8::Object>* callback, const uint8_t initialParamIndex, const uint8_t paramsCount, ArgConverter* argConverter)
-        : isolate_(isolate), callback_(callback), initialParamIndex_(initialParamIndex), paramsCount_(paramsCount), argConverter_(argConverter) {}
+    MethodCallbackWrapper(v8::Isolate* isolate, const v8::Persistent<v8::Object>* callback, const uint8_t initialParamIndex, const uint8_t paramsCount, const TypeEncoding* typeEncoding, ArgConverter* argConverter)
+        : isolate_(isolate), callback_(callback), initialParamIndex_(initialParamIndex), paramsCount_(paramsCount), typeEncoding_(typeEncoding), argConverter_(argConverter) {}
     v8::Isolate* isolate_;
     const v8::Persistent<v8::Object>* callback_;
     const uint8_t initialParamIndex_;
     const uint8_t paramsCount_;
+    const TypeEncoding* typeEncoding_;
     ArgConverter* argConverter_;
 };
 
@@ -45,6 +46,7 @@ public:
     v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, id obj);
     v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, id obj, v8::Local<v8::Object> receiver);
     v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);
+    const InterfaceMeta* FindInterfaceMeta(Class klass);
     static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData);
 private:
     v8::Isolate* isolate_;
@@ -52,7 +54,6 @@ private:
     Interop interop_;
     v8::Persistent<v8::Function>* poEmptyObjCtorFunc_;
 
-    const InterfaceMeta* FindInterfaceMeta(id obj);
     const InterfaceMeta* GetInterfaceMeta(std::string className);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     void SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding);

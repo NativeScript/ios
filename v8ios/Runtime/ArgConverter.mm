@@ -10,6 +10,7 @@ namespace tns {
 void ArgConverter::Init(Isolate* isolate, ObjectManager objectManager) {
     isolate_ = isolate;
     objectManager_ = objectManager;
+    interop_.RegisterInteropTypes(isolate);
 
     poEmptyObjCtorFunc_ = new Persistent<v8::Function>(isolate, CreateEmptyObjectFunction(isolate));
 }
@@ -79,9 +80,11 @@ void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* iso
         ObjectWeakCallbackState* state = new ObjectWeakCallbackState(poCallback);
         poCallback->SetWeak(state, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
 
+        const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
         int argsCount = typeEncoding->details.block.signature.count - 1;
-        MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, this);
-        CFTypeRef blockPtr = interop_.CreateBlock(1, argsCount, ArgConverter::MethodCallback, userData);
+
+        MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding, this);
+        CFTypeRef blockPtr = interop_.CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
         [invocation setArgument:&blockPtr atIndex:index];
         return;
     }
@@ -358,15 +361,18 @@ Local<Object> ArgConverter::CreateJsWrapper(Isolate* isolate, id obj, Local<Obje
         receiver = CreateEmptyObject(context);
     }
 
-    const InterfaceMeta* meta = FindInterfaceMeta(obj);
-    if (meta != nullptr) {
-        auto it = Caches::Prototypes.find(meta);
-        if (it != Caches::Prototypes.end()) {
-            Persistent<Value>* poPrototype = it->second;
-            Local<Value> prototype = Local<Value>::New(isolate, *poPrototype);
-            bool success;
-            if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
-                assert(false);
+    if (obj != nullptr) {
+        Class klass = [obj class];
+        const InterfaceMeta* meta = FindInterfaceMeta(klass);
+        if (meta != nullptr) {
+            auto it = Caches::Prototypes.find(meta);
+            if (it != Caches::Prototypes.end()) {
+                Persistent<Value>* poPrototype = it->second;
+                Local<Value> prototype = Local<Value>::New(isolate, *poPrototype);
+                bool success;
+                if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
+                    assert(false);
+                }
             }
         }
     }
@@ -379,13 +385,7 @@ Local<Object> ArgConverter::CreateJsWrapper(Isolate* isolate, id obj, Local<Obje
     return receiver;
 }
 
-const InterfaceMeta* ArgConverter::FindInterfaceMeta(id obj) {
-    if (obj == nullptr) {
-        return nullptr;
-    }
-
-    Class klass = [obj class];
-
+const InterfaceMeta* ArgConverter::FindInterfaceMeta(Class klass) {
     std::string origClassName = class_getName(klass);
     auto it = Caches::Metadata.find(origClassName);
     if (it != Caches::Metadata.end()) {
