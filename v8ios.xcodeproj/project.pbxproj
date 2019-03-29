@@ -21,7 +21,7 @@
 		C27E278B22202664009C10A3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C27E278922202664009C10A3 /* Main.storyboard */; };
 		C27E278D22202665009C10A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C27E278C22202665009C10A3 /* Assets.xcassets */; };
 		C27E279022202665009C10A3 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C27E278E22202665009C10A3 /* LaunchScreen.storyboard */; };
-		C27E279322202665009C10A3 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.m */; };
+		C27E279322202665009C10A3 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.mm */; };
 		C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF122214A4D007DE2BA /* platform-ios.cpp */; };
 		C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */; };
 		C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B2C22241270007DE2BA /* Runtime.mm */; };
@@ -29,7 +29,7 @@
 		C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */; };
 		C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9CC224391A3006FB9D3 /* Caches.cpp */; };
 		C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */; };
-		C2AAE9D722490F50006FB9D3 /* Helpers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D522490F50006FB9D3 /* Helpers.cpp */; };
+		C2AAE9D722490F50006FB9D3 /* Helpers.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D522490F50006FB9D3 /* Helpers.mm */; };
 		C2B12E9E22269B43000F6AFC /* richards.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9C22269B43000F6AFC /* richards.js */; };
 		C2B12E9F22269B43000F6AFC /* base.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9D22269B43000F6AFC /* base.js */; };
 		C2B12EB12226BA2E000F6AFC /* deltablue.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EB02226BA2E000F6AFC /* deltablue.js */; };
@@ -75,7 +75,7 @@
 		C27E278C22202665009C10A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C27E278F22202665009C10A3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		C27E279122202665009C10A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C27E279222202665009C10A3 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		C27E279222202665009C10A3 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		C28B7AE022203080007DE2BA /* include */ = {isa = PBXFileReference; lastKnownFileType = folder; path = include; sourceTree = "<group>"; };
 		C28B7AF02221499D007DE2BA /* platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = platform.h; sourceTree = "<group>"; };
 		C28B7AF122214A4D007DE2BA /* platform-ios.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "platform-ios.cpp"; sourceTree = "<group>"; };
@@ -93,7 +93,7 @@
 		C2AAE9CD224391A3006FB9D3 /* Caches.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Caches.h; sourceTree = "<group>"; };
 		C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ClassBuilder.mm; sourceTree = "<group>"; };
 		C2AAE9D3224902FD006FB9D3 /* ClassBuilder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClassBuilder.h; sourceTree = "<group>"; };
-		C2AAE9D522490F50006FB9D3 /* Helpers.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Helpers.cpp; sourceTree = "<group>"; };
+		C2AAE9D522490F50006FB9D3 /* Helpers.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Helpers.mm; sourceTree = "<group>"; };
 		C2AAE9D622490F50006FB9D3 /* Helpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Helpers.h; sourceTree = "<group>"; };
 		C2B12E9C22269B43000F6AFC /* richards.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = richards.js; sourceTree = "<group>"; };
 		C2B12E9D22269B43000F6AFC /* base.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = base.js; sourceTree = "<group>"; };
@@ -119,6 +119,8 @@
 		C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
 		C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
 		C2E5F77C223796C300A3A68F /* regexp.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = regexp.js; sourceTree = "<group>"; };
+		C2FE377E224E61AA00847863 /* NativeScript.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeScript.h; sourceTree = "<group>"; };
+		C2FE3780224E803700847863 /* DataWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DataWrapper.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -175,6 +177,7 @@
 		C24F391E222598C60027977A /* Runtime */ = {
 			isa = PBXGroup;
 			children = (
+				C2FE377E224E61AA00847863 /* NativeScript.h */,
 				C2AAE9CA2243789A006FB9D3 /* ArgConverter.h */,
 				C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */,
 				C2AAE9CD224391A3006FB9D3 /* Caches.h */,
@@ -183,8 +186,9 @@
 				C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */,
 				C24F39182225859D0027977A /* Console.h */,
 				C24F39192225859D0027977A /* Console.cpp */,
+				C2FE3780224E803700847863 /* DataWrapper.h */,
 				C2AAE9D622490F50006FB9D3 /* Helpers.h */,
-				C2AAE9D522490F50006FB9D3 /* Helpers.cpp */,
+				C2AAE9D522490F50006FB9D3 /* Helpers.mm */,
 				C2335B6F224CADD50071048C /* Interop.h */,
 				C2335B6E224CADD50071048C /* Interop.mm */,
 				C2764AF5222BE705008F674F /* Metadata.h */,
@@ -249,7 +253,7 @@
 				C27E278C22202665009C10A3 /* Assets.xcassets */,
 				C27E278E22202665009C10A3 /* LaunchScreen.storyboard */,
 				C27E279122202665009C10A3 /* Info.plist */,
-				C27E279222202665009C10A3 /* main.m */,
+				C27E279222202665009C10A3 /* main.mm */,
 			);
 			path = v8ios;
 			sourceTree = "<group>";
@@ -356,7 +360,7 @@
 			files = (
 				C27E278822202664009C10A3 /* ViewController.m in Sources */,
 				C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */,
-				C27E279322202665009C10A3 /* main.m in Sources */,
+				C27E279322202665009C10A3 /* main.mm in Sources */,
 				C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */,
 				C2764AF6222BE705008F674F /* Metadata.mm in Sources */,
 				C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */,
@@ -365,7 +369,7 @@
 				C2764AFC223644B3008F674F /* ObjectManager.mm in Sources */,
 				C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */,
 				C2335B70224CADD50071048C /* Interop.mm in Sources */,
-				C2AAE9D722490F50006FB9D3 /* Helpers.cpp in Sources */,
+				C2AAE9D722490F50006FB9D3 /* Helpers.mm in Sources */,
 				C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */,
 				C24F391A2225859D0027977A /* Console.cpp in Sources */,
 				C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */,

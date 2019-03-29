@@ -1,14 +1,10 @@
 #ifndef Interop_h
 #define Interop_h
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-#include "v8.h"
-#pragma clang diagnostic pop
-
 #import <CoreFoundation/CFBase.h>
 #import <objc/runtime.h>
 #include "ffi.h"
+#include "NativeScript.h"
 #include "Metadata.h"
 
 namespace tns {
@@ -20,8 +16,10 @@ public:
     void RegisterInteropTypes(v8::Isolate* isolate);
     CFTypeRef CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
+    static void CallFunction(v8::Isolate* isolate, const FunctionMeta* functionMeta, const std::vector<v8::Local<v8::Value>> args);
 private:
-    ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);
+    static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);
+    static void* GetFunctionPointer(const FunctionMeta* meta);
 
     typedef struct JSBlock {
         typedef struct {

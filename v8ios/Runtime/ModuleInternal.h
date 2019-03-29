@@ -1,11 +1,8 @@
 #ifndef ModuleInternal_h
 #define ModuleInternal_h
 
+#include "NativeScript.h"
 #include <map>
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-#include "v8.h"
-#pragma clang diagnostic pop
 
 namespace tns {
 

@@ -1,10 +1,7 @@
 #ifndef ObjectManager_h
 #define ObjectManager_h
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-#include "v8.h"
-#pragma clang diagnostic pop
+#include "NativeScript.h"
 
 namespace tns {
 

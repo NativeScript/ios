@@ -1,12 +1,8 @@
 #ifndef MetadataBuilder_h
 #define MetadataBuilder_h
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-#include "v8.h"
-#pragma clang diagnostic pop
-
 #include <map>
+#include "NativeScript.h"
 #include "Metadata.h"
 #include "ObjectManager.h"
 #include "ArgConverter.h"

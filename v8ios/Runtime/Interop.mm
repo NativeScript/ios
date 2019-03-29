@@ -1,5 +1,8 @@
 #include <Foundation/Foundation.h>
+#include <dlfcn.h>
 #include "Interop.h"
+#include "Helpers.h"
+#include "DataWrapper.h"
 
 using namespace v8;
 
@@ -20,7 +23,7 @@ IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCou
     ffi_cif* cif = new ffi_cif();
     const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount + initialParamIndex]();
 
-    ffi_type* returnType = GetArgumentType(typeEncoding);
+    ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
 
     for (uint8_t i = 0; i < initialParamIndex; i++) {
         parameterTypesFFITypes[i] = &ffi_type_pointer;
@@ -60,13 +63,63 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
     return blockPointer;
 }
 
+void Interop::CallFunction(Isolate* isolate, const FunctionMeta* functionMeta, const std::vector<Local<Value>> args) {
+    void* functionPointer = Interop::GetFunctionPointer(functionMeta);
+
+    const ffi_type** parameterTypesFFITypes = new const ffi_type*[args.size()]();
+
+    int argsCount = functionMeta->encodings()->count - 1;
+    const TypeEncoding* typeEncoding = functionMeta->encodings()->first();
+    ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
+    for (int i = 0; i < argsCount; i++) {
+        typeEncoding = typeEncoding->next();
+        parameterTypesFFITypes[i] = Interop::GetArgumentType(typeEncoding);
+    }
+
+    ffi_cif* cif = new ffi_cif();
+    ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
+    assert(status == FFI_OK);
+
+    typeEncoding = functionMeta->encodings()->first();
+    void *values[args.size()];
+    for (int i = 0; i < args.size(); i++) {
+        Local<Value> arg = args[i];
+
+        if (arg->IsNullOrUndefined()) {
+            void* nullPtr = nullptr;
+            values[i] = &nullPtr;
+        } else if (arg->IsNumber() || arg->IsNumberObject()) {
+            double value = arg.As<Number>()->Value();
+            values[i] = &value;
+        } else if (arg->IsString()) {
+            NSString* s = [NSString stringWithUTF8String:tns::ToString(isolate, arg).c_str()];
+            values[i] = &s;
+        } else if (arg->IsObject()) {
+            Local<Object> obj = arg.As<Object>();
+            assert(obj->InternalFieldCount() > 0);
+            Local<External> ext = obj->GetInternalField(0).As<External>();
+            DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
+            values[i] = &wrapper->data_;
+        } else {
+            assert(false);
+        }
+    }
+
+    void* resultPtr;
+    ffi_call(cif, FFI_FN(functionPointer), &resultPtr, values);
+}
+
 ffi_type* Interop::GetArgumentType(const TypeEncoding* typeEncoding) {
     switch (typeEncoding->type) {
         case BinaryTypeEncodingType::VoidEncoding: {
             return &ffi_type_void;
         }
-        case BinaryTypeEncodingType::InterfaceDeclarationReference: {
+        case BinaryTypeEncodingType::InterfaceDeclarationReference:
+        case BinaryTypeEncodingType::PointerEncoding: {
             return &ffi_type_pointer;
+        }
+        case BinaryTypeEncodingType::IntEncoding: {
+            return &ffi_type_sint32;
         }
         default: {
             break;
@@ -75,6 +128,49 @@ ffi_type* Interop::GetArgumentType(const TypeEncoding* typeEncoding) {
 
     // TODO: implement all the possible encoding types
     assert(false);
+}
+
+void* Interop::GetFunctionPointer(const FunctionMeta* meta) {
+    // TODO: cache
+
+    void* functionPointer = nullptr;
+
+    const ModuleMeta* moduleMeta = meta->topLevelModule();
+    if (moduleMeta->isFramework()) {
+        NSString* frameworkPathStr = [NSString stringWithFormat:@"%s.framework", moduleMeta->getName()];
+        NSURL* baseUrl = nil;
+        if (moduleMeta->isSystem()) {
+#if TARGET_IPHONE_SIMULATOR
+            NSBundle* foundation = [NSBundle bundleForClass:[NSString class]];
+            NSString* foundationPath = [foundation bundlePath];
+            NSString* basePathStr = [foundationPath substringToIndex:[foundationPath rangeOfString:@"Foundation.framework"].location];
+            baseUrl = [NSURL fileURLWithPath:basePathStr isDirectory:YES];
+#else
+            baseUrl = [NSURL fileURLWithPath:@"/System/Library/Frameworks" isDirectory:YES];
+#endif
+        } else {
+            baseUrl = [[NSBundle mainBundle] privateFrameworksURL];
+        }
+
+        NSURL* bundleUrl = [NSURL URLWithString:frameworkPathStr relativeToURL:baseUrl];
+        CFBundleRef bundle = CFBundleCreate(kCFAllocatorDefault, (CFURLRef)bundleUrl);
+        assert(bundle != nullptr);
+
+        const char* symbolName = meta->name();
+        CFStringRef cfName = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, symbolName, kCFStringEncodingUTF8, kCFAllocatorNull);
+        functionPointer = CFBundleGetFunctionPointerForName(bundle, cfName);
+    } else if (moduleMeta->libraries->count == 1 && moduleMeta->isSystem()) {
+        NSString* libsPath = [[NSBundle bundleForClass:[NSObject class]] bundlePath];
+        NSString* libraryPath = [NSString stringWithFormat:@"%@/lib%s.dylib", libsPath, moduleMeta->libraries->first()->value().getName()];
+
+        if (void* library = dlopen(libraryPath.UTF8String, RTLD_LAZY | RTLD_LOCAL)) {
+            const char* symbolName = meta->name();
+            functionPointer = dlsym(library, symbolName);
+        }
+    }
+
+    assert(functionPointer != nullptr);
+    return functionPointer;
 }
 
 }

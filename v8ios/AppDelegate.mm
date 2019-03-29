@@ -1,6 +1,5 @@
 #import <Foundation/Foundation.h>
 #import "AppDelegate.h"
-#include "Runtime.h"
 
 @interface AppDelegate ()
 
@@ -10,12 +9,6 @@
 
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    NSString* resourcePath = [[NSBundle mainBundle] resourcePath];
-    tns::Runtime* runtime = new tns::Runtime();
-    std::string baseDir = [resourcePath UTF8String];
-    runtime->Init(baseDir);
-    runtime->RunScript("index.js");
-    
     return YES;
 }
 

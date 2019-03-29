@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "ArgConverter.h"
+#include "DataWrapper.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -15,119 +16,135 @@ void ArgConverter::Init(Isolate* isolate, ObjectManager objectManager) {
     poEmptyObjCtorFunc_ = new Persistent<v8::Function>(isolate, CreateEmptyObjectFunction(isolate));
 }
 
-void ArgConverter::SetArgument(NSInvocation* invocation, int index, Isolate* isolate, Local<Value> arg, const TypeEncoding* typeEncoding) {
-    if (arg->IsNull()) {
-        id nullArg = nil;
-        [invocation setArgument:&nullArg atIndex:index];
-        return;
-    }
+Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, NSInvocation* invocation, const TypeEncoding* typeEncoding, const std::string returnType) {
+    for (int i = 0; i < args.size(); i++) {
+        Local<Value> arg = args[i];
+        int index = i + 2;
 
-    if (arg->IsBoolean() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
-        bool value = arg.As<v8::Boolean>()->Value();
-        [invocation setArgument:&value atIndex:index];
-        return;
-    }
-
-    if (arg->IsObject() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
-        Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
-        DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
-        std::string protocolName = wrapper->meta_->name();
-        Protocol* protocol = objc_getProtocol(protocolName.c_str());
-        [invocation setArgument:&protocol atIndex:index];
-        return;
-    }
-
-    if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
-        std::string str = tns::ToString(isolate, arg);
-        const char* s = str.c_str();
-        [invocation setArgument:&s atIndex:index];
-        return;
-    }
-
-    if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
-        std::string str = tns::ToString(isolate, arg);
-        NSString* selector = [NSString stringWithUTF8String:str.c_str()];
-        SEL res = NSSelectorFromString(selector);
-        [invocation setArgument:&res atIndex:index];
-        return;
-    }
-
-    Local<Context> context = isolate->GetCurrentContext();
-    if (arg->IsString()) {
-        std::string str = tns::ToString(isolate, arg);
-        NSString* result = [NSString stringWithUTF8String:str.c_str()];
-        [invocation setArgument:&result atIndex:index];
-        return;
-    }
-
-    if (arg->IsNumber() || arg->IsDate()) {
-        double value;
-        if (!arg->NumberValue(context).To(&value)) {
-            assert(false);
+        if (arg->IsNull()) {
+            id nullArg = nil;
+            [invocation setArgument:&nullArg atIndex:index];
+            continue;
         }
 
-        if (arg->IsNumber() || arg->IsNumberObject()) {
-            SetNumericArgument(invocation, index, value, typeEncoding);
-            return;
-        } else {
-            NSDate* date = [NSDate dateWithTimeIntervalSince1970:value / 1000.0];
-            [invocation setArgument:&date atIndex:index];
+        if (arg->IsBoolean() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
+            bool value = arg.As<v8::Boolean>()->Value();
+            [invocation setArgument:&value atIndex:index];
+            continue;
         }
-    }
 
-    if (arg->IsFunction() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
-        Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, arg.As<Object>());
-        ObjectWeakCallbackState* state = new ObjectWeakCallbackState(poCallback);
-        poCallback->SetWeak(state, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
+        if (arg->IsObject() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
+            Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
+            DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
+            std::string protocolName = wrapper->meta_->name();
+            Protocol* protocol = objc_getProtocol(protocolName.c_str());
+            [invocation setArgument:&protocol atIndex:index];
+            continue;
+        }
 
-        const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
-        int argsCount = typeEncoding->details.block.signature.count - 1;
+        if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
+            std::string str = tns::ToString(isolate, arg);
+            const char* s = str.c_str();
+            [invocation setArgument:&s atIndex:index];
+            continue;
+        }
 
-        MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding, this);
-        CFTypeRef blockPtr = interop_.CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
-        [invocation setArgument:&blockPtr atIndex:index];
-        return;
-    }
+        if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
+            std::string str = tns::ToString(isolate, arg);
+            NSString* selector = [NSString stringWithUTF8String:str.c_str()];
+            SEL res = NSSelectorFromString(selector);
+            [invocation setArgument:&res atIndex:index];
+            continue;
+        }
 
-    if (arg->IsObject()) {
-        Local<Object> obj = arg.As<Object>();
-        if (obj->InternalFieldCount() > 0) {
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            DataWrapper* wrapper = reinterpret_cast<DataWrapper*>(ext->Value());
-            const Meta* meta = wrapper->meta_;
-            if (meta != nullptr && meta->type() == MetaType::JsCode) {
-                const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
-                std::string jsCode = jsCodeMeta->jsCode();
+        Local<Context> context = isolate->GetCurrentContext();
+        if (arg->IsString()) {
+            std::string str = tns::ToString(isolate, arg);
+            NSString* result = [NSString stringWithUTF8String:str.c_str()];
+            [invocation setArgument:&result atIndex:index];
+            continue;
+        }
 
-                Local<Script> script;
-                if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
-                    assert(false);
-                }
-                assert(!script.IsEmpty());
+        if (arg->IsNumber() || arg->IsDate()) {
+            double value;
+            if (!arg->NumberValue(context).To(&value)) {
+                assert(false);
+            }
 
-                Local<Value> result;
-                if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
-                    assert(false);
-                }
-
-                assert(result->IsNumber());
-
-                double value = result.As<Number>()->Value();
+            if (arg->IsNumber() || arg->IsNumberObject()) {
                 SetNumericArgument(invocation, index, value, typeEncoding);
-                return;
-            }
-
-            if (wrapper->data_ != nullptr) {
-                [invocation setArgument:&wrapper->data_ atIndex:index];
-                return;
+                continue;
+            } else {
+                NSDate* date = [NSDate dateWithTimeIntervalSince1970:value / 1000.0];
+                [invocation setArgument:&date atIndex:index];
             }
         }
+
+        if (arg->IsFunction() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
+            Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, arg.As<Object>());
+            ObjectWeakCallbackState* state = new ObjectWeakCallbackState(poCallback);
+            poCallback->SetWeak(state, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
+
+            const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
+            int argsCount = typeEncoding->details.block.signature.count - 1;
+
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding, this);
+            CFTypeRef blockPtr = interop_.CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
+            [invocation setArgument:&blockPtr atIndex:index];
+            continue;
+        }
+
+        if (arg->IsObject()) {
+            Local<Object> obj = arg.As<Object>();
+            if (obj->InternalFieldCount() > 0) {
+                Local<External> ext = obj->GetInternalField(0).As<External>();
+                DataWrapper* wrapper = reinterpret_cast<DataWrapper*>(ext->Value());
+                const Meta* meta = wrapper->meta_;
+                if (meta != nullptr && meta->type() == MetaType::JsCode) {
+                    const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
+                    std::string jsCode = jsCodeMeta->jsCode();
+
+                    Local<Script> script;
+                    if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
+                        assert(false);
+                    }
+                    assert(!script.IsEmpty());
+
+                    Local<Value> result;
+                    if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
+                        assert(false);
+                    }
+
+                    assert(result->IsNumber());
+
+                    double value = result.As<Number>()->Value();
+                    SetNumericArgument(invocation, index, value, typeEncoding);
+                    continue;
+                }
+
+                if (wrapper->data_ != nullptr) {
+                    [invocation setArgument:&wrapper->data_ atIndex:index];
+                    continue;
+                }
+            }
+        }
+
+        assert(false);
     }
 
-    assert(false);
-}
 
-Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, NSInvocation* invocation, std::string returnType) {
+    bool instanceMethod = !receiver.IsEmpty();
+    if (instanceMethod) {
+        Local<External> ext = receiver->GetInternalField(0).As<External>();
+        DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
+        id target = wrapper->data_;
+        [invocation invokeWithTarget:target];
+    } else {
+        [invocation setTarget:klass];
+        [invocation invoke];
+    }
+
+
     if (returnType == "@") {
         id result = nil;
         [invocation getReturnValue:&result];

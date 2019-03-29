@@ -1,13 +1,9 @@
 #ifndef Caches_h
 #define Caches_h
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-#include "v8.h"
-#pragma clang diagnostic pop
-
 #include <string>
 #include <map>
+#include "NativeScript.h"
 #include "Metadata.h"
 
 namespace tns {

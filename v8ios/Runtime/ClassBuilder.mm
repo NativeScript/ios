@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "ClassBuilder.h"
+#include "DataWrapper.h"
 #include "Helpers.h"
 #include "Caches.h"
 
@@ -44,7 +45,9 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     Class extendedClass = item->self_->GetExtendedClass(name.c_str());
     if (info.Length() > 1 && info[1]->IsObject()) {
         item->self_->ExposeDynamicMembers(isolate, extendedClass, implementationObject, info[1].As<Object>());
+        item->self_->ExposeDynamicProtocols(isolate, extendedClass, info[1].As<Object>());
     }
+    objc_registerClassPair(extendedClass);
 
     Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(item->meta_)->second;
     Local<v8::Function> baseCtorFunc = Local<v8::Function>::New(isolate, *poBaseCtorFunc);
@@ -67,6 +70,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         assert(false);
     }
 
+    extendClassCtorFunc->SetName(tns::ToV8String(isolate, class_getName(extendedClass)));
     Local<Object> extendFuncPrototype = extendClassCtorFunc->Get(tns::ToV8String(isolate, "prototype")).As<Object>();
     if (!extendFuncPrototype->SetPrototype(context, implementationObject).To(&success) || !success) {
         assert(false);
@@ -130,6 +134,34 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
             IMP methodBody = interop_.CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
             class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str());
         }
+    }
+}
+
+void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass, Local<Object> nativeSignature) {
+    Local<Value> exposedProtocols = nativeSignature->Get(tns::ToV8String(isolate, "protocols"));
+    if (exposedProtocols.IsEmpty() || !exposedProtocols->IsArray()) {
+        return;
+    }
+
+    Local<v8::Array> protocols = exposedProtocols.As<v8::Array>();
+    if (protocols->Length() < 1) {
+        return;
+    }
+
+    for (uint32_t i = 0; i < protocols->Length(); i++) {
+        Local<Value> element = protocols->Get(i);
+        assert(!element.IsEmpty() && element->IsObject());
+
+        Local<Object> protoObj = element.As<Object>();
+        assert(protoObj->InternalFieldCount() > 0);
+
+        Local<External> ext = protoObj->GetInternalField(0).As<External>();
+        DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
+        const char* protocolName = wrapper->meta_->name();
+        Protocol* proto = objc_getProtocol(protocolName);
+        assert(proto != nullptr);
+
+        class_addProtocol(extendedClass, proto);
     }
 }
 

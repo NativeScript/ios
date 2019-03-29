@@ -1,11 +1,7 @@
 #ifndef ClassBuilder_h
 #define ClassBuilder_h
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-#include "v8.h"
-#pragma clang diagnostic pop
-
+#include "NativeScript.h"
 #include "Metadata.h"
 #include "ArgConverter.h"
 #include "ObjectManager.h"
@@ -29,6 +25,7 @@ private:
 
     Class GetExtendedClass(std::string baseClassName);
     void ExposeDynamicMembers(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
+    void ExposeDynamicProtocols(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> nativeSignature);
 
     struct CacheItem {
     public:

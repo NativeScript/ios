@@ -1,11 +1,8 @@
 #ifndef Runtime_h
 #define Runtime_h
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-#include "v8.h"
-#pragma clang diagnostic pop
 #include "libplatform/libplatform.h"
+#include "NativeScript.h"
 #include "ModuleInternal.h"
 #include "MetadataBuilder.h"
 

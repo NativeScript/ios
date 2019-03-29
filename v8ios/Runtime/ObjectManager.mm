@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include "ObjectManager.h"
 #include "MetadataBuilder.h"
+#include "DataWrapper.h"
 
 using namespace v8;
 using namespace std;

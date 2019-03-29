@@ -1,13 +1,13 @@
 var f = () => {
-    for (var i = 0; i < 100000; i++) {
-        var obj = new NSObject();
-        var str = new NSMutableString();
-        var date = NSDate.date();
-        var url = NSURL.URLWithString("https://example.com");
-        var request = NSURLRequest.requestWithURL(url);
-        var a = NSMutableString.alloc();
-        var b = a.init();
-    }
+   for (var i = 0; i < 100000; i++) {
+       var obj = new NSObject();
+       var str = new NSMutableString();
+       var date = NSDate.date();
+       var url = NSURL.URLWithString("https://example.com");
+       var request = NSURLRequest.requestWithURL(url);
+       var a = NSMutableString.alloc();
+       var b = a.init();
+   }
 };
 
 /**
@@ -18,20 +18,34 @@ var formattedDate = formatter.stringFromDate(date);
 console.log(formattedDate);
 **/
 
-var TimerTarget = NSObject.extend({
-    tick: (timer) => {
-        console.log(timer.userInfo.UTF8String);
+var TNSAppDelegate = UIResponder.extend({
+    get window() {
+        return this._window;
+    },
+    set window(aWindow) {
+        this._window = aWindow;
     }
 }, {
-    exposedMethods: {
-        tick: {
-            returns: "v",
-            params: [ NSTimer ]
-        }
-    }
+    protocols: [UIApplicationDelegate]
 });
-var target = new TimerTarget();
-NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(2.0, target, "tick:", "my user info", false);
+
+UIApplicationMain(0, null, null, TNSAppDelegate.name);
+
+
+//var TimerTarget = NSObject.extend({
+//    tick: (timer) => {
+//        console.log(timer.userInfo.UTF8String);
+//    }
+//}, {
+//    exposedMethods: {
+//        tick: {
+//            returns: "v",
+//            params: [ NSTimer ]
+//        }
+//    }
+//});
+//var target = new TimerTarget();
+//NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(2.0, target, "tick:", "my user info", false);
 
 //var url = NSURL.URLWithString("https://example.com");
 //var request = NSURLRequest.requestWithURL(url);

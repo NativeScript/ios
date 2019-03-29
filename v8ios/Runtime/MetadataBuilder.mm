@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "MetadataBuilder.h"
+#include "DataWrapper.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -318,9 +319,16 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
 }
 
 void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info) {
-    //Isolate* isolate = info.GetIsolate();
-    //CacheItem<FunctionMeta>* item = static_cast<CacheItem<FunctionMeta>*>(info.Data().As<External>()->Value());
-    // TODO: libffi to call the function
+    Isolate* isolate = info.GetIsolate();
+
+    CacheItem<FunctionMeta>* item = static_cast<CacheItem<FunctionMeta>*>(info.Data().As<External>()->Value());
+    std::vector<Local<Value>> args;
+    for (int i = 0; i < info.Length(); i++) {
+        args.push_back(info[i]);
+    }
+    Interop::CallFunction(isolate, item->meta_, args);
+
+    // TODO: Handle return type here
 }
 
 void MetadataBuilder::PropertyGetterCallback(Local<v8::String> name, const PropertyCallbackInfo<Value> &info) {
@@ -366,28 +374,9 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* m
     NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
     [invocation setSelector:selector];
 
-    const TypeEncoding* typeEncoding = meta->encodings()->first();
-    for (int i = 0; i < args.size(); i++) {
-        Local<Value> v8Arg = args[i];
-        if (typeEncoding != nullptr) {
-            typeEncoding = typeEncoding->next();
-        } else {
-            assert(false);
-        }
-        argConverter_.SetArgument(invocation, i + 2, isolate, v8Arg, typeEncoding);
-    }
+    const TypeEncoding* typeEncoding = meta->encodings()->first()->next();
 
-    if (instanceMethod) {
-        Local<External> ext = receiver->GetInternalField(0).As<External>();
-        DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
-        id target = wrapper->data_;
-        [invocation invokeWithTarget:target];
-    } else {
-        [invocation setTarget:klass];
-        [invocation invoke];
-    }
-
-    return argConverter_.ConvertArgument(isolate, invocation, signature.methodReturnType);
+    return argConverter_.Invoke(isolate, klass, receiver, args, invocation, typeEncoding, signature.methodReturnType);
 }
 
 }
