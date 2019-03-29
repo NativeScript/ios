@@ -93,7 +93,8 @@ void Interop::CallFunction(Isolate* isolate, const FunctionMeta* functionMeta, c
             values[i] = &value;
         } else if (arg->IsString()) {
             NSString* s = [NSString stringWithUTF8String:tns::ToString(isolate, arg).c_str()];
-            values[i] = &s;
+            void* strPtr = (__bridge void*)s;
+            values[i] = &strPtr;
         } else if (arg->IsObject()) {
             Local<Object> obj = arg.As<Object>();
             assert(obj->InternalFieldCount() > 0);
