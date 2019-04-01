@@ -25,7 +25,7 @@ private:
 
     Class GetExtendedClass(std::string baseClassName);
     void ExposeDynamicMembers(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
-    void ExposeDynamicProtocols(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> nativeSignature);
+    void ExposeDynamicProtocols(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
 
     struct CacheItem {
     public:
@@ -33,6 +33,16 @@ private:
         const InterfaceMeta* meta_;
         id data_;
         ClassBuilder* self_;
+    };
+
+    struct PropertyCallbackContext {
+    public:
+        PropertyCallbackContext(ClassBuilder* classBuilder, v8::Isolate* isolate, v8::Persistent<v8::Function>* callback, v8::Persistent<v8::Object>* implementationObject)
+            : classBuilder_(classBuilder), isolate_(isolate), callback_(callback), implementationObject_(implementationObject) {}
+        ClassBuilder* classBuilder_;
+        v8::Isolate* isolate_;
+        v8::Persistent<v8::Function>* callback_;
+        v8::Persistent<v8::Object>* implementationObject_;
     };
 };
 

@@ -45,7 +45,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     Class extendedClass = item->self_->GetExtendedClass(name.c_str());
     if (info.Length() > 1 && info[1]->IsObject()) {
         item->self_->ExposeDynamicMembers(isolate, extendedClass, implementationObject, info[1].As<Object>());
-        item->self_->ExposeDynamicProtocols(isolate, extendedClass, info[1].As<Object>());
+        item->self_->ExposeDynamicProtocols(isolate, extendedClass, implementationObject, info[1].As<Object>());
     }
     objc_registerClassPair(extendedClass);
 
@@ -137,7 +137,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
     }
 }
 
-void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass, Local<Object> nativeSignature) {
+void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
     Local<Value> exposedProtocols = nativeSignature->Get(tns::ToV8String(isolate, "protocols"));
     if (exposedProtocols.IsEmpty() || !exposedProtocols->IsArray()) {
         return;
@@ -161,7 +161,118 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
         Protocol* proto = objc_getProtocol(protocolName);
         assert(proto != nullptr);
 
+        if (class_conformsToProtocol(extendedClass, proto)) {
+            continue;
+        }
+
         class_addProtocol(extendedClass, proto);
+
+        const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+        const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName);
+
+        Local<v8::Array> propertyNames;
+        Local<Context> context = isolate->GetCurrentContext();
+        assert(implementationObject->GetPropertyNames(context).ToLocal(&propertyNames));
+
+        for (uint32_t j = 0; j < propertyNames->Length(); j++) {
+            Local<Value> descriptor;
+            Local<Name> propName = propertyNames->Get(j).As<Name>();
+            assert(implementationObject->GetOwnPropertyDescriptor(context, propName).ToLocal(&descriptor));
+            if (descriptor.IsEmpty()) {
+                continue;
+            }
+
+            Local<Value> getter = descriptor.As<Object>()->Get(tns::ToV8String(isolate, "get"));
+            Local<Value> setter = descriptor.As<Object>()->Get(tns::ToV8String(isolate, "set"));
+
+            bool hasGetter = !getter.IsEmpty() && getter->IsFunction();
+            bool hasSetter = !setter.IsEmpty() && setter->IsFunction();
+            if (!hasGetter && !hasSetter) {
+                continue;
+            }
+
+            std::string propertyName = tns::ToString(isolate, propName);
+
+            for (auto propIt = protoMeta->instanceProps->begin(); propIt != protoMeta->instanceProps->end(); propIt++) {
+                const PropertyMeta* propMeta = (*propIt).valuePtr();
+                if (strcmp(propMeta->jsName(), propertyName.c_str()) != 0) {
+                    continue;
+                }
+
+                // An instance property that is part of the protocol is defined in the implementation object
+                // so we need to define it on the new class
+                objc_property_t property = protocol_getProperty(proto, propertyName.c_str(), true, true);
+                uint attrsCount;
+                objc_property_attribute_t* propertyAttrs = property_copyAttributeList(property, &attrsCount);
+                class_addProperty(extendedClass, propertyName.c_str(), propertyAttrs, attrsCount);
+
+                if (hasGetter && propMeta->hasGetter()) {
+                    Persistent<v8::Function>* poGetterFunc = new Persistent<v8::Function>(isolate, getter.As<v8::Function>());
+                    const TypeEncoding* typeEncoding = propMeta->getter()->encodings()->first();
+                    PropertyCallbackContext* userData = new PropertyCallbackContext(this, isolate, poGetterFunc, new Persistent<Object>(isolate, implementationObject));
+
+                    FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
+                        PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                        Local<v8::Function> getterFunc = context->callback_->Get(context->isolate_);
+                        Local<Value> res;
+                        assert(getterFunc->Call(context->isolate_->GetCurrentContext(), context->implementationObject_->Get(context->isolate_), 0, nullptr).ToLocal(&res));
+
+                        if (!res->IsNullOrUndefined() && res->IsObject() && res.As<Object>()->InternalFieldCount() > 0) {
+                            Local<External> ext = res.As<Object>()->GetInternalField(0).As<External>();
+                            DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
+                            *(ffi_arg *)retValue = (unsigned long)wrapper->data_;
+                        } else {
+                            void* nullPtr = nullptr;
+                            *(ffi_arg *)retValue = (unsigned long)nullPtr;
+                        }
+                    };
+
+                    IMP impGetter = interop_.CreateMethod(2, 0, typeEncoding, getterCallback , userData);
+
+                    const char *getterName = property_copyAttributeValue(property, "G");
+                    NSString* selectorString;
+                    if (getterName == nullptr) {
+                        selectorString = [NSString stringWithUTF8String:propertyName.c_str()];
+                    } else {
+                        selectorString = [NSString stringWithUTF8String:getterName];
+                    }
+
+                    class_addMethod(extendedClass, NSSelectorFromString(selectorString), impGetter, "@@:");
+                }
+
+                if (hasSetter) {
+                    Persistent<v8::Function>* poSetterFunc = new Persistent<v8::Function>(isolate, setter.As<v8::Function>());
+                    const TypeEncoding* typeEncoding = propMeta->setter()->encodings()->first();
+                    PropertyCallbackContext* userData = new PropertyCallbackContext(this, isolate, poSetterFunc, new Persistent<Object>(isolate, implementationObject));
+                    FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
+                        id paramValue = *static_cast<const id*>(argValues[2]);
+                        PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                        Local<v8::Function> setterFunc = context->callback_->Get(context->isolate_);
+                        Local<Value> res;
+
+                        Local<Value> argWrapper = context->classBuilder_->argConverter_.CreateJsWrapper(context->isolate_, paramValue, Local<Object>());
+                        Local<Value> params[1] = { argWrapper };
+                        assert(setterFunc->Call(context->isolate_->GetCurrentContext(), context->implementationObject_->Get(context->isolate_), 1, params).ToLocal(&res));
+                    };
+
+                    IMP impSetter = interop_.CreateMethod(2, 1, typeEncoding, setterCallback, userData);
+
+                    const char *setterName = property_copyAttributeValue(property, "S");
+                    NSString* selectorString;
+                    if (setterName == nullptr) {
+                        char firstChar = (char)toupper(propertyName[0]);
+                        NSString* capitalLetter = [NSString stringWithFormat:@"%c", firstChar];
+                        NSString* reminder = [NSString stringWithUTF8String: propertyName.c_str() + 1];
+                        selectorString = [@[@"set", capitalLetter, reminder, @":"] componentsJoinedByString:@""];
+                    } else {
+                        selectorString = [NSString stringWithUTF8String:setterName];
+                    }
+                    class_addMethod(extendedClass, NSSelectorFromString(selectorString), impSetter, "v@:@");
+                }
+
+                free(propertyAttrs);
+            }
+        }
     }
 }
 
