@@ -23,7 +23,7 @@ private:
     static void SuperAccessorGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-    Class GetExtendedClass(std::string baseClassName);
+    Class GetExtendedClass(std::string baseClassName, std::string staticClassName);
     void ExposeDynamicMembers(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
     void ExposeDynamicProtocols(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
 

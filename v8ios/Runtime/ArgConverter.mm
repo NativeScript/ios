@@ -18,6 +18,8 @@ void ArgConverter::Init(Isolate* isolate, ObjectManager objectManager) {
 
 Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, NSInvocation* invocation, const TypeEncoding* typeEncoding, const std::string returnType) {
     for (int i = 0; i < args.size(); i++) {
+        typeEncoding = typeEncoding->next();
+
         Local<Value> arg = args[i];
         int index = i + 2;
 
@@ -88,7 +90,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
             const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
             int argsCount = typeEncoding->details.block.signature.count - 1;
 
-            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding, this);
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, nullptr, 1, argsCount, blockTypeEncoding, this);
             CFTypeRef blockPtr = interop_.CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
             [invocation setArgument:&blockPtr atIndex:index];
             continue;
@@ -138,12 +140,25 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         Local<External> ext = receiver->GetInternalField(0).As<External>();
         DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
         id target = wrapper->data_;
+
+        bool callSuperMethod = receiver->InternalFieldCount() > 1 && !receiver->GetInternalField(1).IsEmpty() && receiver->GetInternalField(1)->IsExternal();
+
+        Class originalClass;
+        Class targetClass;
+        if (callSuperMethod) {
+            targetClass = class_getSuperclass([target class]);
+            originalClass = object_setClass(target, targetClass);
+        }
+
         [invocation invokeWithTarget:target];
+
+        if (callSuperMethod) {
+            object_setClass(target, originalClass);
+        }
     } else {
         [invocation setTarget:klass];
         [invocation invoke];
     }
-
 
     if (returnType == "@") {
         id result = nil;
@@ -246,8 +261,11 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
 
     std::vector<id> arguments;
+    const TypeEncoding* typeEncoding = data->typeEncoding_;
     for (int i = 0; i < data->paramsCount_; i++) {
-        const id arg = *static_cast<const id*>(argValues[i + data->initialParamIndex_]);
+        typeEncoding = typeEncoding->next();
+        int argIndex = i + data->initialParamIndex_;
+        const id arg = *static_cast<const id*>(argValues[argIndex]);
         arguments.push_back(arg);
     }
 
@@ -265,8 +283,18 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             v8Args.push_back(jsWrapper);
         }
 
+        Local<Object> thiz = ctx->Global();
+        if (data->prototype_ != nullptr && data->initialParamIndex_ > 0) {
+            id self_ = *static_cast<const id*>(argValues[0]);
+            Local<Context> context = isolate->GetCurrentContext();
+            thiz = data->argConverter_->CreateJsWrapper(isolate, self_, Local<Object>());
+            Local<External> ext = External::New(isolate, nullptr);
+            thiz->SetInternalField(1, ext);
+            thiz->SetPrototype(context, data->prototype_->Get(isolate)).ToChecked();
+        }
+
         Local<Value> result;
-        if (!callback->Call(ctx, ctx->Global(), (int)arguments.size(), v8Args.data()).ToLocal(&result)) {
+        if (!callback->Call(ctx, thiz, (int)arguments.size(), v8Args.data()).ToLocal(&result)) {
             assert(false);
         }
 
@@ -380,7 +408,7 @@ Local<Object> ArgConverter::CreateJsWrapper(Isolate* isolate, id obj, Local<Obje
 
     if (obj != nullptr) {
         Class klass = [obj class];
-        const InterfaceMeta* meta = FindInterfaceMeta(klass);
+        const BaseClassMeta* meta = FindInterfaceMeta(klass);
         if (meta != nullptr) {
             auto it = Caches::Prototypes.find(meta);
             if (it != Caches::Prototypes.end()) {
@@ -402,7 +430,7 @@ Local<Object> ArgConverter::CreateJsWrapper(Isolate* isolate, id obj, Local<Obje
     return receiver;
 }
 
-const InterfaceMeta* ArgConverter::FindInterfaceMeta(Class klass) {
+const BaseClassMeta* ArgConverter::FindInterfaceMeta(Class klass) {
     std::string origClassName = class_getName(klass);
     auto it = Caches::Metadata.find(origClassName);
     if (it != Caches::Metadata.end()) {
@@ -412,7 +440,7 @@ const InterfaceMeta* ArgConverter::FindInterfaceMeta(Class klass) {
     std::string className = origClassName;
 
     while (true) {
-        const InterfaceMeta* result = GetInterfaceMeta(className);
+        const BaseClassMeta* result = GetInterfaceMeta(className);
         if (result != nullptr) {
             Caches::Metadata.insert(std::make_pair(origClassName, result));
             return result;
@@ -429,14 +457,26 @@ const InterfaceMeta* ArgConverter::FindInterfaceMeta(Class klass) {
     return nullptr;
 }
 
-const InterfaceMeta* ArgConverter::GetInterfaceMeta(std::string className) {
-    auto it = Caches::Metadata.find(className);
+const BaseClassMeta* ArgConverter::GetInterfaceMeta(std::string name) {
+    auto it = Caches::Metadata.find(name);
     if (it != Caches::Metadata.end()) {
         return it->second;
     }
 
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-    return globalTable->findInterfaceMeta(className.c_str());
+    const Meta* result = globalTable->findMeta(name.c_str());
+
+    if (result == nullptr) {
+        return nullptr;
+    }
+
+    if (result->type() == MetaType::Interface) {
+        return static_cast<const InterfaceMeta*>(result);
+    } else if (result->type() == MetaType::ProtocolType) {
+        return static_cast<const ProtocolMeta*>(result);
+    }
+
+    assert(false);
 }
 
 Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {
@@ -452,7 +492,7 @@ Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {
 
 Local<v8::Function> ArgConverter::CreateEmptyObjectFunction(Isolate* isolate) {
     Local<FunctionTemplate> emptyObjCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
-    emptyObjCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    emptyObjCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(2);
     Local<v8::Function> emptyObjCtorFunc;
     if (!emptyObjCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyObjCtorFunc)) {
         assert(false);

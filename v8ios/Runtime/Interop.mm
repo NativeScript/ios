@@ -115,12 +115,25 @@ ffi_type* Interop::GetArgumentType(const TypeEncoding* typeEncoding) {
         case BinaryTypeEncodingType::VoidEncoding: {
             return &ffi_type_void;
         }
+        case BinaryTypeEncodingType::IdEncoding:
         case BinaryTypeEncodingType::InterfaceDeclarationReference:
         case BinaryTypeEncodingType::PointerEncoding: {
             return &ffi_type_pointer;
         }
+        case BinaryTypeEncodingType::BoolEncoding: {
+            return &ffi_type_sint8;
+        }
         case BinaryTypeEncodingType::IntEncoding: {
             return &ffi_type_sint32;
+        }
+        case BinaryTypeEncodingType::LongEncoding: {
+            return &ffi_type_slong;
+        }
+        case BinaryTypeEncodingType::FloatEncoding: {
+            return &ffi_type_float;
+        }
+        case BinaryTypeEncodingType::DoubleEncoding: {
+            return &ffi_type_double;
         }
         default: {
             break;

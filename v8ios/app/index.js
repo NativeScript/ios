@@ -18,6 +18,10 @@ var formattedDate = formatter.stringFromDate(date);
 console.log(formattedDate);
 **/
 
+require("./CanvasViewController");
+require("./DetailViewController");
+require("./MasterViewController");
+
 var TNSAppDelegate = UIResponder.extend({
     get window() {
         return this._window;

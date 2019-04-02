@@ -10,17 +10,12 @@
 		C2335B70224CADD50071048C /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2335B6E224CADD50071048C /* Interop.mm */; };
 		C2335B74224CEAFA0071048C /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2335B73224CEAFA0071048C /* libffi.a */; };
 		C245885E224A4913000D147A /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C245885D224A4913000D147A /* libtorque_generated_initializers.a */; };
-		C24F3915222576D00027977A /* index.js in Resources */ = {isa = PBXBuildFile; fileRef = C24F3914222576D00027977A /* index.js */; };
 		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
-		C2764AF3222BDFDE008F674F /* metadata-x86_64.bin in Resources */ = {isa = PBXBuildFile; fileRef = C2764AF2222BDFDE008F674F /* metadata-x86_64.bin */; };
 		C2764AF6222BE705008F674F /* Metadata.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF4222BE705008F674F /* Metadata.mm */; };
 		C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF7222E80AC008F674F /* MetadataBuilder.mm */; };
 		C2764AFC223644B3008F674F /* ObjectManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.mm */; };
-		C27E278522202664009C10A3 /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = C27E278422202664009C10A3 /* AppDelegate.mm */; };
-		C27E278822202664009C10A3 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = C27E278722202664009C10A3 /* ViewController.m */; };
 		C27E278B22202664009C10A3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C27E278922202664009C10A3 /* Main.storyboard */; };
 		C27E278D22202665009C10A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C27E278C22202665009C10A3 /* Assets.xcassets */; };
-		C27E279022202665009C10A3 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C27E278E22202665009C10A3 /* LaunchScreen.storyboard */; };
 		C27E279322202665009C10A3 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.mm */; };
 		C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF122214A4D007DE2BA /* platform-ios.cpp */; };
 		C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */; };
@@ -30,16 +25,6 @@
 		C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9CC224391A3006FB9D3 /* Caches.cpp */; };
 		C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */; };
 		C2AAE9D722490F50006FB9D3 /* Helpers.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D522490F50006FB9D3 /* Helpers.mm */; };
-		C2B12E9E22269B43000F6AFC /* richards.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9C22269B43000F6AFC /* richards.js */; };
-		C2B12E9F22269B43000F6AFC /* base.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12E9D22269B43000F6AFC /* base.js */; };
-		C2B12EB12226BA2E000F6AFC /* deltablue.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EB02226BA2E000F6AFC /* deltablue.js */; };
-		C2B12EB32226BC0D000F6AFC /* crypto.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EB22226BC0D000F6AFC /* crypto.js */; };
-		C2B12EB52226BC3E000F6AFC /* raytrace.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EB42226BC3E000F6AFC /* raytrace.js */; };
-		C2B12EB72226BC63000F6AFC /* earley-boyer.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EB62226BC63000F6AFC /* earley-boyer.js */; };
-		C2B12EBB2226BCAC000F6AFC /* splay.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EBA2226BCAC000F6AFC /* splay.js */; };
-		C2B12EBD2226BCE3000F6AFC /* navier-stokes.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EBC2226BCE3000F6AFC /* navier-stokes.js */; };
-		C2B12EC12226BD4E000F6AFC /* mandreel.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EC02226BD4E000F6AFC /* mandreel.js */; };
-		C2B12EC92226BDF7000F6AFC /* box2d.js in Resources */ = {isa = PBXBuildFile; fileRef = C2B12EC82226BDF7000F6AFC /* box2d.js */; };
 		C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2B12EE22227C606000F6AFC /* SetTimeout.cpp */; };
 		C2B12F0022297FD7000F6AFC /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EF822297FD1000F6AFC /* libv8_initializers.a */; };
 		C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EF922297FD1000F6AFC /* libv8_libbase.a */; };
@@ -48,7 +33,9 @@
 		C2B12F0422297FD7000F6AFC /* libv8_base.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFC22297FD5000F6AFC /* libv8_base.a */; };
 		C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */; };
 		C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */; };
-		C2E5F77D223796C400A3A68F /* regexp.js in Resources */ = {isa = PBXBuildFile; fileRef = C2E5F77C223796C300A3A68F /* regexp.js */; };
+		C2FF3001225202FC00933782 /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2FF3000225202FC00933782 /* app */; };
+		C2FF30152252034900933782 /* include in Resources */ = {isa = PBXBuildFile; fileRef = C2FF30142252034900933782 /* include */; };
+		C2FF3021225209A700933782 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2FF301C2252062A00933782 /* UIKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,10 +43,8 @@
 		C2335B6F224CADD50071048C /* Interop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Interop.h; sourceTree = "<group>"; };
 		C2335B73224CEAFA0071048C /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
 		C245885D224A4913000D147A /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
-		C24F3914222576D00027977A /* index.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = index.js; sourceTree = "<group>"; };
 		C24F39182225859D0027977A /* Console.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Console.h; sourceTree = "<group>"; };
 		C24F39192225859D0027977A /* Console.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
-		C2764AF2222BDFDE008F674F /* metadata-x86_64.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = "metadata-x86_64.bin"; sourceTree = "<group>"; };
 		C2764AF4222BE705008F674F /* Metadata.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Metadata.mm; sourceTree = "<group>"; };
 		C2764AF5222BE705008F674F /* Metadata.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
 		C2764AF7222E80AC008F674F /* MetadataBuilder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MetadataBuilder.mm; sourceTree = "<group>"; };
@@ -67,16 +52,10 @@
 		C2764AFA223644B3008F674F /* ObjectManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ObjectManager.mm; sourceTree = "<group>"; };
 		C2764AFB223644B3008F674F /* ObjectManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjectManager.h; sourceTree = "<group>"; };
 		C27E278022202664009C10A3 /* v8ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = v8ios.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C27E278322202664009C10A3 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
-		C27E278422202664009C10A3 /* AppDelegate.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = AppDelegate.mm; sourceTree = "<group>"; };
-		C27E278622202664009C10A3 /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
-		C27E278722202664009C10A3 /* ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
 		C27E278A22202664009C10A3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		C27E278C22202665009C10A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		C27E278F22202665009C10A3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		C27E279122202665009C10A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C27E279222202665009C10A3 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
-		C28B7AE022203080007DE2BA /* include */ = {isa = PBXFileReference; lastKnownFileType = folder; path = include; sourceTree = "<group>"; };
 		C28B7AF02221499D007DE2BA /* platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = platform.h; sourceTree = "<group>"; };
 		C28B7AF122214A4D007DE2BA /* platform-ios.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "platform-ios.cpp"; sourceTree = "<group>"; };
 		C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = stack_trace_posix.cpp; sourceTree = "<group>"; };
@@ -95,16 +74,6 @@
 		C2AAE9D3224902FD006FB9D3 /* ClassBuilder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClassBuilder.h; sourceTree = "<group>"; };
 		C2AAE9D522490F50006FB9D3 /* Helpers.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Helpers.mm; sourceTree = "<group>"; };
 		C2AAE9D622490F50006FB9D3 /* Helpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Helpers.h; sourceTree = "<group>"; };
-		C2B12E9C22269B43000F6AFC /* richards.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = richards.js; sourceTree = "<group>"; };
-		C2B12E9D22269B43000F6AFC /* base.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = base.js; sourceTree = "<group>"; };
-		C2B12EB02226BA2E000F6AFC /* deltablue.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = deltablue.js; sourceTree = "<group>"; };
-		C2B12EB22226BC0D000F6AFC /* crypto.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = crypto.js; sourceTree = "<group>"; };
-		C2B12EB42226BC3E000F6AFC /* raytrace.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = raytrace.js; sourceTree = "<group>"; };
-		C2B12EB62226BC63000F6AFC /* earley-boyer.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = "earley-boyer.js"; sourceTree = "<group>"; };
-		C2B12EBA2226BCAC000F6AFC /* splay.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = splay.js; sourceTree = "<group>"; };
-		C2B12EBC2226BCE3000F6AFC /* navier-stokes.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = "navier-stokes.js"; sourceTree = "<group>"; };
-		C2B12EC02226BD4E000F6AFC /* mandreel.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = mandreel.js; sourceTree = "<group>"; };
-		C2B12EC82226BDF7000F6AFC /* box2d.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = box2d.js; sourceTree = "<group>"; };
 		C2B12EE12227C606000F6AFC /* SetTimeout.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SetTimeout.h; sourceTree = "<group>"; };
 		C2B12EE22227C606000F6AFC /* SetTimeout.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SetTimeout.cpp; sourceTree = "<group>"; };
 		C2B12EF022293CC3000F6AFC /* snapshot_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.x86_64.h; sourceTree = "<group>"; };
@@ -118,9 +87,13 @@
 		C2B12EFC22297FD5000F6AFC /* libv8_base.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base.a; sourceTree = "<group>"; };
 		C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
 		C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
-		C2E5F77C223796C300A3A68F /* regexp.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = regexp.js; sourceTree = "<group>"; };
 		C2FE377E224E61AA00847863 /* NativeScript.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeScript.h; sourceTree = "<group>"; };
 		C2FE3780224E803700847863 /* DataWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DataWrapper.h; sourceTree = "<group>"; };
+		C2FF3000225202FC00933782 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
+		C2FF30142252034900933782 /* include */ = {isa = PBXFileReference; lastKnownFileType = folder; path = include; sourceTree = "<group>"; };
+		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		C2FF301C2252062A00933782 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		C2FF301F2252065E00933782 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -128,6 +101,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C2FF3021225209A700933782 /* UIKit.framework in Frameworks */,
 				C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */,
 				C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */,
 				C2335B74224CEAFA0071048C /* libffi.a in Frameworks */,
@@ -143,26 +117,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		C24F3913222576890027977A /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				C2E5F77C223796C300A3A68F /* regexp.js */,
-				C2764AF2222BDFDE008F674F /* metadata-x86_64.bin */,
-				C2B12EC82226BDF7000F6AFC /* box2d.js */,
-				C2B12EC02226BD4E000F6AFC /* mandreel.js */,
-				C2B12EBC2226BCE3000F6AFC /* navier-stokes.js */,
-				C2B12EBA2226BCAC000F6AFC /* splay.js */,
-				C2B12EB62226BC63000F6AFC /* earley-boyer.js */,
-				C2B12EB42226BC3E000F6AFC /* raytrace.js */,
-				C2B12EB22226BC0D000F6AFC /* crypto.js */,
-				C2B12EB02226BA2E000F6AFC /* deltablue.js */,
-				C2B12E9D22269B43000F6AFC /* base.js */,
-				C2B12E9C22269B43000F6AFC /* richards.js */,
-				C24F3914222576D00027977A /* index.js */,
-			);
-			path = Resources;
-			sourceTree = "<group>";
-		};
 		C24F391D222598A80027977A /* Snapshot */ = {
 			isa = PBXGroup;
 			children = (
@@ -225,6 +179,7 @@
 			children = (
 				C27E278222202664009C10A3 /* v8ios */,
 				C27E278122202664009C10A3 /* Products */,
+				C2FF3016225203FD00933782 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -239,19 +194,14 @@
 		C27E278222202664009C10A3 /* v8ios */ = {
 			isa = PBXGroup;
 			children = (
-				C24F3913222576890027977A /* Resources */,
+				C2FF30142252034900933782 /* include */,
+				C2FF3000225202FC00933782 /* app */,
 				C27E279922202720009C10A3 /* Frameworks */,
 				C24F391F222598E40027977A /* V8Platform */,
 				C24F391E222598C60027977A /* Runtime */,
 				C24F391D222598A80027977A /* Snapshot */,
-				C28B7AE022203080007DE2BA /* include */,
-				C27E278322202664009C10A3 /* AppDelegate.h */,
-				C27E278422202664009C10A3 /* AppDelegate.mm */,
-				C27E278622202664009C10A3 /* ViewController.h */,
-				C27E278722202664009C10A3 /* ViewController.m */,
 				C27E278922202664009C10A3 /* Main.storyboard */,
 				C27E278C22202665009C10A3 /* Assets.xcassets */,
-				C27E278E22202665009C10A3 /* LaunchScreen.storyboard */,
 				C27E279122202665009C10A3 /* Info.plist */,
 				C27E279222202665009C10A3 /* main.mm */,
 			);
@@ -273,6 +223,16 @@
 			);
 			name = Frameworks;
 			path = ..;
+			sourceTree = "<group>";
+		};
+		C2FF3016225203FD00933782 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C2FF301F2252065E00933782 /* CoreFoundation.framework */,
+				C2FF301C2252062A00933782 /* UIKit.framework */,
+				C2FF3017225203FD00933782 /* Foundation.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -332,22 +292,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C2B12EBD2226BCE3000F6AFC /* navier-stokes.js in Resources */,
-				C2B12EB32226BC0D000F6AFC /* crypto.js in Resources */,
-				C2B12EB52226BC3E000F6AFC /* raytrace.js in Resources */,
-				C2B12E9E22269B43000F6AFC /* richards.js in Resources */,
-				C2B12EB12226BA2E000F6AFC /* deltablue.js in Resources */,
-				C2764AF3222BDFDE008F674F /* metadata-x86_64.bin in Resources */,
-				C2B12E9F22269B43000F6AFC /* base.js in Resources */,
-				C2B12EBB2226BCAC000F6AFC /* splay.js in Resources */,
-				C2B12EB72226BC63000F6AFC /* earley-boyer.js in Resources */,
-				C2B12EC92226BDF7000F6AFC /* box2d.js in Resources */,
-				C24F3915222576D00027977A /* index.js in Resources */,
-				C27E279022202665009C10A3 /* LaunchScreen.storyboard in Resources */,
+				C2FF3001225202FC00933782 /* app in Resources */,
 				C27E278D22202665009C10A3 /* Assets.xcassets in Resources */,
-				C2B12EC12226BD4E000F6AFC /* mandreel.js in Resources */,
 				C27E278B22202664009C10A3 /* Main.storyboard in Resources */,
-				C2E5F77D223796C400A3A68F /* regexp.js in Resources */,
+				C2FF30152252034900933782 /* include in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -358,7 +306,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C27E278822202664009C10A3 /* ViewController.m in Sources */,
 				C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */,
 				C27E279322202665009C10A3 /* main.mm in Sources */,
 				C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */,
@@ -374,7 +321,6 @@
 				C24F391A2225859D0027977A /* Console.cpp in Sources */,
 				C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */,
 				C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */,
-				C27E278522202664009C10A3 /* AppDelegate.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -387,14 +333,6 @@
 				C27E278A22202664009C10A3 /* Base */,
 			);
 			name = Main.storyboard;
-			sourceTree = "<group>";
-		};
-		C27E278E22202665009C10A3 /* LaunchScreen.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				C27E278F22202665009C10A3 /* Base */,
-			);
-			name = LaunchScreen.storyboard;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

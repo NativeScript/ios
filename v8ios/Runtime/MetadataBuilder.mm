@@ -309,9 +309,10 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
         args.push_back(info[i]);
     }
 
+    const char* jsName = item->classMeta_->jsName();
     Local<Value> result = instanceMethod
-        ? item->builder_->InvokeMethod(isolate, item->meta_, info.This(), args, item->classMeta_->jsName())
-        : item->builder_->InvokeMethod(isolate, item->meta_, Local<Object>(), args, item->classMeta_->jsName());
+        ? item->builder_->InvokeMethod(isolate, item->meta_, info.This(), args, jsName)
+        : item->builder_->InvokeMethod(isolate, item->meta_, Local<Object>(), args, jsName);
 
     if (!result.IsEmpty()) {
         info.GetReturnValue().Set(result);
@@ -374,7 +375,7 @@ Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* m
     NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
     [invocation setSelector:selector];
 
-    const TypeEncoding* typeEncoding = meta->encodings()->first()->next();
+    const TypeEncoding* typeEncoding = meta->encodings()->first();
 
     return argConverter_.Invoke(isolate, klass, receiver, args, invocation, typeEncoding, signature.methodReturnType);
 }

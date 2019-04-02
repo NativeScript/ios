@@ -36,16 +36,27 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
 
     Local<Object> implementationObject = info[0].As<Object>();
     Local<v8::Function> baseFunc = info.This().As<v8::Function>();
-    std::string name = tns::ToString(isolate, baseFunc->GetName());
+    std::string baseClassName = tns::ToString(isolate, baseFunc->GetName());
 
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-    const InterfaceMeta* interfaceMeta = globalTable->findInterfaceMeta(name.c_str());
+    const InterfaceMeta* interfaceMeta = globalTable->findInterfaceMeta(baseClassName.c_str());
     assert(interfaceMeta != nullptr);
 
-    Class extendedClass = item->self_->GetExtendedClass(name.c_str());
+    Local<Object> nativeSignature;
+    std::string staticClassName;
     if (info.Length() > 1 && info[1]->IsObject()) {
-        item->self_->ExposeDynamicMembers(isolate, extendedClass, implementationObject, info[1].As<Object>());
-        item->self_->ExposeDynamicProtocols(isolate, extendedClass, implementationObject, info[1].As<Object>());
+        nativeSignature = info[1].As<Object>();
+        Local<Value> explicitClassName;
+        assert(nativeSignature->Get(context, tns::ToV8String(isolate, "name")).ToLocal(&explicitClassName));
+        if (!explicitClassName.IsEmpty()) {
+            staticClassName = tns::ToString(isolate, explicitClassName);
+        }
+    }
+
+    Class extendedClass = item->self_->GetExtendedClass(baseClassName, staticClassName);
+    if (!nativeSignature.IsEmpty()) {
+        item->self_->ExposeDynamicMembers(isolate, extendedClass, implementationObject, nativeSignature);
+        item->self_->ExposeDynamicProtocols(isolate, extendedClass, implementationObject, nativeSignature);
     }
     objc_registerClassPair(extendedClass);
 
@@ -100,9 +111,10 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 }
 
 void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
+    Local<Context> context = isolate->GetCurrentContext();
     Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
+    const BaseClassMeta* extendedClassMeta = argConverter_.FindInterfaceMeta(extendedClass);
     if (!exposedMethods.IsEmpty() && exposedMethods->IsObject()) {
-        Local<Context> context = isolate->GetCurrentContext();
         Local<v8::Array> methodNames;
         if (!exposedMethods.As<Object>()->GetOwnPropertyNames(context).ToLocal(&methodNames)) {
             assert(false);
@@ -117,12 +129,11 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
                 assert(false);
             }
 
-            // TODO: Prepare the TypeEncoding* from the v8 arguments and return type
-            const InterfaceMeta* interfaceMeta = argConverter_.FindInterfaceMeta(extendedClass);
+            // TODO: Prepare the TypeEncoding* from the v8 arguments and return type.
             std::string typeInfo = "v@:@";
             int argsCount = 1;
             std::string methodNameStr = tns::ToString(isolate, methodName);
-            SEL selector = NSSelectorFromString([NSString stringWithUTF8String:(methodNameStr + ":").c_str()]);
+            SEL selector = NSSelectorFromString([NSString stringWithUTF8String:(methodNameStr).c_str()]);
 
             TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc(2, sizeof(TypeEncoding)));
             typeEncoding->type = BinaryTypeEncodingType::VoidEncoding;
@@ -130,9 +141,67 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
             next->type = BinaryTypeEncodingType::InterfaceDeclarationReference;
 
             Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
-            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding, &argConverter_);
+            Persistent<Object>* prototype = new Persistent<Object>(isolate, implementationObject);
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, prototype, 2, argsCount, typeEncoding, &argConverter_);
             IMP methodBody = interop_.CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
             class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str());
+        }
+    }
+
+    Local<v8::Array> propertyNames;
+    assert(implementationObject->GetOwnPropertyNames(context).ToLocal(&propertyNames));
+    for (uint32_t i = 0; i < propertyNames->Length(); i++) {
+        Local<Value> key = propertyNames->Get(i);
+        Local<Value> method = implementationObject->Get(key);
+        if (method.IsEmpty() || !method->IsFunction()) {
+            continue;
+        }
+
+        std::string methodName = tns::ToString(isolate, key);
+
+        const BaseClassMeta* meta = extendedClassMeta;
+        while (meta != nullptr) {
+            const MethodMeta* methodMeta = nullptr;
+
+            for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
+                const MethodMeta* mm = (*it).valuePtr();
+                if (strcmp(mm->jsName(), methodName.c_str()) == 0) {
+                    methodMeta = mm;
+                    break;
+                }
+            }
+
+            if (methodMeta == nullptr) {
+                for (auto protoIt = meta->protocols->begin(); protoIt != meta->protocols->end(); protoIt++) {
+                    const char* proto = (*protoIt).valuePtr();
+                    const BaseClassMeta* m = argConverter_.GetInterfaceMeta(proto);
+                    for (auto it = m->instanceMethods->begin(); it != m->instanceMethods->end(); it++) {
+                        const MethodMeta* mm = (*it).valuePtr();
+                        if (strcmp(mm->jsName(), methodName.c_str()) == 0) {
+                            methodMeta = mm;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (methodMeta != nullptr) {
+                Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
+                const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
+                uint8_t argsCount = methodMeta->encodings()->count - 1;
+                Persistent<Object>* prototype = new Persistent<Object>(isolate, implementationObject);
+                MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, prototype, 2, argsCount, typeEncoding, &argConverter_);
+                SEL selector = methodMeta->selector();
+                IMP methodBody = interop_.CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
+                class_addMethod(extendedClass, selector, methodBody, "v@:@");
+            }
+
+            if (meta->type() == MetaType::Interface) {
+                const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+                meta = interfaceMeta->baseMeta();
+            } else {
+                break;
+            }
         }
     }
 }
@@ -290,13 +359,13 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<Name> property, const Prope
     info.GetReturnValue().Set(superValue);
 }
 
-Class ClassBuilder::GetExtendedClass(std::string baseClassName) {
+Class ClassBuilder::GetExtendedClass(std::string baseClassName, std::string staticClassName) {
     Class baseClass = objc_getClass(baseClassName.c_str());
-    std::string name = baseClassName + "_" + std::to_string(++ClassBuilder::classNameCounter_);
+    std::string name = !staticClassName.empty() ? staticClassName : baseClassName + "_" + std::to_string(++ClassBuilder::classNameCounter_);
     Class clazz = objc_getClass(name.c_str());
 
     if (clazz != nil) {
-        return GetExtendedClass(baseClassName);
+        return GetExtendedClass(baseClassName, staticClassName);
     }
 
     clazz = objc_allocateClassPair(baseClass, name.c_str(), 0);
