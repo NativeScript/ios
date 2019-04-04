@@ -1,6 +1,5 @@
 #include <Foundation/Foundation.h>
 #include "ArgConverter.h"
-#include "DataWrapper.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -37,8 +36,8 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
 
         if (arg->IsObject() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
             Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
-            DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
-            std::string protocolName = wrapper->meta_->name();
+            BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+            std::string protocolName = wrapper->Metadata()->name();
             Protocol* protocol = objc_getProtocol(protocolName.c_str());
             [invocation setArgument:&protocol atIndex:index];
             continue;
@@ -60,7 +59,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         }
 
         Local<Context> context = isolate->GetCurrentContext();
-        if (arg->IsString()) {
+        if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             std::string str = tns::ToString(isolate, arg);
             NSString* result = [NSString stringWithUTF8String:str.c_str()];
             [invocation setArgument:&result atIndex:index];
@@ -100,8 +99,9 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
             Local<Object> obj = arg.As<Object>();
             if (obj->InternalFieldCount() > 0) {
                 Local<External> ext = obj->GetInternalField(0).As<External>();
-                DataWrapper* wrapper = reinterpret_cast<DataWrapper*>(ext->Value());
-                const Meta* meta = wrapper->meta_;
+                // TODO: Check the actual type of the DataWrapper
+                ObjCDataWrapper* wrapper = reinterpret_cast<ObjCDataWrapper*>(ext->Value());
+                const Meta* meta = wrapper->Metadata();
                 if (meta != nullptr && meta->type() == MetaType::JsCode) {
                     const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
                     std::string jsCode = jsCodeMeta->jsCode();
@@ -124,8 +124,9 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
                     continue;
                 }
 
-                if (wrapper->data_ != nullptr) {
-                    [invocation setArgument:&wrapper->data_ atIndex:index];
+                id data = wrapper->Data();
+                if (data != nullptr) {
+                    [invocation setArgument:&data atIndex:index];
                     continue;
                 }
             }
@@ -138,8 +139,9 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
     bool instanceMethod = !receiver.IsEmpty();
     if (instanceMethod) {
         Local<External> ext = receiver->GetInternalField(0).As<External>();
-        DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
-        id target = wrapper->data_;
+        // TODO: Check the actual type of the DataWrapper
+        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+        id target = wrapper->Data();
 
         bool callSuperMethod = receiver->InternalFieldCount() > 1 && !receiver->GetInternalField(1).IsEmpty() && receiver->GetInternalField(1)->IsExternal();
 
@@ -164,8 +166,9 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         id result = nil;
         [invocation getReturnValue:&result];
         if (result != nil) {
-            CFBridgingRetain(result);
-            return ConvertArgument(isolate, result);
+            // TODO: Create the proper DataWrapper type depending on the return value
+            ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, result);
+            return ConvertArgument(isolate, wrapper);
         }
     }
 
@@ -248,93 +251,120 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
     return Local<Value>();
 }
 
-Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, id obj) {
-    if (obj == nullptr) {
+Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, BaseDataWrapper* wrapper) {
+    // TODO: Check the actual DataWrapper type
+    if (wrapper == nullptr) {
         return Null(isolate);
     }
 
-    Local<Value> result = CreateJsWrapper(isolate, obj, Local<Object>());
+    Local<Value> result = CreateJsWrapper(isolate, wrapper, Local<Object>());
     return result;
 }
 
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
     MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
 
-    std::vector<id> arguments;
-    const TypeEncoding* typeEncoding = data->typeEncoding_;
-    for (int i = 0; i < data->paramsCount_; i++) {
-        typeEncoding = typeEncoding->next();
-        int argIndex = i + data->initialParamIndex_;
-        const id arg = *static_cast<const id*>(argValues[argIndex]);
-        arguments.push_back(arg);
-    }
-
     Isolate* isolate = data->isolate_;
     const Persistent<Object>* poCallback = data->callback_;
 
-    Local<Value> (^cb)() = ^Local<Value>() {
-        EscapableHandleScope handle_scope(isolate);
-        Local<Context> ctx = isolate->GetCurrentContext();
+    void (^cb)() = ^{
+        HandleScope handle_scope(isolate);
         Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
 
         std::vector<Local<Value>> v8Args;
-        for (int i = 0; i < arguments.size(); i++) {
-            Local<Value> jsWrapper = data->argConverter_->ConvertArgument(isolate, arguments[i]);
+        const TypeEncoding* typeEncoding = data->typeEncoding_;
+        for (int i = 0; i < data->paramsCount_; i++) {
+            typeEncoding = typeEncoding->next();
+            int argIndex = i + data->initialParamIndex_;
+
+            Local<Value> jsWrapper;
+            if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
+                long arg = *static_cast<long*>(argValues[argIndex]);
+                BaseDataWrapper* wrapper = new PrimitiveDataWrapper(nullptr, &arg);
+                jsWrapper = data->argConverter_->ConvertArgument(isolate, wrapper);
+            } else if (typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
+                bool arg = *static_cast<bool*>(argValues[argIndex]);
+                BaseDataWrapper* wrapper = new PrimitiveDataWrapper(nullptr, &arg);
+                jsWrapper = data->argConverter_->ConvertArgument(isolate, wrapper);
+            } else {
+                const id arg = *static_cast<const id*>(argValues[argIndex]);
+                if (arg != nil) {
+                    BaseDataWrapper* wrapper = new ObjCDataWrapper(nullptr, arg);
+                    jsWrapper = data->argConverter_->ConvertArgument(isolate, wrapper);
+                } else {
+                    jsWrapper = Null(data->isolate_);
+                }
+            }
+
             v8Args.push_back(jsWrapper);
         }
 
-        Local<Object> thiz = ctx->Global();
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> thiz = context->Global();
         if (data->prototype_ != nullptr && data->initialParamIndex_ > 0) {
             id self_ = *static_cast<const id*>(argValues[0]);
-            Local<Context> context = isolate->GetCurrentContext();
-            thiz = data->argConverter_->CreateJsWrapper(isolate, self_, Local<Object>());
-            Local<External> ext = External::New(isolate, nullptr);
-            thiz->SetInternalField(1, ext);
-            thiz->SetPrototype(context, data->prototype_->Get(isolate)).ToChecked();
+            auto it = Caches::Instances.find(self_);
+            if (it == Caches::Instances.end()) {
+                ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, self_);
+                thiz = data->argConverter_->CreateJsWrapper(isolate, wrapper, Local<Object>());
+                Local<External> ext = External::New(isolate, nullptr);
+                thiz->SetInternalField(1, ext);
+                Local<Context> context = isolate->GetCurrentContext();
+                thiz->SetPrototype(context, data->prototype_->Get(isolate)).ToChecked();
+
+                //TODO: We are creating a persistent object here that will never be GCed
+                // We need to determine the lifetime of this object
+                Persistent<Object>* poObj = new Persistent<Object>(data->isolate_, thiz);
+                Caches::Instances.insert(std::make_pair(self_, poObj));
+            } else {
+                thiz = it->second->Get(data->isolate_);
+            }
         }
 
         Local<Value> result;
-        if (!callback->Call(ctx, thiz, (int)arguments.size(), v8Args.data()).ToLocal(&result)) {
+        if (!callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result)) {
             assert(false);
         }
 
-        return handle_scope.Escape(result);
+        if (!result.IsEmpty() && !result->IsUndefined()) {
+            if (result->IsNumber() || result->IsNumberObject()) {
+                if (data->typeEncoding_->type == BinaryTypeEncodingType::LongEncoding) {
+                    long value = result.As<Number>()->Value();
+                    *static_cast<long*>(retValue) = value;
+                    return;
+                } else if (data->typeEncoding_->type == BinaryTypeEncodingType::DoubleEncoding) {
+                    double value = result.As<Number>()->Value();
+                    *static_cast<double*>(retValue) = value;
+                    return;
+                }
+            } else if (result->IsObject()) {
+                if (data->typeEncoding_->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+                    Local<External> ext = result.As<Object>()->GetInternalField(0).As<External>();
+                    ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+                    id data = wrapper->Data();
+                    *(ffi_arg *)retValue = (unsigned long)data;
+                    return;
+                }
+            }
+
+            // TODO: Handle other return types, i.e. assign the retValue parameter from the v8 result
+            assert(false);
+        }
     };
 
-    HandleScope handle_scope(isolate);
-
-    Local<Value> result;
     if ([NSThread isMainThread]) {
-        result = cb();
-        if (result.IsEmpty() || result->IsUndefined()) {
-            result = Local<Value>();
-        }
+        cb();
     } else {
-        Persistent<Value>* __block poResult = nullptr;
         dispatch_group_t group = dispatch_group_create();
         dispatch_group_enter(group);
         dispatch_async(dispatch_get_main_queue(), ^{
-            HandleScope handle_scope(isolate);
-            Local<Value> localRes = cb();
-            if (!localRes.IsEmpty() && !localRes->IsUndefined()) {
-                poResult = new Persistent<Value>(isolate, localRes);
-            }
+            cb();
             dispatch_group_leave(group);
         });
 
         if (dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC)) != 0) {
             assert(false);
         }
-
-        if (poResult != nullptr) {
-            result = Local<Value>::New(isolate, *poResult);
-            poResult->Reset();
-            delete poResult;
-        }
-    }
-
-    if (!result.IsEmpty() && !result->IsUndefined()) {
-        // TODO: Handle the return type, i.e. assign the retValue parameter from the v8 result
     }
 }
 void ArgConverter::SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding) {
@@ -399,15 +429,21 @@ void ArgConverter::SetNumericArgument(NSInvocation* invocation, int index, doubl
     }
 }
 
-Local<Object> ArgConverter::CreateJsWrapper(Isolate* isolate, id obj, Local<Object> receiver) {
+Local<Object> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver) {
     Local<Context> context = isolate->GetCurrentContext();
 
     if (receiver.IsEmpty()) {
         receiver = CreateEmptyObject(context);
     }
 
-    if (obj != nullptr) {
-        Class klass = [obj class];
+    if (wrapper != nullptr) {
+        id target = nil;
+        if (wrapper->Type() == WrapperType::ObjCObject) {
+            ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+            target = dataWrapper->Data();
+        }
+
+        Class klass = [target class];
         const BaseClassMeta* meta = FindInterfaceMeta(klass);
         if (meta != nullptr) {
             auto it = Caches::Prototypes.find(meta);
@@ -422,7 +458,6 @@ Local<Object> ArgConverter::CreateJsWrapper(Isolate* isolate, id obj, Local<Obje
         }
     }
 
-    DataWrapper* wrapper = new DataWrapper(obj);
     Local<External> ext = External::New(isolate, wrapper);
     receiver->SetInternalField(0, ext);
     objectManager_.Register(isolate, receiver);

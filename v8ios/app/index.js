@@ -10,13 +10,16 @@ var f = () => {
    }
 };
 
-/**
-var formatter = new NSDateFormatter();
-formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z";
-var date = NSDate.date();
-var formattedDate = formatter.stringFromDate(date);
-console.log(formattedDate);
-**/
+//f();
+//gc();
+//gc();
+//console.log("Finished allocating objects\n");
+
+//var formatter = new NSDateFormatter();
+//formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z";
+//var date = NSDate.date();
+//var formattedDate = formatter.stringFromDate(date);
+//console.log(formattedDate.UTF8String);
 
 require("./CanvasViewController");
 require("./DetailViewController");
@@ -33,7 +36,8 @@ var TNSAppDelegate = UIResponder.extend({
     protocols: [UIApplicationDelegate]
 });
 
-UIApplicationMain(0, null, null, TNSAppDelegate.name);
+//setTimeout(() => gc(), 10000);
+//UIApplicationMain(0, null, null, TNSAppDelegate.name);
 
 
 //var TimerTarget = NSObject.extend({
@@ -90,20 +94,6 @@ UIApplicationMain(0, null, null, TNSAppDelegate.name);
 //}, {
 //   name: "MyViewController"
 //});
-//
-//var abc = new MyViewController();
-//abc.viewDidLoad();
-//abc.myMethod();
-//console.log(abc.myMethod);
-//console.log("\n");
-//console.log(abc.myProperty);
-//console.log("\n");
-//console.log(abc.isFirstResponder);
-//console.log("\n");
-
-//f();
-//gc();
-//console.log("Finished allocating objects");
 
 //var aString = new NSMutableString.alloc().init();
 //var hasAppend = aString.respondsToSelector("appendString:");

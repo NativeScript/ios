@@ -40,10 +40,10 @@ private:
     void RegisterCFunction(const FunctionMeta* funcMeta);
     void RegisterAllocMethod(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta);
-    void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta);
-    void RegisterInstanceProtocols(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta);
+    void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className);
+    void RegisterInstanceProtocols(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className);
     void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
-    void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
+    void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className);
     void RegisterStaticProtocols(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
 
     MetadataBuilder(const std::string& baseDir) {
@@ -67,12 +67,12 @@ private:
 
     template<class T>
     struct CacheItem {
-        CacheItem(const T* meta, const BaseClassMeta* classMeta, MetadataBuilder* builder)
-        : meta_(meta), classMeta_(classMeta), builder_(builder) {
+        CacheItem(const T* meta, const std::string className, MetadataBuilder* builder)
+        : meta_(meta), className_(className), builder_(builder) {
             static_assert(std::is_base_of<Meta, T>::value, "Derived not derived from Meta");
         }
         const T* meta_;
-        const BaseClassMeta* classMeta_;
+        const std::string className_;
         MetadataBuilder* builder_;
     };
 };

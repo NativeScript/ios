@@ -58,11 +58,11 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
         .descriptor = &JSBlock::kJSBlockDescriptor,
     };
 
-    object_setClass((__bridge_transfer id)blockPointer, objc_getClass("__NSGlobalBlock__"));
+    object_setClass((__bridge id)blockPointer, objc_getClass("__NSGlobalBlock__"));
 
     return blockPointer;
 }
-
+    
 void Interop::CallFunction(Isolate* isolate, const FunctionMeta* functionMeta, const std::vector<Local<Value>> args) {
     void* functionPointer = Interop::GetFunctionPointer(functionMeta);
 
@@ -99,8 +99,10 @@ void Interop::CallFunction(Isolate* isolate, const FunctionMeta* functionMeta, c
             Local<Object> obj = arg.As<Object>();
             assert(obj->InternalFieldCount() > 0);
             Local<External> ext = obj->GetInternalField(0).As<External>();
-            DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
-            values[i] = &wrapper->data_;
+            // TODO: Check the data wrapper type
+            ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+            id data = wrapper->Data();
+            values[i] = &data;
         } else {
             assert(false);
         }

@@ -7,8 +7,7 @@ dateFormatter.locale = NSLocale.currentLocale;
 dateFormatter.doesRelativeDateFormatting = true;
 
 var JSMasterViewController = UITableViewController.extend({
-      viewDidLoad: function() {
-//        console.log(Object.getOwnPropertyNames(this.__proto__));
+    viewDidLoad: function() {
         UITableViewController.prototype.viewDidLoad.call(this);
 
         this.items = [];
@@ -18,33 +17,32 @@ var JSMasterViewController = UITableViewController.extend({
         this.refreshControl.beginRefreshing();
 
         this.loadData();
-      },
-      "aboutPressed:" : function(sender) {
+    },
+    "aboutPressed:": function(sender) {
         var alertWindow = new UIAlertView({
-          title : "About",
-          message : "NativeScript Team",
-          delegate : null,
-          cancelButtonTitle : "OK",
-          otherButtonTitles : null
+            title: "About",
+            message: "NativeScript Team",
+            delegate: null,
+            cancelButtonTitle: "OK",
+            otherButtonTitles: null
         });
         alertWindow.show();
-      },
-      numberOfSectionsInTableView : function(tableView) { return 1; },
-      tableViewNumberOfRowsInSection : function(tableView, section) {
+    },
+    numberOfSectionsInTableView: function(tableView) {
+        return 1;
+    },
+    tableViewNumberOfRowsInSection: function(tableView, section) {
         return this.items.length;
-      },
-      prepareForSegueSender : function(segue, sender) {
-        console.log("AAAA");
+    },
+    prepareForSegueSender: function(segue, sender) {
         if (segue.identifier == "showDetail") {
-          var item = this.items[this.tableView.indexPathForSelectedRow.row];
-          segue.destinationViewController.item = item;
+            var item = this.items[this.tableView.indexPathForSelectedRow.row];
+            segue.destinationViewController.item = item;
         } else if (segue.identifier == "showCanvas") {
-          segue.destinationViewController.items = this.items;
+            segue.destinationViewController.items = this.items;
         }
-      },
-      tableViewCellForRowAtIndexPath : function(tableView, indexPath) {
-        console.log("AAAA");
-        //log('tableViewCellForRowAtIndexPath');
+    },
+    tableViewCellForRowAtIndexPath: function(tableView, indexPath) {
         var cell = tableView.dequeueReusableCellWithIdentifierForIndexPath("Cell", indexPath);
 
         var item = this.items[indexPath.row];
@@ -58,34 +56,35 @@ var JSMasterViewController = UITableViewController.extend({
 
         var imageView = cell.contentView.viewWithTag(3);
         fetch(item["thumbnail"])
-            .then(data => UIImage.imageWithData.async(UIImage, [ data ]))
-            .then(image => imageView.image = image)
-            .catch(error => console.error(error.toString()));
+            .then(data => imageView.image = UIImage.imageWithData(data))
+            .catch(error => console.log(error.toString()));
 
         return cell;
-      },
-      tableViewHeightForRowAtIndexPath : function(tableView, indexPath) {
+    },
+    tableViewHeightForRowAtIndexPath: function(tableView, indexPath) {
         return 44;
-      },
-      loadData : function() {
+    },
+    loadData: function() {
         fetch("http://www.reddit.com/r/aww.json?limit=500")
             .then(data => {
-              var jsonString =
-                  new NSString({data : data, encoding : NSUTF8StringEncoding});
-              var json = JSON.parse(jsonString.toString());
-              this.items = json.data.children.map(child => child.data);
+                var jsonString = NSString.alloc().initWithDataEncoding(data, NSUTF8StringEncoding);
+                var json = JSON.parse(jsonString.UTF8String);
+                this.items = json.data.children.map(child => child.data);
 
-              this.tableView.reloadData();
-              this.refreshControl.endRefreshing();
+                this.tableView.reloadData();
+                this.refreshControl.endRefreshing();
             })
-            .catch(error => console.error(error));
-      }
-    },
-    {
-      name : "JSMasterViewController",
-      exposedMethods: {
-        "loadData" : {returns : "v"},
-        "aboutPressed:" :
-            {returns : "v", params : [ UIControl ]}
-      }
-    });
+            .catch(error => console.log(error));
+    }
+}, {
+    name: "JSMasterViewController",
+    exposedMethods: {
+        "loadData": {
+            returns: "v"
+        },
+        "aboutPressed:": {
+            returns: "v",
+            params: [UIControl]
+        }
+    }
+});

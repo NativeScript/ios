@@ -16,6 +16,10 @@ int main(int argc, char * argv[]) {
         runtime->Init(baseDir);
         runtime->RunScript("index.js");
 
+        // Start the app manually until the issue with UIApplicationMain
+        // blocking call is resolved
+        UIApplicationMain(0, argv, nil, @"UIResponder_1");
+
         return 0;
     }
 }

@@ -48,7 +48,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         nativeSignature = info[1].As<Object>();
         Local<Value> explicitClassName;
         assert(nativeSignature->Get(context, tns::ToV8String(isolate, "name")).ToLocal(&explicitClassName));
-        if (!explicitClassName.IsEmpty()) {
+        if (!explicitClassName.IsEmpty() && !explicitClassName->IsNullOrUndefined()) {
             staticClassName = tns::ToString(isolate, explicitClassName);
         }
     }
@@ -101,7 +101,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 
     id obj = [[item->data_ alloc] init];
 
-    DataWrapper* wrapper = new DataWrapper(obj);
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(item->meta_, obj);
     Local<External> ext = External::New(isolate, wrapper);
 
     Local<Object> thiz = info.This();
@@ -225,8 +225,8 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
         assert(protoObj->InternalFieldCount() > 0);
 
         Local<External> ext = protoObj->GetInternalField(0).As<External>();
-        DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
-        const char* protocolName = wrapper->meta_->name();
+        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+        const char* protocolName = wrapper->Metadata()->name();
         Protocol* proto = objc_getProtocol(protocolName);
         assert(proto != nullptr);
 
@@ -282,14 +282,16 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
 
                     FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                        HandleScope handle_scope(context->isolate_);
                         Local<v8::Function> getterFunc = context->callback_->Get(context->isolate_);
                         Local<Value> res;
                         assert(getterFunc->Call(context->isolate_->GetCurrentContext(), context->implementationObject_->Get(context->isolate_), 0, nullptr).ToLocal(&res));
 
                         if (!res->IsNullOrUndefined() && res->IsObject() && res.As<Object>()->InternalFieldCount() > 0) {
                             Local<External> ext = res.As<Object>()->GetInternalField(0).As<External>();
-                            DataWrapper* wrapper = static_cast<DataWrapper*>(ext->Value());
-                            *(ffi_arg *)retValue = (unsigned long)wrapper->data_;
+                            // TODO: Check the actual DataWrapper type here
+                            ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+                            *(ffi_arg *)retValue = (unsigned long)wrapper->Data();
                         } else {
                             void* nullPtr = nullptr;
                             *(ffi_arg *)retValue = (unsigned long)nullPtr;
@@ -316,10 +318,13 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
                     FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                         id paramValue = *static_cast<const id*>(argValues[2]);
                         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                        HandleScope handle_scope(context->isolate_);
                         Local<v8::Function> setterFunc = context->callback_->Get(context->isolate_);
                         Local<Value> res;
 
-                        Local<Value> argWrapper = context->classBuilder_->argConverter_.CreateJsWrapper(context->isolate_, paramValue, Local<Object>());
+                        // TODO: Check the actual DataWrapper type and pass metadata
+                        ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, paramValue);
+                        Local<Value> argWrapper = context->classBuilder_->argConverter_.CreateJsWrapper(context->isolate_, wrapper, Local<Object>());
                         Local<Value> params[1] = { argWrapper };
                         assert(setterFunc->Call(context->isolate_->GetCurrentContext(), context->implementationObject_->Get(context->isolate_), 1, params).ToLocal(&res));
                     };
