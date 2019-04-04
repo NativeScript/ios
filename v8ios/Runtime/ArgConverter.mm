@@ -22,7 +22,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         Local<Value> arg = args[i];
         int index = i + 2;
 
-        if (arg->IsNull()) {
+        if (arg->IsNullOrUndefined()) {
             id nullArg = nil;
             [invocation setArgument:&nullArg atIndex:index];
             continue;
