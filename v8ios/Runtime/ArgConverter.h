@@ -33,7 +33,7 @@ public:
     void Init(v8::Isolate* isolate, ObjectManager objectManager);
     v8::Local<v8::Value> Invoke(v8::Isolate* isolate, Class klass, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, NSInvocation* invocation, const TypeEncoding* typeEncoding, const std::string returnType);
     v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, BaseDataWrapper* wrapper);
-    v8::Local<v8::Object> CreateJsWrapper(v8::Isolate* isolate, BaseDataWrapper* wrapper, v8::Local<v8::Object> receiver);
+    v8::Local<v8::Value> CreateJsWrapper(v8::Isolate* isolate, BaseDataWrapper* wrapper, v8::Local<v8::Object> receiver);
     v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);
     const BaseClassMeta* FindInterfaceMeta(Class klass);
     const BaseClassMeta* GetInterfaceMeta(std::string name);

@@ -2,6 +2,7 @@
 #include "MetadataBuilder.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
+#include "Tasks.h"
 
 using namespace v8;
 
@@ -300,7 +301,7 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
     id obj = [klass alloc];
 
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(meta, obj);
-    Local<Object> result = item->builder_->argConverter_.CreateJsWrapper(isolate, wrapper, Local<Object>());
+    Local<Value> result = item->builder_->argConverter_.CreateJsWrapper(isolate, wrapper, Local<Object>());
     info.GetReturnValue().Set(result);
 }
 
@@ -328,6 +329,27 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
     Isolate* isolate = info.GetIsolate();
 
     CacheItem<FunctionMeta>* item = static_cast<CacheItem<FunctionMeta>*>(info.Data().As<External>()->Value());
+
+    if (strcmp(item->meta_->jsName(), "UIApplicationMain") == 0) {
+        std::vector<Persistent<Value>*> args;
+        for (int i = 0; i < info.Length(); i++) {
+            args.push_back(new Persistent<Value>(isolate, info[i]));
+        }
+
+        void* userData = new TaskContext(isolate, item->meta_, args);
+        Tasks::Register([](void* userData) {
+            TaskContext* context = static_cast<TaskContext*>(userData);
+            std::vector<Local<Value>> args;
+            HandleScope handle_scope(context->isolate_);
+            for (int i = 0; i < context->args_.size(); i++) {
+                Local<Value> arg = context->args_[i]->Get(context->isolate_);
+                args.push_back(arg);
+            }
+            Interop::CallFunction(context->isolate_, context->meta_, args);
+        }, userData);
+        return;
+    }
+
     std::vector<Local<Value>> args;
     for (int i = 0; i < info.Length(); i++) {
         args.push_back(info[i]);

@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #include "Runtime.h"
+#include "Tasks.h"
 
 int main(int argc, char * argv[]) {
     // TODO: Statically ensure that the UIKit.framework is loaded. This needs to be moved in a SymbolResolver class later
@@ -16,9 +17,7 @@ int main(int argc, char * argv[]) {
         runtime->Init(baseDir);
         runtime->RunScript("index.js");
 
-        // Start the app manually until the issue with UIApplicationMain
-        // blocking call is resolved
-        UIApplicationMain(0, argv, nil, @"UIResponder_1");
+        tns::Tasks::Drain();
 
         return 0;
     }

@@ -306,7 +306,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             auto it = Caches::Instances.find(self_);
             if (it == Caches::Instances.end()) {
                 ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, self_);
-                thiz = data->argConverter_->CreateJsWrapper(isolate, wrapper, Local<Object>());
+                thiz = data->argConverter_->CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
                 Local<External> ext = External::New(isolate, nullptr);
                 thiz->SetInternalField(1, ext);
                 Local<Context> context = isolate->GetCurrentContext();
@@ -429,38 +429,49 @@ void ArgConverter::SetNumericArgument(NSInvocation* invocation, int index, doubl
     }
 }
 
-Local<Object> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver) {
+Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver) {
     Local<Context> context = isolate->GetCurrentContext();
 
-    if (receiver.IsEmpty()) {
-        receiver = CreateEmptyObject(context);
+    if (wrapper == nullptr) {
+        return Null(isolate);
     }
 
-    if (wrapper != nullptr) {
-        id target = nil;
-        if (wrapper->Type() == WrapperType::ObjCObject) {
-            ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-            target = dataWrapper->Data();
-        }
+    id target = nil;
+    if (wrapper->Type() == WrapperType::ObjCObject) {
+        ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+        target = dataWrapper->Data();
+    }
 
-        Class klass = [target class];
-        const BaseClassMeta* meta = FindInterfaceMeta(klass);
-        if (meta != nullptr) {
-            auto it = Caches::Prototypes.find(meta);
-            if (it != Caches::Prototypes.end()) {
-                Persistent<Value>* poPrototype = it->second;
-                Local<Value> prototype = Local<Value>::New(isolate, *poPrototype);
-                bool success;
-                if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
-                    assert(false);
-                }
+    if (target == nil) {
+        return Null(isolate);
+    }
+
+   if (receiver.IsEmpty()) {
+       auto it = Caches::Instances.find(target);
+       if (it != Caches::Instances.end()) {
+           receiver = it->second->Get(isolate);
+       } else {
+           receiver = CreateEmptyObject(context);
+           Caches::Instances.insert(std::make_pair(target, new Persistent<Object>(isolate, receiver)));
+       }
+   }
+
+    Class klass = [target class];
+    const BaseClassMeta* meta = FindInterfaceMeta(klass);
+    if (meta != nullptr) {
+        auto it = Caches::Prototypes.find(meta);
+        if (it != Caches::Prototypes.end()) {
+            Persistent<Value>* poPrototype = it->second;
+            Local<Value> prototype = Local<Value>::New(isolate, *poPrototype);
+            bool success;
+            if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
+                assert(false);
             }
         }
     }
 
     Local<External> ext = External::New(isolate, wrapper);
     receiver->SetInternalField(0, ext);
-    objectManager_.Register(isolate, receiver);
 
     return receiver;
 }

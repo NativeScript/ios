@@ -27,6 +27,14 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
             delete primitiveWrapper;
         } else {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+            if (objCObjectWrapper->Data() != nil) {
+                auto it = Caches::Instances.find(objCObjectWrapper->Data());
+                if (it != Caches::Instances.end()) {
+                    it->second->Reset();
+                    delete it->second;
+                    Caches::Instances.erase(it);
+                }
+            }
             delete objCObjectWrapper;
         }
         obj->SetInternalField(0, v8::Undefined(isolate));

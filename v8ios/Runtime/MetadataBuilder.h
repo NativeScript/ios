@@ -75,6 +75,14 @@ private:
         const std::string className_;
         MetadataBuilder* builder_;
     };
+
+    struct TaskContext {
+    public:
+        TaskContext(v8::Isolate* isolate, const FunctionMeta* meta, std::vector<v8::Persistent<v8::Value>*> args): isolate_(isolate), meta_(meta), args_(args) {}
+        v8::Isolate* isolate_;
+        const FunctionMeta* meta_;
+        std::vector<v8::Persistent<v8::Value>*> args_;
+    };
 };
 
 }

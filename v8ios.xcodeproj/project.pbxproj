@@ -33,6 +33,7 @@
 		C2B12F0422297FD7000F6AFC /* libv8_base.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFC22297FD5000F6AFC /* libv8_base.a */; };
 		C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */; };
 		C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */; };
+		C2BC5DAC22561C370020F348 /* Tasks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2BC5DAB22561C370020F348 /* Tasks.cpp */; };
 		C2FF3001225202FC00933782 /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2FF3000225202FC00933782 /* app */; };
 		C2FF30152252034900933782 /* include in Resources */ = {isa = PBXBuildFile; fileRef = C2FF30142252034900933782 /* include */; };
 		C2FF3021225209A700933782 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2FF301C2252062A00933782 /* UIKit.framework */; };
@@ -87,6 +88,8 @@
 		C2B12EFC22297FD5000F6AFC /* libv8_base.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base.a; sourceTree = "<group>"; };
 		C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
 		C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
+		C2BC5DAA225602C50020F348 /* Tasks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Tasks.h; sourceTree = "<group>"; };
+		C2BC5DAB22561C370020F348 /* Tasks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Tasks.cpp; sourceTree = "<group>"; };
 		C2FE377E224E61AA00847863 /* NativeScript.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeScript.h; sourceTree = "<group>"; };
 		C2FE3780224E803700847863 /* DataWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DataWrapper.h; sourceTree = "<group>"; };
 		C2FF3000225202FC00933782 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
@@ -158,6 +161,8 @@
 				C2B12EE12227C606000F6AFC /* SetTimeout.h */,
 				C2B12EE22227C606000F6AFC /* SetTimeout.cpp */,
 				C2AAE9C8223BA685006FB9D3 /* StringHasher.h */,
+				C2BC5DAA225602C50020F348 /* Tasks.h */,
+				C2BC5DAB22561C370020F348 /* Tasks.cpp */,
 			);
 			path = Runtime;
 			sourceTree = "<group>";
@@ -313,6 +318,7 @@
 				C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */,
 				C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */,
 				C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */,
+				C2BC5DAC22561C370020F348 /* Tasks.cpp in Sources */,
 				C2764AFC223644B3008F674F /* ObjectManager.mm in Sources */,
 				C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */,
 				C2335B70224CADD50071048C /* Interop.mm in Sources */,

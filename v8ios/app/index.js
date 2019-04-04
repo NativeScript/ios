@@ -37,7 +37,7 @@ var TNSAppDelegate = UIResponder.extend({
 });
 
 //setTimeout(() => gc(), 10000);
-//UIApplicationMain(0, null, null, TNSAppDelegate.name);
+UIApplicationMain(0, null, null, TNSAppDelegate.name);
 
 
 //var TimerTarget = NSObject.extend({
