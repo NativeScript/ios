@@ -118,6 +118,7 @@ class Arguments;
 class DeferredHandles;
 class Heap;
 class HeapObject;
+class ExternalString;
 class Isolate;
 class LocalEmbedderHeapTracer;
 class MicrotaskQueue;
@@ -549,7 +550,7 @@ template <class T> class PersistentBase {
    * is alive. Only allowed when the embedder is asked to trace its heap by
    * EmbedderHeapTracer.
    */
-  V8_DEPRECATE_SOON(
+  V8_DEPRECATED(
       "Used TracedGlobal and EmbedderHeapTracer::RegisterEmbedderReference",
       V8_INLINE void RegisterExternalReference(Isolate* isolate) const);
 
@@ -572,13 +573,9 @@ template <class T> class PersistentBase {
    *
    * This bit is cleared after the each garbage collection pass.
    */
-  V8_DEPRECATE_SOON("Use TracedGlobal.", V8_INLINE void MarkActive());
+  V8_DEPRECATED("Use TracedGlobal.", V8_INLINE void MarkActive());
 
   V8_DEPRECATED("See MarkIndependent.", V8_INLINE bool IsIndependent() const);
-
-  /** Checks if the handle holds the only reference to an object. */
-  V8_DEPRECATED("Garbage collection internal state should not be relied on.",
-                V8_INLINE bool IsNearDeath() const);
 
   /** Returns true if the handle's reference is weak.  */
   V8_INLINE bool IsWeak() const;
@@ -1535,7 +1532,12 @@ class V8_EXPORT ScriptCompiler {
    public:
     enum Encoding { ONE_BYTE, TWO_BYTE, UTF8 };
 
-    StreamedSource(ExternalSourceStream* source_stream, Encoding encoding);
+    V8_DEPRECATE_SOON(
+        "This class takes ownership of source_stream, so use the constructor "
+        "taking a unique_ptr to make these semantics clearer",
+        StreamedSource(ExternalSourceStream* source_stream, Encoding encoding));
+    StreamedSource(std::unique_ptr<ExternalSourceStream> source_stream,
+                   Encoding encoding);
     ~StreamedSource();
 
     internal::ScriptStreamingData* impl() const { return impl_.get(); }
@@ -2796,7 +2798,7 @@ class V8_EXPORT String : public Name {
     void operator=(const ExternalStringResourceBase&) = delete;
 
    private:
-    friend class internal::Heap;
+    friend class internal::ExternalString;
     friend class v8::String;
     friend class internal::ScopedExternalStringLock;
   };
@@ -4526,9 +4528,6 @@ class V8_EXPORT WasmModuleObject : public Object {
   WasmModuleObject();
   static void CheckCast(Value* obj);
 };
-
-V8_DEPRECATED("Use WasmModuleObject",
-              typedef WasmModuleObject WasmCompiledModule);
 
 /**
  * The V8 interface for WebAssembly streaming compilation. When streaming
@@ -6500,10 +6499,6 @@ class V8_EXPORT Extension {  // NOLINT
   bool auto_enable_;
 };
 
-V8_DEPRECATED(
-    "Use unique_ptr version or stop using extension (http://crbug.com/334679).",
-    void V8_EXPORT RegisterExtension(Extension* extension));
-
 void V8_EXPORT RegisterExtension(std::unique_ptr<Extension>);
 
 // --- Statics ---
@@ -6724,11 +6719,8 @@ enum PromiseRejectEvent {
 class PromiseRejectMessage {
  public:
   PromiseRejectMessage(Local<Promise> promise, PromiseRejectEvent event,
-                       Local<Value> value, Local<StackTrace> stack_trace)
-      : promise_(promise),
-        event_(event),
-        value_(value),
-        stack_trace_(stack_trace) {}
+                       Local<Value> value)
+      : promise_(promise), event_(event), value_(value) {}
 
   V8_INLINE Local<Promise> GetPromise() const { return promise_; }
   V8_INLINE PromiseRejectEvent GetEvent() const { return event_; }
@@ -6738,7 +6730,6 @@ class PromiseRejectMessage {
   Local<Promise> promise_;
   PromiseRejectEvent event_;
   Local<Value> value_;
-  Local<StackTrace> stack_trace_;
 };
 
 typedef void (*PromiseRejectCallback)(PromiseRejectMessage message);
@@ -8528,17 +8519,6 @@ class V8_EXPORT Isolate {
 
   /**
    * Iterates through all the persistent handles in the current isolate's heap
-   * that have class_ids and are candidates to be marked as partially dependent
-   * handles. This will visit handles to young objects created since the last
-   * garbage collection but is free to visit an arbitrary superset of these
-   * objects.
-   */
-  V8_DEPRECATED(
-      "Use VisitHandlesWithClassIds",
-      void VisitHandlesForPartialDependence(PersistentHandleVisitor* visitor));
-
-  /**
-   * Iterates through all the persistent handles in the current isolate's heap
    * that have class_ids and are weak to be marked as inactive if there is no
    * pending activity for the handle.
    */
@@ -9789,17 +9769,6 @@ bool PersistentBase<T>::IsIndependent() const {
   return I::GetNodeFlag(reinterpret_cast<internal::Address*>(this->val_),
                         I::kNodeIsIndependentShift);
 }
-
-template <class T>
-bool PersistentBase<T>::IsNearDeath() const {
-  typedef internal::Internals I;
-  if (this->IsEmpty()) return false;
-  uint8_t node_state =
-      I::GetNodeState(reinterpret_cast<internal::Address*>(this->val_));
-  return node_state == I::kNodeStateIsNearDeathValue ||
-      node_state == I::kNodeStateIsPendingValue;
-}
-
 
 template <class T>
 bool PersistentBase<T>::IsWeak() const {
