@@ -60,6 +60,10 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     }
     objc_registerClassPair(extendedClass);
 
+    Persistent<Object>* prototype = new Persistent<Object>(isolate, implementationObject);
+    std::string className = class_getName(extendedClass);
+    Caches::ClassPrototypes.insert(std::make_pair(className, prototype));
+
     Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(item->meta_)->second;
     Local<v8::Function> baseCtorFunc = Local<v8::Function>::New(isolate, *poBaseCtorFunc);
 
@@ -112,6 +116,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 
 void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
     Local<Context> context = isolate->GetCurrentContext();
+
     Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
     const BaseClassMeta* extendedClassMeta = argConverter_.FindInterfaceMeta(extendedClass);
     if (!exposedMethods.IsEmpty() && exposedMethods->IsObject()) {
@@ -141,8 +146,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
             next->type = BinaryTypeEncodingType::InterfaceDeclarationReference;
 
             Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
-            Persistent<Object>* prototype = new Persistent<Object>(isolate, implementationObject);
-            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, prototype, 2, argsCount, typeEncoding, &argConverter_);
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding, &argConverter_);
             IMP methodBody = interop_.CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
             class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str());
         }
@@ -189,8 +193,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
                 Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
                 const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
                 uint8_t argsCount = methodMeta->encodings()->count - 1;
-                Persistent<Object>* prototype = new Persistent<Object>(isolate, implementationObject);
-                MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, prototype, 2, argsCount, typeEncoding, &argConverter_);
+                MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding, &argConverter_);
                 SEL selector = methodMeta->selector();
                 IMP methodBody = interop_.CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
                 class_addMethod(extendedClass, selector, methodBody, "v@:@");

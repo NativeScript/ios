@@ -89,7 +89,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
             const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
             int argsCount = typeEncoding->details.block.signature.count - 1;
 
-            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, nullptr, 1, argsCount, blockTypeEncoding, this);
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding, this);
             CFTypeRef blockPtr = interop_.CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
             [invocation setArgument:&blockPtr atIndex:index];
             continue;
@@ -143,18 +143,20 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
         id target = wrapper->Data();
 
-        bool callSuperMethod = receiver->InternalFieldCount() > 1 && !receiver->GetInternalField(1).IsEmpty() && receiver->GetInternalField(1)->IsExternal();
+        std::string className = object_getClassName(target);
+        auto it = Caches::ClassPrototypes.find(className);
+        bool isExtendedClass = it != Caches::ClassPrototypes.end();
 
         Class originalClass;
         Class targetClass;
-        if (callSuperMethod) {
+        if (isExtendedClass) {
             targetClass = class_getSuperclass([target class]);
             originalClass = object_setClass(target, targetClass);
         }
 
         [invocation invokeWithTarget:target];
 
-        if (callSuperMethod) {
+        if (isExtendedClass) {
             object_setClass(target, originalClass);
         }
     } else {
@@ -301,23 +303,26 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
         Local<Context> context = isolate->GetCurrentContext();
         Local<Object> thiz = context->Global();
-        if (data->prototype_ != nullptr && data->initialParamIndex_ > 0) {
+        if (data->initialParamIndex_ > 0) {
             id self_ = *static_cast<const id*>(argValues[0]);
             auto it = Caches::Instances.find(self_);
-            if (it == Caches::Instances.end()) {
+            if (it != Caches::Instances.end()) {
+                thiz = it->second->Get(data->isolate_);
+            } else  {
                 ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, self_);
                 thiz = data->argConverter_->CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
-                Local<External> ext = External::New(isolate, nullptr);
-                thiz->SetInternalField(1, ext);
-                Local<Context> context = isolate->GetCurrentContext();
-                thiz->SetPrototype(context, data->prototype_->Get(isolate)).ToChecked();
+
+                std::string className = object_getClassName(self_);
+                auto it = Caches::ClassPrototypes.find(className);
+                if (it != Caches::ClassPrototypes.end()) {
+                    Local<Context> context = isolate->GetCurrentContext();
+                    thiz->SetPrototype(context, it->second->Get(isolate)).ToChecked();
+                }
 
                 //TODO: We are creating a persistent object here that will never be GCed
                 // We need to determine the lifetime of this object
                 Persistent<Object>* poObj = new Persistent<Object>(data->isolate_, thiz);
                 Caches::Instances.insert(std::make_pair(self_, poObj));
-            } else {
-                thiz = it->second->Get(data->isolate_);
             }
         }
 
@@ -459,13 +464,22 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
     Class klass = [target class];
     const BaseClassMeta* meta = FindInterfaceMeta(klass);
     if (meta != nullptr) {
-        auto it = Caches::Prototypes.find(meta);
-        if (it != Caches::Prototypes.end()) {
-            Persistent<Value>* poPrototype = it->second;
-            Local<Value> prototype = Local<Value>::New(isolate, *poPrototype);
+        std::string className = object_getClassName(target);
+        auto it = Caches::ClassPrototypes.find(className);
+        if (it != Caches::ClassPrototypes.end()) {
+            Local<Value> prototype = it->second->Get(isolate);
             bool success;
             if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
                 assert(false);
+            }
+        } else {
+            auto it = Caches::Prototypes.find(meta);
+            if (it != Caches::Prototypes.end()) {
+                Local<Value> prototype = it->second->Get(isolate);
+                bool success;
+                if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
+                    assert(false);
+                }
             }
         }
     }
@@ -538,7 +552,7 @@ Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {
 
 Local<v8::Function> ArgConverter::CreateEmptyObjectFunction(Isolate* isolate) {
     Local<FunctionTemplate> emptyObjCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
-    emptyObjCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(2);
+    emptyObjCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
     Local<v8::Function> emptyObjCtorFunc;
     if (!emptyObjCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyObjCtorFunc)) {
         assert(false);
