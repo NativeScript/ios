@@ -1,3 +1,4 @@
+#include <fstream>
 #include "Helpers.h"
 
 using namespace v8;
@@ -13,6 +14,15 @@ std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {
 
     String::Utf8Value result(isolate, value);
     return std::string(*result);
+}
+
+std::string tns::ReadText(const std::string& file) {
+    std::ifstream ifs(file);
+    if (ifs.fail()) {
+        assert(false);
+    }
+    std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
+    return content;
 }
 
 void tns::SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, const Local<Value>& value) {

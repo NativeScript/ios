@@ -2,10 +2,7 @@
 #define ClassBuilder_h
 
 #include "NativeScript.h"
-#include "Metadata.h"
 #include "ArgConverter.h"
-#include "ObjectManager.h"
-#include "Interop.h"
 
 namespace tns {
 

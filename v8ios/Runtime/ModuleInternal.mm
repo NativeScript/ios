@@ -1,6 +1,5 @@
 #include <string>
 #include "ModuleInternal.h"
-#include "Runtime.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -139,7 +138,7 @@ Local<Script> ModuleInternal::LoadScript(const std::string& moduleName, const st
 }
 
 Local<v8::String> ModuleInternal::WrapModuleContent(const std::string& path) {
-    std::string content = Runtime::ReadText(path);
+    std::string content = tns::ReadText(path);
     std::string result("(function(module, exports, require, __filename, __dirname) { ");
     result.reserve(content.length() + 1024);
     result += content;

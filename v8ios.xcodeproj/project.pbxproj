@@ -13,7 +13,7 @@
 		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
 		C2764AF6222BE705008F674F /* Metadata.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF4222BE705008F674F /* Metadata.mm */; };
 		C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF7222E80AC008F674F /* MetadataBuilder.mm */; };
-		C2764AFC223644B3008F674F /* ObjectManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.mm */; };
+		C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.cpp */; };
 		C27E278B22202664009C10A3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C27E278922202664009C10A3 /* Main.storyboard */; };
 		C27E278D22202665009C10A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C27E278C22202665009C10A3 /* Assets.xcassets */; };
 		C27E279322202665009C10A3 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.mm */; };
@@ -50,7 +50,7 @@
 		C2764AF5222BE705008F674F /* Metadata.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
 		C2764AF7222E80AC008F674F /* MetadataBuilder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MetadataBuilder.mm; sourceTree = "<group>"; };
 		C2764AF8222E80AC008F674F /* MetadataBuilder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MetadataBuilder.h; sourceTree = "<group>"; };
-		C2764AFA223644B3008F674F /* ObjectManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ObjectManager.mm; sourceTree = "<group>"; };
+		C2764AFA223644B3008F674F /* ObjectManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ObjectManager.cpp; sourceTree = "<group>"; };
 		C2764AFB223644B3008F674F /* ObjectManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjectManager.h; sourceTree = "<group>"; };
 		C27E278022202664009C10A3 /* v8ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = v8ios.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C27E278A22202664009C10A3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -155,7 +155,7 @@
 				C28B7B5822252431007DE2BA /* ModuleInternal.h */,
 				C28B7B5922252432007DE2BA /* ModuleInternal.mm */,
 				C2764AFB223644B3008F674F /* ObjectManager.h */,
-				C2764AFA223644B3008F674F /* ObjectManager.mm */,
+				C2764AFA223644B3008F674F /* ObjectManager.cpp */,
 				C28B7B2B22241122007DE2BA /* Runtime.h */,
 				C28B7B2C22241270007DE2BA /* Runtime.mm */,
 				C2B12EE12227C606000F6AFC /* SetTimeout.h */,
@@ -319,7 +319,7 @@
 				C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */,
 				C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */,
 				C2BC5DAC22561C370020F348 /* Tasks.cpp in Sources */,
-				C2764AFC223644B3008F674F /* ObjectManager.mm in Sources */,
+				C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */,
 				C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */,
 				C2335B70224CADD50071048C /* Interop.mm in Sources */,
 				C2AAE9D722490F50006FB9D3 /* Helpers.mm in Sources */,

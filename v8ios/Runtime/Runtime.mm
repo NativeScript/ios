@@ -72,7 +72,7 @@ void Runtime::RunScript(string file) {
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
-    string source = Runtime::ReadText(baseDir_ + "/" + file);
+    string source = tns::ReadText(baseDir_ + "/" + file);
     Local<v8::String> script_source = v8::String::NewFromUtf8(isolate, source.c_str(), NewStringType::kNormal).ToLocalChecked();
     Local<Script> script;
     TryCatch tc(isolate);
@@ -123,15 +123,6 @@ void Runtime::PerformanceNowCallback(const FunctionCallbackInfo<Value>& args) {
     std::chrono::milliseconds timestampMs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
     double result = timestampMs.count();
     args.GetReturnValue().Set(result);
-}
-
-std::string Runtime::ReadText(const std::string& file) {
-    std::ifstream ifs(file);
-    if (ifs.fail()) {
-        assert(false);
-    }
-    std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
-    return content;
 }
 
 }

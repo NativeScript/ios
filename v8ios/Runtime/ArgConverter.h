@@ -2,14 +2,10 @@
 #define ArgConverter_h
 
 #include <Foundation/NSInvocation.h>
-#include <string>
-#include <map>
 #include "NativeScript.h"
-#include "Metadata.h"
 #include "ObjectManager.h"
 #include "DataWrapper.h"
 #include "Interop.h"
-#include "Caches.h"
 
 namespace tns {
 

@@ -1,8 +1,6 @@
 #ifndef Interop_h
 #define Interop_h
 
-#import <CoreFoundation/CFBase.h>
-#import <objc/runtime.h>
 #include "ffi.h"
 #include "NativeScript.h"
 #include "Metadata.h"

@@ -13,7 +13,6 @@ public:
     Runtime();
     void Init(const std::string& baseDir);
     void RunScript(std::string file);
-    static std::string ReadText(const std::string& file);
 private:
     v8::Isolate* InitInternal(const std::string& baseDir);
     void DefineGlobalObject(v8::Local<v8::Context> context);
