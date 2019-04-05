@@ -1,6 +1,5 @@
 #import <UIKit/UIKit.h>
 #include "Runtime.h"
-#include "Tasks.h"
 
 int main(int argc, char * argv[]) {
     // TODO: Statically ensure that the UIKit.framework is loaded. This needs to be moved in a SymbolResolver class later
@@ -15,9 +14,6 @@ int main(int argc, char * argv[]) {
         tns::Runtime* runtime = new tns::Runtime();
         std::string baseDir = [path UTF8String];
         runtime->Init(baseDir);
-        runtime->RunScript("index.js");
-
-        tns::Tasks::Drain();
 
         return 0;
     }

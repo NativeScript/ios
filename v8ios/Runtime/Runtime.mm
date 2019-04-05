@@ -4,6 +4,7 @@
 #include "Console.h"
 #include "SetTimeout.h"
 #include "Helpers.h"
+#include "Tasks.h"
 
 #if defined __arm64 && __arm64__
 #include "natives_blob.arm64.h"
@@ -26,6 +27,8 @@ Runtime::Runtime() {
 void Runtime::Init(const string& baseDir) {
     MetadataBuilder::Load(baseDir);
     isolate_ = InitInternal(baseDir);
+    RunScript("index.js");
+    tns::Tasks::Drain();
 }
 
 Isolate* Runtime::InitInternal(const string& baseDir) {
