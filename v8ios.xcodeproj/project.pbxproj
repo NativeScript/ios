@@ -16,7 +16,7 @@
 		C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.cpp */; };
 		C27E278B22202664009C10A3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C27E278922202664009C10A3 /* Main.storyboard */; };
 		C27E278D22202665009C10A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C27E278C22202665009C10A3 /* Assets.xcassets */; };
-		C27E279322202665009C10A3 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.mm */; };
+		C27E279322202665009C10A3 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.m */; };
 		C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF122214A4D007DE2BA /* platform-ios.cpp */; };
 		C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */; };
 		C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B2C22241270007DE2BA /* Runtime.mm */; };
@@ -56,7 +56,7 @@
 		C27E278A22202664009C10A3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		C27E278C22202665009C10A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C27E279122202665009C10A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C27E279222202665009C10A3 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		C27E279222202665009C10A3 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		C28B7AF02221499D007DE2BA /* platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = platform.h; sourceTree = "<group>"; };
 		C28B7AF122214A4D007DE2BA /* platform-ios.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "platform-ios.cpp"; sourceTree = "<group>"; };
 		C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = stack_trace_posix.cpp; sourceTree = "<group>"; };
@@ -208,7 +208,7 @@
 				C27E278922202664009C10A3 /* Main.storyboard */,
 				C27E278C22202665009C10A3 /* Assets.xcassets */,
 				C27E279122202665009C10A3 /* Info.plist */,
-				C27E279222202665009C10A3 /* main.mm */,
+				C27E279222202665009C10A3 /* main.m */,
 			);
 			path = v8ios;
 			sourceTree = "<group>";
@@ -312,7 +312,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */,
-				C27E279322202665009C10A3 /* main.mm in Sources */,
+				C27E279322202665009C10A3 /* main.m in Sources */,
 				C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */,
 				C2764AF6222BE705008F674F /* Metadata.mm in Sources */,
 				C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */,
