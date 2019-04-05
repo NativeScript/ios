@@ -1,15 +1,15 @@
 var fetch = require("./fetch");
 
 var JSCanvasViewController = UICollectionViewController.extend({
-    numberOfSectionsInCollectionView: function () {
+    numberOfSectionsInCollectionView: function() {
         return 1;
     },
 
-    collectionViewNumberOfItemsInSection: function (collectionView, section) {
+    collectionViewNumberOfItemsInSection: function(collectionView, section) {
         return this.items.length;
     },
 
-    collectionViewCellForItemAtIndexPath: function (collectionView, indexPath) {
+    collectionViewCellForItemAtIndexPath: function(collectionView, indexPath) {
         var cell = collectionView.dequeueReusableCellWithReuseIdentifierForIndexPath("Cell", indexPath);
 
         var imageView = cell.contentView.viewWithTag(1);
@@ -19,14 +19,13 @@ var JSCanvasViewController = UICollectionViewController.extend({
         var item = this.items[indexPath.item];
 
         fetch(item["thumbnail"])
-            .then(data => UIImage.imageWithData.async(UIImage, [ data ]))
-            .then(image => imageView.image = image)
-            .catch(error => console.error(error.toString()));
+            .then(data => imageView.image = UIImage.imageWithData(data))
+            .catch(error => console.log(error.toString()));
 
         return cell;
     },
 
-    prepareForSegueSender: function (segue, sender) {
+    prepareForSegueSender: function(segue, sender) {
         if (segue.identifier == "showDetail") {
             var path = this.collectionView.indexPathsForSelectedItems;
             var itemPath = path.firstObject;
