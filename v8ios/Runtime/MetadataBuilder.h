@@ -24,6 +24,7 @@ private:
     ObjectManager objectManager_;
     ArgConverter argConverter_;
     ClassBuilder classBuilder_;
+    v8::Persistent<v8::Function>* poToStringFunction_;
 
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -35,6 +36,7 @@ private:
     static void PropertyNameSetterCallback(v8::Local<v8::Name> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void> &info);
     v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, std::string containingClass);
 
+    v8::Persistent<v8::Function>* CreateToStringFunction(v8::Isolate* isolate);
     v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     void RegisterCFunction(const FunctionMeta* funcMeta);

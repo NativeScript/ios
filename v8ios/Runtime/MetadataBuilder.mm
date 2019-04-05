@@ -16,6 +16,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
 
     argConverter_.Init(isolate, objectManager_);
     classBuilder_.Init(argConverter_, objectManager_);
+    poToStringFunction_ = CreateToStringFunction(isolate);
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
@@ -131,10 +132,46 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     Caches::CtorFuncTemplates.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
 
     Local<Value> prototype = ctorFunc->Get(tns::ToV8String(isolate_, "prototype"));
+
+    prototype.As<Object>()->Set(tns::ToV8String(isolate_, "toString"), poToStringFunction_->Get(isolate_));
+
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate_, prototype);
     Caches::Prototypes.insert(std::make_pair(interfaceMeta, poPrototype));
 
     return ctorFuncTemplate;
+}
+
+Persistent<v8::Function>* MetadataBuilder::CreateToStringFunction(Isolate* isolate) {
+    Local<FunctionTemplate> toStringFuncTemplate = FunctionTemplate::New(isolate_, [](const FunctionCallbackInfo<Value>& info) {
+        Local<Object> thiz = info.This();
+        if (thiz->InternalFieldCount() < 1) {
+            info.GetReturnValue().Set(thiz);
+            return;
+        }
+
+        Local<External> ext = thiz->GetInternalField(0).As<External>();
+        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+        if (wrapper->Type() != WrapperType::ObjCObject) {
+            info.GetReturnValue().Set(thiz);
+            return;
+        }
+
+        ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+        id target = dataWrapper->Data();
+        if (target == nil) {
+            info.GetReturnValue().Set(thiz);
+            return;
+        }
+
+        std::string description = [[target description] UTF8String];
+        Local<v8::String> returnValue = tns::ToV8String(info.GetIsolate(), description);
+        info.GetReturnValue().Set(returnValue);
+    });
+
+    Local<v8::Function> toStringFunc;
+    assert(toStringFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&toStringFunc));
+
+    return new Persistent<v8::Function>(isolate, toStringFunc);
 }
 
 void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {

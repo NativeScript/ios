@@ -1,7 +1,7 @@
 var fetch = require("./fetch");
 
 var JSDetailViewController = UIViewController.extend({
-    viewWillAppear: function (animated) {
+    viewWillAppear: function(animated) {
         var navigationItem = this.navigationItem;
         navigationItem.title = this.item["title"];
         this.activityIndicator().startAnimating();
@@ -13,58 +13,69 @@ var JSDetailViewController = UIViewController.extend({
         }
 
         fetch(url)
-            .then(data => UIImage.imageWithData.async(UIImage, [ data ]))
-            .then(this.setImage.bind(this))
-            .catch(error => console.error(error));
+            .then(data => this.setImage(UIImage.imageWithData(data)))
+            .catch(error => console.log(error));
 
         UIViewController.prototype.viewWillAppear.call(this, animated);
     },
 
-    setImage: function (image) {
+    setImage: function(image) {
         this.imageView().image = image;
         this.activityIndicator().stopAnimating();
         this.toggleTopBarVisibility();
     },
 
-    prefersStatusBarHidden: function () {
+    prefersStatusBarHidden: function() {
         var navigationController = this.navigationController;
         var navigationBarHidden = navigationController.navigationBarHidden;
         return navigationBarHidden;
     },
 
-    toggleTopBarVisibility: function () {
+    toggleTopBarVisibility: function() {
         var navigationController = this.navigationController;
         var navigationBarHidden = navigationController.navigationBarHidden;
 
         this.navigationController.setNavigationBarHiddenAnimated(!navigationBarHidden, true);
     },
 
-    imageView: function () {
+    imageView: function() {
         return this.pImageView;
     },
 
-    "setImageView:": function (aImageView) {
+    "setImageView:": function(aImageView) {
         this.pImageView = aImageView;
     },
 
-    activityIndicator: function () {
+    activityIndicator: function() {
         return this.pActivityIndicator;
     },
 
-    "setActivityIndicator:": function (aActivityIndicator) {
+    "setActivityIndicator:": function(aActivityIndicator) {
         this.pActivityIndicator = aActivityIndicator;
     },
-    viewForZoomingInScrollView: function (scrollView) {
+    viewForZoomingInScrollView: function(scrollView) {
         return this.pImageView;
     }
 }, {
     name: "JSDetailViewController",
     exposedMethods: {
-        "toggleTopBarVisibility": { returns: "v" },
-        "imageView": { returns: UIImageView },
-        "setImageView:": { returns: "v", params: [UIImageView] },
-        "activityIndicator": { returns: UIActivityIndicatorView },
-        "setActivityIndicator:": { returns: "v", params: [UIActivityIndicatorView] }
+        "toggleTopBarVisibility": {
+            returns: "v"
+        },
+        "imageView": {
+            returns: UIImageView
+        },
+        "setImageView:": {
+            returns: "v",
+            params: [UIImageView]
+        },
+        "activityIndicator": {
+            returns: UIActivityIndicatorView
+        },
+        "setActivityIndicator:": {
+            returns: "v",
+            params: [UIActivityIndicatorView]
+        }
     },
     protocols: [UIScrollViewDelegate]
 });
