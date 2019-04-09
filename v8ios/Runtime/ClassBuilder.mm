@@ -1,16 +1,14 @@
 #include <Foundation/Foundation.h>
 #include "ClassBuilder.h"
+#include "ArgConverter.h"
+#include "ObjectManager.h"
 #include "Helpers.h"
 #include "Caches.h"
+#include "Interop.h"
 
 using namespace v8;
 
 namespace tns {
-
-void ClassBuilder::Init(ArgConverter argConverter, ObjectManager objectManager) {
-    argConverter_ = argConverter;
-    objectManager_ = objectManager;
-}
 
 Local<v8::Function> ClassBuilder::GetExtendFunction(Local<Context> context, const InterfaceMeta* interfaceMeta) {
     Isolate* isolate = context->GetIsolate();
@@ -110,14 +108,14 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
     Local<Object> thiz = info.This();
     thiz->SetInternalField(0, ext);
 
-    item->self_->objectManager_.Register(isolate, thiz);
+    ObjectManager::Register(isolate, thiz);
 }
 
 void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
     Local<Context> context = isolate->GetCurrentContext();
 
     Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
-    const BaseClassMeta* extendedClassMeta = argConverter_.FindInterfaceMeta(extendedClass);
+    const BaseClassMeta* extendedClassMeta = ArgConverter::FindInterfaceMeta(extendedClass);
     if (!exposedMethods.IsEmpty() && exposedMethods->IsObject()) {
         Local<v8::Array> methodNames;
         if (!exposedMethods.As<Object>()->GetOwnPropertyNames(context).ToLocal(&methodNames)) {
@@ -145,8 +143,8 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
             next->type = BinaryTypeEncodingType::InterfaceDeclarationReference;
 
             Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
-            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding, &argConverter_);
-            IMP methodBody = interop_.CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
+            IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
             class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str());
         }
     }
@@ -177,7 +175,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
             if (methodMeta == nullptr) {
                 for (auto protoIt = meta->protocols->begin(); protoIt != meta->protocols->end(); protoIt++) {
                     const char* proto = (*protoIt).valuePtr();
-                    const BaseClassMeta* m = argConverter_.GetInterfaceMeta(proto);
+                    const BaseClassMeta* m = ArgConverter::GetInterfaceMeta(proto);
                     for (auto it = m->instanceMethods->begin(); it != m->instanceMethods->end(); it++) {
                         const MethodMeta* mm = (*it).valuePtr();
                         if (strcmp(mm->jsName(), methodName.c_str()) == 0) {
@@ -192,9 +190,9 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
                 Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
                 const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
                 uint8_t argsCount = methodMeta->encodings()->count - 1;
-                MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding, &argConverter_);
+                MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
                 SEL selector = methodMeta->selector();
-                IMP methodBody = interop_.CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
+                IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
                 class_addMethod(extendedClass, selector, methodBody, "v@:@");
             }
 
@@ -300,7 +298,7 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
                         }
                     };
 
-                    IMP impGetter = interop_.CreateMethod(2, 0, typeEncoding, getterCallback , userData);
+                    IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback , userData);
 
                     const char *getterName = property_copyAttributeValue(property, "G");
                     NSString* selectorString;
@@ -326,12 +324,12 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
 
                         // TODO: Check the actual DataWrapper type and pass metadata
                         ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, paramValue);
-                        Local<Value> argWrapper = context->classBuilder_->argConverter_.CreateJsWrapper(context->isolate_, wrapper, Local<Object>());
+                        Local<Value> argWrapper = ArgConverter::CreateJsWrapper(context->isolate_, wrapper, Local<Object>());
                         Local<Value> params[1] = { argWrapper };
                         assert(setterFunc->Call(context->isolate_->GetCurrentContext(), context->implementationObject_->Get(context->isolate_), 1, params).ToLocal(&res));
                     };
 
-                    IMP impSetter = interop_.CreateMethod(2, 1, typeEncoding, setterCallback, userData);
+                    IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
 
                     const char *setterName = property_copyAttributeValue(property, "S");
                     NSString* selectorString;
@@ -357,8 +355,7 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<Name> property, const Prope
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> thiz = info.This();
 
-    CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
-    Local<Object> superValue = item->self_->argConverter_.CreateEmptyObject(context);
+    Local<Object> superValue = ArgConverter::CreateEmptyObject(context);
 
     superValue->SetPrototype(context, thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype()).ToChecked();
     superValue->SetInternalField(0, thiz->GetInternalField(0));

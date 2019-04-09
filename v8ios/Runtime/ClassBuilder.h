@@ -2,18 +2,14 @@
 #define ClassBuilder_h
 
 #include "NativeScript.h"
-#include "ArgConverter.h"
+#include "Metadata.h"
 
 namespace tns {
 
 class ClassBuilder {
 public:
-    void Init(ArgConverter argConverter, ObjectManager objectManager);
     v8::Local<v8::Function> GetExtendFunction(v8::Local<v8::Context> context, const InterfaceMeta* interfaceMeta);
 private:
-    ObjectManager objectManager_;
-    ArgConverter argConverter_;
-    Interop interop_;
     static unsigned long long classNameCounter_;
 
     static void ExtendCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

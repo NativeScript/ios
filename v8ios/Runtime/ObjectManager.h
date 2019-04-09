@@ -14,7 +14,7 @@ struct ObjectWeakCallbackState {
 
 class ObjectManager {
 public:
-    v8::Persistent<v8::Object>* Register(v8::Isolate* isolate, const v8::Local<v8::Object> obj);
+    static v8::Persistent<v8::Object>* Register(v8::Isolate* isolate, const v8::Local<v8::Object> obj);
     static void FinalizerCallback(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
 private:
 };

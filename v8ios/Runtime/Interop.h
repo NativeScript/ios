@@ -11,10 +11,10 @@ typedef void (*FFIMethodCallback)(ffi_cif* cif, void* retValue, void** argValues
 
 class Interop {
 public:
-    void RegisterInteropTypes(v8::Isolate* isolate);
-    CFTypeRef CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
-    IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
+    static CFTypeRef CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
+    static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static void CallFunction(v8::Isolate* isolate, const FunctionMeta* functionMeta, const std::vector<v8::Local<v8::Value>> args);
+    static void* CallFunction(v8::Isolate* isolate, const TypeEncoding* typeEncoding, id target, Class clazz, SEL selector, const std::vector<v8::Local<v8::Value>> args, bool callSuper);
 private:
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);
     static void* GetFunctionPointer(const FunctionMeta* meta);

@@ -68,7 +68,7 @@ var JSMasterViewController = UITableViewController.extend({
         fetch("http://www.reddit.com/r/aww.json?limit=500")
             .then(data => {
                 var jsonString = NSString.alloc().initWithDataEncoding(data, NSUTF8StringEncoding);
-                var json = JSON.parse(jsonString.UTF8String);
+                var json = JSON.parse(jsonString);
                 this.items = json.data.children.map(child => child.data);
 
                 this.tableView.reloadData();

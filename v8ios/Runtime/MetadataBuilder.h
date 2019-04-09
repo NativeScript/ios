@@ -4,8 +4,6 @@
 #include <map>
 #include "NativeScript.h"
 #include "Metadata.h"
-#include "ObjectManager.h"
-#include "ArgConverter.h"
 #include "ClassBuilder.h"
 
 namespace tns {
@@ -21,8 +19,6 @@ public:
 
 private:
     v8::Isolate* isolate_;
-    ObjectManager objectManager_;
-    ArgConverter argConverter_;
     ClassBuilder classBuilder_;
     v8::Persistent<v8::Function>* poToStringFunction_;
 
@@ -34,16 +30,16 @@ private:
     static void PropertySetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
     static void PropertyNameGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
     static void PropertyNameSetterCallback(v8::Local<v8::Name> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void> &info);
-    v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, std::string containingClass);
+    v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, std::string containingClass, bool isMethodCallback);
 
     v8::Persistent<v8::Function>* CreateToStringFunction(v8::Isolate* isolate);
     v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     void RegisterCFunction(const FunctionMeta* funcMeta);
     void RegisterAllocMethod(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
-    void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta);
-    void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className);
-    void RegisterInstanceProtocols(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className);
+    void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::vector<std::string>& names);
+    void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, std::vector<std::string>& names);
+    void RegisterInstanceProtocols(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, std::vector<std::string>& names);
     void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
     void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className);
     void RegisterStaticProtocols(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);

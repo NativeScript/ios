@@ -1,173 +1,45 @@
 #include <Foundation/Foundation.h>
 #include "ArgConverter.h"
+#include "ObjectManager.h"
 #include "Caches.h"
 #include "Helpers.h"
+#include "Interop.h"
 
 using namespace v8;
 using namespace std;
 
 namespace tns {
 
-void ArgConverter::Init(Isolate* isolate, ObjectManager objectManager) {
-    isolate_ = isolate;
-    objectManager_ = objectManager;
-    interop_.RegisterInteropTypes(isolate);
-
+void ArgConverter::Init(Isolate* isolate) {
     poEmptyObjCtorFunc_ = new Persistent<v8::Function>(isolate, CreateEmptyObjectFunction(isolate));
 }
 
-Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, NSInvocation* invocation, const TypeEncoding* typeEncoding, const std::string returnType) {
-    for (int i = 0; i < args.size(); i++) {
-        typeEncoding = typeEncoding->next();
-
-        Local<Value> arg = args[i];
-        int index = i + 2;
-
-        if (arg->IsNullOrUndefined()) {
-            id nullArg = nil;
-            [invocation setArgument:&nullArg atIndex:index];
-            continue;
-        }
-
-        if (arg->IsBoolean() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
-            bool value = arg.As<v8::Boolean>()->Value();
-            [invocation setArgument:&value atIndex:index];
-            continue;
-        }
-
-        if (arg->IsObject() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
-            Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
-            BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-            std::string protocolName = wrapper->Metadata()->name();
-            Protocol* protocol = objc_getProtocol(protocolName.c_str());
-            [invocation setArgument:&protocol atIndex:index];
-            continue;
-        }
-
-        if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
-            std::string str = tns::ToString(isolate, arg);
-            const char* s = str.c_str();
-            [invocation setArgument:&s atIndex:index];
-            continue;
-        }
-
-        if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
-            std::string str = tns::ToString(isolate, arg);
-            NSString* selector = [NSString stringWithUTF8String:str.c_str()];
-            SEL res = NSSelectorFromString(selector);
-            [invocation setArgument:&res atIndex:index];
-            continue;
-        }
-
-        Local<Context> context = isolate->GetCurrentContext();
-        if (arg->IsString() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-            std::string str = tns::ToString(isolate, arg);
-            NSString* result = [NSString stringWithUTF8String:str.c_str()];
-            [invocation setArgument:&result atIndex:index];
-            continue;
-        }
-
-        if (arg->IsNumber() || arg->IsDate()) {
-            double value;
-            if (!arg->NumberValue(context).To(&value)) {
-                assert(false);
-            }
-
-            if (arg->IsNumber() || arg->IsNumberObject()) {
-                SetNumericArgument(invocation, index, value, typeEncoding);
-                continue;
-            } else {
-                NSDate* date = [NSDate dateWithTimeIntervalSince1970:value / 1000.0];
-                [invocation setArgument:&date atIndex:index];
-            }
-        }
-
-        if (arg->IsFunction() && typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
-            Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, arg.As<Object>());
-            ObjectWeakCallbackState* state = new ObjectWeakCallbackState(poCallback);
-            poCallback->SetWeak(state, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
-
-            const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
-            int argsCount = typeEncoding->details.block.signature.count - 1;
-
-            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding, this);
-            CFTypeRef blockPtr = interop_.CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
-            [invocation setArgument:&blockPtr atIndex:index];
-            continue;
-        }
-
-        if (arg->IsObject()) {
-            Local<Object> obj = arg.As<Object>();
-            if (obj->InternalFieldCount() > 0) {
-                Local<External> ext = obj->GetInternalField(0).As<External>();
-                // TODO: Check the actual type of the DataWrapper
-                ObjCDataWrapper* wrapper = reinterpret_cast<ObjCDataWrapper*>(ext->Value());
-                const Meta* meta = wrapper->Metadata();
-                if (meta != nullptr && meta->type() == MetaType::JsCode) {
-                    const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
-                    std::string jsCode = jsCodeMeta->jsCode();
-
-                    Local<Script> script;
-                    if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
-                        assert(false);
-                    }
-                    assert(!script.IsEmpty());
-
-                    Local<Value> result;
-                    if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
-                        assert(false);
-                    }
-
-                    assert(result->IsNumber());
-
-                    double value = result.As<Number>()->Value();
-                    SetNumericArgument(invocation, index, value, typeEncoding);
-                    continue;
-                }
-
-                id data = wrapper->Data();
-                if (data != nullptr) {
-                    [invocation setArgument:&data atIndex:index];
-                    continue;
-                }
-            }
-        }
-
-        assert(false);
-    }
-
-
+Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const TypeEncoding* typeEncoding, SEL selector, bool isMethodCallback) {
+    id target = nil;
     bool instanceMethod = !receiver.IsEmpty();
+    bool callSuper = false;
     if (instanceMethod) {
         Local<External> ext = receiver->GetInternalField(0).As<External>();
         // TODO: Check the actual type of the DataWrapper
         ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
-        id target = wrapper->Data();
+        target = wrapper->Data();
 
         std::string className = object_getClassName(target);
         auto it = Caches::ClassPrototypes.find(className);
-        bool isExtendedClass = it != Caches::ClassPrototypes.end();
-
-        Class originalClass;
-        Class targetClass;
-        if (isExtendedClass) {
-            targetClass = class_getSuperclass([target class]);
-            originalClass = object_setClass(target, targetClass);
-        }
-
-        [invocation invokeWithTarget:target];
-
-        if (isExtendedClass) {
-            object_setClass(target, originalClass);
-        }
-    } else {
-        [invocation setTarget:klass];
-        [invocation invoke];
+        // For extended classes we will call the base method
+        callSuper = isMethodCallback && it != Caches::ClassPrototypes.end();
     }
 
-    if (returnType == "@") {
-        id result = nil;
-        [invocation getReturnValue:&result];
+    void* resultPtr = Interop::CallFunction(isolate, typeEncoding, target, klass, selector, args, callSuper);
+
+    if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
+        typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
+        typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding) {
+        if (resultPtr == nullptr) {
+            return Null(isolate);
+        }
+
+        id result = (__bridge id)resultPtr;
         if (result != nil) {
             // TODO: Create the proper DataWrapper type depending on the return value
             ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, result);
@@ -175,78 +47,56 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         }
     }
 
-    if (returnType == "*" || returnType == "r*") {
-        char* result = nullptr;
-        [invocation getReturnValue:&result];
+    if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
+        const char* result = static_cast<const char*>(resultPtr);
         if (result != nullptr) {
             return tns::ToV8String(isolate, result);
+        } else {
+            return Null(isolate);
         }
     }
 
-    if (returnType == "i") {
-        int result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "I") {
-        unsigned int result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "s") {
-        short result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "S") {
-        unsigned short result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "l") {
-        long result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "L") {
-        unsigned long result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "q") {
-        long long result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "Q") {
-        unsigned long long result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "f") {
-        float result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "d") {
-        double result;
-        [invocation getReturnValue:&result];
-        return Number::New(isolate, result);
-    }
-
-    if (returnType == "B") {
-        bool result;
-        [invocation getReturnValue:&result];
+    if (typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
+        bool result = (bool)resultPtr;
         return v8::Boolean::New(isolate, result);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::UShortEncoding) {
+        return ToV8Number<unsigned short>(isolate, resultPtr);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::ShortEncoding) {
+        return ToV8Number<short>(isolate, resultPtr);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::UIntEncoding) {
+        return ToV8Number<unsigned int>(isolate, resultPtr);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::IntEncoding) {
+        return ToV8Number<int>(isolate, resultPtr);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::ULongEncoding) {
+        return ToV8Number<unsigned long>(isolate, resultPtr);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
+        return ToV8Number<long>(isolate, resultPtr);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::FloatEncoding) {
+        float result = *static_cast<float*>(resultPtr);
+        return Number::New(isolate, result);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::DoubleEncoding) {
+        double result = *static_cast<double*>(resultPtr);
+        return Number::New(isolate, (double)result);
+    }
+
+    if (typeEncoding->type != BinaryTypeEncodingType::VoidEncoding) {
+        assert(false);
     }
 
     // TODO: Handle all the possible return types https://nshipster.com/type-encodings/
@@ -267,10 +117,11 @@ Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, BaseDataWrapper* wr
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
     MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
 
-    Isolate* isolate = data->isolate_;
     const Persistent<Object>* poCallback = data->callback_;
 
     void (^cb)() = ^{
+        Isolate* isolate = data->isolate_;
+
         HandleScope handle_scope(isolate);
         Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
 
@@ -284,16 +135,16 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
                 long arg = *static_cast<long*>(argValues[argIndex]);
                 BaseDataWrapper* wrapper = new PrimitiveDataWrapper(nullptr, &arg);
-                jsWrapper = data->argConverter_->ConvertArgument(isolate, wrapper);
+                jsWrapper = ArgConverter::ConvertArgument(isolate, wrapper);
             } else if (typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
                 bool arg = *static_cast<bool*>(argValues[argIndex]);
                 BaseDataWrapper* wrapper = new PrimitiveDataWrapper(nullptr, &arg);
-                jsWrapper = data->argConverter_->ConvertArgument(isolate, wrapper);
+                jsWrapper = ArgConverter::ConvertArgument(isolate, wrapper);
             } else {
                 const id arg = *static_cast<const id*>(argValues[argIndex]);
                 if (arg != nil) {
                     BaseDataWrapper* wrapper = new ObjCDataWrapper(nullptr, arg);
-                    jsWrapper = data->argConverter_->ConvertArgument(isolate, wrapper);
+                    jsWrapper = ArgConverter::ConvertArgument(isolate, wrapper);
                 } else {
                     jsWrapper = Null(data->isolate_);
                 }
@@ -311,7 +162,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
                 thiz = it->second->Get(data->isolate_);
             } else  {
                 ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, self_);
-                thiz = data->argConverter_->CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
+                thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
 
                 std::string className = object_getClassName(self_);
                 auto it = Caches::ClassPrototypes.find(className);
@@ -373,66 +224,14 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         }
     }
 }
-void ArgConverter::SetNumericArgument(NSInvocation* invocation, int index, double value, const TypeEncoding* typeEncoding) {
-    switch (typeEncoding->type) {
-    case BinaryTypeEncodingType::ShortEncoding: {
-        short arg = (short)value;
-        [invocation setArgument:&arg atIndex:index];
-        break;
+
+template<class T>
+Local<v8::Number> ArgConverter::ToV8Number(Isolate* isolate, void* ptr) {
+    long result = 0;
+    if (ptr != nullptr) {
+        result = (long)ptr;
     }
-    case BinaryTypeEncodingType::UShortEncoding: {
-        ushort arg = (ushort)value;
-        [invocation setArgument:&arg atIndex:index];
-        break;
-    }
-    case BinaryTypeEncodingType::IntEncoding: {
-        int arg = (int)value;
-        [invocation setArgument:&arg atIndex:index];
-        break;
-    }
-    case BinaryTypeEncodingType::UIntEncoding: {
-        uint arg = (uint)value;
-        [invocation setArgument:&arg atIndex:index];
-        break;
-    }
-    case BinaryTypeEncodingType::LongEncoding: {
-        long arg = (long)value;
-        [invocation setArgument:&arg atIndex:index];
-        break;
-    }
-    case BinaryTypeEncodingType::ULongEncoding: {
-        unsigned long arg = (unsigned long)value;
-        [invocation setArgument:&arg atIndex:index];
-        break;
-    }
-    case BinaryTypeEncodingType::LongLongEncoding: {
-        long long arg = (long long)value;
-        [invocation setArgument:&arg atIndex:index];
-        break;
-    }
-    case BinaryTypeEncodingType::ULongLongEncoding: {
-        unsigned long long arg = (unsigned long long)value;
-        [invocation setArgument:&arg atIndex:index];
-        break;
-    }
-    case BinaryTypeEncodingType::FloatEncoding: {
-        float arg = (float)value;
-        [invocation setArgument:&arg atIndex:index];
-        break;
-    }
-    case BinaryTypeEncodingType::DoubleEncoding: {
-        [invocation setArgument:&value atIndex:index];
-        break;
-    }
-    case BinaryTypeEncodingType::IdEncoding: {
-        [invocation setArgument:&value atIndex:index];
-        break;
-    }
-    default: {
-        assert(false);
-        break;
-    }
-    }
+    return v8::Number::New(isolate, (T)result);
 }
 
 Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver) {
@@ -560,5 +359,7 @@ Local<v8::Function> ArgConverter::CreateEmptyObjectFunction(Isolate* isolate) {
     }
     return emptyObjCtorFunc;
 }
+
+Persistent<v8::Function>* ArgConverter::poEmptyObjCtorFunc_;
 
 }
