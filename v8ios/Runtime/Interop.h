@@ -1,6 +1,7 @@
 #ifndef Interop_h
 #define Interop_h
 
+#include <map>
 #include "ffi.h"
 #include "NativeScript.h"
 #include "Metadata.h"
@@ -13,9 +14,9 @@ class Interop {
 public:
     static CFTypeRef CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
-    static void CallFunction(v8::Isolate* isolate, const FunctionMeta* functionMeta, const std::vector<v8::Local<v8::Value>> args);
-    static void* CallFunction(v8::Isolate* isolate, const TypeEncoding* typeEncoding, id target, Class clazz, SEL selector, const std::vector<v8::Local<v8::Value>> args, bool callSuper);
+    static void* CallFunction(v8::Isolate* isolate, const Meta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper = false);
 private:
+    static std::map<const TypeEncoding*, ffi_cif*> cifCache_;
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);
     static void* GetFunctionPointer(const FunctionMeta* meta);
 

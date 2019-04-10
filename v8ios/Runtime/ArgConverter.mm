@@ -14,7 +14,7 @@ void ArgConverter::Init(Isolate* isolate) {
     poEmptyObjCtorFunc_ = new Persistent<v8::Function>(isolate, CreateEmptyObjectFunction(isolate));
 }
 
-Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const TypeEncoding* typeEncoding, SEL selector, bool isMethodCallback) {
+Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const MethodMeta* meta, bool isMethodCallback) {
     id target = nil;
     bool instanceMethod = !receiver.IsEmpty();
     bool callSuper = false;
@@ -30,8 +30,9 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         callSuper = isMethodCallback && it != Caches::ClassPrototypes.end();
     }
 
-    void* resultPtr = Interop::CallFunction(isolate, typeEncoding, target, klass, selector, args, callSuper);
+    void* resultPtr = Interop::CallFunction(isolate, meta, target, klass, args, callSuper);
 
+    const TypeEncoding* typeEncoding = meta->encodings()->first();
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
         typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
         typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding) {

@@ -18,28 +18,39 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .dispose = &disposeBlock
 };
 
+std::map<const TypeEncoding*, ffi_cif*> Interop::cifCache_;
+
 IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData) {
-    ffi_cif* cif = new ffi_cif();
-    const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount + initialParamIndex]();
+    ffi_cif* cif = nullptr;
 
-    ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
+    auto it = cifCache_.find(typeEncoding);
+    if (it != cifCache_.end()) {
+        cif = it->second;
+    } else {
+        const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount + initialParamIndex]();
 
-    for (uint8_t i = 0; i < initialParamIndex; i++) {
-        parameterTypesFFITypes[i] = &ffi_type_pointer;
+        ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
+
+        for (uint8_t i = 0; i < initialParamIndex; i++) {
+            parameterTypesFFITypes[i] = &ffi_type_pointer;
+        }
+
+        for (uint8_t i = 0; i < argsCount; i++) {
+            typeEncoding = typeEncoding->next();
+            ffi_type* argType = GetArgumentType(typeEncoding);
+            parameterTypesFFITypes[i + initialParamIndex] = argType;
+        }
+
+        cif = new ffi_cif();
+        ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, initialParamIndex + argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
+        assert(status == FFI_OK);
+
+        cifCache_.insert(std::make_pair(typeEncoding, cif));
     }
-
-    for (uint8_t i = 0; i < argsCount; i++) {
-        typeEncoding = typeEncoding->next();
-        ffi_type* argType = GetArgumentType(typeEncoding);
-        parameterTypesFFITypes[i + initialParamIndex] = argType;
-    }
-
-    ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, initialParamIndex + argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
-    assert(status == FFI_OK);
 
     void* functionPointer;
     ffi_closure* closure = static_cast<ffi_closure*>(ffi_closure_alloc(sizeof(ffi_closure), &functionPointer));
-    status = ffi_prep_closure_loc(closure, cif, callback, userData, functionPointer);
+    ffi_status status = ffi_prep_closure_loc(closure, cif, callback, userData, functionPointer);
     assert(status == FFI_OK);
 
     return (IMP)functionPointer;
@@ -62,35 +73,78 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
     return blockPointer;
 }
 
-void* Interop::CallFunction(Isolate* isolate, const TypeEncoding* typeEncoding, id target, Class clazz, SEL selector, const std::vector<Local<Value>> args, bool callSuper) {
-    int argsCount = 2 + (int)args.size();
-    const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount]();
-    ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
+void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class clazz, const std::vector<Local<Value>> args, bool callSuper) {
+    void* functionPointer = nullptr;
+    SEL selector;
+    int initialParameterIndex = 0;
+    const TypeEncoding* typeEncoding = nullptr;
 
-    for (int i = 0; i < 2; i++) {
-        parameterTypesFFITypes[i] = &ffi_type_pointer;
-    }
-
-    void *values[argsCount];
-
-    std::unique_ptr<objc_super> sup = std::unique_ptr<objc_super>(new objc_super());
-    if (target && target != nil) {
+    if (meta->type() == MetaType::Function) {
+        const FunctionMeta* functionMeta = static_cast<const FunctionMeta*>(meta);
+        functionPointer = GetFunctionPointer(functionMeta);
+        typeEncoding = functionMeta->encodings()->first();
+    } else if (meta->type() == MetaType::Undefined || meta->type() == MetaType::Union) {
+        const MethodMeta* methodMeta = static_cast<const MethodMeta*>(meta);
+        initialParameterIndex = 2;
+        typeEncoding = methodMeta->encodings()->first();
+        selector = methodMeta->selector();
         if (callSuper) {
-            sup->receiver = target;
-            sup->super_class = class_getSuperclass(object_getClass(target));
-            values[0] = &sup;
+            functionPointer = (void*)objc_msgSendSuper;
         } else {
-            values[0] = &target;
+            functionPointer = (void*)objc_msgSend;
         }
     } else {
-        values[0] = &clazz;
+        assert(false);
     }
-    values[1] = &selector;
 
-    for (int i = 2; i < argsCount; i++) {
+    int argsCount = (int)args.size();
+
+    ffi_cif* cif = nullptr;
+    auto it = cifCache_.find(typeEncoding);
+    if (it != cifCache_.end()) {
+        cif = it->second;
+    } else {
+        const ffi_type** parameterTypesFFITypes = new const ffi_type*[initialParameterIndex + argsCount]();
+        ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
+
+        for (int i = 0; i < initialParameterIndex; i++) {
+            parameterTypesFFITypes[i] = &ffi_type_pointer;
+        }
+
+        const TypeEncoding* enc = typeEncoding;
+        for (int i = initialParameterIndex; i < initialParameterIndex + argsCount; i++) {
+            enc = enc->next();
+            parameterTypesFFITypes[i] = Interop::GetArgumentType(enc);
+        }
+
+        cif = new ffi_cif();
+        ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, initialParameterIndex + argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
+        assert(status == FFI_OK);
+
+        cifCache_.insert(std::make_pair(typeEncoding, cif));
+    }
+
+    void* values[initialParameterIndex + argsCount];
+
+    std::unique_ptr<objc_super> sup = std::unique_ptr<objc_super>(new objc_super());
+    if (initialParameterIndex > 1) {
+        if (target && target != nil) {
+            if (callSuper) {
+                sup->receiver = target;
+                sup->super_class = class_getSuperclass(object_getClass(target));
+                values[0] = &sup;
+            } else {
+                values[0] = &target;
+            }
+        } else {
+            values[0] = &clazz;
+        }
+        values[1] = &selector;
+    }
+
+    for (int i = initialParameterIndex; i < initialParameterIndex + argsCount; i++) {
         typeEncoding = typeEncoding->next();
-        parameterTypesFFITypes[i] = Interop::GetArgumentType(typeEncoding);
-        Local<Value> arg = args[i - 2];
+        Local<Value> arg = args[i - initialParameterIndex];
 
         if (arg->IsNullOrUndefined()) {
             void* nullPtr = nullptr;
@@ -124,7 +178,10 @@ void* Interop::CallFunction(Isolate* isolate, const TypeEncoding* typeEncoding, 
             values[i] = &value;
         } else if (arg->IsNumber() || arg->IsNumberObject()) {
             double value = arg.As<Number>()->Value();
-            if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
+            if (typeEncoding->type == BinaryTypeEncodingType::IntEncoding) {
+                int val = (int)value;
+                values[i] = &val;
+            } else if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
                 long val = (long)value;
                 values[i] = &val;
             } else if (typeEncoding->type == BinaryTypeEncodingType::ULongEncoding) {
@@ -185,66 +242,10 @@ void* Interop::CallFunction(Isolate* isolate, const TypeEncoding* typeEncoding, 
         }
     }
 
-    ffi_cif* cif = new ffi_cif();
-    ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
-    assert(status == FFI_OK);
-
     void* resultPtr = nullptr;
-    if (callSuper) {
-        ffi_call(cif, FFI_FN(objc_msgSendSuper), &resultPtr, values);
-    } else {
-        ffi_call(cif, FFI_FN(objc_msgSend), &resultPtr, values);
-    }
+    ffi_call(cif, FFI_FN(functionPointer), &resultPtr, values);
 
     return resultPtr;
-}
-
-void Interop::CallFunction(Isolate* isolate, const FunctionMeta* functionMeta, const std::vector<Local<Value>> args) {
-    void* functionPointer = Interop::GetFunctionPointer(functionMeta);
-
-    const ffi_type** parameterTypesFFITypes = new const ffi_type*[args.size()]();
-
-    int argsCount = functionMeta->encodings()->count - 1;
-    const TypeEncoding* typeEncoding = functionMeta->encodings()->first();
-    ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
-    for (int i = 0; i < argsCount; i++) {
-        typeEncoding = typeEncoding->next();
-        parameterTypesFFITypes[i] = Interop::GetArgumentType(typeEncoding);
-    }
-
-    ffi_cif* cif = new ffi_cif();
-    ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
-    assert(status == FFI_OK);
-
-    void *values[args.size()];
-    for (int i = 0; i < args.size(); i++) {
-        Local<Value> arg = args[i];
-
-        if (arg->IsNullOrUndefined()) {
-            void* nullPtr = nullptr;
-            values[i] = &nullPtr;
-        } else if (arg->IsNumber() || arg->IsNumberObject()) {
-            double value = arg.As<Number>()->Value();
-            values[i] = &value;
-        } else if (arg->IsString()) {
-            NSString* s = [NSString stringWithUTF8String:tns::ToString(isolate, arg).c_str()];
-            void* strPtr = (__bridge void*)s;
-            values[i] = &strPtr;
-        } else if (arg->IsObject()) {
-            Local<Object> obj = arg.As<Object>();
-            assert(obj->InternalFieldCount() > 0);
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            // TODO: Check the data wrapper type
-            ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
-            id data = wrapper->Data();
-            values[i] = &data;
-        } else {
-            assert(false);
-        }
-    }
-
-    void* resultPtr;
-    ffi_call(cif, FFI_FN(functionPointer), &resultPtr, values);
 }
 
 ffi_type* Interop::GetArgumentType(const TypeEncoding* typeEncoding) {
@@ -294,6 +295,8 @@ void* Interop::GetFunctionPointer(const FunctionMeta* meta) {
     void* functionPointer = nullptr;
 
     const ModuleMeta* moduleMeta = meta->topLevelModule();
+    const char* symbolName = meta->name();
+
     if (moduleMeta->isFramework()) {
         NSString* frameworkPathStr = [NSString stringWithFormat:@"%s.framework", moduleMeta->getName()];
         NSURL* baseUrl = nil;
@@ -314,7 +317,6 @@ void* Interop::GetFunctionPointer(const FunctionMeta* meta) {
         CFBundleRef bundle = CFBundleCreate(kCFAllocatorDefault, (CFURLRef)bundleUrl);
         assert(bundle != nullptr);
 
-        const char* symbolName = meta->name();
         CFStringRef cfName = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, symbolName, kCFStringEncodingUTF8, kCFAllocatorNull);
         functionPointer = CFBundleGetFunctionPointerForName(bundle, cfName);
     } else if (moduleMeta->libraries->count == 1 && moduleMeta->isSystem()) {
@@ -322,7 +324,6 @@ void* Interop::GetFunctionPointer(const FunctionMeta* meta) {
         NSString* libraryPath = [NSString stringWithFormat:@"%@/lib%s.dylib", libsPath, moduleMeta->libraries->first()->value().getName()];
 
         if (void* library = dlopen(libraryPath.UTF8String, RTLD_LAZY | RTLD_LOCAL)) {
-            const char* symbolName = meta->name();
             functionPointer = dlsym(library, symbolName);
         }
     }

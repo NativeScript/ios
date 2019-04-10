@@ -23,7 +23,7 @@ public:
 class ArgConverter {
 public:
     static void Init(v8::Isolate* isolate);
-    static v8::Local<v8::Value> Invoke(v8::Isolate* isolate, Class klass, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, const TypeEncoding* typeEncoding, SEL selector, bool isMethodCallback);
+    static v8::Local<v8::Value> Invoke(v8::Isolate* isolate, Class klass, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, const MethodMeta* meta, bool isMethodCallback);
     static v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, BaseDataWrapper* wrapper);
     static v8::Local<v8::Value> CreateJsWrapper(v8::Isolate* isolate, BaseDataWrapper* wrapper, v8::Local<v8::Object> receiver);
     static v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);

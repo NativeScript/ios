@@ -409,10 +409,8 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
 
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass, bool isMethodCallback) {
     Class klass = objc_getClass(containingClass.c_str());
-    SEL selector = meta->selector();
-    const TypeEncoding* typeEncoding = meta->encodings()->first();
     // TODO: Find out if the isMethodCallback property can be determined based on a UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
-    return ArgConverter::Invoke(isolate, klass, receiver, args, typeEncoding, selector, isMethodCallback);
+    return ArgConverter::Invoke(isolate, klass, receiver, args, meta, isMethodCallback);
 }
 
 void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info) {
@@ -435,7 +433,7 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
                 Local<Value> arg = context->args_[i]->Get(context->isolate_);
                 args.push_back(arg);
             }
-            Interop::CallFunction(context->isolate_, context->meta_, args);
+            Interop::CallFunction(context->isolate_, context->meta_, nil, nil, args);
         }, userData);
         return;
     }
@@ -444,7 +442,8 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
     for (int i = 0; i < info.Length(); i++) {
         args.push_back(info[i]);
     }
-    Interop::CallFunction(isolate, item->meta_, args);
+
+    Interop::CallFunction(isolate, item->meta_, nil, nil, args);
 
     // TODO: Handle return type here
 }
