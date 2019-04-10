@@ -80,10 +80,10 @@ var JSMasterViewController = UITableViewController.extend({
     name: "JSMasterViewController",
     exposedMethods: {
         "loadData": {
-            returns: "v"
+            returns: interop.types.void
         },
         "aboutPressed:": {
-            returns: "v",
+            returns: interop.types.void,
             params: [UIControl]
         }
     }

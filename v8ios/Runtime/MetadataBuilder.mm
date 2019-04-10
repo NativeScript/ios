@@ -18,6 +18,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
     isolate_ = isolate;
 
     ArgConverter::Init(isolate);
+    Interop::RegisterInteropTypes(isolate);
     poToStringFunction_ = CreateToStringFunction(isolate);
 
     Local<Context> context = isolate->GetCurrentContext();
@@ -110,8 +111,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         assert(false);
     }
 
-//    Local<External> ctorFuncExtData = External::New(isolate_, new DataWrapper(interfaceMeta));
-//    tns::SetPrivateValue(isolate_, ctorFunc, tns::ToV8String(isolate_, "metadata"), ctorFuncExtData);
+    Local<External> ctorFuncExtData = External::New(isolate_, new ObjCDataWrapper(interfaceMeta, nil));
+    tns::SetPrivateValue(isolate_, ctorFunc, tns::ToV8String(isolate_, "metadata"), ctorFuncExtData);
 
     Caches::CtorFuncs.insert(std::make_pair(interfaceMeta, new Persistent<v8::Function>(isolate_, ctorFunc)));
     Local<Object> global = context->Global();

@@ -20,6 +20,48 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
 
 std::map<const TypeEncoding*, ffi_cif*> Interop::cifCache_;
 
+void Interop::RegisterInteropTypes(Isolate* isolate) {
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> global = context->Global();
+
+    Local<Object> interop = Object::New(isolate);
+    Local<Object> types = Object::New(isolate);
+
+    RegisterInteropType(isolate, types, "void", BinaryTypeEncodingType::VoidEncoding);
+    RegisterInteropType(isolate, types, "bool", BinaryTypeEncodingType::BoolEncoding);
+    RegisterInteropType(isolate, types, "int8", BinaryTypeEncodingType::ShortEncoding);
+    RegisterInteropType(isolate, types, "uint8", BinaryTypeEncodingType::UShortEncoding);
+    RegisterInteropType(isolate, types, "int16", BinaryTypeEncodingType::IntEncoding);
+    RegisterInteropType(isolate, types, "uint16", BinaryTypeEncodingType::UIntEncoding);
+    RegisterInteropType(isolate, types, "int32", BinaryTypeEncodingType::LongEncoding);
+    RegisterInteropType(isolate, types, "uint32", BinaryTypeEncodingType::ULongEncoding);
+    RegisterInteropType(isolate, types, "int64", BinaryTypeEncodingType::LongLongEncoding);
+    RegisterInteropType(isolate, types, "uint64", BinaryTypeEncodingType::ULongLongEncoding);
+    RegisterInteropType(isolate, types, "float", BinaryTypeEncodingType::FloatEncoding);
+    RegisterInteropType(isolate, types, "double", BinaryTypeEncodingType::DoubleEncoding);
+    RegisterInteropType(isolate, types, "UTF8CString", BinaryTypeEncodingType::CStringEncoding);
+    RegisterInteropType(isolate, types, "unichar", BinaryTypeEncodingType::UnicharEncoding);
+    RegisterInteropType(isolate, types, "id", BinaryTypeEncodingType::IdEncoding);
+    RegisterInteropType(isolate, types, "protocol", BinaryTypeEncodingType::ProtocolEncoding);
+    RegisterInteropType(isolate, types, "class", BinaryTypeEncodingType::ClassEncoding);
+    RegisterInteropType(isolate, types, "selector", BinaryTypeEncodingType::SelectorEncoding);
+
+    bool success = interop->Set(tns::ToV8String(isolate, "types"), types);
+    assert(success);
+
+    success = global->Set(tns::ToV8String(isolate, "interop"), interop);
+    assert(success);
+}
+
+void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::string name, BinaryTypeEncodingType encodingType) {
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> obj = ArgConverter::CreateEmptyObject(context);
+    Local<External> ext = External::New(isolate, &encodingType);
+    obj->SetInternalField(0, ext);
+    bool success = types->Set(tns::ToV8String(isolate, name), obj);
+    assert(success);
+}
+
 IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData) {
     ffi_cif* cif = nullptr;
 

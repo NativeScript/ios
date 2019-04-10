@@ -131,6 +131,22 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
                 assert(false);
             }
 
+            BinaryTypeEncodingType returnType = BinaryTypeEncodingType::VoidEncoding;
+
+            Local<Value> returnsVal = methodSignature.As<Object>()->Get(tns::ToV8String(isolate, "returns"));
+            if (!returnsVal.IsEmpty() && returnsVal->IsObject()) {
+                Local<Object> returnsObj = returnsVal.As<Object>();
+                if (returnsObj->InternalFieldCount() > 0) {
+                    Local<External> ext = returnsObj->GetInternalField(0).As<External>();
+                    returnType = *static_cast<BinaryTypeEncodingType*>(ext->Value());
+                } else {
+                    Local<Value> val = tns::GetPrivateValue(isolate, returnsObj, tns::ToV8String(isolate, "metadata"));
+                    if (!val.IsEmpty() && val->IsExternal()) {
+                        returnType = BinaryTypeEncodingType::PointerEncoding;
+                    }
+                }
+            }
+
             // TODO: Prepare the TypeEncoding* from the v8 arguments and return type.
             std::string typeInfo = "v@:@";
             int argsCount = 1;
@@ -138,7 +154,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
             SEL selector = NSSelectorFromString([NSString stringWithUTF8String:(methodNameStr).c_str()]);
 
             TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc(2, sizeof(TypeEncoding)));
-            typeEncoding->type = BinaryTypeEncodingType::VoidEncoding;
+            typeEncoding->type = returnType;
             TypeEncoding* next = reinterpret_cast<TypeEncoding*>(reinterpret_cast<char*>(typeEncoding) + sizeof(BinaryTypeEncodingType));
             next->type = BinaryTypeEncodingType::InterfaceDeclarationReference;
 
