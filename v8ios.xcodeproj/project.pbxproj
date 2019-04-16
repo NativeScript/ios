@@ -10,9 +10,12 @@
 		C201FB6D225F4FCE00D0636A /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2FF301C2252062A00933782 /* UIKit.framework */; };
 		C201FB6E225FA64700D0636A /* Metadata.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF4222BE705008F674F /* Metadata.mm */; };
 		C201FB6F225FA66B00D0636A /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */; };
+		C201FB71226607BA00D0636A /* libv8_base_without_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB70226607BA00D0636A /* libv8_base_without_compiler.a */; };
+		C201FB7322660C0B00D0636A /* libv8_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7222660C0B00D0636A /* libv8_compiler.a */; };
+		C201FB7522660C1800D0636A /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7422660C1700D0636A /* libv8_initializers.a */; };
+		C201FB7722660C2B00D0636A /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */; };
 		C2335B70224CADD50071048C /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2335B6E224CADD50071048C /* Interop.mm */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2335B74224CEAFA0071048C /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2335B73224CEAFA0071048C /* libffi.a */; };
-		C245885E224A4913000D147A /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C245885D224A4913000D147A /* libtorque_generated_initializers.a */; };
 		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
 		C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF7222E80AC008F674F /* MetadataBuilder.mm */; };
 		C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.cpp */; };
@@ -27,11 +30,9 @@
 		C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */; };
 		C2AAE9D722490F50006FB9D3 /* Helpers.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D522490F50006FB9D3 /* Helpers.mm */; };
 		C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2B12EE22227C606000F6AFC /* SetTimeout.cpp */; };
-		C2B12F0022297FD7000F6AFC /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EF822297FD1000F6AFC /* libv8_initializers.a */; };
 		C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EF922297FD1000F6AFC /* libv8_libbase.a */; };
 		C2B12F0222297FD7000F6AFC /* libv8_init.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFA22297FD2000F6AFC /* libv8_init.a */; };
 		C2B12F0322297FD7000F6AFC /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFB22297FD2000F6AFC /* libv8_external_snapshot.a */; };
-		C2B12F0422297FD7000F6AFC /* libv8_base.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFC22297FD5000F6AFC /* libv8_base.a */; };
 		C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */; };
 		C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */; };
 		C2BC5DAC22561C370020F348 /* Tasks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2BC5DAB22561C370020F348 /* Tasks.cpp */; };
@@ -40,10 +41,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C201FB70226607BA00D0636A /* libv8_base_without_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base_without_compiler.a; sourceTree = "<group>"; };
+		C201FB7222660C0B00D0636A /* libv8_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_compiler.a; sourceTree = "<group>"; };
+		C201FB7422660C1700D0636A /* libv8_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_initializers.a; sourceTree = "<group>"; };
+		C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
 		C2335B6E224CADD50071048C /* Interop.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Interop.mm; sourceTree = "<group>"; };
 		C2335B6F224CADD50071048C /* Interop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Interop.h; sourceTree = "<group>"; };
 		C2335B73224CEAFA0071048C /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
-		C245885D224A4913000D147A /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
 		C24F39182225859D0027977A /* Console.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Console.h; sourceTree = "<group>"; };
 		C24F39192225859D0027977A /* Console.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
 		C2764AF4222BE705008F674F /* Metadata.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Metadata.mm; sourceTree = "<group>"; };
@@ -81,11 +85,9 @@
 		C2B12EF122293CC3000F6AFC /* natives_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.x86_64.h; sourceTree = "<group>"; };
 		C2B12EF4222957FC000F6AFC /* snapshot_blob.arm64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.arm64.h; sourceTree = "<group>"; };
 		C2B12EF6222958D7000F6AFC /* natives_blob.arm64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.arm64.h; sourceTree = "<group>"; };
-		C2B12EF822297FD1000F6AFC /* libv8_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_initializers.a; sourceTree = "<group>"; };
 		C2B12EF922297FD1000F6AFC /* libv8_libbase.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libbase.a; sourceTree = "<group>"; };
 		C2B12EFA22297FD2000F6AFC /* libv8_init.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_init.a; sourceTree = "<group>"; };
 		C2B12EFB22297FD2000F6AFC /* libv8_external_snapshot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_external_snapshot.a; sourceTree = "<group>"; };
-		C2B12EFC22297FD5000F6AFC /* libv8_base.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base.a; sourceTree = "<group>"; };
 		C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
 		C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
 		C2BC5DAA225602C50020F348 /* Tasks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Tasks.h; sourceTree = "<group>"; };
@@ -104,16 +106,17 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C201FB7522660C1800D0636A /* libv8_initializers.a in Frameworks */,
 				C201FB6D225F4FCE00D0636A /* UIKit.framework in Frameworks */,
 				C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */,
+				C201FB71226607BA00D0636A /* libv8_base_without_compiler.a in Frameworks */,
 				C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */,
+				C201FB7722660C2B00D0636A /* libtorque_generated_initializers.a in Frameworks */,
 				C2335B74224CEAFA0071048C /* libffi.a in Frameworks */,
 				C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */,
-				C2B12F0422297FD7000F6AFC /* libv8_base.a in Frameworks */,
-				C245885E224A4913000D147A /* libtorque_generated_initializers.a in Frameworks */,
 				C2B12F0222297FD7000F6AFC /* libv8_init.a in Frameworks */,
+				C201FB7322660C0B00D0636A /* libv8_compiler.a in Frameworks */,
 				C2B12F0322297FD7000F6AFC /* libv8_external_snapshot.a in Frameworks */,
-				C2B12F0022297FD7000F6AFC /* libv8_initializers.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -217,11 +220,12 @@
 			isa = PBXGroup;
 			children = (
 				C2335B73224CEAFA0071048C /* libffi.a */,
-				C245885D224A4913000D147A /* libtorque_generated_initializers.a */,
-				C2B12EFC22297FD5000F6AFC /* libv8_base.a */,
+				C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */,
+				C201FB70226607BA00D0636A /* libv8_base_without_compiler.a */,
+				C201FB7222660C0B00D0636A /* libv8_compiler.a */,
 				C2B12EFB22297FD2000F6AFC /* libv8_external_snapshot.a */,
 				C2B12EFA22297FD2000F6AFC /* libv8_init.a */,
-				C2B12EF822297FD1000F6AFC /* libv8_initializers.a */,
+				C201FB7422660C1700D0636A /* libv8_initializers.a */,
 				C2B12EF922297FD1000F6AFC /* libv8_libbase.a */,
 				C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */,
 				C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */,

@@ -6768,7 +6768,8 @@ class V8_EXPORT MicrotaskQueue {
   /**
    * Creates an empty MicrotaskQueue instance.
    */
-  static std::unique_ptr<MicrotaskQueue> New(Isolate* isolate);
+  static std::unique_ptr<MicrotaskQueue> New(
+      Isolate* isolate, MicrotasksPolicy policy = MicrotasksPolicy::kAuto);
 
   virtual ~MicrotaskQueue() = default;
 
@@ -6815,6 +6816,12 @@ class V8_EXPORT MicrotaskQueue {
    * Returns true if a microtask is running on this MicrotaskQueue instance.
    */
   virtual bool IsRunningMicrotasks() const = 0;
+
+  /**
+   * Returns the current depth of nested MicrotasksScope that has
+   * kRunMicrotasks.
+   */
+  virtual int GetMicrotasksScopeDepth() const = 0;
 
  private:
   friend class internal::MicrotaskQueue;
@@ -7167,7 +7174,7 @@ typedef void (*JitCodeEventHandler)(const JitCodeEvent* event);
 /**
  * Callback function passed to SetUnhandledExceptionCallback.
  */
-#if defined(V8_OS_WIN_X64)
+#if defined(V8_OS_WIN)
 typedef int (*UnhandledExceptionCallback)(
     _EXCEPTION_POINTERS* exception_pointers);
 #endif
@@ -8791,7 +8798,7 @@ class V8_EXPORT V8 {
    */
   static bool EnableWebAssemblyTrapHandler(bool use_v8_signal_handler);
 
-#if defined(V8_OS_WIN_X64)
+#if defined(V8_OS_WIN)
   /**
    * On Win64, by default V8 does not emit unwinding data for jitted code,
    * which means the OS cannot walk the stack frames and the system Structured
