@@ -64,35 +64,9 @@ void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::st
 }
 
 IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData) {
-    ffi_cif* cif = nullptr;
-
-    auto it = cifCache_.find(typeEncoding);
-    if (it != cifCache_.end()) {
-        cif = it->second;
-    } else {
-        const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount + initialParamIndex]();
-
-        ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
-
-        for (uint8_t i = 0; i < initialParamIndex; i++) {
-            parameterTypesFFITypes[i] = &ffi_type_pointer;
-        }
-
-        for (uint8_t i = 0; i < argsCount; i++) {
-            typeEncoding = typeEncoding->next();
-            ffi_type* argType = GetArgumentType(typeEncoding);
-            parameterTypesFFITypes[i + initialParamIndex] = argType;
-        }
-
-        cif = new ffi_cif();
-        ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, initialParamIndex + argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
-        assert(status == FFI_OK);
-
-        cifCache_.insert(std::make_pair(typeEncoding, cif));
-    }
-
     void* functionPointer;
     ffi_closure* closure = static_cast<ffi_closure*>(ffi_closure_alloc(sizeof(ffi_closure), &functionPointer));
+    ffi_cif* cif = Interop::GetCif(typeEncoding, initialParamIndex, initialParamIndex + argsCount);
     ffi_status status = ffi_prep_closure_loc(closure, cif, callback, userData, functionPointer);
     assert(status == FFI_OK);
 
@@ -142,30 +116,7 @@ void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class
 
     int argsCount = initialParameterIndex + (int)args.size();
 
-    ffi_cif* cif = nullptr;
-    auto it = cifCache_.find(typeEncoding);
-    if (it != cifCache_.end()) {
-        cif = it->second;
-    } else {
-        const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount]();
-        ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
-
-        for (int i = 0; i < initialParameterIndex; i++) {
-            parameterTypesFFITypes[i] = &ffi_type_pointer;
-        }
-
-        const TypeEncoding* enc = typeEncoding;
-        for (int i = initialParameterIndex; i < argsCount; i++) {
-            enc = enc->next();
-            parameterTypesFFITypes[i] = Interop::GetArgumentType(enc);
-        }
-
-        cif = new ffi_cif();
-        ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
-        assert(status == FFI_OK);
-
-        cifCache_.insert(std::make_pair(typeEncoding, cif));
-    }
+    ffi_cif* cif = Interop::GetCif(typeEncoding, initialParameterIndex, argsCount);
 
     size_t stackSize = 0;
 
@@ -393,6 +344,35 @@ void* Interop::GetFunctionPointer(const FunctionMeta* meta) {
 
     assert(functionPointer != nullptr);
     return functionPointer;
+}
+
+ffi_cif* Interop::GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) {
+    ffi_cif* cif = nullptr;
+    auto it = cifCache_.find(typeEncoding);
+    if (it != cifCache_.end()) {
+        cif = it->second;
+    } else {
+        const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount]();
+        ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
+
+        for (int i = 0; i < initialParameterIndex; i++) {
+            parameterTypesFFITypes[i] = &ffi_type_pointer;
+        }
+
+        const TypeEncoding* enc = typeEncoding;
+        for (int i = initialParameterIndex; i < argsCount; i++) {
+            enc = enc->next();
+            parameterTypesFFITypes[i] = Interop::GetArgumentType(enc);
+        }
+
+        cif = new ffi_cif();
+        ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
+        assert(status == FFI_OK);
+
+        cifCache_.insert(std::make_pair(typeEncoding, cif));
+    }
+
+    return cif;
 }
 
 template <typename T>
