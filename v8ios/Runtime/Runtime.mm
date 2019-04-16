@@ -13,7 +13,7 @@
 #include "natives_blob.x86_64.h"
 #include "snapshot_blob.x86_64.h"
 #else
-#error Unknown CPU architecture. Only ARM, ARM64 and X86_64 architectures are supported
+#error Unknown CPU architecture. Only ARM64 and X86_64 architectures are supported
 #endif
 
 using namespace v8;

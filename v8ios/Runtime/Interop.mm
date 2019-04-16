@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include <malloc/malloc.h>
 #include <objc/message.h>
 #include <dlfcn.h>
 #include "Interop.h"
@@ -110,14 +111,14 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
         .descriptor = &JSBlock::kJSBlockDescriptor,
     };
 
-    object_setClass((__bridge id)blockPointer, objc_getClass("__NSGlobalBlock__"));
+    object_setClass((__bridge id)blockPointer, objc_getClass("__NSMallocBlock__"));
 
     return blockPointer;
 }
 
 void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class clazz, const std::vector<Local<Value>> args, bool callSuper) {
     void* functionPointer = nullptr;
-    SEL selector;
+    SEL selector = nil;
     int initialParameterIndex = 0;
     const TypeEncoding* typeEncoding = nullptr;
 
@@ -139,14 +140,14 @@ void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class
         assert(false);
     }
 
-    int argsCount = (int)args.size();
+    int argsCount = initialParameterIndex + (int)args.size();
 
     ffi_cif* cif = nullptr;
     auto it = cifCache_.find(typeEncoding);
     if (it != cifCache_.end()) {
         cif = it->second;
     } else {
-        const ffi_type** parameterTypesFFITypes = new const ffi_type*[initialParameterIndex + argsCount]();
+        const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount]();
         ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
 
         for (int i = 0; i < initialParameterIndex; i++) {
@@ -154,19 +155,47 @@ void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class
         }
 
         const TypeEncoding* enc = typeEncoding;
-        for (int i = initialParameterIndex; i < initialParameterIndex + argsCount; i++) {
+        for (int i = initialParameterIndex; i < argsCount; i++) {
             enc = enc->next();
             parameterTypesFFITypes[i] = Interop::GetArgumentType(enc);
         }
 
         cif = new ffi_cif();
-        ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, initialParameterIndex + argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
+        ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
         assert(status == FFI_OK);
 
         cifCache_.insert(std::make_pair(typeEncoding, cif));
     }
 
-    void* values[initialParameterIndex + argsCount];
+    size_t stackSize = 0;
+
+    size_t argsArrayOffset = stackSize;
+    stackSize += malloc_good_size(sizeof(void * [argsCount]));
+
+    ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
+    stackSize += malloc_good_size(std::max(sizeof(*returnType), sizeof(ffi_arg)));
+
+    std::vector<size_t> argValueOffsets;
+
+    for (size_t i = 0; i < initialParameterIndex; i++) {
+        argValueOffsets.push_back(stackSize);
+        stackSize += malloc_good_size(std::max(sizeof(ffi_type_pointer), sizeof(ffi_arg)));
+    }
+
+    const TypeEncoding* enc = typeEncoding;
+    for (size_t i = initialParameterIndex; i < argsCount; i++) {
+        argValueOffsets.push_back(stackSize);
+        enc = enc->next();
+        ffi_type* argType = Interop::GetArgumentType(enc);
+        stackSize += malloc_good_size(std::max(sizeof(*argType), sizeof(ffi_arg)));
+    }
+
+    uint8_t* buffer = reinterpret_cast<uint8_t*>(malloc(stackSize));
+
+    void** argsArray = reinterpret_cast<void**>(buffer + argsArrayOffset);
+    for (size_t i = 0; i < argsCount; i++) {
+        argsArray[i] = buffer + argValueOffsets[i];
+    }
 
     std::unique_ptr<objc_super> sup = std::unique_ptr<objc_super>(new objc_super());
     if (initialParameterIndex > 1) {
@@ -174,63 +203,49 @@ void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class
             if (callSuper) {
                 sup->receiver = target;
                 sup->super_class = class_getSuperclass(object_getClass(target));
-                values[0] = &sup;
+                Interop::SetArgument(buffer + argValueOffsets[0], sup.get());
             } else {
-                values[0] = &target;
+                Interop::SetArgument(buffer + argValueOffsets[0], target);
             }
         } else {
-            values[0] = &clazz;
+            Interop::SetArgument(buffer + argValueOffsets[0], clazz);
         }
-        values[1] = &selector;
+        Interop::SetArgument(buffer + argValueOffsets[1], selector);
     }
 
-    for (int i = initialParameterIndex; i < initialParameterIndex + argsCount; i++) {
+    for (int i = initialParameterIndex; i < argsCount; i++) {
         typeEncoding = typeEncoding->next();
         Local<Value> arg = args[i - initialParameterIndex];
 
+        void* buff = buffer + argValueOffsets[i];
+
         if (arg->IsNullOrUndefined()) {
-            void* nullPtr = nullptr;
-            values[i] = &nullPtr;
+            Interop::SetArgument(buff, nullptr);
         } else if (arg->IsBoolean() && typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
             bool value = arg.As<v8::Boolean>()->Value();
-            if (!value) {
-                void* nullPtr = nullptr;
-                values[i] = &nullPtr;
-            } else {
-                values[i] = &value;
-            }
-        } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
-            Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
-            BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-            std::string protocolName = wrapper->Metadata()->name();
-            Protocol* protocol = objc_getProtocol(protocolName.c_str());
-            values[i] = &protocol;
-        } else if (arg->IsString() && typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
-            const char* s = tns::ToString(isolate, arg).c_str();
-            values[i] = &s;
+            Interop::SetArgument(buff, value);
         } else if (arg->IsString() && typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
             std::string str = tns::ToString(isolate, arg);
             NSString* selStr = [NSString stringWithUTF8String:str.c_str()];
             SEL selector = NSSelectorFromString(selStr);
-            values[i] = &selector;
+            Interop::SetArgument(buff, selector);
         } else if (arg->IsString() && typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             std::string str = tns::ToString(isolate, arg);
             NSString* result = [NSString stringWithUTF8String:str.c_str()];
-            void* value = (__bridge void*)result;
-            values[i] = &value;
+            Interop::SetArgument(buff, result);
         } else if (arg->IsNumber() || arg->IsNumberObject()) {
             double value = arg.As<Number>()->Value();
             if (typeEncoding->type == BinaryTypeEncodingType::IntEncoding) {
                 int val = (int)value;
-                values[i] = &val;
+                Interop::SetArgument(buff, val);
             } else if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
                 long val = (long)value;
-                values[i] = &val;
+                Interop::SetArgument(buff, val);
             } else if (typeEncoding->type == BinaryTypeEncodingType::ULongEncoding) {
                 unsigned long val = (unsigned long)value;
-                values[i] = &val;
+                Interop::SetArgument(buff, val);
             } else if (typeEncoding->type == BinaryTypeEncodingType::DoubleEncoding) {
-                values[i] = &value;
+                Interop::SetArgument(buff, value);
             } else {
                 assert(false);
             }
@@ -244,7 +259,7 @@ void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class
 
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
             CFTypeRef blockPtr = CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
-            values[i] = &blockPtr;
+            Interop::SetArgument(buff, blockPtr);
         } else if (arg->IsObject()) {
             Local<Object> obj = arg.As<Object>();
             assert(obj->InternalFieldCount() > 0);
@@ -272,20 +287,22 @@ void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class
                 assert(result->IsNumber());
 
                 double value = result.As<Number>()->Value();
-                values[i] = &value;
+                Interop::SetArgument(buff, value);
                 continue;
             }
 
             id data = wrapper->Data();
-            void* value = (__bridge void*)data;
-            values[i] = &value;
+            Interop::SetArgument(buff, data);
         } else {
             assert(false);
         }
     }
 
     void* resultPtr = nullptr;
+    void** values = reinterpret_cast<void**>(buffer + argsArrayOffset);
     ffi_call(cif, FFI_FN(functionPointer), &resultPtr, values);
+
+    free(buffer);
 
     return resultPtr;
 }
@@ -359,6 +376,10 @@ void* Interop::GetFunctionPointer(const FunctionMeta* meta) {
         CFBundleRef bundle = CFBundleCreate(kCFAllocatorDefault, (CFURLRef)bundleUrl);
         assert(bundle != nullptr);
 
+        CFErrorRef error = nullptr;
+        bool loaded = CFBundleLoadExecutableAndReturnError(bundle, &error);
+        assert(loaded);
+
         CFStringRef cfName = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, symbolName, kCFStringEncodingUTF8, kCFAllocatorNull);
         functionPointer = CFBundleGetFunctionPointerForName(bundle, cfName);
     } else if (moduleMeta->libraries->count == 1 && moduleMeta->isSystem()) {
@@ -372,6 +393,11 @@ void* Interop::GetFunctionPointer(const FunctionMeta* meta) {
 
     assert(functionPointer != nullptr);
     return functionPointer;
+}
+
+template <typename T>
+void Interop::SetArgument(void* buffer, T value) {
+    *static_cast<T*>(buffer) = value;
 }
 
 }

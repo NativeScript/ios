@@ -7,18 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C2335B70224CADD50071048C /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2335B6E224CADD50071048C /* Interop.mm */; };
+		C201FB6D225F4FCE00D0636A /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2FF301C2252062A00933782 /* UIKit.framework */; };
+		C201FB6E225FA64700D0636A /* Metadata.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF4222BE705008F674F /* Metadata.mm */; };
+		C201FB6F225FA66B00D0636A /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */; };
+		C2335B70224CADD50071048C /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2335B6E224CADD50071048C /* Interop.mm */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2335B74224CEAFA0071048C /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2335B73224CEAFA0071048C /* libffi.a */; };
 		C245885E224A4913000D147A /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C245885D224A4913000D147A /* libtorque_generated_initializers.a */; };
 		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
-		C2764AF6222BE705008F674F /* Metadata.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF4222BE705008F674F /* Metadata.mm */; };
 		C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF7222E80AC008F674F /* MetadataBuilder.mm */; };
 		C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.cpp */; };
 		C27E278B22202664009C10A3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C27E278922202664009C10A3 /* Main.storyboard */; };
 		C27E278D22202665009C10A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C27E278C22202665009C10A3 /* Assets.xcassets */; };
 		C27E279322202665009C10A3 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.mm */; };
 		C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF122214A4D007DE2BA /* platform-ios.cpp */; };
-		C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */; };
 		C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B2C22241270007DE2BA /* Runtime.mm */; };
 		C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B5922252432007DE2BA /* ModuleInternal.mm */; };
 		C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */; };
@@ -36,7 +37,6 @@
 		C2BC5DAC22561C370020F348 /* Tasks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2BC5DAB22561C370020F348 /* Tasks.cpp */; };
 		C2FF3001225202FC00933782 /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2FF3000225202FC00933782 /* app */; };
 		C2FF30152252034900933782 /* include in Resources */ = {isa = PBXBuildFile; fileRef = C2FF30142252034900933782 /* include */; };
-		C2FF3021225209A700933782 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2FF301C2252062A00933782 /* UIKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -104,7 +104,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C2FF3021225209A700933782 /* UIKit.framework in Frameworks */,
+				C201FB6D225F4FCE00D0636A /* UIKit.framework in Frameworks */,
 				C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */,
 				C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */,
 				C2335B74224CEAFA0071048C /* libffi.a in Frameworks */,
@@ -311,10 +311,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C28B7AF422215505007DE2BA /* stack_trace_posix.cpp in Sources */,
+				C201FB6F225FA66B00D0636A /* stack_trace_posix.cpp in Sources */,
+				C201FB6E225FA64700D0636A /* Metadata.mm in Sources */,
 				C27E279322202665009C10A3 /* main.mm in Sources */,
 				C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */,
-				C2764AF6222BE705008F674F /* Metadata.mm in Sources */,
 				C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */,
 				C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */,
 				C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */,
@@ -461,10 +461,7 @@
 		C27E279722202665009C10A3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = (
-					x86_64,
-					arm64,
-				);
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_CXX_LIBRARY = "libc++";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -492,10 +489,7 @@
 		C27E279822202665009C10A3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = (
-					x86_64,
-					arm64,
-				);
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_CXX_LIBRARY = "libc++";
 				CODE_SIGN_IDENTITY = "iPhone Developer";

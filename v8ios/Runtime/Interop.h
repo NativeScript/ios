@@ -22,6 +22,8 @@ private:
     static void RegisterInteropType(v8::Isolate* isolate, v8::Local<v8::Object> types, std::string name, BinaryTypeEncodingType encodingType);
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);
     static void* GetFunctionPointer(const FunctionMeta* meta);
+    template <typename T>
+    static void SetArgument(void* buffer, T value);
 
     typedef struct JSBlock {
         typedef struct {
