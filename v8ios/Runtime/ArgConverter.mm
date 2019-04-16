@@ -116,14 +116,17 @@ Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, BaseDataWrapper* wr
 }
 
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
-    MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
-
-    const Persistent<Object>* poCallback = data->callback_;
-
     void (^cb)() = ^{
+        MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
+
         Isolate* isolate = data->isolate_;
 
         HandleScope handle_scope(isolate);
+
+        Persistent<Object>* poCallback = data->callback_;
+        ObjectWeakCallbackState* weakCallbackState = new ObjectWeakCallbackState(poCallback);
+        poCallback->SetWeak(weakCallbackState, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
+
         Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
 
         std::vector<Local<Value>> v8Args;
@@ -161,7 +164,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             auto it = Caches::Instances.find(self_);
             if (it != Caches::Instances.end()) {
                 thiz = it->second->Get(data->isolate_);
-            } else  {
+            } else {
                 ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, self_);
                 thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
 

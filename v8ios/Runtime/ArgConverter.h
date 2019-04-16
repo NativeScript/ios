@@ -11,10 +11,10 @@ class ArgConverter;
 
 struct MethodCallbackWrapper {
 public:
-    MethodCallbackWrapper(v8::Isolate* isolate, const v8::Persistent<v8::Object>* callback, const uint8_t initialParamIndex, const uint8_t paramsCount, const TypeEncoding* typeEncoding)
+    MethodCallbackWrapper(v8::Isolate* isolate, v8::Persistent<v8::Object>* callback, const uint8_t initialParamIndex, const uint8_t paramsCount, const TypeEncoding* typeEncoding)
         : isolate_(isolate), callback_(callback), initialParamIndex_(initialParamIndex), paramsCount_(paramsCount), typeEncoding_(typeEncoding) {}
     v8::Isolate* isolate_;
-    const v8::Persistent<v8::Object>* callback_;
+    v8::Persistent<v8::Object>* callback_;
     const uint8_t initialParamIndex_;
     const uint8_t paramsCount_;
     const TypeEncoding* typeEncoding_;

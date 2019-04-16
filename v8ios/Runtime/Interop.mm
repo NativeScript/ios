@@ -126,6 +126,23 @@ void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class
     ffi_type* returnType = Interop::GetArgumentType(typeEncoding);
     stackSize += malloc_good_size(std::max(sizeof(*returnType), sizeof(ffi_arg)));
 
+#if defined(__x86_64__)
+    if (meta->type() == MetaType::Undefined || meta->type() == MetaType::Union) {
+        const unsigned UNIX64_FLAG_RET_IN_MEM = (1 << 10);
+
+        if (returnType->type == FFI_TYPE_LONGDOUBLE) {
+            functionPointer = (void*)objc_msgSend_fpret;
+        } else if (returnType->type == FFI_TYPE_STRUCT && (cif->flags & UNIX64_FLAG_RET_IN_MEM)) {
+            if (callSuper) {
+                functionPointer = (void*)objc_msgSend_stret;
+            } else {
+                functionPointer = (void*)objc_msgSendSuper_stret;
+            }
+        }
+    }
+#endif
+
+
     std::vector<size_t> argValueOffsets;
 
     for (size_t i = 0; i < initialParameterIndex; i++) {
@@ -180,34 +197,44 @@ void* Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class
             NSString* selStr = [NSString stringWithUTF8String:str.c_str()];
             SEL selector = NSSelectorFromString(selStr);
             Interop::SetArgument(buff, selector);
+        } else if (arg->IsString() && typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
+            std::string str = tns::ToString(isolate, arg);
+            Interop::SetArgument(buff, str.c_str());
         } else if (arg->IsString() && typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             std::string str = tns::ToString(isolate, arg);
             NSString* result = [NSString stringWithUTF8String:str.c_str()];
             Interop::SetArgument(buff, result);
         } else if (arg->IsNumber() || arg->IsNumberObject()) {
             double value = arg.As<Number>()->Value();
-            if (typeEncoding->type == BinaryTypeEncodingType::IntEncoding) {
-                int val = (int)value;
-                Interop::SetArgument(buff, val);
-            } else if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
-                long val = (long)value;
-                Interop::SetArgument(buff, val);
+
+            if (typeEncoding->type == BinaryTypeEncodingType::UShortEncoding) {
+                Interop::SetArgument(buff, (unsigned short)value);
+            } else if (typeEncoding->type == BinaryTypeEncodingType::ShortEncoding) {
+                Interop::SetArgument(buff, (short)value);
+            } else if (typeEncoding->type == BinaryTypeEncodingType::UIntEncoding) {
+                Interop::SetArgument(buff, (unsigned int)value);
+            } else if (typeEncoding->type == BinaryTypeEncodingType::IntEncoding) {
+                Interop::SetArgument(buff, (int)value);
             } else if (typeEncoding->type == BinaryTypeEncodingType::ULongEncoding) {
-                unsigned long val = (unsigned long)value;
-                Interop::SetArgument(buff, val);
+                Interop::SetArgument(buff, (unsigned long)value);
+            } else if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
+                Interop::SetArgument(buff, (long)value);
+            } else if (typeEncoding->type == BinaryTypeEncodingType::ULongLongEncoding) {
+                Interop::SetArgument(buff, (unsigned long long)value);
+            } else if (typeEncoding->type == BinaryTypeEncodingType::LongLongEncoding) {
+                Interop::SetArgument(buff, (long long)value);
+            } else if (typeEncoding->type == BinaryTypeEncodingType::FloatEncoding) {
+                Interop::SetArgument(buff, (float)value);
             } else if (typeEncoding->type == BinaryTypeEncodingType::DoubleEncoding) {
                 Interop::SetArgument(buff, value);
             } else {
                 assert(false);
             }
         } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
-            Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, arg.As<Object>());
-            ObjectWeakCallbackState* state = new ObjectWeakCallbackState(poCallback);
-            poCallback->SetWeak(state, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
-
             const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
             int argsCount = typeEncoding->details.block.signature.count - 1;
 
+            Persistent<Object>* poCallback = new Persistent<Object>(isolate, arg.As<Object>());
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
             CFTypeRef blockPtr = CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
             Interop::SetArgument(buff, blockPtr);
