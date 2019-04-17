@@ -263,10 +263,9 @@ void MetadataBuilder::RegisterInstanceProtocols(Local<FunctionTemplate> ctorFunc
         RegisterInstanceProperties(ctorFuncTemplate, meta, className, names);
     }
 
-    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
     for (auto itProto = meta->protocols->begin(); itProto != meta->protocols->end(); itProto++) {
         std::string protocolName = (*itProto).valuePtr();
-        const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName.c_str());
+        const BaseClassMeta* protoMeta = ArgConverter::GetInterfaceMeta(protocolName.c_str());
         if (protoMeta != nullptr) {
             RegisterInstanceProtocols(ctorFuncTemplate, protoMeta, className, names);
         }
