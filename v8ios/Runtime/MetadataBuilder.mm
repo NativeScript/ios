@@ -88,13 +88,19 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     Local<v8::Function> baseCtorFunc;
 
     while (true) {
-        const InterfaceMeta* baseMeta = interfaceMeta->baseMeta();
-        if (baseMeta != nullptr) {
-            Local<FunctionTemplate> baseCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
-            ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
-            auto it = Caches::CtorFuncs.find(baseMeta);
-            if (it != Caches::CtorFuncs.end()) {
-                baseCtorFunc = Local<v8::Function>::New(isolate_, *it->second);
+        const char* baseName = interfaceMeta->baseName();
+        if (baseName != nullptr) {
+            const BaseClassMeta* baseClassMeta = ArgConverter::GetInterfaceMeta(baseName);
+            if (baseClassMeta->type() == MetaType::Interface) {
+                const InterfaceMeta* baseMeta = static_cast<const InterfaceMeta*>(baseClassMeta);
+                if (baseMeta != nullptr) {
+                    Local<FunctionTemplate> baseCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
+                    ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
+                    auto it = Caches::CtorFuncs.find(baseMeta);
+                    if (it != Caches::CtorFuncs.end()) {
+                        baseCtorFunc = Local<v8::Function>::New(isolate_, *it->second);
+                    }
+                }
             }
         }
         break;
