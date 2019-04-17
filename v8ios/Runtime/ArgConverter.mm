@@ -2,7 +2,6 @@
 #include "ArgConverter.h"
 #include "ObjectManager.h"
 #include "Caches.h"
-#include "Helpers.h"
 #include "Interop.h"
 
 using namespace v8;
@@ -30,79 +29,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         callSuper = isMethodCallback && it != Caches::ClassPrototypes.end();
     }
 
-    void* resultPtr = Interop::CallFunction(isolate, meta, target, klass, args, callSuper);
-
-    const TypeEncoding* typeEncoding = meta->encodings()->first();
-    if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
-        typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
-        typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding) {
-        if (resultPtr == nullptr) {
-            return Null(isolate);
-        }
-
-        id result = (__bridge id)resultPtr;
-        if (result != nil) {
-            // TODO: Create the proper DataWrapper type depending on the return value
-            ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, result);
-            return ConvertArgument(isolate, wrapper);
-        }
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
-        const char* result = static_cast<const char*>(resultPtr);
-        if (result != nullptr) {
-            return tns::ToV8String(isolate, result);
-        } else {
-            return Null(isolate);
-        }
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
-        bool result = (bool)resultPtr;
-        return v8::Boolean::New(isolate, result);
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::UShortEncoding) {
-        return ToV8Number<unsigned short>(isolate, resultPtr);
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::ShortEncoding) {
-        return ToV8Number<short>(isolate, resultPtr);
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::UIntEncoding) {
-        return ToV8Number<unsigned int>(isolate, resultPtr);
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::IntEncoding) {
-        return ToV8Number<int>(isolate, resultPtr);
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::ULongEncoding) {
-        return ToV8Number<unsigned long>(isolate, resultPtr);
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
-        return ToV8Number<long>(isolate, resultPtr);
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::FloatEncoding) {
-        float result = *static_cast<float*>(resultPtr);
-        return Number::New(isolate, result);
-    }
-
-    if (typeEncoding->type == BinaryTypeEncodingType::DoubleEncoding) {
-        double result = *static_cast<double*>(resultPtr);
-        return Number::New(isolate, (double)result);
-    }
-
-    if (typeEncoding->type != BinaryTypeEncodingType::VoidEncoding) {
-        assert(false);
-    }
-
-    // TODO: Handle all the possible return types https://nshipster.com/type-encodings/
-
-    return Local<Value>();
+    return Interop::CallFunction(isolate, meta, target, klass, args, callSuper);
 }
 
 Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, BaseDataWrapper* wrapper) {

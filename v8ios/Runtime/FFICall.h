@@ -31,11 +31,21 @@ public:
     void** ArgsArray() {
         return this->argsArray_;
     }
+
+    void* ResultBuffer() {
+        return this->buffer_ + this->returnOffset_;
+    }
+
+    template <typename T>
+    T& GetResult() {
+        return *static_cast<T*>(this->ResultBuffer());
+    }
 private:
     static std::map<const TypeEncoding*, ffi_cif*> cifCache_;
 
     std::vector<size_t> argValueOffsets_;
     size_t argsArrayOffset_;
+    size_t returnOffset_;
     size_t stackSize_;
     uint8_t* buffer_;
     void** argsArray_;

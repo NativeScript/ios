@@ -15,7 +15,7 @@ public:
     static void RegisterInteropTypes(v8::Isolate* isolate);
     static CFTypeRef CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
-    static void* CallFunction(v8::Isolate* isolate, const Meta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper = false);
+    static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const Meta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper = false);
 private:
     static void RegisterInteropType(v8::Isolate* isolate, v8::Local<v8::Object> types, std::string name, BinaryTypeEncodingType encodingType);
     static void* GetFunctionPointer(const FunctionMeta* meta);

@@ -1,5 +1,4 @@
 #include "FFICall.h"
-#include "ffi.h"
 
 namespace tns {
 
@@ -8,6 +7,8 @@ FFICall::FFICall(const TypeEncoding* typeEncoding, const int initialParameterInd
 
     this->argsArrayOffset_ = this->stackSize_;
     this->stackSize_ += malloc_good_size(sizeof(void* [argsCount]));
+
+    this->returnOffset_ = this->stackSize_;
 
     ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
     this->stackSize_ += malloc_good_size(std::max(sizeof(*returnType), sizeof(ffi_arg)));
