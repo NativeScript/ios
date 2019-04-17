@@ -91,7 +91,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         const char* baseName = interfaceMeta->baseName();
         if (baseName != nullptr) {
             const BaseClassMeta* baseClassMeta = ArgConverter::GetInterfaceMeta(baseName);
-            if (baseClassMeta->type() == MetaType::Interface) {
+            if (baseClassMeta && baseClassMeta->type() == MetaType::Interface) {
                 const InterfaceMeta* baseMeta = static_cast<const InterfaceMeta*>(baseClassMeta);
                 if (baseMeta != nullptr) {
                     Local<FunctionTemplate> baseCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
