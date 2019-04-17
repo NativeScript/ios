@@ -34,8 +34,6 @@ private:
     static v8::Persistent<v8::Function>* poEmptyObjCtorFunc_;
 
     static v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
-    template<class T>
-    static v8::Local<v8::Number> ToV8Number(v8::Isolate* isolate, void* ptr);
 };
 
 }

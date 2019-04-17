@@ -156,15 +156,6 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     }
 }
 
-template<class T>
-Local<v8::Number> ArgConverter::ToV8Number(Isolate* isolate, void* ptr) {
-    long result = 0;
-    if (ptr != nullptr) {
-        result = (long)ptr;
-    }
-    return v8::Number::New(isolate, (T)result);
-}
-
 Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver) {
     Local<Context> context = isolate->GetCurrentContext();
 
