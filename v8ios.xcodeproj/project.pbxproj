@@ -14,6 +14,7 @@
 		C201FB7322660C0B00D0636A /* libv8_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7222660C0B00D0636A /* libv8_compiler.a */; };
 		C201FB7522660C1800D0636A /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7422660C1700D0636A /* libv8_initializers.a */; };
 		C201FB7722660C2B00D0636A /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */; };
+		C201FB7A226702BA00D0636A /* FFICall.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C201FB78226702BA00D0636A /* FFICall.cpp */; };
 		C2335B70224CADD50071048C /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2335B6E224CADD50071048C /* Interop.mm */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2335B74224CEAFA0071048C /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2335B73224CEAFA0071048C /* libffi.a */; };
 		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
@@ -45,6 +46,8 @@
 		C201FB7222660C0B00D0636A /* libv8_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_compiler.a; sourceTree = "<group>"; };
 		C201FB7422660C1700D0636A /* libv8_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_initializers.a; sourceTree = "<group>"; };
 		C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
+		C201FB78226702BA00D0636A /* FFICall.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FFICall.cpp; sourceTree = "<group>"; };
+		C201FB79226702BA00D0636A /* FFICall.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FFICall.h; sourceTree = "<group>"; };
 		C2335B6E224CADD50071048C /* Interop.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Interop.mm; sourceTree = "<group>"; };
 		C2335B6F224CADD50071048C /* Interop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Interop.h; sourceTree = "<group>"; };
 		C2335B73224CEAFA0071048C /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
@@ -147,6 +150,8 @@
 				C24F39182225859D0027977A /* Console.h */,
 				C24F39192225859D0027977A /* Console.cpp */,
 				C2FE3780224E803700847863 /* DataWrapper.h */,
+				C201FB79226702BA00D0636A /* FFICall.h */,
+				C201FB78226702BA00D0636A /* FFICall.cpp */,
 				C2AAE9D622490F50006FB9D3 /* Helpers.h */,
 				C2AAE9D522490F50006FB9D3 /* Helpers.mm */,
 				C2335B6F224CADD50071048C /* Interop.h */,
@@ -317,6 +322,7 @@
 			files = (
 				C201FB6F225FA66B00D0636A /* stack_trace_posix.cpp in Sources */,
 				C201FB6E225FA64700D0636A /* Metadata.mm in Sources */,
+				C201FB7A226702BA00D0636A /* FFICall.cpp in Sources */,
 				C27E279322202665009C10A3 /* main.mm in Sources */,
 				C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */,
 				C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */,

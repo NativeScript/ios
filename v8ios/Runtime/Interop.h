@@ -17,14 +17,8 @@ public:
     static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static void* CallFunction(v8::Isolate* isolate, const Meta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper = false);
 private:
-    static std::map<const TypeEncoding*, ffi_cif*> cifCache_;
-
     static void RegisterInteropType(v8::Isolate* isolate, v8::Local<v8::Object> types, std::string name, BinaryTypeEncodingType encodingType);
-    static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);
     static void* GetFunctionPointer(const FunctionMeta* meta);
-    static ffi_cif* GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
-    template <typename T>
-    static void SetArgument(void* buffer, T value);
 
     typedef struct JSBlock {
         typedef struct {
