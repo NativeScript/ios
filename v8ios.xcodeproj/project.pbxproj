@@ -15,6 +15,7 @@
 		C201FB7522660C1800D0636A /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7422660C1700D0636A /* libv8_initializers.a */; };
 		C201FB7722660C2B00D0636A /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */; };
 		C201FB7A226702BA00D0636A /* FFICall.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C201FB78226702BA00D0636A /* FFICall.cpp */; };
+		C201FB7F226760A700D0636A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C201FB7E226760A700D0636A /* LaunchScreen.storyboard */; };
 		C2335B70224CADD50071048C /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2335B6E224CADD50071048C /* Interop.mm */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2335B74224CEAFA0071048C /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2335B73224CEAFA0071048C /* libffi.a */; };
 		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
@@ -48,6 +49,7 @@
 		C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
 		C201FB78226702BA00D0636A /* FFICall.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FFICall.cpp; sourceTree = "<group>"; };
 		C201FB79226702BA00D0636A /* FFICall.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FFICall.h; sourceTree = "<group>"; };
+		C201FB7E226760A700D0636A /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		C2335B6E224CADD50071048C /* Interop.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Interop.mm; sourceTree = "<group>"; };
 		C2335B6F224CADD50071048C /* Interop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Interop.h; sourceTree = "<group>"; };
 		C2335B73224CEAFA0071048C /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
@@ -217,6 +219,7 @@
 				C27E278C22202665009C10A3 /* Assets.xcassets */,
 				C27E279122202665009C10A3 /* Info.plist */,
 				C27E279222202665009C10A3 /* main.mm */,
+				C201FB7E226760A700D0636A /* LaunchScreen.storyboard */,
 			);
 			path = v8ios;
 			sourceTree = "<group>";
@@ -309,6 +312,7 @@
 				C2FF3001225202FC00933782 /* app in Resources */,
 				C27E278D22202665009C10A3 /* Assets.xcassets in Resources */,
 				C27E278B22202664009C10A3 /* Main.storyboard in Resources */,
+				C201FB7F226760A700D0636A /* LaunchScreen.storyboard in Resources */,
 				C2FF30152252034900933782 /* include in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
