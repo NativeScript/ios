@@ -1,19 +1,24 @@
 #ifndef Common_h
 #define Common_h
 
+#include <map>
 #include "Metadata.h"
+#include "ffi.h"
 
 namespace tns {
 
 enum WrapperType {
-    Primitive = 1,
-    ObjCObject = 2
+    Base = 1,
+    Record = 2,
+    ObjCObject = 3
 };
 
 class BaseDataWrapper {
 public:
     BaseDataWrapper(const Meta* meta): meta_(meta) {}
-    virtual WrapperType Type() = 0;
+    virtual WrapperType Type() {
+        return WrapperType::Base;
+    }
     const Meta* Metadata() {
         return meta_;
     }
@@ -21,17 +26,21 @@ private:
     const Meta* meta_;
 };
 
-class PrimitiveDataWrapper: public BaseDataWrapper {
+class RecordDataWrapper: public BaseDataWrapper {
 public:
-    PrimitiveDataWrapper(const Meta* meta, const void* data): BaseDataWrapper(meta), data_(data) {}
+    RecordDataWrapper(const Meta* meta, void* data, ffi_type* ffiType): BaseDataWrapper(meta), data_(data), ffiType_(ffiType) {}
     WrapperType Type() {
-        return WrapperType::Primitive;
+        return WrapperType::Record;
     }
-    const void* Data() {
+    void* Data() {
         return data_;
     }
+    ffi_type* FFIType() {
+        return ffiType_;
+    }
 private:
-    const void* data_;
+    void* data_;
+    ffi_type* ffiType_;
 };
 
 class ObjCDataWrapper: public BaseDataWrapper {

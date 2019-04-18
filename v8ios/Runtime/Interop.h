@@ -5,6 +5,7 @@
 #include "ffi.h"
 #include "NativeScript.h"
 #include "Metadata.h"
+#include "FFICall.h"
 
 namespace tns {
 
@@ -16,8 +17,10 @@ public:
     static CFTypeRef CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const Meta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper = false);
+    static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call);
 private:
     static void RegisterInteropType(v8::Isolate* isolate, v8::Local<v8::Object> types, std::string name, BinaryTypeEncodingType encodingType);
+    static void SetFFIParams(v8::Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<v8::Local<v8::Value>> args);
     static void* GetFunctionPointer(const FunctionMeta* meta);
 
     typedef struct JSBlock {

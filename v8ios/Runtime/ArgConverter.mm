@@ -65,12 +65,10 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             Local<Value> jsWrapper;
             if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
                 long arg = *static_cast<long*>(argValues[argIndex]);
-                BaseDataWrapper* wrapper = new PrimitiveDataWrapper(nullptr, &arg);
-                jsWrapper = ArgConverter::ConvertArgument(isolate, wrapper);
+                jsWrapper = Number::New(isolate, arg);
             } else if (typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
                 bool arg = *static_cast<bool*>(argValues[argIndex]);
-                BaseDataWrapper* wrapper = new PrimitiveDataWrapper(nullptr, &arg);
-                jsWrapper = ArgConverter::ConvertArgument(isolate, wrapper);
+                jsWrapper = v8::Boolean::New(isolate, arg);
             } else {
                 const id arg = *static_cast<const id*>(argValues[argIndex]);
                 if (arg != nil) {
@@ -161,6 +159,29 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
 
     if (wrapper == nullptr) {
         return Null(isolate);
+    }
+
+    if (wrapper->Type() == WrapperType::Record) {
+        if (receiver.IsEmpty()) {
+            receiver = CreateEmptyObject(context);
+        }
+
+        RecordDataWrapper* recordWrapper = static_cast<RecordDataWrapper*>(wrapper);
+
+        const Meta* meta = recordWrapper->Metadata();
+        auto it = Caches::Prototypes.find(meta);
+        if (it != Caches::Prototypes.end()) {
+            Local<Value> prototype = it->second->Get(isolate);
+            bool success;
+            if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
+                assert(false);
+            }
+        }
+
+        Local<External> ext = External::New(isolate, wrapper);
+        receiver->SetInternalField(0, ext);
+
+        return receiver;
     }
 
     id target = nil;

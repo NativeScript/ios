@@ -35,7 +35,7 @@ void MetadataBuilder::Init(Isolate* isolate) {
             break;
         }
         case MetaType::JsCode: {
-            PrimitiveDataWrapper* wrapper = new PrimitiveDataWrapper(meta, nullptr);
+            BaseDataWrapper* wrapper = new BaseDataWrapper(meta);
             Local<Object> enumValue = ArgConverter::CreateEmptyObject(context);
             Local<External> ext = External::New(isolate, wrapper);
             enumValue->SetInternalField(0, ext);
@@ -46,11 +46,36 @@ void MetadataBuilder::Init(Isolate* isolate) {
             const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
             Local<Object> proto = ArgConverter::CreateEmptyObject(context);
 
-            PrimitiveDataWrapper* wrapper = new PrimitiveDataWrapper(protoMeta, nullptr);
+            BaseDataWrapper* wrapper = new BaseDataWrapper(protoMeta);
             Local<External> ext = External::New(isolate, wrapper);
             proto->SetInternalField(0, ext);
 
             global->Set(tns::ToV8String(isolate, meta->jsName()), proto);
+            break;
+        }
+        case MetaType::Struct: {
+            const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+
+            Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate_, nullptr, Local<Value>());
+            ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+            ctorFuncTemplate->SetClassName(tns::ToV8String(isolate_, structMeta->jsName()));
+            Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
+
+            NamedPropertyHandlerConfiguration config(StructPropertyGetterCallback, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, Local<Value>());
+            proto->SetHandler(config);
+
+            Local<Context> context = isolate_->GetCurrentContext();
+            Local<v8::Function> ctorFunc;
+            if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
+                assert(false);
+            }
+
+            Local<Value> prototype = ctorFunc->Get(tns::ToV8String(isolate_, "prototype"));
+
+            prototype.As<Object>()->Set(tns::ToV8String(isolate_, "toString"), poToStringFunction_->Get(isolate_));
+
+            Persistent<Value>* poPrototype = new Persistent<Value>(isolate_, prototype);
+            Caches::Prototypes.insert(std::make_pair(structMeta, poPrototype));
             break;
         }
         case MetaType::Interface: {
@@ -413,6 +438,30 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
     item->builder_->InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->className_, false);
 }
 
+void MetadataBuilder::StructPropertyGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    Local<Object> thiz = info.This();
+    Local<External> ext = thiz->GetInternalField(0).As<External>();
+    RecordDataWrapper* wrapper = static_cast<RecordDataWrapper*>(ext->Value());
+    const StructMeta* structMeta = static_cast<const StructMeta*>(wrapper->Metadata());
+    std::string propertyName = tns::ToString(isolate, property);
+
+    std::map<std::string, std::pair<const TypeEncoding*, size_t>> offsets;
+    FFICall::GetStructFFIType(structMeta, offsets);
+    auto it = offsets.find(propertyName);
+    if (it == offsets.end()) {
+        info.GetReturnValue().Set(v8::Undefined(isolate));
+        return;
+    }
+
+    const TypeEncoding* fieldEncoding = it->second.first;
+    ptrdiff_t offset = it->second.second;
+    void* buffer = wrapper->Data();
+    BaseFFICall call((uint8_t*)buffer, offset);
+    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, wrapper->FFIType(), &call);
+    info.GetReturnValue().Set(result);
+}
+
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass, bool isMethodCallback) {
     Class klass = objc_getClass(containingClass.c_str());
     // TODO: Find out if the isMethodCallback property can be determined based on a UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
@@ -449,9 +498,10 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
         args.push_back(info[i]);
     }
 
-    Interop::CallFunction(isolate, item->meta_, nil, nil, args);
-
-    // TODO: Handle return type here
+    Local<Value> result = Interop::CallFunction(isolate, item->meta_, nil, nil, args);
+    if (item->meta_->encodings()->first()->type != BinaryTypeEncodingType::VoidEncoding) {
+        info.GetReturnValue().Set(result);
+    }
 }
 
 }

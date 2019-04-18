@@ -3,7 +3,6 @@
 #include <dlfcn.h>
 #include "Interop.h"
 #include "ObjectManager.h"
-#include "FFICall.h"
 #include "Helpers.h"
 #include "DataWrapper.h"
 #include "ArgConverter.h"
@@ -154,51 +153,61 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
         call.SetArgument(1, selector);
     }
 
+    Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
+
+    ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+
+    Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call);
+
+    return result;
+}
+
+void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<Local<Value>> args) {
     const TypeEncoding* enc = typeEncoding;
     for (int i = initialParameterIndex; i < argsCount; i++) {
         enc = enc->next();
         Local<Value> arg = args[i - initialParameterIndex];
 
         if (arg->IsNullOrUndefined()) {
-            call.SetArgument(i, nullptr);
+            call->SetArgument(i, nullptr);
         } else if (arg->IsBoolean() && enc->type == BinaryTypeEncodingType::BoolEncoding) {
             bool value = arg.As<v8::Boolean>()->Value();
-            call.SetArgument(i, value);
+            call->SetArgument(i, value);
         } else if (arg->IsString() && enc->type == BinaryTypeEncodingType::SelectorEncoding) {
             std::string str = tns::ToString(isolate, arg);
             NSString* selStr = [NSString stringWithUTF8String:str.c_str()];
             SEL selector = NSSelectorFromString(selStr);
-            call.SetArgument(i, selector);
+            call->SetArgument(i, selector);
         } else if (arg->IsString() && enc->type == BinaryTypeEncodingType::CStringEncoding) {
             std::string str = tns::ToString(isolate, arg);
-            call.SetArgument(i, str.c_str());
+            call->SetArgument(i, str.c_str());
         } else if (arg->IsString() && enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             std::string str = tns::ToString(isolate, arg);
             NSString* result = [NSString stringWithUTF8String:str.c_str()];
-            call.SetArgument(i, result);
+            call->SetArgument(i, result);
         } else if (arg->IsNumber() || arg->IsNumberObject()) {
             double value = arg.As<Number>()->Value();
 
             if (enc->type == BinaryTypeEncodingType::UShortEncoding) {
-                call.SetArgument(i, (unsigned short)value);
+                call->SetArgument(i, (unsigned short)value);
             } else if (enc->type == BinaryTypeEncodingType::ShortEncoding) {
-                call.SetArgument(i, (short)value);
+                call->SetArgument(i, (short)value);
             } else if (enc->type == BinaryTypeEncodingType::UIntEncoding) {
-                call.SetArgument(i, (unsigned int)value);
+                call->SetArgument(i, (unsigned int)value);
             } else if (enc->type == BinaryTypeEncodingType::IntEncoding) {
-                call.SetArgument(i, (int)value);
+                call->SetArgument(i, (int)value);
             } else if (enc->type == BinaryTypeEncodingType::ULongEncoding) {
-                call.SetArgument(i, (unsigned long)value);
+                call->SetArgument(i, (unsigned long)value);
             } else if (enc->type == BinaryTypeEncodingType::LongEncoding) {
-                call.SetArgument(i, (long)value);
+                call->SetArgument(i, (long)value);
             } else if (enc->type == BinaryTypeEncodingType::ULongLongEncoding) {
-                call.SetArgument(i, (unsigned long long)value);
+                call->SetArgument(i, (unsigned long long)value);
             } else if (enc->type == BinaryTypeEncodingType::LongLongEncoding) {
-                call.SetArgument(i, (long long)value);
+                call->SetArgument(i, (long long)value);
             } else if (enc->type == BinaryTypeEncodingType::FloatEncoding) {
-                call.SetArgument(i, (float)value);
+                call->SetArgument(i, (float)value);
             } else if (enc->type == BinaryTypeEncodingType::DoubleEncoding) {
-                call.SetArgument(i, value);
+                call->SetArgument(i, value);
             } else {
                 assert(false);
             }
@@ -209,7 +218,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
             Persistent<Object>* poCallback = new Persistent<Object>(isolate, arg.As<Object>());
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
             CFTypeRef blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
-            call.SetArgument(i, blockPtr);
+            call->SetArgument(i, blockPtr);
         } else if (arg->IsObject()) {
             Local<Object> obj = arg.As<Object>();
             assert(obj->InternalFieldCount() > 0);
@@ -237,24 +246,41 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
                 assert(result->IsNumber());
 
                 double value = result.As<Number>()->Value();
-                call.SetArgument(i, value);
+                call->SetArgument(i, value);
                 continue;
             }
 
             id data = wrapper->Data();
-            call.SetArgument(i, data);
+            call->SetArgument(i, data);
         } else {
             assert(false);
         }
     }
+}
 
-    ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call) {
+    if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
+        const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
+        // TODO: Cache the metadata
+        const Meta* meta = MetaFile::instance()->globalTable()->findMeta(structName);
+        assert(meta != nullptr && meta->type() == MetaType::Struct);
+        const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+
+        void* result = call->ResultBuffer();
+
+        size_t rsize = returnType->size;
+        void* dest = std::malloc(rsize);
+        memcpy(dest, result, rsize);
+
+        RecordDataWrapper* wrapper = new RecordDataWrapper(structMeta, dest, returnType);
+        return ArgConverter::ConvertArgument(isolate, wrapper);
+    }
 
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
         typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
         typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding) {
 
-        id result = call.GetResult<id>();
+        id result = call->GetResult<id>();
 
         if (result == nil) {
             return Null(isolate);
@@ -266,7 +292,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
-        char* result = call.GetResult<char*>();
+        char* result = call->GetResult<char*>();
         if (result == nullptr) {
             return Null(isolate);
         }
@@ -275,57 +301,57 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
-        bool result = call.GetResult<bool>();
+        bool result = call->GetResult<bool>();
         return v8::Boolean::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::UShortEncoding) {
-        unsigned short result = call.GetResult<unsigned short>();
+        unsigned short result = call->GetResult<unsigned short>();
         return Number::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::ShortEncoding) {
-        short result = call.GetResult<short>();
+        short result = call->GetResult<short>();
         return Number::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::UIntEncoding) {
-        unsigned int result = call.GetResult<unsigned int>();
+        unsigned int result = call->GetResult<unsigned int>();
         return Number::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::IntEncoding) {
-        int result = call.GetResult<int>();
+        int result = call->GetResult<int>();
         return Number::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::ULongEncoding) {
-        unsigned long result = call.GetResult<unsigned long>();
+        unsigned long result = call->GetResult<unsigned long>();
         return Number::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
-        long result = call.GetResult<long>();
+        long result = call->GetResult<long>();
         return Number::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::ULongLongEncoding) {
-        unsigned long long result = call.GetResult<unsigned long long>();
+        unsigned long long result = call->GetResult<unsigned long long>();
         return Number::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::LongLongEncoding) {
-        long long result = call.GetResult<long long>();
+        long long result = call->GetResult<long long>();
         return Number::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::FloatEncoding) {
-        float result = call.GetResult<float>();
+        float result = call->GetResult<float>();
         return Number::New(isolate, result);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::DoubleEncoding) {
-        double result = call.GetResult<double>();
+        double result = call->GetResult<double>();
         return Number::New(isolate, result);
     }
 

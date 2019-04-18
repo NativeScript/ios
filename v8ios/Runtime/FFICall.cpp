@@ -2,7 +2,7 @@
 
 namespace tns {
 
-FFICall::FFICall(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) {
+FFICall::FFICall(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) : BaseFFICall(nullptr, 0) {
     this->stackSize_ = 0;
 
     this->argsArrayOffset_ = this->stackSize_;
@@ -66,6 +66,17 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
         case BinaryTypeEncodingType::DoubleEncoding: {
             return &ffi_type_double;
         }
+        case BinaryTypeEncodingType::StructDeclarationReference: {
+            const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
+            const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+            // TODO: cache metadata
+            const Meta* meta = globalTable->findMeta(structName);
+            assert(meta->type() == MetaType::Struct);
+            const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+
+            std::map<std::string, std::pair<const TypeEncoding*, size_t>> offsets;
+            return FFICall::GetStructFFIType(structMeta, offsets);
+        }
         default: {
             break;
         }
@@ -73,6 +84,37 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
 
     // TODO: implement all the possible encoding types
     assert(false);
+}
+
+ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::map<std::string, std::pair<const TypeEncoding*, size_t>>& offsets) {
+    ffi_type* ffiType = new ffi_type({ .size = 0, .alignment = 0, .type = FFI_TYPE_STRUCT });
+
+    size_t count = structMeta->fieldsCount();
+    ffiType->elements = new ffi_type*[count + 1];
+    const TypeEncoding* fieldEncoding = structMeta->fieldsEncodings()->first();
+
+    for (int i = 0; i < count; i++) {
+        ffi_type* fieldFFIType = FFICall::GetArgumentType(fieldEncoding);
+        ffiType->elements[i] = fieldFFIType;
+
+        size_t offset = ffiType->size;
+        unsigned short alignment = fieldFFIType->alignment;
+
+        size_t padding = (alignment - (offset % alignment)) % alignment;
+
+        std::string fieldName = structMeta->fieldNames()[i].valuePtr();
+        offset += padding;
+        offsets.insert(std::make_pair(fieldName, std::make_pair(fieldEncoding, offset)));
+
+        ffiType->size = offset + fieldFFIType->size;
+        ffiType->alignment = std::max(ffiType->alignment, fieldFFIType->alignment);
+
+        fieldEncoding = fieldEncoding->next();
+    }
+
+    ffiType->elements[count] = nullptr;
+
+    return ffiType;
 }
 
 ffi_cif* FFICall::GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) {
