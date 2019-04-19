@@ -56,6 +56,28 @@ private:
     id data_;
 };
 
+struct RecordField {
+public:
+    RecordField(ptrdiff_t offset, size_t size, const TypeEncoding* encoding)
+        : offset_(offset), size_(size), encoding_(encoding) { }
+
+    ptrdiff_t Offset() {
+        return this->offset_;
+    }
+
+    const TypeEncoding* Encoding() {
+        return this->encoding_;
+    }
+
+    size_t Size() {
+        return this->size_;
+    }
+private:
+    ptrdiff_t offset_;
+    size_t size_;
+    const TypeEncoding* encoding_;
+};
+
 }
 
 #endif /* Common_h */

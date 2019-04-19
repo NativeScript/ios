@@ -4,7 +4,6 @@
 #include "Interop.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
-#include "DataWrapper.h"
 #include "ArgConverter.h"
 
 using namespace v8;
@@ -370,6 +369,79 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
     // TODO: Handle all the possible return types https://nshipster.com/type-encodings/
 
     return Local<Value>();
+}
+
+void Interop::SetStructPropertyValue(RecordDataWrapper* wrapper, RecordField field, Local<Value> value) {
+    if (value.IsEmpty()) {
+        return;
+    }
+
+    void* sourceBuffer = nullptr;
+
+    const TypeEncoding* fieldEncoding = field.Encoding();
+    switch (fieldEncoding->type) {
+        case BinaryTypeEncodingType::StructDeclarationReference: {
+            Local<Object> obj = value.As<Object>();
+            Local<External> ext = obj->GetInternalField(0).As<External>();
+            RecordDataWrapper* targetStruct = static_cast<RecordDataWrapper*>(ext->Value());
+            sourceBuffer = targetStruct->Data();
+            break;
+        }
+        case BinaryTypeEncodingType::UShortEncoding: {
+            unsigned short val = value.As<Number>()->Value();
+            sourceBuffer = &val;
+            break;
+        }
+        case BinaryTypeEncodingType::ShortEncoding: {
+            short val = value.As<Number>()->Value();
+            sourceBuffer = &val;
+            break;
+        }
+        case BinaryTypeEncodingType::UIntEncoding: {
+            unsigned int val = value.As<Number>()->Value();
+            sourceBuffer = &val;
+            break;
+        }
+        case BinaryTypeEncodingType::IntEncoding: {
+            int val = value.As<Number>()->Value();
+            sourceBuffer = &val;
+            break;
+        }
+        case BinaryTypeEncodingType::ULongEncoding: {
+            unsigned long val = value.As<Number>()->Value();
+            sourceBuffer = &val;
+            break;
+        }
+        case BinaryTypeEncodingType::ULongLongEncoding: {
+            unsigned long long val = value.As<Number>()->Value();
+            sourceBuffer = &val;
+            break;
+        }
+        case BinaryTypeEncodingType::LongLongEncoding: {
+            long long val = value.As<Number>()->Value();
+            sourceBuffer = &val;
+            break;
+        }
+        case BinaryTypeEncodingType::FloatEncoding: {
+            float val = value.As<Number>()->Value();
+            sourceBuffer = &val;
+            break;
+        }
+        case BinaryTypeEncodingType::DoubleEncoding: {
+            double val = value.As<Number>()->Value();
+            sourceBuffer = &val;
+            break;
+        }
+        default: {
+            // TODO: Handle all possible cases
+            assert(false);
+        }
+    }
+
+    void* destBuffer = (uint8_t*)wrapper->Data() + field.Offset();
+
+    size_t fieldSize = field.Size();
+    memcpy(destBuffer, sourceBuffer, fieldSize);
 }
 
 void* Interop::GetFunctionPointer(const FunctionMeta* meta) {

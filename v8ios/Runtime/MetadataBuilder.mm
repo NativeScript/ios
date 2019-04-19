@@ -433,19 +433,23 @@ void MetadataBuilder::StructPropertyGetterCallback(v8::Local<v8::Name> property,
     RecordDataWrapper* wrapper = static_cast<RecordDataWrapper*>(ext->Value());
     const StructMeta* structMeta = static_cast<const StructMeta*>(wrapper->Metadata());
 
-    std::map<std::string, std::pair<const TypeEncoding*, size_t>> offsets;
-    FFICall::GetStructFFIType(structMeta, offsets);
-    auto it = offsets.find(propertyName);
-    if (it == offsets.end()) {
+    std::map<std::string, RecordField> fields;
+    FFICall::GetStructFFIType(structMeta, fields);
+    auto it = fields.find(propertyName);
+    if (it == fields.end()) {
         info.GetReturnValue().Set(v8::Undefined(isolate));
         return;
     }
 
-    const TypeEncoding* fieldEncoding = it->second.first;
-    ptrdiff_t offset = it->second.second;
+    RecordField field = it->second;
+    const TypeEncoding* fieldEncoding = field.Encoding();
+    ptrdiff_t offset = field.Offset();
     void* buffer = wrapper->Data();
     BaseFFICall call((uint8_t*)buffer, offset);
-    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, wrapper->FFIType(), &call);
+    ffi_type* ffiType = wrapper->FFIType();
+
+    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, ffiType, &call);
+
     info.GetReturnValue().Set(result);
 }
 
@@ -464,14 +468,15 @@ void MetadataBuilder::StructPropertySetterCallback(Local<Name> property, Local<V
     RecordDataWrapper* wrapper = static_cast<RecordDataWrapper*>(ext->Value());
     const StructMeta* structMeta = static_cast<const StructMeta*>(wrapper->Metadata());
 
-    std::map<std::string, std::pair<const TypeEncoding*, size_t>> offsets;
-    FFICall::GetStructFFIType(structMeta, offsets);
-    auto it = offsets.find(propertyName);
-    if (it == offsets.end()) {
+    std::map<std::string, RecordField> fields;
+    FFICall::GetStructFFIType(structMeta, fields);
+    auto it = fields.find(propertyName);
+    if (it == fields.end()) {
         return;
     }
 
-    // TODO: We have the offset of the property in memory and we need to memcpy the new bytes into it
+    RecordField field = it->second;
+    Interop::SetStructPropertyValue(wrapper, field, value);
 }
 
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass, bool isMethodCallback) {

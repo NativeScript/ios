@@ -4,6 +4,7 @@
 #include <malloc/malloc.h>
 #include <map>
 #include "Metadata.h"
+#include "DataWrapper.h"
 #include "ffi.h"
 
 namespace tns {
@@ -37,7 +38,7 @@ public:
     }
 
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);
-    static ffi_type* GetStructFFIType(const StructMeta* structMeta, std::map<std::string, std::pair<const TypeEncoding*, size_t>>& offsets);
+    static ffi_type* GetStructFFIType(const StructMeta* structMeta, std::map<std::string, RecordField>& fields);
     static ffi_cif* GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
 
     void* ArgumentBuffer(unsigned index) {
