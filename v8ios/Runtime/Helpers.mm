@@ -13,6 +13,12 @@ std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {
     }
 
     String::Utf8Value result(isolate, value);
+
+    const char* val = *result;
+    if (val == nullptr) {
+        return std::string();
+    }
+
     return std::string(*result);
 }
 
