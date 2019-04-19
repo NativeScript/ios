@@ -9,8 +9,9 @@ using namespace std;
 
 namespace tns {
 
-void ArgConverter::Init(Isolate* isolate) {
-    poEmptyObjCtorFunc_ = new Persistent<v8::Function>(isolate, CreateEmptyObjectFunction(isolate));
+void ArgConverter::Init(Isolate* isolate, GenericNamedPropertyGetterCallback structPropertyGetter, GenericNamedPropertySetterCallback structPropertySetter) {
+    poEmptyObjCtorFunc_ = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate));
+    poEmptyStructCtorFunc_ = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter));
 }
 
 Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const MethodMeta* meta, bool isMethodCallback) {
@@ -163,19 +164,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
 
     if (wrapper->Type() == WrapperType::Record) {
         if (receiver.IsEmpty()) {
-            receiver = CreateEmptyObject(context);
-        }
-
-        RecordDataWrapper* recordWrapper = static_cast<RecordDataWrapper*>(wrapper);
-
-        const Meta* meta = recordWrapper->Metadata();
-        auto it = Caches::Prototypes.find(meta);
-        if (it != Caches::Prototypes.end()) {
-            Local<Value> prototype = it->second->Get(isolate);
-            bool success;
-            if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
-                assert(false);
-            }
+            receiver = CreateEmptyStruct(context);
         }
 
         Local<External> ext = External::New(isolate, wrapper);
@@ -283,26 +272,40 @@ const BaseClassMeta* ArgConverter::GetInterfaceMeta(std::string name) {
 }
 
 Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {
+    return ArgConverter::CreateEmptyInstance(context, poEmptyObjCtorFunc_);
+}
+
+Local<Object> ArgConverter::CreateEmptyStruct(Local<Context> context) {
+    return ArgConverter::CreateEmptyInstance(context, poEmptyStructCtorFunc_);
+}
+
+Local<Object> ArgConverter::CreateEmptyInstance(Local<Context> context, Persistent<v8::Function>* ctorFunc) {
     Isolate* isolate = context->GetIsolate();
-    Local<v8::Function> emptyObjCtorFunc = Local<v8::Function>::New(isolate, *poEmptyObjCtorFunc_);
+    Local<v8::Function> emptyCtorFunc = ctorFunc->Get(isolate);
     Local<Value> value;
-    if (!emptyObjCtorFunc->CallAsConstructor(context, 0, nullptr).ToLocal(&value) || value.IsEmpty() || !value->IsObject()) {
+    if (!emptyCtorFunc->CallAsConstructor(context, 0, nullptr).ToLocal(&value) || value.IsEmpty() || !value->IsObject()) {
         assert(false);
     }
     Local<Object> result = value.As<Object>();
     return result;
 }
 
-Local<v8::Function> ArgConverter::CreateEmptyObjectFunction(Isolate* isolate) {
-    Local<FunctionTemplate> emptyObjCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
-    emptyObjCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-    Local<v8::Function> emptyObjCtorFunc;
-    if (!emptyObjCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyObjCtorFunc)) {
+Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, GenericNamedPropertyGetterCallback propertyGetter, GenericNamedPropertySetterCallback propertySetter) {
+    Local<FunctionTemplate> emptyInstanceCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
+    Local<ObjectTemplate> instanceTemplate = emptyInstanceCtorFuncTemplate->InstanceTemplate();
+    instanceTemplate->SetInternalFieldCount(1);
+
+    NamedPropertyHandlerConfiguration config(propertyGetter, propertySetter);
+    instanceTemplate->SetHandler(config);
+
+    Local<v8::Function> emptyInstanceCtorFunc;
+    if (!emptyInstanceCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyInstanceCtorFunc)) {
         assert(false);
     }
-    return emptyObjCtorFunc;
+    return emptyInstanceCtorFunc;
 }
 
 Persistent<v8::Function>* ArgConverter::poEmptyObjCtorFunc_;
+Persistent<v8::Function>* ArgConverter::poEmptyStructCtorFunc_;
 
 }

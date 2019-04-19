@@ -17,7 +17,7 @@ MetadataBuilder::MetadataBuilder() {
 void MetadataBuilder::Init(Isolate* isolate) {
     isolate_ = isolate;
 
-    ArgConverter::Init(isolate);
+    ArgConverter::Init(isolate, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);
     Interop::RegisterInteropTypes(isolate);
     poToStringFunction_ = CreateToStringFunction(isolate);
 
@@ -54,28 +54,6 @@ void MetadataBuilder::Init(Isolate* isolate) {
             break;
         }
         case MetaType::Struct: {
-            const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-
-            Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate_, nullptr, Local<Value>());
-            ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-            ctorFuncTemplate->SetClassName(tns::ToV8String(isolate_, structMeta->jsName()));
-            Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
-
-            NamedPropertyHandlerConfiguration config(StructPropertyGetterCallback, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, Local<Value>());
-            proto->SetHandler(config);
-
-            Local<Context> context = isolate_->GetCurrentContext();
-            Local<v8::Function> ctorFunc;
-            if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-                assert(false);
-            }
-
-            Local<Value> prototype = ctorFunc->Get(tns::ToV8String(isolate_, "prototype"));
-
-            prototype.As<Object>()->Set(tns::ToV8String(isolate_, "toString"), poToStringFunction_->Get(isolate_));
-
-            Persistent<Value>* poPrototype = new Persistent<Value>(isolate_, prototype);
-            Caches::Prototypes.insert(std::make_pair(structMeta, poPrototype));
             break;
         }
         case MetaType::Interface: {
@@ -177,36 +155,38 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 }
 
 Persistent<v8::Function>* MetadataBuilder::CreateToStringFunction(Isolate* isolate) {
-    Local<FunctionTemplate> toStringFuncTemplate = FunctionTemplate::New(isolate_, [](const FunctionCallbackInfo<Value>& info) {
-        Local<Object> thiz = info.This();
-        if (thiz->InternalFieldCount() < 1) {
-            info.GetReturnValue().Set(thiz);
-            return;
-        }
-
-        Local<External> ext = thiz->GetInternalField(0).As<External>();
-        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-        if (wrapper->Type() != WrapperType::ObjCObject) {
-            info.GetReturnValue().Set(thiz);
-            return;
-        }
-
-        ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(ext->Value());
-        id target = dataWrapper->Data();
-        if (target == nil) {
-            info.GetReturnValue().Set(thiz);
-            return;
-        }
-
-        std::string description = [[target description] UTF8String];
-        Local<v8::String> returnValue = tns::ToV8String(info.GetIsolate(), description);
-        info.GetReturnValue().Set(returnValue);
-    });
+    Local<FunctionTemplate> toStringFuncTemplate = FunctionTemplate::New(isolate_, MetadataBuilder::ToStringFunctionCallback);
 
     Local<v8::Function> toStringFunc;
     assert(toStringFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&toStringFunc));
 
     return new Persistent<v8::Function>(isolate, toStringFunc);
+}
+
+void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<v8::Value>& info) {
+    Local<Object> thiz = info.This();
+    if (thiz->InternalFieldCount() < 1) {
+        info.GetReturnValue().Set(thiz);
+        return;
+    }
+
+    Local<External> ext = thiz->GetInternalField(0).As<External>();
+    BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+    if (wrapper->Type() != WrapperType::ObjCObject) {
+        info.GetReturnValue().Set(thiz);
+        return;
+    }
+
+    ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+    id target = dataWrapper->Data();
+    if (target == nil) {
+        info.GetReturnValue().Set(thiz);
+        return;
+    }
+
+    std::string description = [[target description] UTF8String];
+    Local<v8::String> returnValue = tns::ToV8String(info.GetIsolate(), description);
+    info.GetReturnValue().Set(returnValue);
 }
 
 void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {
@@ -441,10 +421,17 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
 void MetadataBuilder::StructPropertyGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
     Isolate* isolate = info.GetIsolate();
     Local<Object> thiz = info.This();
+
+    std::string propertyName = tns::ToString(isolate, property);
+
+    if (propertyName == "") {
+        info.GetReturnValue().Set(thiz);
+        return;
+    }
+
     Local<External> ext = thiz->GetInternalField(0).As<External>();
     RecordDataWrapper* wrapper = static_cast<RecordDataWrapper*>(ext->Value());
     const StructMeta* structMeta = static_cast<const StructMeta*>(wrapper->Metadata());
-    std::string propertyName = tns::ToString(isolate, property);
 
     std::map<std::string, std::pair<const TypeEncoding*, size_t>> offsets;
     FFICall::GetStructFFIType(structMeta, offsets);
@@ -460,6 +447,31 @@ void MetadataBuilder::StructPropertyGetterCallback(v8::Local<v8::Name> property,
     BaseFFICall call((uint8_t*)buffer, offset);
     Local<Value> result = Interop::GetResult(isolate, fieldEncoding, wrapper->FFIType(), &call);
     info.GetReturnValue().Set(result);
+}
+
+void MetadataBuilder::StructPropertySetterCallback(Local<Name> property, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    Local<Object> thiz = info.This();
+
+    std::string propertyName = tns::ToString(isolate, property);
+
+    if (propertyName == "") {
+        info.GetReturnValue().Set(thiz);
+        return;
+    }
+
+    Local<External> ext = thiz->GetInternalField(0).As<External>();
+    RecordDataWrapper* wrapper = static_cast<RecordDataWrapper*>(ext->Value());
+    const StructMeta* structMeta = static_cast<const StructMeta*>(wrapper->Metadata());
+
+    std::map<std::string, std::pair<const TypeEncoding*, size_t>> offsets;
+    FFICall::GetStructFFIType(structMeta, offsets);
+    auto it = offsets.find(propertyName);
+    if (it == offsets.end()) {
+        return;
+    }
+
+    // TODO: We have the offset of the property in memory and we need to memcpy the new bytes into it
 }
 
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass, bool isMethodCallback) {

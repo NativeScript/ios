@@ -13,7 +13,6 @@ public:
     BaseFFICall(uint8_t* buffer, size_t returnOffset): buffer_(buffer), returnOffset_(returnOffset) { }
 
     ~BaseFFICall() {
-        free(this->buffer_);
     }
 
     void* ResultBuffer() {
@@ -34,6 +33,7 @@ public:
     FFICall(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
 
     ~FFICall() {
+        free(this->buffer_);
     }
 
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);

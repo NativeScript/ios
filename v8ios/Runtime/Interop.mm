@@ -219,11 +219,19 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
             CFTypeRef blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
             call->SetArgument(i, blockPtr);
+        } else if (arg->IsObject() && enc->type == BinaryTypeEncodingType::StructDeclarationReference) {
+            Local<Object> obj = arg.As<Object>();
+            assert(obj->InternalFieldCount() > 0);
+            Local<External> ext = obj->GetInternalField(0).As<External>();
+            RecordDataWrapper* wrapper = static_cast<RecordDataWrapper*>(ext->Value());
+            void* buffer = wrapper->Data();
+            size_t size = wrapper->FFIType()->size;
+            void* argBuffer = call->ArgumentBuffer(i);
+            memcpy(argBuffer, buffer, size);
         } else if (arg->IsObject()) {
             Local<Object> obj = arg.As<Object>();
             assert(obj->InternalFieldCount() > 0);
             Local<External> ext = obj->GetInternalField(0).As<External>();
-            // TODO: Check the data wrapper type
             ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
 
             const Meta* meta = wrapper->Metadata();
