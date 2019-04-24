@@ -10,7 +10,7 @@ namespace tns {
 
 class Caches {
 public:
-    static std::map<std::string, const BaseClassMeta*> Metadata;
+    static std::map<std::string, const Meta*> Metadata;
     static std::map<const Meta*, v8::Persistent<v8::Value>*> Prototypes;
     static std::map<const std::string, v8::Persistent<v8::Object>*> ClassPrototypes;
     static std::map<const InterfaceMeta*, v8::Persistent<v8::FunctionTemplate>*> CtorFuncTemplates;

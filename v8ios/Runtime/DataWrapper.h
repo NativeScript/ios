@@ -1,7 +1,6 @@
 #ifndef Common_h
 #define Common_h
 
-#include <map>
 #include "Metadata.h"
 #include "ffi.h"
 
@@ -9,8 +8,9 @@ namespace tns {
 
 enum WrapperType {
     Base = 1,
-    Record = 2,
-    ObjCObject = 3
+    Primitive = 2,
+    Record = 3,
+    ObjCObject = 4
 };
 
 class BaseDataWrapper {
@@ -24,6 +24,29 @@ public:
     }
 private:
     const Meta* meta_;
+};
+
+class PrimitiveDataWrapper: public BaseDataWrapper {
+public:
+    PrimitiveDataWrapper(ffi_type* ffiType, BinaryTypeEncodingType encodingType): BaseDataWrapper(nullptr), ffiType_(ffiType), encodingType_(encodingType) {
+        value_ = malloc(sizeof(ffiType->size));
+    }
+    WrapperType Type() {
+        return WrapperType::Primitive;
+    }
+    void* Value() {
+        return this->value_;
+    }
+    ffi_type* FFIType() {
+        return this->ffiType_;
+    }
+    BinaryTypeEncodingType EncodingType() {
+        return this->encodingType_;
+    }
+private:
+    void* value_;
+    ffi_type* ffiType_;
+    BinaryTypeEncodingType encodingType_;
 };
 
 class RecordDataWrapper: public BaseDataWrapper {

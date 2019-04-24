@@ -19,6 +19,8 @@
 		C2335B70224CADD50071048C /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2335B6E224CADD50071048C /* Interop.mm */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2335B74224CEAFA0071048C /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2335B73224CEAFA0071048C /* libffi.a */; };
 		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
+		C2543CED226F001A007AC505 /* ArrayAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2543CEB226F001A007AC505 /* ArrayAdapter.mm */; };
+		C2543CF0226F49AA007AC505 /* SymbolLoader.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2543CEE226F49AA007AC505 /* SymbolLoader.mm */; };
 		C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF7222E80AC008F674F /* MetadataBuilder.mm */; };
 		C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.cpp */; };
 		C27E278B22202664009C10A3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C27E278922202664009C10A3 /* Main.storyboard */; };
@@ -55,6 +57,11 @@
 		C2335B73224CEAFA0071048C /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
 		C24F39182225859D0027977A /* Console.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Console.h; sourceTree = "<group>"; };
 		C24F39192225859D0027977A /* Console.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
+		C2543CEB226F001A007AC505 /* ArrayAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ArrayAdapter.mm; sourceTree = "<group>"; };
+		C2543CEC226F001A007AC505 /* ArrayAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArrayAdapter.h; sourceTree = "<group>"; };
+		C2543CEE226F49AA007AC505 /* SymbolLoader.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = SymbolLoader.mm; sourceTree = "<group>"; };
+		C2543CEF226F49AA007AC505 /* SymbolLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SymbolLoader.h; sourceTree = "<group>"; };
+		C2543CF1226F52C7007AC505 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
 		C2764AF4222BE705008F674F /* Metadata.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Metadata.mm; sourceTree = "<group>"; };
 		C2764AF5222BE705008F674F /* Metadata.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
 		C2764AF7222E80AC008F674F /* MetadataBuilder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MetadataBuilder.mm; sourceTree = "<group>"; };
@@ -145,6 +152,8 @@
 				C2FE377E224E61AA00847863 /* NativeScript.h */,
 				C2AAE9CA2243789A006FB9D3 /* ArgConverter.h */,
 				C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */,
+				C2543CEC226F001A007AC505 /* ArrayAdapter.h */,
+				C2543CEB226F001A007AC505 /* ArrayAdapter.mm */,
 				C2AAE9CD224391A3006FB9D3 /* Caches.h */,
 				C2AAE9CC224391A3006FB9D3 /* Caches.cpp */,
 				C2AAE9D3224902FD006FB9D3 /* ClassBuilder.h */,
@@ -171,6 +180,8 @@
 				C2B12EE12227C606000F6AFC /* SetTimeout.h */,
 				C2B12EE22227C606000F6AFC /* SetTimeout.cpp */,
 				C2AAE9C8223BA685006FB9D3 /* StringHasher.h */,
+				C2543CEF226F49AA007AC505 /* SymbolLoader.h */,
+				C2543CEE226F49AA007AC505 /* SymbolLoader.mm */,
 				C2BC5DAA225602C50020F348 /* Tasks.h */,
 				C2BC5DAB22561C370020F348 /* Tasks.cpp */,
 			);
@@ -339,6 +350,8 @@
 				C2AAE9D722490F50006FB9D3 /* Helpers.mm in Sources */,
 				C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */,
 				C24F391A2225859D0027977A /* Console.cpp in Sources */,
+				C2543CED226F001A007AC505 /* ArrayAdapter.mm in Sources */,
+				C2543CF0226F49AA007AC505 /* SymbolLoader.mm in Sources */,
 				C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */,
 				C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */,
 			);

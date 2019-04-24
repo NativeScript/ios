@@ -92,6 +92,10 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         assert(false);
     }
 
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, extendedClass);
+    Local<External> extendedData = External::New(isolate, wrapper);
+    tns::SetPrivateValue(isolate, extendClassCtorFunc, tns::ToV8String(isolate, "metadata"), extendedData);
+
     info.GetReturnValue().Set(extendClassCtorFunc);
 }
 
@@ -115,7 +119,6 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
     Local<Context> context = isolate->GetCurrentContext();
 
     Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
-    const BaseClassMeta* extendedClassMeta = ArgConverter::FindInterfaceMeta(extendedClass);
     if (!exposedMethods.IsEmpty() && exposedMethods->IsObject()) {
         Local<v8::Array> methodNames;
         if (!exposedMethods.As<Object>()->GetOwnPropertyNames(context).ToLocal(&methodNames)) {
@@ -138,7 +141,8 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
                 Local<Object> returnsObj = returnsVal.As<Object>();
                 if (returnsObj->InternalFieldCount() > 0) {
                     Local<External> ext = returnsObj->GetInternalField(0).As<External>();
-                    returnType = *static_cast<BinaryTypeEncodingType*>(ext->Value());
+                    PrimitiveDataWrapper* pdw = static_cast<PrimitiveDataWrapper*>(ext->Value());
+                    returnType = pdw->EncodingType();
                 } else {
                     Local<Value> val = tns::GetPrivateValue(isolate, returnsObj, tns::ToV8String(isolate, "metadata"));
                     if (!val.IsEmpty() && val->IsExternal()) {
@@ -165,6 +169,12 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
         }
     }
 
+    const Meta* m = ArgConverter::FindMeta(extendedClass);
+    if (m == nullptr) {
+        return;
+    }
+    const BaseClassMeta* extendedClassMeta = static_cast<const BaseClassMeta*>(m);
+
     Local<v8::Array> propertyNames;
     assert(implementationObject->GetOwnPropertyNames(context).ToLocal(&propertyNames));
     for (uint32_t i = 0; i < propertyNames->Length(); i++) {
@@ -190,9 +200,13 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
 
             if (methodMeta == nullptr) {
                 for (auto protoIt = meta->protocols->begin(); protoIt != meta->protocols->end(); protoIt++) {
-                    const char* proto = (*protoIt).valuePtr();
-                    const BaseClassMeta* m = ArgConverter::GetInterfaceMeta(proto);
-                    for (auto it = m->instanceMethods->begin(); it != m->instanceMethods->end(); it++) {
+                    const char* protocolName = (*protoIt).valuePtr();
+                    const Meta* m = ArgConverter::GetMeta(protocolName);
+                    if (!m) {
+                        continue;
+                    }
+                    const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(m);
+                    for (auto it = protocolMeta->instanceMethods->begin(); it != protocolMeta->instanceMethods->end(); it++) {
                         const MethodMeta* mm = (*it).valuePtr();
                         if (strcmp(mm->jsName(), methodName.c_str()) == 0) {
                             methodMeta = mm;

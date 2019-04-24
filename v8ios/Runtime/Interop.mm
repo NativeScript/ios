@@ -1,10 +1,11 @@
 #include <Foundation/Foundation.h>
 #include <objc/message.h>
-#include <dlfcn.h>
 #include "Interop.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
 #include "ArgConverter.h"
+#include "ArrayAdapter.h"
+#include "SymbolLoader.h"
 
 using namespace v8;
 
@@ -24,24 +25,26 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     Local<Object> interop = Object::New(isolate);
     Local<Object> types = Object::New(isolate);
 
-    RegisterInteropType(isolate, types, "void", BinaryTypeEncodingType::VoidEncoding);
-    RegisterInteropType(isolate, types, "bool", BinaryTypeEncodingType::BoolEncoding);
-    RegisterInteropType(isolate, types, "int8", BinaryTypeEncodingType::ShortEncoding);
-    RegisterInteropType(isolate, types, "uint8", BinaryTypeEncodingType::UShortEncoding);
-    RegisterInteropType(isolate, types, "int16", BinaryTypeEncodingType::IntEncoding);
-    RegisterInteropType(isolate, types, "uint16", BinaryTypeEncodingType::UIntEncoding);
-    RegisterInteropType(isolate, types, "int32", BinaryTypeEncodingType::LongEncoding);
-    RegisterInteropType(isolate, types, "uint32", BinaryTypeEncodingType::ULongEncoding);
-    RegisterInteropType(isolate, types, "int64", BinaryTypeEncodingType::LongLongEncoding);
-    RegisterInteropType(isolate, types, "uint64", BinaryTypeEncodingType::ULongLongEncoding);
-    RegisterInteropType(isolate, types, "float", BinaryTypeEncodingType::FloatEncoding);
-    RegisterInteropType(isolate, types, "double", BinaryTypeEncodingType::DoubleEncoding);
-    RegisterInteropType(isolate, types, "UTF8CString", BinaryTypeEncodingType::CStringEncoding);
-    RegisterInteropType(isolate, types, "unichar", BinaryTypeEncodingType::UnicharEncoding);
-    RegisterInteropType(isolate, types, "id", BinaryTypeEncodingType::IdEncoding);
-    RegisterInteropType(isolate, types, "protocol", BinaryTypeEncodingType::ProtocolEncoding);
-    RegisterInteropType(isolate, types, "class", BinaryTypeEncodingType::ClassEncoding);
-    RegisterInteropType(isolate, types, "selector", BinaryTypeEncodingType::SelectorEncoding);
+    RegisterReferenceInteropType(isolate, interop);
+
+    RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(&ffi_type_void, BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(&ffi_type_sint8, BinaryTypeEncodingType::BoolEncoding));
+    RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(&ffi_type_sint8, BinaryTypeEncodingType::ShortEncoding));
+    RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(&ffi_type_uint8, BinaryTypeEncodingType::UShortEncoding));
+    RegisterInteropType(isolate, types, "int16", new PrimitiveDataWrapper(&ffi_type_sint16, BinaryTypeEncodingType::IntEncoding));
+    RegisterInteropType(isolate, types, "uint16", new PrimitiveDataWrapper(&ffi_type_uint16, BinaryTypeEncodingType::UIntEncoding));
+    RegisterInteropType(isolate, types, "int32", new PrimitiveDataWrapper(&ffi_type_sint32, BinaryTypeEncodingType::LongEncoding));
+    RegisterInteropType(isolate, types, "uint32", new PrimitiveDataWrapper(&ffi_type_uint32, BinaryTypeEncodingType::ULongEncoding));
+    RegisterInteropType(isolate, types, "int64", new PrimitiveDataWrapper(&ffi_type_sint64, BinaryTypeEncodingType::LongLongEncoding));
+    RegisterInteropType(isolate, types, "uint64", new PrimitiveDataWrapper(&ffi_type_uint64, BinaryTypeEncodingType::ULongLongEncoding));
+    RegisterInteropType(isolate, types, "float", new PrimitiveDataWrapper(&ffi_type_float, BinaryTypeEncodingType::FloatEncoding));
+    RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(&ffi_type_double, BinaryTypeEncodingType::DoubleEncoding));
+    RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::CStringEncoding));
+    RegisterInteropType(isolate, types, "unichar", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::UnicharEncoding));
+    RegisterInteropType(isolate, types, "id", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::IdEncoding));
+    RegisterInteropType(isolate, types, "protocol", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::ProtocolEncoding));
+    RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::ClassEncoding));
+    RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::SelectorEncoding));
 
     bool success = interop->Set(tns::ToV8String(isolate, "types"), types);
     assert(success);
@@ -50,13 +53,55 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     assert(success);
 }
 
-void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::string name, BinaryTypeEncodingType encodingType) {
+void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::string name, PrimitiveDataWrapper* wrapper) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> obj = ArgConverter::CreateEmptyObject(context);
-    Local<External> ext = External::New(isolate, &encodingType);
+    Local<External> ext = External::New(isolate, wrapper);
     obj->SetInternalField(0, ext);
     bool success = types->Set(tns::ToV8String(isolate, name), obj);
     assert(success);
+}
+
+void Interop::RegisterReferenceInteropType(Isolate* isolate, Local<Object> interop) {
+    Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        assert(info.Length() == 2);
+        assert(info[0]->IsObject());
+        assert(info[0].As<Object>()->InternalFieldCount() > 0);
+
+        Local<External> ext = info[0].As<Object>()->GetInternalField(0).As<External>();
+        PrimitiveDataWrapper* wrapper = static_cast<PrimitiveDataWrapper*>(ext->Value());
+
+        ext = External::New(isolate, wrapper);
+        Local<Object> thiz = info.This();
+        thiz->SetInternalField(0, ext);
+
+        ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
+    });
+    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
+
+    proto->SetAccessor(tns::ToV8String(isolate, "value"), [](Local<v8::String> property, const PropertyCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Local<External> ext = info.This()->GetInternalField(0).As<External>();
+        PrimitiveDataWrapper* wrapper = static_cast<PrimitiveDataWrapper*>(ext->Value());
+        BinaryTypeEncodingType type = wrapper->EncodingType();
+        uint8_t* buffer = (uint8_t*)wrapper->Value();
+
+        BaseFFICall call(buffer, 0);
+        Local<Value> result = Interop::GetPrimitiveReturnType(isolate, type, &call);
+        if (!result.IsEmpty()) {
+            info.GetReturnValue().Set(result);
+        }
+    });
+
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<v8::Function> ctorFunc;
+    if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
+        assert(false);
+    }
+
+    interop->Set(tns::ToV8String(isolate, "Reference"), ctorFunc);
 }
 
 IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData) {
@@ -94,7 +139,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
 
     if (meta->type() == MetaType::Function) {
         const FunctionMeta* functionMeta = static_cast<const FunctionMeta*>(meta);
-        functionPointer = Interop::GetFunctionPointer(functionMeta);
+        functionPointer = SymbolLoader::instance().loadFunctionSymbol(functionMeta->topLevelModule(), meta->name());
         typeEncoding = functionMeta->encodings()->first();
     } else if (meta->type() == MetaType::Undefined || meta->type() == MetaType::Union) {
         const MethodMeta* methodMeta = static_cast<const MethodMeta*>(meta);
@@ -129,9 +174,9 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
                 functionPointer = (void*)objc_msgSend_fpret;
             } else if (returnType->type == FFI_TYPE_STRUCT && (cif->flags & UNIX64_FLAG_RET_IN_MEM)) {
                 if (callSuper) {
-                    functionPointer = (void*)objc_msgSend_stret;
-                } else {
                     functionPointer = (void*)objc_msgSendSuper_stret;
+                } else {
+                    functionPointer = (void*)objc_msgSend_stret;
                 }
             }
         }
@@ -152,13 +197,15 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
         call.SetArgument(1, selector);
     }
 
-    Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
+    @autoreleasepool {
+        Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
 
-    ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+        ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
-    Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call);
+        Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call);
 
-    return result;
+        return result;
+    }
 }
 
 void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<Local<Value>> args) {
@@ -178,8 +225,9 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             SEL selector = NSSelectorFromString(selStr);
             call->SetArgument(i, selector);
         } else if (arg->IsString() && enc->type == BinaryTypeEncodingType::CStringEncoding) {
-            std::string str = tns::ToString(isolate, arg);
-            call->SetArgument(i, str.c_str());
+            const char* str = tns::ToString(isolate, arg).c_str();
+            const char* strCopy = strdup(str);
+            call->SetArgument(i, strCopy);
         } else if (arg->IsString() && enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             std::string str = tns::ToString(isolate, arg);
             NSString* result = [NSString stringWithUTF8String:str.c_str()];
@@ -210,6 +258,10 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             } else {
                 assert(false);
             }
+        } else if (enc->type == BinaryTypeEncodingType::PointerEncoding) {
+            Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
+            PrimitiveDataWrapper* wrapper = static_cast<PrimitiveDataWrapper*>(ext->Value());
+            call->SetArgument(i, wrapper->Value());
         } else if (arg->IsFunction() && enc->type == BinaryTypeEncodingType::BlockEncoding) {
             const TypeEncoding* blockTypeEncoding = enc->details.block.signature.first();
             int argsCount = enc->details.block.signature.count - 1;
@@ -227,6 +279,18 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             size_t size = wrapper->FFIType()->size;
             void* argBuffer = call->ArgumentBuffer(i);
             memcpy(argBuffer, buffer, size);
+        } else if (arg->IsArray()) {
+            Local<v8::Array> array = arg.As<v8::Array>();
+            ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
+            call->SetArgument(i, adapter);
+        } else if (arg->IsObject() && enc->type == BinaryTypeEncodingType::ClassEncoding) {
+            Local<Object> obj = arg.As<Object>();
+            Local<Value> metadataProp = tns::GetPrivateValue(isolate, obj, tns::ToV8String(isolate, "metadata"));
+            assert(!metadataProp.IsEmpty() && metadataProp->IsExternal());
+            Local<External> extData = metadataProp.As<External>();
+            ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(extData->Value());
+            Class clazz = wrapper->Data();
+            call->SetArgument(i, clazz);
         } else if (arg->IsObject()) {
             Local<Object> obj = arg.As<Object>();
             assert(obj->InternalFieldCount() > 0);
@@ -298,7 +362,11 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         return ArgConverter::ConvertArgument(isolate, wrapper);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
+    return Interop::GetPrimitiveReturnType(isolate, typeEncoding->type, call);
+}
+
+Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodingType type, BaseFFICall* call) {
+    if (type == BinaryTypeEncodingType::CStringEncoding) {
         char* result = call->GetResult<char*>();
         if (result == nullptr) {
             return Null(isolate);
@@ -307,62 +375,62 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         return tns::ToV8String(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
+    if (type == BinaryTypeEncodingType::BoolEncoding) {
         bool result = call->GetResult<bool>();
         return v8::Boolean::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::UShortEncoding) {
+    if (type == BinaryTypeEncodingType::UShortEncoding) {
         unsigned short result = call->GetResult<unsigned short>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::ShortEncoding) {
+    if (type == BinaryTypeEncodingType::ShortEncoding) {
         short result = call->GetResult<short>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::UIntEncoding) {
+    if (type == BinaryTypeEncodingType::UIntEncoding) {
         unsigned int result = call->GetResult<unsigned int>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::IntEncoding) {
+    if (type == BinaryTypeEncodingType::IntEncoding) {
         int result = call->GetResult<int>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::ULongEncoding) {
+    if (type == BinaryTypeEncodingType::ULongEncoding) {
         unsigned long result = call->GetResult<unsigned long>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
+    if (type == BinaryTypeEncodingType::LongEncoding) {
         long result = call->GetResult<long>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::ULongLongEncoding) {
+    if (type == BinaryTypeEncodingType::ULongLongEncoding) {
         unsigned long long result = call->GetResult<unsigned long long>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::LongLongEncoding) {
+    if (type == BinaryTypeEncodingType::LongLongEncoding) {
         long long result = call->GetResult<long long>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::FloatEncoding) {
+    if (type == BinaryTypeEncodingType::FloatEncoding) {
         float result = call->GetResult<float>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type == BinaryTypeEncodingType::DoubleEncoding) {
+    if (type == BinaryTypeEncodingType::DoubleEncoding) {
         double result = call->GetResult<double>();
         return Number::New(isolate, result);
     }
 
-    if (typeEncoding->type != BinaryTypeEncodingType::VoidEncoding) {
+    if (type != BinaryTypeEncodingType::VoidEncoding) {
         assert(false);
     }
 
@@ -442,53 +510,6 @@ void Interop::SetStructPropertyValue(RecordDataWrapper* wrapper, RecordField fie
 
     size_t fieldSize = field.Size();
     memcpy(destBuffer, sourceBuffer, fieldSize);
-}
-
-void* Interop::GetFunctionPointer(const FunctionMeta* meta) {
-    // TODO: cache
-
-    void* functionPointer = nullptr;
-
-    const ModuleMeta* moduleMeta = meta->topLevelModule();
-    const char* symbolName = meta->name();
-
-    if (moduleMeta->isFramework()) {
-        NSString* frameworkPathStr = [NSString stringWithFormat:@"%s.framework", moduleMeta->getName()];
-        NSURL* baseUrl = nil;
-        if (moduleMeta->isSystem()) {
-#if TARGET_IPHONE_SIMULATOR
-            NSBundle* foundation = [NSBundle bundleForClass:[NSString class]];
-            NSString* foundationPath = [foundation bundlePath];
-            NSString* basePathStr = [foundationPath substringToIndex:[foundationPath rangeOfString:@"Foundation.framework"].location];
-            baseUrl = [NSURL fileURLWithPath:basePathStr isDirectory:YES];
-#else
-            baseUrl = [NSURL fileURLWithPath:@"/System/Library/Frameworks" isDirectory:YES];
-#endif
-        } else {
-            baseUrl = [[NSBundle mainBundle] privateFrameworksURL];
-        }
-
-        NSURL* bundleUrl = [NSURL URLWithString:frameworkPathStr relativeToURL:baseUrl];
-        CFBundleRef bundle = CFBundleCreate(kCFAllocatorDefault, (CFURLRef)bundleUrl);
-        assert(bundle != nullptr);
-
-        CFErrorRef error = nullptr;
-        bool loaded = CFBundleLoadExecutableAndReturnError(bundle, &error);
-        assert(loaded);
-
-        CFStringRef cfName = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, symbolName, kCFStringEncodingUTF8, kCFAllocatorNull);
-        functionPointer = CFBundleGetFunctionPointerForName(bundle, cfName);
-    } else if (moduleMeta->libraries->count == 1 && moduleMeta->isSystem()) {
-        NSString* libsPath = [[NSBundle bundleForClass:[NSObject class]] bundlePath];
-        NSString* libraryPath = [NSString stringWithFormat:@"%@/lib%s.dylib", libsPath, moduleMeta->libraries->first()->value().getName()];
-
-        if (void* library = dlopen(libraryPath.UTF8String, RTLD_LAZY | RTLD_LOCAL)) {
-            functionPointer = dlsym(library, symbolName);
-        }
-    }
-
-    assert(functionPointer != nullptr);
-    return functionPointer;
 }
 
 }

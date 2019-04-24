@@ -194,7 +194,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
    }
 
     Class klass = [target class];
-    const BaseClassMeta* meta = FindInterfaceMeta(klass);
+    const Meta* meta = FindMeta(klass);
     if (meta != nullptr) {
         std::string className = object_getClassName(target);
         auto it = Caches::ClassPrototypes.find(className);
@@ -222,7 +222,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
     return receiver;
 }
 
-const BaseClassMeta* ArgConverter::FindInterfaceMeta(Class klass) {
+const Meta* ArgConverter::FindMeta(Class klass) {
     std::string origClassName = class_getName(klass);
     auto it = Caches::Metadata.find(origClassName);
     if (it != Caches::Metadata.end()) {
@@ -232,7 +232,7 @@ const BaseClassMeta* ArgConverter::FindInterfaceMeta(Class klass) {
     std::string className = origClassName;
 
     while (true) {
-        const BaseClassMeta* result = GetInterfaceMeta(className);
+        const Meta* result = GetMeta(className);
         if (result != nullptr) {
             Caches::Metadata.insert(std::make_pair(origClassName, result));
             return result;
@@ -249,7 +249,7 @@ const BaseClassMeta* ArgConverter::FindInterfaceMeta(Class klass) {
     return nullptr;
 }
 
-const BaseClassMeta* ArgConverter::GetInterfaceMeta(std::string name) {
+const Meta* ArgConverter::GetMeta(std::string name) {
     auto it = Caches::Metadata.find(name);
     if (it != Caches::Metadata.end()) {
         return it->second;
@@ -262,13 +262,7 @@ const BaseClassMeta* ArgConverter::GetInterfaceMeta(std::string name) {
         return nullptr;
     }
 
-    if (result->type() == MetaType::Interface) {
-        return static_cast<const InterfaceMeta*>(result);
-    } else if (result->type() == MetaType::ProtocolType) {
-        return static_cast<const ProtocolMeta*>(result);
-    }
-
-    assert(false);
+    return result;
 }
 
 Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {
@@ -287,6 +281,9 @@ Local<Object> ArgConverter::CreateEmptyInstance(Local<Context> context, Persiste
         assert(false);
     }
     Local<Object> result = value.As<Object>();
+
+    ObjectManager::Register(isolate, result);
+
     return result;
 }
 

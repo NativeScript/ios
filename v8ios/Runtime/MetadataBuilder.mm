@@ -1,6 +1,8 @@
 #include <Foundation/Foundation.h>
+#include <map>
 #include "MetadataBuilder.h"
 #include "ArgConverter.h"
+#include "SymbolLoader.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Interop.h"
@@ -73,6 +75,30 @@ void MetadataBuilder::Init(Isolate* isolate) {
     }
 }
 
+void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTemplate> global) {
+    global->SetHandler(NamedPropertyHandlerConfiguration([](Local<Name> property, const PropertyCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        std::string propName = tns::ToString(info.GetIsolate(), property);
+        const Meta* meta = ArgConverter::GetMeta(propName);
+        if (meta == nullptr || meta->type() != MetaType::Var) {
+            return;
+        }
+
+        void* dataSymbol = SymbolLoader::instance().loadDataSymbol(meta->topLevelModule(), meta->name());
+        if (!dataSymbol) {
+            return;
+        }
+
+        id result = *static_cast<const id*>(dataSymbol);
+        if ([result isKindOfClass:[NSString class]]) {
+            Local<v8::String> strResult = tns::ToV8String(isolate, [result UTF8String]);
+            info.GetReturnValue().Set(strResult);
+        }
+
+        // TODO: Handle other data variable types than NSString
+    }));
+}
+
 Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta) {
     Local<FunctionTemplate> ctorFuncTemplate;
     auto it = Caches::CtorFuncTemplates.find(interfaceMeta);
@@ -93,7 +119,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     while (true) {
         const char* baseName = interfaceMeta->baseName();
         if (baseName != nullptr) {
-            const BaseClassMeta* baseClassMeta = ArgConverter::GetInterfaceMeta(baseName);
+            const Meta* baseClassMeta = ArgConverter::GetMeta(baseName);
             if (baseClassMeta && baseClassMeta->type() == MetaType::Interface) {
                 const InterfaceMeta* baseMeta = static_cast<const InterfaceMeta*>(baseClassMeta);
                 if (baseMeta != nullptr) {
@@ -120,7 +146,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         assert(false);
     }
 
-    Local<External> ctorFuncExtData = External::New(isolate_, new ObjCDataWrapper(interfaceMeta, nil));
+    Class clazz = objc_getClass(interfaceMeta->name());
+    Local<External> ctorFuncExtData = External::New(isolate_, new ObjCDataWrapper(interfaceMeta, clazz));
     tns::SetPrivateValue(isolate_, ctorFunc, tns::ToV8String(isolate_, "metadata"), ctorFuncExtData);
 
     Caches::CtorFuncs.insert(std::make_pair(interfaceMeta, new Persistent<v8::Function>(isolate_, ctorFunc)));
@@ -270,8 +297,9 @@ void MetadataBuilder::RegisterInstanceProtocols(Local<FunctionTemplate> ctorFunc
 
     for (auto itProto = meta->protocols->begin(); itProto != meta->protocols->end(); itProto++) {
         std::string protocolName = (*itProto).valuePtr();
-        const BaseClassMeta* protoMeta = ArgConverter::GetInterfaceMeta(protocolName.c_str());
-        if (protoMeta != nullptr) {
+        const Meta* m = ArgConverter::GetMeta(protocolName.c_str());
+        if (m != nullptr) {
+            const BaseClassMeta* protoMeta = static_cast<const BaseClassMeta*>(m);
             RegisterInstanceProtocols(ctorFuncTemplate, protoMeta, className, names);
         }
     }

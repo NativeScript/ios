@@ -21,9 +21,10 @@ public:
     static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call);
     static void SetStructPropertyValue(RecordDataWrapper* wrapper, RecordField field, v8::Local<v8::Value> value);
 private:
-    static void RegisterInteropType(v8::Isolate* isolate, v8::Local<v8::Object> types, std::string name, BinaryTypeEncodingType encodingType);
+    static void RegisterInteropType(v8::Isolate* isolate, v8::Local<v8::Object> types, std::string name, PrimitiveDataWrapper* wrapper);
+    static void RegisterReferenceInteropType(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void SetFFIParams(v8::Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<v8::Local<v8::Value>> args);
-    static void* GetFunctionPointer(const FunctionMeta* meta);
+    static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseFFICall* call);
 
     typedef struct JSBlock {
         typedef struct {

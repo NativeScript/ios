@@ -101,8 +101,8 @@ Local<Object> ModuleInternal::LoadImpl(const std::string& moduleName, const std:
     }
 
     Local<v8::Function> require = GetRequireFunction(baseDir);
-    Local<Value> requireArgs[4] {
-        moduleObj, exportsObj, require, tns::ToV8String(isolate_, baseDir.c_str())
+    Local<Value> requireArgs[5] {
+        moduleObj, exportsObj, require, tns::ToV8String(isolate_, baseDir.c_str()), tns::ToV8String(isolate_, baseDir.c_str())
     };
 
     moduleObj->Set(tns::ToV8String(isolate_, "require"), require);

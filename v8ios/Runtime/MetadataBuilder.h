@@ -1,7 +1,6 @@
 #ifndef MetadataBuilder_h
 #define MetadataBuilder_h
 
-#include <map>
 #include "NativeScript.h"
 #include "Metadata.h"
 #include "ClassBuilder.h"
@@ -12,6 +11,8 @@ class MetadataBuilder {
 public:
     MetadataBuilder();
     void Init(v8::Isolate* isolate);
+    void RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTemplate> global);
+
     static MetadataBuilder* Load(const std::string& baseDir) {
         static MetadataBuilder *b = new MetadataBuilder(baseDir);
         return b;

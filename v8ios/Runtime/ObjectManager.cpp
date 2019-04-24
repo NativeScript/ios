@@ -21,7 +21,9 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
     if (obj->InternalFieldCount() > 0) {
         Local<External> ext = obj->GetInternalField(0).As<External>();
         BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-        if (wrapper->Type() == WrapperType::Record) {
+        if (wrapper->Type() == WrapperType::Primitive) {
+            delete wrapper;
+        } else if (wrapper->Type() == WrapperType::Record) {
             RecordDataWrapper* recordWrapper = static_cast<RecordDataWrapper*>(ext->Value());
             void* data = recordWrapper->Data();
             if (data) {

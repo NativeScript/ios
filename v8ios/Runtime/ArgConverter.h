@@ -28,8 +28,8 @@ public:
     static v8::Local<v8::Value> CreateJsWrapper(v8::Isolate* isolate, BaseDataWrapper* wrapper, v8::Local<v8::Object> receiver);
     static v8::Local<v8::Object> CreateEmptyObject(v8::Local<v8::Context> context);
     static v8::Local<v8::Object> CreateEmptyStruct(v8::Local<v8::Context> context);
-    static const BaseClassMeta* FindInterfaceMeta(Class klass);
-    static const BaseClassMeta* GetInterfaceMeta(std::string name);
+    static const Meta* FindMeta(Class klass);
+    static const Meta* GetMeta(std::string name);
     static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData);
 private:
     static v8::Persistent<v8::Function>* poEmptyObjCtorFunc_;
