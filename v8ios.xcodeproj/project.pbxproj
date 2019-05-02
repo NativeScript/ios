@@ -23,6 +23,7 @@
 		C2543CF0226F49AA007AC505 /* SymbolLoader.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2543CEE226F49AA007AC505 /* SymbolLoader.mm */; };
 		C2543CF52270A974007AC505 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C2543CF32270A974007AC505 /* Main.storyboard */; };
 		C2543CF7227841B6007AC505 /* ClassBuilder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2543CF6227841B6007AC505 /* ClassBuilder.cpp */; };
+		C2543CFA227B220F007AC505 /* WeakRef.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2543CF8227B220F007AC505 /* WeakRef.cpp */; };
 		C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF7222E80AC008F674F /* MetadataBuilder.mm */; };
 		C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.cpp */; };
 		C27E278D22202665009C10A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C27E278C22202665009C10A3 /* Assets.xcassets */; };
@@ -64,6 +65,8 @@
 		C2543CEF226F49AA007AC505 /* SymbolLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SymbolLoader.h; sourceTree = "<group>"; };
 		C2543CF42270A974007AC505 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		C2543CF6227841B6007AC505 /* ClassBuilder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ClassBuilder.cpp; sourceTree = "<group>"; };
+		C2543CF8227B220F007AC505 /* WeakRef.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = WeakRef.cpp; sourceTree = "<group>"; };
+		C2543CF9227B220F007AC505 /* WeakRef.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WeakRef.h; sourceTree = "<group>"; };
 		C2764AF4222BE705008F674F /* Metadata.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Metadata.mm; sourceTree = "<group>"; };
 		C2764AF5222BE705008F674F /* Metadata.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
 		C2764AF7222E80AC008F674F /* MetadataBuilder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MetadataBuilder.mm; sourceTree = "<group>"; };
@@ -186,6 +189,8 @@
 				C2543CEE226F49AA007AC505 /* SymbolLoader.mm */,
 				C2BC5DAA225602C50020F348 /* Tasks.h */,
 				C2BC5DAB22561C370020F348 /* Tasks.cpp */,
+				C2543CF9227B220F007AC505 /* WeakRef.h */,
+				C2543CF8227B220F007AC505 /* WeakRef.cpp */,
 			);
 			path = Runtime;
 			sourceTree = "<group>";
@@ -338,6 +343,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C201FB6F225FA66B00D0636A /* stack_trace_posix.cpp in Sources */,
+				C2543CFA227B220F007AC505 /* WeakRef.cpp in Sources */,
 				C201FB6E225FA64700D0636A /* Metadata.mm in Sources */,
 				C2543CF7227841B6007AC505 /* ClassBuilder.cpp in Sources */,
 				C201FB7A226702BA00D0636A /* FFICall.cpp in Sources */,

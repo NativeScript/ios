@@ -5,6 +5,7 @@
 #include "SetTimeout.h"
 #include "Helpers.h"
 #include "Tasks.h"
+#include "WeakRef.h"
 
 #if defined __arm64 && __arm64__
 #include "natives_blob.arm64.h"
@@ -65,6 +66,7 @@ Isolate* Runtime::InitInternal(const string& baseDir) {
     DefinePerformanceObject(context);
     Console::Init(isolate);
     SetTimeout::Init(isolate);
+    WeakRef::Init(isolate);
     moduleInternal_.Init(isolate, baseDir);
     metadataBuilder_.Init(isolate);
 
