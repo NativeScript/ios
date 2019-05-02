@@ -24,12 +24,12 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
         if (wrapper->Type() == WrapperType::Primitive) {
             delete wrapper;
         } else if (wrapper->Type() == WrapperType::Record) {
-            RecordDataWrapper* recordWrapper = static_cast<RecordDataWrapper*>(ext->Value());
-            void* data = recordWrapper->Data();
+            StructDataWrapper* structWrapper = static_cast<StructDataWrapper*>(ext->Value());
+            void* data = structWrapper->Data();
             if (data) {
                 std::free(data);
             }
-            delete recordWrapper;
+            delete structWrapper;
         } else {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(ext->Value());
             if (objCObjectWrapper->Data() != nil) {

@@ -163,6 +163,8 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
 
     std::unique_ptr<objc_super> sup = std::unique_ptr<objc_super>(new objc_super());
 
+    bool isInstanceMethod = (target && target != nil);
+
     if (initialParameterIndex > 1) {
 #if defined(__x86_64__)
         if (meta->type() == MetaType::Undefined || meta->type() == MetaType::Union) {
@@ -182,7 +184,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
         }
 #endif
 
-        if (target && target != nil) {
+        if (isInstanceMethod) {
             if (callSuper) {
                 sup->receiver = target;
                 sup->super_class = class_getSuperclass(object_getClass(target));
@@ -202,7 +204,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
 
         ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
-        Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call);
+        Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call, isInstanceMethod);
 
         return result;
     }
@@ -274,7 +276,7 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             Local<Object> obj = arg.As<Object>();
             assert(obj->InternalFieldCount() > 0);
             Local<External> ext = obj->GetInternalField(0).As<External>();
-            RecordDataWrapper* wrapper = static_cast<RecordDataWrapper*>(ext->Value());
+            StructDataWrapper* wrapper = static_cast<StructDataWrapper*>(ext->Value());
             void* buffer = wrapper->Data();
             size_t size = wrapper->FFIType()->size;
             void* argBuffer = call->ArgumentBuffer(i);
@@ -295,16 +297,12 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             Local<Object> obj = arg.As<Object>();
             assert(obj->InternalFieldCount() > 0);
             Local<External> ext = obj->GetInternalField(0).As<External>();
-            ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
-
-            const Meta* meta = wrapper->Metadata();
-            if (meta != nullptr && meta->type() == MetaType::JsCode) {
-                const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
-                std::string jsCode = jsCodeMeta->jsCode();
-
+            BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+            if (wrapper->Type() == WrapperType::Enum) {
+                EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
                 Local<Context> context = isolate->GetCurrentContext();
                 Local<Script> script;
-                if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
+                if (!Script::Compile(context, tns::ToV8String(isolate, enumWrapper->JSCode())).ToLocal(&script)) {
                     assert(false);
                 }
                 assert(!script.IsEmpty());
@@ -318,18 +316,18 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
 
                 double value = result.As<Number>()->Value();
                 call->SetArgument(i, value);
-                continue;
+            } else {
+                ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                id data = objCDataWrapper->Data();
+                call->SetArgument(i, data);
             }
-
-            id data = wrapper->Data();
-            call->SetArgument(i, data);
         } else {
             assert(false);
         }
     }
 }
 
-Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call) {
+Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool isInstanceMethod) {
     if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
         // TODO: Cache the metadata
@@ -343,13 +341,14 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         void* dest = std::malloc(rsize);
         memcpy(dest, result, rsize);
 
-        RecordDataWrapper* wrapper = new RecordDataWrapper(structMeta, dest, returnType);
+        StructDataWrapper* wrapper = new StructDataWrapper(structMeta, dest, returnType);
         return ArgConverter::ConvertArgument(isolate, wrapper);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
         typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
-        typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding) {
+        typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding ||
+        typeEncoding->type == BinaryTypeEncodingType::ClassEncoding) {
 
         id result = call->GetResult<id>();
 
@@ -357,8 +356,14 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
-        // TODO: Create the proper DataWrapper type depending on the return value
-        ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, result);
+        if (isInstanceMethod && [result isKindOfClass:[NSString class]]) {
+            // Convert NSString instances to javascript strings for all instance method calls
+            const char* str = [result UTF8String];
+            return tns::ToV8String(isolate, str);
+        }
+
+        std::string className = object_getClassName(result);
+        ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, result);
         return ArgConverter::ConvertArgument(isolate, wrapper);
     }
 
@@ -439,7 +444,7 @@ Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodin
     return Local<Value>();
 }
 
-void Interop::SetStructPropertyValue(RecordDataWrapper* wrapper, RecordField field, Local<Value> value) {
+void Interop::SetStructPropertyValue(StructDataWrapper* wrapper, StructField field, Local<Value> value) {
     if (value.IsEmpty()) {
         return;
     }
@@ -451,7 +456,7 @@ void Interop::SetStructPropertyValue(RecordDataWrapper* wrapper, RecordField fie
         case BinaryTypeEncodingType::StructDeclarationReference: {
             Local<Object> obj = value.As<Object>();
             Local<External> ext = obj->GetInternalField(0).As<External>();
-            RecordDataWrapper* targetStruct = static_cast<RecordDataWrapper*>(ext->Value());
+            StructDataWrapper* targetStruct = static_cast<StructDataWrapper*>(ext->Value());
             sourceBuffer = targetStruct->Data();
             break;
         }

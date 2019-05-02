@@ -27,6 +27,9 @@ void MetadataBuilder::Init(Isolate* isolate) {
     Local<Object> global = context->Global();
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
 
+    RegisterBaseTypeScriptExtendsFunction(isolate); // Register the __extends function to the global object
+    RegisterNativeTypeScriptExtendsFunction(isolate); // Override the __extends function for native objects
+
     for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
         const Meta* meta = (*it);
 
@@ -36,26 +39,15 @@ void MetadataBuilder::Init(Isolate* isolate) {
             RegisterCFunction(funcMeta);
             break;
         }
-        case MetaType::JsCode: {
-            BaseDataWrapper* wrapper = new BaseDataWrapper(meta);
-            Local<Object> enumValue = ArgConverter::CreateEmptyObject(context);
-            Local<External> ext = External::New(isolate, wrapper);
-            enumValue->SetInternalField(0, ext);
-            global->Set(tns::ToV8String(isolate, meta->jsName()), enumValue);
-            break;
-        }
         case MetaType::ProtocolType: {
             const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
             Local<Object> proto = ArgConverter::CreateEmptyObject(context);
 
-            BaseDataWrapper* wrapper = new BaseDataWrapper(protoMeta);
+            BaseDataWrapper* wrapper = new BaseDataWrapper(protoMeta->name());
             Local<External> ext = External::New(isolate, wrapper);
             proto->SetInternalField(0, ext);
 
             global->Set(tns::ToV8String(isolate, meta->jsName()), proto);
-            break;
-        }
-        case MetaType::Struct: {
             break;
         }
         case MetaType::Interface: {
@@ -80,22 +72,35 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTempla
         Isolate* isolate = info.GetIsolate();
         std::string propName = tns::ToString(info.GetIsolate(), property);
         const Meta* meta = ArgConverter::GetMeta(propName);
-        if (meta == nullptr || meta->type() != MetaType::Var) {
+        if (meta == nullptr) {
             return;
         }
 
-        void* dataSymbol = SymbolLoader::instance().loadDataSymbol(meta->topLevelModule(), meta->name());
-        if (!dataSymbol) {
-            return;
-        }
+        if (meta->type() == MetaType::Var) {
+            void* dataSymbol = SymbolLoader::instance().loadDataSymbol(meta->topLevelModule(), meta->name());
+            if (!dataSymbol) {
+                return;
+            }
 
-        id result = *static_cast<const id*>(dataSymbol);
-        if ([result isKindOfClass:[NSString class]]) {
-            Local<v8::String> strResult = tns::ToV8String(isolate, [result UTF8String]);
-            info.GetReturnValue().Set(strResult);
-        }
+            id result = *static_cast<const id*>(dataSymbol);
+            if ([result isKindOfClass:[NSString class]]) {
+                Local<v8::String> strResult = tns::ToV8String(isolate, [result UTF8String]);
+                info.GetReturnValue().Set(strResult);
+                return;
+            }
 
-        // TODO: Handle other data variable types than NSString
+            // TODO: Handle other data variable types than NSString
+            assert(false);
+        } else if (meta->type() == MetaType::JsCode) {
+            const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
+            std::string jsCode = jsCodeMeta->jsCode();
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Object> enumValue = ArgConverter::CreateEmptyObject(context);
+            EnumDataWrapper* wrapper = new EnumDataWrapper(meta->name(), jsCode);
+            Local<External> ext = External::New(isolate, wrapper);
+            enumValue->SetInternalField(0, ext);
+            info.GetReturnValue().Set(enumValue);
+        }
     }));
 }
 
@@ -147,7 +152,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     }
 
     Class clazz = objc_getClass(interfaceMeta->name());
-    Local<External> ctorFuncExtData = External::New(isolate_, new ObjCDataWrapper(interfaceMeta, clazz));
+    Local<External> ctorFuncExtData = External::New(isolate_, new ObjCDataWrapper(interfaceMeta->name(), clazz));
     tns::SetPrivateValue(isolate_, ctorFunc, tns::ToV8String(isolate_, "metadata"), ctorFuncExtData);
 
     Caches::CtorFuncs.insert(std::make_pair(interfaceMeta, new Persistent<v8::Function>(isolate_, ctorFunc)));
@@ -214,6 +219,105 @@ void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<v8::Va
     std::string description = [[target description] UTF8String];
     Local<v8::String> returnValue = tns::ToV8String(info.GetIsolate(), description);
     info.GetReturnValue().Set(returnValue);
+}
+
+void MetadataBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
+    if (poOriginalExtendsFunc_ != nullptr) {
+        return;
+    }
+
+    std::string extendsFuncScript =
+        "(function() { "
+        "    function __extends(d, b) { "
+        "         for (var p in b) {"
+        "             if (b.hasOwnProperty(p)) {"
+        "                 d[p] = b[p];"
+        "             }"
+        "         }"
+        "         function __() { this.constructor = d; }"
+        "         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());"
+        "    } "
+        "    return __extends;"
+        "})()";
+
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Script> script;
+    assert(Script::Compile(context, tns::ToV8String(isolate, extendsFuncScript.c_str())).ToLocal(&script));
+
+    Local<Value> extendsFunc;
+    assert(script->Run(context).ToLocal(&extendsFunc) && extendsFunc->IsFunction());
+
+    poOriginalExtendsFunc_ = new Persistent<v8::Function>(isolate, extendsFunc.As<v8::Function>());
+}
+
+void MetadataBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> global = context->Global();
+
+    Local<v8::Function> extendsFunc = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+        assert(info.Length() == 2);
+        Isolate* isolate = info.GetIsolate();
+        Local<Context> context = isolate->GetCurrentContext();
+        MetadataBuilder* builder = static_cast<MetadataBuilder*>(info.Data().As<External>()->Value());
+
+        Local<Value> metadataProp = tns::GetPrivateValue(isolate, info[1].As<Object>(), tns::ToV8String(isolate, "metadata"));
+        if (metadataProp.IsEmpty() || !metadataProp->IsExternal()) {
+            // We are not extending a native object -> call the base __extends function
+            Local<v8::Function> originalExtendsFunc = builder->poOriginalExtendsFunc_->Get(isolate);
+            Local<Value> args[] = { info[0], info[1] };
+            originalExtendsFunc->Call(context, context->Global(), info.Length(), args).ToLocalChecked();
+            return;
+        }
+
+        Local<External> superExt = metadataProp.As<External>();
+        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(superExt->Value());
+        Class baseClass = wrapper->Data();
+        std::string baseClassName = class_getName(baseClass);
+
+        Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
+        std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
+
+        Class extendedClass = builder->classBuilder_.GetExtendedClass(baseClassName, extendedClassName);
+
+        tns::SetPrivateValue(isolate, extendedClassCtorFunc, tns::ToV8String(isolate, "metadata"), External::New(isolate, new ObjCDataWrapper(extendedClassName, nil)));
+
+        const Meta* baseMeta = ArgConverter::FindMeta(baseClass);
+        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
+        Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(interfaceMeta)->second;
+
+        Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
+        assert(extendedClassCtorFunc->SetPrototype(context, baseCtorFunc).ToChecked());
+
+        Local<Object> extendedClassCtorFuncPrototype = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "prototype")).As<Object>();
+        extendedClassCtorFuncPrototype->SetPrototype(context, baseCtorFunc->Get(tns::ToV8String(isolate, "prototype")).As<Object>()).ToChecked();
+        Caches::ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendedClassCtorFuncPrototype)));
+
+        Persistent<v8::Function>* poExtendedClassCtorFunc = new Persistent<v8::Function>(isolate, extendedClassCtorFunc);
+
+        IMP newInitialize = imp_implementationWithBlock(^(id self) {
+            Local<v8::Function> extendedClassCtorFunc = poExtendedClassCtorFunc->Get(isolate);
+
+            Local<Value> exposedMethods = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "ObjCExposedMethods"));
+            Local<Value> implementationObject = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "prototype"));
+            if (implementationObject.IsEmpty() || exposedMethods.IsEmpty() || !exposedMethods->IsObject() || !implementationObject->IsObject()) {
+                return;
+            }
+
+            builder->classBuilder_.ExposeDynamicMethods(isolate, extendedClass, exposedMethods.As<Object>(), implementationObject.As<Object>());
+
+            Local<Value> exposedProtocols = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "ObjCProtocols"));
+            if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
+                builder->classBuilder_.ExposeDynamicProtocols(isolate, extendedClass, implementationObject.As<Object>(), exposedProtocols.As<v8::Array>());
+            }
+
+            poExtendedClassCtorFunc->Reset();
+        });
+        class_addMethod(object_getClass(extendedClass), @selector(initialize), newInitialize, "v@:");
+
+        info.GetReturnValue().Set(v8::Undefined(isolate));
+    }, External::New(isolate, this)).ToLocalChecked();
+
+    global->Set(tns::ToV8String(isolate, "__extends"), extendsFunc);
 }
 
 void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {
@@ -371,11 +475,11 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
     CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
     const InterfaceMeta* meta = item->meta_;
 
-    NSString* className = [NSString stringWithUTF8String:meta->jsName()];
+    NSString* className = [NSString stringWithUTF8String:meta->name()];
     Class klass = NSClassFromString(className);
     id obj = [[klass alloc] init];
 
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(meta, obj);
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(meta->name(), obj);
     ArgConverter::CreateJsWrapper(isolate, wrapper, info.This());
 }
 
@@ -385,10 +489,10 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
     const InterfaceMeta* meta = item->meta_;
-    Class klass = objc_getClass(meta->jsName());
+    Class klass = objc_getClass(meta->name());
     id obj = [klass alloc];
 
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(meta, obj);
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(meta->name(), obj);
     Local<Value> result = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>());
     info.GetReturnValue().Set(result);
 }
@@ -403,7 +507,17 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
         args.push_back(info[i]);
     }
 
-    const std::string className = item->className_;
+    std::string className = item->className_;
+
+    Local<Object> thiz = info.This();
+    if (thiz->IsFunction()) {
+        Local<Value> metadataProp = tns::GetPrivateValue(isolate, thiz, tns::ToV8String(isolate, "metadata"));
+        if (metadataProp->IsExternal()) {
+            ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(metadataProp.As<External>()->Value());
+            className = wrapper->Name();
+        }
+    }
+
     Local<Value> result = instanceMethod
         ? item->builder_->InvokeMethod(isolate, item->meta_, info.This(), args, className, true)
         : item->builder_->InvokeMethod(isolate, item->meta_, Local<Object>(), args, className, true);
@@ -458,10 +572,10 @@ void MetadataBuilder::StructPropertyGetterCallback(v8::Local<v8::Name> property,
     }
 
     Local<External> ext = thiz->GetInternalField(0).As<External>();
-    RecordDataWrapper* wrapper = static_cast<RecordDataWrapper*>(ext->Value());
+    StructDataWrapper* wrapper = static_cast<StructDataWrapper*>(ext->Value());
     const StructMeta* structMeta = static_cast<const StructMeta*>(wrapper->Metadata());
 
-    std::map<std::string, RecordField> fields;
+    std::map<std::string, StructField> fields;
     FFICall::GetStructFFIType(structMeta, fields);
     auto it = fields.find(propertyName);
     if (it == fields.end()) {
@@ -469,14 +583,14 @@ void MetadataBuilder::StructPropertyGetterCallback(v8::Local<v8::Name> property,
         return;
     }
 
-    RecordField field = it->second;
+    StructField field = it->second;
     const TypeEncoding* fieldEncoding = field.Encoding();
     ptrdiff_t offset = field.Offset();
     void* buffer = wrapper->Data();
     BaseFFICall call((uint8_t*)buffer, offset);
     ffi_type* ffiType = wrapper->FFIType();
 
-    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, ffiType, &call);
+    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, ffiType, &call, false);
 
     info.GetReturnValue().Set(result);
 }
@@ -493,17 +607,17 @@ void MetadataBuilder::StructPropertySetterCallback(Local<Name> property, Local<V
     }
 
     Local<External> ext = thiz->GetInternalField(0).As<External>();
-    RecordDataWrapper* wrapper = static_cast<RecordDataWrapper*>(ext->Value());
+    StructDataWrapper* wrapper = static_cast<StructDataWrapper*>(ext->Value());
     const StructMeta* structMeta = static_cast<const StructMeta*>(wrapper->Metadata());
 
-    std::map<std::string, RecordField> fields;
+    std::map<std::string, StructField> fields;
     FFICall::GetStructFFIType(structMeta, fields);
     auto it = fields.find(propertyName);
     if (it == fields.end()) {
         return;
     }
 
-    RecordField field = it->second;
+    StructField field = it->second;
     Interop::SetStructPropertyValue(wrapper, field, value);
 }
 

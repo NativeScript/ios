@@ -75,7 +75,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
             assert(meta->type() == MetaType::Struct);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
 
-            std::map<std::string, RecordField> fields;
+            std::map<std::string, StructField> fields;
             return FFICall::GetStructFFIType(structMeta, fields);
         }
         default: {
@@ -87,7 +87,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
     assert(false);
 }
 
-ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::map<std::string, RecordField>& fields) {
+ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::map<std::string, StructField>& fields) {
     ffi_type* ffiType = new ffi_type({ .size = 0, .alignment = 0, .type = FFI_TYPE_STRUCT });
 
     size_t count = structMeta->fieldsCount();
@@ -105,7 +105,7 @@ ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::map<std::
 
         std::string fieldName = structMeta->fieldNames()[i].valuePtr();
         offset += padding;
-        RecordField field(offset, fieldFFIType->size, fieldEncoding);
+        StructField field(offset, fieldFFIType->size, fieldEncoding);
 
         fields.insert(std::make_pair(fieldName, field));
 

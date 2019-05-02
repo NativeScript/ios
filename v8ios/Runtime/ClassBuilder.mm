@@ -53,16 +53,19 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     Class extendedClass = item->self_->GetExtendedClass(baseClassName, staticClassName);
     if (!nativeSignature.IsEmpty()) {
         item->self_->ExposeDynamicMembers(isolate, extendedClass, implementationObject, nativeSignature);
-        item->self_->ExposeDynamicProtocols(isolate, extendedClass, implementationObject, nativeSignature);
+
+        Local<Value> exposedProtocols = nativeSignature->Get(tns::ToV8String(isolate, "protocols"));
+        if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
+            item->self_->ExposeDynamicProtocols(isolate, extendedClass, implementationObject, exposedProtocols.As<v8::Array>());
+        }
     }
-    objc_registerClassPair(extendedClass);
 
     Persistent<Object>* prototype = new Persistent<Object>(isolate, implementationObject);
     std::string className = class_getName(extendedClass);
     Caches::ClassPrototypes.insert(std::make_pair(className, prototype));
 
     Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(item->meta_)->second;
-    Local<v8::Function> baseCtorFunc = Local<v8::Function>::New(isolate, *poBaseCtorFunc);
+    Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
 
     CacheItem* cacheItem = new CacheItem(nullptr, extendedClass, item->self_);
     Local<External> ext = External::New(isolate, cacheItem);
@@ -92,7 +95,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         assert(false);
     }
 
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, extendedClass);
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(class_getName(extendedClass), extendedClass);
     Local<External> extendedData = External::New(isolate, wrapper);
     tns::SetPrivateValue(isolate, extendClassCtorFunc, tns::ToV8String(isolate, "metadata"), extendedData);
 
@@ -106,7 +109,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 
     id obj = [[item->data_ alloc] init];
 
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(item->meta_, obj);
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(item->meta_->name(), obj);
     Local<External> ext = External::New(isolate, wrapper);
 
     Local<Object> thiz = info.This();
@@ -116,9 +119,13 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 }
 
 void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
+      Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
+      this->ExposeDynamicMethods(isolate, extendedClass, exposedMethods, implementationObject);
+}
+
+void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, Local<Value> exposedMethods, Local<Object> implementationObject) {
     Local<Context> context = isolate->GetCurrentContext();
 
-    Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
     if (!exposedMethods.IsEmpty() && exposedMethods->IsObject()) {
         Local<v8::Array> methodNames;
         if (!exposedMethods.As<Object>()->GetOwnPropertyNames(context).ToLocal(&methodNames)) {
@@ -173,6 +180,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
     if (m == nullptr) {
         return;
     }
+
     const BaseClassMeta* extendedClassMeta = static_cast<const BaseClassMeta*>(m);
 
     Local<v8::Array> propertyNames;
@@ -236,17 +244,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
     }
 }
 
-void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
-    Local<Value> exposedProtocols = nativeSignature->Get(tns::ToV8String(isolate, "protocols"));
-    if (exposedProtocols.IsEmpty() || !exposedProtocols->IsArray()) {
-        return;
-    }
-
-    Local<v8::Array> protocols = exposedProtocols.As<v8::Array>();
-    if (protocols->Length() < 1) {
-        return;
-    }
-
+void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<v8::Array> protocols) {
     for (uint32_t i = 0; i < protocols->Length(); i++) {
         Local<Value> element = protocols->Get(i);
         assert(!element.IsEmpty() && element->IsObject());
@@ -256,8 +254,8 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
 
         Local<External> ext = protoObj->GetInternalField(0).As<External>();
         BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-        const char* protocolName = wrapper->Metadata()->name();
-        Protocol* proto = objc_getProtocol(protocolName);
+        std::string protocolName = wrapper->Name();
+        Protocol* proto = objc_getProtocol(protocolName.c_str());
         assert(proto != nullptr);
 
         if (class_conformsToProtocol(extendedClass, proto)) {
@@ -267,7 +265,7 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
         class_addProtocol(extendedClass, proto);
 
         const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-        const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName);
+        const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName.c_str());
 
         Local<v8::Array> propertyNames;
         Local<Context> context = isolate->GetCurrentContext();
@@ -353,7 +351,7 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
                         Local<Value> res;
 
                         // TODO: Check the actual DataWrapper type and pass metadata
-                        ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, paramValue);
+                        ObjCDataWrapper* wrapper = new ObjCDataWrapper(std::string(), paramValue);
                         Local<Value> argWrapper = ArgConverter::CreateJsWrapper(context->isolate_, wrapper, Local<Object>());
                         Local<Value> params[1] = { argWrapper };
                         assert(setterFunc->Call(context->isolate_->GetCurrentContext(), context->implementationObject_->Get(context->isolate_), 1, params).ToLocal(&res));
@@ -391,19 +389,6 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<Name> property, const Prope
     superValue->SetInternalField(0, thiz->GetInternalField(0));
 
     info.GetReturnValue().Set(superValue);
-}
-
-Class ClassBuilder::GetExtendedClass(std::string baseClassName, std::string staticClassName) {
-    Class baseClass = objc_getClass(baseClassName.c_str());
-    std::string name = !staticClassName.empty() ? staticClassName : baseClassName + "_" + std::to_string(++ClassBuilder::classNameCounter_);
-    Class clazz = objc_getClass(name.c_str());
-
-    if (clazz != nil) {
-        return GetExtendedClass(baseClassName, staticClassName);
-    }
-
-    clazz = objc_allocateClassPair(baseClass, name.c_str(), 0);
-    return clazz;
 }
 
 unsigned long long ClassBuilder::classNameCounter_ = 0;

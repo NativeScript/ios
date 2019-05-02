@@ -22,6 +22,7 @@ private:
     v8::Isolate* isolate_;
     ClassBuilder classBuilder_;
     v8::Persistent<v8::Function>* poToStringFunction_;
+    v8::Persistent<v8::Function>* poOriginalExtendsFunc_;
 
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -39,6 +40,8 @@ private:
     v8::Persistent<v8::Function>* CreateToStringFunction(v8::Isolate* isolate);
     v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
+    void RegisterBaseTypeScriptExtendsFunction(v8::Isolate* isolate);
+    void RegisterNativeTypeScriptExtendsFunction(v8::Isolate* isolate);
     void RegisterCFunction(const FunctionMeta* funcMeta);
     void RegisterAllocMethod(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::vector<std::string>& names);

@@ -1,5 +1,5 @@
-#ifndef Common_h
-#define Common_h
+#ifndef DataWrapper_h
+#define DataWrapper_h
 
 #include "Metadata.h"
 #include "ffi.h"
@@ -9,26 +9,40 @@ namespace tns {
 enum WrapperType {
     Base = 1,
     Primitive = 2,
-    Record = 3,
-    ObjCObject = 4
+    Enum = 3,
+    Record = 4,
+    ObjCObject = 5
 };
 
 class BaseDataWrapper {
 public:
-    BaseDataWrapper(const Meta* meta): meta_(meta) {}
+    BaseDataWrapper(std::string name): name_(name) {}
     virtual WrapperType Type() {
         return WrapperType::Base;
     }
-    const Meta* Metadata() {
-        return meta_;
+    std::string Name() {
+        return name_;
     }
 private:
-    const Meta* meta_;
+    std::string name_;
+};
+
+class EnumDataWrapper: public BaseDataWrapper {
+public:
+    EnumDataWrapper(std::string name, std::string jsCode): BaseDataWrapper(name), jsCode_(jsCode) {}
+    WrapperType Type() {
+        return WrapperType::Enum;
+    }
+    std::string JSCode() {
+        return jsCode_;
+    }
+private:
+    std::string jsCode_;
 };
 
 class PrimitiveDataWrapper: public BaseDataWrapper {
 public:
-    PrimitiveDataWrapper(ffi_type* ffiType, BinaryTypeEncodingType encodingType): BaseDataWrapper(nullptr), ffiType_(ffiType), encodingType_(encodingType) {
+    PrimitiveDataWrapper(ffi_type* ffiType, BinaryTypeEncodingType encodingType): BaseDataWrapper(std::string()), ffiType_(ffiType), encodingType_(encodingType) {
         value_ = malloc(sizeof(ffiType->size));
     }
     WrapperType Type() {
@@ -49,9 +63,9 @@ private:
     BinaryTypeEncodingType encodingType_;
 };
 
-class RecordDataWrapper: public BaseDataWrapper {
+class StructDataWrapper: public BaseDataWrapper {
 public:
-    RecordDataWrapper(const Meta* meta, void* data, ffi_type* ffiType): BaseDataWrapper(meta), data_(data), ffiType_(ffiType) {}
+    StructDataWrapper(const Meta* meta, void* data, ffi_type* ffiType): BaseDataWrapper(meta->name()), meta_(meta), data_(data), ffiType_(ffiType) {}
     WrapperType Type() {
         return WrapperType::Record;
     }
@@ -61,14 +75,18 @@ public:
     ffi_type* FFIType() {
         return ffiType_;
     }
+    const Meta* Metadata() {
+        return meta_;
+    }
 private:
     void* data_;
     ffi_type* ffiType_;
+    const Meta* meta_;
 };
 
 class ObjCDataWrapper: public BaseDataWrapper {
 public:
-    ObjCDataWrapper(const Meta* meta, id data): BaseDataWrapper(meta), data_(data) {}
+    ObjCDataWrapper(std::string name, id data): BaseDataWrapper(name), data_(data) {}
     WrapperType Type() {
         return WrapperType::ObjCObject;
     }
@@ -79,9 +97,9 @@ private:
     id data_;
 };
 
-struct RecordField {
+struct StructField {
 public:
-    RecordField(ptrdiff_t offset, size_t size, const TypeEncoding* encoding)
+    StructField(ptrdiff_t offset, size_t size, const TypeEncoding* encoding)
         : offset_(offset), size_(size), encoding_(encoding) { }
 
     ptrdiff_t Offset() {
@@ -103,4 +121,4 @@ private:
 
 }
 
-#endif /* Common_h */
+#endif /* DataWrapper_h */

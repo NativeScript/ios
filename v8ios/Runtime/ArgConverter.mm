@@ -73,7 +73,8 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             } else {
                 const id arg = *static_cast<const id*>(argValues[argIndex]);
                 if (arg != nil) {
-                    BaseDataWrapper* wrapper = new ObjCDataWrapper(nullptr, arg);
+                    std::string name = object_getClassName(arg);
+                    BaseDataWrapper* wrapper = new ObjCDataWrapper(name, arg);
                     jsWrapper = ArgConverter::ConvertArgument(isolate, wrapper);
                 } else {
                     jsWrapper = Null(data->isolate_);
@@ -91,10 +92,10 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             if (it != Caches::Instances.end()) {
                 thiz = it->second->Get(data->isolate_);
             } else {
-                ObjCDataWrapper* wrapper = new ObjCDataWrapper(nullptr, self_);
+                std::string className = object_getClassName(self_);
+                ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, self_);
                 thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
 
-                std::string className = object_getClassName(self_);
                 auto it = Caches::ClassPrototypes.find(className);
                 if (it != Caches::ClassPrototypes.end()) {
                     Local<Context> context = isolate->GetCurrentContext();

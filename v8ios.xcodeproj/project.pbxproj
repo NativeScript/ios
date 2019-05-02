@@ -21,9 +21,10 @@
 		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
 		C2543CED226F001A007AC505 /* ArrayAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2543CEB226F001A007AC505 /* ArrayAdapter.mm */; };
 		C2543CF0226F49AA007AC505 /* SymbolLoader.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2543CEE226F49AA007AC505 /* SymbolLoader.mm */; };
+		C2543CF52270A974007AC505 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C2543CF32270A974007AC505 /* Main.storyboard */; };
+		C2543CF7227841B6007AC505 /* ClassBuilder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2543CF6227841B6007AC505 /* ClassBuilder.cpp */; };
 		C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF7222E80AC008F674F /* MetadataBuilder.mm */; };
 		C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.cpp */; };
-		C27E278B22202664009C10A3 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C27E278922202664009C10A3 /* Main.storyboard */; };
 		C27E278D22202665009C10A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C27E278C22202665009C10A3 /* Assets.xcassets */; };
 		C27E279322202665009C10A3 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.mm */; };
 		C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF122214A4D007DE2BA /* platform-ios.cpp */; };
@@ -61,7 +62,8 @@
 		C2543CEC226F001A007AC505 /* ArrayAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArrayAdapter.h; sourceTree = "<group>"; };
 		C2543CEE226F49AA007AC505 /* SymbolLoader.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = SymbolLoader.mm; sourceTree = "<group>"; };
 		C2543CEF226F49AA007AC505 /* SymbolLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SymbolLoader.h; sourceTree = "<group>"; };
-		C2543CF1226F52C7007AC505 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
+		C2543CF42270A974007AC505 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		C2543CF6227841B6007AC505 /* ClassBuilder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ClassBuilder.cpp; sourceTree = "<group>"; };
 		C2764AF4222BE705008F674F /* Metadata.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Metadata.mm; sourceTree = "<group>"; };
 		C2764AF5222BE705008F674F /* Metadata.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
 		C2764AF7222E80AC008F674F /* MetadataBuilder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MetadataBuilder.mm; sourceTree = "<group>"; };
@@ -69,7 +71,6 @@
 		C2764AFA223644B3008F674F /* ObjectManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ObjectManager.cpp; sourceTree = "<group>"; };
 		C2764AFB223644B3008F674F /* ObjectManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjectManager.h; sourceTree = "<group>"; };
 		C27E278022202664009C10A3 /* v8ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = v8ios.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C27E278A22202664009C10A3 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		C27E278C22202665009C10A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C27E279122202665009C10A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C27E279222202665009C10A3 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
@@ -158,6 +159,7 @@
 				C2AAE9CC224391A3006FB9D3 /* Caches.cpp */,
 				C2AAE9D3224902FD006FB9D3 /* ClassBuilder.h */,
 				C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */,
+				C2543CF6227841B6007AC505 /* ClassBuilder.cpp */,
 				C24F39182225859D0027977A /* Console.h */,
 				C24F39192225859D0027977A /* Console.cpp */,
 				C2FE3780224E803700847863 /* DataWrapper.h */,
@@ -226,10 +228,10 @@
 				C24F391F222598E40027977A /* V8Platform */,
 				C24F391E222598C60027977A /* Runtime */,
 				C24F391D222598A80027977A /* Snapshot */,
-				C27E278922202664009C10A3 /* Main.storyboard */,
 				C27E278C22202665009C10A3 /* Assets.xcassets */,
 				C27E279122202665009C10A3 /* Info.plist */,
 				C27E279222202665009C10A3 /* main.mm */,
+				C2543CF32270A974007AC505 /* Main.storyboard */,
 				C201FB7E226760A700D0636A /* LaunchScreen.storyboard */,
 			);
 			path = v8ios;
@@ -321,8 +323,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				C2FF3001225202FC00933782 /* app in Resources */,
+				C2543CF52270A974007AC505 /* Main.storyboard in Resources */,
 				C27E278D22202665009C10A3 /* Assets.xcassets in Resources */,
-				C27E278B22202664009C10A3 /* Main.storyboard in Resources */,
 				C201FB7F226760A700D0636A /* LaunchScreen.storyboard in Resources */,
 				C2FF30152252034900933782 /* include in Resources */,
 			);
@@ -337,6 +339,7 @@
 			files = (
 				C201FB6F225FA66B00D0636A /* stack_trace_posix.cpp in Sources */,
 				C201FB6E225FA64700D0636A /* Metadata.mm in Sources */,
+				C2543CF7227841B6007AC505 /* ClassBuilder.cpp in Sources */,
 				C201FB7A226702BA00D0636A /* FFICall.cpp in Sources */,
 				C27E279322202665009C10A3 /* main.mm in Sources */,
 				C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */,
@@ -360,10 +363,10 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXVariantGroup section */
-		C27E278922202664009C10A3 /* Main.storyboard */ = {
+		C2543CF32270A974007AC505 /* Main.storyboard */ = {
 			isa = PBXVariantGroup;
 			children = (
-				C27E278A22202664009C10A3 /* Base */,
+				C2543CF42270A974007AC505 /* Base */,
 			);
 			name = Main.storyboard;
 			sourceTree = "<group>";

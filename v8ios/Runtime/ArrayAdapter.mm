@@ -29,6 +29,10 @@ using namespace v8;
     }
 
     Local<Value> item = self->object_->Get((uint)index);
+    if (item->IsNullOrUndefined()) {
+        return nil;
+    }
+
     assert(item->IsString());
 
     std::string value = tns::ToString(self->isolate_, item);

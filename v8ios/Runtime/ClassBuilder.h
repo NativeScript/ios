@@ -9,6 +9,9 @@ namespace tns {
 class ClassBuilder {
 public:
     v8::Local<v8::Function> GetExtendFunction(v8::Local<v8::Context> context, const InterfaceMeta* interfaceMeta);
+    Class GetExtendedClass(std::string baseClassName, std::string staticClassName);
+    void ExposeDynamicMethods(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Value> exposedMethods, v8::Local<v8::Object> implementationObject);
+    void ExposeDynamicProtocols(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Array> protocols);
 private:
     static unsigned long long classNameCounter_;
 
@@ -16,9 +19,7 @@ private:
     static void SuperAccessorGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-    Class GetExtendedClass(std::string baseClassName, std::string staticClassName);
     void ExposeDynamicMembers(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
-    void ExposeDynamicProtocols(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
 
     struct CacheItem {
     public:
