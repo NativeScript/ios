@@ -274,13 +274,25 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             call->SetArgument(i, blockPtr);
         } else if (arg->IsObject() && enc->type == BinaryTypeEncodingType::StructDeclarationReference) {
             Local<Object> obj = arg.As<Object>();
-            assert(obj->InternalFieldCount() > 0);
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            StructDataWrapper* wrapper = static_cast<StructDataWrapper*>(ext->Value());
-            void* buffer = wrapper->Data();
-            size_t size = wrapper->FFIType()->size;
             void* argBuffer = call->ArgumentBuffer(i);
-            memcpy(argBuffer, buffer, size);
+            if (obj->InternalFieldCount() > 0) {
+                Local<External> ext = obj->GetInternalField(0).As<External>();
+                StructDataWrapper* wrapper = static_cast<StructDataWrapper*>(ext->Value());
+                void* buffer = wrapper->Data();
+                size_t size = wrapper->FFIType()->size;
+                memcpy(argBuffer, buffer, size);
+            } else {
+                // Create the structure using the struct initializer syntax
+                ptrdiff_t position = 0;
+                const char* structName = enc->details.declarationReference.name.valuePtr();
+                const Meta* meta = ArgConverter::GetMeta(structName);
+                if (meta != nullptr && meta->type() == MetaType::Struct) {
+                    const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+                    Interop::InitializeStruct(isolate, argBuffer, structMeta, obj, position);
+                } else {
+                    assert(false);
+                }
+            }
         } else if (arg->IsArray()) {
             Local<v8::Array> array = arg.As<v8::Array>();
             ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
@@ -325,6 +337,60 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             assert(false);
         }
     }
+}
+
+void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, const StructMeta* structMeta, v8::Local<v8::Value> inititalizer, ptrdiff_t& position) {
+    const TypeEncoding* fieldEncoding = structMeta->fieldsEncodings()->first();
+
+    for (auto it = structMeta->fieldNames().begin(); it != structMeta->fieldNames().end(); it++) {
+        const char* fieldName = (*it).valuePtr();
+        Local<Value> value;
+        if (!inititalizer.IsEmpty() && !inititalizer->IsNullOrUndefined() && inititalizer->IsObject()) {
+            value = inititalizer.As<Object>()->Get(tns::ToV8String(isolate, fieldName));
+        }
+
+        if (fieldEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
+            const Meta* meta = ArgConverter::GetMeta(fieldEncoding->details.declarationReference.name.valuePtr());
+            if (meta != nullptr && meta->type() == MetaType::Struct) {
+                Interop::InitializeStruct(isolate, destBuffer, static_cast<const StructMeta*>(meta), value, position);
+            } else {
+                assert(false);
+            }
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::UShortEncoding) {
+            position += Interop::SetStructValue<ushort>(value, destBuffer, position);
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::ShortEncoding) {
+            position += Interop::SetStructValue<short>(value, destBuffer, position);
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::UIntEncoding) {
+            position += Interop::SetStructValue<uint>(value, destBuffer, position);
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::IntEncoding) {
+            position += Interop::SetStructValue<int>(value, destBuffer, position);
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::ULongEncoding) {
+            position += Interop::SetStructValue<unsigned long>(value, destBuffer, position);
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::LongEncoding) {
+            position += Interop::SetStructValue<long>(value, destBuffer, position);
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::ULongLongEncoding) {
+            position += Interop::SetStructValue<unsigned long long>(value, destBuffer, position);
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::LongLongEncoding) {
+            position += Interop::SetStructValue<long long>(value, destBuffer, position);
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::FloatEncoding) {
+            position += Interop::SetStructValue<float>(value, destBuffer, position);
+        } else if (fieldEncoding->type == BinaryTypeEncodingType::DoubleEncoding) {
+            position += Interop::SetStructValue<double>(value, destBuffer, position);
+        } else {
+            // TODO: Unsupported struct field encoding
+            assert(false);
+        }
+
+        fieldEncoding = fieldEncoding->next();
+    }
+}
+
+template <typename T>
+size_t Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t position) {
+    double result = !value.IsEmpty() && !value->IsNullOrUndefined() && value->IsNumber()
+        ? value.As<Number>()->Value() : 0;
+    *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
+    return sizeof(T);
 }
 
 Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool isInstanceMethod) {

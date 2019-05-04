@@ -27,8 +27,8 @@ void MetadataBuilder::Init(Isolate* isolate) {
     Local<Object> global = context->Global();
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
 
-    RegisterBaseTypeScriptExtendsFunction(isolate); // Register the __extends function to the global object
-    RegisterNativeTypeScriptExtendsFunction(isolate); // Override the __extends function for native objects
+    classBuilder_.RegisterBaseTypeScriptExtendsFunction(isolate); // Register the __extends function to the global object
+    classBuilder_.RegisterNativeTypeScriptExtendsFunction(isolate); // Override the __extends function for native objects
 
     for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
         const Meta* meta = (*it);
@@ -89,6 +89,14 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTempla
                 return;
             }
 
+            const VarMeta* varMeta = static_cast<const VarMeta*>(meta);
+            if (varMeta->encoding()->type == BinaryTypeEncodingType::DoubleEncoding) {
+                double value = *static_cast<double*>(dataSymbol);
+                Local<Number> numResult = Number::New(isolate, value);
+                info.GetReturnValue().Set(numResult);
+                return;
+            }
+
             // TODO: Handle other data variable types than NSString
             assert(false);
         } else if (meta->type() == MetaType::JsCode) {
@@ -100,8 +108,50 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTempla
             Local<External> ext = External::New(isolate, wrapper);
             enumValue->SetInternalField(0, ext);
             info.GetReturnValue().Set(enumValue);
+        } else if (meta->type() == MetaType::Struct) {
+            const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+            Local<v8::Function> structCtorFunc = MetadataBuilder::GetOrCreateStructCtorFunction(isolate, structMeta);
+            info.GetReturnValue().Set(structCtorFunc);
         }
     }));
+}
+
+Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isolate, const StructMeta* structMeta) {
+    auto it = Caches::StructConstructorFunctions.find(structMeta);
+    if (it != Caches::StructConstructorFunctions.end()) {
+        return it->second->Get(isolate);
+    }
+
+    CacheItem<StructMeta>* item = new CacheItem<StructMeta>(structMeta, std::string(), nullptr);
+    Local<External> ext = External::New(isolate, item);
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<v8::Function> structCtorFunc;
+
+    bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+        assert(info.IsConstructCall());
+        assert(info.Length() == 1);
+
+        CacheItem<StructMeta>* item = static_cast<CacheItem<StructMeta>*>(info.Data().As<External>()->Value());
+
+        std::map<std::string, StructField> fields;
+        ffi_type* ffiType = FFICall::GetStructFFIType(item->meta_, fields);
+
+        void* dest = std::malloc(ffiType->size);
+        ptrdiff_t position = 0;
+        Interop::InitializeStruct(info.GetIsolate(), dest, item->meta_, info[0], position);
+
+        Isolate* isolate = info.GetIsolate();
+        StructDataWrapper* wrapper = new StructDataWrapper(item->meta_, dest, ffiType);
+        Local<Value> result = ArgConverter::ConvertArgument(isolate, wrapper);
+        info.GetReturnValue().Set(result);
+    }, ext).ToLocal(&structCtorFunc);
+
+    assert(success);
+
+    Persistent<v8::Function>* poStructCtorFunc = new Persistent<v8::Function>(isolate, structCtorFunc);
+    Caches::StructConstructorFunctions.insert(std::make_pair(structMeta, poStructCtorFunc));
+
+    return structCtorFunc;
 }
 
 Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta) {
@@ -219,105 +269,6 @@ void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<v8::Va
     std::string description = [[target description] UTF8String];
     Local<v8::String> returnValue = tns::ToV8String(info.GetIsolate(), description);
     info.GetReturnValue().Set(returnValue);
-}
-
-void MetadataBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
-    if (poOriginalExtendsFunc_ != nullptr) {
-        return;
-    }
-
-    std::string extendsFuncScript =
-        "(function() { "
-        "    function __extends(d, b) { "
-        "         for (var p in b) {"
-        "             if (b.hasOwnProperty(p)) {"
-        "                 d[p] = b[p];"
-        "             }"
-        "         }"
-        "         function __() { this.constructor = d; }"
-        "         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());"
-        "    } "
-        "    return __extends;"
-        "})()";
-
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Script> script;
-    assert(Script::Compile(context, tns::ToV8String(isolate, extendsFuncScript.c_str())).ToLocal(&script));
-
-    Local<Value> extendsFunc;
-    assert(script->Run(context).ToLocal(&extendsFunc) && extendsFunc->IsFunction());
-
-    poOriginalExtendsFunc_ = new Persistent<v8::Function>(isolate, extendsFunc.As<v8::Function>());
-}
-
-void MetadataBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> global = context->Global();
-
-    Local<v8::Function> extendsFunc = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
-        assert(info.Length() == 2);
-        Isolate* isolate = info.GetIsolate();
-        Local<Context> context = isolate->GetCurrentContext();
-        MetadataBuilder* builder = static_cast<MetadataBuilder*>(info.Data().As<External>()->Value());
-
-        Local<Value> metadataProp = tns::GetPrivateValue(isolate, info[1].As<Object>(), tns::ToV8String(isolate, "metadata"));
-        if (metadataProp.IsEmpty() || !metadataProp->IsExternal()) {
-            // We are not extending a native object -> call the base __extends function
-            Local<v8::Function> originalExtendsFunc = builder->poOriginalExtendsFunc_->Get(isolate);
-            Local<Value> args[] = { info[0], info[1] };
-            originalExtendsFunc->Call(context, context->Global(), info.Length(), args).ToLocalChecked();
-            return;
-        }
-
-        Local<External> superExt = metadataProp.As<External>();
-        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(superExt->Value());
-        Class baseClass = wrapper->Data();
-        std::string baseClassName = class_getName(baseClass);
-
-        Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
-        std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
-
-        Class extendedClass = builder->classBuilder_.GetExtendedClass(baseClassName, extendedClassName);
-
-        tns::SetPrivateValue(isolate, extendedClassCtorFunc, tns::ToV8String(isolate, "metadata"), External::New(isolate, new ObjCDataWrapper(extendedClassName, nil)));
-
-        const Meta* baseMeta = ArgConverter::FindMeta(baseClass);
-        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
-        Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(interfaceMeta)->second;
-
-        Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
-        assert(extendedClassCtorFunc->SetPrototype(context, baseCtorFunc).ToChecked());
-
-        Local<Object> extendedClassCtorFuncPrototype = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "prototype")).As<Object>();
-        extendedClassCtorFuncPrototype->SetPrototype(context, baseCtorFunc->Get(tns::ToV8String(isolate, "prototype")).As<Object>()).ToChecked();
-        Caches::ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendedClassCtorFuncPrototype)));
-
-        Persistent<v8::Function>* poExtendedClassCtorFunc = new Persistent<v8::Function>(isolate, extendedClassCtorFunc);
-
-        IMP newInitialize = imp_implementationWithBlock(^(id self) {
-            Local<v8::Function> extendedClassCtorFunc = poExtendedClassCtorFunc->Get(isolate);
-
-            Local<Value> exposedMethods = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "ObjCExposedMethods"));
-            Local<Value> implementationObject = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "prototype"));
-            if (implementationObject.IsEmpty() || exposedMethods.IsEmpty() || !exposedMethods->IsObject() || !implementationObject->IsObject()) {
-                return;
-            }
-
-            builder->classBuilder_.ExposeDynamicMethods(isolate, extendedClass, exposedMethods.As<Object>(), implementationObject.As<Object>());
-
-            Local<Value> exposedProtocols = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "ObjCProtocols"));
-            if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
-                builder->classBuilder_.ExposeDynamicProtocols(isolate, extendedClass, implementationObject.As<Object>(), exposedProtocols.As<v8::Array>());
-            }
-
-            poExtendedClassCtorFunc->Reset();
-        });
-        class_addMethod(object_getClass(extendedClass), @selector(initialize), newInitialize, "v@:");
-
-        info.GetReturnValue().Set(v8::Undefined(isolate));
-    }, External::New(isolate, this)).ToLocalChecked();
-
-    global->Set(tns::ToV8String(isolate, "__extends"), extendsFunc);
 }
 
 void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {

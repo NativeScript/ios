@@ -12,7 +12,11 @@ public:
     Class GetExtendedClass(std::string baseClassName, std::string staticClassName);
     void ExposeDynamicMethods(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Value> exposedMethods, v8::Local<v8::Object> implementationObject);
     void ExposeDynamicProtocols(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Array> protocols);
+
+    void RegisterBaseTypeScriptExtendsFunction(v8::Isolate* isolate);
+    void RegisterNativeTypeScriptExtendsFunction(v8::Isolate* isolate);
 private:
+    static v8::Persistent<v8::Function>* poOriginalExtendsFunc_;
     static unsigned long long classNameCounter_;
 
     static void ExtendCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

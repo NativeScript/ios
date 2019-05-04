@@ -36,12 +36,11 @@ private:
     static void StructPropertySetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void ToStringFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, std::string containingClass, bool isMethodCallback);
+    static v8::Local<v8::Function> GetOrCreateStructCtorFunction(v8::Isolate* isolate, const StructMeta* structMeta);
 
     v8::Persistent<v8::Function>* CreateToStringFunction(v8::Isolate* isolate);
     v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
-    void RegisterBaseTypeScriptExtendsFunction(v8::Isolate* isolate);
-    void RegisterNativeTypeScriptExtendsFunction(v8::Isolate* isolate);
     void RegisterCFunction(const FunctionMeta* funcMeta);
     void RegisterAllocMethod(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::vector<std::string>& names);
