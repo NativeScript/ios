@@ -4,6 +4,7 @@
 #include "ObjectManager.h"
 #include "Helpers.h"
 #include "ArgConverter.h"
+#include "DictionaryAdapter.h"
 #include "ArrayAdapter.h"
 #include "SymbolLoader.h"
 
@@ -307,31 +308,36 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             call->SetArgument(i, clazz);
         } else if (arg->IsObject()) {
             Local<Object> obj = arg.As<Object>();
-            assert(obj->InternalFieldCount() > 0);
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-            if (wrapper->Type() == WrapperType::Enum) {
-                EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
-                Local<Context> context = isolate->GetCurrentContext();
-                Local<Script> script;
-                if (!Script::Compile(context, tns::ToV8String(isolate, enumWrapper->JSCode())).ToLocal(&script)) {
-                    assert(false);
-                }
-                assert(!script.IsEmpty());
 
-                Local<Value> result;
-                if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
-                    assert(false);
-                }
-
-                assert(result->IsNumber());
-
-                double value = result.As<Number>()->Value();
-                call->SetArgument(i, value);
+            if (obj->InternalFieldCount() < 1) {
+                DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
+                call->SetArgument(i, adapter);
             } else {
-                ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                id data = objCDataWrapper->Data();
-                call->SetArgument(i, data);
+                Local<External> ext = obj->GetInternalField(0).As<External>();
+                BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+                if (wrapper->Type() == WrapperType::Enum) {
+                    EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
+                    Local<Context> context = isolate->GetCurrentContext();
+                    Local<Script> script;
+                    if (!Script::Compile(context, tns::ToV8String(isolate, enumWrapper->JSCode())).ToLocal(&script)) {
+                        assert(false);
+                    }
+                    assert(!script.IsEmpty());
+
+                    Local<Value> result;
+                    if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
+                        assert(false);
+                    }
+
+                    assert(result->IsNumber());
+
+                    double value = result.As<Number>()->Value();
+                    call->SetArgument(i, value);
+                } else {
+                    ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                    id data = objCDataWrapper->Data();
+                    call->SetArgument(i, data);
+                }
             }
         } else {
             assert(false);

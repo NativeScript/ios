@@ -31,6 +31,9 @@
 		C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF122214A4D007DE2BA /* platform-ios.cpp */; };
 		C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B2C22241270007DE2BA /* Runtime.mm */; };
 		C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B5922252432007DE2BA /* ModuleInternal.mm */; };
+		C2A7BE10227C7F3A00D43EEB /* TNSWidgets.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2A7BE0F227C7F3A00D43EEB /* TNSWidgets.framework */; };
+		C2A7BE12227C7FEF00D43EEB /* TNSWidgets.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2A7BE0F227C7F3A00D43EEB /* TNSWidgets.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C2A7BE16227DA1C000D43EEB /* DictionaryAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2A7BE14227DA1C000D43EEB /* DictionaryAdapter.mm */; };
 		C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */; };
 		C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9CC224391A3006FB9D3 /* Caches.cpp */; };
 		C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */; };
@@ -45,6 +48,20 @@
 		C2FF3001225202FC00933782 /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2FF3000225202FC00933782 /* app */; };
 		C2FF30152252034900933782 /* include in Resources */ = {isa = PBXBuildFile; fileRef = C2FF30142252034900933782 /* include */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C2A7BE13227C7FEF00D43EEB /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				C2A7BE12227C7FEF00D43EEB /* TNSWidgets.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		C201FB70226607BA00D0636A /* libv8_base_without_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base_without_compiler.a; sourceTree = "<group>"; };
@@ -86,6 +103,9 @@
 		C28B7B2C22241270007DE2BA /* Runtime.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Runtime.mm; sourceTree = "<group>"; };
 		C28B7B5822252431007DE2BA /* ModuleInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ModuleInternal.h; sourceTree = "<group>"; };
 		C28B7B5922252432007DE2BA /* ModuleInternal.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ModuleInternal.mm; sourceTree = "<group>"; };
+		C2A7BE0F227C7F3A00D43EEB /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
+		C2A7BE14227DA1C000D43EEB /* DictionaryAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DictionaryAdapter.mm; sourceTree = "<group>"; };
+		C2A7BE15227DA1C000D43EEB /* DictionaryAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DictionaryAdapter.h; sourceTree = "<group>"; };
 		C2AAE9C8223BA685006FB9D3 /* StringHasher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
 		C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ArgConverter.mm; sourceTree = "<group>"; };
 		C2AAE9CA2243789A006FB9D3 /* ArgConverter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArgConverter.h; sourceTree = "<group>"; };
@@ -126,6 +146,7 @@
 				C201FB6D225F4FCE00D0636A /* UIKit.framework in Frameworks */,
 				C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */,
 				C201FB71226607BA00D0636A /* libv8_base_without_compiler.a in Frameworks */,
+				C2A7BE10227C7F3A00D43EEB /* TNSWidgets.framework in Frameworks */,
 				C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */,
 				C201FB7722660C2B00D0636A /* libtorque_generated_initializers.a in Frameworks */,
 				C2335B74224CEAFA0071048C /* libffi.a in Frameworks */,
@@ -166,6 +187,8 @@
 				C24F39182225859D0027977A /* Console.h */,
 				C24F39192225859D0027977A /* Console.cpp */,
 				C2FE3780224E803700847863 /* DataWrapper.h */,
+				C2A7BE15227DA1C000D43EEB /* DictionaryAdapter.h */,
+				C2A7BE14227DA1C000D43EEB /* DictionaryAdapter.mm */,
 				C201FB79226702BA00D0636A /* FFICall.h */,
 				C201FB78226702BA00D0636A /* FFICall.cpp */,
 				C2AAE9D622490F50006FB9D3 /* Helpers.h */,
@@ -245,6 +268,7 @@
 		C27E279922202720009C10A3 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				C2A7BE0F227C7F3A00D43EEB /* TNSWidgets.framework */,
 				C2335B73224CEAFA0071048C /* libffi.a */,
 				C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */,
 				C201FB70226607BA00D0636A /* libv8_base_without_compiler.a */,
@@ -280,6 +304,7 @@
 				C27E277C22202664009C10A3 /* Sources */,
 				C27E277D22202664009C10A3 /* Frameworks */,
 				C27E277E22202664009C10A3 /* Resources */,
+				C2A7BE13227C7FEF00D43EEB /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -345,6 +370,7 @@
 				C201FB6F225FA66B00D0636A /* stack_trace_posix.cpp in Sources */,
 				C2543CFA227B220F007AC505 /* WeakRef.cpp in Sources */,
 				C201FB6E225FA64700D0636A /* Metadata.mm in Sources */,
+				C2A7BE16227DA1C000D43EEB /* DictionaryAdapter.mm in Sources */,
 				C2543CF7227841B6007AC505 /* ClassBuilder.cpp in Sources */,
 				C201FB7A226702BA00D0636A /* FFICall.cpp in Sources */,
 				C27E279322202665009C10A3 /* main.mm in Sources */,
@@ -504,6 +530,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = W7TGC3P93K;
 				ENABLE_BITCODE = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
 				INFOPLIST_FILE = v8ios/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -532,6 +562,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = W7TGC3P93K;
 				ENABLE_BITCODE = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
 				INFOPLIST_FILE = v8ios/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (

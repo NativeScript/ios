@@ -1,4 +1,4 @@
-#import <FOundation/NSString.h>
+#import <Foundation/NSString.h>
 #import "ArrayAdapter.h"
 #include "Helpers.h"
 
@@ -7,20 +7,20 @@ using namespace v8;
 
 @implementation ArrayAdapter {
     Isolate* isolate_;
-    Local<v8::Array> object_;
+    Persistent<v8::Array>* object_;
 }
 
 - (instancetype)initWithJSObject:(Local<v8::Array>)jsObject isolate:(Isolate*)isolate {
     if (self) {
         self->isolate_ = isolate;
-        self->object_ = jsObject;
+        self->object_ = new Persistent<v8::Array>(isolate, jsObject);
     }
 
     return self;
 }
 
 - (NSUInteger)count {
-    return self->object_->Length();
+    return self->object_->Get(self->isolate_)->Length();
 }
 
 - (id)objectAtIndex:(NSUInteger)index {
@@ -28,7 +28,8 @@ using namespace v8;
         assert(false);
     }
 
-    Local<Value> item = self->object_->Get((uint)index);
+    Local<v8::Array> array = self->object_->Get(self->isolate_);
+    Local<Value> item = array->Get((uint)index);
     if (item->IsNullOrUndefined()) {
         return nil;
     }
@@ -42,7 +43,7 @@ using namespace v8;
 }
 
 - (void)dealloc {
-    NSLog(@"Destroying the instance");
+    self->object_->Reset();
 }
 
 @end

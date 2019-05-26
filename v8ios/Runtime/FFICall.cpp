@@ -52,6 +52,15 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
         case BinaryTypeEncodingType::BoolEncoding: {
             return &ffi_type_sint8;
         }
+        case BinaryTypeEncodingType::UShortEncoding: {
+            return &ffi_type_uint16;
+        }
+        case BinaryTypeEncodingType::ShortEncoding: {
+            return &ffi_type_sint16;
+        }
+        case BinaryTypeEncodingType::UIntEncoding: {
+            return &ffi_type_uint32;
+        }
         case BinaryTypeEncodingType::IntEncoding: {
             return &ffi_type_sint32;
         }
