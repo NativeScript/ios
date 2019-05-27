@@ -82,18 +82,18 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTempla
                 return;
             }
 
-            id result = *static_cast<const id*>(dataSymbol);
-            if ([result isKindOfClass:[NSString class]]) {
-                Local<v8::String> strResult = tns::ToV8String(isolate, [result UTF8String]);
-                info.GetReturnValue().Set(strResult);
-                return;
-            }
-
             const VarMeta* varMeta = static_cast<const VarMeta*>(meta);
             if (varMeta->encoding()->type == BinaryTypeEncodingType::DoubleEncoding) {
                 double value = *static_cast<double*>(dataSymbol);
                 Local<Number> numResult = Number::New(isolate, value);
                 info.GetReturnValue().Set(numResult);
+                return;
+            }
+
+            id result = *static_cast<const id*>(dataSymbol);
+            if ([result isKindOfClass:[NSString class]]) {
+                Local<v8::String> strResult = tns::ToV8String(isolate, [result UTF8String]);
+                info.GetReturnValue().Set(strResult);
                 return;
             }
 
