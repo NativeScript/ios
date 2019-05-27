@@ -249,7 +249,7 @@ typedef struct {
 typedef union {
   ffi_sarg  sint;
   ffi_arg   uint;
-  float        flt;
+  float	    flt;
   char      data[FFI_SIZEOF_ARG];
   void*     ptr;
 } ffi_raw;
@@ -258,22 +258,22 @@ typedef union {
 /* This is a special case for mips64/n32 ABI (and perhaps others) where
    sizeof(void *) is 4 and FFI_SIZEOF_ARG is 8.  */
 typedef union {
-  signed int    sint;
-  unsigned int    uint;
-  float        flt;
-  char        data[FFI_SIZEOF_JAVA_RAW];
-  void*        ptr;
+  signed int	sint;
+  unsigned int	uint;
+  float		flt;
+  char		data[FFI_SIZEOF_JAVA_RAW];
+  void*		ptr;
 } ffi_java_raw;
 #else
 typedef ffi_raw ffi_java_raw;
 #endif
 
 
-FFI_API
+FFI_API 
 void ffi_raw_call (ffi_cif *cif,
-           void (*fn)(void),
-           void *rvalue,
-           ffi_raw *avalue);
+		   void (*fn)(void),
+		   void *rvalue,
+		   ffi_raw *avalue);
 
 FFI_API void ffi_ptrarray_to_raw (ffi_cif *cif, void **args, ffi_raw *raw);
 FFI_API void ffi_raw_to_ptrarray (ffi_cif *cif, ffi_raw *raw, void **args);
@@ -286,9 +286,9 @@ FFI_API size_t ffi_raw_size (ffi_cif *cif);
 #if !FFI_NATIVE_RAW_API
 FFI_API
 void ffi_java_raw_call (ffi_cif *cif,
-            void (*fn)(void),
-            void *rvalue,
-            ffi_java_raw *avalue);
+			void (*fn)(void),
+			void *rvalue,
+			ffi_java_raw *avalue);
 #endif
 
 FFI_API
@@ -332,9 +332,9 @@ FFI_API void ffi_closure_free (void *);
 
 FFI_API ffi_status
 ffi_prep_closure (ffi_closure*,
-          ffi_cif *,
-          void (*fun)(ffi_cif*,void*,void**,void*),
-          void *user_data)
+		  ffi_cif *,
+		  void (*fun)(ffi_cif*,void*,void**,void*),
+		  void *user_data)
 #if defined(__GNUC__) && (((__GNUC__ * 100) + __GNUC_MINOR__) >= 405)
   __attribute__((deprecated ("use ffi_prep_closure_loc instead")))
 #elif defined(__GNUC__) && __GNUC__ >= 3
@@ -344,10 +344,10 @@ ffi_prep_closure (ffi_closure*,
 
 FFI_API ffi_status
 ffi_prep_closure_loc (ffi_closure*,
-              ffi_cif *,
-              void (*fun)(ffi_cif*,void*,void**,void*),
-              void *user_data,
-              void*codeloc);
+		      ffi_cif *,
+		      void (*fun)(ffi_cif*,void*,void**,void*),
+		      void *user_data,
+		      void*codeloc);
 
 #ifdef __sgi
 # pragma pack 8
@@ -363,8 +363,8 @@ typedef struct {
 
 #if !FFI_NATIVE_RAW_API
 
-  /* If this is enabled, then a raw closure has the same layout
-     as a regular closure.  We use this to install an intermediate
+  /* If this is enabled, then a raw closure has the same layout 
+     as a regular closure.  We use this to install an intermediate 
      handler to do the transaltion, void** -> ffi_raw*.  */
 
   void     (*translate_args)(ffi_cif*,void*,void**,void*);
@@ -389,8 +389,8 @@ typedef struct {
 
 #if !FFI_NATIVE_RAW_API
 
-  /* If this is enabled, then a raw closure has the same layout
-     as a regular closure.  We use this to install an intermediate
+  /* If this is enabled, then a raw closure has the same layout 
+     as a regular closure.  We use this to install an intermediate 
      handler to do the translation, void** -> ffi_raw*.  */
 
   void     (*translate_args)(ffi_cif*,void*,void**,void*);
@@ -405,30 +405,30 @@ typedef struct {
 
 FFI_API ffi_status
 ffi_prep_raw_closure (ffi_raw_closure*,
-              ffi_cif *cif,
-              void (*fun)(ffi_cif*,void*,ffi_raw*,void*),
-              void *user_data);
+		      ffi_cif *cif,
+		      void (*fun)(ffi_cif*,void*,ffi_raw*,void*),
+		      void *user_data);
 
 FFI_API ffi_status
 ffi_prep_raw_closure_loc (ffi_raw_closure*,
-              ffi_cif *cif,
-              void (*fun)(ffi_cif*,void*,ffi_raw*,void*),
-              void *user_data,
-              void *codeloc);
+			  ffi_cif *cif,
+			  void (*fun)(ffi_cif*,void*,ffi_raw*,void*),
+			  void *user_data,
+			  void *codeloc);
 
 #if !FFI_NATIVE_RAW_API
 FFI_API ffi_status
 ffi_prep_java_raw_closure (ffi_java_raw_closure*,
-                   ffi_cif *cif,
-                   void (*fun)(ffi_cif*,void*,ffi_java_raw*,void*),
-                   void *user_data);
+		           ffi_cif *cif,
+		           void (*fun)(ffi_cif*,void*,ffi_java_raw*,void*),
+		           void *user_data);
 
 FFI_API ffi_status
 ffi_prep_java_raw_closure_loc (ffi_java_raw_closure*,
-                   ffi_cif *cif,
-                   void (*fun)(ffi_cif*,void*,ffi_java_raw*,void*),
-                   void *user_data,
-                   void *codeloc);
+			       ffi_cif *cif,
+			       void (*fun)(ffi_cif*,void*,ffi_java_raw*,void*),
+			       void *user_data,
+			       void *codeloc);
 #endif
 
 #endif /* FFI_CLOSURES */
@@ -442,39 +442,39 @@ typedef struct {
 } ffi_go_closure;
 
 FFI_API ffi_status ffi_prep_go_closure (ffi_go_closure*, ffi_cif *,
-                void (*fun)(ffi_cif*,void*,void**,void*));
+				void (*fun)(ffi_cif*,void*,void**,void*));
 
 FFI_API void ffi_call_go (ffi_cif *cif, void (*fn)(void), void *rvalue,
-          void **avalue, void *closure);
+		  void **avalue, void *closure);
 
 #endif /* FFI_GO_CLOSURES */
 
 /* ---- Public interface definition -------------------------------------- */
 
-FFI_API
+FFI_API 
 ffi_status ffi_prep_cif(ffi_cif *cif,
-            ffi_abi abi,
-            unsigned int nargs,
-            ffi_type *rtype,
-            ffi_type **atypes);
+			ffi_abi abi,
+			unsigned int nargs,
+			ffi_type *rtype,
+			ffi_type **atypes);
 
 FFI_API
 ffi_status ffi_prep_cif_var(ffi_cif *cif,
-                ffi_abi abi,
-                unsigned int nfixedargs,
-                unsigned int ntotalargs,
-                ffi_type *rtype,
-                ffi_type **atypes);
+			    ffi_abi abi,
+			    unsigned int nfixedargs,
+			    unsigned int ntotalargs,
+			    ffi_type *rtype,
+			    ffi_type **atypes);
 
 FFI_API
 void ffi_call(ffi_cif *cif,
-          void (*fn)(void),
-          void *rvalue,
-          void **avalue);
+	      void (*fn)(void),
+	      void *rvalue,
+	      void **avalue);
 
 FFI_API
 ffi_status ffi_get_struct_offsets (ffi_abi abi, ffi_type *struct_type,
-                   size_t *offsets);
+				   size_t *offsets);
 
 /* Useful for eliminating compiler warnings.  */
 #define FFI_FN(f) ((void (*)(void))f)
@@ -484,18 +484,18 @@ ffi_status ffi_get_struct_offsets (ffi_abi abi, ffi_type *struct_type,
 #endif
 
 /* If these change, update src/mips/ffitarget.h. */
-#define FFI_TYPE_VOID       0
+#define FFI_TYPE_VOID       0    
 #define FFI_TYPE_INT        1
-#define FFI_TYPE_FLOAT      2
+#define FFI_TYPE_FLOAT      2    
 #define FFI_TYPE_DOUBLE     3
 #if 0
 #define FFI_TYPE_LONGDOUBLE 4
 #else
 #define FFI_TYPE_LONGDOUBLE FFI_TYPE_DOUBLE
 #endif
-#define FFI_TYPE_UINT8      5
+#define FFI_TYPE_UINT8      5   
 #define FFI_TYPE_SINT8      6
-#define FFI_TYPE_UINT16     7
+#define FFI_TYPE_UINT16     7 
 #define FFI_TYPE_SINT16     8
 #define FFI_TYPE_UINT32     9
 #define FFI_TYPE_SINT32     10
