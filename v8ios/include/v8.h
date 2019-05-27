@@ -122,7 +122,6 @@ class ExternalString;
 class Isolate;
 class LocalEmbedderHeapTracer;
 class MicrotaskQueue;
-class NeverReadOnlySpaceObject;
 struct ScriptStreamingData;
 template<typename T> class CustomArguments;
 class PropertyCallbackArguments;
@@ -1901,6 +1900,11 @@ class V8_EXPORT StackFrame {
    * Returns whether or not the associated functions is defined in wasm.
    */
   bool IsWasm() const;
+
+  /**
+   * Returns whether or not the associated function is defined by the user.
+   */
+  bool IsUserJavaScript() const;
 };
 
 
@@ -2089,10 +2093,10 @@ class V8_EXPORT ValueSerializer {
   void WriteDouble(double value);
   void WriteRawBytes(const void* source, size_t length);
 
- private:
   ValueSerializer(const ValueSerializer&) = delete;
   void operator=(const ValueSerializer&) = delete;
 
+ private:
   struct PrivateData;
   PrivateData* private_;
 };
@@ -2191,10 +2195,10 @@ class V8_EXPORT ValueDeserializer {
   V8_WARN_UNUSED_RESULT bool ReadDouble(double* value);
   V8_WARN_UNUSED_RESULT bool ReadRawBytes(size_t length, const void** data);
 
- private:
   ValueDeserializer(const ValueDeserializer&) = delete;
   void operator=(const ValueDeserializer&) = delete;
 
+ private:
   struct PrivateData;
   PrivateData* private_;
 };
@@ -2717,6 +2721,10 @@ class V8_EXPORT String : public Name {
      */
     virtual bool IsCacheable() const { return true; }
 
+    // Disallow copying and assigning.
+    ExternalStringResourceBase(const ExternalStringResourceBase&) = delete;
+    void operator=(const ExternalStringResourceBase&) = delete;
+
    protected:
     ExternalStringResourceBase() = default;
 
@@ -2745,10 +2753,6 @@ class V8_EXPORT String : public Name {
      * Unlocks the string.
      */
     virtual void Unlock() const {}
-
-    // Disallow copying and assigning.
-    ExternalStringResourceBase(const ExternalStringResourceBase&) = delete;
-    void operator=(const ExternalStringResourceBase&) = delete;
 
    private:
     friend class internal::ExternalString;
@@ -2833,43 +2837,23 @@ class V8_EXPORT String : public Name {
 
   V8_INLINE static String* Cast(v8::Value* obj);
 
-  // TODO(dcarney): remove with deprecation of New functions.
-  enum NewStringType {
-    kNormalString = static_cast<int>(v8::NewStringType::kNormal),
-    kInternalizedString = static_cast<int>(v8::NewStringType::kInternalized)
-  };
-
-  /** Allocates a new string from UTF-8 data.*/
-  static V8_DEPRECATED(
-      "Use maybe version",
-      Local<String> NewFromUtf8(Isolate* isolate, const char* data,
-                                NewStringType type = kNormalString,
-                                int length = -1));
-
   /** Allocates a new string from UTF-8 data. Only returns an empty value when
    * length > kMaxLength. **/
   static V8_WARN_UNUSED_RESULT MaybeLocal<String> NewFromUtf8(
-      Isolate* isolate, const char* data, v8::NewStringType type,
-      int length = -1);
+      Isolate* isolate, const char* data,
+      NewStringType type = NewStringType::kNormal, int length = -1);
 
   /** Allocates a new string from Latin-1 data.  Only returns an empty value
    * when length > kMaxLength. **/
   static V8_WARN_UNUSED_RESULT MaybeLocal<String> NewFromOneByte(
-      Isolate* isolate, const uint8_t* data, v8::NewStringType type,
-      int length = -1);
-
-  /** Allocates a new string from UTF-16 data.*/
-  static V8_DEPRECATED(
-      "Use maybe version",
-      Local<String> NewFromTwoByte(Isolate* isolate, const uint16_t* data,
-                                   NewStringType type = kNormalString,
-                                   int length = -1));
+      Isolate* isolate, const uint8_t* data,
+      NewStringType type = NewStringType::kNormal, int length = -1);
 
   /** Allocates a new string from UTF-16 data. Only returns an empty value when
    * length > kMaxLength. **/
   static V8_WARN_UNUSED_RESULT MaybeLocal<String> NewFromTwoByte(
-      Isolate* isolate, const uint16_t* data, v8::NewStringType type,
-      int length = -1);
+      Isolate* isolate, const uint16_t* data,
+      NewStringType type = NewStringType::kNormal, int length = -1);
 
   /**
    * Creates a new string by concatenating the left and the right strings
@@ -2908,10 +2892,6 @@ class V8_EXPORT String : public Name {
    * should the underlying buffer be deallocated or modified except through the
    * destructor of the external string resource.
    */
-  static V8_DEPRECATED(
-      "Use maybe version",
-      Local<String> NewExternal(Isolate* isolate,
-                                ExternalOneByteStringResource* resource));
   static V8_WARN_UNUSED_RESULT MaybeLocal<String> NewExternalOneByte(
       Isolate* isolate, ExternalOneByteStringResource* resource);
 
@@ -3849,9 +3829,6 @@ class ReturnValue {
     TYPE_CHECK(T, S);
   }
   // Local setters
-  template <typename S>
-  V8_INLINE V8_DEPRECATED("Use Global<> instead",
-                          void Set(const Persistent<S>& handle));
   template <typename S>
   V8_INLINE void Set(const Global<S>& handle);
   template <typename S>
@@ -5240,38 +5217,6 @@ class V8_EXPORT Date : public Object {
 
   V8_INLINE static Date* Cast(Value* obj);
 
-  /**
-   * Time zone redetection indicator for
-   * DateTimeConfigurationChangeNotification.
-   *
-   * kSkip indicates V8 that the notification should not trigger redetecting
-   * host time zone. kRedetect indicates V8 that host time zone should be
-   * redetected, and used to set the default time zone.
-   *
-   * The host time zone detection may require file system access or similar
-   * operations unlikely to be available inside a sandbox. If v8 is run inside a
-   * sandbox, the host time zone has to be detected outside the sandbox before
-   * calling DateTimeConfigurationChangeNotification function.
-   */
-  enum class TimeZoneDetection { kSkip, kRedetect };
-
-  /**
-   * Notification that the embedder has changed the time zone,
-   * daylight savings time, or other date / time configuration
-   * parameters.  V8 keeps a cache of various values used for
-   * date / time computation.  This notification will reset
-   * those cached values for the current context so that date /
-   * time configuration changes would be reflected in the Date
-   * object.
-   *
-   * This API should not be called more than needed as it will
-   * negatively impact the performance of date operations.
-   */
-  V8_DEPRECATED("Use Isolate::DateTimeConfigurationChangeNotification",
-                static void DateTimeConfigurationChangeNotification(
-                    Isolate* isolate, TimeZoneDetection time_zone_detection =
-                                          TimeZoneDetection::kSkip));
-
  private:
   static void CheckCast(Value* obj);
 };
@@ -5956,21 +5901,6 @@ class V8_EXPORT FunctionTemplate : public Template {
    * function call.  Currently defaults to true, but this is subject to change.
    */
   void SetAcceptAnyReceiver(bool value);
-
-  /**
-   * Determines whether the __proto__ accessor ignores instances of
-   * the function template.  If instances of the function template are
-   * ignored, __proto__ skips all instances and instead returns the
-   * next object in the prototype chain.
-   *
-   * Call with a value of true to make the __proto__ accessor ignore
-   * instances of the function template.  Call with a value of false
-   * to make the __proto__ accessor not ignore instances of the
-   * function template.  By default, instances of a function template
-   * are not ignored.
-   */
-  V8_DEPRECATED("This feature is incompatible with ES6+.",
-                void SetHiddenPrototype(bool value));
 
   /**
    * Sets the ReadOnly flag in the attributes of the 'prototype' property
@@ -6776,11 +6706,12 @@ class V8_EXPORT MicrotaskQueue {
    */
   virtual int GetMicrotasksScopeDepth() const = 0;
 
+  MicrotaskQueue(const MicrotaskQueue&) = delete;
+  MicrotaskQueue& operator=(const MicrotaskQueue&) = delete;
+
  private:
   friend class internal::MicrotaskQueue;
   MicrotaskQueue() = default;
-  MicrotaskQueue(const MicrotaskQueue&) = delete;
-  MicrotaskQueue& operator=(const MicrotaskQueue&) = delete;
 };
 
 /**
@@ -7171,7 +7102,7 @@ enum class MemoryPressureLevel { kNone, kModerate, kCritical };
  */
 class V8_EXPORT EmbedderHeapTracer {
  public:
-  enum class TraceFlags : uint64_t {
+  enum TraceFlags : uint64_t {
     kNoFlags = 0,
     kReduceMemory = 1 << 0,
   };
@@ -7190,6 +7121,24 @@ class V8_EXPORT EmbedderHeapTracer {
    public:
     virtual ~TracedGlobalHandleVisitor() = default;
     virtual void VisitTracedGlobalHandle(const TracedGlobal<Value>& value) = 0;
+  };
+
+  /**
+   * Summary of a garbage collection cycle. See |TraceEpilogue| on how the
+   * summary is reported.
+   */
+  struct TraceSummary {
+    /**
+     * Time spent managing the retained memory in milliseconds. This can e.g.
+     * include the time tracing through objects in the embedder.
+     */
+    double time = 0.0;
+
+    /**
+     * Memory retained by the embedder through the |EmbedderHeapTracer|
+     * mechanism in bytes.
+     */
+    size_t allocated_size = 0;
   };
 
   virtual ~EmbedderHeapTracer() = default;
@@ -7238,9 +7187,12 @@ class V8_EXPORT EmbedderHeapTracer {
   /**
    * Called at the end of a GC cycle.
    *
-   * Note that allocation is *not* allowed within |TraceEpilogue|.
+   * Note that allocation is *not* allowed within |TraceEpilogue|. Can be
+   * overriden to fill a |TraceSummary| that is used by V8 to schedule future
+   * garbage collections.
    */
-  virtual void TraceEpilogue() = 0;
+  virtual void TraceEpilogue() {}
+  virtual void TraceEpilogue(TraceSummary* trace_summary) { TraceEpilogue(); }
 
   /**
    * Called upon entering the final marking pause. No more incremental marking
@@ -7278,6 +7230,14 @@ class V8_EXPORT EmbedderHeapTracer {
   void GarbageCollectionForTesting(EmbedderStackState stack_state);
 
   /*
+   * Called by the embedder to signal newly allocated memory. Not bound to
+   * tracing phases. Embedders should trade off when increments are reported as
+   * V8 may consult global heuristics on whether to trigger garbage collection
+   * on this change.
+   */
+  void IncreaseAllocatedSize(size_t bytes);
+
+  /*
    * Returns the v8::Isolate this tracer is attached too and |nullptr| if it
    * is not attached to any v8::Isolate.
    */
@@ -7288,18 +7248,6 @@ class V8_EXPORT EmbedderHeapTracer {
 
   friend class internal::LocalEmbedderHeapTracer;
 };
-
-constexpr EmbedderHeapTracer::TraceFlags operator&(
-    EmbedderHeapTracer::TraceFlags lhs, EmbedderHeapTracer::TraceFlags rhs) {
-  return static_cast<EmbedderHeapTracer::TraceFlags>(
-      static_cast<uint64_t>(lhs) & static_cast<uint64_t>(rhs));
-}
-
-constexpr EmbedderHeapTracer::TraceFlags operator|(
-    EmbedderHeapTracer::TraceFlags lhs, EmbedderHeapTracer::TraceFlags rhs) {
-  return static_cast<EmbedderHeapTracer::TraceFlags>(
-      static_cast<uint64_t>(lhs) | static_cast<uint64_t>(rhs));
-}
 
 /**
  * Callback and supporting data used in SnapshotCreator to implement embedder
@@ -8648,9 +8596,8 @@ class V8_EXPORT V8 {
    */
   static void SetFlagsFromString(const char* str);
   static void SetFlagsFromString(const char* str, size_t length);
-  V8_DEPRECATE_SOON("use size_t version",
-                    static void SetFlagsFromString(const char* str,
-                                                   int length));
+  V8_DEPRECATED("use size_t version",
+                static void SetFlagsFromString(const char* str, int length));
 
   /**
    * Sets V8 flags from the command line.
@@ -9957,17 +9904,6 @@ void TracedGlobal<T>::SetFinalizationCallback(
 
 template <typename T>
 ReturnValue<T>::ReturnValue(internal::Address* slot) : value_(slot) {}
-
-template<typename T>
-template<typename S>
-void ReturnValue<T>::Set(const Persistent<S>& handle) {
-  TYPE_CHECK(T, S);
-  if (V8_UNLIKELY(handle.IsEmpty())) {
-    *value_ = GetDefaultValue();
-  } else {
-    *value_ = *reinterpret_cast<internal::Address*>(*handle);
-  }
-}
 
 template <typename T>
 template <typename S>

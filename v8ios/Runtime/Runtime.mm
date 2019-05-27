@@ -99,14 +99,14 @@ void Runtime::RunScript(string file) {
 void Runtime::DefineGlobalObject(Local<Context> context) {
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
-    if (!global->DefineOwnProperty(context, v8::String::NewFromUtf8(context->GetIsolate(), "global"), global, readOnlyFlags).FromMaybe(false)) {
+    if (!global->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "global"), global, readOnlyFlags).FromMaybe(false)) {
         assert(false);
     }
 }
 
 void Runtime::DefinePerformanceObject(Local<Context> context) {
     Local<Object> global = context->Global();
-    Local<v8::String> performancePropertyName = v8::String::NewFromUtf8(context->GetIsolate(), "performance");
+    Local<v8::String> performancePropertyName = ToV8String(context->GetIsolate(), "performance");
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     if (!global->DefineOwnProperty(context, performancePropertyName, global, readOnlyFlags).FromMaybe(false)) {
         assert(false);
@@ -121,7 +121,7 @@ void Runtime::DefinePerformanceObject(Local<Context> context) {
     if (!Function::New(context, PerformanceNowCallback).ToLocal(&nowFunc)) {
         assert(false);
     }
-    performance->ToObject(context).ToLocalChecked()->Set(v8::String::NewFromUtf8(context->GetIsolate(), "now"), nowFunc);
+    performance->ToObject(context).ToLocalChecked()->Set(ToV8String(context->GetIsolate(), "now"), nowFunc);
 }
 
 void Runtime::PerformanceNowCallback(const FunctionCallbackInfo<Value>& args) {

@@ -23,6 +23,8 @@ class Mutex;
 namespace platform {
 namespace tracing {
 
+class PerfettoTracingController;
+
 const int kTraceMaxNumArgs = 2;
 
 class V8_PLATFORM_EXPORT TraceObject {
@@ -238,6 +240,11 @@ class V8_PLATFORM_EXPORT TracingController
   TracingController();
   ~TracingController() override;
   void Initialize(TraceBuffer* trace_buffer);
+#ifdef V8_USE_PERFETTO
+  // Must be called before StartTracing() if V8_USE_PERFETTO is true. Provides
+  // the output stream for the JSON trace data.
+  void InitializeForPerfetto(std::ostream* output_stream);
+#endif
 
   // v8::TracingController implementation.
   const uint8_t* GetCategoryGroupEnabled(const char* category_group) override;
@@ -280,6 +287,11 @@ class V8_PLATFORM_EXPORT TracingController
   std::unique_ptr<base::Mutex> mutex_;
   std::unordered_set<v8::TracingController::TraceStateObserver*> observers_;
   std::atomic_bool recording_{false};
+#ifdef V8_USE_PERFETTO
+  std::atomic_bool perfetto_recording_{false};
+  std::unique_ptr<PerfettoTracingController> perfetto_tracing_controller_;
+  std::ostream* output_stream_ = nullptr;
+#endif
 
   // Disallow copy and assign
   TracingController(const TracingController&) = delete;

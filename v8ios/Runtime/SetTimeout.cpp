@@ -1,5 +1,6 @@
 #include <dispatch/dispatch.h>
 #include "SetTimeout.h"
+#include "Helpers.h"
 
 using namespace v8;
 
@@ -14,7 +15,7 @@ void SetTimeout::Init(Isolate* isolate) {
         assert(false);
     }
 
-    if (!global->Set(String::NewFromUtf8(isolate, "setTimeout"), setTimeoutFunc)) {
+    if (!global->Set(context, ToV8String(isolate, "setTimeout"), setTimeoutFunc).FromMaybe(false)) {
         assert(false);
     }
 
@@ -23,7 +24,7 @@ void SetTimeout::Init(Isolate* isolate) {
         assert(false);
     }
 
-    if (!global->Set(String::NewFromUtf8(isolate, "clearTimeout"), clearTimeoutFunc)) {
+    if (!global->Set(context, ToV8String(isolate, "clearTimeout"), clearTimeoutFunc).FromMaybe(false)) {
         assert(false);
     }
 }
@@ -97,7 +98,7 @@ void SetTimeout::Elapsed(const uint32_t key) {
 
     RemoveKey(key);
 }
-    
+
 void SetTimeout::RemoveKey(const uint32_t key) {
     auto it = cache_.find(key);
     if (it == cache_.end()) {

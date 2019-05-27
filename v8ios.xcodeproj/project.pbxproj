@@ -26,6 +26,7 @@
 		C2543CFA227B220F007AC505 /* WeakRef.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2543CF8227B220F007AC505 /* WeakRef.cpp */; };
 		C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF7222E80AC008F674F /* MetadataBuilder.mm */; };
 		C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.cpp */; };
+		C27A2FBD229C1D7100965800 /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C27A2FBC229C1D7100965800 /* libv8_external_snapshot.a */; };
 		C27E278D22202665009C10A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C27E278C22202665009C10A3 /* Assets.xcassets */; };
 		C27E279322202665009C10A3 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.mm */; };
 		C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF122214A4D007DE2BA /* platform-ios.cpp */; };
@@ -41,7 +42,6 @@
 		C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2B12EE22227C606000F6AFC /* SetTimeout.cpp */; };
 		C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EF922297FD1000F6AFC /* libv8_libbase.a */; };
 		C2B12F0222297FD7000F6AFC /* libv8_init.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFA22297FD2000F6AFC /* libv8_init.a */; };
-		C2B12F0322297FD7000F6AFC /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFB22297FD2000F6AFC /* libv8_external_snapshot.a */; };
 		C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */; };
 		C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */; };
 		C2BC5DAC22561C370020F348 /* Tasks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2BC5DAB22561C370020F348 /* Tasks.cpp */; };
@@ -90,6 +90,7 @@
 		C2764AF8222E80AC008F674F /* MetadataBuilder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MetadataBuilder.h; sourceTree = "<group>"; };
 		C2764AFA223644B3008F674F /* ObjectManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ObjectManager.cpp; sourceTree = "<group>"; };
 		C2764AFB223644B3008F674F /* ObjectManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjectManager.h; sourceTree = "<group>"; };
+		C27A2FBC229C1D7100965800 /* libv8_external_snapshot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_external_snapshot.a; sourceTree = "<group>"; };
 		C27E278022202664009C10A3 /* v8ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = v8ios.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C27E278C22202665009C10A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C27E279122202665009C10A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -123,7 +124,6 @@
 		C2B12EF6222958D7000F6AFC /* natives_blob.arm64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.arm64.h; sourceTree = "<group>"; };
 		C2B12EF922297FD1000F6AFC /* libv8_libbase.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libbase.a; sourceTree = "<group>"; };
 		C2B12EFA22297FD2000F6AFC /* libv8_init.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_init.a; sourceTree = "<group>"; };
-		C2B12EFB22297FD2000F6AFC /* libv8_external_snapshot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_external_snapshot.a; sourceTree = "<group>"; };
 		C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
 		C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
 		C2BC5DAA225602C50020F348 /* Tasks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Tasks.h; sourceTree = "<group>"; };
@@ -152,8 +152,8 @@
 				C2335B74224CEAFA0071048C /* libffi.a in Frameworks */,
 				C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */,
 				C2B12F0222297FD7000F6AFC /* libv8_init.a in Frameworks */,
+				C27A2FBD229C1D7100965800 /* libv8_external_snapshot.a in Frameworks */,
 				C201FB7322660C0B00D0636A /* libv8_compiler.a in Frameworks */,
-				C2B12F0322297FD7000F6AFC /* libv8_external_snapshot.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -273,7 +273,7 @@
 				C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */,
 				C201FB70226607BA00D0636A /* libv8_base_without_compiler.a */,
 				C201FB7222660C0B00D0636A /* libv8_compiler.a */,
-				C2B12EFB22297FD2000F6AFC /* libv8_external_snapshot.a */,
+				C27A2FBC229C1D7100965800 /* libv8_external_snapshot.a */,
 				C2B12EFA22297FD2000F6AFC /* libv8_init.a */,
 				C201FB7422660C1700D0636A /* libv8_initializers.a */,
 				C2B12EF922297FD1000F6AFC /* libv8_libbase.a */,

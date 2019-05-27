@@ -33,6 +33,9 @@ Thumbs.db
 # CLion
 .idea
 
+# VSCode
+.vscode
+
 # Other
 node_modules/
 package-lock.json
