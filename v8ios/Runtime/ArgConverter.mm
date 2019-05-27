@@ -3,6 +3,7 @@
 #include "ObjectManager.h"
 #include "Caches.h"
 #include "Interop.h"
+#include "Helpers.h"
 
 using namespace v8;
 using namespace std;
@@ -126,13 +127,18 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
                     return;
                 }
             } else if (result->IsObject()) {
-                if (data->typeEncoding_->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+                if (data->typeEncoding_->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
+                    data->typeEncoding_->type == BinaryTypeEncodingType::InstanceTypeEncoding) {
                     Local<External> ext = result.As<Object>()->GetInternalField(0).As<External>();
                     ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
                     id data = wrapper->Data();
                     *(ffi_arg *)retValue = (unsigned long)data;
                     return;
                 }
+            } else if (result->IsBoolean()) {
+                bool boolValue = result.As<v8::Boolean>()->Value();
+                *(ffi_arg *)retValue = (bool)boolValue;
+                return;
             }
 
             // TODO: Handle other return types, i.e. assign the retValue parameter from the v8 result
@@ -214,6 +220,16 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
                     assert(false);
                 }
             }
+        }
+    }
+
+    Class metaClass = object_getClass(target);
+    if (class_isMetaClass(metaClass)) {
+        Local<Value> metadataProp = tns::GetPrivateValue(isolate, receiver, tns::ToV8String(isolate, "metadata"));
+        if (metadataProp.IsEmpty() || !metadataProp->IsExternal()) {
+            ObjCDataWrapper* wrapper = new ObjCDataWrapper(class_getName(klass), klass);
+            Local<External> extendedData = External::New(isolate, wrapper);
+            tns::SetPrivateValue(isolate, receiver, tns::ToV8String(isolate, "metadata"), extendedData);
         }
     }
 
