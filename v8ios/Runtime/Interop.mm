@@ -521,7 +521,8 @@ void Interop::SetStructPropertyValue(StructDataWrapper* wrapper, StructField fie
         return;
     }
 
-    void* sourceBuffer = nullptr;
+    uint8_t* data = (uint8_t*)wrapper->Data();
+    uint8_t* destBuffer = data + field.Offset();
 
     const TypeEncoding* fieldEncoding = field.Encoding();
     switch (fieldEncoding->type) {
@@ -529,52 +530,55 @@ void Interop::SetStructPropertyValue(StructDataWrapper* wrapper, StructField fie
             Local<Object> obj = value.As<Object>();
             Local<External> ext = obj->GetInternalField(0).As<External>();
             StructDataWrapper* targetStruct = static_cast<StructDataWrapper*>(ext->Value());
-            sourceBuffer = targetStruct->Data();
+
+            void* sourceBuffer = targetStruct->Data();
+            size_t fieldSize = field.Size();
+            memcpy(destBuffer, sourceBuffer, fieldSize);
             break;
         }
         case BinaryTypeEncodingType::UShortEncoding: {
             unsigned short val = value.As<Number>()->Value();
-            sourceBuffer = &val;
+            *static_cast<unsigned short*>((void*)destBuffer) = val;
             break;
         }
         case BinaryTypeEncodingType::ShortEncoding: {
             short val = value.As<Number>()->Value();
-            sourceBuffer = &val;
+            *static_cast<short*>((void*)destBuffer) = val;
             break;
         }
         case BinaryTypeEncodingType::UIntEncoding: {
             unsigned int val = value.As<Number>()->Value();
-            sourceBuffer = &val;
+            *static_cast<unsigned int*>((void*)destBuffer) = val;
             break;
         }
         case BinaryTypeEncodingType::IntEncoding: {
             int val = value.As<Number>()->Value();
-            sourceBuffer = &val;
+            *static_cast<int*>((void*)destBuffer) = val;
             break;
         }
         case BinaryTypeEncodingType::ULongEncoding: {
             unsigned long val = value.As<Number>()->Value();
-            sourceBuffer = &val;
+            *static_cast<unsigned long*>((void*)destBuffer) = val;
             break;
         }
         case BinaryTypeEncodingType::ULongLongEncoding: {
             unsigned long long val = value.As<Number>()->Value();
-            sourceBuffer = &val;
+            *static_cast<unsigned long long*>((void*)destBuffer) = val;
             break;
         }
         case BinaryTypeEncodingType::LongLongEncoding: {
             long long val = value.As<Number>()->Value();
-            sourceBuffer = &val;
+            *static_cast<long long*>((void*)destBuffer) = val;
             break;
         }
         case BinaryTypeEncodingType::FloatEncoding: {
             float val = value.As<Number>()->Value();
-            sourceBuffer = &val;
+            *static_cast<float*>((void*)destBuffer) = val;
             break;
         }
         case BinaryTypeEncodingType::DoubleEncoding: {
             double val = value.As<Number>()->Value();
-            sourceBuffer = &val;
+            *static_cast<double*>((void*)destBuffer) = val;
             break;
         }
         default: {
@@ -582,11 +586,6 @@ void Interop::SetStructPropertyValue(StructDataWrapper* wrapper, StructField fie
             assert(false);
         }
     }
-
-    void* destBuffer = (uint8_t*)wrapper->Data() + field.Offset();
-
-    size_t fieldSize = field.Size();
-    memcpy(destBuffer, sourceBuffer, fieldSize);
 }
 
 }
