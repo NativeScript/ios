@@ -1,5 +1,6 @@
 #import <Foundation/NSString.h>
 #import "ArrayAdapter.h"
+#import "DataWrapper.h"
 #include "Helpers.h"
 
 using namespace tns;
@@ -34,12 +35,25 @@ using namespace v8;
         return nil;
     }
 
-    assert(item->IsString());
+    if (item->IsString()) {
+        std::string value = tns::ToString(self->isolate_, item);
+        NSString* result = [NSString stringWithUTF8String:value.c_str()];
+        return result;
+    }
 
-    std::string value = tns::ToString(self->isolate_, item);
-    NSString* result = [NSString stringWithUTF8String:value.c_str()];
+    if (item->IsObject()) {
+        Local<Object> obj = item.As<Object>();
+        assert(obj->InternalFieldCount() > 0);
+        Local<External> ext = obj->GetInternalField(0).As<External>();
+        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+        assert(wrapper->Type() == WrapperType::ObjCObject);
+        ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+        id result = objCDataWrapper->Data();
+        return result;
+    }
 
-    return result;
+    // TODO: Handle other possible types
+    assert(false);
 }
 
 - (void)dealloc {
