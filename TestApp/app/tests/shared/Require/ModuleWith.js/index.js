@@ -1,0 +1,1 @@
+TNSLog("module with .js in the name loaded");

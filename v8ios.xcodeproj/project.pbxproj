@@ -7,56 +7,101 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C201FB6D225F4FCE00D0636A /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2FF301C2252062A00933782 /* UIKit.framework */; };
-		C201FB6E225FA64700D0636A /* Metadata.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF4222BE705008F674F /* Metadata.mm */; };
-		C201FB6F225FA66B00D0636A /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */; };
-		C201FB71226607BA00D0636A /* libv8_base_without_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB70226607BA00D0636A /* libv8_base_without_compiler.a */; };
-		C201FB7322660C0B00D0636A /* libv8_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7222660C0B00D0636A /* libv8_compiler.a */; };
-		C201FB7522660C1800D0636A /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7422660C1700D0636A /* libv8_initializers.a */; };
-		C201FB7722660C2B00D0636A /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */; };
-		C201FB7A226702BA00D0636A /* FFICall.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C201FB78226702BA00D0636A /* FFICall.cpp */; };
-		C201FB7F226760A700D0636A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C201FB7E226760A700D0636A /* LaunchScreen.storyboard */; };
-		C2335B70224CADD50071048C /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2335B6E224CADD50071048C /* Interop.mm */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
-		C2335B74224CEAFA0071048C /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2335B73224CEAFA0071048C /* libffi.a */; };
-		C24F391A2225859D0027977A /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C24F39192225859D0027977A /* Console.cpp */; };
-		C2543CED226F001A007AC505 /* ArrayAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2543CEB226F001A007AC505 /* ArrayAdapter.mm */; };
-		C2543CF0226F49AA007AC505 /* SymbolLoader.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2543CEE226F49AA007AC505 /* SymbolLoader.mm */; };
-		C2543CF52270A974007AC505 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C2543CF32270A974007AC505 /* Main.storyboard */; };
-		C2543CF7227841B6007AC505 /* ClassBuilder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2543CF6227841B6007AC505 /* ClassBuilder.cpp */; };
-		C2543CFA227B220F007AC505 /* WeakRef.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2543CF8227B220F007AC505 /* WeakRef.cpp */; };
-		C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2764AF7222E80AC008F674F /* MetadataBuilder.mm */; };
-		C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2764AFA223644B3008F674F /* ObjectManager.cpp */; };
-		C27A2FBD229C1D7100965800 /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C27A2FBC229C1D7100965800 /* libv8_external_snapshot.a */; };
-		C27E278D22202665009C10A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C27E278C22202665009C10A3 /* Assets.xcassets */; };
-		C27E279322202665009C10A3 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C27E279222202665009C10A3 /* main.mm */; };
-		C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C28B7AF122214A4D007DE2BA /* platform-ios.cpp */; };
-		C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B2C22241270007DE2BA /* Runtime.mm */; };
-		C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */ = {isa = PBXBuildFile; fileRef = C28B7B5922252432007DE2BA /* ModuleInternal.mm */; };
-		C2A7BE10227C7F3A00D43EEB /* TNSWidgets.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2A7BE0F227C7F3A00D43EEB /* TNSWidgets.framework */; };
-		C2A7BE12227C7FEF00D43EEB /* TNSWidgets.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2A7BE0F227C7F3A00D43EEB /* TNSWidgets.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		C2A7BE16227DA1C000D43EEB /* DictionaryAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2A7BE14227DA1C000D43EEB /* DictionaryAdapter.mm */; };
-		C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */; };
-		C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9CC224391A3006FB9D3 /* Caches.cpp */; };
-		C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */; };
-		C2AAE9D722490F50006FB9D3 /* Helpers.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2AAE9D522490F50006FB9D3 /* Helpers.mm */; };
-		C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2B12EE22227C606000F6AFC /* SetTimeout.cpp */; };
-		C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EF922297FD1000F6AFC /* libv8_libbase.a */; };
-		C2B12F0222297FD7000F6AFC /* libv8_init.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFA22297FD2000F6AFC /* libv8_init.a */; };
-		C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */; };
-		C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */; };
-		C2BC5DAC22561C370020F348 /* Tasks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2BC5DAB22561C370020F348 /* Tasks.cpp */; };
-		C2FF3001225202FC00933782 /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2FF3000225202FC00933782 /* app */; };
-		C2FF30152252034900933782 /* include in Resources */ = {isa = PBXBuildFile; fileRef = C2FF30142252034900933782 /* include */; };
+		C2DDEB36229EAB3B00345BFE /* NativeScript.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB34229EAB3B00345BFE /* NativeScript.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3E229EABFF00345BFE /* libffi.a */; };
+		C2DDEB49229EAC0000345BFE /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3F229EABFF00345BFE /* libv8_external_snapshot.a */; };
+		C2DDEB4A229EAC0000345BFE /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB40229EAC0000345BFE /* libtorque_generated_initializers.a */; };
+		C2DDEB4B229EAC0000345BFE /* libv8_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB41229EAC0000345BFE /* libv8_compiler.a */; };
+		C2DDEB4C229EAC0000345BFE /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB42229EAC0000345BFE /* libv8_initializers.a */; };
+		C2DDEB4D229EAC0000345BFE /* libv8_base_without_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB43229EAC0000345BFE /* libv8_base_without_compiler.a */; };
+		C2DDEB4E229EAC0000345BFE /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB44229EAC0000345BFE /* libv8_libplatform.a */; };
+		C2DDEB4F229EAC0000345BFE /* libv8_init.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB45229EAC0000345BFE /* libv8_init.a */; };
+		C2DDEB50229EAC0000345BFE /* libv8_libbase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB46229EAC0000345BFE /* libv8_libbase.a */; };
+		C2DDEB51229EAC0000345BFE /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB47229EAC0000345BFE /* libv8_libsampler.a */; };
+		C2DDEB57229EAC1F00345BFE /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB52229EAC1F00345BFE /* platform-ios.cpp */; };
+		C2DDEB58229EAC1F00345BFE /* timezone-cache.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB53229EAC1F00345BFE /* timezone-cache.h */; };
+		C2DDEB59229EAC1F00345BFE /* platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB54229EAC1F00345BFE /* platform.h */; };
+		C2DDEB5A229EAC1F00345BFE /* stack_trace.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB55229EAC1F00345BFE /* stack_trace.h */; };
+		C2DDEB5B229EAC1F00345BFE /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB56229EAC1F00345BFE /* stack_trace_posix.cpp */; };
+		C2DDEB60229EAC3C00345BFE /* snapshot_blob.x86_64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5C229EAC3C00345BFE /* snapshot_blob.x86_64.h */; };
+		C2DDEB61229EAC3C00345BFE /* snapshot_blob.arm64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5D229EAC3C00345BFE /* snapshot_blob.arm64.h */; };
+		C2DDEB62229EAC3C00345BFE /* natives_blob.x86_64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5E229EAC3C00345BFE /* natives_blob.x86_64.h */; };
+		C2DDEB63229EAC3C00345BFE /* natives_blob.arm64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5F229EAC3C00345BFE /* natives_blob.arm64.h */; };
+		C2DDEB8D229EAC8300345BFE /* Common.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB64229EAC8100345BFE /* Common.h */; };
+		C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB65229EAC8100345BFE /* Interop.h */; };
+		C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB66229EAC8100345BFE /* ArgConverter.h */; };
+		C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */; };
+		C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB68229EAC8100345BFE /* FFICall.cpp */; };
+		C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB69229EAC8100345BFE /* WeakRef.cpp */; };
+		C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */; };
+		C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6B229EAC8200345BFE /* Console.cpp */; };
+		C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */; };
+		C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB6D229EAC8200345BFE /* Helpers.h */; };
+		C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB6E229EAC8200345BFE /* Metadata.h */; };
+		C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */; };
+		C2DDEB99229EAC8300345BFE /* Metadata.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB70229EAC8200345BFE /* Metadata.mm */; };
+		C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */; };
+		C2DDEB9B229EAC8300345BFE /* DataWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB72229EAC8200345BFE /* DataWrapper.h */; };
+		C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB73229EAC8200345BFE /* ClassBuilder.cpp */; };
+		C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB74229EAC8200345BFE /* SetTimeout.h */; };
+		C2DDEB9E229EAC8300345BFE /* SymbolLoader.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB75229EAC8200345BFE /* SymbolLoader.mm */; };
+		C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB76229EAC8200345BFE /* Tasks.h */; };
+		C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB77229EAC8200345BFE /* Interop.mm */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
+		C2DDEBA1229EAC8300345BFE /* FFICall.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB78229EAC8200345BFE /* FFICall.h */; };
+		C2DDEBA2229EAC8300345BFE /* Console.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB79229EAC8200345BFE /* Console.h */; };
+		C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB7A229EAC8200345BFE /* ArrayAdapter.mm */; };
+		C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB7B229EAC8200345BFE /* Runtime.h */; };
+		C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB7C229EAC8200345BFE /* Runtime.mm */; };
+		C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB7D229EAC8200345BFE /* Helpers.mm */; };
+		C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB7E229EAC8200345BFE /* ClassBuilder.h */; };
+		C2DDEBA8229EAC8300345BFE /* SymbolLoader.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB7F229EAC8200345BFE /* SymbolLoader.h */; };
+		C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB81229EAC8200345BFE /* ModuleInternal.mm */; };
+		C2DDEBAB229EAC8300345BFE /* WeakRef.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB82229EAC8200345BFE /* WeakRef.h */; };
+		C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB83229EAC8300345BFE /* ObjectManager.h */; };
+		C2DDEBAD229EAC8300345BFE /* Caches.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB84229EAC8300345BFE /* Caches.h */; };
+		C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */; };
+		C2DDEBAF229EAC8300345BFE /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB86229EAC8300345BFE /* ObjectManager.cpp */; };
+		C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB87229EAC8300345BFE /* StringHasher.h */; };
+		C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB88229EAC8300345BFE /* Caches.cpp */; };
+		C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB89229EAC8300345BFE /* ModuleInternal.h */; };
+		C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB8A229EAC8300345BFE /* ClassBuilder.mm */; };
+		C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB8B229EAC8300345BFE /* DictionaryAdapter.mm */; };
+		C2DDEBB5229EAC8300345BFE /* Tasks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB8C229EAC8300345BFE /* Tasks.cpp */; };
+		C2DDEBBE229EB02500345BFE /* v8-version.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBB8229EB02500345BFE /* v8-version.h */; };
+		C2DDEBBF229EB02500345BFE /* v8.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBB9229EB02500345BFE /* v8.h */; };
+		C2DDEBC0229EB02500345BFE /* libffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBBA229EB02500345BFE /* libffi.h */; };
+		C2DDEBC1229EB02500345BFE /* v8config.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBBB229EB02500345BFE /* v8config.h */; };
+		C2DDEBC2229EB02500345BFE /* v8-internal.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBBC229EB02500345BFE /* v8-internal.h */; };
+		C2DDEBC3229EB02500345BFE /* v8-platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBBD229EB02500345BFE /* v8-platform.h */; };
+		C2DDEBC9229EB06500345BFE /* libplatform.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBC6229EB06500345BFE /* libplatform.h */; };
+		C2DDEBCA229EB06500345BFE /* libplatform-export.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBC7229EB06500345BFE /* libplatform-export.h */; };
+		C2DDEBCB229EB06500345BFE /* v8-tracing.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBC8229EB06500345BFE /* v8-tracing.h */; };
+		C2DDEBD3229EB06E00345BFE /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBCE229EB06E00345BFE /* ffitarget.h */; };
+		C2DDEBD4229EB06E00345BFE /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBCF229EB06E00345BFE /* ffi.h */; };
+		C2DDEBD5229EB06E00345BFE /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBD1229EB06E00345BFE /* ffitarget.h */; };
+		C2DDEBD6229EB06E00345BFE /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBD2229EB06E00345BFE /* ffi.h */; };
+		C2DDEBD7229EB1C500345BFE /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2FF301C2252062A00933782 /* UIKit.framework */; };
+		C2DDEBDC229EB37A00345BFE /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEBDB229EB37A00345BFE /* main.mm */; };
+		C2DDEBDE229EB4A900345BFE /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2DDEBDD229EB4A900345BFE /* app */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C2DDEBD8229EB31500345BFE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2DDEB31229EAB3B00345BFE;
+			remoteInfo = NativeScript;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
-		C2A7BE13227C7FEF00D43EEB /* Embed Frameworks */ = {
+		C2937490229EC6910075CB16 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				C2A7BE12227C7FEF00D43EEB /* TNSWidgets.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -64,176 +109,125 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		C201FB70226607BA00D0636A /* libv8_base_without_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base_without_compiler.a; sourceTree = "<group>"; };
-		C201FB7222660C0B00D0636A /* libv8_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_compiler.a; sourceTree = "<group>"; };
-		C201FB7422660C1700D0636A /* libv8_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_initializers.a; sourceTree = "<group>"; };
-		C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
-		C201FB78226702BA00D0636A /* FFICall.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FFICall.cpp; sourceTree = "<group>"; };
-		C201FB79226702BA00D0636A /* FFICall.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FFICall.h; sourceTree = "<group>"; };
-		C201FB7E226760A700D0636A /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		C2335B6E224CADD50071048C /* Interop.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Interop.mm; sourceTree = "<group>"; };
-		C2335B6F224CADD50071048C /* Interop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Interop.h; sourceTree = "<group>"; };
-		C2335B73224CEAFA0071048C /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
-		C24F39182225859D0027977A /* Console.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Console.h; sourceTree = "<group>"; };
-		C24F39192225859D0027977A /* Console.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
-		C2543CEB226F001A007AC505 /* ArrayAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ArrayAdapter.mm; sourceTree = "<group>"; };
-		C2543CEC226F001A007AC505 /* ArrayAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArrayAdapter.h; sourceTree = "<group>"; };
-		C2543CEE226F49AA007AC505 /* SymbolLoader.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = SymbolLoader.mm; sourceTree = "<group>"; };
-		C2543CEF226F49AA007AC505 /* SymbolLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SymbolLoader.h; sourceTree = "<group>"; };
-		C2543CF42270A974007AC505 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
-		C2543CF6227841B6007AC505 /* ClassBuilder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ClassBuilder.cpp; sourceTree = "<group>"; };
-		C2543CF8227B220F007AC505 /* WeakRef.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = WeakRef.cpp; sourceTree = "<group>"; };
-		C2543CF9227B220F007AC505 /* WeakRef.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WeakRef.h; sourceTree = "<group>"; };
-		C2764AF4222BE705008F674F /* Metadata.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Metadata.mm; sourceTree = "<group>"; };
-		C2764AF5222BE705008F674F /* Metadata.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
-		C2764AF7222E80AC008F674F /* MetadataBuilder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MetadataBuilder.mm; sourceTree = "<group>"; };
-		C2764AF8222E80AC008F674F /* MetadataBuilder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MetadataBuilder.h; sourceTree = "<group>"; };
-		C2764AFA223644B3008F674F /* ObjectManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ObjectManager.cpp; sourceTree = "<group>"; };
-		C2764AFB223644B3008F674F /* ObjectManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjectManager.h; sourceTree = "<group>"; };
-		C27A2FBC229C1D7100965800 /* libv8_external_snapshot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_external_snapshot.a; sourceTree = "<group>"; };
-		C27E278022202664009C10A3 /* v8ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = v8ios.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C27E278C22202665009C10A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		C27E279122202665009C10A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C27E279222202665009C10A3 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
-		C28B7AF02221499D007DE2BA /* platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = platform.h; sourceTree = "<group>"; };
-		C28B7AF122214A4D007DE2BA /* platform-ios.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "platform-ios.cpp"; sourceTree = "<group>"; };
-		C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = stack_trace_posix.cpp; sourceTree = "<group>"; };
-		C28B7AF522215528007DE2BA /* stack_trace.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stack_trace.h; sourceTree = "<group>"; };
-		C28B7B0E2223E6C0007DE2BA /* timezone-cache.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "timezone-cache.h"; sourceTree = "<group>"; };
-		C28B7B2B22241122007DE2BA /* Runtime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Runtime.h; sourceTree = "<group>"; };
-		C28B7B2C22241270007DE2BA /* Runtime.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Runtime.mm; sourceTree = "<group>"; };
-		C28B7B5822252431007DE2BA /* ModuleInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ModuleInternal.h; sourceTree = "<group>"; };
-		C28B7B5922252432007DE2BA /* ModuleInternal.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ModuleInternal.mm; sourceTree = "<group>"; };
-		C2A7BE0F227C7F3A00D43EEB /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
-		C2A7BE14227DA1C000D43EEB /* DictionaryAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DictionaryAdapter.mm; sourceTree = "<group>"; };
-		C2A7BE15227DA1C000D43EEB /* DictionaryAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DictionaryAdapter.h; sourceTree = "<group>"; };
-		C2AAE9C8223BA685006FB9D3 /* StringHasher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
-		C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ArgConverter.mm; sourceTree = "<group>"; };
-		C2AAE9CA2243789A006FB9D3 /* ArgConverter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArgConverter.h; sourceTree = "<group>"; };
-		C2AAE9CC224391A3006FB9D3 /* Caches.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Caches.cpp; sourceTree = "<group>"; };
-		C2AAE9CD224391A3006FB9D3 /* Caches.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Caches.h; sourceTree = "<group>"; };
-		C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ClassBuilder.mm; sourceTree = "<group>"; };
-		C2AAE9D3224902FD006FB9D3 /* ClassBuilder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ClassBuilder.h; sourceTree = "<group>"; };
-		C2AAE9D522490F50006FB9D3 /* Helpers.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Helpers.mm; sourceTree = "<group>"; };
-		C2AAE9D622490F50006FB9D3 /* Helpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Helpers.h; sourceTree = "<group>"; };
-		C2B12EE12227C606000F6AFC /* SetTimeout.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SetTimeout.h; sourceTree = "<group>"; };
-		C2B12EE22227C606000F6AFC /* SetTimeout.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SetTimeout.cpp; sourceTree = "<group>"; };
-		C2B12EF022293CC3000F6AFC /* snapshot_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.x86_64.h; sourceTree = "<group>"; };
-		C2B12EF122293CC3000F6AFC /* natives_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.x86_64.h; sourceTree = "<group>"; };
-		C2B12EF4222957FC000F6AFC /* snapshot_blob.arm64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.arm64.h; sourceTree = "<group>"; };
-		C2B12EF6222958D7000F6AFC /* natives_blob.arm64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.arm64.h; sourceTree = "<group>"; };
-		C2B12EF922297FD1000F6AFC /* libv8_libbase.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libbase.a; sourceTree = "<group>"; };
-		C2B12EFA22297FD2000F6AFC /* libv8_init.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_init.a; sourceTree = "<group>"; };
-		C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
-		C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
-		C2BC5DAA225602C50020F348 /* Tasks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Tasks.h; sourceTree = "<group>"; };
-		C2BC5DAB22561C370020F348 /* Tasks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Tasks.cpp; sourceTree = "<group>"; };
-		C2FE377E224E61AA00847863 /* NativeScript.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeScript.h; sourceTree = "<group>"; };
-		C2FE3780224E803700847863 /* DataWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DataWrapper.h; sourceTree = "<group>"; };
-		C2FF3000225202FC00933782 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
-		C2FF30142252034900933782 /* include */ = {isa = PBXFileReference; lastKnownFileType = folder; path = include; sourceTree = "<group>"; };
+		C293748C229EC6780075CB16 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
+		C2DDEB16229EA89000345BFE /* TestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2DDEB26229EA89200345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C2DDEB32229EAB3B00345BFE /* NativeScript.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScript.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2DDEB34229EAB3B00345BFE /* NativeScript.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeScript.h; sourceTree = "<group>"; };
+		C2DDEB35229EAB3B00345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C2DDEB3E229EABFF00345BFE /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
+		C2DDEB3F229EABFF00345BFE /* libv8_external_snapshot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_external_snapshot.a; sourceTree = "<group>"; };
+		C2DDEB40229EAC0000345BFE /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
+		C2DDEB41229EAC0000345BFE /* libv8_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_compiler.a; sourceTree = "<group>"; };
+		C2DDEB42229EAC0000345BFE /* libv8_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_initializers.a; sourceTree = "<group>"; };
+		C2DDEB43229EAC0000345BFE /* libv8_base_without_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base_without_compiler.a; sourceTree = "<group>"; };
+		C2DDEB44229EAC0000345BFE /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
+		C2DDEB45229EAC0000345BFE /* libv8_init.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_init.a; sourceTree = "<group>"; };
+		C2DDEB46229EAC0000345BFE /* libv8_libbase.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libbase.a; sourceTree = "<group>"; };
+		C2DDEB47229EAC0000345BFE /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
+		C2DDEB52229EAC1F00345BFE /* platform-ios.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "platform-ios.cpp"; sourceTree = "<group>"; };
+		C2DDEB53229EAC1F00345BFE /* timezone-cache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "timezone-cache.h"; sourceTree = "<group>"; };
+		C2DDEB54229EAC1F00345BFE /* platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = platform.h; sourceTree = "<group>"; };
+		C2DDEB55229EAC1F00345BFE /* stack_trace.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = stack_trace.h; sourceTree = "<group>"; };
+		C2DDEB56229EAC1F00345BFE /* stack_trace_posix.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = stack_trace_posix.cpp; sourceTree = "<group>"; };
+		C2DDEB5C229EAC3C00345BFE /* snapshot_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.x86_64.h; sourceTree = "<group>"; };
+		C2DDEB5D229EAC3C00345BFE /* snapshot_blob.arm64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.arm64.h; sourceTree = "<group>"; };
+		C2DDEB5E229EAC3C00345BFE /* natives_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.x86_64.h; sourceTree = "<group>"; };
+		C2DDEB5F229EAC3C00345BFE /* natives_blob.arm64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.arm64.h; sourceTree = "<group>"; };
+		C2DDEB64229EAC8100345BFE /* Common.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Common.h; sourceTree = "<group>"; };
+		C2DDEB65229EAC8100345BFE /* Interop.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Interop.h; sourceTree = "<group>"; };
+		C2DDEB66229EAC8100345BFE /* ArgConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArgConverter.h; sourceTree = "<group>"; };
+		C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MetadataBuilder.h; sourceTree = "<group>"; };
+		C2DDEB68229EAC8100345BFE /* FFICall.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FFICall.cpp; sourceTree = "<group>"; };
+		C2DDEB69229EAC8100345BFE /* WeakRef.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WeakRef.cpp; sourceTree = "<group>"; };
+		C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ArgConverter.mm; sourceTree = "<group>"; };
+		C2DDEB6B229EAC8200345BFE /* Console.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
+		C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SetTimeout.cpp; sourceTree = "<group>"; };
+		C2DDEB6D229EAC8200345BFE /* Helpers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Helpers.h; sourceTree = "<group>"; };
+		C2DDEB6E229EAC8200345BFE /* Metadata.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
+		C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayAdapter.h; sourceTree = "<group>"; };
+		C2DDEB70229EAC8200345BFE /* Metadata.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Metadata.mm; sourceTree = "<group>"; };
+		C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MetadataBuilder.mm; sourceTree = "<group>"; };
+		C2DDEB72229EAC8200345BFE /* DataWrapper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DataWrapper.h; sourceTree = "<group>"; };
+		C2DDEB73229EAC8200345BFE /* ClassBuilder.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ClassBuilder.cpp; sourceTree = "<group>"; };
+		C2DDEB74229EAC8200345BFE /* SetTimeout.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SetTimeout.h; sourceTree = "<group>"; };
+		C2DDEB75229EAC8200345BFE /* SymbolLoader.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = SymbolLoader.mm; sourceTree = "<group>"; };
+		C2DDEB76229EAC8200345BFE /* Tasks.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Tasks.h; sourceTree = "<group>"; };
+		C2DDEB77229EAC8200345BFE /* Interop.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Interop.mm; sourceTree = "<group>"; };
+		C2DDEB78229EAC8200345BFE /* FFICall.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FFICall.h; sourceTree = "<group>"; };
+		C2DDEB79229EAC8200345BFE /* Console.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Console.h; sourceTree = "<group>"; };
+		C2DDEB7A229EAC8200345BFE /* ArrayAdapter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ArrayAdapter.mm; sourceTree = "<group>"; };
+		C2DDEB7B229EAC8200345BFE /* Runtime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Runtime.h; sourceTree = "<group>"; };
+		C2DDEB7C229EAC8200345BFE /* Runtime.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Runtime.mm; sourceTree = "<group>"; };
+		C2DDEB7D229EAC8200345BFE /* Helpers.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Helpers.mm; sourceTree = "<group>"; };
+		C2DDEB7E229EAC8200345BFE /* ClassBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ClassBuilder.h; sourceTree = "<group>"; };
+		C2DDEB7F229EAC8200345BFE /* SymbolLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SymbolLoader.h; sourceTree = "<group>"; };
+		C2DDEB81229EAC8200345BFE /* ModuleInternal.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ModuleInternal.mm; sourceTree = "<group>"; };
+		C2DDEB82229EAC8200345BFE /* WeakRef.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WeakRef.h; sourceTree = "<group>"; };
+		C2DDEB83229EAC8300345BFE /* ObjectManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ObjectManager.h; sourceTree = "<group>"; };
+		C2DDEB84229EAC8300345BFE /* Caches.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Caches.h; sourceTree = "<group>"; };
+		C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DictionaryAdapter.h; sourceTree = "<group>"; };
+		C2DDEB86229EAC8300345BFE /* ObjectManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ObjectManager.cpp; sourceTree = "<group>"; };
+		C2DDEB87229EAC8300345BFE /* StringHasher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
+		C2DDEB88229EAC8300345BFE /* Caches.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Caches.cpp; sourceTree = "<group>"; };
+		C2DDEB89229EAC8300345BFE /* ModuleInternal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ModuleInternal.h; sourceTree = "<group>"; };
+		C2DDEB8A229EAC8300345BFE /* ClassBuilder.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ClassBuilder.mm; sourceTree = "<group>"; };
+		C2DDEB8B229EAC8300345BFE /* DictionaryAdapter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = DictionaryAdapter.mm; sourceTree = "<group>"; };
+		C2DDEB8C229EAC8300345BFE /* Tasks.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Tasks.cpp; sourceTree = "<group>"; };
+		C2DDEBB8229EB02500345BFE /* v8-version.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "v8-version.h"; path = "Headers/v8-version.h"; sourceTree = "<group>"; };
+		C2DDEBB9229EB02500345BFE /* v8.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = v8.h; path = Headers/v8.h; sourceTree = "<group>"; };
+		C2DDEBBA229EB02500345BFE /* libffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = libffi.h; path = Headers/libffi.h; sourceTree = "<group>"; };
+		C2DDEBBB229EB02500345BFE /* v8config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = v8config.h; path = Headers/v8config.h; sourceTree = "<group>"; };
+		C2DDEBBC229EB02500345BFE /* v8-internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "v8-internal.h"; path = "Headers/v8-internal.h"; sourceTree = "<group>"; };
+		C2DDEBBD229EB02500345BFE /* v8-platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "v8-platform.h"; path = "Headers/v8-platform.h"; sourceTree = "<group>"; };
+		C2DDEBC6229EB06500345BFE /* libplatform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = libplatform.h; sourceTree = "<group>"; };
+		C2DDEBC7229EB06500345BFE /* libplatform-export.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "libplatform-export.h"; sourceTree = "<group>"; };
+		C2DDEBC8229EB06500345BFE /* v8-tracing.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-tracing.h"; sourceTree = "<group>"; };
+		C2DDEBCE229EB06E00345BFE /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
+		C2DDEBCF229EB06E00345BFE /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
+		C2DDEBD1229EB06E00345BFE /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
+		C2DDEBD2229EB06E00345BFE /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
+		C2DDEBDB229EB37A00345BFE /* main.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		C2DDEBDD229EB4A900345BFE /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
 		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		C2FF301C2252062A00933782 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		C2FF301F2252065E00933782 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		C27E277D22202664009C10A3 /* Frameworks */ = {
+		C2DDEB13229EA89000345BFE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C201FB7522660C1800D0636A /* libv8_initializers.a in Frameworks */,
-				C201FB6D225F4FCE00D0636A /* UIKit.framework in Frameworks */,
-				C2B12F0722297FD7000F6AFC /* libv8_libsampler.a in Frameworks */,
-				C201FB71226607BA00D0636A /* libv8_base_without_compiler.a in Frameworks */,
-				C2A7BE10227C7F3A00D43EEB /* TNSWidgets.framework in Frameworks */,
-				C2B12F0122297FD7000F6AFC /* libv8_libbase.a in Frameworks */,
-				C201FB7722660C2B00D0636A /* libtorque_generated_initializers.a in Frameworks */,
-				C2335B74224CEAFA0071048C /* libffi.a in Frameworks */,
-				C2B12F0622297FD7000F6AFC /* libv8_libplatform.a in Frameworks */,
-				C2B12F0222297FD7000F6AFC /* libv8_init.a in Frameworks */,
-				C27A2FBD229C1D7100965800 /* libv8_external_snapshot.a in Frameworks */,
-				C201FB7322660C0B00D0636A /* libv8_compiler.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C2DDEB2F229EAB3B00345BFE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2DDEBD7229EB1C500345BFE /* UIKit.framework in Frameworks */,
+				C2DDEB4C229EAC0000345BFE /* libv8_initializers.a in Frameworks */,
+				C2DDEB4E229EAC0000345BFE /* libv8_libplatform.a in Frameworks */,
+				C2DDEB49229EAC0000345BFE /* libv8_external_snapshot.a in Frameworks */,
+				C2DDEB4F229EAC0000345BFE /* libv8_init.a in Frameworks */,
+				C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */,
+				C2DDEB4B229EAC0000345BFE /* libv8_compiler.a in Frameworks */,
+				C2DDEB4D229EAC0000345BFE /* libv8_base_without_compiler.a in Frameworks */,
+				C2DDEB50229EAC0000345BFE /* libv8_libbase.a in Frameworks */,
+				C2DDEB51229EAC0000345BFE /* libv8_libsampler.a in Frameworks */,
+				C2DDEB4A229EAC0000345BFE /* libtorque_generated_initializers.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		C24F391D222598A80027977A /* Snapshot */ = {
-			isa = PBXGroup;
-			children = (
-				C2B12EF6222958D7000F6AFC /* natives_blob.arm64.h */,
-				C2B12EF4222957FC000F6AFC /* snapshot_blob.arm64.h */,
-				C2B12EF122293CC3000F6AFC /* natives_blob.x86_64.h */,
-				C2B12EF022293CC3000F6AFC /* snapshot_blob.x86_64.h */,
-			);
-			path = Snapshot;
-			sourceTree = "<group>";
-		};
-		C24F391E222598C60027977A /* Runtime */ = {
-			isa = PBXGroup;
-			children = (
-				C2FE377E224E61AA00847863 /* NativeScript.h */,
-				C2AAE9CA2243789A006FB9D3 /* ArgConverter.h */,
-				C2AAE9C92243789A006FB9D3 /* ArgConverter.mm */,
-				C2543CEC226F001A007AC505 /* ArrayAdapter.h */,
-				C2543CEB226F001A007AC505 /* ArrayAdapter.mm */,
-				C2AAE9CD224391A3006FB9D3 /* Caches.h */,
-				C2AAE9CC224391A3006FB9D3 /* Caches.cpp */,
-				C2AAE9D3224902FD006FB9D3 /* ClassBuilder.h */,
-				C2AAE9D2224902FD006FB9D3 /* ClassBuilder.mm */,
-				C2543CF6227841B6007AC505 /* ClassBuilder.cpp */,
-				C24F39182225859D0027977A /* Console.h */,
-				C24F39192225859D0027977A /* Console.cpp */,
-				C2FE3780224E803700847863 /* DataWrapper.h */,
-				C2A7BE15227DA1C000D43EEB /* DictionaryAdapter.h */,
-				C2A7BE14227DA1C000D43EEB /* DictionaryAdapter.mm */,
-				C201FB79226702BA00D0636A /* FFICall.h */,
-				C201FB78226702BA00D0636A /* FFICall.cpp */,
-				C2AAE9D622490F50006FB9D3 /* Helpers.h */,
-				C2AAE9D522490F50006FB9D3 /* Helpers.mm */,
-				C2335B6F224CADD50071048C /* Interop.h */,
-				C2335B6E224CADD50071048C /* Interop.mm */,
-				C2764AF5222BE705008F674F /* Metadata.h */,
-				C2764AF4222BE705008F674F /* Metadata.mm */,
-				C2764AF8222E80AC008F674F /* MetadataBuilder.h */,
-				C2764AF7222E80AC008F674F /* MetadataBuilder.mm */,
-				C28B7B5822252431007DE2BA /* ModuleInternal.h */,
-				C28B7B5922252432007DE2BA /* ModuleInternal.mm */,
-				C2764AFB223644B3008F674F /* ObjectManager.h */,
-				C2764AFA223644B3008F674F /* ObjectManager.cpp */,
-				C28B7B2B22241122007DE2BA /* Runtime.h */,
-				C28B7B2C22241270007DE2BA /* Runtime.mm */,
-				C2B12EE12227C606000F6AFC /* SetTimeout.h */,
-				C2B12EE22227C606000F6AFC /* SetTimeout.cpp */,
-				C2AAE9C8223BA685006FB9D3 /* StringHasher.h */,
-				C2543CEF226F49AA007AC505 /* SymbolLoader.h */,
-				C2543CEE226F49AA007AC505 /* SymbolLoader.mm */,
-				C2BC5DAA225602C50020F348 /* Tasks.h */,
-				C2BC5DAB22561C370020F348 /* Tasks.cpp */,
-				C2543CF9227B220F007AC505 /* WeakRef.h */,
-				C2543CF8227B220F007AC505 /* WeakRef.cpp */,
-			);
-			path = Runtime;
-			sourceTree = "<group>";
-		};
-		C24F391F222598E40027977A /* V8Platform */ = {
-			isa = PBXGroup;
-			children = (
-				C28B7AF02221499D007DE2BA /* platform.h */,
-				C28B7B0E2223E6C0007DE2BA /* timezone-cache.h */,
-				C28B7AF122214A4D007DE2BA /* platform-ios.cpp */,
-				C28B7AF522215528007DE2BA /* stack_trace.h */,
-				C28B7AF322215505007DE2BA /* stack_trace_posix.cpp */,
-			);
-			path = V8Platform;
-			sourceTree = "<group>";
-		};
 		C27E277722202663009C10A3 = {
 			isa = PBXGroup;
 			children = (
-				C27E278222202664009C10A3 /* v8ios */,
+				C2DDEB17229EA89000345BFE /* TestApp */,
+				C2DDEB33229EAB3B00345BFE /* NativeScript */,
 				C27E278122202664009C10A3 /* Products */,
 				C2FF3016225203FD00933782 /* Frameworks */,
 			);
@@ -242,46 +236,192 @@
 		C27E278122202664009C10A3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C27E278022202664009C10A3 /* v8ios.app */,
+				C2DDEB16229EA89000345BFE /* TestApp.app */,
+				C2DDEB32229EAB3B00345BFE /* NativeScript.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		C27E278222202664009C10A3 /* v8ios */ = {
+		C293748B229EC6170075CB16 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				C2FF30142252034900933782 /* include */,
-				C2FF3000225202FC00933782 /* app */,
-				C27E279922202720009C10A3 /* Frameworks */,
-				C24F391F222598E40027977A /* V8Platform */,
-				C24F391E222598C60027977A /* Runtime */,
-				C24F391D222598A80027977A /* Snapshot */,
-				C27E278C22202665009C10A3 /* Assets.xcassets */,
-				C27E279122202665009C10A3 /* Info.plist */,
-				C27E279222202665009C10A3 /* main.mm */,
-				C2543CF32270A974007AC505 /* Main.storyboard */,
-				C201FB7E226760A700D0636A /* LaunchScreen.storyboard */,
+				C293748C229EC6780075CB16 /* TNSWidgets.framework */,
 			);
-			path = v8ios;
+			path = Frameworks;
 			sourceTree = "<group>";
 		};
-		C27E279922202720009C10A3 /* Frameworks */ = {
+		C2DDEB17229EA89000345BFE /* TestApp */ = {
 			isa = PBXGroup;
 			children = (
-				C2A7BE0F227C7F3A00D43EEB /* TNSWidgets.framework */,
-				C2335B73224CEAFA0071048C /* libffi.a */,
-				C201FB7622660C2A00D0636A /* libtorque_generated_initializers.a */,
-				C201FB70226607BA00D0636A /* libv8_base_without_compiler.a */,
-				C201FB7222660C0B00D0636A /* libv8_compiler.a */,
-				C27A2FBC229C1D7100965800 /* libv8_external_snapshot.a */,
-				C2B12EFA22297FD2000F6AFC /* libv8_init.a */,
-				C201FB7422660C1700D0636A /* libv8_initializers.a */,
-				C2B12EF922297FD1000F6AFC /* libv8_libbase.a */,
-				C2B12EFE22297FD7000F6AFC /* libv8_libplatform.a */,
-				C2B12EFF22297FD7000F6AFC /* libv8_libsampler.a */,
+				C293748B229EC6170075CB16 /* Frameworks */,
+				C2DDEBDD229EB4A900345BFE /* app */,
+				C2DDEBDA229EB37A00345BFE /* Source Files */,
+				C2DDEB26229EA89200345BFE /* Info.plist */,
 			);
-			name = Frameworks;
-			path = ..;
+			path = TestApp;
+			sourceTree = "<group>";
+		};
+		C2DDEB33229EAB3B00345BFE /* NativeScript */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEBB7229EB00800345BFE /* Headers */,
+				C2DDEB3D229EABBB00345BFE /* Frameworks */,
+				C2DDEB3C229EAB9600345BFE /* V8Platform */,
+				C2DDEB3B229EAB8600345BFE /* Runtime */,
+				C2DDEB3A229EAB7400345BFE /* Snapshot */,
+				C2DDEB34229EAB3B00345BFE /* NativeScript.h */,
+				C2DDEB35229EAB3B00345BFE /* Info.plist */,
+			);
+			path = NativeScript;
+			sourceTree = "<group>";
+		};
+		C2DDEB3A229EAB7400345BFE /* Snapshot */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEB5F229EAC3C00345BFE /* natives_blob.arm64.h */,
+				C2DDEB5E229EAC3C00345BFE /* natives_blob.x86_64.h */,
+				C2DDEB5D229EAC3C00345BFE /* snapshot_blob.arm64.h */,
+				C2DDEB5C229EAC3C00345BFE /* snapshot_blob.x86_64.h */,
+			);
+			path = Snapshot;
+			sourceTree = "<group>";
+		};
+		C2DDEB3B229EAB8600345BFE /* Runtime */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEB66229EAC8100345BFE /* ArgConverter.h */,
+				C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */,
+				C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */,
+				C2DDEB7A229EAC8200345BFE /* ArrayAdapter.mm */,
+				C2DDEB84229EAC8300345BFE /* Caches.h */,
+				C2DDEB88229EAC8300345BFE /* Caches.cpp */,
+				C2DDEB7E229EAC8200345BFE /* ClassBuilder.h */,
+				C2DDEB73229EAC8200345BFE /* ClassBuilder.cpp */,
+				C2DDEB8A229EAC8300345BFE /* ClassBuilder.mm */,
+				C2DDEB64229EAC8100345BFE /* Common.h */,
+				C2DDEB79229EAC8200345BFE /* Console.h */,
+				C2DDEB6B229EAC8200345BFE /* Console.cpp */,
+				C2DDEB72229EAC8200345BFE /* DataWrapper.h */,
+				C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */,
+				C2DDEB8B229EAC8300345BFE /* DictionaryAdapter.mm */,
+				C2DDEB78229EAC8200345BFE /* FFICall.h */,
+				C2DDEB68229EAC8100345BFE /* FFICall.cpp */,
+				C2DDEB6D229EAC8200345BFE /* Helpers.h */,
+				C2DDEB7D229EAC8200345BFE /* Helpers.mm */,
+				C2DDEB65229EAC8100345BFE /* Interop.h */,
+				C2DDEB77229EAC8200345BFE /* Interop.mm */,
+				C2DDEB6E229EAC8200345BFE /* Metadata.h */,
+				C2DDEB70229EAC8200345BFE /* Metadata.mm */,
+				C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */,
+				C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */,
+				C2DDEB89229EAC8300345BFE /* ModuleInternal.h */,
+				C2DDEB81229EAC8200345BFE /* ModuleInternal.mm */,
+				C2DDEB83229EAC8300345BFE /* ObjectManager.h */,
+				C2DDEB86229EAC8300345BFE /* ObjectManager.cpp */,
+				C2DDEB7B229EAC8200345BFE /* Runtime.h */,
+				C2DDEB7C229EAC8200345BFE /* Runtime.mm */,
+				C2DDEB74229EAC8200345BFE /* SetTimeout.h */,
+				C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */,
+				C2DDEB87229EAC8300345BFE /* StringHasher.h */,
+				C2DDEB7F229EAC8200345BFE /* SymbolLoader.h */,
+				C2DDEB75229EAC8200345BFE /* SymbolLoader.mm */,
+				C2DDEB76229EAC8200345BFE /* Tasks.h */,
+				C2DDEB8C229EAC8300345BFE /* Tasks.cpp */,
+				C2DDEB82229EAC8200345BFE /* WeakRef.h */,
+				C2DDEB69229EAC8100345BFE /* WeakRef.cpp */,
+			);
+			path = Runtime;
+			sourceTree = "<group>";
+		};
+		C2DDEB3C229EAB9600345BFE /* V8Platform */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEB52229EAC1F00345BFE /* platform-ios.cpp */,
+				C2DDEB54229EAC1F00345BFE /* platform.h */,
+				C2DDEB56229EAC1F00345BFE /* stack_trace_posix.cpp */,
+				C2DDEB55229EAC1F00345BFE /* stack_trace.h */,
+				C2DDEB53229EAC1F00345BFE /* timezone-cache.h */,
+			);
+			path = V8Platform;
+			sourceTree = "<group>";
+		};
+		C2DDEB3D229EABBB00345BFE /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEB3E229EABFF00345BFE /* libffi.a */,
+				C2DDEB40229EAC0000345BFE /* libtorque_generated_initializers.a */,
+				C2DDEB43229EAC0000345BFE /* libv8_base_without_compiler.a */,
+				C2DDEB41229EAC0000345BFE /* libv8_compiler.a */,
+				C2DDEB3F229EABFF00345BFE /* libv8_external_snapshot.a */,
+				C2DDEB45229EAC0000345BFE /* libv8_init.a */,
+				C2DDEB42229EAC0000345BFE /* libv8_initializers.a */,
+				C2DDEB46229EAC0000345BFE /* libv8_libbase.a */,
+				C2DDEB44229EAC0000345BFE /* libv8_libplatform.a */,
+				C2DDEB47229EAC0000345BFE /* libv8_libsampler.a */,
+			);
+			path = Frameworks;
+			sourceTree = "<group>";
+		};
+		C2DDEBB7229EB00800345BFE /* Headers */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEBCC229EB06E00345BFE /* libffi */,
+				C2DDEBC5229EB06500345BFE /* libplatform */,
+				C2DDEBBA229EB02500345BFE /* libffi.h */,
+				C2DDEBBC229EB02500345BFE /* v8-internal.h */,
+				C2DDEBBD229EB02500345BFE /* v8-platform.h */,
+				C2DDEBB8229EB02500345BFE /* v8-version.h */,
+				C2DDEBB9229EB02500345BFE /* v8.h */,
+				C2DDEBBB229EB02500345BFE /* v8config.h */,
+			);
+			name = Headers;
+			sourceTree = "<group>";
+		};
+		C2DDEBC5229EB06500345BFE /* libplatform */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEBC6229EB06500345BFE /* libplatform.h */,
+				C2DDEBC7229EB06500345BFE /* libplatform-export.h */,
+				C2DDEBC8229EB06500345BFE /* v8-tracing.h */,
+			);
+			name = libplatform;
+			path = Headers/libplatform;
+			sourceTree = "<group>";
+		};
+		C2DDEBCC229EB06E00345BFE /* libffi */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEBCD229EB06E00345BFE /* arm64 */,
+				C2DDEBD0229EB06E00345BFE /* x86_64 */,
+			);
+			name = libffi;
+			path = Headers/libffi;
+			sourceTree = "<group>";
+		};
+		C2DDEBCD229EB06E00345BFE /* arm64 */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEBCE229EB06E00345BFE /* ffitarget.h */,
+				C2DDEBCF229EB06E00345BFE /* ffi.h */,
+			);
+			path = arm64;
+			sourceTree = "<group>";
+		};
+		C2DDEBD0229EB06E00345BFE /* x86_64 */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEBD1229EB06E00345BFE /* ffitarget.h */,
+				C2DDEBD2229EB06E00345BFE /* ffi.h */,
+			);
+			path = x86_64;
+			sourceTree = "<group>";
+		};
+		C2DDEBDA229EB37A00345BFE /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				C2DDEBDB229EB37A00345BFE /* main.mm */,
+			);
+			path = "Source Files";
 			sourceTree = "<group>";
 		};
 		C2FF3016225203FD00933782 /* Frameworks */ = {
@@ -296,24 +436,95 @@
 		};
 /* End PBXGroup section */
 
+/* Begin PBXHeadersBuildPhase section */
+		C2DDEB2D229EAB3B00345BFE /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2DDEBBF229EB02500345BFE /* v8.h in Headers */,
+				C2DDEB59229EAC1F00345BFE /* platform.h in Headers */,
+				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
+				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
+				C2DDEB61229EAC3C00345BFE /* snapshot_blob.arm64.h in Headers */,
+				C2DDEB63229EAC3C00345BFE /* natives_blob.arm64.h in Headers */,
+				C2DDEBBE229EB02500345BFE /* v8-version.h in Headers */,
+				C2DDEBAD229EAC8300345BFE /* Caches.h in Headers */,
+				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
+				C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */,
+				C2DDEB60229EAC3C00345BFE /* snapshot_blob.x86_64.h in Headers */,
+				C2DDEBC1229EB02500345BFE /* v8config.h in Headers */,
+				C2DDEBD6229EB06E00345BFE /* ffi.h in Headers */,
+				C2DDEBA1229EAC8300345BFE /* FFICall.h in Headers */,
+				C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */,
+				C2DDEBC3229EB02500345BFE /* v8-platform.h in Headers */,
+				C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */,
+				C2DDEB58229EAC1F00345BFE /* timezone-cache.h in Headers */,
+				C2DDEBCB229EB06500345BFE /* v8-tracing.h in Headers */,
+				C2DDEBA2229EAC8300345BFE /* Console.h in Headers */,
+				C2DDEBC0229EB02500345BFE /* libffi.h in Headers */,
+				C2DDEBC9229EB06500345BFE /* libplatform.h in Headers */,
+				C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */,
+				C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */,
+				C2DDEBAB229EAC8300345BFE /* WeakRef.h in Headers */,
+				C2DDEBA8229EAC8300345BFE /* SymbolLoader.h in Headers */,
+				C2DDEB62229EAC3C00345BFE /* natives_blob.x86_64.h in Headers */,
+				C2DDEBC2229EB02500345BFE /* v8-internal.h in Headers */,
+				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
+				C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */,
+				C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */,
+				C2DDEB36229EAB3B00345BFE /* NativeScript.h in Headers */,
+				C2DDEBCA229EB06500345BFE /* libplatform-export.h in Headers */,
+				C2DDEBD4229EB06E00345BFE /* ffi.h in Headers */,
+				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
+				C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */,
+				C2DDEB5A229EAC1F00345BFE /* stack_trace.h in Headers */,
+				C2DDEBD5229EB06E00345BFE /* ffitarget.h in Headers */,
+				C2DDEB9B229EAC8300345BFE /* DataWrapper.h in Headers */,
+				C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */,
+				C2DDEBD3229EB06E00345BFE /* ffitarget.h in Headers */,
+				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
 /* Begin PBXNativeTarget section */
-		C27E277F22202664009C10A3 /* v8ios */ = {
+		C2DDEB15229EA89000345BFE /* TestApp */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C27E279622202665009C10A3 /* Build configuration list for PBXNativeTarget "v8ios" */;
+			buildConfigurationList = C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestApp" */;
 			buildPhases = (
-				C27E277C22202664009C10A3 /* Sources */,
-				C27E277D22202664009C10A3 /* Frameworks */,
-				C27E277E22202664009C10A3 /* Resources */,
-				C2A7BE13227C7FEF00D43EEB /* Embed Frameworks */,
+				C2DDEB12229EA89000345BFE /* Sources */,
+				C2DDEB13229EA89000345BFE /* Frameworks */,
+				C2DDEB14229EA89000345BFE /* Resources */,
+				C2937490229EC6910075CB16 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C2DDEBD9229EB31500345BFE /* PBXTargetDependency */,
+			);
+			name = TestApp;
+			productName = TestApp;
+			productReference = C2DDEB16229EA89000345BFE /* TestApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C2DDEB31229EAB3B00345BFE /* NativeScript */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C2DDEB37229EAB3B00345BFE /* Build configuration list for PBXNativeTarget "NativeScript" */;
+			buildPhases = (
+				C2DDEB2D229EAB3B00345BFE /* Headers */,
+				C2DDEB2E229EAB3B00345BFE /* Sources */,
+				C2DDEB2F229EAB3B00345BFE /* Frameworks */,
+				C2DDEB30229EAB3B00345BFE /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = v8ios;
-			productName = v8ios;
-			productReference = C27E278022202664009C10A3 /* v8ios.app */;
-			productType = "com.apple.product-type.application";
+			name = NativeScript;
+			productName = NativeScript;
+			productReference = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */;
+			productType = "com.apple.product-type.framework";
 		};
 /* End PBXNativeTarget section */
 
@@ -324,8 +535,11 @@
 				LastUpgradeCheck = 1000;
 				ORGANIZATIONNAME = Progress;
 				TargetAttributes = {
-					C27E277F22202664009C10A3 = {
-						CreatedOnToolsVersion = 10.0;
+					C2DDEB15229EA89000345BFE = {
+						CreatedOnToolsVersion = 10.2.1;
+					};
+					C2DDEB31229EAB3B00345BFE = {
+						CreatedOnToolsVersion = 10.2.1;
 					};
 				};
 			};
@@ -342,68 +556,76 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				C27E277F22202664009C10A3 /* v8ios */,
+				C2DDEB15229EA89000345BFE /* TestApp */,
+				C2DDEB31229EAB3B00345BFE /* NativeScript */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		C27E277E22202664009C10A3 /* Resources */ = {
+		C2DDEB14229EA89000345BFE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C2FF3001225202FC00933782 /* app in Resources */,
-				C2543CF52270A974007AC505 /* Main.storyboard in Resources */,
-				C27E278D22202665009C10A3 /* Assets.xcassets in Resources */,
-				C201FB7F226760A700D0636A /* LaunchScreen.storyboard in Resources */,
-				C2FF30152252034900933782 /* include in Resources */,
+				C2DDEBDE229EB4A900345BFE /* app in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C2DDEB30229EAB3B00345BFE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		C27E277C22202664009C10A3 /* Sources */ = {
+		C2DDEB12229EA89000345BFE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C201FB6F225FA66B00D0636A /* stack_trace_posix.cpp in Sources */,
-				C2543CFA227B220F007AC505 /* WeakRef.cpp in Sources */,
-				C201FB6E225FA64700D0636A /* Metadata.mm in Sources */,
-				C2A7BE16227DA1C000D43EEB /* DictionaryAdapter.mm in Sources */,
-				C2543CF7227841B6007AC505 /* ClassBuilder.cpp in Sources */,
-				C201FB7A226702BA00D0636A /* FFICall.cpp in Sources */,
-				C27E279322202665009C10A3 /* main.mm in Sources */,
-				C2B12EE32227C606000F6AFC /* SetTimeout.cpp in Sources */,
-				C28B7AF222214A4D007DE2BA /* platform-ios.cpp in Sources */,
-				C2764AF9222E80AC008F674F /* MetadataBuilder.mm in Sources */,
-				C28B7B2D22241270007DE2BA /* Runtime.mm in Sources */,
-				C2BC5DAC22561C370020F348 /* Tasks.cpp in Sources */,
-				C2764AFC223644B3008F674F /* ObjectManager.cpp in Sources */,
-				C2AAE9CB2243789A006FB9D3 /* ArgConverter.mm in Sources */,
-				C2335B70224CADD50071048C /* Interop.mm in Sources */,
-				C2AAE9D722490F50006FB9D3 /* Helpers.mm in Sources */,
-				C2AAE9CE224391A3006FB9D3 /* Caches.cpp in Sources */,
-				C24F391A2225859D0027977A /* Console.cpp in Sources */,
-				C2543CED226F001A007AC505 /* ArrayAdapter.mm in Sources */,
-				C2543CF0226F49AA007AC505 /* SymbolLoader.mm in Sources */,
-				C28B7B5A22252432007DE2BA /* ModuleInternal.mm in Sources */,
-				C2AAE9D4224902FD006FB9D3 /* ClassBuilder.mm in Sources */,
+				C2DDEBDC229EB37A00345BFE /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C2DDEB2E229EAB3B00345BFE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2DDEB5B229EAC1F00345BFE /* stack_trace_posix.cpp in Sources */,
+				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
+				C2DDEBAF229EAC8300345BFE /* ObjectManager.cpp in Sources */,
+				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
+				C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */,
+				C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */,
+				C2DDEB9E229EAC8300345BFE /* SymbolLoader.mm in Sources */,
+				C2DDEB99229EAC8300345BFE /* Metadata.mm in Sources */,
+				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
+				C2DDEB57229EAC1F00345BFE /* platform-ios.cpp in Sources */,
+				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
+				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
+				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
+				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,
+				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
+				C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */,
+				C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */,
+				C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */,
+				C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */,
+				C2DDEBB5229EAC8300345BFE /* Tasks.cpp in Sources */,
+				C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXVariantGroup section */
-		C2543CF32270A974007AC505 /* Main.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				C2543CF42270A974007AC505 /* Base */,
-			);
-			name = Main.storyboard;
-			sourceTree = "<group>";
+/* Begin PBXTargetDependency section */
+		C2DDEBD9229EB31500345BFE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
+			targetProxy = C2DDEBD8229EB31500345BFE /* PBXContainerItemProxy */;
 		};
-/* End PBXVariantGroup section */
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		C27E279422202665009C10A3 /* Debug */ = {
@@ -520,67 +742,124 @@
 			};
 			name = Release;
 		};
-		C27E279722202665009C10A3 /* Debug */ = {
+		C2DDEB2A229EA89200345BFE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CLANG_CXX_LIBRARY = "libc++";
-				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = W7TGC3P93K;
-				ENABLE_BITCODE = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
+					"$(PROJECT_DIR)/TestApp/Frameworks",
 					"$(PROJECT_DIR)",
 				);
-				INFOPLIST_FILE = v8ios/Info.plist;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/**";
+				INFOPLIST_FILE = TestApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)",
+				OTHER_LDFLAGS = (
+					"-framework",
+					NativeScript,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.v8ios;
+				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				TARGETED_DEVICE_FAMILY = "1,2";
-				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/v8ios/include";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
-		C27E279822202665009C10A3 /* Release */ = {
+		C2DDEB2B229EA89200345BFE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CLANG_CXX_LIBRARY = "libc++";
-				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = W7TGC3P93K;
-				ENABLE_BITCODE = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
+					"$(PROJECT_DIR)/TestApp/Frameworks",
 					"$(PROJECT_DIR)",
 				);
-				INFOPLIST_FILE = v8ios/Info.plist;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/**";
+				INFOPLIST_FILE = TestApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				OTHER_LDFLAGS = (
+					"-framework",
+					NativeScript,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		C2DDEB38229EAB3B00345BFE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"'NATIVESCRIPT_VERSION=1.0.0'",
+				);
+				INFOPLIST_FILE = NativeScript/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)",
+					"$(PROJECT_DIR)/NativeScript/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.v8ios;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript.NativeScript;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/v8ios/include";
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/Headers";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		C2DDEB39229EAB3B00345BFE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GCC_PREPROCESSOR_DEFINITIONS = "'NATIVESCRIPT_VERSION=1.0.0'";
+				INFOPLIST_FILE = NativeScript/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/NativeScript/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript.NativeScript;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/Headers";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
 			};
 			name = Release;
 		};
@@ -596,11 +875,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C27E279622202665009C10A3 /* Build configuration list for PBXNativeTarget "v8ios" */ = {
+		C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C27E279722202665009C10A3 /* Debug */,
-				C27E279822202665009C10A3 /* Release */,
+				C2DDEB2A229EA89200345BFE /* Debug */,
+				C2DDEB2B229EA89200345BFE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C2DDEB37229EAB3B00345BFE /* Build configuration list for PBXNativeTarget "NativeScript" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2DDEB38229EAB3B00345BFE /* Debug */,
+				C2DDEB39229EAB3B00345BFE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

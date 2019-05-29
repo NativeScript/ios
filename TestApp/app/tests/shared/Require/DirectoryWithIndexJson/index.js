@@ -1,0 +1,1 @@
+exports.title = require('./module');
