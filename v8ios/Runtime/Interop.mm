@@ -212,8 +212,8 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             SEL selector = NSSelectorFromString(selStr);
             call->SetArgument(i, selector);
         } else if (arg->IsString() && enc->type == BinaryTypeEncodingType::CStringEncoding) {
-            const char* str = tns::ToString(isolate, arg).c_str();
-            const char* strCopy = strdup(str);
+            v8::String::Utf8Value utf8Value(isolate, arg);
+            const char* strCopy = strdup(*utf8Value);
             call->SetArgument(i, strCopy);
         } else if (arg->IsString() && enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             std::string str = tns::ToString(isolate, arg);

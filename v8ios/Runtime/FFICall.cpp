@@ -11,7 +11,7 @@ FFICall::FFICall(const TypeEncoding* typeEncoding, const int initialParameterInd
     this->returnOffset_ = this->stackSize_;
 
     ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
-    this->stackSize_ += malloc_good_size(std::max(sizeof(*returnType), sizeof(ffi_arg)));
+    this->stackSize_ += malloc_good_size(std::max(returnType->size, sizeof(ffi_arg)));
 
     for (size_t i = 0; i < initialParameterIndex; i++) {
         this->argValueOffsets_.push_back(this->stackSize_);
@@ -23,7 +23,7 @@ FFICall::FFICall(const TypeEncoding* typeEncoding, const int initialParameterInd
         this->argValueOffsets_.push_back(this->stackSize_);
         enc = enc->next();
         ffi_type* argType = FFICall::GetArgumentType(enc);
-        this->stackSize_ += malloc_good_size(std::max(sizeof(*argType), sizeof(ffi_arg)));
+        this->stackSize_ += malloc_good_size(std::max(argType->size, sizeof(ffi_arg)));
     }
 
     this->buffer_ = reinterpret_cast<uint8_t*>(malloc(this->stackSize_));
