@@ -42,8 +42,9 @@ private:
 
 class PrimitiveDataWrapper: public BaseDataWrapper {
 public:
-    PrimitiveDataWrapper(ffi_type* ffiType, BinaryTypeEncodingType encodingType): BaseDataWrapper(std::string()), ffiType_(ffiType), encodingType_(encodingType) {
-        value_ = malloc(sizeof(ffiType->size));
+    PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType encodingType): BaseDataWrapper(std::string()), encodingType_(encodingType) {
+        value_ = malloc(size);
+        memset(value_, 0, size);
     }
     WrapperType Type() {
         return WrapperType::Primitive;
@@ -51,15 +52,11 @@ public:
     void* Value() {
         return this->value_;
     }
-    ffi_type* FFIType() {
-        return this->ffiType_;
-    }
     BinaryTypeEncodingType EncodingType() {
         return this->encodingType_;
     }
 private:
     void* value_;
-    ffi_type* ffiType_;
     BinaryTypeEncodingType encodingType_;
 };
 
@@ -99,8 +96,8 @@ private:
 
 struct StructField {
 public:
-    StructField(ptrdiff_t offset, size_t size, const TypeEncoding* encoding)
-        : offset_(offset), size_(size), encoding_(encoding) { }
+    StructField(ptrdiff_t offset, ffi_type* ffiType, const TypeEncoding* encoding)
+        : offset_(offset), ffiType_(ffiType), encoding_(encoding) { }
 
     ptrdiff_t Offset() {
         return this->offset_;
@@ -110,12 +107,12 @@ public:
         return this->encoding_;
     }
 
-    size_t Size() {
-        return this->size_;
+    ffi_type* FFIType() {
+        return this->ffiType_;
     }
 private:
     ptrdiff_t offset_;
-    size_t size_;
+    ffi_type* ffiType_;
     const TypeEncoding* encoding_;
 };
 

@@ -28,24 +28,8 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
 
     RegisterReferenceInteropType(isolate, interop);
 
-    RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(&ffi_type_void, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(&ffi_type_sint8, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(&ffi_type_sint8, BinaryTypeEncodingType::ShortEncoding));
-    RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(&ffi_type_uint8, BinaryTypeEncodingType::UShortEncoding));
-    RegisterInteropType(isolate, types, "int16", new PrimitiveDataWrapper(&ffi_type_sint16, BinaryTypeEncodingType::IntEncoding));
-    RegisterInteropType(isolate, types, "uint16", new PrimitiveDataWrapper(&ffi_type_uint16, BinaryTypeEncodingType::UIntEncoding));
-    RegisterInteropType(isolate, types, "int32", new PrimitiveDataWrapper(&ffi_type_sint32, BinaryTypeEncodingType::LongEncoding));
-    RegisterInteropType(isolate, types, "uint32", new PrimitiveDataWrapper(&ffi_type_uint32, BinaryTypeEncodingType::ULongEncoding));
-    RegisterInteropType(isolate, types, "int64", new PrimitiveDataWrapper(&ffi_type_sint64, BinaryTypeEncodingType::LongLongEncoding));
-    RegisterInteropType(isolate, types, "uint64", new PrimitiveDataWrapper(&ffi_type_uint64, BinaryTypeEncodingType::ULongLongEncoding));
-    RegisterInteropType(isolate, types, "float", new PrimitiveDataWrapper(&ffi_type_float, BinaryTypeEncodingType::FloatEncoding));
-    RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(&ffi_type_double, BinaryTypeEncodingType::DoubleEncoding));
-    RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::CStringEncoding));
-    RegisterInteropType(isolate, types, "unichar", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::UnicharEncoding));
-    RegisterInteropType(isolate, types, "id", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::IdEncoding));
-    RegisterInteropType(isolate, types, "protocol", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::ProtocolEncoding));
-    RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::ClassEncoding));
-    RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(&ffi_type_pointer, BinaryTypeEncodingType::SelectorEncoding));
+    RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(sizeof(ffi_type_void.size), BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(sizeof(bool), BinaryTypeEncodingType::BoolEncoding));
 
     bool success = interop->Set(tns::ToV8String(isolate, "types"), types);
     assert(success);
@@ -399,7 +383,7 @@ size_t Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t p
     return sizeof(T);
 }
 
-Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool isInstanceMethod) {
+Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool isInstanceMethod, ffi_type* structFieldFFIType) {
     if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
         // TODO: Cache the metadata
@@ -409,11 +393,12 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         void* result = call->ResultBuffer();
 
-        size_t rsize = returnType->size;
-        void* dest = std::malloc(rsize);
-        memcpy(dest, result, rsize);
+        ffi_type* ffiType = (structFieldFFIType != nullptr) ? structFieldFFIType : returnType;
 
-        StructDataWrapper* wrapper = new StructDataWrapper(structMeta, dest, returnType);
+        void* dest = std::malloc(ffiType->size);
+        memcpy(dest, result, ffiType->size);
+
+        StructDataWrapper* wrapper = new StructDataWrapper(structMeta, dest, ffiType);
         return ArgConverter::ConvertArgument(isolate, wrapper);
     }
 
@@ -532,7 +517,7 @@ void Interop::SetStructPropertyValue(StructDataWrapper* wrapper, StructField fie
             StructDataWrapper* targetStruct = static_cast<StructDataWrapper*>(ext->Value());
 
             void* sourceBuffer = targetStruct->Data();
-            size_t fieldSize = field.Size();
+            size_t fieldSize = field.FFIType()->size;
             memcpy(destBuffer, sourceBuffer, fieldSize);
             break;
         }

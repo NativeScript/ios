@@ -114,7 +114,7 @@ ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::map<std::
 
         std::string fieldName = structMeta->fieldNames()[i].valuePtr();
         offset += padding;
-        StructField field(offset, fieldFFIType->size, fieldEncoding);
+        StructField field(offset, fieldFFIType, fieldEncoding);
 
         fields.insert(std::make_pair(fieldName, field));
 
