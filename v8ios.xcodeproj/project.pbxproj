@@ -7,6 +7,25 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
+		C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
+		C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */; };
+		C293751A229FC1600075CB16 /* TNSMethodCalls.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F2229FC1600075CB16 /* TNSMethodCalls.m */; };
+		C293751B229FC1600075CB16 /* TNSTestNativeCallbacks.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F4229FC1600075CB16 /* TNSTestNativeCallbacks.m */; };
+		C293751C229FC1600075CB16 /* TNSFunctions.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F6229FC1600075CB16 /* TNSFunctions.m */; };
+		C293751D229FC1600075CB16 /* TNSTestCommon.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F8229FC1600075CB16 /* TNSTestCommon.m */; };
+		C293751E229FC1600075CB16 /* TNSDeclarationConflicts.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374FB229FC1600075CB16 /* TNSDeclarationConflicts.m */; };
+		C293751F229FC1600075CB16 /* TNSBridgedTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374FE229FC1600075CB16 /* TNSBridgedTypes.m */; };
+		C2937520229FC1600075CB16 /* TNSVersions.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374FF229FC1600075CB16 /* TNSVersions.m */; };
+		C2937521229FC1600075CB16 /* TNSApi.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937501229FC1600075CB16 /* TNSApi.m */; };
+		C2937522229FC1600075CB16 /* TNSReturnsRetained.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937502229FC1600075CB16 /* TNSReturnsRetained.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
+		C2937523229FC1600075CB16 /* TNSReturnsUnmanaged.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937504229FC1600075CB16 /* TNSReturnsUnmanaged.m */; };
+		C2937524229FC1600075CB16 /* TNSAllocLog.m in Sources */ = {isa = PBXBuildFile; fileRef = C293750B229FC1600075CB16 /* TNSAllocLog.m */; };
+		C2937525229FC1600075CB16 /* TNSFunctionPointers.m in Sources */ = {isa = PBXBuildFile; fileRef = C293750C229FC1600075CB16 /* TNSFunctionPointers.m */; };
+		C2937526229FC1600075CB16 /* TNSRecords.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937510229FC1600075CB16 /* TNSRecords.m */; };
+		C2937527229FC1600075CB16 /* TNSPrimitives.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937511229FC1600075CB16 /* TNSPrimitives.m */; };
+		C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937512229FC1600075CB16 /* TNSObjCTypes.m */; };
+		C2937529229FC1600075CB16 /* TNSPrimitivePointers.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */; };
 		C2DDEB36229EAB3B00345BFE /* NativeScript.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB34229EAB3B00345BFE /* NativeScript.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3E229EABFF00345BFE /* libffi.a */; };
 		C2DDEB49229EAC0000345BFE /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3F229EABFF00345BFE /* libv8_external_snapshot.a */; };
@@ -86,6 +105,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		C293752A229FC4740075CB16 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C29374E1229FC0F60075CB16;
+			remoteInfo = TestFixtures;
+		};
 		C2DDEBD8229EB31500345BFE /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = C27E277822202663009C10A3 /* Project object */;
@@ -106,10 +132,60 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C29374E0229FC0F60075CB16 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "include/$(PRODUCT_NAME)";
+			dstSubfolderSpec = 16;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		C293748C229EC6780075CB16 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
+		C29374E2229FC0F60075CB16 /* libTestFixtures.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTestFixtures.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		C29374EC229FC1600075CB16 /* TNSMethodCalls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSMethodCalls.h; sourceTree = "<group>"; };
+		C29374ED229FC1600075CB16 /* TNSConstructorResolution.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSConstructorResolution.h; sourceTree = "<group>"; };
+		C29374EE229FC1600075CB16 /* TNSInheritance.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSInheritance.m; sourceTree = "<group>"; };
+		C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSClassWithPlaceholder.m; sourceTree = "<group>"; };
+		C29374F0229FC1600075CB16 /* TNSInheritance.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSInheritance.h; sourceTree = "<group>"; };
+		C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSConstructorResolution.m; sourceTree = "<group>"; };
+		C29374F2229FC1600075CB16 /* TNSMethodCalls.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSMethodCalls.m; sourceTree = "<group>"; };
+		C29374F3229FC1600075CB16 /* TNSClassWithPlaceholder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSClassWithPlaceholder.h; sourceTree = "<group>"; };
+		C29374F4229FC1600075CB16 /* TNSTestNativeCallbacks.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSTestNativeCallbacks.m; sourceTree = "<group>"; };
+		C29374F6229FC1600075CB16 /* TNSFunctions.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSFunctions.m; sourceTree = "<group>"; };
+		C29374F7229FC1600075CB16 /* TNSFunctions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSFunctions.h; sourceTree = "<group>"; };
+		C29374F8229FC1600075CB16 /* TNSTestCommon.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSTestCommon.m; sourceTree = "<group>"; };
+		C29374F9229FC1600075CB16 /* TestFixtures.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestFixtures.h; sourceTree = "<group>"; };
+		C29374FB229FC1600075CB16 /* TNSDeclarationConflicts.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSDeclarationConflicts.m; sourceTree = "<group>"; };
+		C29374FC229FC1600075CB16 /* TNSReturnsRetained.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSReturnsRetained.h; sourceTree = "<group>"; };
+		C29374FD229FC1600075CB16 /* TNSApi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSApi.h; sourceTree = "<group>"; };
+		C29374FE229FC1600075CB16 /* TNSBridgedTypes.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSBridgedTypes.m; sourceTree = "<group>"; };
+		C29374FF229FC1600075CB16 /* TNSVersions.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSVersions.m; sourceTree = "<group>"; };
+		C2937500229FC1600075CB16 /* TNSReturnsUnmanaged.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSReturnsUnmanaged.h; sourceTree = "<group>"; };
+		C2937501229FC1600075CB16 /* TNSApi.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSApi.m; sourceTree = "<group>"; };
+		C2937502229FC1600075CB16 /* TNSReturnsRetained.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSReturnsRetained.m; sourceTree = "<group>"; };
+		C2937503229FC1600075CB16 /* TNSDeclarationConflicts.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSDeclarationConflicts.h; sourceTree = "<group>"; };
+		C2937504229FC1600075CB16 /* TNSReturnsUnmanaged.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSReturnsUnmanaged.m; sourceTree = "<group>"; };
+		C2937505229FC1600075CB16 /* TNSVersions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSVersions.h; sourceTree = "<group>"; };
+		C2937506229FC1600075CB16 /* TNSBridgedTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSBridgedTypes.h; sourceTree = "<group>"; };
+		C2937507229FC1600075CB16 /* TNSTestNativeCallbacks.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSTestNativeCallbacks.h; sourceTree = "<group>"; };
+		C2937508229FC1600075CB16 /* TNSTestCommon.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSTestCommon.h; sourceTree = "<group>"; };
+		C2937509229FC1600075CB16 /* TestFixtures-Prefix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "TestFixtures-Prefix.h"; sourceTree = "<group>"; };
+		C293750B229FC1600075CB16 /* TNSAllocLog.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSAllocLog.m; sourceTree = "<group>"; };
+		C293750C229FC1600075CB16 /* TNSFunctionPointers.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSFunctionPointers.m; sourceTree = "<group>"; };
+		C293750D229FC1600075CB16 /* TNSObjCTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSObjCTypes.h; sourceTree = "<group>"; };
+		C293750E229FC1600075CB16 /* TNSPrimitives.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSPrimitives.h; sourceTree = "<group>"; };
+		C293750F229FC1600075CB16 /* TNSPrimitivePointers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSPrimitivePointers.h; sourceTree = "<group>"; };
+		C2937510229FC1600075CB16 /* TNSRecords.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSRecords.m; sourceTree = "<group>"; };
+		C2937511229FC1600075CB16 /* TNSPrimitives.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSPrimitives.m; sourceTree = "<group>"; };
+		C2937512229FC1600075CB16 /* TNSObjCTypes.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSObjCTypes.m; sourceTree = "<group>"; };
+		C2937513229FC1600075CB16 /* TNSFunctionPointers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSFunctionPointers.h; sourceTree = "<group>"; };
+		C2937514229FC1600075CB16 /* TNSAllocLog.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSAllocLog.h; sourceTree = "<group>"; };
+		C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSPrimitivePointers.m; sourceTree = "<group>"; };
+		C2937516229FC1600075CB16 /* TNSRecords.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSRecords.h; sourceTree = "<group>"; };
 		C2DDEB16229EA89000345BFE /* TestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB26229EA89200345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C2DDEB32229EAB3B00345BFE /* NativeScript.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScript.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -195,6 +271,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		C29374DF229FC0F60075CB16 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C2DDEB13229EA89000345BFE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -228,6 +311,7 @@
 			children = (
 				C2DDEB17229EA89000345BFE /* TestApp */,
 				C2DDEB33229EAB3B00345BFE /* NativeScript */,
+				C29374E3229FC0F60075CB16 /* TestFixtures */,
 				C27E278122202664009C10A3 /* Products */,
 				C2FF3016225203FD00933782 /* Frameworks */,
 			);
@@ -238,6 +322,7 @@
 			children = (
 				C2DDEB16229EA89000345BFE /* TestApp.app */,
 				C2DDEB32229EAB3B00345BFE /* NativeScript.framework */,
+				C29374E2229FC0F60075CB16 /* libTestFixtures.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -248,6 +333,85 @@
 				C293748C229EC6780075CB16 /* TNSWidgets.framework */,
 			);
 			path = Frameworks;
+			sourceTree = "<group>";
+		};
+		C29374E3229FC0F60075CB16 /* TestFixtures */ = {
+			isa = PBXGroup;
+			children = (
+				C29374FA229FC1600075CB16 /* Api */,
+				C29374F5229FC1600075CB16 /* Functions */,
+				C29374EB229FC1600075CB16 /* Interfaces */,
+				C293750A229FC1600075CB16 /* Marshalling */,
+				C2937509229FC1600075CB16 /* TestFixtures-Prefix.h */,
+				C29374F9229FC1600075CB16 /* TestFixtures.h */,
+				C2937508229FC1600075CB16 /* TNSTestCommon.h */,
+				C29374F8229FC1600075CB16 /* TNSTestCommon.m */,
+				C2937507229FC1600075CB16 /* TNSTestNativeCallbacks.h */,
+				C29374F4229FC1600075CB16 /* TNSTestNativeCallbacks.m */,
+			);
+			path = TestFixtures;
+			sourceTree = "<group>";
+		};
+		C29374EB229FC1600075CB16 /* Interfaces */ = {
+			isa = PBXGroup;
+			children = (
+				C29374EC229FC1600075CB16 /* TNSMethodCalls.h */,
+				C29374ED229FC1600075CB16 /* TNSConstructorResolution.h */,
+				C29374EE229FC1600075CB16 /* TNSInheritance.m */,
+				C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */,
+				C29374F0229FC1600075CB16 /* TNSInheritance.h */,
+				C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */,
+				C29374F2229FC1600075CB16 /* TNSMethodCalls.m */,
+				C29374F3229FC1600075CB16 /* TNSClassWithPlaceholder.h */,
+			);
+			path = Interfaces;
+			sourceTree = "<group>";
+		};
+		C29374F5229FC1600075CB16 /* Functions */ = {
+			isa = PBXGroup;
+			children = (
+				C29374F6229FC1600075CB16 /* TNSFunctions.m */,
+				C29374F7229FC1600075CB16 /* TNSFunctions.h */,
+			);
+			path = Functions;
+			sourceTree = "<group>";
+		};
+		C29374FA229FC1600075CB16 /* Api */ = {
+			isa = PBXGroup;
+			children = (
+				C29374FB229FC1600075CB16 /* TNSDeclarationConflicts.m */,
+				C29374FC229FC1600075CB16 /* TNSReturnsRetained.h */,
+				C29374FD229FC1600075CB16 /* TNSApi.h */,
+				C29374FE229FC1600075CB16 /* TNSBridgedTypes.m */,
+				C29374FF229FC1600075CB16 /* TNSVersions.m */,
+				C2937500229FC1600075CB16 /* TNSReturnsUnmanaged.h */,
+				C2937501229FC1600075CB16 /* TNSApi.m */,
+				C2937502229FC1600075CB16 /* TNSReturnsRetained.m */,
+				C2937503229FC1600075CB16 /* TNSDeclarationConflicts.h */,
+				C2937504229FC1600075CB16 /* TNSReturnsUnmanaged.m */,
+				C2937505229FC1600075CB16 /* TNSVersions.h */,
+				C2937506229FC1600075CB16 /* TNSBridgedTypes.h */,
+			);
+			path = Api;
+			sourceTree = "<group>";
+		};
+		C293750A229FC1600075CB16 /* Marshalling */ = {
+			isa = PBXGroup;
+			children = (
+				C293750B229FC1600075CB16 /* TNSAllocLog.m */,
+				C293750C229FC1600075CB16 /* TNSFunctionPointers.m */,
+				C293750D229FC1600075CB16 /* TNSObjCTypes.h */,
+				C293750E229FC1600075CB16 /* TNSPrimitives.h */,
+				C293750F229FC1600075CB16 /* TNSPrimitivePointers.h */,
+				C2937510229FC1600075CB16 /* TNSRecords.m */,
+				C2937511229FC1600075CB16 /* TNSPrimitives.m */,
+				C2937512229FC1600075CB16 /* TNSObjCTypes.m */,
+				C2937513229FC1600075CB16 /* TNSFunctionPointers.h */,
+				C2937514229FC1600075CB16 /* TNSAllocLog.h */,
+				C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */,
+				C2937516229FC1600075CB16 /* TNSRecords.h */,
+			);
+			path = Marshalling;
 			sourceTree = "<group>";
 		};
 		C2DDEB17229EA89000345BFE /* TestApp */ = {
@@ -489,6 +653,23 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
+		C29374E1229FC0F60075CB16 /* TestFixtures */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C29374E8229FC0F60075CB16 /* Build configuration list for PBXNativeTarget "TestFixtures" */;
+			buildPhases = (
+				C29374DE229FC0F60075CB16 /* Sources */,
+				C29374DF229FC0F60075CB16 /* Frameworks */,
+				C29374E0229FC0F60075CB16 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TestFixtures;
+			productName = TestFixtures;
+			productReference = C29374E2229FC0F60075CB16 /* libTestFixtures.a */;
+			productType = "com.apple.product-type.library.static";
+		};
 		C2DDEB15229EA89000345BFE /* TestApp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestApp" */;
@@ -501,6 +682,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				C293752B229FC4740075CB16 /* PBXTargetDependency */,
 				C2DDEBD9229EB31500345BFE /* PBXTargetDependency */,
 			);
 			name = TestApp;
@@ -535,6 +717,9 @@
 				LastUpgradeCheck = 1000;
 				ORGANIZATIONNAME = Progress;
 				TargetAttributes = {
+					C29374E1229FC0F60075CB16 = {
+						CreatedOnToolsVersion = 10.2.1;
+					};
 					C2DDEB15229EA89000345BFE = {
 						CreatedOnToolsVersion = 10.2.1;
 					};
@@ -558,6 +743,7 @@
 			targets = (
 				C2DDEB15229EA89000345BFE /* TestApp */,
 				C2DDEB31229EAB3B00345BFE /* NativeScript */,
+				C29374E1229FC0F60075CB16 /* TestFixtures */,
 			);
 		};
 /* End PBXProject section */
@@ -581,6 +767,32 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C29374DE229FC0F60075CB16 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C293751A229FC1600075CB16 /* TNSMethodCalls.m in Sources */,
+				C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */,
+				C2937524229FC1600075CB16 /* TNSAllocLog.m in Sources */,
+				C2937523229FC1600075CB16 /* TNSReturnsUnmanaged.m in Sources */,
+				C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */,
+				C293751C229FC1600075CB16 /* TNSFunctions.m in Sources */,
+				C2937529229FC1600075CB16 /* TNSPrimitivePointers.m in Sources */,
+				C2937527229FC1600075CB16 /* TNSPrimitives.m in Sources */,
+				C2937521229FC1600075CB16 /* TNSApi.m in Sources */,
+				C293751E229FC1600075CB16 /* TNSDeclarationConflicts.m in Sources */,
+				C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */,
+				C2937525229FC1600075CB16 /* TNSFunctionPointers.m in Sources */,
+				C2937520229FC1600075CB16 /* TNSVersions.m in Sources */,
+				C293751B229FC1600075CB16 /* TNSTestNativeCallbacks.m in Sources */,
+				C293751D229FC1600075CB16 /* TNSTestCommon.m in Sources */,
+				C293751F229FC1600075CB16 /* TNSBridgedTypes.m in Sources */,
+				C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */,
+				C2937526229FC1600075CB16 /* TNSRecords.m in Sources */,
+				C2937522229FC1600075CB16 /* TNSReturnsRetained.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C2DDEB12229EA89000345BFE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -620,6 +832,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		C293752B229FC4740075CB16 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C29374E1229FC0F60075CB16 /* TestFixtures */;
+			targetProxy = C293752A229FC4740075CB16 /* PBXContainerItemProxy */;
+		};
 		C2DDEBD9229EB31500345BFE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
@@ -742,6 +959,38 @@
 			};
 			name = Release;
 		};
+		C29374E9229FC0F60075CB16 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_WARN_STRICT_PROTOTYPES = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.2;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SYMROOT = build;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C29374EA229FC0F60075CB16 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_WARN_STRICT_PROTOTYPES = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.2;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SYMROOT = build;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		C2DDEB2A229EA89200345BFE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -759,8 +1008,13 @@
 					"@executable_path/Frameworks",
 				);
 				OTHER_LDFLAGS = (
+					"-Wl,-search_paths_first",
+					"-Wl,-headerpad_max_install_names",
+					"-ObjC",
 					"-framework",
 					NativeScript,
+					"-force_load",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libTestFixtures.a",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -785,8 +1039,13 @@
 					"@executable_path/Frameworks",
 				);
 				OTHER_LDFLAGS = (
+					"-Wl,-search_paths_first",
+					"-Wl,-headerpad_max_install_names",
+					"-ObjC",
 					"-framework",
 					NativeScript,
+					"-force_load",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libTestFixtures.a",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -871,6 +1130,15 @@
 			buildConfigurations = (
 				C27E279422202665009C10A3 /* Debug */,
 				C27E279522202665009C10A3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C29374E8229FC0F60075CB16 /* Build configuration list for PBXNativeTarget "TestFixtures" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C29374E9229FC0F60075CB16 /* Debug */,
+				C29374EA229FC0F60075CB16 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

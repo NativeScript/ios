@@ -12,100 +12,100 @@ describe(module.id, function () {
         expect(object.hash).toBe(3);
     });
 
-//     it("MethodCalledInDealloc", function () {
-//         expect(function () {
-//             (function () {
-//                 var JSApi = TNSApi.extend({});
-//                 new JSApi();
-//             }());
+    it("MethodCalledInDealloc", function () {
+        expect(function () {
+            (function () {
+                var JSApi = TNSApi.extend({});
+                new JSApi();
+            }());
 
-//             // TODO
-//             // [self collectGarbage];
-//         }).not.toThrow();
-//     });
+            // TODO
+            // [self collectGarbage];
+        }).not.toThrow();
+    });
 
-//     it("CustomGetterAndSetter", function () {
-//         var object = new TNSApi();
-//         expect(object.property).toBe(0);
-//         object.property = 3;
-//         expect(object.property).toBe(3);
+    it("CustomGetterAndSetter", function () {
+        var object = new TNSApi();
+        expect(object.property).toBe(0);
+        object.property = 3;
+        expect(object.property).toBe(3);
 
-//         TNSTestNativeCallbacks.apiCustomGetterAndSetter(object);
-//     });
+        TNSTestNativeCallbacks.apiCustomGetterAndSetter(object);
+    });
 
-//     it("OverrideWithCustomGetterAndSetter", function () {
-//         var JSApi = TNSApi.extend({
-//             get property() {
-//                 return -Object.getOwnPropertyDescriptor(TNSApi.prototype, 'property').get.call(this);
-//             },
-//             set property(x) {
-//                 Object.getOwnPropertyDescriptor(TNSApi.prototype, 'property').set.call(this, x * 2);
-//             },
-//         });
-//         var object = new JSApi();
-//         expect(object.property).toBe(0);
-//         object.property = 3;
-//         expect(object.property).toBe(-6);
+    // it("OverrideWithCustomGetterAndSetter", function () {
+    //     var JSApi = TNSApi.extend({
+    //         get property() {
+    //             return -Object.getOwnPropertyDescriptor(TNSApi.prototype, 'property').get.call(this);
+    //         },
+    //         set property(x) {
+    //             Object.getOwnPropertyDescriptor(TNSApi.prototype, 'property').set.call(this, x * 2);
+    //         },
+    //     });
+    //     var object = new JSApi();
+    //     expect(object.property).toBe(0);
+    //     object.property = 3;
+    //     expect(object.property).toBe(-6);
 
-//         TNSTestNativeCallbacks.apiOverrideWithCustomGetterAndSetter(object);
-//     });
+    //     TNSTestNativeCallbacks.apiOverrideWithCustomGetterAndSetter(object);
+    // });
 
-//     // TODO
-//     // it("BigIntMethods", function() {
-//     //      var bigInt = functionWithLongLong('9223372036854775807');
-//     //      assert(bigInt.value === '9223372036854775807');
-//     //      assert(isNaN(bigInt.valueOf()));
-//     //      assert(('' + bigInt) === 'NaN');
-//     //      assert(bigInt.toString() === '9223372036854775807');
-//     //      assert(isNaN(1 + bigInt));
-//     // });
+    // TODO
+    // it("BigIntMethods", function() {
+    //      var bigInt = functionWithLongLong('9223372036854775807');
+    //      assert(bigInt.value === '9223372036854775807');
+    //      assert(isNaN(bigInt.valueOf()));
+    //      assert(('' + bigInt) === 'NaN');
+    //      assert(bigInt.toString() === '9223372036854775807');
+    //      assert(isNaN(1 + bigInt));
+    // });
 
-//     // TODO
-//     // it("BigIntEdgeCases", function() {
-//     //      assert(functionWithLongLong(9007199254740992) === 9007199254740992);
-//     //      assert(functionWithLongLong('9007199254740993').toString() === '9007199254740993');
+    // TODO
+    // it("BigIntEdgeCases", function() {
+    //      assert(functionWithLongLong(9007199254740992) === 9007199254740992);
+    //      assert(functionWithLongLong('9007199254740993').toString() === '9007199254740993');
 
-//     //      assert(functionWithLongLong(-9007199254740992) === -9007199254740992);
-//     //      assert(functionWithLongLong('-9007199254740993').toString() === '-9007199254740993');
-//     // });
+    //      assert(functionWithLongLong(-9007199254740992) === -9007199254740992);
+    //      assert(functionWithLongLong('-9007199254740993').toString() === '-9007199254740993');
+    // });
 
-//     // TODO: check object
-// //    it("CFDictionary", function() {
-// //        var object = new NSMutableDictionary();
-// //        object.setObjectForKey('value', 'key');
-// //        var value = CFDictionaryGetValue(object, 'key');
-// //    });
+    // TODO: check object
+//    it("CFDictionary", function() {
+//        var object = new NSMutableDictionary();
+//        object.setObjectForKey('value', 'key');
+//        var value = CFDictionaryGetValue(object, 'key');
+//    });
 
-//     it("instanceOfNativeClass", function () {
-//         var array = new NSMutableArray();
-//         expect(array instanceof NSMutableArray).toBe(true);
-//         expect(array instanceof NSArray).toBe(true);
-//         expect(array instanceof NSObject).toBe(true);
-//     });
+    it("instanceOfNativeClass", function () {
+        var array = new NSMutableArray();
+        expect(array instanceof NSMutableArray).toBe(true);
+        expect(array instanceof NSArray).toBe(true);
+        expect(array instanceof NSObject).toBe(true);
+    });
 
-//     it("instanceOfDerivedClass", function () {
-//         var JSObject = TNSDerivedInterface.extend({});
-//         var object = JSObject.alloc().init();
-//         expect(object instanceof JSObject).toBe(true);
-//         expect(object instanceof TNSDerivedInterface).toBe(true);
-//         expect(object instanceof NSObject).toBe(true);
-//     });
+    // it("instanceOfDerivedClass", function () {
+    //     var JSObject = TNSDerivedInterface.extend({});
+    //     var object = JSObject.alloc().init();
+    //     expect(object instanceof JSObject).toBe(true);
+    //     expect(object instanceof TNSDerivedInterface).toBe(true);
+    //     expect(object instanceof NSObject).toBe(true);
+    // });
 
-//     it("instanceOfUITabBarController", function () {
-//         var object = UITabBarController.alloc().init();
-//         expect(object instanceof UITabBarController).toBe(true);
-//         expect(object instanceof UIViewController).toBe(true);
-//         expect(object instanceof UIResponder).toBe(true);
-//         expect(object instanceof NSObject).toBe(true);
-//     });
+    it("instanceOfUITabBarController", function () {
+        var object = UITabBarController.alloc().init();
+        expect(object instanceof UITabBarController).toBe(true);
+        expect(object instanceof UIViewController).toBe(true);
+        expect(object instanceof UIResponder).toBe(true);
+        expect(object instanceof NSObject).toBe(true);
+    });
 
-//     it("Appearance", function () {
-//         expect(UILabel.appearance().description.indexOf('<Customizable class: UILabel>')).not.toBe(-1);
+    it("Appearance", function () {
+        expect(UILabel.appearance().description.indexOf('<Customizable class: UILabel>')).not.toBe(-1);
 
-//         UILabel.appearance().textColor = UIColor.redColor;
-//         expect(UILabel.appearance().textColor).toBe(UIColor.redColor);
-//         expect(UILabel.appearance().constructor).toBe(UILabel);
-//     });
+        UILabel.appearance().textColor = UIColor.redColor;
+        expect(UILabel.appearance().textColor).toBe(UIColor.redColor);
+        // expect(UILabel.appearance().constructor).toBe(UILabel);
+    });
 
 //     it("ReadonlyPropertyInProtocolAndOverrideWithSetterInInterface", function () {
 //         var object = new UIView();
@@ -136,9 +136,9 @@ describe(module.id, function () {
 //         TNSTestNativeCallbacks.apiDescriptionOverride(object);
 //     });
 
-//     it("ProtocolClassConflict", function () {
-//         expect(NSProtocolFromString("NSObject")).toBe(NSObjectProtocol);
-//     });
+    it("ProtocolClassConflict", function () {
+        expect(NSProtocolFromString("NSObject")).toBe(NSObjectProtocol);
+    });
 
 //     it("NSMutableArrayMethods", function () {
 //         var JSMutableArray = NSMutableArray.extend({
@@ -190,12 +190,12 @@ describe(module.id, function () {
 //         expect(TNSGetOutput()).toBe('44abcd');
 //     });
 
-//     it("SpecialCaseProperty_When_InstancesRespondToSelector:_IsFalse", function () {
-//         var field = new UITextField();
-//         expect(field.secureTextEntry).toBe(false);
-//         field.secureTextEntry = true;
-//         expect(field.secureTextEntry).toBe(true);
-//     });
+    it("SpecialCaseProperty_When_InstancesRespondToSelector:_IsFalse", function () {
+        var field = new UITextField();
+        expect(field.secureTextEntry).toBe(false);
+        field.secureTextEntry = true;
+        expect(field.secureTextEntry).toBe(true);
+    });
 
 //      it("SpecialCaseProperty_When_CustomSelector_ImplementedInJS", function () {
 //         var field = new (UITextField.extend({
@@ -223,9 +223,9 @@ describe(module.id, function () {
 //         expect(TNSGetOutput()).toBe(expectedOutput);
 //      });
 
-//     it("TypedefPointerClass", function () {
-//         expect(TNSApi.alloc().init().strokeColor).toBeNull();
-//     });
+    it("TypedefPointerClass", function () {
+        expect(TNSApi.alloc().init().strokeColor).toBeNull();
+    });
 
 //     if (TNSIsConfigurationDebug) {
 //         it("GlobalObjectProperties", function () {
@@ -237,25 +237,25 @@ describe(module.id, function () {
 //         });
 //     }
 
-//     it("NSObjectSuperClass", function () {
-//         expect(NSObject.superclass()).toBeNull();
-//         expect(NSObject.alloc().init().superclass).toBeNull();
-//     });
+    it("NSObjectSuperClass", function () {
+        expect(NSObject.superclass()).toBeNull();
+        expect(NSObject.alloc().init().superclass).toBeNull();
+    });
 
-//     it("NSObjectAsId", function () {
-//         expect(NSObject.respondsToSelector('description')).toBe(true);
-//     });
+//    it("NSObjectAsId", function () {
+//        expect(NSObject.respondsToSelector('description')).toBe(true);
+//    });
 
-//     it("FunctionLength", function () {
-//         expect(functionWithInt.length).toBe(1);
-//         expect(NSObject.isSubclassOfClass.length).toBe(1);
-//     });
+//    it("FunctionLength", function () {
+//        expect(functionWithInt.length).toBe(1);
+//        expect(NSObject.isSubclassOfClass.length).toBe(1);
+//    });
 
-//     it("ArgumentsCount", function () {
-//         expect(function () {
-//             NSObject.alloc().init(3);
-//         }).toThrowError();
-//     });
+//    it("ArgumentsCount", function () {
+//        expect(function () {
+//            NSObject.alloc().init(3);
+//        }).toThrowError();
+//    });
 
 //     it("NSError", function () {
 //         expect(function () {

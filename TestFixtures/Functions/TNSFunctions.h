@@ -1,0 +1,1 @@
+CFArrayRef CFArrayCreateWithString(CFStringRef string);
