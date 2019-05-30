@@ -127,7 +127,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target
         const FunctionMeta* functionMeta = static_cast<const FunctionMeta*>(meta);
         functionPointer = SymbolLoader::instance().loadFunctionSymbol(functionMeta->topLevelModule(), meta->name());
         typeEncoding = functionMeta->encodings()->first();
-    } else if (meta->type() == MetaType::Undefined || meta->type() == MetaType::Union) {
+    } else if (meta->type() == MetaType::Undefined || meta->type() == MetaType::Union || meta->type() == MetaType::Struct) {
         const MethodMeta* methodMeta = static_cast<const MethodMeta*>(meta);
         initialParameterIndex = 2;
         typeEncoding = methodMeta->encodings()->first();
