@@ -46,7 +46,8 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
         case BinaryTypeEncodingType::BlockEncoding:
         case BinaryTypeEncodingType::CStringEncoding:
         case BinaryTypeEncodingType::ClassEncoding:
-        case BinaryTypeEncodingType::PointerEncoding: {
+        case BinaryTypeEncodingType::PointerEncoding:
+        case BinaryTypeEncodingType::ProtocolEncoding: {
             return &ffi_type_pointer;
         }
         case BinaryTypeEncodingType::BoolEncoding: {

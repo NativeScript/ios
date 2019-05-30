@@ -16,6 +16,7 @@ public:
     static std::map<const InterfaceMeta*, v8::Persistent<v8::FunctionTemplate>*> CtorFuncTemplates;
     static std::map<const InterfaceMeta*, v8::Persistent<v8::Function>*> CtorFuncs;
     static std::map<id, v8::Persistent<v8::Object>*> Instances;
+    static std::map<std::string, v8::Persistent<v8::Object>*> ProtocolInstances;
     static std::map<const StructMeta*, v8::Persistent<v8::Function>*> StructConstructorFunctions;
 };
 

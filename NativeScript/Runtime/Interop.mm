@@ -7,6 +7,7 @@
 #include "DictionaryAdapter.h"
 #include "ArrayAdapter.h"
 #include "SymbolLoader.h"
+#include "Caches.h"
 
 using namespace v8;
 
@@ -400,6 +401,27 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         StructDataWrapper* wrapper = new StructDataWrapper(structMeta, dest, ffiType);
         return ArgConverter::ConvertArgument(isolate, wrapper);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
+        id result = call->GetResult<id>();
+        if (result == nil) {
+            return Null(isolate);
+        }
+
+        const char* protocolName = protocol_getName(result);
+        auto it = Caches::ProtocolInstances.find(protocolName);
+        if (it != Caches::ProtocolInstances.end()) {
+            return it->second->Get(isolate);
+        }
+
+        Local<Object> proto = ArgConverter::CreateEmptyObject(isolate->GetCurrentContext());
+        BaseDataWrapper* wrapper = new BaseDataWrapper(protocolName);
+        Local<External> ext = External::New(isolate, wrapper);
+        proto->SetInternalField(0, ext);
+
+        Caches::ProtocolInstances.insert(std::make_pair(protocolName, new Persistent<Object>(isolate, proto)));
+        return proto;
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||

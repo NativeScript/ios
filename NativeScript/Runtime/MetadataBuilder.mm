@@ -40,13 +40,13 @@ void MetadataBuilder::Init(Isolate* isolate) {
             break;
         }
         case MetaType::ProtocolType: {
-            const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
             Local<Object> proto = ArgConverter::CreateEmptyObject(context);
 
-            BaseDataWrapper* wrapper = new BaseDataWrapper(protoMeta->name());
+            BaseDataWrapper* wrapper = new BaseDataWrapper(meta->name());
             Local<External> ext = External::New(isolate, wrapper);
             proto->SetInternalField(0, ext);
 
+            Caches::ProtocolInstances.insert(std::make_pair(meta->name(), new Persistent<Object>(isolate, proto)));
             global->Set(tns::ToV8String(isolate, meta->jsName()), proto);
             break;
         }
