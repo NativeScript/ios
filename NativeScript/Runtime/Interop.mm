@@ -136,6 +136,14 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             v8::String::Utf8Value utf8Value(isolate, arg);
             const char* strCopy = strdup(*utf8Value);
             call->SetArgument(i, strCopy);
+        } else if (arg->IsString() && enc->type == BinaryTypeEncodingType::UnicharEncoding) {
+            v8::String::Utf8Value utf8Value(isolate, arg);
+            const char* strCopy = strdup(*utf8Value);
+            if (strlen(strCopy) > 1) {
+                assert(false);
+            }
+            unichar c = (strlen(strCopy) == 0) ? 0 : strCopy[0];
+            call->SetArgument(i, c);
         } else if (arg->IsString() && (enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference || enc->type == BinaryTypeEncodingType::IdEncoding)) {
             std::string str = tns::ToString(isolate, arg);
             NSString* result = [NSString stringWithUTF8String:str.c_str()];
@@ -163,6 +171,10 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
                 call->SetArgument(i, (float)value);
             } else if (enc->type == BinaryTypeEncodingType::DoubleEncoding) {
                 call->SetArgument(i, value);
+            } else if (enc->type == BinaryTypeEncodingType::UCharEncoding) {
+                call->SetArgument(i, (unsigned char)value);
+            } else if (enc->type == BinaryTypeEncodingType::CharEncoding) {
+                call->SetArgument(i, (char)value);
             } else {
                 assert(false);
             }
@@ -203,6 +215,13 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             Local<v8::Array> array = arg.As<v8::Array>();
             ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
             call->SetArgument(i, adapter);
+        } else if (arg->IsObject() && enc->type == BinaryTypeEncodingType::ProtocolEncoding) {
+            Local<Object> obj = arg.As<Object>();
+            assert(obj->InternalFieldCount() > 0);
+            Local<External> ext = obj->GetInternalField(0).As<External>();
+            BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+            Protocol* proto = objc_getProtocol(wrapper->Name().c_str());
+            call->SetArgument(i, proto);
         } else if (arg->IsObject() && enc->type == BinaryTypeEncodingType::ClassEncoding) {
             Local<Object> obj = arg.As<Object>();
             Local<Value> metadataProp = tns::GetPrivateValue(isolate, obj, tns::ToV8String(isolate, "metadata"));
@@ -304,7 +323,7 @@ size_t Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t p
     return sizeof(T);
 }
 
-Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool isInstanceMethod, ffi_type* structFieldFFIType) {
+Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool isInstanceMethod, ffi_type* structFieldFFIType, bool isPrimitiveFunction) {
     if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
         // TODO: Cache the metadata
@@ -321,6 +340,16 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         StructDataWrapper* wrapper = new StructDataWrapper(structMeta, dest, ffiType);
         return ArgConverter::ConvertArgument(isolate, wrapper);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
+        SEL result = call->GetResult<SEL>();
+        if (result == nil) {
+            return Null(isolate);
+        }
+
+        NSString* selStr = NSStringFromSelector(result);
+        return tns::ToV8String(isolate, [selStr UTF8String]);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
@@ -344,10 +373,24 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         return proto;
     }
 
+    if (typeEncoding->type == BinaryTypeEncodingType::ClassEncoding) {
+        Class result = call->GetResult<Class>();
+        if (result == nullptr) {
+            return Null(isolate);
+        }
+
+        const char* className = class_getName(result);
+        auto it = Caches::CtorFuncs.find(className);
+        if (it != Caches::CtorFuncs.end()) {
+            return it->second->Get(isolate);
+        }
+
+        assert(false);
+    }
+
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
         typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
-        typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding ||
-        typeEncoding->type == BinaryTypeEncodingType::ClassEncoding) {
+        typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding) {
 
         id result = call->GetResult<id>();
 
@@ -355,13 +398,13 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
-        if (isInstanceMethod && [result isKindOfClass:[NSString class]]) {
+        if ((isInstanceMethod || isPrimitiveFunction) && [result isKindOfClass:[NSString class]]) {
             // Convert NSString instances to javascript strings for all instance method calls
             const char* str = [result UTF8String];
             return tns::ToV8String(isolate, str);
         }
 
-        if (isInstanceMethod && [result isKindOfClass:[NSNumber class]]) {
+        if ((isInstanceMethod || isPrimitiveFunction) && [result isKindOfClass:[NSNumber class]]) {
             // Convert NSNumber instances to javascript numbers for all instance method calls
             double value = [result doubleValue];
             return Number::New(isolate, value);
@@ -437,6 +480,30 @@ Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodin
 
     if (type == BinaryTypeEncodingType::DoubleEncoding) {
         double result = call->GetResult<double>();
+        return Number::New(isolate, result);
+    }
+
+    if (type == BinaryTypeEncodingType::UnicharEncoding) {
+        unichar result = call->GetResult<unichar>();
+        char chars[2];
+
+        if (result > 127) {
+            chars[0] = (result >> 8) & (1 << 8) - 1;
+            chars[1] = result & (1 << 8) - 1;
+        } else {
+            chars[0] = result;
+        }
+
+        return tns::ToV8String(isolate, chars);
+    }
+
+    if (type == BinaryTypeEncodingType::UCharEncoding) {
+        unsigned char result = call->GetResult<unsigned char>();
+        return Number::New(isolate, result);
+    }
+
+    if (type == BinaryTypeEncodingType::CharEncoding) {
+        char result = call->GetResult<char>();
         return Number::New(isolate, result);
     }
 

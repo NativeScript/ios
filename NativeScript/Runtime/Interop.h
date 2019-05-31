@@ -19,7 +19,7 @@ public:
     static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     template <typename TMeta>
     static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const TMeta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper = false);
-    static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool isInstanceMethod, ffi_type* structFieldFFIType = nullptr);
+    static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool isInstanceMethod, ffi_type* structFieldFFIType = nullptr, bool isPrimitiveFunction = false);
     static void SetStructPropertyValue(StructDataWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, const StructMeta* structMeta, v8::Local<v8::Value> inititalizer, ptrdiff_t& position);
 private:

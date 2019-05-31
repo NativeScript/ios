@@ -64,7 +64,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     std::string className = class_getName(extendedClass);
     Caches::ClassPrototypes.insert(std::make_pair(className, prototype));
 
-    Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(item->meta_)->second;
+    Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(item->meta_->name())->second;
     Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
 
     CacheItem* cacheItem = new CacheItem(nullptr, extendedClass, item->self_);
@@ -184,7 +184,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
 
         const Meta* baseMeta = ArgConverter::FindMeta(baseClass);
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
-        Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(interfaceMeta)->second;
+        Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(interfaceMeta->name())->second;
 
         Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
         assert(extendedClassCtorFunc->SetPrototype(context, baseCtorFunc).ToChecked());

@@ -26,7 +26,7 @@ global.UNUSED = function (param) {
 require("./tests/Infrastructure/Jasmine/jasmine-2.0.1/boot");
 
 //require("./tests/Marshalling/Primitives/Function");
-//import "./Marshalling/Primitives/Static";
+require("./tests/Marshalling/Primitives/Static");
 //import "./Marshalling/Primitives/Instance";
 //import "./Marshalling/Primitives/Derived";
 //

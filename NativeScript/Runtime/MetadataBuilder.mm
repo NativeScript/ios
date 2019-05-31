@@ -189,7 +189,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
                 if (baseMeta != nullptr) {
                     Local<FunctionTemplate> baseCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
                     ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
-                    auto it = Caches::CtorFuncs.find(baseMeta);
+                    auto it = Caches::CtorFuncs.find(baseMeta->name());
                     if (it != Caches::CtorFuncs.end()) {
                         baseCtorFunc = Local<v8::Function>::New(isolate_, *it->second);
                     }
@@ -214,7 +214,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     Local<External> ctorFuncExtData = External::New(isolate_, new ObjCDataWrapper(interfaceMeta->name(), clazz));
     tns::SetPrivateValue(isolate_, ctorFunc, tns::ToV8String(isolate_, "metadata"), ctorFuncExtData);
 
-    Caches::CtorFuncs.insert(std::make_pair(interfaceMeta, new Persistent<v8::Function>(isolate_, ctorFunc)));
+    Caches::CtorFuncs.insert(std::make_pair(interfaceMeta->name(), new Persistent<v8::Function>(isolate_, ctorFunc)));
     Local<Object> global = context->Global();
     global->Set(tns::ToV8String(isolate_, interfaceMeta->jsName()), ctorFunc);
 

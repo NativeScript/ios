@@ -52,7 +52,12 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
         case BinaryTypeEncodingType::IncompleteArrayEncoding: {
             return &ffi_type_pointer;
         }
-        case BinaryTypeEncodingType::BoolEncoding: {
+        case BinaryTypeEncodingType::UnicharEncoding: {
+            return &ffi_type_ushort;
+        }
+        case BinaryTypeEncodingType::BoolEncoding:
+        case BinaryTypeEncodingType::UCharEncoding:
+        case BinaryTypeEncodingType::CharEncoding: {
             return &ffi_type_sint8;
         }
         case BinaryTypeEncodingType::UShortEncoding: {

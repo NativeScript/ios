@@ -213,15 +213,15 @@ describe(module.id, function () {
         expect(actual).toBe("1");
     });
 
-    it("StaticMethodWithUnichar", function () {
-        var result = TNSPrimitives.methodWithUnichar('i');
-        expect(result).toBe('i');
+    // it("StaticMethodWithUnichar", function () {
+    //     var result = TNSPrimitives.methodWithUnichar('i');
+    //     expect(result).toBe('i');
 
-        var actual = TNSGetOutput();
-        expect(actual).toBe("i");
+    //     var actual = TNSGetOutput();
+    //     expect(actual).toBe("i");
 
-        expect(function () {
-            TNSPrimitives.methodWithUnichar('iPhone');
-        }).toThrowError();
-    });
+    //     expect(function () {
+    //         TNSPrimitives.methodWithUnichar('iPhone');
+    //     }).toThrowError();
+    // });
 });

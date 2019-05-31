@@ -12,11 +12,13 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
     SEL selector = nil;
     int initialParameterIndex = 0;
     const TypeEncoding* typeEncoding = nullptr;
+    bool isPrimitiveFunction = false;
 
     if constexpr(std::is_same_v<TMeta, FunctionMeta>) {
         const FunctionMeta* functionMeta = static_cast<const FunctionMeta*>(meta);
         functionPointer = SymbolLoader::instance().loadFunctionSymbol(functionMeta->topLevelModule(), meta->name());
         typeEncoding = functionMeta->encodings()->first();
+        isPrimitiveFunction = true;
     } else if constexpr(std::is_same_v<TMeta, MethodMeta>) {
         const MethodMeta* methodMeta = static_cast<const MethodMeta*>(meta);
         initialParameterIndex = 2;
@@ -80,7 +82,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
 
         ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
-        Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call, isInstanceMethod);
+        Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call, isInstanceMethod, nullptr, isPrimitiveFunction);
 
         return result;
     }
