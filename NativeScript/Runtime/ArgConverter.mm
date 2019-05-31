@@ -3,6 +3,7 @@
 #include "ObjectManager.h"
 #include "Caches.h"
 #include "Interop.h"
+#include "Interop_impl.h"
 #include "Helpers.h"
 
 using namespace v8;

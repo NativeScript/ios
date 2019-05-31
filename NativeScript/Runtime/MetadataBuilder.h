@@ -46,9 +46,10 @@ private:
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::vector<std::string>& names);
     void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, std::vector<std::string>& names);
     void RegisterInstanceProtocols(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, std::vector<std::string>& names);
-    void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
-    void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className);
-    void RegisterStaticProtocols(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta);
+    void RegisterStaticMethods(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, std::vector<std::string>& names);
+    void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names);
+    void RegisterStaticProtocols(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names);
+    void DefineFunctionLengthProperty(v8::Local<v8::Context> context, const TypeEncodingsList<ArrayCount>* encodings, v8::Local<v8::Function> func);
 
     MetadataBuilder(const std::string& baseDir) {
         std::string fileName = baseDir + "/metadata-x86_64.bin";

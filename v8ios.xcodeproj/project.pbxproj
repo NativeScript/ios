@@ -26,6 +26,7 @@
 		C2937527229FC1600075CB16 /* TNSPrimitives.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937511229FC1600075CB16 /* TNSPrimitives.m */; };
 		C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937512229FC1600075CB16 /* TNSObjCTypes.m */; };
 		C2937529229FC1600075CB16 /* TNSPrimitivePointers.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */; };
+		C293752E22A10C490075CB16 /* Interop_impl.h in Sources */ = {isa = PBXBuildFile; fileRef = C293752D22A10C490075CB16 /* Interop_impl.h */; };
 		C2DDEB36229EAB3B00345BFE /* NativeScript.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB34229EAB3B00345BFE /* NativeScript.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3E229EABFF00345BFE /* libffi.a */; };
 		C2DDEB49229EAC0000345BFE /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3F229EABFF00345BFE /* libv8_external_snapshot.a */; };
@@ -186,6 +187,7 @@
 		C2937514229FC1600075CB16 /* TNSAllocLog.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSAllocLog.h; sourceTree = "<group>"; };
 		C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSPrimitivePointers.m; sourceTree = "<group>"; };
 		C2937516229FC1600075CB16 /* TNSRecords.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSRecords.h; sourceTree = "<group>"; };
+		C293752D22A10C490075CB16 /* Interop_impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Interop_impl.h; sourceTree = "<group>"; };
 		C2DDEB16229EA89000345BFE /* TestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB26229EA89200345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C2DDEB32229EAB3B00345BFE /* NativeScript.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScript.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -473,6 +475,7 @@
 				C2DDEB6D229EAC8200345BFE /* Helpers.h */,
 				C2DDEB7D229EAC8200345BFE /* Helpers.mm */,
 				C2DDEB65229EAC8100345BFE /* Interop.h */,
+				C293752D22A10C490075CB16 /* Interop_impl.h */,
 				C2DDEB77229EAC8200345BFE /* Interop.mm */,
 				C2DDEB6E229EAC8200345BFE /* Metadata.h */,
 				C2DDEB70229EAC8200345BFE /* Metadata.mm */,
@@ -818,6 +821,7 @@
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
+				C293752E22A10C490075CB16 /* Interop_impl.h in Sources */,
 				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,
 				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
 				C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */,
@@ -1056,6 +1060,7 @@
 		C2DDEB38229EAB3B00345BFE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1063,6 +1068,7 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GCC_C_LANGUAGE_STANDARD = c11;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"'NATIVESCRIPT_VERSION=1.0.0'",
@@ -1092,6 +1098,7 @@
 		C2DDEB39229EAB3B00345BFE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1099,6 +1106,7 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GCC_C_LANGUAGE_STANDARD = c11;
 				GCC_PREPROCESSOR_DEFINITIONS = "'NATIVESCRIPT_VERSION=1.0.0'";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";

@@ -208,7 +208,7 @@
                 return;
             } catch (e) { errors.push('  PhantomJs attempt: ' + e.message); }
             try {
-                nodeWrite(path, filename, text);
+                //nodeWrite(path, filename, text);
                 return;
             } catch (f) { errors.push('  NodeJS attempt: ' + f.message); }
             try {

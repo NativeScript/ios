@@ -4,8 +4,8 @@ console.log('Application Start!');
 require("./tests/Infrastructure/timers");
 require("./tests/Infrastructure/simulator");
 
-// global.UNUSED = function (param) {
-// };
+global.UNUSED = function (param) {
+};
 
 // var args = NSProcessInfo.processInfo.arguments;
 // var logjunit = args.containsObject("-logjunit");
@@ -48,12 +48,12 @@ require("./tests/Infrastructure/Jasmine/jasmine-2.0.1/boot");
 //import "./Inheritance/ProtocolImplementationTests";
 //import "./Inheritance/TypeScriptTests";
 //
-//import "./MethodCallsTests";
+require("./tests/MethodCallsTests");
 //import "./FunctionsTests";
-//import "./VersionDiffTests";
+require("./tests/VersionDiffTests");
 //import "./ObjCConstructors";
 //
-//import "./MetadataTests";
+require("./tests/MetadataTests");
 //
 require("./tests/ApiTests");
 //import "./DeclarationConflicts";

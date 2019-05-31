@@ -246,10 +246,10 @@ describe(module.id, function () {
 //        expect(NSObject.respondsToSelector('description')).toBe(true);
 //    });
 
-//    it("FunctionLength", function () {
-//        expect(functionWithInt.length).toBe(1);
-//        expect(NSObject.isSubclassOfClass.length).toBe(1);
-//    });
+  it("FunctionLength", function () {
+       expect(functionWithInt.length).toBe(1);
+       expect(NSObject.isSubclassOfClass.length).toBe(1);
+  });
 
 //    it("ArgumentsCount", function () {
 //        expect(function () {
@@ -330,14 +330,14 @@ describe(module.id, function () {
 //         }).toThrowError(/JS error/);
 //     });
 
-//     it("globalPropertyOfGlobalObject", function () {
-//         expect(global.toString()).toBe("[object NativeScriptGlobal]");
-//     });
+    // it("globalPropertyOfGlobalObject", function () {
+    //     expect(global.toString()).toBe("[object NativeScriptGlobal]");
+    // });
 
-//     it("globalPropertyOfGlobalObjectIsEqulatToGlobalScopeThis", function () {
-//         var globalScopeThis = Function("return this")();
-//         expect(global).toBe(globalScopeThis);
-//     });
+    it("globalPropertyOfGlobalObjectIsEqulatToGlobalScopeThis", function () {
+        var globalScopeThis = Function("return this")();
+        expect(global).toBe(globalScopeThis);
+    });
 
 //     it("Swizzle", function () {
 //         var object = TNSSwizzleKlass.alloc().init();
@@ -414,26 +414,26 @@ describe(module.id, function () {
 //         });
 //     }
 
-//     function range(start, end, inclusive) {
-//         var mapper = (_, k) => start + k;
-//         if (end < start) {
-//             mapper = (_, k) => start - k;
-//         }
+    function range(start, end, inclusive) {
+        var mapper = (_, k) => start + k;
+        if (end < start) {
+            mapper = (_, k) => start - k;
+        }
 
-//         return Array.from({ length: Math.abs(start - end) + (inclusive ? 1 : 0) }, mapper);
-//     }
+        return Array.from({ length: Math.abs(start - end) + (inclusive ? 1 : 0) }, mapper);
+    }
 
-//     it("should be able to iterate over NSArray", function () {
-//         var expected = range(0, 256);
-//         var actual = new Array();
+    // it("should be able to iterate over NSArray", function () {
+    //     var expected = range(0, 256);
+    //     var actual = new Array();
 
-//         var array = NSArray.arrayWithArray(expected);
-//         for (var x of array) {
-//             actual.push(x);
-//         }
+    //     var array = NSArray.arrayWithArray(expected);
+    //     for (var x of array) {
+    //         actual.push(x);
+    //     }
 
-//         expect(actual).toEqual(expected);
-//     });
+    //     expect(actual).toEqual(expected);
+    // });
 
 //     it("should be able to iterate over NSEnumerator", function () {
 //         var expected = range(0, 256);
@@ -448,10 +448,10 @@ describe(module.id, function () {
 //         expect(actual).toEqual(expected);
 //     });
 
-//     it("should be able to call string.normalize with simple value", function () {
-//         var str = 'string value';
-//         expect(str.normalize()).toBe(str);
-//     });
+    it("should be able to call string.normalize with simple value", function () {
+        var str = 'string value';
+        expect(str.normalize()).toBe(str);
+    });
 
 //     describe("__releaseNativeCounterpart", function () {
 //         it("deallocates js derived instances created with alloc().init()", function () {
@@ -585,10 +585,10 @@ describe(module.id, function () {
 //         }).toThrowError(ReferenceError, /TNSUnavailableConstant/);
 //     });
 
-//     it("bridged types", function () {
-//         expect(TNSObjectGet() instanceof NSObject).toBe(true);
-//         expect(TNSMutableObjectGet() instanceof NSObject).toBe(true);
-//     });
+    it("bridged types", function () {
+        expect(TNSObjectGet() instanceof NSObject).toBe(true);
+        expect(TNSMutableObjectGet() instanceof NSObject).toBe(true);
+    });
 
 //     it("returns retained", function () {
 //         expect(functionReturnsNSRetained().retainCount()).toBe(1);
@@ -679,50 +679,50 @@ describe(module.id, function () {
 //         expect(stack).toBe(expectedStack);
 //     });
 
-//     it("should allow calling callbacks from another thread", function () {
-//         var result = TNSTestNativeCallbacks.callOnThread(function() {
-//             return 'method called';
-//         });
+    // it("should allow calling callbacks from another thread", function () {
+    //     var result = TNSTestNativeCallbacks.callOnThread(function() {
+    //         return 'method called';
+    //     });
 
-//         expect(result).toBe('method called');
-//     });
+    //     expect(result).toBe('method called');
+    // });
 
-//     it("Unimplemented properties from UIBarItem class should be provided by the inheritors", function () {
-//         var classConstructors = ["UIBarButtonItem", "UITabBarItem"];
-//         var props = ["enabled", "image", "imageInsets", "title"];
-//         if (NSProcessInfo.processInfo.isOperatingSystemAtLeastVersion({majorVersion: 11, minorVersion: 0, patchVersion: 0})) {
-//             props = props.concat("landscapeImagePhone", "landscapeImagePhoneInsets");
-//         }
+    it("Unimplemented properties from UIBarItem class should be provided by the inheritors", function () {
+        var classConstructors = ["UIBarButtonItem", "UITabBarItem"];
+        var props = ["enabled", "image", "imageInsets", "title"];
+        if (NSProcessInfo.processInfo.isOperatingSystemAtLeastVersion({majorVersion: 11, minorVersion: 0, patchVersion: 0})) {
+            props = props.concat("landscapeImagePhone", "landscapeImagePhoneInsets");
+        }
 
-//         for (var klass of classConstructors) {
-//             var instance = new global[klass]();
-//             for (var prop of props) {
-//                 expect(instance[prop]).toBeDefined(`"${prop}" must be defined in instances of "${klass}"`);
-//             }
-//         }
-//     });
+        for (var klass of classConstructors) {
+            var instance = new global[klass]();
+            for (var prop of props) {
+                expect(instance[prop]).toBeDefined(`"${prop}" must be defined in instances of "${klass}"`);
+            }
+        }
+    });
 
-//     it("Unimplemented properties from MTLRenderPassAttachmentDescriptor class should be provided by the inheritors", function () {
-//         var classConstructors = [
-//             "MTLRenderPassDepthAttachmentDescriptor", "MTLRenderPassStencilAttachmentDescriptor",
-//             "MTLRenderPassColorAttachmentDescriptor"
-//         ];
-//         var props = [
-//             "depthPlane", "level", "loadAction", "resolveDepthPlane", "resolveLevel", "resolveSlice",
-//             "resolveTexture", "slice", "storeAction", "texture"
-//         ];
+    it("Unimplemented properties from MTLRenderPassAttachmentDescriptor class should be provided by the inheritors", function () {
+        var classConstructors = [
+            "MTLRenderPassDepthAttachmentDescriptor", "MTLRenderPassStencilAttachmentDescriptor",
+            "MTLRenderPassColorAttachmentDescriptor"
+        ];
+        var props = [
+            "depthPlane", "level", "loadAction", "resolveDepthPlane", "resolveLevel", "resolveSlice",
+            "resolveTexture", "slice", "storeAction", "texture"
+        ];
 
-//         if (NSProcessInfo.processInfo.isOperatingSystemAtLeastVersion({majorVersion: 11, minorVersion: 0, patchVersion: 0})) {
-//             props = props.concat("storeActionOptions");
-//         }
+        if (NSProcessInfo.processInfo.isOperatingSystemAtLeastVersion({majorVersion: 11, minorVersion: 0, patchVersion: 0})) {
+            props = props.concat("storeActionOptions");
+        }
 
-//         for (var klass of classConstructors) {
-//             var instance = new global[klass]();
-//             for (var prop of props) {
-//                 expect(instance[prop]).toBeDefined(`"${prop}" must be defined in instances of "${klass}"`);
-//             }
-//         }
-//     });
+        for (var klass of classConstructors) {
+            var instance = new global[klass]();
+            for (var prop of props) {
+                expect(instance[prop]).toBeDefined(`"${prop}" must be defined in instances of "${klass}"`);
+            }
+        }
+    });
 
 //     if (TNSIsConfigurationDebug) {
 //         it("ApiIterator", function () {

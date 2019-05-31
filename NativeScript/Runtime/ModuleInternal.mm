@@ -90,8 +90,13 @@ Local<Object> ModuleInternal::LoadImpl(const std::string& moduleName, const std:
     Local<Object> exportsObj = Object::New(isolate_);
     moduleObj->Set(tns::ToV8String(isolate_, "exports"), exportsObj);
 
-    Local<Script> script = LoadScript(moduleName, baseDir);
+    const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     Local<Context> context = isolate_->GetCurrentContext();
+    Local<v8::String> fileName = tns::ToV8String(isolate_, baseDir + "/" + moduleName + ".js");
+    bool success = moduleObj->DefineOwnProperty(context, tns::ToV8String(isolate_, "id"), fileName, readOnlyFlags).FromMaybe(false);
+    assert(success);
+
+    Local<Script> script = LoadScript(moduleName, baseDir);
 
     TryCatch tc(isolate_);
     Local<v8::Function> moduleFunc = script->Run(context).ToLocalChecked().As<v8::Function>();

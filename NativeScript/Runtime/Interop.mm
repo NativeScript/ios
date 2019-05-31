@@ -1,12 +1,11 @@
 #include <Foundation/Foundation.h>
-#include <objc/message.h>
 #include "Interop.h"
+#include "Interop_impl.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
 #include "ArgConverter.h"
 #include "DictionaryAdapter.h"
 #include "ArrayAdapter.h"
-#include "SymbolLoader.h"
 #include "Caches.h"
 
 using namespace v8;
@@ -115,85 +114,6 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
     object_setClass((__bridge id)blockPointer, objc_getClass("__NSMallocBlock__"));
 
     return blockPointer;
-}
-
-Local<Value> Interop::CallFunction(Isolate* isolate, const Meta* meta, id target, Class clazz, const std::vector<Local<Value>> args, bool callSuper) {
-    void* functionPointer = nullptr;
-    SEL selector = nil;
-    int initialParameterIndex = 0;
-    const TypeEncoding* typeEncoding = nullptr;
-
-    if (meta->type() == MetaType::Function) {
-        const FunctionMeta* functionMeta = static_cast<const FunctionMeta*>(meta);
-        functionPointer = SymbolLoader::instance().loadFunctionSymbol(functionMeta->topLevelModule(), meta->name());
-        typeEncoding = functionMeta->encodings()->first();
-    } else if (meta->type() == MetaType::Undefined || meta->type() == MetaType::Union || meta->type() == MetaType::Struct) {
-        const MethodMeta* methodMeta = static_cast<const MethodMeta*>(meta);
-        initialParameterIndex = 2;
-        typeEncoding = methodMeta->encodings()->first();
-        selector = methodMeta->selector();
-        if (callSuper) {
-            functionPointer = (void*)objc_msgSendSuper;
-        } else {
-            functionPointer = (void*)objc_msgSend;
-        }
-    } else {
-        assert(false);
-    }
-
-    int argsCount = initialParameterIndex + (int)args.size();
-
-    ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, argsCount);
-
-    FFICall call(typeEncoding, initialParameterIndex, argsCount);
-
-    std::unique_ptr<objc_super> sup = std::unique_ptr<objc_super>(new objc_super());
-
-    bool isInstanceMethod = (target && target != nil);
-
-    if (initialParameterIndex > 1) {
-#if defined(__x86_64__)
-        if (meta->type() == MetaType::Undefined || meta->type() == MetaType::Union) {
-            const unsigned UNIX64_FLAG_RET_IN_MEM = (1 << 10);
-
-            ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
-
-            if (returnType->type == FFI_TYPE_LONGDOUBLE) {
-                functionPointer = (void*)objc_msgSend_fpret;
-            } else if (returnType->type == FFI_TYPE_STRUCT && (cif->flags & UNIX64_FLAG_RET_IN_MEM)) {
-                if (callSuper) {
-                    functionPointer = (void*)objc_msgSendSuper_stret;
-                } else {
-                    functionPointer = (void*)objc_msgSend_stret;
-                }
-            }
-        }
-#endif
-
-        if (isInstanceMethod) {
-            if (callSuper) {
-                sup->receiver = target;
-                sup->super_class = class_getSuperclass(object_getClass(target));
-                call.SetArgument(0, sup.get());
-            } else {
-                call.SetArgument(0, target);
-            }
-        } else {
-            call.SetArgument(0, clazz);
-        }
-
-        call.SetArgument(1, selector);
-    }
-
-    @autoreleasepool {
-        Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
-
-        ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
-
-        Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call, isInstanceMethod);
-
-        return result;
-    }
 }
 
 void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<Local<Value>> args) {

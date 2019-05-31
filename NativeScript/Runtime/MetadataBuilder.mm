@@ -6,6 +6,7 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Interop.h"
+#include "Interop_impl.h"
 #include "Caches.h"
 #include "Tasks.h"
 
@@ -83,6 +84,14 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTempla
             }
 
             const VarMeta* varMeta = static_cast<const VarMeta*>(meta);
+
+            if (varMeta->encoding()->type == BinaryTypeEncodingType::IntEncoding) {
+                int value = *static_cast<int*>(dataSymbol);
+                Local<Number> numResult = Number::New(isolate, value);
+                info.GetReturnValue().Set(numResult);
+                return;
+            }
+
             if (varMeta->encoding()->type == BinaryTypeEncodingType::DoubleEncoding) {
                 double value = *static_cast<double*>(dataSymbol);
                 Local<Number> numResult = Number::New(isolate, value);
@@ -190,10 +199,10 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         break;
     }
 
-    std::vector<std::string> names;
-    RegisterInstanceProperties(ctorFuncTemplate, interfaceMeta, interfaceMeta->name(), names);
-    RegisterInstanceMethods(ctorFuncTemplate, interfaceMeta, names);
-    RegisterInstanceProtocols(ctorFuncTemplate, interfaceMeta, interfaceMeta->name(), names);
+    std::vector<std::string> instanceMembers;
+    RegisterInstanceProperties(ctorFuncTemplate, interfaceMeta, interfaceMeta->name(), instanceMembers);
+    RegisterInstanceMethods(ctorFuncTemplate, interfaceMeta, instanceMembers);
+    RegisterInstanceProtocols(ctorFuncTemplate, interfaceMeta, interfaceMeta->name(), instanceMembers);
 
     Local<Context> context = isolate_->GetCurrentContext();
     Local<v8::Function> ctorFunc;
@@ -216,10 +225,11 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         }
     }
 
+    std::vector<std::string> staticMembers;
     RegisterAllocMethod(ctorFunc, interfaceMeta);
-    RegisterStaticMethods(ctorFunc, interfaceMeta);
-    RegisterStaticProperties(ctorFunc, interfaceMeta, interfaceMeta->name());
-    RegisterStaticProtocols(ctorFunc, interfaceMeta);
+    RegisterStaticMethods(ctorFunc, interfaceMeta, staticMembers);
+    RegisterStaticProperties(ctorFunc, interfaceMeta, interfaceMeta->name(), staticMembers);
+    RegisterStaticProtocols(ctorFunc, interfaceMeta, interfaceMeta->name(), staticMembers);
 
     Local<v8::Function> extendFunc = classBuilder_.GetExtendFunction(context, interfaceMeta);
     ctorFunc->Set(tns::ToV8String(isolate_, "extend"), extendFunc);
@@ -282,6 +292,8 @@ void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {
     if (!v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func)) {
         assert(false);
     }
+
+    DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
     global->Set(tns::ToV8String(isolate_, funcMeta->jsName()), func);
 }
 
@@ -360,54 +372,65 @@ void MetadataBuilder::RegisterInstanceProtocols(Local<FunctionTemplate> ctorFunc
     }
 }
 
-void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const BaseClassMeta* meta) {
+void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const BaseClassMeta* meta, std::vector<std::string>& names) {
     Local<Context> context = isolate_->GetCurrentContext();
     for (auto it = meta->staticMethods->begin(); it != meta->staticMethods->end(); it++) {
         const MethodMeta* methodMeta = (*it).valuePtr();
-        CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name(), this);
-        Local<External> ext = External::New(isolate_, item);
-        Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate_, MethodCallback, ext);
-        Local<v8::Function> staticMethod;
-        if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
-            assert(false);
+
+        std::string name = methodMeta->jsName();
+        if (std::find(names.begin(), names.end(), name) == names.end()) {
+            CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name(), this);
+            Local<External> ext = External::New(isolate_, item);
+            Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate_, MethodCallback, ext);
+            Local<v8::Function> staticMethod;
+            if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
+                assert(false);
+            }
+
+            DefineFunctionLengthProperty(context, methodMeta->encodings(), staticMethod);
+            ctorFunc->Set(tns::ToV8String(isolate_, methodMeta->jsName()), staticMethod);
+            names.push_back(name);
         }
-        ctorFunc->Set(tns::ToV8String(isolate_, methodMeta->jsName()), staticMethod);
     }
 }
 
-void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className) {
+void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names) {
     for (auto it = meta->staticProps->begin(); it != meta->staticProps->end(); it++) {
         const PropertyMeta* propMeta = (*it).valuePtr();
 
-        AccessorNameGetterCallback getter = nullptr;
-        AccessorNameSetterCallback setter = nullptr;
-        if (propMeta->hasGetter()) {
-            getter = PropertyNameGetterCallback;
-        }
+        std::string name = propMeta->jsName();
+        if (std::find(names.begin(), names.end(), name) == names.end()) {
+            AccessorNameGetterCallback getter = nullptr;
+            AccessorNameSetterCallback setter = nullptr;
+            if (propMeta->hasGetter()) {
+                getter = PropertyNameGetterCallback;
+            }
 
-        if (propMeta->hasSetter()) {
-            setter = PropertyNameSetterCallback;
-        }
+            if (propMeta->hasSetter()) {
+                setter = PropertyNameSetterCallback;
+            }
 
-        if (getter || setter) {
-            CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className, this);
-            Local<External> ext = External::New(isolate_, item);
+            if (getter || setter) {
+                CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className, this);
+                Local<External> ext = External::New(isolate_, item);
 
-            Local<v8::String> propName = tns::ToV8String(isolate_, propMeta->jsName());
-            Local<Context> context = isolate_->GetCurrentContext();
-            bool success;
-            Maybe<bool> maybeSuccess = ctorFunc->SetAccessor(context, propName, getter, setter, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
-            if (!maybeSuccess.To(&success) || !success) {
-                assert(false);
+                Local<v8::String> propName = tns::ToV8String(isolate_, propMeta->jsName());
+                Local<Context> context = isolate_->GetCurrentContext();
+                bool success;
+                Maybe<bool> maybeSuccess = ctorFunc->SetAccessor(context, propName, getter, setter, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
+                if (!maybeSuccess.To(&success) || !success) {
+                    assert(false);
+                }
+                names.push_back(name);
             }
         }
     }
 }
 
-void MetadataBuilder::RegisterStaticProtocols(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta) {
+void MetadataBuilder::RegisterStaticProtocols(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names) {
     if (meta->type() == MetaType::ProtocolType) {
-        RegisterStaticMethods(ctorFunc, meta);
-        //RegisterStaticProperties(ctorFunc, meta);
+        RegisterStaticMethods(ctorFunc, meta, names);
+        RegisterStaticProperties(ctorFunc, meta, className, names);
     }
 
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
@@ -415,7 +438,7 @@ void MetadataBuilder::RegisterStaticProtocols(v8::Local<v8::Function> ctorFunc, 
         std::string protocolName = (*itProto).valuePtr();
         const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName.c_str());
         if (protoMeta != nullptr) {
-            RegisterStaticProtocols(ctorFunc, protoMeta);
+            RegisterStaticProtocols(ctorFunc, protoMeta, className, names);
         }
     }
 }
@@ -570,6 +593,14 @@ void MetadataBuilder::StructPropertySetterCallback(Local<Name> property, Local<V
 
     StructField field = it->second;
     Interop::SetStructPropertyValue(wrapper, field, value);
+}
+
+void MetadataBuilder::DefineFunctionLengthProperty(Local<Context> context, const TypeEncodingsList<ArrayCount>* encodings, Local<v8::Function> func) {
+    Isolate* isolate = context->GetIsolate();
+    const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+    int paramsCount = std::max(0, encodings->count - 1);
+    bool success = func->DefineOwnProperty(context, tns::ToV8String(isolate, "length"), Number::New(isolate, paramsCount), readOnlyFlags).FromMaybe(false);
+    assert(success);
 }
 
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass, bool isMethodCallback) {
