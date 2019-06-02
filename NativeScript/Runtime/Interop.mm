@@ -336,7 +336,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         ffi_type* ffiType = (structFieldFFIType != nullptr) ? structFieldFFIType : returnType;
 
-        void* dest = std::malloc(ffiType->size);
+        void* dest = malloc(ffiType->size);
         memcpy(dest, result, ffiType->size);
 
         StructDataWrapper* wrapper = new StructDataWrapper(structMeta, dest, ffiType);
@@ -493,6 +493,7 @@ Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodin
             chars[1] = result & (1 << 8) - 1;
         } else {
             chars[0] = result;
+            chars[1] = 0;
         }
 
         return tns::ToV8String(isolate, chars);

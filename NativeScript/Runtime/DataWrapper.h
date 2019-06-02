@@ -43,8 +43,7 @@ private:
 class PrimitiveDataWrapper: public BaseDataWrapper {
 public:
     PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType encodingType): BaseDataWrapper(std::string()), encodingType_(encodingType) {
-        value_ = malloc(size);
-        memset(value_, 0, size);
+        value_ = calloc(1, size);
     }
     WrapperType Type() {
         return WrapperType::Primitive;

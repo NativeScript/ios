@@ -150,8 +150,7 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isol
         std::map<std::string, StructField> fields;
         ffi_type* ffiType = FFICall::GetStructFFIType(item->meta_, fields);
 
-        void* dest = std::malloc(ffiType->size);
-        memset(dest, 0, ffiType->size);
+        void* dest = calloc(1, ffiType->size);
         ptrdiff_t position = 0;
         Local<Value> initializer;
         if (info.Length() > 0) {

@@ -26,8 +26,7 @@ FFICall::FFICall(const TypeEncoding* typeEncoding, const int initialParameterInd
         this->stackSize_ += malloc_good_size(std::max(argType->size, sizeof(ffi_arg)));
     }
 
-    this->buffer_ = reinterpret_cast<uint8_t*>(malloc(this->stackSize_));
-    memset(this->buffer_, 0, this->stackSize_);
+    this->buffer_ = reinterpret_cast<uint8_t*>(calloc(1, this->stackSize_));
 
     this->argsArray_ = reinterpret_cast<void**>(this->buffer_ + this->argsArrayOffset_);
     for (size_t i = 0; i < argsCount; i++) {
