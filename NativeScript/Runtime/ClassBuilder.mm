@@ -95,9 +95,12 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         assert(false);
     }
 
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(class_getName(extendedClass), extendedClass);
+    std::string extendedClassName = class_getName(extendedClass);
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(extendedClassName, extendedClass);
     Local<External> extendedData = External::New(isolate, wrapper);
     tns::SetPrivateValue(isolate, extendClassCtorFunc, tns::ToV8String(isolate, "metadata"), extendedData);
+
+    Caches::CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
 
     info.GetReturnValue().Set(extendClassCtorFunc);
 }

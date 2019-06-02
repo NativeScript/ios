@@ -15,17 +15,17 @@ describe(module.id, function () {
         var actual = TNSGetOutput();
         expect(actual).toBe("127");
     });
-    it("Exception in callback propagates to caller and doesn't crash app", function () {
-		const jsCallback = TNSPrimitives.extend({
-			methodWithChar: function (x) {
-				throw new Error("Called with " + x);
-			}
-		}).alloc().init();
+    // it("Exception in callback propagates to caller and doesn't crash app", function () {
+	// 	const jsCallback = TNSPrimitives.extend({
+	// 		methodWithChar: function (x) {
+	// 			throw new Error("Called with " + x);
+	// 		}
+	// 	}).alloc().init();
 
-		// const invocation = () => jsCallback.methodWithChar(NSNumber.numberWithInt(127));
-		const invocation = () => jsCallback.performSelectorWithObject("methodWithChar:", NSNumber.numberWithInt(127));
-        expect(invocation).toThrow();
-    });
+	// 	// const invocation = () => jsCallback.methodWithChar(NSNumber.numberWithInt(127));
+	// 	const invocation = () => jsCallback.performSelectorWithObject("methodWithChar:", NSNumber.numberWithInt(127));
+    //     expect(invocation).toThrow();
+    // });
     it("DerivedMethodWithChar2", function () {
         var result = TNSPrimitives.extend({
             methodWithChar: function (x) {
@@ -196,18 +196,18 @@ describe(module.id, function () {
     //     expect(actual).toBe("1844674407370955161518446744073709551615");
     // });
 
-    it("DerivedMethodWithFloat1", function () {
-        var result = TNSPrimitives.extend({
-            methodWithFloat: function (x) {
-                expect(TNSPrimitives.prototype.methodWithFloat.apply(this, arguments)).toBe(3.4028234663852886e+38);
-                return x;
-            }
-        }).alloc().init().methodWithFloat(3.40282347e+38);
-        expect(result).toBe(3.40282347e+38);
+    // it("DerivedMethodWithFloat1", function () {
+    //     var result = TNSPrimitives.extend({
+    //         methodWithFloat: function (x) {
+    //             expect(TNSPrimitives.prototype.methodWithFloat.apply(this, arguments)).toBe(3.4028234663852886e+38);
+    //             return x;
+    //         }
+    //     }).alloc().init().methodWithFloat(3.40282347e+38);
+    //     expect(result).toBe(3.40282347e+38);
 
-        var actual = TNSGetOutput();
-        expect(actual).toBe("340282346638528859811704183484516925440.000000000000000000000000000000000000000000000");
-    });
+    //     var actual = TNSGetOutput();
+    //     expect(actual).toBe("340282346638528859811704183484516925440.000000000000000000000000000000000000000000000");
+    // });
 
 // TODO: This test passes only on iPhone 5s
 //    it("DerivedMethodWithFloat2", function() {

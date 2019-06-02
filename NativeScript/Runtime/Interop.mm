@@ -242,8 +242,9 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
                 if (wrapper->Type() == WrapperType::Enum) {
                     EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
                     Local<Context> context = isolate->GetCurrentContext();
+                    std::string jsCode = enumWrapper->JSCode();
                     Local<Script> script;
-                    if (!Script::Compile(context, tns::ToV8String(isolate, enumWrapper->JSCode())).ToLocal(&script)) {
+                    if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
                         assert(false);
                     }
                     assert(!script.IsEmpty());

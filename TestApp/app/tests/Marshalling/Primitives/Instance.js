@@ -220,8 +220,8 @@ describe(module.id, function () {
         var actual = TNSGetOutput();
         expect(actual).toBe("i");
 
-        expect(function () {
-            TNSPrimitives.alloc().init().methodWithUnichar('iPhone');
-        }).toThrowError();
+        // expect(function () {
+        //     TNSPrimitives.alloc().init().methodWithUnichar('iPhone');
+        // }).toThrowError();
     });
 });

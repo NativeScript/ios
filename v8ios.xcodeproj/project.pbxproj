@@ -103,6 +103,8 @@
 		C2DDEBD7229EB1C500345BFE /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2FF301C2252062A00933782 /* UIKit.framework */; };
 		C2DDEBDC229EB37A00345BFE /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEBDB229EB37A00345BFE /* main.mm */; };
 		C2DDEBDE229EB4A900345BFE /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2DDEBDD229EB4A900345BFE /* app */; };
+		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
+		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -267,6 +269,8 @@
 		C2DDEBD2229EB06E00345BFE /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
 		C2DDEBDB229EB37A00345BFE /* main.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		C2DDEBDD229EB4A900345BFE /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
+		C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InlineFunctions.cpp; sourceTree = "<group>"; };
+		C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InlineFunctions.h; sourceTree = "<group>"; };
 		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		C2FF301C2252062A00933782 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		C2FF301F2252065E00933782 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
@@ -474,6 +478,8 @@
 				C2DDEB68229EAC8100345BFE /* FFICall.cpp */,
 				C2DDEB6D229EAC8200345BFE /* Helpers.h */,
 				C2DDEB7D229EAC8200345BFE /* Helpers.mm */,
+				C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */,
+				C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */,
 				C2DDEB65229EAC8100345BFE /* Interop.h */,
 				C293752D22A10C490075CB16 /* Interop_impl.h */,
 				C2DDEB77229EAC8200345BFE /* Interop.mm */,
@@ -619,6 +625,7 @@
 				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
 				C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */,
 				C2DDEB60229EAC3C00345BFE /* snapshot_blob.x86_64.h in Headers */,
+				C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */,
 				C2DDEBC1229EB02500345BFE /* v8config.h in Headers */,
 				C2DDEBD6229EB06E00345BFE /* ffi.h in Headers */,
 				C2DDEBA1229EAC8300345BFE /* FFICall.h in Headers */,
@@ -818,6 +825,7 @@
 				C2DDEB99229EAC8300345BFE /* Metadata.mm in Sources */,
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
 				C2DDEB57229EAC1F00345BFE /* platform-ios.cpp in Sources */,
+				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,

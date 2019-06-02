@@ -3,6 +3,7 @@
 #include "Runtime.h"
 #include "Console.h"
 #include "SetTimeout.h"
+#include "InlineFunctions.h"
 #include "Helpers.h"
 #include "Tasks.h"
 #include "WeakRef.h"
@@ -70,6 +71,7 @@ Isolate* Runtime::InitInternal(const string& baseDir) {
     DefineTimeMethod(context);
     DefinePerformanceObject(context);
     Console::Init(isolate);
+    InlineFunctions::Init(isolate);
     SetTimeout::Init(isolate);
     WeakRef::Init(isolate);
     moduleInternal_.Init(isolate, baseDir);

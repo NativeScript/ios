@@ -112,11 +112,17 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTempla
             const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
             std::string jsCode = jsCodeMeta->jsCode();
             Local<Context> context = isolate->GetCurrentContext();
-            Local<Object> enumValue = ArgConverter::CreateEmptyObject(context);
-            EnumDataWrapper* wrapper = new EnumDataWrapper(meta->name(), jsCode);
-            Local<External> ext = External::New(isolate, wrapper);
-            enumValue->SetInternalField(0, ext);
-            info.GetReturnValue().Set(enumValue);
+            Local<Script> script;
+            if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
+                assert(false);
+            }
+            assert(!script.IsEmpty());
+
+            Local<Value> result;
+            if (!script->Run(context).ToLocal(&result)) {
+                assert(false);
+            }
+            info.GetReturnValue().Set(result);
         } else if (meta->type() == MetaType::Struct) {
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
             Local<v8::Function> structCtorFunc = MetadataBuilder::GetOrCreateStructCtorFunction(isolate, structMeta);
@@ -138,7 +144,6 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isol
 
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         assert(info.IsConstructCall());
-        assert(info.Length() == 1);
 
         CacheItem<StructMeta>* item = static_cast<CacheItem<StructMeta>*>(info.Data().As<External>()->Value());
 
@@ -146,8 +151,13 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isol
         ffi_type* ffiType = FFICall::GetStructFFIType(item->meta_, fields);
 
         void* dest = std::malloc(ffiType->size);
+        memset(dest, 0, ffiType->size);
         ptrdiff_t position = 0;
-        Interop::InitializeStruct(info.GetIsolate(), dest, item->meta_, info[0], position);
+        Local<Value> initializer;
+        if (info.Length() > 0) {
+            initializer = info[0];
+        }
+        Interop::InitializeStruct(info.GetIsolate(), dest, item->meta_, initializer, position);
 
         Isolate* isolate = info.GetIsolate();
         StructDataWrapper* wrapper = new StructDataWrapper(item->meta_, dest, ffiType);

@@ -7,28 +7,28 @@ require("./tests/Infrastructure/simulator");
 global.UNUSED = function (param) {
 };
 
-// var args = NSProcessInfo.processInfo.arguments;
-// var logjunit = args.containsObject("-logjunit");
+var args = NSProcessInfo.processInfo.arguments;
+var logjunit = args.containsObject("-logjunit");
 
-// // Provides an output channel for jasmine JUnit test result xml.
-// global.__JUnitSaveResults = function (text) {
-//     TNSSaveResults(text);
+// Provides an output channel for jasmine JUnit test result xml.
+global.__JUnitSaveResults = function (text) {
+    TNSSaveResults(text);
 
-//     if (logjunit) {
-//         text.split('\n').forEach(function (line) {
-//             console.log("TKUnit: " + line);
-//         });
-//     }
-// };
+    if (logjunit) {
+        text.split('\n').forEach(function (line) {
+            console.log("TKUnit: " + line);
+        });
+    }
+};
 
-// global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
+global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
 
 require("./tests/Infrastructure/Jasmine/jasmine-2.0.1/boot");
 
 //require("./tests/Marshalling/Primitives/Function");
 require("./tests/Marshalling/Primitives/Static");
-//import "./Marshalling/Primitives/Instance";
-//import "./Marshalling/Primitives/Derived";
+require("./tests/Marshalling/Primitives/Instance");
+require("./tests/Marshalling/Primitives/Derived");
 //
 //import "./Marshalling/ObjCTypesTests";
 //import "./Marshalling/ConstantsTests";
@@ -40,7 +40,7 @@ require("./tests/Marshalling/Primitives/Static");
 //import "./Marshalling/PointerTests";
 //import "./Marshalling/ReferenceTests";
 //import "./Marshalling/FunctionPointerTests";
-//import "./Marshalling/EnumTests";
+require("./tests/Marshalling/EnumTests");
 //import "./Marshalling/ProtocolTests";
 //
 //// import "./Inheritance/ConstructorResolutionTests";
@@ -50,8 +50,8 @@ require("./tests/Marshalling/Primitives/Static");
 //
 require("./tests/MethodCallsTests");
 //import "./FunctionsTests";
-require("./tests/VersionDiffTests");
-//import "./ObjCConstructors";
+//require("./tests/VersionDiffTests");
+//require("./tests/ObjCConstructors");
 //
 require("./tests/MetadataTests");
 //
