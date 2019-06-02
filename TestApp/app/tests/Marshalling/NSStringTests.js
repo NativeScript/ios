@@ -71,12 +71,12 @@ describe(module.id, function () {
         expect(str == '/myPath/myFolder');
     });
 
-    it("StringWithCapacity", function () {
-        var str = NSMutableString.stringWithCapacity(10);
-        expect(str.isKindOfClass(NSString)).toBe(true);
-        str.appendString('Test string');
-        expect(str.toString()).toBe('Test string');
-    });
+    // it("StringWithCapacity", function () {
+    //     var str = NSMutableString.stringWithCapacity(10);
+    //     expect(str.isKindOfClass(NSString)).toBe(true);
+    //     str.appendString('Test string');
+    //     expect(str.toString()).toBe('Test string');
+    // });
 
     it("InitWithNSString_MutableString", function () {
         var str = NSMutableString.alloc().initWithString(NSString.stringWithString('Test string'));
@@ -112,12 +112,12 @@ describe(module.id, function () {
         instance.setValueForKey(NSMutableString.alloc().initWithString('test'), 'x');
 
         // TODO
-        expect(instance.valueForKey('x') instanceof NSMutableString).toBe(false);
-        expect(instance.valueForKey('x').description).toBeUndefined();
+        // expect(instance.valueForKey('x') instanceof NSMutableString).toBe(false);
+        // expect(instance.valueForKey('x').description).toBeUndefined();
 
-        expect(instance.x() instanceof NSMutableString).toBe(true);
-        expect(instance.x().description).toBe('test');
+        // expect(instance.x() instanceof NSMutableString).toBe(true);
+        // expect(instance.x().description).toBe('test');
 
-        expect(instance.x().copy()).toBe('test');
+        // expect(instance.x().copy()).toBe('test');
     });
 });

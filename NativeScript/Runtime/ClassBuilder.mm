@@ -199,6 +199,8 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
 
         Persistent<v8::Function>* poExtendedClassCtorFunc = new Persistent<v8::Function>(isolate, extendedClassCtorFunc);
 
+        Caches::CtorFuncs.emplace(std::make_pair(extendedClassName, poExtendedClassCtorFunc));
+
         IMP newInitialize = imp_implementationWithBlock(^(id self) {
             Local<v8::Function> extendedClassCtorFunc = poExtendedClassCtorFunc->Get(isolate);
 

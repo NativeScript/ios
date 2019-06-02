@@ -71,11 +71,11 @@ Isolate* Runtime::InitInternal(const string& baseDir) {
     DefineTimeMethod(context);
     DefinePerformanceObject(context);
     Console::Init(isolate);
-    InlineFunctions::Init(isolate);
     SetTimeout::Init(isolate);
     WeakRef::Init(isolate);
     moduleInternal_.Init(isolate, baseDir);
     metadataBuilder_.Init(isolate);
+    InlineFunctions::Init(isolate);
 
     return isolate;
 }

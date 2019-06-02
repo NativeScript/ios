@@ -31,11 +31,11 @@ require("./tests/Marshalling/Primitives/Instance");
 require("./tests/Marshalling/Primitives/Derived");
 //
 //import "./Marshalling/ObjCTypesTests";
-//import "./Marshalling/ConstantsTests";
+require("./tests/Marshalling/ConstantsTests");
 //import "./Marshalling/RecordTests";
 //import "./Marshalling/VectorTests";
 //import "./Marshalling/MatrixTests";
-//import "./Marshalling/NSStringTests";
+require("./tests/Marshalling/NSStringTests");
 //import "./Marshalling/TypesTests";
 //import "./Marshalling/PointerTests";
 //import "./Marshalling/ReferenceTests";

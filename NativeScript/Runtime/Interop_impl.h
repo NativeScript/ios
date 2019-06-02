@@ -13,6 +13,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
     int initialParameterIndex = 0;
     const TypeEncoding* typeEncoding = nullptr;
     bool isPrimitiveFunction = false;
+    bool isInitializer = false;
 
     if constexpr(std::is_same_v<TMeta, FunctionMeta>) {
         const FunctionMeta* functionMeta = static_cast<const FunctionMeta*>(meta);
@@ -22,6 +23,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
     } else if constexpr(std::is_same_v<TMeta, MethodMeta>) {
         const MethodMeta* methodMeta = static_cast<const MethodMeta*>(meta);
         initialParameterIndex = 2;
+        isInitializer = methodMeta->isInitializer();
         typeEncoding = methodMeta->encodings()->first();
         selector = methodMeta->selector();
         if (callSuper) {
@@ -77,12 +79,15 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
         call.SetArgument(1, selector);
     }
 
+    bool isInstanceReturnType = typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding;
+    bool marshalToPrimitive = isPrimitiveFunction || (!isInstanceReturnType && !isInitializer);
+
     @autoreleasepool {
         Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
 
         ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
-        Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call, isInstanceMethod, nullptr, isPrimitiveFunction);
+        Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call, marshalToPrimitive, nullptr);
 
         return result;
     }

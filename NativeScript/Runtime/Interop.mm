@@ -324,7 +324,7 @@ size_t Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t p
     return sizeof(T);
 }
 
-Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool isInstanceMethod, ffi_type* structFieldFFIType, bool isPrimitiveFunction) {
+Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool marshalToPrimitive, ffi_type* structFieldFFIType) {
     if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
         // TODO: Cache the metadata
@@ -399,13 +399,13 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
-        if ((isInstanceMethod || isPrimitiveFunction) && [result isKindOfClass:[NSString class]]) {
+        if (marshalToPrimitive && [result isKindOfClass:[NSString class]]) {
             // Convert NSString instances to javascript strings for all instance method calls
             const char* str = [result UTF8String];
             return tns::ToV8String(isolate, str);
         }
 
-        if ((isInstanceMethod || isPrimitiveFunction) && [result isKindOfClass:[NSNumber class]]) {
+        if (marshalToPrimitive && [result isKindOfClass:[NSNumber class]]) {
             // Convert NSNumber instances to javascript numbers for all instance method calls
             double value = [result doubleValue];
             return Number::New(isolate, value);

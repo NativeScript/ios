@@ -125,16 +125,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		C2937490229EC6910075CB16 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		C29374E0229FC0F60075CB16 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -687,7 +677,6 @@
 				C2DDEB12229EA89000345BFE /* Sources */,
 				C2DDEB13229EA89000345BFE /* Frameworks */,
 				C2DDEB14229EA89000345BFE /* Resources */,
-				C2937490229EC6910075CB16 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -1014,7 +1003,7 @@
 				);
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/**";
 				INFOPLIST_FILE = TestApp/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1045,7 +1034,7 @@
 				);
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/**";
 				INFOPLIST_FILE = TestApp/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
