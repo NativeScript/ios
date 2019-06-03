@@ -71,12 +71,12 @@ describe(module.id, function () {
         expect(str == '/myPath/myFolder');
     });
 
-    // it("StringWithCapacity", function () {
-    //     var str = NSMutableString.stringWithCapacity(10);
-    //     expect(str.isKindOfClass(NSString)).toBe(true);
-    //     str.appendString('Test string');
-    //     expect(str.toString()).toBe('Test string');
-    // });
+    it("StringWithCapacity", function () {
+        var str = NSMutableString.stringWithCapacity(10);
+        expect(str.isKindOfClass(NSString)).toBe(true);
+        str.appendString('Test string');
+        expect(str.toString()).toBe('Test string');
+    });
 
     it("InitWithNSString_MutableString", function () {
         var str = NSMutableString.alloc().initWithString(NSString.stringWithString('Test string'));

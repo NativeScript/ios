@@ -400,9 +400,19 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         }
 
         if (marshalToPrimitive && [result isKindOfClass:[NSString class]]) {
-            // Convert NSString instances to javascript strings for all instance method calls
-            const char* str = [result UTF8String];
-            return tns::ToV8String(isolate, str);
+            if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+                std::string returnClassName = typeEncoding->details.declarationReference.name.valuePtr();
+                Class returnClass = objc_getClass(returnClassName.c_str());
+                if (returnClass != nil && returnClass == [NSMutableString class]) {
+                    marshalToPrimitive = false;
+                }
+            }
+
+            if (marshalToPrimitive) {
+                // Convert NSString instances to javascript strings for all instance method calls
+                const char* str = [result UTF8String];
+                return tns::ToV8String(isolate, str);
+            }
         }
 
         if (marshalToPrimitive && [result isKindOfClass:[NSNumber class]]) {
