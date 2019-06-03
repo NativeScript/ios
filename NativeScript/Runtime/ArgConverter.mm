@@ -21,6 +21,8 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
     bool instanceMethod = !receiver.IsEmpty();
     bool callSuper = false;
     if (instanceMethod) {
+        assert(receiver->InternalFieldCount() > 0);
+
         Local<External> ext = receiver->GetInternalField(0).As<External>();
         // TODO: Check the actual type of the DataWrapper
         ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());

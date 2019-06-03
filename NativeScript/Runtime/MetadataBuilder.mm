@@ -99,6 +99,13 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTempla
                 return;
             }
 
+            if (varMeta->encoding()->type == BinaryTypeEncodingType::BoolEncoding) {
+                bool value = *static_cast<bool*>(dataSymbol);
+                Local<Value> numResult = v8::Boolean::New(isolate, value);
+                info.GetReturnValue().Set(numResult);
+                return;
+            }
+
             id result = *static_cast<const id*>(dataSymbol);
             if ([result isKindOfClass:[NSString class]]) {
                 Local<v8::String> strResult = tns::ToV8String(isolate, [result UTF8String]);
@@ -470,12 +477,25 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.Length() == 0);
 
     Isolate* isolate = info.GetIsolate();
-    CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
-    const InterfaceMeta* meta = item->meta_;
-    Class klass = objc_getClass(meta->name());
+
+    Local<Object> thiz = info.This();
+    std::string className;
+
+    Local<Value> metadataProp = tns::GetPrivateValue(isolate, thiz, tns::ToV8String(isolate, "metadata"));
+    if (!metadataProp.IsEmpty() && !metadataProp->IsNullOrUndefined() && metadataProp->IsExternal()) {
+        Local<External> e = metadataProp.As<External>();
+        ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(e->Value());
+        className = wr->Name();
+    } else {
+        CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
+        const InterfaceMeta* meta = item->meta_;
+        className = meta->name();
+    }
+
+    Class klass = objc_getClass(className.c_str());
     id obj = [klass alloc];
 
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(meta->name(), obj);
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, obj);
     Local<Value> result = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>());
     info.GetReturnValue().Set(result);
 }
@@ -511,9 +531,14 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
 }
 
 void MetadataBuilder::PropertyGetterCallback(Local<v8::String> name, const PropertyCallbackInfo<Value> &info) {
+    Local<Object> receiver = info.This();
+
+    if (receiver->InternalFieldCount() < 1) {
+        return;
+    }
+
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
-    Local<Object> receiver = info.This();
 
     Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->className_, false);
     if (!result.IsEmpty()) {

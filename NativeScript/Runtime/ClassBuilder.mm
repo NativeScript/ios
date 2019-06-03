@@ -60,10 +60,6 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         item->self_->ExposeDynamicMembers(isolate, extendedClass, implementationObject, nativeSignature);
     }
 
-    Persistent<Object>* prototype = new Persistent<Object>(isolate, implementationObject);
-    std::string className = class_getName(extendedClass);
-    Caches::ClassPrototypes.insert(std::make_pair(className, prototype));
-
     Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(item->meta_->name())->second;
     Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
 
@@ -101,6 +97,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     tns::SetPrivateValue(isolate, extendClassCtorFunc, tns::ToV8String(isolate, "metadata"), extendedData);
 
     Caches::CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
+    Caches::ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendFuncPrototype)));
 
     info.GetReturnValue().Set(extendClassCtorFunc);
 }

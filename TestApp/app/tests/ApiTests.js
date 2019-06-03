@@ -83,13 +83,13 @@ describe(module.id, function () {
         expect(array instanceof NSObject).toBe(true);
     });
 
-    // it("instanceOfDerivedClass", function () {
-    //     var JSObject = TNSDerivedInterface.extend({});
-    //     var object = JSObject.alloc().init();
-    //     expect(object instanceof JSObject).toBe(true);
-    //     expect(object instanceof TNSDerivedInterface).toBe(true);
-    //     expect(object instanceof NSObject).toBe(true);
-    // });
+    it("instanceOfDerivedClass", function () {
+        var JSObject = TNSDerivedInterface.extend({});
+        var object = JSObject.alloc().init();
+        expect(object instanceof JSObject).toBe(true);
+        expect(object instanceof TNSDerivedInterface).toBe(true);
+        expect(object instanceof NSObject).toBe(true);
+    });
 
     it("instanceOfUITabBarController", function () {
         var object = UITabBarController.alloc().init();
@@ -107,21 +107,21 @@ describe(module.id, function () {
         // expect(UILabel.appearance().constructor).toBe(UILabel);
     });
 
-//     it("ReadonlyPropertyInProtocolAndOverrideWithSetterInInterface", function () {
-//         var object = new UIView();
-//         object.bounds = {
-//             origin: {
-//                 x: 10,
-//                 y: 20
-//             },
-//             size: {
-//                 width: 30,
-//                 height: 40
-//             }
-//         };
+    it("ReadonlyPropertyInProtocolAndOverrideWithSetterInInterface", function () {
+        var object = new UIView();
+        object.bounds = {
+            origin: {
+                x: 10,
+                y: 20
+            },
+            size: {
+                width: 30,
+                height: 40
+            }
+        };
 
-//         TNSTestNativeCallbacks.apiReadonlyPropertyInProtocolAndOverrideWithSetterInInterface(object);
-//     });
+        TNSTestNativeCallbacks.apiReadonlyPropertyInProtocolAndOverrideWithSetterInInterface(object);
+    });
 
 //     it("DescriptionOverride", function () {
 //         var object = NSObject.extend({
@@ -197,45 +197,45 @@ describe(module.id, function () {
         expect(field.secureTextEntry).toBe(true);
     });
 
-//      it("SpecialCaseProperty_When_CustomSelector_ImplementedInJS", function () {
-//         var field = new (UITextField.extend({
-//             get secureTextEntry() {
-//                 TNSLog("getter");
-//                 return this._secureTextEntry;
-//             },
-//             set secureTextEntry(val) {
-//                 this._secureTextEntry = val;
-//                 TNSLog("setter:" + val);
-//             }
-//         }))();
-//         var expectedOutput = "";
+     it("SpecialCaseProperty_When_CustomSelector_ImplementedInJS", function () {
+        var field = new (UITextField.extend({
+            get secureTextEntry() {
+                TNSLog("getter");
+                return this._secureTextEntry;
+            },
+            set secureTextEntry(val) {
+                this._secureTextEntry = val;
+                TNSLog("setter:" + val);
+            }
+        }))();
+        var expectedOutput = "";
 
-//         expect(field.secureTextEntry).toBeUndefined(); expectedOutput+="getter";
+        expect(field.secureTextEntry).toBeUndefined(); expectedOutput+="getter";
 
-//         field.secureTextEntry = true; expectedOutput+="setter:true";
+        field.secureTextEntry = true; expectedOutput+="setter:true";
 
-//         expect(field.secureTextEntry).toBe(true); expectedOutput+="getter";
+        expect(field.secureTextEntry).toBe(true); expectedOutput+="getter";
 
-//         field.secureTextEntry = false; expectedOutput+="setter:false";
+        field.secureTextEntry = false; expectedOutput+="setter:false";
 
-//         expect(field.secureTextEntry).toBe(false); expectedOutput+="getter";
+        expect(field.secureTextEntry).toBe(false); expectedOutput+="getter";
 
-//         expect(TNSGetOutput()).toBe(expectedOutput);
-//      });
+        expect(TNSGetOutput()).toBe(expectedOutput);
+     });
 
     it("TypedefPointerClass", function () {
         expect(TNSApi.alloc().init().strokeColor).toBeNull();
     });
 
-//     if (TNSIsConfigurationDebug) {
-//         it("GlobalObjectProperties", function () {
-//             var propertyNames = Object.getOwnPropertyNames(global);
-//             expect(propertyNames).toContain("NSTimeZoneNameStyle");
-//             expect(propertyNames).toContain("UITextViewTextDidChangeNotification");
-//             expect(propertyNames).toContain("UIApplicationStateRestorationBundleVersionKey");
-//             expect(propertyNames.length).toBeGreaterThan(4000);
-//         });
-//     }
+    //  if (TNSIsConfigurationDebug) {
+    //      it("GlobalObjectProperties", function () {
+    //          var propertyNames = Object.getOwnPropertyNames(global);
+    //          expect(propertyNames).toContain("NSTimeZoneNameStyle");
+    //          expect(propertyNames).toContain("UITextViewTextDidChangeNotification");
+    //          expect(propertyNames).toContain("UIApplicationStateRestorationBundleVersionKey");
+    //          expect(propertyNames.length).toBeGreaterThan(4000);
+    //      });
+    //  }
 
     it("NSObjectSuperClass", function () {
         expect(NSObject.superclass()).toBeNull();
