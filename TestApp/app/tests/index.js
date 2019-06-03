@@ -25,7 +25,7 @@ global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).str
 
 require("./tests/Infrastructure/Jasmine/jasmine-2.0.1/boot");
 
-//require("./tests/Marshalling/Primitives/Function");
+require("./tests/Marshalling/Primitives/Function");
 require("./tests/Marshalling/Primitives/Static");
 require("./tests/Marshalling/Primitives/Instance");
 require("./tests/Marshalling/Primitives/Derived");
