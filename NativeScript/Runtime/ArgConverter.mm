@@ -34,6 +34,24 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         callSuper = isMethodCallback && it != Caches::ClassPrototypes.end();
     }
 
+    if (args.size() != meta->encodings()->count - 1) {
+        // Arguments number mismatch -> search for a possible method overload in the class hierarchy
+        std::string methodName = meta->jsName();
+        std::string className = class_getName(klass);
+        MemberType type = instanceMethod ? MemberType::InstanceMethod : MemberType::StaticMethod;
+        std::vector<const MethodMeta*> overloads;
+        ArgConverter::FindMethodOverloads(className, methodName, type, overloads);
+        if (overloads.size() > 0) {
+            for (auto it = overloads.begin(); it != overloads.end(); it++) {
+                const MethodMeta* methodMeta = (*it);
+                if (args.size() == methodMeta->encodings()->count - 1) {
+                    meta = methodMeta;
+                    break;
+                }
+            }
+        }
+    }
+
     return Interop::CallFunction(isolate, meta, target, klass, args, callSuper);
 }
 
@@ -320,6 +338,24 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, 
         assert(false);
     }
     return emptyInstanceCtorFunc;
+}
+
+void ArgConverter::FindMethodOverloads(std::string className, std::string methodName, MemberType type, std::vector<const MethodMeta*>& overloads) {
+    const Meta* meta = ArgConverter::GetMeta(className);
+    if (meta == nullptr || meta->type() != MetaType::Interface) {
+        return;
+    }
+
+    const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+    MembersCollection members = interfaceMeta->members(methodName.c_str(), methodName.length(), type);
+    for (auto it = members.begin(); it != members.end(); it++) {
+        const MethodMeta* methodMeta = static_cast<const MethodMeta*>(*it);
+        overloads.push_back(methodMeta);
+    }
+
+    if (interfaceMeta->baseName() != nullptr) {
+        ArgConverter::FindMethodOverloads(interfaceMeta->baseName(), methodName, type, overloads);
+    }
 }
 
 Persistent<v8::Function>* ArgConverter::poEmptyObjCtorFunc_;

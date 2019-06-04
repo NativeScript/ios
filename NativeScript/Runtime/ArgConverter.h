@@ -37,6 +37,7 @@ private:
 
     static v8::Local<v8::Function> CreateEmptyInstanceFunction(v8::Isolate* isolate, v8::GenericNamedPropertyGetterCallback propertyGetter = nullptr, v8::GenericNamedPropertySetterCallback propertySetter = nullptr);
     static v8::Local<v8::Object> CreateEmptyInstance(v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
+    static void FindMethodOverloads(std::string className, std::string methodName, MemberType type, std::vector<const MethodMeta*>& overloads);
 };
 
 }
