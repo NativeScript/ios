@@ -150,8 +150,12 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             call->SetArgument(i, result);
         } else if (arg->IsNumber() || arg->IsNumberObject()) {
             double value = arg.As<Number>()->Value();
-
-            if (enc->type == BinaryTypeEncodingType::UShortEncoding) {
+            
+            if (enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+                // NSNumber
+                NSNumber* num = [NSNumber numberWithDouble:value];
+                call->SetArgument(i, num);
+            } else if (enc->type == BinaryTypeEncodingType::UShortEncoding) {
                 call->SetArgument(i, (unsigned short)value);
             } else if (enc->type == BinaryTypeEncodingType::ShortEncoding) {
                 call->SetArgument(i, (short)value);
