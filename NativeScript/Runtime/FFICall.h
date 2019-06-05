@@ -50,6 +50,17 @@ public:
         *static_cast<T*>(ArgumentBuffer(index)) = value;
     }
 
+    template <typename T>
+    void SetNumericArgument(unsigned index, T value) {
+        if (value < std::numeric_limits<T>::min()) {
+            *static_cast<T*>(ArgumentBuffer(index)) = std::numeric_limits<T>::min();
+        } else if (value > std::numeric_limits<T>::max()) {
+            *static_cast<T*>(ArgumentBuffer(index)) = std::numeric_limits<T>::max();
+        } else {
+            *static_cast<T*>(ArgumentBuffer(index)) = value;
+        }
+    }
+
     void** ArgsArray() {
         return this->argsArray_;
     }

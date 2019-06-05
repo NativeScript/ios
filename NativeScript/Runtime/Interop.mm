@@ -156,29 +156,29 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
                 NSNumber* num = [NSNumber numberWithDouble:value];
                 call->SetArgument(i, num);
             } else if (enc->type == BinaryTypeEncodingType::UShortEncoding) {
-                call->SetArgument(i, (unsigned short)value);
+                call->SetNumericArgument<unsigned short>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::ShortEncoding) {
-                call->SetArgument(i, (short)value);
+                call->SetNumericArgument<short>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::UIntEncoding) {
-                call->SetArgument(i, (unsigned int)value);
+                call->SetNumericArgument<unsigned int>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::IntEncoding) {
-                call->SetArgument(i, (int)value);
+                call->SetNumericArgument<int>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::ULongEncoding) {
-                call->SetArgument(i, (unsigned long)value);
+                call->SetNumericArgument<unsigned long>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::LongEncoding) {
-                call->SetArgument(i, (long)value);
+                call->SetNumericArgument<long>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::ULongLongEncoding) {
-                call->SetArgument(i, (unsigned long long)value);
+                call->SetNumericArgument<unsigned long long>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::LongLongEncoding) {
-                call->SetArgument(i, (long long)value);
+                call->SetNumericArgument<long long>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::FloatEncoding) {
-                call->SetArgument(i, (float)value);
+                call->SetNumericArgument<float>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::DoubleEncoding) {
-                call->SetArgument(i, value);
+                call->SetNumericArgument<double>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::UCharEncoding) {
-                call->SetArgument(i, (unsigned char)value);
+                call->SetNumericArgument<unsigned char>(i, value);
             } else if (enc->type == BinaryTypeEncodingType::CharEncoding) {
-                call->SetArgument(i, (char)value);
+                call->SetNumericArgument<char>(i, value);
             } else {
                 assert(false);
             }

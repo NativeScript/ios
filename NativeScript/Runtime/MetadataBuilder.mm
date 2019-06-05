@@ -68,7 +68,9 @@ void MetadataBuilder::Init(Isolate* isolate) {
     }
 }
 
-void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTemplate> global) {
+void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<ObjectTemplate> global) {
+    Local<External> ext = External::New(isolate, this);
+
     global->SetHandler(NamedPropertyHandlerConfiguration([](Local<Name> property, const PropertyCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         std::string propName = tns::ToString(info.GetIsolate(), property);
@@ -132,10 +134,12 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(v8::Local<v8::ObjectTempla
             info.GetReturnValue().Set(result);
         } else if (meta->type() == MetaType::Struct) {
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-            Local<v8::Function> structCtorFunc = MetadataBuilder::GetOrCreateStructCtorFunction(isolate, structMeta);
+            Local<External> ext = info.Data().As<External>();
+            MetadataBuilder* builder = static_cast<MetadataBuilder*>(ext->Value());
+            Local<v8::Function> structCtorFunc = builder->GetOrCreateStructCtorFunction(isolate, structMeta);
             info.GetReturnValue().Set(structCtorFunc);
         }
-    }));
+    }, nullptr, nullptr, nullptr, nullptr, ext));
 }
 
 Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isolate, const StructMeta* structMeta) {
@@ -174,7 +178,7 @@ void MetadataBuilder::StructConstructorCallback(const v8::FunctionCallbackInfo<v
     ffi_type* ffiType = FFICall::GetStructFFIType(item->meta_, fields);
 
     Local<Value> initializer = info.Length() > 0 ? info[0] : Local<Value>();
-    void* dest = calloc(1, ffiType->size);
+    void* dest = malloc(ffiType->size);
     Interop::InitializeStruct(info.GetIsolate(), dest, fields, initializer);
 
     Isolate* isolate = info.GetIsolate();
@@ -232,7 +236,7 @@ std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Isolate* isolate, Loc
     if (initializer->InternalFieldCount() < 1) {
         std::vector<StructField> fields;
         ffiType = FFICall::GetStructFFIType(structMeta, fields);
-        data = calloc(1, ffiType->size);
+        data = malloc(ffiType->size);
         Interop::InitializeStruct(isolate, data, fields, initializer);
     } else {
         Local<External> ext = initializer->GetInternalField(0).As<External>();
@@ -325,9 +329,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 
     Caches::CtorFuncTemplates.insert(std::make_pair(interfaceMeta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
 
-    Local<Value> prototype = ctorFunc->Get(tns::ToV8String(isolate_, "prototype"));
-
-    prototype.As<Object>()->Set(tns::ToV8String(isolate_, "toString"), poToStringFunction_->Get(isolate_));
+    Local<Object> prototype = ctorFunc->Get(tns::ToV8String(isolate_, "prototype")).As<Object>();
+    prototype->Set(tns::ToV8String(isolate_, "toString"), poToStringFunction_->Get(isolate_));
 
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate_, prototype);
     Caches::Prototypes.insert(std::make_pair(interfaceMeta, poPrototype));

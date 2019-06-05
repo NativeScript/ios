@@ -61,7 +61,7 @@ Isolate* Runtime::InitInternal(const string& baseDir) {
     HandleScope handle_scope(isolate);
     Local<FunctionTemplate> globalTemplateFunction = FunctionTemplate::New(isolate);
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
-    metadataBuilder_.RegisterConstantsOnGlobalObject(globalTemplate);
+    metadataBuilder_.RegisterConstantsOnGlobalObject(isolate, globalTemplate);
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
 
