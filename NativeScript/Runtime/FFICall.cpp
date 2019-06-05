@@ -72,10 +72,24 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
             return &ffi_type_sint32;
         }
         case BinaryTypeEncodingType::ULongEncoding: {
-            return &ffi_type_ulong;
+#if defined(__LP64__)
+            return &ffi_type_uint64;
+#else
+            return &ffi_type_uint32;
+#endif
         }
         case BinaryTypeEncodingType::LongEncoding: {
-            return &ffi_type_slong;
+#if defined(__LP64__)
+            return &ffi_type_sint64;
+#else
+            return &ffi_type_sint32;
+#endif
+        }
+        case BinaryTypeEncodingType::ULongLongEncoding: {
+            return &ffi_type_uint64;
+        }
+        case BinaryTypeEncodingType::LongLongEncoding: {
+            return &ffi_type_sint64;
         }
         case BinaryTypeEncodingType::FloatEncoding: {
             return &ffi_type_float;
@@ -91,7 +105,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
             assert(meta->type() == MetaType::Struct);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
 
-            std::map<std::string, StructField> fields;
+            std::vector<StructField> fields;
             return FFICall::GetStructFFIType(structMeta, fields);
         }
         default: {
@@ -103,7 +117,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
     assert(false);
 }
 
-ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::map<std::string, StructField>& fields) {
+ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::vector<StructField>& fields) {
     ffi_type* ffiType = new ffi_type({ .size = 0, .alignment = 0, .type = FFI_TYPE_STRUCT });
 
     size_t count = structMeta->fieldsCount();
@@ -121,9 +135,9 @@ ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::map<std::
 
         std::string fieldName = structMeta->fieldNames()[i].valuePtr();
         offset += padding;
-        StructField field(offset, fieldFFIType, fieldEncoding);
+        StructField field(offset, fieldFFIType, fieldName, fieldEncoding);
 
-        fields.insert(std::make_pair(fieldName, field));
+        fields.push_back(field);
 
         ffiType->size = offset + fieldFFIType->size;
         ffiType->alignment = std::max(ffiType->alignment, fieldFFIType->alignment);

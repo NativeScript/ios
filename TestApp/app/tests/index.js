@@ -32,7 +32,7 @@ require("./tests/Marshalling/Primitives/Derived");
 //
 //import "./Marshalling/ObjCTypesTests";
 require("./tests/Marshalling/ConstantsTests");
-//import "./Marshalling/RecordTests";
+require("./tests/Marshalling/RecordTests");
 //import "./Marshalling/VectorTests";
 //import "./Marshalling/MatrixTests";
 require("./tests/Marshalling/NSStringTests");

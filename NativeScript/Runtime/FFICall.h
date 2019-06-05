@@ -38,7 +38,7 @@ public:
     }
 
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);
-    static ffi_type* GetStructFFIType(const StructMeta* structMeta, std::map<std::string, StructField>& fields);
+    static ffi_type* GetStructFFIType(const StructMeta* structMeta, std::vector<StructField>& fields);
     static ffi_cif* GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
 
     void* ArgumentBuffer(unsigned index) {

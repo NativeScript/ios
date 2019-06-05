@@ -95,23 +95,28 @@ private:
 
 struct StructField {
 public:
-    StructField(ptrdiff_t offset, ffi_type* ffiType, const TypeEncoding* encoding)
-        : offset_(offset), ffiType_(ffiType), encoding_(encoding) { }
+    StructField(ptrdiff_t offset, ffi_type* ffiType, std::string name, const TypeEncoding* encoding)
+        : offset_(offset), ffiType_(ffiType), name_(name), encoding_(encoding) { }
 
     ptrdiff_t Offset() {
         return this->offset_;
     }
 
-    const TypeEncoding* Encoding() {
-        return this->encoding_;
-    }
-
     ffi_type* FFIType() {
         return this->ffiType_;
+    }
+
+    std::string Name() {
+        return this->name_;
+    }
+
+    const TypeEncoding* Encoding() {
+        return this->encoding_;
     }
 private:
     ptrdiff_t offset_;
     ffi_type* ffiType_;
+    std::string name_;
     const TypeEncoding* encoding_;
 };
 

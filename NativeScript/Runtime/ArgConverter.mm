@@ -195,6 +195,23 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
             receiver = CreateEmptyStruct(context);
         }
 
+        if (wrapper->Type() == WrapperType::Record) {
+            StructDataWrapper* structWrapper = static_cast<StructDataWrapper*>(wrapper);
+            if (structWrapper->Metadata()->type() == MetaType::Struct) {
+                const StructMeta* structMeta = static_cast<const StructMeta*>(structWrapper->Metadata());
+
+                auto it = Caches::StructConstructorFunctions.find(structMeta);
+                if (it != Caches::StructConstructorFunctions.end()) {
+                    Local<v8::Function> structCtorFunc = it->second->Get(isolate);
+                    Local<Value> proto = structCtorFunc->Get(tns::ToV8String(isolate, "prototype"));
+                    if (!proto.IsEmpty()) {
+                        bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
+                        assert(success);
+                    }
+                }
+            }
+        }
+
         Local<External> ext = External::New(isolate, wrapper);
         receiver->SetInternalField(0, ext);
 
