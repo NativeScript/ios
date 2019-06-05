@@ -220,10 +220,11 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             Local<v8::Array> array = arg.As<v8::Array>();
             ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
             call->SetArgument(i, adapter);
-        } else if (arg->IsObject() && enc->type == BinaryTypeEncodingType::ProtocolEncoding) {
+        } else if (arg->IsFunction() && enc->type == BinaryTypeEncodingType::ProtocolEncoding) {
             Local<Object> obj = arg.As<Object>();
-            assert(obj->InternalFieldCount() > 0);
-            Local<External> ext = obj->GetInternalField(0).As<External>();
+            Local<Value> metadataProp = tns::GetPrivateValue(isolate, obj, tns::ToV8String(isolate, "metadata"));
+            assert(!metadataProp.IsEmpty() && metadataProp->IsExternal());
+            Local<External> ext = metadataProp.As<External>();
             BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
             Protocol* proto = objc_getProtocol(wrapper->Name().c_str());
             call->SetArgument(i, proto);
@@ -375,29 +376,24 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
-        const char* protocolName = protocol_getName(result);
-        auto it = Caches::ProtocolInstances.find(protocolName);
-        if (it != Caches::ProtocolInstances.end()) {
+
+        const char* name = protocol_getName(result);
+        auto it = Caches::ProtocolCtorFuncs.find(name);
+        if (it != Caches::ProtocolCtorFuncs.end()) {
             return it->second->Get(isolate);
         }
 
-        Local<Object> proto = ArgConverter::CreateEmptyObject(isolate->GetCurrentContext());
-        BaseDataWrapper* wrapper = new BaseDataWrapper(protocolName);
-        Local<External> ext = External::New(isolate, wrapper);
-        proto->SetInternalField(0, ext);
-
-        Caches::ProtocolInstances.insert(std::make_pair(protocolName, new Persistent<Object>(isolate, proto)));
-        return proto;
+        assert(false);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::ClassEncoding) {
         Class result = call->GetResult<Class>();
-        if (result == nullptr) {
+        if (result == nil) {
             return Null(isolate);
         }
 
-        const char* className = class_getName(result);
-        auto it = Caches::CtorFuncs.find(className);
+        const char* name = class_getName(result);
+        auto it = Caches::CtorFuncs.find(name);
         if (it != Caches::CtorFuncs.end()) {
             return it->second->Get(isolate);
         }

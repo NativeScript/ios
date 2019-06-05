@@ -375,12 +375,13 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
 void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<v8::Array> protocols) {
     for (uint32_t i = 0; i < protocols->Length(); i++) {
         Local<Value> element = protocols->Get(i);
-        assert(!element.IsEmpty() && element->IsObject());
+        assert(!element.IsEmpty() && element->IsFunction());
 
-        Local<Object> protoObj = element.As<Object>();
-        assert(protoObj->InternalFieldCount() > 0);
+        Local<v8::Function> protoObj = element.As<v8::Function>();
+        Local<Value> metadataProp = tns::GetPrivateValue(isolate, protoObj, tns::ToV8String(isolate, "metadata"));
+        assert(!metadataProp.IsEmpty() && metadataProp->IsExternal());
 
-        Local<External> ext = protoObj->GetInternalField(0).As<External>();
+        Local<External> ext = metadataProp.As<External>();
         BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
         std::string protocolName = wrapper->Name();
         Protocol* proto = objc_getProtocol(protocolName.c_str());

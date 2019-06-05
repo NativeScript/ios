@@ -42,7 +42,7 @@ private:
 
     v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, std::string containingClass, bool isMethodCallback);
     v8::Persistent<v8::Function>* CreateToStringFunction(v8::Isolate* isolate);
-    v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const InterfaceMeta* interfaceMeta);
+    v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const BaseClassMeta* meta);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     v8::Local<v8::Function> GetOrCreateStructCtorFunction(v8::Isolate* isolate, const StructMeta* structMeta);
     void RegisterCFunction(const FunctionMeta* funcMeta);

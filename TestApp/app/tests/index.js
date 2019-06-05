@@ -41,7 +41,7 @@ require("./tests/Marshalling/NSStringTests");
 //import "./Marshalling/ReferenceTests";
 //import "./Marshalling/FunctionPointerTests";
 require("./tests/Marshalling/EnumTests");
-//import "./Marshalling/ProtocolTests";
+require("./tests/Marshalling/ProtocolTests");
 //
 //// import "./Inheritance/ConstructorResolutionTests";
 //import "./Inheritance/InheritanceTests";
@@ -56,7 +56,7 @@ require("./tests/MethodCallsTests");
 require("./tests/MetadataTests");
 //
 require("./tests/ApiTests");
-//import "./DeclarationConflicts";
+require("./tests/DeclarationConflicts");
 //
 require("./tests/Promises");
 //require("./tests/Modules");
