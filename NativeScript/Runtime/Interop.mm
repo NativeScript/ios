@@ -111,6 +111,8 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
         .descriptor = &JSBlock::kJSBlockDescriptor,
     };
 
+    blockPointer->userData = userData;
+
     object_setClass((__bridge id)blockPointer, objc_getClass("__NSMallocBlock__"));
 
     return blockPointer;
@@ -399,6 +401,59 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         }
 
         assert(false);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
+        JSBlock* block = call->GetResult<JSBlock*>();
+
+        if (block == nullptr) {
+            return Null(isolate);
+        }
+
+        if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
+            MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
+            Local<v8::Function> callback = wrapper->callback_->Get(isolate).As<v8::Function>();
+            return callback;
+        }
+
+        Local<Context> context = isolate->GetCurrentContext();
+        BlockDataWrapper* blockWrapper = new BlockDataWrapper(block, typeEncoding);
+        Local<External> ext = External::New(isolate, blockWrapper);
+        Local<v8::Function> callback;
+
+        CFRetain(block);
+
+        bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+            Local<External> ext = info.Data().As<External>();
+            BlockDataWrapper* wrapper = static_cast<BlockDataWrapper*>(ext->Value());
+
+            JSBlock* block = static_cast<JSBlock*>(wrapper->Block());
+
+            const TypeEncoding* typeEncoding = wrapper->Encodings();
+            int argsCount = typeEncoding->details.block.signature.count;
+            const TypeEncoding* enc = typeEncoding->details.block.signature.first();
+
+            ffi_cif* cif = FFICall::GetCif(enc, 1, argsCount);
+            FFICall call(cif);
+
+            std::vector<Local<Value>> args;
+            for (int i = 0; i < info.Length(); i++) {
+                args.push_back(info[i]);
+            }
+
+            Isolate* isolate = info.GetIsolate();
+            call.SetArgument(0, block);
+            Interop::SetFFIParams(isolate, enc, &call, argsCount, 1, args);
+
+            ffi_call(cif, FFI_FN(block->invoke), call.ResultBuffer(), call.ArgsArray());
+
+            Local<Value> result = Interop::GetResult(isolate, enc, cif->rtype, &call, true);
+
+            info.GetReturnValue().Set(result);
+        }, ext).ToLocal(&callback);
+        assert(success);
+
+        return callback;
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||

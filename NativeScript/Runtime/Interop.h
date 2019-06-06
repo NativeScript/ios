@@ -49,6 +49,7 @@ private:
         int32_t reserved;
         const void* invoke;
         JSBlockDescriptor* descriptor;
+        void* userData;
 
         static JSBlockDescriptor kJSBlockDescriptor;
 

@@ -2,29 +2,22 @@
 
 namespace tns {
 
-FFICall::FFICall(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) : BaseFFICall(nullptr, 0) {
+FFICall::FFICall(ffi_cif* cif) : BaseFFICall(nullptr, 0) {
+    unsigned int argsCount = cif->nargs;
     size_t stackSize = 0;
 
     if (argsCount > 0) {
-        stackSize += malloc_good_size(sizeof(void* [argsCount]));
+        stackSize = malloc_good_size(sizeof(void* [argsCount]));
     }
 
     this->returnOffset_ = stackSize;
 
-    ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
-    stackSize += malloc_good_size(std::max(returnType->size, sizeof(ffi_arg)));
+    stackSize += malloc_good_size(std::max(cif->rtype->size, sizeof(ffi_arg)));
 
     std::vector<size_t> argValueOffsets;
-    for (size_t i = 0; i < initialParameterIndex; i++) {
+    for (size_t i = 0; i < argsCount; i++) {
         argValueOffsets.push_back(stackSize);
-        stackSize += malloc_good_size(std::max(sizeof(ffi_type_pointer), sizeof(ffi_arg)));
-    }
-
-    const TypeEncoding* enc = typeEncoding;
-    for (size_t i = initialParameterIndex; i < argsCount; i++) {
-        argValueOffsets.push_back(stackSize);
-        enc = enc->next();
-        ffi_type* argType = FFICall::GetArgumentType(enc);
+        ffi_type* argType = cif->arg_types[i];
         stackSize += malloc_good_size(std::max(argType->size, sizeof(ffi_arg)));
     }
 

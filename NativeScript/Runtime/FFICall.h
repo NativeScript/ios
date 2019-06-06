@@ -31,7 +31,7 @@ protected:
 
 class FFICall: public BaseFFICall {
 public:
-    FFICall(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
+    FFICall(ffi_cif* cif);
 
     ~FFICall() {
         free(this->buffer_);

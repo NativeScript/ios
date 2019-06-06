@@ -11,7 +11,8 @@ enum WrapperType {
     Primitive = 2,
     Enum = 3,
     Record = 4,
-    ObjCObject = 5
+    ObjCObject = 5,
+    Block = 6,
 };
 
 class BaseDataWrapper {
@@ -91,6 +92,24 @@ public:
     }
 private:
     id data_;
+};
+
+class BlockDataWrapper: public BaseDataWrapper {
+public:
+    BlockDataWrapper(void* block, const TypeEncoding* typeEncoding)
+        : BaseDataWrapper(""), block_(block), typeEncoding_(typeEncoding) {}
+    WrapperType Type() {
+        return WrapperType::Block;
+    }
+    void* Block() {
+        return this->block_;
+    }
+    const TypeEncoding* Encodings() {
+        return this->typeEncoding_;
+    }
+private:
+    void* block_;
+    const TypeEncoding* typeEncoding_;
 };
 
 struct StructField {

@@ -30,7 +30,7 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
                 std::free(data);
             }
             delete structWrapper;
-        } else {
+        } else if (wrapper->Type() == WrapperType::ObjCObject) {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(ext->Value());
             if (objCObjectWrapper->Data() != nil) {
                 auto it = Caches::Instances.find(objCObjectWrapper->Data());
@@ -41,6 +41,9 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
                 }
             }
             delete objCObjectWrapper;
+        } else if (wrapper->Type() == WrapperType::Block) {
+            BlockDataWrapper* blockWrapper = static_cast<BlockDataWrapper*>(ext->Value());
+            delete blockWrapper;
         }
         obj->SetInternalField(0, v8::Undefined(isolate));
     }

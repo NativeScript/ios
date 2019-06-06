@@ -37,7 +37,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
 
     ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, argsCount);
 
-    FFICall call(typeEncoding, initialParameterIndex, argsCount);
+    FFICall call(cif);
 
     std::unique_ptr<objc_super> sup = std::unique_ptr<objc_super>(new objc_super());
 
