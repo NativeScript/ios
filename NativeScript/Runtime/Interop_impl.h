@@ -71,7 +71,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
                 call.SetArgument(0, target);
             }
         } else {
-            call.SetArgument<Class>(0, clazz);
+            call.SetArgument(0, clazz);
         }
 
         call.SetArgument(1, selector);

@@ -42,7 +42,7 @@ public:
     static ffi_cif* GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
 
     void* ArgumentBuffer(unsigned index) {
-        return this->buffer_ + this->argValueOffsets_[index];
+        return this->argsArray_[index];
     }
 
     template <typename T>
@@ -66,10 +66,6 @@ public:
     }
 private:
     static std::map<const TypeEncoding*, ffi_cif*> cifCache_;
-
-    std::vector<size_t> argValueOffsets_;
-    size_t argsArrayOffset_;
-    size_t stackSize_;
     void** argsArray_;
 };
 

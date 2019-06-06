@@ -3,36 +3,36 @@
 namespace tns {
 
 FFICall::FFICall(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) : BaseFFICall(nullptr, 0) {
-    this->stackSize_ = 0;
+    size_t stackSize = 0;
 
-    this->argsArrayOffset_ = this->stackSize_;
     if (argsCount > 0) {
-        this->stackSize_ += malloc_good_size(sizeof(void* [argsCount]));
+        stackSize += malloc_good_size(sizeof(void* [argsCount]));
     }
 
-    this->returnOffset_ = this->stackSize_;
+    this->returnOffset_ = stackSize;
 
     ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
-    this->stackSize_ += malloc_good_size(std::max(returnType->size, sizeof(ffi_arg)));
+    stackSize += malloc_good_size(std::max(returnType->size, sizeof(ffi_arg)));
 
+    std::vector<size_t> argValueOffsets;
     for (size_t i = 0; i < initialParameterIndex; i++) {
-        this->argValueOffsets_.push_back(this->stackSize_);
-        this->stackSize_ += malloc_good_size(std::max(sizeof(ffi_type_pointer), sizeof(ffi_arg)));
+        argValueOffsets.push_back(stackSize);
+        stackSize += malloc_good_size(std::max(sizeof(ffi_type_pointer), sizeof(ffi_arg)));
     }
 
     const TypeEncoding* enc = typeEncoding;
     for (size_t i = initialParameterIndex; i < argsCount; i++) {
-        this->argValueOffsets_.push_back(this->stackSize_);
+        argValueOffsets.push_back(stackSize);
         enc = enc->next();
         ffi_type* argType = FFICall::GetArgumentType(enc);
-        this->stackSize_ += malloc_good_size(std::max(argType->size, sizeof(ffi_arg)));
+        stackSize += malloc_good_size(std::max(argType->size, sizeof(ffi_arg)));
     }
 
-    this->buffer_ = reinterpret_cast<uint8_t*>(malloc(this->stackSize_));
+    this->buffer_ = reinterpret_cast<uint8_t*>(calloc(1, stackSize));
 
-    this->argsArray_ = reinterpret_cast<void**>(this->buffer_ + this->argsArrayOffset_);
+    this->argsArray_ = reinterpret_cast<void**>(this->buffer_);
     for (size_t i = 0; i < argsCount; i++) {
-        this->argsArray_[i] = this->buffer_ + this->argValueOffsets_[i];
+        this->argsArray_[i] = this->buffer_ + argValueOffsets[i];
     }
 }
 
