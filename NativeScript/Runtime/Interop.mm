@@ -238,6 +238,11 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(extData->Value());
             Class clazz = wrapper->Data();
             call->SetArgument(i, clazz);
+        } else if (arg->IsDate()) {
+            Local<Date> date = arg.As<Date>();
+            double time = date->ValueOf();
+            NSDate* nsDate = [NSDate dateWithTimeIntervalSince1970:(time / 1000)];
+            call->SetArgument(i, nsDate);
         } else if (arg->IsObject()) {
             Local<Object> obj = arg.As<Object>();
 
@@ -465,6 +470,26 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         if (result == nil) {
             return Null(isolate);
+        }
+
+        if (result == [NSNull null]) {
+            return Null(isolate);
+        }
+
+        if ([result isKindOfClass:[@YES class]]) {
+            return v8::Boolean::New(isolate, [result boolValue]);
+        }
+
+        if ([result isKindOfClass:[NSDate class]]) {
+            Local<Context> context = isolate->GetCurrentContext();
+            double time = [result timeIntervalSince1970] * 1000.0;
+            Local<Value> date;
+            if (Date::New(context, time).ToLocal(&date)) {
+                return date;
+            }
+
+            // TODO: invalid date
+            assert(false);
         }
 
         if (marshalToPrimitive && [result isKindOfClass:[NSString class]]) {

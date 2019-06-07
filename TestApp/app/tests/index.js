@@ -30,7 +30,7 @@ require("./tests/Marshalling/Primitives/Static");
 require("./tests/Marshalling/Primitives/Instance");
 require("./tests/Marshalling/Primitives/Derived");
 //
-//import "./Marshalling/ObjCTypesTests";
+require("./tests/Marshalling/ObjCTypesTests");
 require("./tests/Marshalling/ConstantsTests");
 require("./tests/Marshalling/RecordTests");
 //import "./Marshalling/VectorTests";
