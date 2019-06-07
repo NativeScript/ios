@@ -472,7 +472,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
-        if (result == [NSNull null]) {
+        if (marshalToPrimitive && result == [NSNull null]) {
             return Null(isolate);
         }
 
@@ -508,7 +508,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             }
         }
 
-        if (marshalToPrimitive && [result isKindOfClass:[NSNumber class]]) {
+        if (marshalToPrimitive && [result isKindOfClass:[NSNumber class]] && ![result isKindOfClass:[NSDecimalNumber class]]) {
             // Convert NSNumber instances to javascript numbers for all instance method calls
             double value = [result doubleValue];
             return Number::New(isolate, value);
