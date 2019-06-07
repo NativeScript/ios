@@ -31,7 +31,7 @@ namespace tns {
         return result;
     }
 
-    static int compareIdentifiers(const char* nullTerminated, const char* notNullTerminated, size_t length) {
+    static size_t compareIdentifiers(const char* nullTerminated, const char* notNullTerminated, size_t length) {
         int result = strncmp(nullTerminated, notNullTerminated, length);
         return (result == 0) ? strlen(nullTerminated) - length : result;
     }

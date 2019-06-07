@@ -2,33 +2,6 @@
 
 namespace tns {
 
-FFICall::FFICall(ffi_cif* cif) : BaseFFICall(nullptr, 0) {
-    unsigned int argsCount = cif->nargs;
-    size_t stackSize = 0;
-
-    if (argsCount > 0) {
-        stackSize = malloc_good_size(sizeof(void* [argsCount]));
-    }
-
-    this->returnOffset_ = stackSize;
-
-    stackSize += malloc_good_size(std::max(cif->rtype->size, sizeof(ffi_arg)));
-
-    std::vector<size_t> argValueOffsets;
-    for (size_t i = 0; i < argsCount; i++) {
-        argValueOffsets.push_back(stackSize);
-        ffi_type* argType = cif->arg_types[i];
-        stackSize += malloc_good_size(std::max(argType->size, sizeof(ffi_arg)));
-    }
-
-    this->buffer_ = reinterpret_cast<uint8_t*>(calloc(1, stackSize));
-
-    this->argsArray_ = reinterpret_cast<void**>(this->buffer_);
-    for (size_t i = 0; i < argsCount; i++) {
-        this->argsArray_[i] = this->buffer_ + argValueOffsets[i];
-    }
-}
-
 ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
     switch (typeEncoding->type) {
         case BinaryTypeEncodingType::VoidEncoding: {

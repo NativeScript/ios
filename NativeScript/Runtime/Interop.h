@@ -19,7 +19,7 @@ public:
     static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     template <typename TMeta>
     static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const TMeta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper = false);
-    static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool marshalToPrimitive, ffi_type* structFieldFFIType = nullptr);
+    static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, ffi_type* structFieldFFIType = nullptr);
     static void SetStructPropertyValue(StructDataWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer);
 private:
@@ -29,7 +29,7 @@ private:
     static void RegisterInteropType(v8::Isolate* isolate, v8::Local<v8::Object> types, std::string name, PrimitiveDataWrapper* wrapper);
     static void RegisterReferenceInteropType(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void SetFFIParams(v8::Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<v8::Local<v8::Value>> args);
-    static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseFFICall* call);
+    static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call);
 
     typedef struct JSBlock {
         typedef struct {

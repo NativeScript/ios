@@ -98,6 +98,9 @@ TNSStructWith4Doubles getStructWith4Doubles() {
     return result;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconditional-uninitialized"
+
 matrix_float2x2 getMatrixFloat2x2() {
     matrix_float2x2 result;
     float pi = 3.1415;
@@ -259,6 +262,8 @@ matrix_double4x4 getMatrixDouble4x4() {
     }
     return result;
 }
+
+#pragma warning( pop ) 
 
 matrix_float2x2 doubleMatrixFloat2x2(matrix_float2x2 m) {
     for (int i = 0; i < 4; i++) {

@@ -85,23 +85,9 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             typeEncoding = typeEncoding->next();
             int argIndex = i + data->initialParamIndex_;
 
-            Local<Value> jsWrapper;
-            if (typeEncoding->type == BinaryTypeEncodingType::LongEncoding) {
-                long arg = *static_cast<long*>(argValues[argIndex]);
-                jsWrapper = Number::New(isolate, arg);
-            } else if (typeEncoding->type == BinaryTypeEncodingType::BoolEncoding) {
-                bool arg = *static_cast<bool*>(argValues[argIndex]);
-                jsWrapper = v8::Boolean::New(isolate, arg);
-            } else {
-                const id arg = *static_cast<const id*>(argValues[argIndex]);
-                if (arg != nil) {
-                    std::string name = object_getClassName(arg);
-                    BaseDataWrapper* wrapper = new ObjCDataWrapper(name, arg);
-                    jsWrapper = ArgConverter::ConvertArgument(isolate, wrapper);
-                } else {
-                    jsWrapper = Null(data->isolate_);
-                }
-            }
+            uint8_t* argBuffer = (uint8_t*)argValues[argIndex];
+            BaseCall call(argBuffer);
+            Local<Value> jsWrapper = Interop::GetResult(isolate, typeEncoding, &call, true);
 
             v8Args.push_back(jsWrapper);
         }
@@ -149,11 +135,12 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
                 }
             } else if (result->IsObject()) {
                 if (data->typeEncoding_->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
-                    data->typeEncoding_->type == BinaryTypeEncodingType::InstanceTypeEncoding) {
+                    data->typeEncoding_->type == BinaryTypeEncodingType::InstanceTypeEncoding ||
+                    data->typeEncoding_->type == BinaryTypeEncodingType::IdEncoding) {
                     Local<External> ext = result.As<Object>()->GetInternalField(0).As<External>();
                     ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
                     id data = wrapper->Data();
-                    *(ffi_arg *)retValue = (unsigned long)data;
+                    *(ffi_arg*)retValue = (unsigned long)data;
                     return;
                 }
             } else if (result->IsBoolean()) {

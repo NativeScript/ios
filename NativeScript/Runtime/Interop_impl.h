@@ -85,7 +85,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
 
         ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
-        Local<Value> result = Interop::GetResult(isolate, typeEncoding, cif->rtype, &call, marshalToPrimitive, nullptr);
+        Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, marshalToPrimitive, nullptr);
 
         return result;
     }

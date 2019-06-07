@@ -673,10 +673,9 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<Name> property, const P
     const TypeEncoding* fieldEncoding = field.Encoding();
     ptrdiff_t offset = field.Offset();
     void* buffer = wrapper->Data();
-    BaseFFICall call((uint8_t*)buffer, offset);
-    ffi_type* structFFIType = wrapper->FFIType();
+    BaseCall call((uint8_t*)buffer, offset);
 
-    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, structFFIType, &call, false, field.FFIType());
+    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, &call, false, field.FFIType());
 
     info.GetReturnValue().Set(result);
 }

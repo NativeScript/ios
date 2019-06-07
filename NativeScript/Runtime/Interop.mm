@@ -73,7 +73,7 @@ void Interop::RegisterReferenceInteropType(Isolate* isolate, Local<Object> inter
         BinaryTypeEncodingType type = wrapper->EncodingType();
         uint8_t* buffer = (uint8_t*)wrapper->Value();
 
-        BaseFFICall call(buffer, 0);
+        BaseCall call(buffer);
         Local<Value> result = Interop::GetPrimitiveReturnType(isolate, type, &call);
         if (!result.IsEmpty()) {
             info.GetReturnValue().Set(result);
@@ -343,7 +343,7 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
 }
 
-Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, ffi_type* returnType, BaseFFICall* call, bool marshalToPrimitive, ffi_type* structFieldFFIType) {
+Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, ffi_type* structFieldFFIType) {
     if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
         // TODO: Cache the metadata
@@ -353,6 +353,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         void* result = call->ResultBuffer();
 
+        ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
         ffi_type* ffiType = (structFieldFFIType != nullptr) ? structFieldFFIType : returnType;
 
         void* dest = malloc(ffiType->size);
@@ -447,7 +448,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
             ffi_call(cif, FFI_FN(block->invoke), call.ResultBuffer(), call.ArgsArray());
 
-            Local<Value> result = Interop::GetResult(isolate, enc, cif->rtype, &call, true);
+            Local<Value> result = Interop::GetResult(isolate, enc, &call, true);
 
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&callback);
@@ -468,8 +469,8 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         if (marshalToPrimitive && [result isKindOfClass:[NSString class]]) {
             if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-                std::string returnClassName = typeEncoding->details.declarationReference.name.valuePtr();
-                Class returnClass = objc_getClass(returnClassName.c_str());
+                const char* returnClassName = typeEncoding->details.declarationReference.name.valuePtr();
+                Class returnClass = objc_getClass(returnClassName);
                 if (returnClass != nil && returnClass == [NSMutableString class]) {
                     marshalToPrimitive = false;
                 }
@@ -496,7 +497,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
     return Interop::GetPrimitiveReturnType(isolate, typeEncoding->type, call);
 }
 
-Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodingType type, BaseFFICall* call) {
+Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call) {
     if (type == BinaryTypeEncodingType::CStringEncoding) {
         char* result = call->GetResult<char*>();
         if (result == nullptr) {

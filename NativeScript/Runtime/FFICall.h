@@ -9,11 +9,11 @@
 
 namespace tns {
 
-class BaseFFICall {
+class BaseCall {
 public:
-    BaseFFICall(uint8_t* buffer, size_t returnOffset): buffer_(buffer), returnOffset_(returnOffset) { }
+    BaseCall(uint8_t* buffer, size_t returnOffset = 0): buffer_(buffer), returnOffset_(returnOffset) { }
 
-    ~BaseFFICall() {
+    ~BaseCall() {
     }
 
     void* ResultBuffer() {
@@ -29,9 +29,34 @@ protected:
     uint8_t* buffer_;
 };
 
-class FFICall: public BaseFFICall {
+class FFICall: public BaseCall {
 public:
-    FFICall(ffi_cif* cif);
+    FFICall(ffi_cif* cif): BaseCall(nullptr) {
+        unsigned int argsCount = cif->nargs;
+        size_t stackSize = 0;
+
+        if (argsCount > 0) {
+            stackSize = malloc_good_size(sizeof(void* [argsCount]));
+        }
+
+        this->returnOffset_ = stackSize;
+
+        stackSize += malloc_good_size(std::max(cif->rtype->size, sizeof(ffi_arg)));
+
+        std::vector<size_t> argValueOffsets;
+        for (size_t i = 0; i < argsCount; i++) {
+            argValueOffsets.push_back(stackSize);
+            ffi_type* argType = cif->arg_types[i];
+            stackSize += malloc_good_size(std::max(argType->size, sizeof(ffi_arg)));
+        }
+
+        this->buffer_ = reinterpret_cast<uint8_t*>(calloc(1, stackSize));
+
+        this->argsArray_ = reinterpret_cast<void**>(this->buffer_);
+        for (size_t i = 0; i < argsCount; i++) {
+            this->argsArray_[i] = this->buffer_ + argValueOffsets[i];
+        }
+    }
 
     ~FFICall() {
         free(this->buffer_);
@@ -53,11 +78,11 @@ public:
     template <typename T>
     void SetNumericArgument(unsigned index, T value) {
         if (value < std::numeric_limits<T>::min()) {
-            *static_cast<T*>(ArgumentBuffer(index)) = std::numeric_limits<T>::min();
+            this->SetArgument(index, std::numeric_limits<T>::min());
         } else if (value > std::numeric_limits<T>::max()) {
-            *static_cast<T*>(ArgumentBuffer(index)) = std::numeric_limits<T>::max();
+            this->SetArgument(index, std::numeric_limits<T>::max());
         } else {
-            *static_cast<T*>(ArgumentBuffer(index)) = value;
+            this->SetArgument(index, value);
         }
     }
 
