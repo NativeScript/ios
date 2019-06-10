@@ -23,12 +23,16 @@ public:
     static void SetStructPropertyValue(StructDataWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer);
 private:
+    static v8::Persistent<v8::Function>* sliceFunc_;
+
     template <typename T>
     static void SetStructValue(v8::Local<v8::Value> value, void* destBuffer, ptrdiff_t position);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer, ptrdiff_t& position);
     static void RegisterInteropType(v8::Isolate* isolate, v8::Local<v8::Object> types, std::string name, PrimitiveDataWrapper* wrapper);
     static void RegisterReferenceInteropType(v8::Isolate* isolate, v8::Local<v8::Object> interop);
+    static void RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void SetFFIParams(v8::Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<v8::Local<v8::Value>> args);
+    static v8::Local<v8::Array> ToArray(v8::Isolate* isolate, v8::Local<v8::Object> object);
     static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call);
 
     typedef struct JSBlock {

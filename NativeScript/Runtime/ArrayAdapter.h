@@ -6,7 +6,7 @@
 
 @interface ArrayAdapter : NSArray
 
--(instancetype)initWithJSObject:(v8::Local<v8::Array>)jsObject isolate:(v8::Isolate*)isolate;
+-(instancetype)initWithJSObject:(v8::Local<v8::Object>)jsObject isolate:(v8::Isolate*)isolate;
 
 @end
 

@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		C266567822AA405100EE15CC /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C266567722AA405100EE15CC /* Default-568h@2x.png */; };
+		C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C266567922AA630F00EE15CC /* NSDataAdapter.mm */; };
+		C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C266567A22AA630F00EE15CC /* NSDataAdapter.h */; };
 		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
 		C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */; };
@@ -139,6 +141,8 @@
 
 /* Begin PBXFileReference section */
 		C266567722AA405100EE15CC /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
+		C266567922AA630F00EE15CC /* NSDataAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NSDataAdapter.mm; sourceTree = "<group>"; };
+		C266567A22AA630F00EE15CC /* NSDataAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NSDataAdapter.h; sourceTree = "<group>"; };
 		C293748C229EC6780075CB16 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
 		C29374E2229FC0F60075CB16 /* libTestFixtures.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTestFixtures.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		C29374EC229FC1600075CB16 /* TNSMethodCalls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSMethodCalls.h; sourceTree = "<group>"; };
@@ -482,6 +486,8 @@
 				C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */,
 				C2DDEB89229EAC8300345BFE /* ModuleInternal.h */,
 				C2DDEB81229EAC8200345BFE /* ModuleInternal.mm */,
+				C266567A22AA630F00EE15CC /* NSDataAdapter.h */,
+				C266567922AA630F00EE15CC /* NSDataAdapter.mm */,
 				C2DDEB83229EAC8300345BFE /* ObjectManager.h */,
 				C2DDEB86229EAC8300345BFE /* ObjectManager.cpp */,
 				C2DDEB7B229EAC8200345BFE /* Runtime.h */,
@@ -622,6 +628,7 @@
 				C2DDEBC1229EB02500345BFE /* v8config.h in Headers */,
 				C2DDEBD6229EB06E00345BFE /* ffi.h in Headers */,
 				C2DDEBA1229EAC8300345BFE /* FFICall.h in Headers */,
+				C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */,
 				C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */,
 				C2DDEBC3229EB02500345BFE /* v8-platform.h in Headers */,
 				C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */,
@@ -822,6 +829,7 @@
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
+				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,
 				C293752E22A10C490075CB16 /* Interop_impl.h in Sources */,
 				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,
 				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,

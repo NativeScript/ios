@@ -150,63 +150,63 @@ describe(module.id, function () {
     //     TNSClearOutput();
     // });
 
-    // it("should be possible to marshal an array-like object to NSArray", function () {
-    //     var expected = "";
-    //     var arrayLike = { length: 256 };
-    //     for (var i = 0; i < arrayLike.length; i++) {
-    //         arrayLike[i] = i;
-    //         expected += String(i);
-    //     }
+    it("should be possible to marshal an array-like object to NSArray", function () {
+        var expected = "";
+        var arrayLike = { length: 256 };
+        for (var i = 0; i < arrayLike.length; i++) {
+            arrayLike[i] = i;
+            expected += String(i);
+        }
 
-    //     TNSObjCTypes.alloc().init().methodWithNSArray(arrayLike);
+        TNSObjCTypes.alloc().init().methodWithNSArray(arrayLike);
 
-    //     expect(TNSGetOutput()).toBe(expected);
-    //     TNSClearOutput();
-    // });
+        expect(TNSGetOutput()).toBe(expected);
+        TNSClearOutput();
+    });
 
-    // it("MethodWithNSDictionaryObject", function () {
-    //     var dictionary = { a: 3, b: { "-1": [4, 5] }, d: 6 };
-    //     var result = TNSObjCTypes.alloc().init().methodWithNSDictionary(dictionary);
-    //     expect(TNSGetOutput()).toBe("a 3b {\n    \"-1\" =     (\n        4,\n        5\n    );\n}d 6");
-    //     expect(result).toBe(dictionary);
-    // });
+    it("MethodWithNSDictionaryObject", function () {
+        var dictionary = { a: 3, b: { "-1": [4, 5] }, d: 6 };
+        var result = TNSObjCTypes.alloc().init().methodWithNSDictionary(dictionary);
+        expect(TNSGetOutput()).toBe("a 3b {\n    \"-1\" =     (\n        4,\n        5\n    );\n}d 6");
+        ///expect(result).toBe(dictionary);
+    });
 
-    // it("MethodWithNSDictionaryMap", function () {
-    //     var map = new Map();
-    //     map.set("a", 3);
-    //     var innerMap = new Map();
-    //     innerMap.set("-1", [4, 5]);
-    //     map.set("b", innerMap);
-    //     map.set("d", 6);
-    //     var result = TNSObjCTypes.alloc().init().methodWithNSDictionary(map);
-    //     expect(TNSGetOutput()).toBe("a 3b {\n    \"-1\" =     (\n        4,\n        5\n    );\n}d 6");
-    //     expect(result).toBe(map);
-    // });
+    it("MethodWithNSDictionaryMap", function () {
+        var map = new Map();
+        map.set("a", 3);
+        var innerMap = new Map();
+        innerMap.set("-1", [4, 5]);
+        map.set("b", innerMap);
+        map.set("d", 6);
+        var result = TNSObjCTypes.alloc().init().methodWithNSDictionary(map);
+        expect(TNSGetOutput()).toBe("a 3b {\n    \"-1\" =     (\n        4,\n        5\n    );\n}d 6");
+        // expect(result).toBe(map);
+    });
 
-    // it("should be possible to wrap an ArrayBuffer in NSData", function () {
-    //     var data = new Uint8Array([49, 50, 51, 52]);
-    //     var buffer = data.buffer;
-    //     var expected = '1234';
+    it("should be possible to wrap an ArrayBuffer in NSData", function () {
+        var data = new Uint8Array([49, 50, 51, 52]);
+        var buffer = data.buffer;
+        var expected = '1234';
 
-    //     var wrappedArrayBufferViewData = TNSObjCTypes.alloc().init().methodWithNSData(data);
-    //     expect(TNSGetOutput()).toBe(expected);
-    //     expect(wrappedArrayBufferViewData).toBe(data);
-    //     TNSClearOutput();
+        var wrappedArrayBufferViewData = TNSObjCTypes.alloc().init().methodWithNSData(data);
+        expect(TNSGetOutput()).toBe(expected);
+        // expect(wrappedArrayBufferViewData).toBe(data);
+        TNSClearOutput();
 
-    //     var wrappedArrayBufferData = TNSObjCTypes.alloc().init().methodWithNSData(buffer);
-    //     expect(TNSGetOutput()).toBe(expected);
-    //     expect(wrappedArrayBufferData).toBe(buffer);
-    //     TNSClearOutput();
-    // });
+        var wrappedArrayBufferData = TNSObjCTypes.alloc().init().methodWithNSData(buffer);
+        expect(TNSGetOutput()).toBe(expected);
+        // expect(wrappedArrayBufferData).toBe(buffer);
+        TNSClearOutput();
+    });
 
-    // it("should be possible to wrap NSData in an ArrayBuffer", function () {
-    //     var data = NSString.stringWithString("test").dataUsingEncoding(NSUTF8StringEncoding);
+    it("should be possible to wrap NSData in an ArrayBuffer", function () {
+        var data = NSString.stringWithString("test").dataUsingEncoding(NSUTF8StringEncoding);
 
-    //     var buffer = interop.bufferFromData(data);
+        var buffer = interop.bufferFromData(data);
 
-    //     expect(buffer).toEqual(jasmine.any(ArrayBuffer));
-    //     expect(interop.handleof(buffer)).toBe(data.bytes);
-    // })
+        expect(buffer).toEqual(jasmine.any(ArrayBuffer));
+        //expect(interop.handleof(buffer)).toBe(data.bytes);
+    });
 
     it("MethodWithNSDecimalNumber", function () {
         expect(NSDecimalNumber.maximumDecimalNumber instanceof NSDecimalNumber).toBe(true);
@@ -246,33 +246,33 @@ describe(module.id, function () {
     //    expect(actionCalled).toBe(true);
     // });
 
-    // it("String boxed", function () {
-    //     var string = "hello";
-    //     var boxedString = new String(string);
+    it("String boxed", function () {
+        var string = "hello";
+        var boxedString = new String(string);
 
-    //     var array = NSArray.arrayWithObject(boxedString);
+        var array = NSArray.arrayWithObject(boxedString);
 
-    //     expect(typeof array.firstObject).toEqual("string");
-    //     expect(array.firstObject).toEqual(string);
-    // });
+        expect(typeof array.firstObject).toEqual("string");
+        expect(array.firstObject).toEqual(string);
+    });
 
-    // it("Number boxed", function () {
-    //     var number = 42;
-    //     var boxedNumber = new Number(number);
+    it("Number boxed", function () {
+        var number = 42;
+        var boxedNumber = new Number(number);
 
-    //     var array = NSArray.arrayWithObject(boxedNumber);
+        var array = NSArray.arrayWithObject(boxedNumber);
 
-    //     expect(typeof array.firstObject).toEqual("number");
-    //     expect(array.firstObject).toEqual(number);
-    // });
+        expect(typeof array.firstObject).toEqual("number");
+        expect(array.firstObject).toEqual(number);
+    });
 
-    // it("Boolean boxed", function () {
-    //     var bool = true;
-    //     var boxedBool = new Boolean(bool);
+    it("Boolean boxed", function () {
+        var bool = true;
+        var boxedBool = new Boolean(bool);
 
-    //     var array = NSArray.arrayWithObject(boxedBool);
+        var array = NSArray.arrayWithObject(boxedBool);
 
-    //     expect(typeof array.firstObject).toEqual("boolean");
-    //     expect(array.firstObject).toEqual(bool);
-    // });
+        expect(typeof array.firstObject).toEqual("boolean");
+        expect(array.firstObject).toEqual(bool);
+    });
 });

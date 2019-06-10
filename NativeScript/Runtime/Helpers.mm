@@ -12,6 +12,11 @@ std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {
         return std::string();
     }
 
+    if (value->IsStringObject()) {
+        Local<v8::String> obj = value.As<StringObject>()->ValueOf();
+        return tns::ToString(isolate, obj);
+    }
+
     String::Utf8Value result(isolate, value);
 
     const char* val = *result;
@@ -20,6 +25,38 @@ std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {
     }
 
     return std::string(*result);
+}
+
+double tns::ToNumber(const Local<Value>& value) {
+    double result = 0;
+
+    if (value.IsEmpty()) {
+        return result;
+    }
+
+    if (value->IsNumberObject()) {
+        result = value.As<NumberObject>()->ValueOf();
+    } else if (value->IsNumber()) {
+        result = value.As<Number>()->Value();
+    }
+
+    return result;
+}
+
+bool tns::ToBool(const Local<Value>& value) {
+    bool result = false;
+
+    if (value.IsEmpty()) {
+        return result;
+    }
+
+    if (value->IsBooleanObject()) {
+        result = value.As<BooleanObject>()->ValueOf();
+    } else if (value->IsBoolean()) {
+        result = value.As<Boolean>()->Value();
+    }
+
+    return result;
 }
 
 std::string tns::ReadText(const std::string& file) {
@@ -56,4 +93,16 @@ Local<Value> tns::GetPrivateValue(Isolate* isolate, const Local<Object>& obj, co
     }
 
     return result;
+}
+
+bool tns::IsString(Local<Value> value) {
+    return !value.IsEmpty() && (value->IsString() || value->IsStringObject());
+}
+
+bool tns::IsNumber(Local<Value> value) {
+    return !value.IsEmpty() && (value->IsNumber() || value->IsNumberObject());
+}
+
+bool tns::IsBool(Local<Value> value) {
+    return !value.IsEmpty() && (value->IsBoolean() || value->IsBooleanObject());
 }

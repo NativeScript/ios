@@ -6,6 +6,7 @@
 #include "ArgConverter.h"
 #include "DictionaryAdapter.h"
 #include "ArrayAdapter.h"
+#include "NSDataAdapter.h"
 #include "Caches.h"
 
 using namespace v8;
@@ -27,6 +28,7 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     Local<Object> types = Object::New(isolate);
 
     RegisterReferenceInteropType(isolate, interop);
+    RegisterBufferFromDataFunction(isolate, interop);
 
     RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(sizeof(ffi_type_void.size), BinaryTypeEncodingType::VoidEncoding));
     RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(sizeof(bool), BinaryTypeEncodingType::BoolEncoding));
@@ -89,6 +91,32 @@ void Interop::RegisterReferenceInteropType(Isolate* isolate, Local<Object> inter
     interop->Set(tns::ToV8String(isolate, "Reference"), ctorFunc);
 }
 
+void Interop::RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop) {
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<v8::Function> func;
+    bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+        assert(info.Length() == 1 && info[0]->IsObject());
+        Local<Object> arg = info[0].As<Object>();
+        assert(arg->InternalFieldCount() > 0 && arg->GetInternalField(0)->IsExternal());
+
+        Local<External> ext = arg->GetInternalField(0).As<External>();
+        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+
+        id obj = wrapper->Data();
+        assert([obj isKindOfClass:[NSData class]]);
+
+        Isolate* isolate = info.GetIsolate();
+        size_t length = [obj length];
+        void* data = const_cast<void*>([obj bytes]);
+
+        Local<ArrayBuffer> result = ArrayBuffer::New(isolate, data, length);
+        info.GetReturnValue().Set(result);
+    }).ToLocal(&func);
+    assert(success);
+
+    interop->Set(tns::ToV8String(isolate, "bufferFromData"), func);
+}
+
 IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData) {
     void* functionPointer;
     ffi_closure* closure = static_cast<ffi_closure*>(ffi_closure_alloc(sizeof(ffi_closure), &functionPointer));
@@ -126,10 +154,14 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
 
         if (arg->IsNullOrUndefined()) {
             call->SetArgument(i, nullptr);
-        } else if (arg->IsBoolean() && enc->type == BinaryTypeEncodingType::BoolEncoding) {
-            bool value = arg.As<v8::Boolean>()->Value();
+        } else if (tns::IsBool(arg) && enc->type == BinaryTypeEncodingType::IdEncoding) {
+            bool value = tns::ToBool(arg);
+            NSObject* o = @(value);
+            call->SetArgument(i, o);
+        } else if (tns::IsBool(arg)) {
+            bool value = tns::ToBool(arg);
             call->SetArgument(i, value);
-        } else if (arg->IsString() && enc->type == BinaryTypeEncodingType::SelectorEncoding) {
+        } else if (tns::IsString(arg) && enc->type == BinaryTypeEncodingType::SelectorEncoding) {
             std::string str = tns::ToString(isolate, arg);
             NSString* selStr = [NSString stringWithUTF8String:str.c_str()];
             SEL selector = NSSelectorFromString(selStr);
@@ -146,14 +178,14 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
             }
             unichar c = (strlen(strCopy) == 0) ? 0 : strCopy[0];
             call->SetArgument(i, c);
-        } else if (arg->IsString() && (enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference || enc->type == BinaryTypeEncodingType::IdEncoding)) {
+        } else if (tns::IsString(arg) && (enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference || enc->type == BinaryTypeEncodingType::IdEncoding)) {
             std::string str = tns::ToString(isolate, arg);
             NSString* result = [NSString stringWithUTF8String:str.c_str()];
             call->SetArgument(i, result);
-        } else if (arg->IsNumber() || arg->IsNumberObject()) {
-            double value = arg.As<Number>()->Value();
+        } else if (tns::IsNumber(arg)) {
+            double value = tns::ToNumber(arg);
 
-            if (enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+            if (enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference || enc->type == BinaryTypeEncodingType::IdEncoding) {
                 // NSNumber
                 NSNumber* num = [NSNumber numberWithDouble:value];
                 call->SetArgument(i, num);
@@ -218,10 +250,6 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
                     assert(false);
                 }
             }
-        } else if (arg->IsArray()) {
-            Local<v8::Array> array = arg.As<v8::Array>();
-            ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
-            call->SetArgument(i, adapter);
         } else if (arg->IsFunction() && enc->type == BinaryTypeEncodingType::ProtocolEncoding) {
             Local<Object> obj = arg.As<Object>();
             Local<Value> metadataProp = tns::GetPrivateValue(isolate, obj, tns::ToV8String(isolate, "metadata"));
@@ -246,36 +274,57 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
         } else if (arg->IsObject()) {
             Local<Object> obj = arg.As<Object>();
 
-            if (obj->InternalFieldCount() < 1) {
-                DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
-                call->SetArgument(i, adapter);
-            } else {
-                Local<External> ext = obj->GetInternalField(0).As<External>();
-                BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-                if (wrapper->Type() == WrapperType::Enum) {
-                    EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
-                    Local<Context> context = isolate->GetCurrentContext();
-                    std::string jsCode = enumWrapper->JSCode();
-                    Local<Script> script;
-                    if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
-                        assert(false);
-                    }
-                    assert(!script.IsEmpty());
-
-                    Local<Value> result;
-                    if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
-                        assert(false);
-                    }
-
-                    assert(result->IsNumber());
-
-                    double value = result.As<Number>()->Value();
-                    call->SetArgument(i, value);
-                } else {
-                    ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    id data = objCDataWrapper->Data();
-                    call->SetArgument(i, data);
+            if (enc->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+                const char* name = enc->details.declarationReference.name.valuePtr();
+                Class klass = objc_getClass(name);
+                if (!klass) {
+                    assert(false);
                 }
+
+                if (klass == [NSArray class]) {
+                    Local<v8::Array> array = Interop::ToArray(isolate, obj);
+                    ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
+                    call->SetArgument(i, adapter);
+                    continue;
+                } else if ((klass == [NSData class] || klass == [NSMutableData class]) && (arg->IsArrayBuffer() || arg->IsArrayBufferView())) {
+                    Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
+                    NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
+                    call->SetArgument(i, adapter);
+                    continue;
+                } else if (klass == [NSDictionary class]) {
+                    DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
+                    call->SetArgument(i, adapter);
+                    continue;
+                }
+            }
+
+            assert(obj->InternalFieldCount() > 0);
+
+            Local<External> ext = obj->GetInternalField(0).As<External>();
+            BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+            if (wrapper->Type() == WrapperType::Enum) {
+                EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
+                Local<Context> context = isolate->GetCurrentContext();
+                std::string jsCode = enumWrapper->JSCode();
+                Local<Script> script;
+                if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
+                    assert(false);
+                }
+                assert(!script.IsEmpty());
+
+                Local<Value> result;
+                if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
+                    assert(false);
+                }
+
+                assert(result->IsNumber());
+
+                double value = result.As<Number>()->Value();
+                call->SetArgument(i, value);
+            } else {
+                ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                id data = objCDataWrapper->Data();
+                call->SetArgument(i, data);
             }
         } else {
             assert(false);
@@ -514,9 +563,16 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Number::New(isolate, value);
         }
 
+        auto it = Caches::Instances.find(result);
+        if (it != Caches::Instances.end()) {
+            return it->second->Get(isolate);
+        }
+
         std::string className = object_getClassName(result);
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, result);
-        return ArgConverter::ConvertArgument(isolate, wrapper);
+        Local<Value> jsResult = ArgConverter::ConvertArgument(isolate, wrapper);
+
+        return jsResult;
     }
 
     return Interop::GetPrimitiveReturnType(isolate, typeEncoding->type, call);
@@ -692,5 +748,41 @@ void Interop::SetStructPropertyValue(StructDataWrapper* wrapper, StructField fie
         }
     }
 }
+
+Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
+    if (object->IsArray()) {
+        return object.As<v8::Array>();
+    }
+
+    if (sliceFunc_ == nullptr) {
+        std::string source = "Array.prototype.slice";
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Script> script;
+        if (!Script::Compile(context, tns::ToV8String(isolate, source)).ToLocal(&script)) {
+            assert(false);
+        }
+        assert(!script.IsEmpty());
+
+        Local<Value> sliceFunc;
+        if (!script->Run(context).ToLocal(&sliceFunc)) {
+            assert(false);
+        }
+
+        assert(sliceFunc->IsFunction());
+        sliceFunc_ = new Persistent<v8::Function>(isolate, sliceFunc.As<v8::Function>());
+    }
+
+    Local<v8::Function> sliceFunc = sliceFunc_->Get(isolate);
+    Local<Value> sliceArgs[1] { object };
+
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> result;
+    bool success = sliceFunc->Call(context, object, 1, sliceArgs).ToLocal(&result);
+    assert(success);
+
+    return result.As<v8::Array>();
+}
+
+Persistent<v8::Function>* Interop::sliceFunc_ = nullptr;
 
 }
