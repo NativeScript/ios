@@ -70,22 +70,6 @@ public:
         return this->argsArray_[index];
     }
 
-    template <typename T>
-    void SetArgument(unsigned index, T value) {
-        *static_cast<T*>(ArgumentBuffer(index)) = value;
-    }
-
-    template <typename T>
-    void SetNumericArgument(unsigned index, T value) {
-        if (value < std::numeric_limits<T>::min()) {
-            this->SetArgument(index, std::numeric_limits<T>::min());
-        } else if (value > std::numeric_limits<T>::max()) {
-            this->SetArgument(index, std::numeric_limits<T>::max());
-        } else {
-            this->SetArgument(index, value);
-        }
-    }
-
     void** ArgsArray() {
         return this->argsArray_;
     }

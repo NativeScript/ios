@@ -14,43 +14,43 @@ describe(module.id, function () {
         expect(TNSFunctionWithSimpleCFTypeRefReturn()).toBe('test');
     });
 
-    // it("OutParameter", function () {
-    //     var refValue = new interop.Reference();
-    //     expect(refValue instanceof interop.Reference).toBe(true);
-    //     TNSObjCTypes.alloc().init().methodWithIdOutParameter(refValue);
-    //     expect(refValue.value).toBe('test');
-    //     expect(TNSGetOutput()).toBe('(null)');
-    // });
+    it("OutParameter", function () {
+        var refValue = new interop.Reference();
+        expect(refValue instanceof interop.Reference).toBe(true);
+        TNSObjCTypes.alloc().init().methodWithIdOutParameter(refValue);
+        expect(refValue.value).toBe('test');
+        expect(TNSGetOutput()).toBe('(null)');
+    });
 
-    // it("OutParameterWithValue", function () {
-    //     var refValue = new interop.Reference('in');
-    //     TNSObjCTypes.alloc().init().methodWithIdOutParameter(refValue);
-    //     expect(refValue.value).toBe('test');
-    //     expect(TNSGetOutput()).toBe('in');
-    // });
+    it("OutParameterWithValue", function () {
+        var refValue = new interop.Reference('in');
+        TNSObjCTypes.alloc().init().methodWithIdOutParameter(refValue);
+        expect(refValue.value).toBe('test');
+        expect(TNSGetOutput()).toBe('in');
+    });
 
-    // it("OutParameterWithValueAndType", function () {
-    //     var refValue = new interop.Reference(interop.types.id, 'in');
-    //     TNSObjCTypes.alloc().init().methodWithIdOutParameter(refValue);
-    //     expect(refValue.value).toBe('test');
-    //     expect(TNSGetOutput()).toBe('in');
-    // });
+    it("OutParameterWithValueAndType", function () {
+        var refValue = new interop.Reference(interop.types.id, 'in');
+        TNSObjCTypes.alloc().init().methodWithIdOutParameter(refValue);
+        expect(refValue.value).toBe('test');
+        expect(TNSGetOutput()).toBe('in');
+    });
 
-    // it("OutParameterLongLong", function () {
-    //     var refValue = new interop.Reference(3);
-    //     TNSObjCTypes.alloc().init().methodWithLongLongOutParameter(refValue);
-    //     expect(refValue.value).toBe(1);
-    //     expect(TNSGetOutput()).toBe('3');
-    // });
+    it("OutParameterLongLong", function () {
+        var refValue = new interop.Reference(3);
+        TNSObjCTypes.alloc().init().methodWithLongLongOutParameter(refValue);
+        expect(refValue.value).toBe(1);
+        expect(TNSGetOutput()).toBe('3');
+    });
 
-    // it("OutParameterStruct", function () {
-    //     var refValue = new interop.Reference({x: 1, y: 2, z: 3});
-    //     TNSObjCTypes.alloc().init().methodWithStructOutParameter(refValue);
-    //     expect(refValue.value.x).toBe(4);
-    //     expect(refValue.value.y).toBe(5);
-    //     expect(refValue.value.z).toBe(6);
-    //     expect(TNSGetOutput()).toBe('1 2 3');
-    // });
+    it("OutParameterStruct", function () {
+        var refValue = new interop.Reference({x: 1, y: 2, z: 3});
+        TNSObjCTypes.alloc().init().methodWithStructOutParameter(refValue);
+        expect(refValue.value.x).toBe(4);
+        expect(refValue.value.y).toBe(5);
+        expect(refValue.value.z).toBe(6);
+        expect(TNSGetOutput()).toBe('1 2 3');
+    });
 
     it("NilBlock", function () {
         expect(TNSObjCTypes.alloc().init().methodWithBlock(null)).toBe(null);

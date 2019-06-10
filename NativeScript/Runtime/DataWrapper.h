@@ -3,6 +3,7 @@
 
 #include "Metadata.h"
 #include "libffi.h"
+#include "Common.h"
 
 namespace tns {
 
@@ -13,6 +14,7 @@ enum WrapperType {
     Record = 4,
     ObjCObject = 5,
     Block = 6,
+    InteropReference = 7,
 };
 
 class BaseDataWrapper {
@@ -39,6 +41,40 @@ public:
     }
 private:
     std::string jsCode_;
+};
+    
+class InteropReferenceDataWrapper: public BaseDataWrapper {
+public:
+    InteropReferenceDataWrapper(v8::Persistent<v8::Value>* value): BaseDataWrapper(std::string()), value_(value), data_(nullptr) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::InteropReference;
+    }
+    
+    v8::Persistent<v8::Value>* Value() {
+        return this->value_;
+    }
+    
+    const TypeEncoding* Encoding() {
+        return this->encoding_;
+    }
+    
+    void SetEncoding(const TypeEncoding* encoding) {
+        this->encoding_ = encoding;
+    }
+
+    void* Data() {
+        return this->data_;
+    }
+
+    void SetData(void* data) {
+        this->data_ = data;
+    }
+private:
+    v8::Persistent<v8::Value>* value_;
+    const TypeEncoding* encoding_;
+    void* data_;
 };
 
 class PrimitiveDataWrapper: public BaseDataWrapper {

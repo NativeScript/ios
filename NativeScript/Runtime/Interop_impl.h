@@ -66,15 +66,15 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
             if (callSuper) {
                 sup->receiver = target;
                 sup->super_class = class_getSuperclass(object_getClass(target));
-                call.SetArgument(0, sup.get());
+                Interop::SetValue(call.ArgumentBuffer(0), sup.get());
             } else {
-                call.SetArgument(0, target);
+                Interop::SetValue(call.ArgumentBuffer(0), target);
             }
         } else {
-            call.SetArgument(0, clazz);
+            Interop::SetValue(call.ArgumentBuffer(0), clazz);
         }
 
-        call.SetArgument(1, selector);
+        Interop::SetValue(call.ArgumentBuffer(1), selector);
     }
 
     bool isInstanceReturnType = typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding;

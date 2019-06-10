@@ -44,7 +44,13 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
         } else if (wrapper->Type() == WrapperType::Block) {
             BlockDataWrapper* blockWrapper = static_cast<BlockDataWrapper*>(ext->Value());
             delete blockWrapper;
+        } else if (wrapper->Type() == WrapperType::InteropReference) {
+            InteropReferenceDataWrapper* referenceWrapper = static_cast<InteropReferenceDataWrapper*>(ext->Value());
+            if (referenceWrapper->Value() != nullptr) {
+                referenceWrapper->Value()->Reset();
+            }
         }
+
         obj->SetInternalField(0, v8::Undefined(isolate));
     }
     state->target_->Reset();

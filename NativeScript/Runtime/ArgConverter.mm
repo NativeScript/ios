@@ -34,6 +34,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         callSuper = isMethodCallback && it != Caches::ClassPrototypes.end();
     }
 
+    // TODO: Take into account an optional error out parameter when considering for method overloads - meta->hasErrorOutParameter()
     if (args.size() != meta->encodings()->count - 1) {
         // Arguments number mismatch -> search for a possible method overload in the class hierarchy
         std::string methodName = meta->jsName();

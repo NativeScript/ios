@@ -35,6 +35,24 @@ private:
     static v8::Local<v8::Array> ToArray(v8::Isolate* isolate, v8::Local<v8::Object> object);
     static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call);
 
+    static void WriteValue(v8::Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, v8::Local<v8::Value> arg);
+
+    template <typename T>
+    static void SetValue(void* dest, T value) {
+        *static_cast<T*>(dest) = value;
+    }
+
+    template <typename T>
+    static void SetNumericValue(void* dest, T value) {
+        if (value < std::numeric_limits<T>::min()) {
+            Interop::SetValue(dest, std::numeric_limits<T>::min());
+        } else if (value > std::numeric_limits<T>::max()) {
+            Interop::SetValue(dest, std::numeric_limits<T>::max());
+        } else {
+            Interop::SetValue(dest, value);
+        }
+    }
+
     typedef struct JSBlock {
         typedef struct {
             uintptr_t reserved;
