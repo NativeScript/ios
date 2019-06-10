@@ -125,30 +125,30 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('called');
     });
 
-    // it("should be possible to marshal a JavaScript Array exotic to NSArray", function () {
-    //     var array = [1, [2, 'a'], NSObject];
-    //     var result = TNSObjCTypes.alloc().init().methodWithNSArray(array);
-    //     expect(TNSGetOutput()).toBe(
-    //         '1(\n' +
-    //         '    2,\n' +
-    //         '    a\n' +
-    //         ')NSObject');
-    //     TNSClearOutput();
+    it("should be possible to marshal a JavaScript Array exotic to NSArray", function () {
+        var array = [1, [2, 'a'], NSObject];
+        var result = TNSObjCTypes.alloc().init().methodWithNSArray(array);
+        expect(TNSGetOutput()).toBe(
+            '1(\n' +
+            '    2,\n' +
+            '    a\n' +
+            ')NSObject');
+        TNSClearOutput();
 
-    //     expect(array[0]).toBe(result[0]);
-    //     expect(array[1]).toBe(result[1]);
-    //     expect(array[2]).toBe(result[2]);
-    //     expect(result).toBe(array);
+        expect(array[0]).toBe(result[0]);
+        expect(array[1]).toBe(result[1]);
+        expect(array[2]).toBe(result[2]);
+        expect(result).toBe(array);
 
-    //     array[0] = 3;
-    //     array[1] = 4;
-    //     TNSObjCTypes.alloc().init().methodWithNSArray(array);
-    //     expect(TNSGetOutput()).toBe(
-    //         '3' +
-    //         '4' +
-    //         'NSObject');
-    //     TNSClearOutput();
-    // });
+        array[0] = 3;
+        array[1] = 4;
+        TNSObjCTypes.alloc().init().methodWithNSArray(array);
+        expect(TNSGetOutput()).toBe(
+            '3' +
+            '4' +
+            'NSObject');
+        TNSClearOutput();
+    });
 
     it("should be possible to marshal an array-like object to NSArray", function () {
         var expected = "";
@@ -168,7 +168,7 @@ describe(module.id, function () {
         var dictionary = { a: 3, b: { "-1": [4, 5] }, d: 6 };
         var result = TNSObjCTypes.alloc().init().methodWithNSDictionary(dictionary);
         expect(TNSGetOutput()).toBe("a 3b {\n    \"-1\" =     (\n        4,\n        5\n    );\n}d 6");
-        ///expect(result).toBe(dictionary);
+        expect(result).toBe(dictionary);
     });
 
     it("MethodWithNSDictionaryMap", function () {
@@ -180,7 +180,7 @@ describe(module.id, function () {
         map.set("d", 6);
         var result = TNSObjCTypes.alloc().init().methodWithNSDictionary(map);
         expect(TNSGetOutput()).toBe("a 3b {\n    \"-1\" =     (\n        4,\n        5\n    );\n}d 6");
-        // expect(result).toBe(map);
+        expect(result).toBe(map);
     });
 
     it("should be possible to wrap an ArrayBuffer in NSData", function () {
@@ -190,12 +190,12 @@ describe(module.id, function () {
 
         var wrappedArrayBufferViewData = TNSObjCTypes.alloc().init().methodWithNSData(data);
         expect(TNSGetOutput()).toBe(expected);
-        // expect(wrappedArrayBufferViewData).toBe(data);
+        expect(wrappedArrayBufferViewData).toBe(data);
         TNSClearOutput();
 
         var wrappedArrayBufferData = TNSObjCTypes.alloc().init().methodWithNSData(buffer);
         expect(TNSGetOutput()).toBe(expected);
-        // expect(wrappedArrayBufferData).toBe(buffer);
+        expect(wrappedArrayBufferData).toBe(buffer);
         TNSClearOutput();
     });
 

@@ -54,9 +54,9 @@ void Interop::RegisterReferenceInteropType(Isolate* isolate, Local<Object> inter
         Isolate* isolate = info.GetIsolate();
         Persistent<Value>* val = nullptr;
         if (info.Length() == 1) {
-            val = new Persistent<Value>(isolate, info[0]);
+            val = ObjectManager::Register(isolate, info[0]);
         } else if (info.Length() > 1) {
-            val = new Persistent<Value>(isolate, info[1]);
+            val = ObjectManager::Register(isolate, info[1]);
         }
 
         InteropReferenceDataWrapper* wrapper = new InteropReferenceDataWrapper(val);
@@ -249,7 +249,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
         int argsCount = typeEncoding->details.block.signature.count - 1;
 
-        Persistent<Object>* poCallback = new Persistent<Object>(isolate, arg.As<Object>());
+        Persistent<Value>* poCallback = new Persistent<Value>(isolate, arg);
         MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
         CFTypeRef blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
         Interop::SetValue(dest, blockPtr);
@@ -308,15 +308,18 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             if (klass == [NSArray class]) {
                 Local<v8::Array> array = Interop::ToArray(isolate, obj);
                 ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
+                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Object>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
                 return;
             } else if ((klass == [NSData class] || klass == [NSMutableData class]) && (arg->IsArrayBuffer() || arg->IsArrayBufferView())) {
                 Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
                 NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
+                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Object>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
                 return;
             } else if (klass == [NSDictionary class]) {
                 DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
+                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Object>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
                 return;
             }

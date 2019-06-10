@@ -275,7 +275,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             TypeEncoding* next = reinterpret_cast<TypeEncoding*>(reinterpret_cast<char*>(typeEncoding) + sizeof(BinaryTypeEncodingType));
             next->type = BinaryTypeEncodingType::InterfaceDeclarationReference;
 
-            Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
+            Persistent<Value>* poCallback = new Persistent<Value>(isolate, method);
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
             IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
             class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str());
@@ -352,7 +352,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             if (methodMeta != nullptr) {
                 Local<Value> method = implementationObject->Get(key);
                 if (!method.IsEmpty() && method->IsFunction()) {
-                    Persistent<v8::Object>* poCallback = new Persistent<v8::Object>(isolate, method.As<Object>());
+                    Persistent<Value>* poCallback = new Persistent<Value>(isolate, method);
                     const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
                     uint8_t argsCount = methodMeta->encodings()->count - 1;
                     MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);

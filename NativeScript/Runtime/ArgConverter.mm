@@ -74,7 +74,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
         HandleScope handle_scope(isolate);
 
-        Persistent<Object>* poCallback = data->callback_;
+        Persistent<Value>* poCallback = data->callback_;
         ObjectWeakCallbackState* weakCallbackState = new ObjectWeakCallbackState(poCallback);
         poCallback->SetWeak(weakCallbackState, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
 
