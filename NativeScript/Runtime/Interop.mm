@@ -50,51 +50,7 @@ void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::st
 }
 
 void Interop::RegisterReferenceInteropType(Isolate* isolate, Local<Object> interop) {
-    Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
-        Isolate* isolate = info.GetIsolate();
-        Persistent<Value>* val = nullptr;
-        if (info.Length() == 1) {
-            val = ObjectManager::Register(isolate, info[0]);
-        } else if (info.Length() > 1) {
-            val = ObjectManager::Register(isolate, info[1]);
-        }
-
-        InteropReferenceDataWrapper* wrapper = new InteropReferenceDataWrapper(val);
-        Local<External> ext = External::New(isolate, wrapper);
-
-        Local<Object> thiz = info.This();
-        thiz->SetInternalField(0, ext);
-    });
-    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-    Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
-
-    proto->SetAccessor(tns::ToV8String(isolate, "value"), [](Local<v8::String> property, const PropertyCallbackInfo<Value>& info) {
-        Isolate* isolate = info.GetIsolate();
-        Local<External> ext = info.This()->GetInternalField(0).As<External>();
-        InteropReferenceDataWrapper* wrapper = static_cast<InteropReferenceDataWrapper*>(ext->Value());
-
-        if (wrapper->Data() == nullptr) {
-            info.GetReturnValue().Set(v8::Undefined(isolate));
-            return;
-        }
-
-        const TypeEncoding* encoding = wrapper->Encoding();
-        uint8_t* data = (uint8_t*)wrapper->Data();
-
-        BaseCall call(data);
-        Local<Value> jsResult = Interop::GetResult(isolate, encoding, &call, true);
-
-        if (!jsResult.IsEmpty()) {
-            info.GetReturnValue().Set(jsResult);
-        }
-    });
-
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<v8::Function> ctorFunc;
-    if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-        assert(false);
-    }
-
+    Local<v8::Function> ctorFunc = Interop::GetInteropReferenceCtorFunc(isolate);
     interop->Set(tns::ToV8String(isolate, "Reference"), ctorFunc);
 }
 
@@ -295,6 +251,20 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         double time = date->ValueOf();
         NSDate* nsDate = [NSDate dateWithTimeIntervalSince1970:(time / 1000)];
         Interop::SetValue(dest, nsDate);
+    } else if (typeEncoding->type == BinaryTypeEncodingType::IncompleteArrayEncoding) {
+        v8::ArrayBuffer::Contents contents;
+        if (arg->IsArrayBuffer()) {
+            contents = arg.As<ArrayBuffer>()->GetContents();
+        } else if (arg->IsArrayBufferView()) {
+            contents = arg.As<ArrayBufferView>()->Buffer()->GetContents();
+        } else {
+            // TODO: Unsupported array reference - throw an exception
+            assert(false);
+        }
+
+        void* data = contents.Data();
+
+        Interop::SetValue(dest, data);
     } else if (arg->IsObject()) {
         Local<Object> obj = arg.As<Object>();
 
@@ -535,6 +505,24 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         assert(success);
 
         return callback;
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::PointerEncoding) {
+        uint8_t* result = call->GetResult<uint8_t*>();
+
+        const TypeEncoding* enc = typeEncoding->details.pointer.getInnerType();
+        BaseCall c(result);
+        Local<Value> value = Interop::GetResult(isolate, enc, &c, true);
+
+        Local<v8::Function> interopReferenceCtorFunc = Interop::GetInteropReferenceCtorFunc(isolate);
+        Local<Value> args[1] = { value };
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> instance;
+        bool success = interopReferenceCtorFunc->NewInstance(context, 1, args).ToLocal(&instance);
+        ObjectManager::Register(isolate, instance);
+        assert(success);
+
+        return instance;
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
@@ -809,6 +797,89 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
     return result.As<v8::Array>();
 }
 
+v8::Local<v8::Function> Interop::GetInteropReferenceCtorFunc(v8::Isolate* isolate) {
+    if (interopReferenceCtorFunc_ != nullptr) {
+        return interopReferenceCtorFunc_->Get(isolate);
+    }
+
+    Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Persistent<Value>* val = nullptr;
+        if (info.Length() == 1) {
+            val = new Persistent<Value>(isolate, info[0]);
+        } else if (info.Length() > 1) {
+            val = new Persistent<Value>(isolate, info[1]);
+        }
+
+        InteropReferenceDataWrapper* wrapper = new InteropReferenceDataWrapper(val);
+        Local<External> ext = External::New(isolate, wrapper);
+
+        Local<Object> thiz = info.This();
+        thiz->SetInternalField(0, ext);
+
+        ObjectManager::Register(isolate, thiz);
+    });
+    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
+    ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "Reference"));
+
+    proto->SetAccessor(tns::ToV8String(isolate, "value"), [](Local<v8::String> property, const PropertyCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Local<External> ext = info.This()->GetInternalField(0).As<External>();
+        InteropReferenceDataWrapper* wrapper = static_cast<InteropReferenceDataWrapper*>(ext->Value());
+        Local<Value> result = Interop::GetInteropReferenceValue(isolate, wrapper);
+
+        if (!result.IsEmpty()) {
+            info.GetReturnValue().Set(result);
+        } else {
+            info.GetReturnValue().Set(v8::Undefined(isolate));
+        }
+    });
+
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<v8::Function> ctorFunc;
+    if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
+        assert(false);
+    }
+
+    interopReferenceCtorFunc_ = new Persistent<v8::Function>(isolate, ctorFunc);
+
+    return ctorFunc;
+}
+
+Local<Value> Interop::GetInteropReferenceValue(Isolate* isolate, InteropReferenceDataWrapper* wrapper) {
+    if (wrapper->Data() == nullptr) {
+        if (wrapper->Value() == nullptr) {
+            return Local<Value>();
+        }
+
+        Local<Value> result = wrapper->Value()->Get(isolate);
+
+        if (result->IsObject() && result.As<Object>()->InternalFieldCount() > 0) {
+            Local<Value> internalField = result.As<Object>()->GetInternalField(0);
+            if (!internalField.IsEmpty() && internalField->IsExternal()) {
+                Local<External> ext = internalField.As<External>();
+                BaseDataWrapper* w = static_cast<BaseDataWrapper*>(ext->Value());
+                if (w->Type() == WrapperType::InteropReference) {
+                    InteropReferenceDataWrapper* irw = static_cast<InteropReferenceDataWrapper*>(w);
+                    return Interop::GetInteropReferenceValue(isolate, irw);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    const TypeEncoding* encoding = wrapper->Encoding();
+    uint8_t* data = (uint8_t*)wrapper->Data();
+
+    BaseCall call(data);
+    Local<Value> jsResult = Interop::GetResult(isolate, encoding, &call, true);
+    return jsResult;
+}
+
+
 Persistent<v8::Function>* Interop::sliceFunc_ = nullptr;
+Persistent<v8::Function>* Interop::interopReferenceCtorFunc_ = nullptr;
 
 }

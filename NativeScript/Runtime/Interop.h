@@ -24,6 +24,7 @@ public:
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer);
 private:
     static v8::Persistent<v8::Function>* sliceFunc_;
+    static v8::Persistent<v8::Function>* interopReferenceCtorFunc_;
 
     template <typename T>
     static void SetStructValue(v8::Local<v8::Value> value, void* destBuffer, ptrdiff_t position);
@@ -32,6 +33,8 @@ private:
     static void RegisterReferenceInteropType(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void SetFFIParams(v8::Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<v8::Local<v8::Value>> args);
+    static v8::Local<v8::Function> GetInteropReferenceCtorFunc(v8::Isolate* isolate);
+    static v8::Local<v8::Value> GetInteropReferenceValue(v8::Isolate* isolate, InteropReferenceDataWrapper* wrapper);
     static v8::Local<v8::Array> ToArray(v8::Isolate* isolate, v8::Local<v8::Object> object);
     static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call);
 

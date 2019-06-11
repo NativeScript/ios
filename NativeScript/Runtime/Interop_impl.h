@@ -82,9 +82,11 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
 
     @autoreleasepool {
         Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
+    }
 
-        ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+    ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
+    @autoreleasepool {
         Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, marshalToPrimitive, nullptr);
 
         return result;
