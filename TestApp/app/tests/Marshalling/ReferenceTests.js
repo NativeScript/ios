@@ -6,7 +6,7 @@ describe(module.id, function () {
     it("SimpleReference", function () {
         var reference = new interop.Reference();
         expect(reference instanceof interop.Reference).toBe(true);
-        //expect(reference.toString()).toBe('<Reference: 0x0>');
+        expect(reference.toString()).toBe('<Reference: 0x0>');
     });
 
     // it("ReferenceValue", function () {

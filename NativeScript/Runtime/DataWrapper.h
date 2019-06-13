@@ -7,22 +7,32 @@
 
 namespace tns {
 
-enum WrapperType {
+enum class WrapperType {
     Base = 1,
     Primitive = 2,
     Enum = 3,
-    Record = 4,
-    ObjCObject = 5,
-    Block = 6,
-    InteropReference = 7,
+    Struct = 4,
+    StructType = 5,
+    ObjCObject = 6,
+    ObjCClass = 7,
+    ObjCProtocol = 8,
+    Function = 9,
+    Block = 10,
+    Reference = 11,
+    ReferenceType = 12,
+    Pointer = 13,
+    PointerType = 14,
 };
 
 class BaseDataWrapper {
 public:
-    BaseDataWrapper(std::string name): name_(name) {}
+    BaseDataWrapper(std::string name): name_(name) {
+    }
+
     virtual WrapperType Type() {
         return WrapperType::Base;
     }
+
     std::string Name() {
         return name_;
     }
@@ -32,39 +42,91 @@ private:
 
 class EnumDataWrapper: public BaseDataWrapper {
 public:
-    EnumDataWrapper(std::string name, std::string jsCode): BaseDataWrapper(name), jsCode_(jsCode) {}
+    EnumDataWrapper(std::string name, std::string jsCode): BaseDataWrapper(name), jsCode_(jsCode) {
+    }
+
     WrapperType Type() {
         return WrapperType::Enum;
     }
+
     std::string JSCode() {
         return jsCode_;
     }
 private:
     std::string jsCode_;
 };
-    
-class InteropReferenceDataWrapper: public BaseDataWrapper {
+
+class PointerTypeWrapper: public BaseDataWrapper {
 public:
-    InteropReferenceDataWrapper(v8::Persistent<v8::Value>* value): BaseDataWrapper(std::string()), value_(value), data_(nullptr) {
+    PointerTypeWrapper(): BaseDataWrapper(std::string()) {
     }
 
     WrapperType Type() {
-        return WrapperType::InteropReference;
+        return WrapperType::PointerType;
     }
-    
+};
+
+class PointerWrapper: public BaseDataWrapper {
+public:
+    PointerWrapper(void* data): BaseDataWrapper(std::string()), data_(data), isAdopted_(false) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::Pointer;
+    }
+
+    void* Data() const {
+        return this->data_;
+    }
+
+    void SetData(void* data) {
+        this->data_ = data;
+    }
+
+    bool IsAdopted() const {
+        return this->isAdopted_;
+    }
+
+    void SetAdopted(bool value) {
+        this->isAdopted_ = value;
+    }
+private:
+    void* data_;
+    bool isAdopted_;
+};
+
+class ReferenceTypeWrapper: public BaseDataWrapper {
+public:
+    ReferenceTypeWrapper(): BaseDataWrapper(std::string()) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::ReferenceType;
+    }
+};
+
+class ReferenceWrapper: public BaseDataWrapper {
+public:
+    ReferenceWrapper(v8::Persistent<v8::Value>* value): BaseDataWrapper(std::string()), value_(value), data_(nullptr) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::Reference;
+    }
+
     v8::Persistent<v8::Value>* Value() {
         return this->value_;
     }
-    
+
     const TypeEncoding* Encoding() {
         return this->encoding_;
     }
-    
+
     void SetEncoding(const TypeEncoding* encoding) {
         this->encoding_ = encoding;
     }
 
-    void* Data() {
+    void* Data() const {
         return this->data_;
     }
 
@@ -82,12 +144,15 @@ public:
     PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType encodingType): BaseDataWrapper(std::string()), encodingType_(encodingType) {
         value_ = calloc(1, size);
     }
+
     WrapperType Type() {
         return WrapperType::Primitive;
     }
+
     void* Value() {
         return this->value_;
     }
+
     BinaryTypeEncodingType EncodingType() {
         return this->encodingType_;
     }
@@ -96,33 +161,52 @@ private:
     BinaryTypeEncodingType encodingType_;
 };
 
-class StructDataWrapper: public BaseDataWrapper {
+class StructTypeWrapper: public BaseDataWrapper {
 public:
-    StructDataWrapper(const Meta* meta, void* data, ffi_type* ffiType): BaseDataWrapper(meta->name()), meta_(meta), data_(data), ffiType_(ffiType) {}
+    StructTypeWrapper(const StructMeta* meta): BaseDataWrapper(meta->name()), meta_(meta) {
+    }
+
     WrapperType Type() {
-        return WrapperType::Record;
+        return WrapperType::StructType;
     }
-    void* Data() {
-        return data_;
+
+    const StructMeta* Meta() {
+        return this->meta_;
     }
+private:
+    const StructMeta* meta_;
+};
+
+class StructWrapper: public StructTypeWrapper {
+public:
+    StructWrapper(const StructMeta* meta, void* data, ffi_type* ffiType): StructTypeWrapper(meta), data_(data), ffiType_(ffiType) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::Struct;
+    }
+
+    void* Data() const {
+        return this->data_;
+    }
+
     ffi_type* FFIType() {
-        return ffiType_;
-    }
-    const Meta* Metadata() {
-        return meta_;
+        return this->ffiType_;
     }
 private:
     void* data_;
     ffi_type* ffiType_;
-    const Meta* meta_;
 };
 
 class ObjCDataWrapper: public BaseDataWrapper {
 public:
-    ObjCDataWrapper(std::string name, id data): BaseDataWrapper(name), data_(data) {}
+    ObjCDataWrapper(std::string name, id data): BaseDataWrapper(name), data_(data) {
+    }
+
     WrapperType Type() {
         return WrapperType::ObjCObject;
     }
+
     id Data() {
         return data_;
     }
@@ -130,16 +214,68 @@ private:
     id data_;
 };
 
+class ObjCClassWrapper: public BaseDataWrapper {
+public:
+    ObjCClassWrapper(Class klazz): BaseDataWrapper(std::string()), klass_(klazz) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::ObjCClass;
+    }
+
+    Class Klass() {
+        return this->klass_;
+    }
+private:
+    Class klass_;
+};
+
+class ObjCProtocolWrapper: public BaseDataWrapper {
+public:
+    ObjCProtocolWrapper(Protocol* proto): BaseDataWrapper(std::string()), proto_(proto) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::ObjCProtocol;
+    }
+
+    Protocol* Proto() {
+        return this->proto_;
+    }
+private:
+    Protocol* proto_;
+};
+
+class FunctionWrapper: public BaseDataWrapper {
+public:
+    FunctionWrapper(const FunctionMeta* meta): BaseDataWrapper(std::string()), meta_(meta) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::Function;
+    }
+
+    const FunctionMeta* Meta() {
+        return this->meta_;
+    }
+private:
+    const FunctionMeta* meta_;
+};
+
 class BlockDataWrapper: public BaseDataWrapper {
 public:
     BlockDataWrapper(void* block, const TypeEncoding* typeEncoding)
-        : BaseDataWrapper(""), block_(block), typeEncoding_(typeEncoding) {}
+    : BaseDataWrapper(std::string()), block_(block), typeEncoding_(typeEncoding) {
+        }
+
     WrapperType Type() {
         return WrapperType::Block;
     }
+
     void* Block() {
         return this->block_;
     }
+
     const TypeEncoding* Encodings() {
         return this->typeEncoding_;
     }

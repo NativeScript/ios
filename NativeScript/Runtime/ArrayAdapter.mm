@@ -72,22 +72,28 @@ using namespace v8;
     if (item->IsObject()) {
         Local<Object> obj = item.As<Object>();
 
-        if (obj->InternalFieldCount() > 0) {
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-            assert(wrapper->Type() == WrapperType::ObjCObject);
-            ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-            id result = objCDataWrapper->Data();
-            return result;
-        }
-
-        Local<Value> metadataProp = tns::GetPrivateValue(self->isolate_, obj, tns::ToV8String(self->isolate_, "metadata"));
-        if (!metadataProp.IsEmpty() && metadataProp->IsExternal()) {
-            // TODO: Specialize the metadata instead of wrapping both class and protocols into the same property
-            ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(metadataProp.As<External>()->Value());
-            std::string name = wrapper->Name();
-            Class klass = objc_getClass(name.c_str());
-            return klass != nil ? klass : objc_getProtocol(name.c_str());
+        if (BaseDataWrapper* wrapper = tns::GetValue(self->isolate_, obj)) {
+            switch (wrapper->Type()) {
+                case WrapperType::ObjCObject: {
+                    ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
+                    return wr->Data();
+                    break;
+                }
+                case WrapperType::ObjCClass: {
+                    ObjCClassWrapper* wr = static_cast<ObjCClassWrapper*>(wrapper);
+                    return wr->Klass();
+                    break;
+                }
+                case WrapperType::ObjCProtocol: {
+                    ObjCProtocolWrapper* wr = static_cast<ObjCProtocolWrapper*>(wrapper);
+                    return wr->Proto();
+                    break;
+                }
+                default:
+                    // TODO: Unsupported object type
+                    assert(false);
+                    break;
+            }
         } else {
             DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:item.As<Object>() isolate:self->isolate_];
             return adapter;

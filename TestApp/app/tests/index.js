@@ -37,7 +37,7 @@ require("./tests/Marshalling/RecordTests");
 //import "./Marshalling/MatrixTests";
 require("./tests/Marshalling/NSStringTests");
 //import "./Marshalling/TypesTests";
-//import "./Marshalling/PointerTests";
+require("./tests/Marshalling/PointerTests");
 require("./tests/Marshalling/ReferenceTests");
 //import "./Marshalling/FunctionPointerTests";
 require("./tests/Marshalling/EnumTests");

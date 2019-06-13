@@ -178,30 +178,24 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
         return Null(isolate);
     }
 
-    if (wrapper->Type() == WrapperType::Record) {
+    if (wrapper->Type() == WrapperType::Struct) {
         if (receiver.IsEmpty()) {
             receiver = CreateEmptyStruct(context);
         }
 
-        if (wrapper->Type() == WrapperType::Record) {
-            StructDataWrapper* structWrapper = static_cast<StructDataWrapper*>(wrapper);
-            if (structWrapper->Metadata()->type() == MetaType::Struct) {
-                const StructMeta* structMeta = static_cast<const StructMeta*>(structWrapper->Metadata());
-
-                auto it = Caches::StructConstructorFunctions.find(structMeta);
-                if (it != Caches::StructConstructorFunctions.end()) {
-                    Local<v8::Function> structCtorFunc = it->second->Get(isolate);
-                    Local<Value> proto = structCtorFunc->Get(tns::ToV8String(isolate, "prototype"));
-                    if (!proto.IsEmpty()) {
-                        bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
-                        assert(success);
-                    }
-                }
+        StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
+        const StructMeta* structMeta = structWrapper->Meta();
+        auto it = Caches::StructConstructorFunctions.find(structMeta);
+        if (it != Caches::StructConstructorFunctions.end()) {
+            Local<v8::Function> structCtorFunc = it->second->Get(isolate);
+            Local<Value> proto = structCtorFunc->Get(tns::ToV8String(isolate, "prototype"));
+            if (!proto.IsEmpty()) {
+                bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
+                assert(success);
             }
         }
 
-        Local<External> ext = External::New(isolate, wrapper);
-        receiver->SetInternalField(0, ext);
+        tns::SetValue(isolate, receiver, structWrapper);
 
         return receiver;
     }
@@ -251,16 +245,13 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
 
     Class metaClass = object_getClass(target);
     if (class_isMetaClass(metaClass)) {
-        Local<Value> metadataProp = tns::GetPrivateValue(isolate, receiver, tns::ToV8String(isolate, "metadata"));
-        if (metadataProp.IsEmpty() || !metadataProp->IsExternal()) {
-            ObjCDataWrapper* wrapper = new ObjCDataWrapper(class_getName(klass), klass);
-            Local<External> extendedData = External::New(isolate, wrapper);
-            tns::SetPrivateValue(isolate, receiver, tns::ToV8String(isolate, "metadata"), extendedData);
+        if (tns::GetValue(isolate, receiver) == nullptr) {
+            ObjCClassWrapper* wrapper = new ObjCClassWrapper(klass);
+            tns::SetValue(isolate, receiver, wrapper);
         }
     }
 
-    Local<External> ext = External::New(isolate, wrapper);
-    receiver->SetInternalField(0, ext);
+    tns::SetValue(isolate, receiver, wrapper);
 
     return receiver;
 }

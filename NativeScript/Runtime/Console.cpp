@@ -12,12 +12,12 @@ void Console::Init(Isolate* isolate) {
     bool success = console->SetPrototype(context, Object::New(isolate)).FromMaybe(false);
     assert(success);
 
-    Local<Function> func;
+    Local<v8::Function> func;
     if (!Function::New(context, LogCallback, console, 0, ConstructorBehavior::kThrow).ToLocal(&func)) {
         return;
     }
 
-    Local<String> logFuncName = tns::ToV8String(isolate, "log");
+    Local<v8::String> logFuncName = tns::ToV8String(isolate, "log");
     func->SetName(logFuncName);
     if (!console->CreateDataProperty(context, logFuncName, func).FromMaybe(false)) {
         assert(false);

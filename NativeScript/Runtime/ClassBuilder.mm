@@ -92,9 +92,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     }
 
     std::string extendedClassName = class_getName(extendedClass);
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(extendedClassName, extendedClass);
-    Local<External> extendedData = External::New(isolate, wrapper);
-    tns::SetPrivateValue(isolate, extendClassCtorFunc, tns::ToV8String(isolate, "metadata"), extendedData);
+    ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass);
+    tns::SetValue(isolate, extendClassCtorFunc, wrapper);
 
     Caches::CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
     Caches::ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendFuncPrototype)));
@@ -110,11 +109,9 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
     id obj = [[item->data_ alloc] init];
 
     const char* className = class_getName(item->data_);
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, obj);
-    Local<External> ext = External::New(isolate, wrapper);
-
     Local<Object> thiz = info.This();
-    thiz->SetInternalField(0, ext);
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, obj);
+    tns::SetValue(isolate, thiz, wrapper);
 
     Persistent<Object>* poThiz = new Persistent<Object>(isolate, thiz);
     Caches::Instances.insert(std::make_pair(obj, poThiz));
@@ -161,8 +158,8 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         Local<Context> context = isolate->GetCurrentContext();
         ClassBuilder* builder = static_cast<ClassBuilder*>(info.Data().As<External>()->Value());
 
-        Local<Value> metadataProp = tns::GetPrivateValue(isolate, info[1].As<Object>(), tns::ToV8String(isolate, "metadata"));
-        if (metadataProp.IsEmpty() || !metadataProp->IsExternal()) {
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, info[1].As<Object>());
+        if (!wrapper) {
             // We are not extending a native object -> call the base __extends function
             Local<v8::Function> originalExtendsFunc = poOriginalExtendsFunc_->Get(isolate);
             Local<Value> args[] = { info[0], info[1] };
@@ -170,9 +167,8 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
             return;
         }
 
-        Local<External> superExt = metadataProp.As<External>();
-        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(superExt->Value());
-        Class baseClass = wrapper->Data();
+        ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+        Class baseClass = dataWrapper->Data();
         std::string baseClassName = class_getName(baseClass);
 
         Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
@@ -180,7 +176,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
 
         Class extendedClass = builder->GetExtendedClass(baseClassName, extendedClassName);
 
-        tns::SetPrivateValue(isolate, extendedClassCtorFunc, tns::ToV8String(isolate, "metadata"), External::New(isolate, new ObjCDataWrapper(extendedClassName, nil)));
+        tns::SetValue(isolate, extendedClassCtorFunc, new ObjCClassWrapper(extendedClass));
 
         const Meta* baseMeta = ArgConverter::FindMeta(baseClass);
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
@@ -252,13 +248,11 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             Local<Value> returnsVal = methodSignature.As<Object>()->Get(tns::ToV8String(isolate, "returns"));
             if (!returnsVal.IsEmpty() && returnsVal->IsObject()) {
                 Local<Object> returnsObj = returnsVal.As<Object>();
-                if (returnsObj->InternalFieldCount() > 0) {
-                    Local<External> ext = returnsObj->GetInternalField(0).As<External>();
-                    PrimitiveDataWrapper* pdw = static_cast<PrimitiveDataWrapper*>(ext->Value());
-                    returnType = pdw->EncodingType();
-                } else {
-                    Local<Value> val = tns::GetPrivateValue(isolate, returnsObj, tns::ToV8String(isolate, "metadata"));
-                    if (!val.IsEmpty() && val->IsExternal()) {
+                if (BaseDataWrapper* wrapper = tns::GetValue(isolate, returnsObj)) {
+                    if (wrapper->Type() == WrapperType::Primitive) {
+                        PrimitiveDataWrapper* pdw = static_cast<PrimitiveDataWrapper*>(wrapper);
+                        returnType = pdw->EncodingType();
+                    } else {
                         returnType = BinaryTypeEncodingType::PointerEncoding;
                     }
                 }
@@ -378,13 +372,10 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
         assert(!element.IsEmpty() && element->IsFunction());
 
         Local<v8::Function> protoObj = element.As<v8::Function>();
-        Local<Value> metadataProp = tns::GetPrivateValue(isolate, protoObj, tns::ToV8String(isolate, "metadata"));
-        assert(!metadataProp.IsEmpty() && metadataProp->IsExternal());
-
-        Local<External> ext = metadataProp.As<External>();
-        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-        std::string protocolName = wrapper->Name();
-        Protocol* proto = objc_getProtocol(protocolName.c_str());
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, protoObj);
+        assert(wrapper && wrapper->Type() == WrapperType::ObjCProtocol);
+        ObjCProtocolWrapper* protoWrapper = static_cast<ObjCProtocolWrapper*>(wrapper);
+        Protocol* proto = protoWrapper->Proto();
         assert(proto != nullptr);
 
         if (class_conformsToProtocol(extendedClass, proto)) {
@@ -394,7 +385,8 @@ void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass,
         class_addProtocol(extendedClass, proto);
 
         const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-        const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName.c_str());
+        const char* protocolName = protocol_getName(proto);
+        const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName);
 
         Local<v8::Array> propertyNames;
         Local<Context> context = isolate->GetCurrentContext();

@@ -4,7 +4,7 @@
 using namespace v8;
 
 Local<String> tns::ToV8String(Isolate* isolate, std::string value) {
-    return String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal).ToLocalChecked();
+    return v8::String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal).ToLocalChecked();
 }
 
 std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {
@@ -17,7 +17,7 @@ std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {
         return tns::ToString(isolate, obj);
     }
 
-    String::Utf8Value result(isolate, value);
+    v8::String::Utf8Value result(isolate, value);
 
     const char* val = *result;
     if (val == nullptr) {
@@ -68,7 +68,7 @@ std::string tns::ReadText(const std::string& file) {
     return content;
 }
 
-void tns::SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, const Local<Value>& value) {
+void tns::SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<v8::String>& propName, const Local<Value>& value) {
     Local<Private> privateKey = Private::ForApi(isolate, propName);
     bool success;
     if (!obj->SetPrivate(isolate->GetCurrentContext(), privateKey, value).To(&success) || !success) {
@@ -76,7 +76,7 @@ void tns::SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Loca
     }
 }
 
-Local<Value> tns::GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName) {
+Local<Value> tns::GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<v8::String>& propName) {
     Local<Private> privateKey = Private::ForApi(isolate, propName);
 
     Maybe<bool> hasPrivate = obj->HasPrivate(isolate->GetCurrentContext(), privateKey);
@@ -93,6 +93,42 @@ Local<Value> tns::GetPrivateValue(Isolate* isolate, const Local<Object>& obj, co
     }
 
     return result;
+}
+
+void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* value) {
+    if (obj.IsEmpty() || obj->IsNullOrUndefined()) {
+        return;
+    }
+
+    Local<External> ext = External::New(isolate, value);
+
+    if (obj->InternalFieldCount() > 0) {
+        obj->SetInternalField(0, ext);
+    } else {
+        tns::SetPrivateValue(isolate, obj, tns::ToV8String(isolate, "metadata"), ext);
+    }
+}
+
+tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Object>& obj) {
+    if (obj.IsEmpty() || obj->IsNullOrUndefined()) {
+        return nullptr;
+    }
+
+    if (obj->InternalFieldCount() > 0) {
+        Local<Value> field = obj->GetInternalField(0);
+        if (field.IsEmpty() || field->IsNullOrUndefined() || !field->IsExternal()) {
+            return nullptr;
+        }
+
+        return static_cast<BaseDataWrapper*>(field.As<External>()->Value());
+    }
+
+    Local<Value> metadataProp = tns::GetPrivateValue(isolate, obj, tns::ToV8String(isolate, "metadata"));
+    if (metadataProp.IsEmpty() || metadataProp->IsNullOrUndefined() || !metadataProp->IsExternal()) {
+        return nullptr;
+    }
+
+    return static_cast<BaseDataWrapper*>(metadataProp.As<External>()->Value());
 }
 
 bool tns::IsString(Local<Value> value) {

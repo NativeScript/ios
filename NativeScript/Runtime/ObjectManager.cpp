@@ -43,8 +43,8 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
     Local<External> ext = internalField.As<External>();
     BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
     switch (wrapper->Type()) {
-        case WrapperType::Record: {
-            StructDataWrapper* structWrapper = static_cast<StructDataWrapper*>(wrapper);
+        case WrapperType::Struct: {
+            StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
             void* data = structWrapper->Data();
             if (data) {
                 std::free(data);
@@ -65,11 +65,11 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         }
         case WrapperType::Block: {
             BlockDataWrapper* blockWrapper = static_cast<BlockDataWrapper*>(ext->Value());
-            free(blockWrapper->Block());
+            std::free(blockWrapper->Block());
             break;
         }
-        case WrapperType::InteropReference: {
-            InteropReferenceDataWrapper* referenceWrapper = static_cast<InteropReferenceDataWrapper*>(ext->Value());
+        case WrapperType::Reference: {
+            ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(ext->Value());
             if (referenceWrapper->Value() != nullptr) {
                 Local<Value> value = referenceWrapper->Value()->Get(isolate);
                 ObjectManager::DisposeValue(isolate, value);
@@ -81,6 +81,22 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
                 referenceWrapper->SetData(nullptr);
             }
 
+            break;
+        }
+        case WrapperType::Pointer: {
+            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(ext->Value());
+            if (pointerWrapper->Data() != nullptr) {
+                auto it = Caches::PointerInstances.find(pointerWrapper->Data());
+                if (it != Caches::PointerInstances.end()) {
+                    delete it->second;
+                    Caches::PointerInstances.erase(it);
+                }
+
+                if (pointerWrapper->IsAdopted()) {
+                    std::free(pointerWrapper->Data());
+                    pointerWrapper->SetData(nullptr);
+                }
+            }
             break;
         }
         default:

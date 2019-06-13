@@ -10,7 +10,7 @@ void SetTimeout::Init(Isolate* isolate) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
 
-    Local<Function> setTimeoutFunc;
+    Local<v8::Function> setTimeoutFunc;
     if (!Function::New(context, SetTimeoutCallback).ToLocal(&setTimeoutFunc)) {
         assert(false);
     }
@@ -19,7 +19,7 @@ void SetTimeout::Init(Isolate* isolate) {
         assert(false);
     }
 
-    Local<Function> clearTimeoutFunc;
+    Local<v8::Function> clearTimeoutFunc;
     if (!Function::New(context, ClearTimeoutCallback).ToLocal(&clearTimeoutFunc)) {
         assert(false);
     }
@@ -46,9 +46,9 @@ void SetTimeout::SetTimeoutCallback(const FunctionCallbackInfo<Value>& args) {
 
     // TODO: implement better unique number generator
     uint32_t key = ++count_;
-    Local<Function> callback = args[0].As<Function>();
+    Local<v8::Function> callback = args[0].As<v8::Function>();
     dispatch_block_t block = dispatch_block_create(DISPATCH_BLOCK_INHERIT_QOS_CLASS, ^{ Elapsed(key); });
-    CacheEntry entry(isolate, new Persistent<Function>(isolate, callback));
+    CacheEntry entry(isolate, new Persistent<v8::Function>(isolate, callback));
     cache_.insert(std::make_pair(key, entry));
 
     dispatch_time_t time = dispatch_time(DISPATCH_TIME_NOW, timeout * NSEC_PER_MSEC);
@@ -85,10 +85,10 @@ void SetTimeout::Elapsed(const uint32_t key) {
     }
 
     Isolate* isolate = it->second.isolate_;
-    Persistent<Function>* poCallback = it->second.callback_;
+    Persistent<v8::Function>* poCallback = it->second.callback_;
     HandleScope handle_scope(isolate);
 
-    Local<Function> cb = Local<Function>::New(isolate, *poCallback);
+    Local<v8::Function> cb = poCallback->Get(isolate);
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
     Local<Value> result;
@@ -105,7 +105,7 @@ void SetTimeout::RemoveKey(const uint32_t key) {
         return;
     }
 
-    Persistent<Function>* poCallback = it->second.callback_;
+    Persistent<v8::Function>* poCallback = it->second.callback_;
     poCallback->Reset();
     delete poCallback;
     cache_.erase(it);

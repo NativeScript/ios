@@ -10,6 +10,11 @@
 		C266567822AA405100EE15CC /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C266567722AA405100EE15CC /* Default-568h@2x.png */; };
 		C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C266567922AA630F00EE15CC /* NSDataAdapter.mm */; };
 		C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C266567A22AA630F00EE15CC /* NSDataAdapter.h */; };
+		C266569022AFE1A700EE15CC /* libv8.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C266568F22AFE1A600EE15CC /* libv8.a */; };
+		C266569322AFFF7E00EE15CC /* Pointer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C266569122AFFF7E00EE15CC /* Pointer.cpp */; };
+		C266569422AFFF7E00EE15CC /* Pointer.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569222AFFF7E00EE15CC /* Pointer.h */; };
+		C266569722AFFFB000EE15CC /* Reference.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C266569522AFFFB000EE15CC /* Reference.cpp */; };
+		C266569822AFFFB000EE15CC /* Reference.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569622AFFFB000EE15CC /* Reference.h */; };
 		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
 		C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */; };
@@ -32,15 +37,6 @@
 		C293752E22A10C490075CB16 /* Interop_impl.h in Sources */ = {isa = PBXBuildFile; fileRef = C293752D22A10C490075CB16 /* Interop_impl.h */; };
 		C2DDEB36229EAB3B00345BFE /* NativeScript.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB34229EAB3B00345BFE /* NativeScript.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3E229EABFF00345BFE /* libffi.a */; };
-		C2DDEB49229EAC0000345BFE /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3F229EABFF00345BFE /* libv8_external_snapshot.a */; };
-		C2DDEB4A229EAC0000345BFE /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB40229EAC0000345BFE /* libtorque_generated_initializers.a */; };
-		C2DDEB4B229EAC0000345BFE /* libv8_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB41229EAC0000345BFE /* libv8_compiler.a */; };
-		C2DDEB4C229EAC0000345BFE /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB42229EAC0000345BFE /* libv8_initializers.a */; };
-		C2DDEB4D229EAC0000345BFE /* libv8_base_without_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB43229EAC0000345BFE /* libv8_base_without_compiler.a */; };
-		C2DDEB4E229EAC0000345BFE /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB44229EAC0000345BFE /* libv8_libplatform.a */; };
-		C2DDEB4F229EAC0000345BFE /* libv8_init.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB45229EAC0000345BFE /* libv8_init.a */; };
-		C2DDEB50229EAC0000345BFE /* libv8_libbase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB46229EAC0000345BFE /* libv8_libbase.a */; };
-		C2DDEB51229EAC0000345BFE /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB47229EAC0000345BFE /* libv8_libsampler.a */; };
 		C2DDEB57229EAC1F00345BFE /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB52229EAC1F00345BFE /* platform-ios.cpp */; };
 		C2DDEB58229EAC1F00345BFE /* timezone-cache.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB53229EAC1F00345BFE /* timezone-cache.h */; };
 		C2DDEB59229EAC1F00345BFE /* platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB54229EAC1F00345BFE /* platform.h */; };
@@ -143,6 +139,11 @@
 		C266567722AA405100EE15CC /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		C266567922AA630F00EE15CC /* NSDataAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NSDataAdapter.mm; sourceTree = "<group>"; };
 		C266567A22AA630F00EE15CC /* NSDataAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NSDataAdapter.h; sourceTree = "<group>"; };
+		C266568F22AFE1A600EE15CC /* libv8.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8.a; sourceTree = "<group>"; };
+		C266569122AFFF7E00EE15CC /* Pointer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Pointer.cpp; sourceTree = "<group>"; };
+		C266569222AFFF7E00EE15CC /* Pointer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Pointer.h; sourceTree = "<group>"; };
+		C266569522AFFFB000EE15CC /* Reference.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Reference.cpp; sourceTree = "<group>"; };
+		C266569622AFFFB000EE15CC /* Reference.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Reference.h; sourceTree = "<group>"; };
 		C293748C229EC6780075CB16 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
 		C29374E2229FC0F60075CB16 /* libTestFixtures.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTestFixtures.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		C29374EC229FC1600075CB16 /* TNSMethodCalls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSMethodCalls.h; sourceTree = "<group>"; };
@@ -192,15 +193,6 @@
 		C2DDEB34229EAB3B00345BFE /* NativeScript.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeScript.h; sourceTree = "<group>"; };
 		C2DDEB35229EAB3B00345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C2DDEB3E229EABFF00345BFE /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
-		C2DDEB3F229EABFF00345BFE /* libv8_external_snapshot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_external_snapshot.a; sourceTree = "<group>"; };
-		C2DDEB40229EAC0000345BFE /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
-		C2DDEB41229EAC0000345BFE /* libv8_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_compiler.a; sourceTree = "<group>"; };
-		C2DDEB42229EAC0000345BFE /* libv8_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_initializers.a; sourceTree = "<group>"; };
-		C2DDEB43229EAC0000345BFE /* libv8_base_without_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base_without_compiler.a; sourceTree = "<group>"; };
-		C2DDEB44229EAC0000345BFE /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
-		C2DDEB45229EAC0000345BFE /* libv8_init.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_init.a; sourceTree = "<group>"; };
-		C2DDEB46229EAC0000345BFE /* libv8_libbase.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libbase.a; sourceTree = "<group>"; };
-		C2DDEB47229EAC0000345BFE /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
 		C2DDEB52229EAC1F00345BFE /* platform-ios.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "platform-ios.cpp"; sourceTree = "<group>"; };
 		C2DDEB53229EAC1F00345BFE /* timezone-cache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "timezone-cache.h"; sourceTree = "<group>"; };
 		C2DDEB54229EAC1F00345BFE /* platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = platform.h; sourceTree = "<group>"; };
@@ -291,17 +283,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C266569022AFE1A700EE15CC /* libv8.a in Frameworks */,
 				C2DDEBD7229EB1C500345BFE /* UIKit.framework in Frameworks */,
-				C2DDEB4C229EAC0000345BFE /* libv8_initializers.a in Frameworks */,
-				C2DDEB4E229EAC0000345BFE /* libv8_libplatform.a in Frameworks */,
-				C2DDEB49229EAC0000345BFE /* libv8_external_snapshot.a in Frameworks */,
-				C2DDEB4F229EAC0000345BFE /* libv8_init.a in Frameworks */,
 				C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */,
-				C2DDEB4B229EAC0000345BFE /* libv8_compiler.a in Frameworks */,
-				C2DDEB4D229EAC0000345BFE /* libv8_base_without_compiler.a in Frameworks */,
-				C2DDEB50229EAC0000345BFE /* libv8_libbase.a in Frameworks */,
-				C2DDEB51229EAC0000345BFE /* libv8_libsampler.a in Frameworks */,
-				C2DDEB4A229EAC0000345BFE /* libtorque_generated_initializers.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -490,6 +474,10 @@
 				C266567922AA630F00EE15CC /* NSDataAdapter.mm */,
 				C2DDEB83229EAC8300345BFE /* ObjectManager.h */,
 				C2DDEB86229EAC8300345BFE /* ObjectManager.cpp */,
+				C266569222AFFF7E00EE15CC /* Pointer.h */,
+				C266569122AFFF7E00EE15CC /* Pointer.cpp */,
+				C266569622AFFFB000EE15CC /* Reference.h */,
+				C266569522AFFFB000EE15CC /* Reference.cpp */,
 				C2DDEB7B229EAC8200345BFE /* Runtime.h */,
 				C2DDEB7C229EAC8200345BFE /* Runtime.mm */,
 				C2DDEB74229EAC8200345BFE /* SetTimeout.h */,
@@ -520,16 +508,8 @@
 		C2DDEB3D229EABBB00345BFE /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				C266568F22AFE1A600EE15CC /* libv8.a */,
 				C2DDEB3E229EABFF00345BFE /* libffi.a */,
-				C2DDEB40229EAC0000345BFE /* libtorque_generated_initializers.a */,
-				C2DDEB43229EAC0000345BFE /* libv8_base_without_compiler.a */,
-				C2DDEB41229EAC0000345BFE /* libv8_compiler.a */,
-				C2DDEB3F229EABFF00345BFE /* libv8_external_snapshot.a */,
-				C2DDEB45229EAC0000345BFE /* libv8_init.a */,
-				C2DDEB42229EAC0000345BFE /* libv8_initializers.a */,
-				C2DDEB46229EAC0000345BFE /* libv8_libbase.a */,
-				C2DDEB44229EAC0000345BFE /* libv8_libplatform.a */,
-				C2DDEB47229EAC0000345BFE /* libv8_libsampler.a */,
 			);
 			path = Frameworks;
 			sourceTree = "<group>";
@@ -643,6 +623,7 @@
 				C2DDEBA8229EAC8300345BFE /* SymbolLoader.h in Headers */,
 				C2DDEB62229EAC3C00345BFE /* natives_blob.x86_64.h in Headers */,
 				C2DDEBC2229EB02500345BFE /* v8-internal.h in Headers */,
+				C266569822AFFFB000EE15CC /* Reference.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
 				C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */,
 				C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */,
@@ -657,6 +638,7 @@
 				C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */,
 				C2DDEBD3229EB06E00345BFE /* ffitarget.h in Headers */,
 				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
+				C266569422AFFF7E00EE15CC /* Pointer.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -819,6 +801,7 @@
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.cpp in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
+				C266569322AFFF7E00EE15CC /* Pointer.cpp in Sources */,
 				C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */,
 				C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */,
 				C2DDEB9E229EAC8300345BFE /* SymbolLoader.mm in Sources */,
@@ -827,6 +810,7 @@
 				C2DDEB57229EAC1F00345BFE /* platform-ios.cpp in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
+				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
 				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,

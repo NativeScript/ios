@@ -1,6 +1,7 @@
 #ifndef Interop_h
 #define Interop_h
 
+#include <CoreFoundation/CFBase.h>
 #include <map>
 #include "libffi.h"
 #include "Common.h"
@@ -20,21 +21,20 @@ public:
     template <typename TMeta>
     static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const TMeta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper = false);
     static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, ffi_type* structFieldFFIType = nullptr);
-    static void SetStructPropertyValue(StructDataWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
+    static void SetStructPropertyValue(StructWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer);
 private:
     static v8::Persistent<v8::Function>* sliceFunc_;
-    static v8::Persistent<v8::Function>* interopReferenceCtorFunc_;
 
     template <typename T>
     static void SetStructValue(v8::Local<v8::Value> value, void* destBuffer, ptrdiff_t position);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer, ptrdiff_t& position);
     static void RegisterInteropType(v8::Isolate* isolate, v8::Local<v8::Object> types, std::string name, PrimitiveDataWrapper* wrapper);
-    static void RegisterReferenceInteropType(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
+    static void RegisterHandleOfFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
+    static void RegisterAllocFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
+    static void RegisterSizeOfFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void SetFFIParams(v8::Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<v8::Local<v8::Value>> args);
-    static v8::Local<v8::Function> GetInteropReferenceCtorFunc(v8::Isolate* isolate);
-    static v8::Local<v8::Value> GetInteropReferenceValue(v8::Isolate* isolate, InteropReferenceDataWrapper* wrapper);
     static v8::Local<v8::Array> ToArray(v8::Isolate* isolate, v8::Local<v8::Object> object);
     static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call);
 

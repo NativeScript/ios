@@ -3,6 +3,7 @@
 
 #include <string>
 #include "Common.h"
+#include "DataWrapper.h"
 
 namespace tns {
 
@@ -15,6 +16,9 @@ std::string ReadText(const std::string& file);
 
 void SetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName, const v8::Local<v8::Value>& value);
 v8::Local<v8::Value> GetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName);
+
+void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
+BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj);
 
 bool IsString(v8::Local<v8::Value> value);
 bool IsNumber(v8::Local<v8::Value> value);
