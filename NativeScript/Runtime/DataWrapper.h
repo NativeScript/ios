@@ -8,20 +8,22 @@
 namespace tns {
 
 enum class WrapperType {
-    Base = 1,
-    Primitive = 2,
-    Enum = 3,
-    Struct = 4,
-    StructType = 5,
-    ObjCObject = 6,
-    ObjCClass = 7,
-    ObjCProtocol = 8,
-    Function = 9,
-    Block = 10,
-    Reference = 11,
-    ReferenceType = 12,
-    Pointer = 13,
-    PointerType = 14,
+    Base,
+    Primitive,
+    Enum,
+    Struct,
+    StructType,
+    ObjCObject,
+    ObjCClass,
+    ObjCProtocol,
+    Function,
+    Block,
+    Reference,
+    ReferenceType,
+    Pointer,
+    PointerType,
+    FunctionReference,
+    FunctionReferenceType,
 };
 
 class BaseDataWrapper {
@@ -262,11 +264,11 @@ private:
     const FunctionMeta* meta_;
 };
 
-class BlockDataWrapper: public BaseDataWrapper {
+class BlockWrapper: public BaseDataWrapper {
 public:
-    BlockDataWrapper(void* block, const TypeEncoding* typeEncoding)
-    : BaseDataWrapper(std::string()), block_(block), typeEncoding_(typeEncoding) {
-        }
+    BlockWrapper(void* block, const TypeEncoding* typeEncoding)
+        : BaseDataWrapper(std::string()), block_(block), typeEncoding_(typeEncoding) {
+    }
 
     WrapperType Type() {
         return WrapperType::Block;
@@ -309,6 +311,41 @@ private:
     ffi_type* ffiType_;
     std::string name_;
     const TypeEncoding* encoding_;
+};
+
+class FunctionReferenceTypeWrapper: public BaseDataWrapper {
+public:
+    FunctionReferenceTypeWrapper(): BaseDataWrapper(std::string()) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::FunctionReferenceType;
+    }
+};
+
+class FunctionReferenceWrapper: public BaseDataWrapper {
+public:
+    FunctionReferenceWrapper(v8::Persistent<v8::Function>* function): BaseDataWrapper(std::string()), function_(function), data_(nullptr) {
+    }
+
+    WrapperType Type() {
+        return WrapperType::FunctionReference;
+    }
+
+    v8::Persistent<v8::Function>* Function() {
+        return this->function_;
+    }
+
+    void* Data() const {
+        return this->data_;
+    }
+
+    void SetData(void* data) {
+        this->data_ = data;
+    }
+private:
+    v8::Persistent<v8::Function>* function_;
+    void* data_;
 };
 
 }

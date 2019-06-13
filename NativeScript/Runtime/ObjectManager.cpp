@@ -1,5 +1,6 @@
 #include "ObjectManager.h"
 #include "DataWrapper.h"
+#include "Helpers.h"
 #include "Caches.h"
 
 using namespace v8;
@@ -35,13 +36,11 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         return;
     }
 
-    Local<Value> internalField = obj->GetInternalField(0);
-    if (internalField.IsEmpty() || internalField->IsNullOrUndefined() || !internalField->IsExternal()) {
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
+    if (wrapper == nullptr) {
         return;
     }
 
-    Local<External> ext = internalField.As<External>();
-    BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
     switch (wrapper->Type()) {
         case WrapperType::Struct: {
             StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
@@ -64,12 +63,12 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             break;
         }
         case WrapperType::Block: {
-            BlockDataWrapper* blockWrapper = static_cast<BlockDataWrapper*>(ext->Value());
+            BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
             std::free(blockWrapper->Block());
             break;
         }
         case WrapperType::Reference: {
-            ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(ext->Value());
+            ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
             if (referenceWrapper->Value() != nullptr) {
                 Local<Value> value = referenceWrapper->Value()->Get(isolate);
                 ObjectManager::DisposeValue(isolate, value);
@@ -84,7 +83,7 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             break;
         }
         case WrapperType::Pointer: {
-            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(ext->Value());
+            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
             if (pointerWrapper->Data() != nullptr) {
                 auto it = Caches::PointerInstances.find(pointerWrapper->Data());
                 if (it != Caches::PointerInstances.end()) {
@@ -99,6 +98,14 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             }
             break;
         }
+        case WrapperType::FunctionReference: {
+            FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
+            if (funcWrapper->Function() != nullptr) {
+                funcWrapper->Function()->Reset();
+            }
+            break;
+        }
+
         default:
             break;
     }

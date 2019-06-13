@@ -15,6 +15,8 @@
 		C266569422AFFF7E00EE15CC /* Pointer.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569222AFFF7E00EE15CC /* Pointer.h */; };
 		C266569722AFFFB000EE15CC /* Reference.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C266569522AFFFB000EE15CC /* Reference.cpp */; };
 		C266569822AFFFB000EE15CC /* Reference.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569622AFFFB000EE15CC /* Reference.h */; };
+		C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C266569C22B282BA00EE15CC /* FunctionReference.cpp */; };
+		C266569F22B282BA00EE15CC /* FunctionReference.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569D22B282BA00EE15CC /* FunctionReference.h */; };
 		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
 		C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */; };
@@ -144,6 +146,8 @@
 		C266569222AFFF7E00EE15CC /* Pointer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Pointer.h; sourceTree = "<group>"; };
 		C266569522AFFFB000EE15CC /* Reference.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Reference.cpp; sourceTree = "<group>"; };
 		C266569622AFFFB000EE15CC /* Reference.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Reference.h; sourceTree = "<group>"; };
+		C266569C22B282BA00EE15CC /* FunctionReference.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FunctionReference.cpp; sourceTree = "<group>"; };
+		C266569D22B282BA00EE15CC /* FunctionReference.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FunctionReference.h; sourceTree = "<group>"; };
 		C293748C229EC6780075CB16 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
 		C29374E2229FC0F60075CB16 /* libTestFixtures.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTestFixtures.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		C29374EC229FC1600075CB16 /* TNSMethodCalls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSMethodCalls.h; sourceTree = "<group>"; };
@@ -457,6 +461,8 @@
 				C2DDEB8B229EAC8300345BFE /* DictionaryAdapter.mm */,
 				C2DDEB78229EAC8200345BFE /* FFICall.h */,
 				C2DDEB68229EAC8100345BFE /* FFICall.cpp */,
+				C266569D22B282BA00EE15CC /* FunctionReference.h */,
+				C266569C22B282BA00EE15CC /* FunctionReference.cpp */,
 				C2DDEB6D229EAC8200345BFE /* Helpers.h */,
 				C2DDEB7D229EAC8200345BFE /* Helpers.mm */,
 				C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */,
@@ -604,6 +610,7 @@
 				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
 				C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */,
 				C2DDEB60229EAC3C00345BFE /* snapshot_blob.x86_64.h in Headers */,
+				C266569F22B282BA00EE15CC /* FunctionReference.h in Headers */,
 				C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */,
 				C2DDEBC1229EB02500345BFE /* v8config.h in Headers */,
 				C2DDEBD6229EB06E00345BFE /* ffi.h in Headers */,
@@ -821,6 +828,7 @@
 				C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */,
 				C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */,
 				C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */,
+				C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */,
 				C2DDEBB5229EAC8300345BFE /* Tasks.cpp in Sources */,
 				C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */,
 			);

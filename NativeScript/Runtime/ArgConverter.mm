@@ -123,16 +123,54 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             assert(false);
         }
 
-        if (!result.IsEmpty() && !result->IsUndefined()) {
-            if (result->IsNumber() || result->IsNumberObject()) {
-                if (data->typeEncoding_->type == BinaryTypeEncodingType::LongEncoding) {
-                    long value = result.As<Number>()->Value();
-                    *static_cast<long*>(retValue) = value;
-                    return;
-                } else if (data->typeEncoding_->type == BinaryTypeEncodingType::DoubleEncoding) {
-                    double value = result.As<Number>()->Value();
-                    *static_cast<double*>(retValue) = value;
-                    return;
+        if (!result.IsEmpty() && !result->IsNullOrUndefined()) {
+            // TODO: Refactor this to reuse some existing logic in Interop::SetFFIParams
+
+            if (tns::IsNumber(result)) {
+                double value = tns::ToNumber(result);
+                switch (data->typeEncoding_->type) {
+                    case BinaryTypeEncodingType::UShortEncoding: {
+                        *static_cast<unsigned short*>(retValue) = (unsigned short)value;
+                        return;
+                    }
+                    case BinaryTypeEncodingType::ShortEncoding: {
+                        *static_cast<short*>(retValue) = (short)value;
+                        return;
+                    }
+                    case BinaryTypeEncodingType::UIntEncoding: {
+                        *static_cast<unsigned int*>(retValue) = (unsigned int)value;
+                        return;
+                    }
+                    case BinaryTypeEncodingType::IntEncoding: {
+                        *static_cast<int*>(retValue) = (int)value;
+                        return;
+                    }
+                    case BinaryTypeEncodingType::ULongEncoding: {
+                        *static_cast<unsigned long*>(retValue) = (unsigned long)value;
+                        return;
+                    }
+                    case BinaryTypeEncodingType::LongEncoding: {
+                        *static_cast<long*>(retValue) = (long)value;
+                        return;
+                    }
+                    case BinaryTypeEncodingType::ULongLongEncoding: {
+                        *static_cast<unsigned long long*>(retValue) = (unsigned long long)value;
+                        return;
+                    }
+                    case BinaryTypeEncodingType::LongLongEncoding: {
+                        *static_cast<long long*>(retValue) = (long long)value;
+                        return;
+                    }
+                    case BinaryTypeEncodingType::FloatEncoding: {
+                        *static_cast<float*>(retValue) = (float)value;
+                        return;
+                    }
+                    case BinaryTypeEncodingType::DoubleEncoding: {
+                        *static_cast<double*>(retValue) = value;
+                        return;
+                    }
+                    default:
+                        break;
                 }
             } else if (result->IsObject()) {
                 if (data->typeEncoding_->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||

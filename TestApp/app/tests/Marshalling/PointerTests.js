@@ -104,7 +104,8 @@ describe(module.id, function () {
 
         expect(interop.handleof(TNSBaseProtocol1) instanceof interop.Pointer).toBe(true);
         expect(interop.handleof(functionWithInt) instanceof interop.Pointer).toBe(true);
-        // expect(interop.handleof(TNSObjCTypes.alloc().init().methodWithBlockScope(4)) instanceof interop.Pointer).toBe(true);
+        expect(interop.handleof(TNSObjCTypes.alloc().init().methodWithBlock(() => {})) instanceof interop.Pointer).toBe(true);
+        expect(interop.handleof(TNSObjCTypes.alloc().init().methodWithBlockScope(4)) instanceof interop.Pointer).toBe(true);
 
         expect(interop.handleof(new TNSSimpleStruct()) instanceof interop.Pointer).toBe(true);
         expect(interop.handleof(interop.alloc(4)) instanceof interop.Pointer).toBe(true);
@@ -116,13 +117,13 @@ describe(module.id, function () {
         functionWithIntPtr(reference);
         expect(interop.handleof(reference) instanceof interop.Pointer).toBe(true);
 
-        // var functionReference = new interop.FunctionReference(function () {
-        // });
+        var functionReference = new interop.FunctionReference(function () {
+        });
         // expect(function () {
         //     interop.handleof(functionReference);
         // }).toThrowError();
-        // functionWithSimpleFunctionPointer(functionReference);
-        // expect(interop.handleof(functionReference) instanceof interop.Pointer).toBe(true);
+        functionWithSimpleFunctionPointer(functionReference);
+        expect(interop.handleof(functionReference) instanceof interop.Pointer).toBe(true);
 
         expect(interop.handleof(null)).toBe(null);
     });
@@ -136,14 +137,15 @@ describe(module.id, function () {
 
         expect(interop.sizeof(TNSBaseProtocol1)).toBeGreaterThan(0);
         expect(interop.sizeof(functionWithInt)).toBeGreaterThan(0);
-        // expect(interop.sizeof(TNSObjCTypes.alloc().init().methodWithBlockScope(4))).toBeGreaterThan(0);
+        expect(interop.sizeof(TNSObjCTypes.alloc().init().methodWithBlock(() => {}))).toBeGreaterThan(0);
+        expect(interop.sizeof(TNSObjCTypes.alloc().init().methodWithBlockScope(4))).toBeGreaterThan(0);
 
         expect(interop.sizeof(interop.Reference)).toBeGreaterThan(0);
         expect(interop.sizeof(new interop.Reference())).toBeGreaterThan(0);
 
-        // expect(interop.sizeof(interop.FunctionReference)).toBeGreaterThan(0);
-        // expect(interop.sizeof(new interop.FunctionReference(function () {
-        // }))).toBeGreaterThan(0);
+        expect(interop.sizeof(interop.FunctionReference)).toBeGreaterThan(0);
+        expect(interop.sizeof(new interop.FunctionReference(function () {
+        }))).toBeGreaterThan(0);
 
         expect(interop.sizeof(interop.Pointer)).toBeGreaterThan(0);
         expect(interop.sizeof(new interop.Pointer(0xFFFFFF))).toBeGreaterThan(0);

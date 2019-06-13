@@ -8,6 +8,7 @@
 #include "ArrayAdapter.h"
 #include "NSDataAdapter.h"
 #include "Caches.h"
+#include "FunctionReference.h"
 #include "Reference.h"
 #include "Pointer.h"
 
@@ -31,6 +32,7 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
 
     Reference::Register(isolate, interop);
     Pointer::Register(isolate, interop);
+    FunctionReference::Register(isolate, interop);
     RegisterBufferFromDataFunction(isolate, interop);
     RegisterHandleOfFunction(isolate, interop);
     RegisterAllocFunction(isolate, interop);
@@ -144,8 +146,10 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
                         }
                         case WrapperType::Reference: {
                             ReferenceWrapper* w = static_cast<ReferenceWrapper*>(wrapper);
-                            handle = w->Data();
-                            hasHandle = true;
+                            if (w->Data() != nullptr) {
+                                handle = w->Data();
+                                hasHandle = true;
+                            }
                             break;
                         }
                         case WrapperType::Pointer: {
@@ -158,6 +162,20 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
                             FunctionWrapper* w = static_cast<FunctionWrapper*>(wrapper);
                             const FunctionMeta* meta = w->Meta();
                             handle = SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
+                            hasHandle = true;
+                            break;
+                        }
+                        case WrapperType::FunctionReference: {
+                            FunctionReferenceWrapper* w = static_cast<FunctionReferenceWrapper*>(wrapper);
+                            if (w->Data() != nullptr) {
+                                handle = w->Data();
+                                hasHandle = true;
+                            }
+                            break;
+                        }
+                        case WrapperType::Block: {
+                            BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
+                            handle = blockWrapper->Block();
                             hasHandle = true;
                             break;
                         }
@@ -237,6 +255,9 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
                         case WrapperType::Pointer:
                         case WrapperType::Reference:
                         case WrapperType::ReferenceType:
+                        case WrapperType::Block:
+                        case WrapperType::FunctionReference:
+                        case WrapperType::FunctionReferenceType:
                         case WrapperType::Function: {
                             size = sizeof(void*);
                             break;
@@ -374,21 +395,38 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         }
     } else if (typeEncoding->type == BinaryTypeEncodingType::PointerEncoding) {
         const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, arg.As<Object>());
+        assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
 
-        Local<External> ext = arg.As<Object>()->GetInternalField(0).As<External>();
-        ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(ext->Value());
+        ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
 
         ffi_type* ffiType = FFICall::GetArgumentType(innerType);
         void* data = calloc(ffiType->size, 1);
 
-        if (wrapper->Value() != nullptr) {
+        if (referenceWrapper->Value() != nullptr) {
             // Initialize the ref/out parameter value before passing it to the function call
-            Interop::WriteValue(isolate, innerType, data, wrapper->Value()->Get(isolate));
+            Interop::WriteValue(isolate, innerType, data, referenceWrapper->Value()->Get(isolate));
         }
 
-        wrapper->SetData(data);
-        wrapper->SetEncoding(innerType);
+        referenceWrapper->SetData(data);
+        referenceWrapper->SetEncoding(innerType);
         Interop::SetValue(dest, data);
+    } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::FunctionPointerEncoding) {
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, arg.As<Object>());
+        assert(wrapper != nullptr && wrapper->Type() == WrapperType::FunctionReference);
+        FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
+        const TypeEncoding* functionTypeEncoding = typeEncoding->details.functionPointer.signature.first();
+        int argsCount = typeEncoding->details.block.signature.count - 1;
+
+        Local<v8::Function> callback = funcWrapper->Function()->Get(isolate);
+        Persistent<Value>* poCallback = new Persistent<Value>(isolate, callback);
+        MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 0, argsCount, functionTypeEncoding);
+
+        void* functionPointer = (void*)Interop::CreateMethod(0, argsCount, functionTypeEncoding, ArgConverter::MethodCallback, userData);
+
+        funcWrapper->SetData(functionPointer);
+
+        Interop::SetValue(dest, functionPointer);
     } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
         const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
         int argsCount = typeEncoding->details.block.signature.count - 1;
@@ -396,6 +434,10 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         Persistent<Value>* poCallback = new Persistent<Value>(isolate, arg);
         MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
         CFTypeRef blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
+
+        BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding);
+        tns::SetValue(isolate, arg.As<Object>(), wrapper);
+
         Interop::SetValue(dest, blockPtr);
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         Local<Object> obj = arg.As<Object>();
@@ -654,7 +696,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         }
 
         Local<Context> context = isolate->GetCurrentContext();
-        BlockDataWrapper* blockWrapper = new BlockDataWrapper(block, typeEncoding);
+        BlockWrapper* blockWrapper = new BlockWrapper(block, typeEncoding);
         Local<External> ext = External::New(isolate, blockWrapper);
         Local<v8::Function> callback;
 
@@ -662,7 +704,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
             Local<External> ext = info.Data().As<External>();
-            BlockDataWrapper* wrapper = static_cast<BlockDataWrapper*>(ext->Value());
+            BlockWrapper* wrapper = static_cast<BlockWrapper*>(ext->Value());
 
             JSBlock* block = static_cast<JSBlock*>(wrapper->Block());
 
@@ -689,6 +731,8 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&callback);
         assert(success);
+
+        tns::SetValue(isolate, callback, blockWrapper);
 
         return callback;
     }
