@@ -10,13 +10,21 @@
 		C266567822AA405100EE15CC /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C266567722AA405100EE15CC /* Default-568h@2x.png */; };
 		C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C266567922AA630F00EE15CC /* NSDataAdapter.mm */; };
 		C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C266567A22AA630F00EE15CC /* NSDataAdapter.h */; };
-		C266569022AFE1A700EE15CC /* libv8.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C266568F22AFE1A600EE15CC /* libv8.a */; };
 		C266569322AFFF7E00EE15CC /* Pointer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C266569122AFFF7E00EE15CC /* Pointer.cpp */; };
 		C266569422AFFF7E00EE15CC /* Pointer.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569222AFFF7E00EE15CC /* Pointer.h */; };
 		C266569722AFFFB000EE15CC /* Reference.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C266569522AFFFB000EE15CC /* Reference.cpp */; };
 		C266569822AFFFB000EE15CC /* Reference.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569622AFFFB000EE15CC /* Reference.h */; };
 		C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C266569C22B282BA00EE15CC /* FunctionReference.cpp */; };
 		C266569F22B282BA00EE15CC /* FunctionReference.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569D22B282BA00EE15CC /* FunctionReference.h */; };
+		C26656A922B3760800EE15CC /* libv8_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A022B3760800EE15CC /* libv8_compiler.a */; };
+		C26656AA22B3760900EE15CC /* libv8_base_without_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A122B3760800EE15CC /* libv8_base_without_compiler.a */; };
+		C26656AB22B3760900EE15CC /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A222B3760800EE15CC /* libv8_libsampler.a */; };
+		C26656AC22B3760900EE15CC /* libv8_libbase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A322B3760800EE15CC /* libv8_libbase.a */; };
+		C26656AD22B3760900EE15CC /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A422B3760800EE15CC /* libv8_external_snapshot.a */; };
+		C26656AE22B3760900EE15CC /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A522B3760800EE15CC /* libv8_libplatform.a */; };
+		C26656AF22B3760900EE15CC /* libv8_init.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A622B3760800EE15CC /* libv8_init.a */; };
+		C26656B022B3760900EE15CC /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A722B3760800EE15CC /* libv8_initializers.a */; };
+		C26656B122B3760900EE15CC /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */; };
 		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
 		C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */; };
@@ -141,13 +149,21 @@
 		C266567722AA405100EE15CC /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		C266567922AA630F00EE15CC /* NSDataAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NSDataAdapter.mm; sourceTree = "<group>"; };
 		C266567A22AA630F00EE15CC /* NSDataAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NSDataAdapter.h; sourceTree = "<group>"; };
-		C266568F22AFE1A600EE15CC /* libv8.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8.a; sourceTree = "<group>"; };
 		C266569122AFFF7E00EE15CC /* Pointer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Pointer.cpp; sourceTree = "<group>"; };
 		C266569222AFFF7E00EE15CC /* Pointer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Pointer.h; sourceTree = "<group>"; };
 		C266569522AFFFB000EE15CC /* Reference.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Reference.cpp; sourceTree = "<group>"; };
 		C266569622AFFFB000EE15CC /* Reference.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Reference.h; sourceTree = "<group>"; };
 		C266569C22B282BA00EE15CC /* FunctionReference.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FunctionReference.cpp; sourceTree = "<group>"; };
 		C266569D22B282BA00EE15CC /* FunctionReference.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FunctionReference.h; sourceTree = "<group>"; };
+		C26656A022B3760800EE15CC /* libv8_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_compiler.a; sourceTree = "<group>"; };
+		C26656A122B3760800EE15CC /* libv8_base_without_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base_without_compiler.a; sourceTree = "<group>"; };
+		C26656A222B3760800EE15CC /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
+		C26656A322B3760800EE15CC /* libv8_libbase.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libbase.a; sourceTree = "<group>"; };
+		C26656A422B3760800EE15CC /* libv8_external_snapshot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_external_snapshot.a; sourceTree = "<group>"; };
+		C26656A522B3760800EE15CC /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
+		C26656A622B3760800EE15CC /* libv8_init.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_init.a; sourceTree = "<group>"; };
+		C26656A722B3760800EE15CC /* libv8_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_initializers.a; sourceTree = "<group>"; };
+		C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
 		C293748C229EC6780075CB16 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
 		C29374E2229FC0F60075CB16 /* libTestFixtures.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTestFixtures.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		C29374EC229FC1600075CB16 /* TNSMethodCalls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSMethodCalls.h; sourceTree = "<group>"; };
@@ -287,8 +303,16 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C266569022AFE1A700EE15CC /* libv8.a in Frameworks */,
+				C26656B022B3760900EE15CC /* libv8_initializers.a in Frameworks */,
+				C26656AA22B3760900EE15CC /* libv8_base_without_compiler.a in Frameworks */,
 				C2DDEBD7229EB1C500345BFE /* UIKit.framework in Frameworks */,
+				C26656AE22B3760900EE15CC /* libv8_libplatform.a in Frameworks */,
+				C26656A922B3760800EE15CC /* libv8_compiler.a in Frameworks */,
+				C26656B122B3760900EE15CC /* libtorque_generated_initializers.a in Frameworks */,
+				C26656AD22B3760900EE15CC /* libv8_external_snapshot.a in Frameworks */,
+				C26656AB22B3760900EE15CC /* libv8_libsampler.a in Frameworks */,
+				C26656AC22B3760900EE15CC /* libv8_libbase.a in Frameworks */,
+				C26656AF22B3760900EE15CC /* libv8_init.a in Frameworks */,
 				C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -514,7 +538,15 @@
 		C2DDEB3D229EABBB00345BFE /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				C266568F22AFE1A600EE15CC /* libv8.a */,
+				C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */,
+				C26656A122B3760800EE15CC /* libv8_base_without_compiler.a */,
+				C26656A022B3760800EE15CC /* libv8_compiler.a */,
+				C26656A422B3760800EE15CC /* libv8_external_snapshot.a */,
+				C26656A622B3760800EE15CC /* libv8_init.a */,
+				C26656A722B3760800EE15CC /* libv8_initializers.a */,
+				C26656A322B3760800EE15CC /* libv8_libbase.a */,
+				C26656A522B3760800EE15CC /* libv8_libplatform.a */,
+				C26656A222B3760800EE15CC /* libv8_libsampler.a */,
 				C2DDEB3E229EABFF00345BFE /* libffi.a */,
 			);
 			path = Frameworks;
