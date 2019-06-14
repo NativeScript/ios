@@ -25,6 +25,7 @@
 		C26656AF22B3760900EE15CC /* libv8_init.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A622B3760800EE15CC /* libv8_init.a */; };
 		C26656B022B3760900EE15CC /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A722B3760800EE15CC /* libv8_initializers.a */; };
 		C26656B122B3760900EE15CC /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */; };
+		C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */ = {isa = PBXBuildFile; fileRef = C26656B222B3768C00EE15CC /* InteropTypes.mm */; };
 		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
 		C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */; };
@@ -164,6 +165,7 @@
 		C26656A622B3760800EE15CC /* libv8_init.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_init.a; sourceTree = "<group>"; };
 		C26656A722B3760800EE15CC /* libv8_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_initializers.a; sourceTree = "<group>"; };
 		C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
+		C26656B222B3768C00EE15CC /* InteropTypes.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = InteropTypes.mm; sourceTree = "<group>"; };
 		C293748C229EC6780075CB16 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
 		C29374E2229FC0F60075CB16 /* libTestFixtures.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTestFixtures.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		C29374EC229FC1600075CB16 /* TNSMethodCalls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSMethodCalls.h; sourceTree = "<group>"; };
@@ -494,6 +496,7 @@
 				C2DDEB65229EAC8100345BFE /* Interop.h */,
 				C293752D22A10C490075CB16 /* Interop_impl.h */,
 				C2DDEB77229EAC8200345BFE /* Interop.mm */,
+				C26656B222B3768C00EE15CC /* InteropTypes.mm */,
 				C2DDEB6E229EAC8200345BFE /* Metadata.h */,
 				C2DDEB70229EAC8200345BFE /* Metadata.mm */,
 				C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */,
@@ -855,6 +858,7 @@
 				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,
 				C293752E22A10C490075CB16 /* Interop_impl.h in Sources */,
 				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,
+				C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */,
 				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
 				C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */,
 				C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */,
