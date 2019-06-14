@@ -21,9 +21,9 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "Reference"));
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
-    proto->SetAccessor(tns::ToV8String(isolate, "value"), ValueCallback);
-
     Local<Context> context = isolate->GetCurrentContext();
+    proto->SetAccessor(tns::ToV8String(isolate, "value"), GetValueCallback, SetValueCallback);
+
     Local<v8::Function> ctorFunc;
     if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
         assert(false);
@@ -54,10 +54,11 @@ void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& 
     ObjectManager::Register(isolate, thiz);
 }
 
-void Reference::ValueCallback(Local<v8::String> property, const PropertyCallbackInfo<Value>& info) {
+void Reference::GetValueCallback(Local<Name> name, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
-    Local<External> ext = info.This()->GetInternalField(0).As<External>();
-    ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(ext->Value());
+    BaseDataWrapper* baseWrapper = tns::GetValue(isolate, info.This());
+    assert(baseWrapper->Type() == WrapperType::Reference);
+    ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
     Local<Value> result = Reference::GetInteropReferenceValue(isolate, wrapper);
 
     if (!result.IsEmpty()) {
@@ -67,35 +68,65 @@ void Reference::ValueCallback(Local<v8::String> property, const PropertyCallback
     }
 }
 
-Local<Value> Reference::GetInteropReferenceValue(Isolate* isolate, ReferenceWrapper* wrapper) {
-    if (wrapper->Data() == nullptr) {
-        if (wrapper->Value() == nullptr) {
-            return Local<Value>();
-        }
+void Reference::SetValueCallback(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<void>& info) {
+    Isolate* isolate = info.GetIsolate();
 
-        Local<Value> result = wrapper->Value()->Get(isolate);
-
-        if (result->IsObject() && result.As<Object>()->InternalFieldCount() > 0) {
-            Local<Value> internalField = result.As<Object>()->GetInternalField(0);
-            if (!internalField.IsEmpty() && internalField->IsExternal()) {
-                Local<External> ext = internalField.As<External>();
-                BaseDataWrapper* w = static_cast<BaseDataWrapper*>(ext->Value());
-                if (w->Type() == WrapperType::Reference) {
-                    ReferenceWrapper* rw = static_cast<ReferenceWrapper*>(w);
-                    return Reference::GetInteropReferenceValue(isolate, rw);
-                }
-            }
-        }
-
-        return result;
+    BaseDataWrapper* baseWrapper = tns::GetValue(isolate, info.This());
+    assert(baseWrapper->Type() == WrapperType::Reference);
+    ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
+    if (wrapper->Data() != nullptr) {
+        std::free(wrapper->Data());
+        wrapper->SetData(nullptr);
     }
 
-    const TypeEncoding* encoding = wrapper->Encoding();
-    uint8_t* data = (uint8_t*)wrapper->Data();
+    BaseDataWrapper* argWrapper = tns::GetValue(isolate, value);
 
-    BaseCall call(data);
-    Local<Value> jsResult = Interop::GetResult(isolate, encoding, &call, true);
-    return jsResult;
+    if (argWrapper != nullptr && argWrapper->Type() == WrapperType::Pointer) {
+        PointerWrapper* pw = static_cast<PointerWrapper*>(argWrapper);
+        pw->SetData(pw->Data());
+    } else {
+        Persistent<Value>* poValue = new Persistent<Value>(isolate, value);
+        wrapper->SetValue(poValue);
+
+        const TypeEncoding* typeEncoding = wrapper->Encoding();
+        if (typeEncoding != nullptr) {
+            ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
+            void* data = calloc(ffiType->size, 1);
+            Interop::WriteValue(isolate, typeEncoding, data, value);
+            wrapper->SetData(data);
+        }
+    }
+}
+
+Local<Value> Reference::GetInteropReferenceValue(Isolate* isolate, ReferenceWrapper* wrapper) {
+    if (wrapper->Data() != nullptr) {
+        const TypeEncoding* encoding = wrapper->Encoding();
+        uint8_t* data = (uint8_t*)wrapper->Data();
+
+        BaseCall call(data);
+        Local<Value> jsResult = Interop::GetResult(isolate, encoding, &call, true);
+        return jsResult;
+    }
+
+    if (wrapper->Value() == nullptr) {
+        return Local<Value>();
+    }
+
+    Local<Value> result = wrapper->Value()->Get(isolate);
+
+    if (result->IsObject() && result.As<Object>()->InternalFieldCount() > 0) {
+        Local<Value> internalField = result.As<Object>()->GetInternalField(0);
+        if (!internalField.IsEmpty() && internalField->IsExternal()) {
+            Local<External> ext = internalField.As<External>();
+            BaseDataWrapper* w = static_cast<BaseDataWrapper*>(ext->Value());
+            if (w->Type() == WrapperType::Reference) {
+                ReferenceWrapper* rw = static_cast<ReferenceWrapper*>(w);
+                return Reference::GetInteropReferenceValue(isolate, rw);
+            }
+        }
+    }
+
+    return result;
 }
 
 void Reference::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype) {

@@ -23,6 +23,7 @@ public:
     static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, ffi_type* structFieldFFIType = nullptr);
     static void SetStructPropertyValue(StructWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer);
+    static void WriteValue(v8::Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, v8::Local<v8::Value> arg);
 private:
     static v8::Persistent<v8::Function>* sliceFunc_;
 
@@ -33,12 +34,12 @@ private:
     static void RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void RegisterHandleOfFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void RegisterAllocFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
+    static void RegisterFreeFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
+    static void RegisterAdoptFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void RegisterSizeOfFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static void SetFFIParams(v8::Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<v8::Local<v8::Value>> args);
     static v8::Local<v8::Array> ToArray(v8::Isolate* isolate, v8::Local<v8::Object> object);
     static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call);
-
-    static void WriteValue(v8::Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, v8::Local<v8::Value> arg);
 
     template <typename T>
     static void SetValue(void* dest, T value) {

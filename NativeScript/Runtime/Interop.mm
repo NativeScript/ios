@@ -9,6 +9,7 @@
 #include "NSDataAdapter.h"
 #include "Caches.h"
 #include "Reference.h"
+#include "Pointer.h"
 
 using namespace v8;
 
@@ -128,21 +129,28 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
     } else if (typeEncoding->type == BinaryTypeEncodingType::PointerEncoding) {
         const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg.As<Object>());
-        assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
+        if (innerType->type == BinaryTypeEncodingType::VoidEncoding) {
+            assert(wrapper != nullptr && wrapper->Type() == WrapperType::Pointer);
+            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+            void* data = pointerWrapper->Data();
+            Interop::SetValue(dest, data);
+        } else {
+            assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
 
-        ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
+            ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
 
-        ffi_type* ffiType = FFICall::GetArgumentType(innerType);
-        void* data = calloc(ffiType->size, 1);
+            ffi_type* ffiType = FFICall::GetArgumentType(innerType);
+            void* data = calloc(ffiType->size, 1);
 
-        if (referenceWrapper->Value() != nullptr) {
-            // Initialize the ref/out parameter value before passing it to the function call
-            Interop::WriteValue(isolate, innerType, data, referenceWrapper->Value()->Get(isolate));
+            if (referenceWrapper->Value() != nullptr) {
+                // Initialize the ref/out parameter value before passing it to the function call
+                Interop::WriteValue(isolate, innerType, data, referenceWrapper->Value()->Get(isolate));
+            }
+
+            referenceWrapper->SetData(data);
+            referenceWrapper->SetEncoding(innerType);
+            Interop::SetValue(dest, data);
         }
-
-        referenceWrapper->SetData(data);
-        referenceWrapper->SetEncoding(innerType);
-        Interop::SetValue(dest, data);
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::FunctionPointerEncoding) {
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg.As<Object>());
         assert(wrapper != nullptr && wrapper->Type() == WrapperType::FunctionReference);
@@ -238,27 +246,26 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             if (klass == [NSArray class]) {
                 Local<v8::Array> array = Interop::ToArray(isolate, obj);
                 ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
-                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Object>(isolate, obj)));
+                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
                 return;
             } else if ((klass == [NSData class] || klass == [NSMutableData class]) && (arg->IsArrayBuffer() || arg->IsArrayBufferView())) {
                 Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
                 NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
-                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Object>(isolate, obj)));
+                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
                 return;
             } else if (klass == [NSDictionary class]) {
                 DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
-                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Object>(isolate, obj)));
+                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
                 return;
             }
         }
 
-        assert(obj->InternalFieldCount() > 0);
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
+        assert(wrapper != nullptr);
 
-        Local<External> ext = obj->GetInternalField(0).As<External>();
-        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
         if (wrapper->Type() == WrapperType::Enum) {
             EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
             Local<Context> context = isolate->GetCurrentContext();
@@ -278,10 +285,14 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
 
             double value = result.As<Number>()->Value();
             SetValue(dest, value);
+        } else if (wrapper->Type() == WrapperType::Pointer) {
+            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+            void* data = pointerWrapper->Data();
+            Interop::SetValue(dest, data);
         } else {
             ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
             id data = objCDataWrapper->Data();
-            SetValue(dest, data);
+            Interop::SetValue(dest, data);
         }
     } else {
         assert(false);
@@ -471,10 +482,19 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
     if (typeEncoding->type == BinaryTypeEncodingType::PointerEncoding) {
         uint8_t* result = call->GetResult<uint8_t*>();
+        if (result == nullptr) {
+            return Null(isolate);
+        }
 
-        const TypeEncoding* enc = typeEncoding->details.pointer.getInnerType();
+        const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
+
+        if (innerType->type == BinaryTypeEncodingType::VoidEncoding) {
+            Local<Value> instance = Pointer::NewInstance(isolate, result);
+            return instance;
+        }
+
         BaseCall c(result);
-        Local<Value> value = Interop::GetResult(isolate, enc, &c, true);
+        Local<Value> value = Interop::GetResult(isolate, innerType, &c, true);
 
         Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
         Local<Value> args[1] = { value };

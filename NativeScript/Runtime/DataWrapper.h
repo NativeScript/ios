@@ -109,7 +109,7 @@ public:
 
 class ReferenceWrapper: public BaseDataWrapper {
 public:
-    ReferenceWrapper(v8::Persistent<v8::Value>* value): BaseDataWrapper(std::string()), value_(value), data_(nullptr) {
+    ReferenceWrapper(v8::Persistent<v8::Value>* value): BaseDataWrapper(std::string()), value_(value), encoding_(nullptr), data_(nullptr) {
     }
 
     WrapperType Type() {
@@ -118,6 +118,13 @@ public:
 
     v8::Persistent<v8::Value>* Value() {
         return this->value_;
+    }
+
+    void SetValue(v8::Persistent<v8::Value>* value) {
+        if (this->value_ != nullptr) {
+            this->value_->Reset();
+        }
+        this->value_ = value;
     }
 
     const TypeEncoding* Encoding() {
@@ -143,23 +150,22 @@ private:
 
 class PrimitiveDataWrapper: public BaseDataWrapper {
 public:
-    PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType encodingType): BaseDataWrapper(std::string()), encodingType_(encodingType) {
-        value_ = calloc(1, size);
+    PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType encodingType): BaseDataWrapper(std::string()), size_(size), encodingType_(encodingType) {
     }
 
     WrapperType Type() {
         return WrapperType::Primitive;
     }
 
-    void* Value() {
-        return this->value_;
+    size_t Size() {
+        return this->size_;
     }
 
     BinaryTypeEncodingType EncodingType() {
         return this->encodingType_;
     }
 private:
-    void* value_;
+    size_t size_;
     BinaryTypeEncodingType encodingType_;
 };
 

@@ -9,52 +9,52 @@ describe(module.id, function () {
         expect(reference.toString()).toBe('<Reference: 0x0>');
     });
 
-    // it("ReferenceValue", function () {
-    //     var reference = new interop.Reference();
-    //     expect(reference.value).toBeUndefined();
-    //     expect(function () {
-    //         interop.handleof(reference);
-    //     }).toThrow();
+    it("ReferenceValue", function () {
+        var reference = new interop.Reference();
+        expect(reference.value).toBeUndefined();
+        // expect(function () {
+        //     interop.handleof(reference);
+        // }).toThrow();
 
-    //     reference.value = 5;
-    //     expect(reference.value).toBe(5);
+        reference.value = 5;
+        expect(reference.value).toBe(5);
 
-    //     functionWithIntPtr(reference);
-    //     expect(reference.value).toBe(5);
-    //     expect(interop.handleof(reference) instanceof interop.Pointer).toBe(true);
+        functionWithIntPtr(reference);
+        expect(reference.value).toBe(5);
+        expect(interop.handleof(reference) instanceof interop.Pointer).toBe(true);
 
-    //     reference.value = 10;
-    //     expect(reference.value).toBe(10);
-    //     expect(interop.handleof(reference) instanceof interop.Pointer).toBe(true);
+        reference.value = 10;
+        expect(reference.value).toBe(10);
+        expect(interop.handleof(reference) instanceof interop.Pointer).toBe(true);
 
-    //     var oldHandle = interop.handleof(reference);
-    //     functionWithIntPtr(reference);
-    //     expect(oldHandle).toBe(interop.handleof(reference));
-    //     expect(reference.value).toBe(10);
+        var oldHandle = interop.handleof(reference);
+        functionWithIntPtr(reference);
+        // expect(oldHandle).toBe(interop.handleof(reference));
+        expect(reference.value).toBe(10);
 
-    //     expect(TNSGetOutput()).toBe('510');
-    // });
+        expect(TNSGetOutput()).toBe('510');
+    });
 
-    // it("LiveReference", function () {
-    //     var manager = new TNSPointerManager();
-    //     expect(manager.data().value).toBe(0);
+    it("LiveReference", function () {
+        var manager = new TNSPointerManager();
+        expect(manager.data().value).toBe(0);
 
-    //     manager.increment();
-    //     expect(manager.data().value).toBe(1);
+        manager.increment();
+        expect(manager.data().value).toBe(1);
 
-    //     manager.increment();
-    //     expect(manager.data().value).toBe(2);
-    // });
+        manager.increment();
+        expect(manager.data().value).toBe(2);
+    });
 
-    // it("NullPtr", function () {
-    //     expect(functionWithNullPointer(null)).toBeNull();
-    //     expect(TNSGetOutput()).toBe('0x0');
-    // });
+    it("NullPtr", function () {
+        expect(functionWithNullPointer(null)).toBeNull();
+        expect(TNSGetOutput()).toBe('0x0');
+    });
 
-    // it("functionWith_VoidPtr", function () {
-    //     expect(functionWith_VoidPtr(interop.alloc(4)) instanceof interop.Pointer).toBe(true);
-    //     expect(TNSGetOutput().length).toBeGreaterThan(0);
-    // });
+    it("functionWith_VoidPtr", function () {
+        expect(functionWith_VoidPtr(interop.alloc(4)) instanceof interop.Pointer).toBe(true);
+        expect(TNSGetOutput().length).toBeGreaterThan(0);
+    });
 
     it("functionWith_BoolPtr", function () {
         expect(functionWith_BoolPtr(new interop.Reference(true)).value).toBe(true);
@@ -247,21 +247,21 @@ describe(module.id, function () {
         TNSClearOutput();
     });
 
-    // it("CastPointerToNSObject", function () {
-    //     var x = NSObject.alloc().init();
-    //     var y = NSObject(interop.handleof(x));
-    //     expect(x).toBe(y);
-    //     expect(x.toString()).toBe(y.toString());
-    //     expect(interop.handleof(x)).toBe(interop.handleof(y));
-    // });
+    it("CastPointerToNSObject", function () {
+        var x = NSObject.alloc().init();
+        var y = new NSObject(interop.handleof(x));
+        expect(x).toBe(y);
+        expect(x.toString()).toBe(y.toString());
+        expect(interop.handleof(x)).toBe(interop.handleof(y));
+    });
 
-    // it("ImplicitPointerToId", function () {
-    //     var array = NSMutableArray.alloc().init();
-    //     var object = new NSObject();
-    //     array.addObject(interop.handleof(object));
+    it("ImplicitPointerToId", function () {
+        var array = NSMutableArray.alloc().init();
+        var object = new NSObject();
+        array.addObject(interop.handleof(object));
 
-    //     expect(array.firstObject).toBe(object);
-    // });
+        expect(array.firstObject).toBe(object);
+    });
 
     describe("ReferenceConstructor", function () {
         it("should accept empty arguments", function () {

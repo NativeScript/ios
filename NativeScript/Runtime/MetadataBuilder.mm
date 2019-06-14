@@ -2,6 +2,7 @@
 #include <map>
 #include "MetadataBuilder.h"
 #include "ArgConverter.h"
+#include "ObjectManager.h"
 #include "SymbolLoader.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
@@ -537,20 +538,44 @@ void MetadataBuilder::RegisterStaticProtocols(Local<v8::Function> ctorFunc, cons
 }
 
 void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
-//    assert(info.Length() == 0);
+    assert(info.IsConstructCall());
+
     Isolate* isolate = info.GetIsolate();
+
+    id obj = nil;
+
+    if (info.Length() == 1) {
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, info[0]);
+        if (wrapper != nullptr && wrapper->Type() == WrapperType::Pointer) {
+            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+            obj = CFBridgingRelease(pointerWrapper->Data());
+        }
+    }
 
     CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
     const BaseClassMeta* meta = item->meta_;
 
     assert(meta->type() == MetaType::Interface);
 
-    NSString* className = [NSString stringWithUTF8String:meta->name()];
-    Class klass = NSClassFromString(className);
-    id obj = [[klass alloc] init];
+    if (obj == nil) {
+        Class klass = objc_getClass(meta->name());
+        obj = [[klass alloc] init];
+    }
 
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(meta->name(), obj);
-    ArgConverter::CreateJsWrapper(isolate, wrapper, info.This());
+
+    Local<Object> thiz = info.This();
+    ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
+
+    Persistent<Value>* poThiz = ObjectManager::Register(isolate, thiz);
+
+    auto it = Caches::Instances.find(obj);
+    if (it == Caches::Instances.end()) {
+        Caches::Instances.insert(std::make_pair(obj, poThiz));
+    } else {
+        Local<Value> result = it->second->Get(isolate);
+        info.GetReturnValue().Set(result);
+    }
 }
 
 void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {

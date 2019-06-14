@@ -113,7 +113,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, obj);
     tns::SetValue(isolate, thiz, wrapper);
 
-    Persistent<Object>* poThiz = new Persistent<Object>(isolate, thiz);
+    Persistent<Value>* poThiz = new Persistent<Value>(isolate, thiz);
     Caches::Instances.insert(std::make_pair(obj, poThiz));
 
     ObjectManager::Register(isolate, thiz);

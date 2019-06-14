@@ -99,7 +99,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             id self_ = *static_cast<const id*>(argValues[0]);
             auto it = Caches::Instances.find(self_);
             if (it != Caches::Instances.end()) {
-                thiz = it->second->Get(data->isolate_);
+                thiz = it->second->Get(data->isolate_).As<Object>();
             } else {
                 std::string className = object_getClassName(self_);
                 ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, self_);
@@ -113,7 +113,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
                 //TODO: We are creating a persistent object here that will never be GCed
                 // We need to determine the lifetime of this object
-                Persistent<Object>* poObj = new Persistent<Object>(data->isolate_, thiz);
+                Persistent<Value>* poObj = new Persistent<Value>(data->isolate_, thiz);
                 Caches::Instances.insert(std::make_pair(self_, poObj));
             }
         }
@@ -251,10 +251,10 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
    if (receiver.IsEmpty()) {
        auto it = Caches::Instances.find(target);
        if (it != Caches::Instances.end()) {
-           receiver = it->second->Get(isolate);
+           receiver = it->second->Get(isolate).As<Object>();
        } else {
            receiver = CreateEmptyObject(context);
-           Caches::Instances.insert(std::make_pair(target, new Persistent<Object>(isolate, receiver)));
+           Caches::Instances.insert(std::make_pair(target, new Persistent<Value>(isolate, receiver)));
        }
    }
 

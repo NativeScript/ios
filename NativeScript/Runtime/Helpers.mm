@@ -109,11 +109,12 @@ void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* 
     }
 }
 
-tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Object>& obj) {
-    if (obj.IsEmpty() || obj->IsNullOrUndefined()) {
+tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
+    if (val.IsEmpty() || val->IsNullOrUndefined() || !val->IsObject()) {
         return nullptr;
     }
 
+    Local<Object> obj = val.As<Object>();
     if (obj->InternalFieldCount() > 0) {
         Local<Value> field = obj->GetInternalField(0);
         if (field.IsEmpty() || field->IsNullOrUndefined() || !field->IsExternal()) {

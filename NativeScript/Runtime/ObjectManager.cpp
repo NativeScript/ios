@@ -55,8 +55,6 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             if (objCObjectWrapper->Data() != nil) {
                 auto it = Caches::Instances.find(objCObjectWrapper->Data());
                 if (it != Caches::Instances.end()) {
-                    it->second->Reset();
-                    delete it->second;
                     Caches::Instances.erase(it);
                 }
             }
