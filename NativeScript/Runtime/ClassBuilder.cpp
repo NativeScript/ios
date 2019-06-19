@@ -11,7 +11,11 @@ Class ClassBuilder::GetExtendedClass(std::string baseClassName, std::string stat
     Class clazz = objc_getClass(name.c_str());
 
     if (clazz != nil) {
-        return clazz;
+        int i = 1;
+        while (clazz != nil) {
+            name = name + std::to_string(i++);
+            clazz = objc_getClass(name.c_str());
+        }
     }
 
     clazz = objc_allocateClassPair(baseClass, name.c_str(), 0);
