@@ -36,8 +36,15 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         return;
     }
 
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
+    Local<Value> internalField = obj->GetInternalField(0);
+    if (internalField.IsEmpty() || internalField->IsNullOrUndefined() || !internalField->IsExternal()) {
+        return;
+    }
+
+    void* internalFieldValue = internalField.As<External>()->Value();
+    BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(internalFieldValue);
     if (wrapper == nullptr) {
+        obj->SetInternalField(0, v8::Undefined(isolate));
         return;
     }
 
@@ -109,6 +116,7 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
     }
 
     delete wrapper;
+    wrapper = nullptr;
     obj->SetInternalField(0, v8::Undefined(isolate));
 }
 

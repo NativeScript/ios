@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include <numeric>
 #include "ClassBuilder.h"
 #include "ArgConverter.h"
 #include "ObjectManager.h"
@@ -35,6 +36,17 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     Local<v8::Function> baseFunc = info.This().As<v8::Function>();
     std::string baseClassName = tns::ToString(isolate, baseFunc->GetName());
 
+    BaseDataWrapper* baseWrapper = tns::GetValue(isolate, baseFunc);
+    if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::ObjCClass) {
+        ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(baseWrapper);
+        if (classWrapper->ExtendedClass()) {
+            Local<v8::String> errorMessage = tns::ToV8String(isolate, "Cannot extend an already extended class");
+            Local<Value> exception = Exception::Error(errorMessage);
+            isolate->ThrowException(exception);
+            return;
+        }
+    }
+
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
     const InterfaceMeta* interfaceMeta = globalTable->findInterfaceMeta(baseClassName.c_str());
     assert(interfaceMeta != nullptr);
@@ -52,12 +64,9 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
 
     Class extendedClass = item->self_->GetExtendedClass(baseClassName, staticClassName);
     if (!nativeSignature.IsEmpty()) {
-        Local<Value> exposedProtocols = nativeSignature->Get(tns::ToV8String(isolate, "protocols"));
-        if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
-            item->self_->ExposeDynamicProtocols(isolate, extendedClass, implementationObject, exposedProtocols.As<v8::Array>());
-        }
-
         item->self_->ExposeDynamicMembers(isolate, extendedClass, implementationObject, nativeSignature);
+    } else {
+        item->self_->ExposeDynamicMethods(isolate, extendedClass, Local<Value>(), Local<Value>(), implementationObject);
     }
 
     Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(item->meta_->name())->second;
@@ -74,7 +83,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     }
 
     bool success;
-    if (!implementationObject->SetPrototype(context, baseCtorFunc->Get(tns::ToV8String(isolate, "prototype"))).To(&success) || !success) {
+    Local<Value> baseProto = baseCtorFunc->Get(tns::ToV8String(isolate, "prototype"));
+    if (!implementationObject->SetPrototype(context, baseProto).To(&success) || !success) {
         assert(false);
     }
     if (!implementationObject->SetAccessor(context, tns::ToV8String(isolate, "super"), SuperAccessorGetterCallback, nullptr, ext).To(&success) || !success) {
@@ -92,7 +102,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     }
 
     std::string extendedClassName = class_getName(extendedClass);
-    ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass);
+    ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass, true);
     tns::SetValue(isolate, extendClassCtorFunc, wrapper);
 
     Caches::CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
@@ -125,18 +135,18 @@ void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
     }
 
     std::string extendsFuncScript =
-        "(function() { "
-        "    function __extends(d, b) { "
-        "         for (var p in b) {"
-        "             if (b.hasOwnProperty(p)) {"
-        "                 d[p] = b[p];"
-        "             }"
-        "         }"
-        "         function __() { this.constructor = d; }"
-        "         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());"
-        "    } "
-        "    return __extends;"
-        "})()";
+    "(function() { "
+    "    function __extends(d, b) { "
+    "         for (var p in b) {"
+    "             if (b.hasOwnProperty(p)) {"
+    "                 d[p] = b[p];"
+    "             }"
+    "         }"
+    "         function __() { this.constructor = d; }"
+    "         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());"
+    "    } "
+    "    return __extends;"
+    "})()";
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<Script> script;
@@ -174,9 +184,9 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
         std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
 
-        Class extendedClass = builder->GetExtendedClass(baseClassName, extendedClassName);
+        __block Class extendedClass = builder->GetExtendedClass(baseClassName, extendedClassName);
 
-        tns::SetValue(isolate, extendedClassCtorFunc, new ObjCClassWrapper(extendedClass));
+        tns::SetValue(isolate, extendedClassCtorFunc, new ObjCClassWrapper(extendedClass, true));
 
         const Meta* baseMeta = ArgConverter::FindMeta(baseClass);
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
@@ -204,13 +214,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
             }
 
             Local<Value> exposedProtocols = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "ObjCProtocols"));
-            if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
-                builder->ExposeDynamicProtocols(isolate, extendedClass, implementationObject.As<Object>(), exposedProtocols.As<v8::Array>());
-            }
-
-            builder->ExposeDynamicMethods(isolate, extendedClass, exposedMethods.As<Object>(), implementationObject.As<Object>());
-
-            poExtendedClassCtorFunc->Reset();
+            builder->ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject.As<Object>());
         });
         class_addMethod(object_getClass(extendedClass), @selector(initialize), newInitialize, "v@:");
 
@@ -221,12 +225,36 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
 }
 
 void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
-      Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
-      this->ExposeDynamicMethods(isolate, extendedClass, exposedMethods, implementationObject);
+    Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
+    Local<Value> exposedProtocols = nativeSignature->Get(tns::ToV8String(isolate, "protocols"));
+    this->ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject);
 }
 
-void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, Local<Value> exposedMethods, Local<Object> implementationObject) {
+void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, Local<Value> exposedMethods, Local<Value> exposedProtocols, Local<Object> implementationObject) {
     Local<Context> context = isolate->GetCurrentContext();
+
+    std::vector<Protocol*> protocols;
+    if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
+        Local<v8::Array> protocolsArray = exposedProtocols.As<v8::Array>();
+        for (uint32_t i = 0; i < protocolsArray->Length(); i++) {
+            Local<Value> element = protocolsArray->Get(i);
+            assert(!element.IsEmpty() && element->IsFunction());
+
+            Local<v8::Function> protoObj = element.As<v8::Function>();
+            BaseDataWrapper* wrapper = tns::GetValue(isolate, protoObj);
+            assert(wrapper && wrapper->Type() == WrapperType::ObjCProtocol);
+            ObjCProtocolWrapper* protoWrapper = static_cast<ObjCProtocolWrapper*>(wrapper);
+            Protocol* proto = protoWrapper->Proto();
+            assert(proto != nullptr);
+
+            if (class_conformsToProtocol(extendedClass, proto)) {
+                continue;
+            }
+
+            protocols.push_back(proto);
+            class_addProtocol(extendedClass, proto);
+        }
+    }
 
     if (!exposedMethods.IsEmpty() && exposedMethods->IsObject()) {
         Local<v8::Array> methodNames;
@@ -287,215 +315,230 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
     assert(implementationObject->GetOwnPropertyNames(context).ToLocal(&propertyNames));
     for (uint32_t i = 0; i < propertyNames->Length(); i++) {
         Local<Value> key = propertyNames->Get(i);
+        if (!key->IsName()) {
+            continue;
+        }
+
         std::string methodName = tns::ToString(isolate, key);
 
-        const BaseClassMeta* meta = extendedClassMeta;
-        while (meta != nullptr) {
-            const MethodMeta* methodMeta = nullptr;
+        Local<Value> propertyDescriptor;
+        assert(implementationObject->GetOwnPropertyDescriptor(context, key.As<Name>()).ToLocal(&propertyDescriptor));
+        if (propertyDescriptor.IsEmpty() || propertyDescriptor->IsNullOrUndefined()) {
+            continue;
+        }
 
-            for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
-                const MethodMeta* mm = (*it).valuePtr();
-                if (strcmp(mm->jsName(), methodName.c_str()) == 0) {
-                    methodMeta = mm;
-                    break;
-                }
-            }
+        Local<Value> getter = propertyDescriptor.As<Object>()->Get(tns::ToV8String(isolate, "get"));
+        Local<Value> setter = propertyDescriptor.As<Object>()->Get(tns::ToV8String(isolate, "set"));
+        if ((!getter.IsEmpty() || !setter.IsEmpty()) && (getter->IsFunction() || setter->IsFunction())) {
+            std::vector<std::pair<const PropertyMeta*, objc_property_t>> propertyMetas;
+            VisitProperties(methodName, extendedClassMeta, propertyMetas, protocols);
+            ExposeProperties(isolate, extendedClass, propertyMetas, implementationObject, getter, setter);
+            continue;
+        }
 
-            if (methodMeta == nullptr) {
-                for (auto protoIt = meta->protocols->begin(); protoIt != meta->protocols->end(); protoIt++) {
-                    const char* protocolName = (*protoIt).valuePtr();
-                    const Meta* m = ArgConverter::GetMeta(protocolName);
-                    if (!m) {
-                        continue;
-                    }
-                    const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(m);
-                    for (auto it = protocolMeta->instanceMethods->begin(); it != protocolMeta->instanceMethods->end(); it++) {
-                        const MethodMeta* mm = (*it).valuePtr();
-                        if (strcmp(mm->jsName(), methodName.c_str()) == 0) {
-                            methodMeta = mm;
-                            break;
-                        }
-                    }
-                }
-            }
+        Local<Value> method = propertyDescriptor.As<Object>()->Get(tns::ToV8String(isolate, "value"));
+        if (method.IsEmpty() || !method->IsFunction()) {
+            continue;
+        }
 
-            if (methodMeta == nullptr) {
-                unsigned count;
-                auto pl = class_copyProtocolList(extendedClass, &count);
+        std::vector<const MethodMeta*> methodMetas;
+        VisitMethods(isolate, extendedClass, methodName, extendedClassMeta, methodMetas, protocols);
 
-                for (unsigned i = 0; i < count; i++) {
-                    const char* protocolName = protocol_getName(pl[i]);
-                    const Meta* meta = ArgConverter::GetMeta(protocolName);
-                    if (meta == nullptr || meta->type() != MetaType::ProtocolType) {
-                        continue;
-                    }
-
-                    const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(meta);
-                    for (auto it = protocolMeta->instanceMethods->begin(); it != protocolMeta->instanceMethods->end(); it++) {
-                        const MethodMeta* mm = (*it).valuePtr();
-                        if (strcmp(mm->jsName(), methodName.c_str()) == 0) {
-                            methodMeta = mm;
-                            break;
-                        }
-                    }
-                }
-
-                free(pl);
-            }
-
-            if (methodMeta != nullptr) {
-                Local<Value> method = implementationObject->Get(key);
-                if (!method.IsEmpty() && method->IsFunction()) {
-                    Persistent<Value>* poCallback = new Persistent<Value>(isolate, method);
-                    const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
-                    uint8_t argsCount = methodMeta->encodings()->count - 1;
-                    MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
-                    SEL selector = methodMeta->selector();
-                    IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
-                    class_addMethod(extendedClass, selector, methodBody, "v@:@");
-                }
-            }
-
-            if (meta->type() == MetaType::Interface) {
-                const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
-                meta = interfaceMeta->baseMeta();
-            } else {
-                break;
-            }
+        for (int j = 0; j < methodMetas.size(); j++) {
+            const MethodMeta* methodMeta = methodMetas[j];
+            Persistent<Value>* poCallback = new Persistent<Value>(isolate, method);
+            const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
+            uint8_t argsCount = methodMeta->encodings()->count - 1;
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
+            SEL selector = methodMeta->selector();
+            IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
+            class_addMethod(extendedClass, selector, methodBody, "v@:@");
         }
     }
 }
 
-void ClassBuilder::ExposeDynamicProtocols(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<v8::Array> protocols) {
-    for (uint32_t i = 0; i < protocols->Length(); i++) {
-        Local<Value> element = protocols->Get(i);
-        assert(!element.IsEmpty() && element->IsFunction());
+void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<std::pair<const PropertyMeta*, objc_property_t>>& propertyMetas, std::vector<Protocol*> exposedProtocols) {
+    for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
+        const PropertyMeta* propertyMeta = (*it).valuePtr();
+        if (propertyMeta->jsName() == propertyName) {
+            objc_property_t property = nullptr;
+            if (meta->type() == MetaType::ProtocolType) {
+                Protocol* proto = objc_getProtocol(meta->name());
+                assert(proto != nullptr);
+                property = protocol_getProperty(proto, propertyName.c_str(), true, true);
+            } else if (meta->type() == MetaType::Interface) {
+                Class klass = objc_getClass(meta->name());
+                assert(klass != nullptr);
+                property = class_getProperty(klass, propertyName.c_str());
+            }
 
-        Local<v8::Function> protoObj = element.As<v8::Function>();
-        BaseDataWrapper* wrapper = tns::GetValue(isolate, protoObj);
-        assert(wrapper && wrapper->Type() == WrapperType::ObjCProtocol);
-        ObjCProtocolWrapper* protoWrapper = static_cast<ObjCProtocolWrapper*>(wrapper);
-        Protocol* proto = protoWrapper->Proto();
-        assert(proto != nullptr);
+            if (property != nullptr) {
+                if (std::find_if(propertyMetas.begin(), propertyMetas.end(), [&propertyMeta](const std::pair<const PropertyMeta*, objc_property_t>& x) { return x.first == propertyMeta; }) == propertyMetas.end()) {
+                    propertyMetas.push_back(std::make_pair(propertyMeta, property));
+                }
+            }
+        }
+    }
 
-        if (class_conformsToProtocol(extendedClass, proto)) {
+    for (auto protoIt = meta->protocols->begin(); protoIt != meta->protocols->end(); protoIt++) {
+        const char* protocolName = (*protoIt).valuePtr();
+        const Meta* m = ArgConverter::GetMeta(protocolName);
+        if (!m) {
             continue;
         }
+        const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(m);
+        VisitProperties(propertyName, protocolMeta, propertyMetas, exposedProtocols);
+    }
 
-        class_addProtocol(extendedClass, proto);
-
-        const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+    for (auto it = exposedProtocols.begin(); it != exposedProtocols.end(); it++) {
+        Protocol* proto = *it;
         const char* protocolName = protocol_getName(proto);
-        const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName);
+        const Meta* meta = ArgConverter::GetMeta(protocolName);
+        if (meta != nullptr && meta->type() == MetaType::ProtocolType) {
+            const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(meta);
+            VisitProperties(propertyName, protocolMeta, propertyMetas, std::vector<Protocol*>());
+        }
+    }
 
-        Local<v8::Array> propertyNames;
-        Local<Context> context = isolate->GetCurrentContext();
-        assert(implementationObject->GetPropertyNames(context).ToLocal(&propertyNames));
+    if (meta->type() == MetaType::Interface) {
+        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+        const BaseClassMeta* baseMeta = interfaceMeta->baseMeta();
+        if (baseMeta != nullptr) {
+            VisitProperties(propertyName, baseMeta, propertyMetas, exposedProtocols);
+        }
+    }
+}
 
-        for (uint32_t j = 0; j < propertyNames->Length(); j++) {
-            Local<Value> descriptor;
-            Local<Name> propName = propertyNames->Get(j).As<Name>();
-            assert(implementationObject->GetOwnPropertyDescriptor(context, propName).ToLocal(&descriptor));
-            if (descriptor.IsEmpty() || descriptor->IsNullOrUndefined()) {
-                continue;
-            }
-
-            Local<Value> getter = descriptor.As<Object>()->Get(tns::ToV8String(isolate, "get"));
-            Local<Value> setter = descriptor.As<Object>()->Get(tns::ToV8String(isolate, "set"));
-
-            bool hasGetter = !getter.IsEmpty() && getter->IsFunction();
-            bool hasSetter = !setter.IsEmpty() && setter->IsFunction();
-            if (!hasGetter && !hasSetter) {
-                continue;
-            }
-
-            std::string propertyName = tns::ToString(isolate, propName);
-
-            for (auto propIt = protoMeta->instanceProps->begin(); propIt != protoMeta->instanceProps->end(); propIt++) {
-                const PropertyMeta* propMeta = (*propIt).valuePtr();
-                if (strcmp(propMeta->jsName(), propertyName.c_str()) != 0) {
-                    continue;
-                }
-
-                // An instance property that is part of the protocol is defined in the implementation object
-                // so we need to define it on the new class
-                objc_property_t property = protocol_getProperty(proto, propertyName.c_str(), true, true);
-                uint attrsCount;
-                objc_property_attribute_t* propertyAttrs = property_copyAttributeList(property, &attrsCount);
-                class_addProperty(extendedClass, propertyName.c_str(), propertyAttrs, attrsCount);
-
-                if (hasGetter && propMeta->hasGetter()) {
-                    Persistent<v8::Function>* poGetterFunc = new Persistent<v8::Function>(isolate, getter.As<v8::Function>());
-                    const TypeEncoding* typeEncoding = propMeta->getter()->encodings()->first();
-                    PropertyCallbackContext* userData = new PropertyCallbackContext(this, isolate, poGetterFunc, new Persistent<Object>(isolate, implementationObject));
-
-                    FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
-                        PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
-                        HandleScope handle_scope(context->isolate_);
-                        Local<v8::Function> getterFunc = context->callback_->Get(context->isolate_);
-                        Local<Value> res;
-                        assert(getterFunc->Call(context->isolate_->GetCurrentContext(), context->implementationObject_->Get(context->isolate_), 0, nullptr).ToLocal(&res));
-
-                        if (!res->IsNullOrUndefined() && res->IsObject() && res.As<Object>()->InternalFieldCount() > 0) {
-                            Local<External> ext = res.As<Object>()->GetInternalField(0).As<External>();
-                            // TODO: Check the actual DataWrapper type here
-                            ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
-                            *(ffi_arg *)retValue = (unsigned long)wrapper->Data();
-                        } else {
-                            void* nullPtr = nullptr;
-                            *(ffi_arg *)retValue = (unsigned long)nullPtr;
-                        }
-                    };
-
-                    IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback , userData);
-
-                    const char *getterName = property_copyAttributeValue(property, "G");
-                    NSString* selectorString;
-                    if (getterName == nullptr) {
-                        selectorString = [NSString stringWithUTF8String:propertyName.c_str()];
-                    } else {
-                        selectorString = [NSString stringWithUTF8String:getterName];
-                    }
-
-                    class_addMethod(extendedClass, NSSelectorFromString(selectorString), impGetter, "@@:");
-                }
-
-                if (hasSetter) {
-                    Persistent<v8::Function>* poSetterFunc = new Persistent<v8::Function>(isolate, setter.As<v8::Function>());
-                    const TypeEncoding* typeEncoding = propMeta->setter()->encodings()->first();
-                    PropertyCallbackContext* userData = new PropertyCallbackContext(this, isolate, poSetterFunc, new Persistent<Object>(isolate, implementationObject));
-                    FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
-                        id paramValue = *static_cast<const id*>(argValues[2]);
-                        PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
-                        HandleScope handle_scope(context->isolate_);
-                        Local<v8::Function> setterFunc = context->callback_->Get(context->isolate_);
-                        Local<Value> res;
-
-                        // TODO: Check the actual DataWrapper type and pass metadata
-                        ObjCDataWrapper* wrapper = new ObjCDataWrapper(std::string(), paramValue);
-                        Local<Value> argWrapper = ArgConverter::CreateJsWrapper(context->isolate_, wrapper, Local<Object>());
-                        Local<Value> params[1] = { argWrapper };
-                        assert(setterFunc->Call(context->isolate_->GetCurrentContext(), context->implementationObject_->Get(context->isolate_), 1, params).ToLocal(&res));
-                    };
-
-                    IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
-
-                    const char *setterName = property_copyAttributeValue(property, "S");
-                    NSString* selectorString;
-                    if (setterName == nullptr) {
-                        char firstChar = (char)toupper(propertyName[0]);
-                        NSString* capitalLetter = [NSString stringWithFormat:@"%c", firstChar];
-                        NSString* reminder = [NSString stringWithUTF8String: propertyName.c_str() + 1];
-                        selectorString = [@[@"set", capitalLetter, reminder, @":"] componentsJoinedByString:@""];
-                    } else {
-                        selectorString = [NSString stringWithUTF8String:setterName];
-                    }
-                    class_addMethod(extendedClass, NSSelectorFromString(selectorString), impSetter, "v@:@");
-                }
-
-                free(propertyAttrs);
+void ClassBuilder::VisitMethods(Isolate* isolate, Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<Protocol*> exposedProtocols) {
+    for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
+        const MethodMeta* methodMeta = (*it).valuePtr();
+        if (methodMeta->jsName() == methodName) {
+            if (std::find(methodMetas.begin(), methodMetas.end(), methodMeta) == methodMetas.end()) {
+                methodMetas.push_back(methodMeta);
             }
         }
+    }
+
+    for (auto protoIt = meta->protocols->begin(); protoIt != meta->protocols->end(); protoIt++) {
+        const char* protocolName = (*protoIt).valuePtr();
+        const Meta* m = ArgConverter::GetMeta(protocolName);
+        if (!m) {
+            continue;
+        }
+        const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(m);
+        VisitMethods(isolate, extendedClass, methodName, protocolMeta, methodMetas, exposedProtocols);
+    }
+
+    for (auto it = exposedProtocols.begin(); it != exposedProtocols.end(); it++) {
+        Protocol* proto = *it;
+        const char* protocolName = protocol_getName(proto);
+        const Meta* meta = ArgConverter::GetMeta(protocolName);
+        if (meta != nullptr && meta->type() == MetaType::ProtocolType) {
+            const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(meta);
+            VisitMethods(isolate, extendedClass, methodName, protocolMeta, methodMetas, std::vector<Protocol*>());
+        }
+    }
+
+    if (meta->type() == MetaType::Interface) {
+        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+        const BaseClassMeta* baseMeta = interfaceMeta->baseMeta();
+        if (baseMeta != nullptr) {
+            VisitMethods(isolate, extendedClass, methodName, interfaceMeta->baseMeta(), methodMetas, exposedProtocols);
+        }
+    }
+}
+
+void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::vector<std::pair<const PropertyMeta*, objc_property_t>> propertyMetas, Local<Object> implementationObject, Local<Value> getter, Local<Value> setter) {
+    for (int j = 0; j < propertyMetas.size(); j++) {
+        objc_property_t property = propertyMetas[j].second;
+        const PropertyMeta* propertyMeta = propertyMetas[j].first;
+        std::string propertyName = propertyMeta->name();
+
+        uint attrsCount;
+        objc_property_attribute_t* propertyAttrs = property_copyAttributeList(property, &attrsCount);
+        class_addProperty(extendedClass, propertyMeta->name(), propertyAttrs, attrsCount);
+
+        if (!getter.IsEmpty() && getter->IsFunction() && propertyMeta->hasGetter()) {
+            Persistent<v8::Function>* poGetterFunc = new Persistent<v8::Function>(isolate, getter.As<v8::Function>());
+            PropertyCallbackContext* userData = new PropertyCallbackContext(this, isolate, poGetterFunc, new Persistent<Object>(isolate, implementationObject), propertyMeta);
+
+            FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
+                PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                HandleScope handle_scope(context->isolate_);
+                Local<v8::Function> getterFunc = context->callback_->Get(context->isolate_);
+                Local<Value> res;
+
+                id thiz = *static_cast<const id*>(argValues[0]);
+                auto it = Caches::Instances.find(thiz);
+                Local<Object> self_ = it != Caches::Instances.end()
+                    ? it->second->Get(context->isolate_).As<Object>()
+                    : context->implementationObject_->Get(context->isolate_);
+                assert(getterFunc->Call(context->isolate_->GetCurrentContext(), self_, 0, nullptr).ToLocal(&res));
+
+                BaseDataWrapper* wrapper = tns::GetValue(context->isolate_, res);
+                if (wrapper != nullptr) {
+                    if (wrapper->Type() == WrapperType::ObjCObject) {
+                        ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
+                        *(ffi_arg *)retValue = (unsigned long)wr->Data();
+                    } else {
+                        // TODO: Implement other object wrappers
+                        assert(false);
+                    }
+                } else {
+                    void* nullPtr = nullptr;
+                    *(ffi_arg *)retValue = (unsigned long)nullPtr;
+                }
+            };
+            const TypeEncoding* typeEncoding = propertyMeta->getter()->encodings()->first();
+            IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback , userData);
+
+            const char *getterName = property_copyAttributeValue(property, "G");
+            NSString* selectorStr = getterName != nullptr ? [NSString stringWithUTF8String:getterName] : [NSString stringWithUTF8String:propertyName.c_str()];
+            class_addMethod(extendedClass, NSSelectorFromString(selectorStr), impGetter, "@@:");
+        }
+
+        if (!setter.IsEmpty() && setter->IsFunction() && propertyMeta->hasSetter()) {
+            Persistent<v8::Function>* poSetterFunc = new Persistent<v8::Function>(isolate, setter.As<v8::Function>());
+            PropertyCallbackContext* userData = new PropertyCallbackContext(this, isolate, poSetterFunc, new Persistent<Object>(isolate, implementationObject), propertyMeta);
+
+            FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
+                PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                HandleScope handle_scope(context->isolate_);
+                Local<v8::Function> setterFunc = context->callback_->Get(context->isolate_);
+                Local<Value> res;
+
+                id thiz = *static_cast<const id*>(argValues[0]);
+                auto it = Caches::Instances.find(thiz);
+                Local<Object> self_ = it != Caches::Instances.end()
+                    ? it->second->Get(context->isolate_).As<Object>()
+                    : context->implementationObject_->Get(context->isolate_);
+
+                uint8_t* argBuffer = (uint8_t*)argValues[2];
+                const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();
+                BaseCall call(argBuffer);
+                Local<Value> jsWrapper = Interop::GetResult(context->isolate_, typeEncoding, &call, true);
+                Local<Value> params[1] = { jsWrapper };
+
+                assert(setterFunc->Call(context->isolate_->GetCurrentContext(), self_, 1, params).ToLocal(&res));
+            };
+
+            const TypeEncoding* typeEncoding = propertyMeta->setter()->encodings()->first();
+            IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
+
+            const char *setterName = property_copyAttributeValue(property, "S");
+            NSString* selectorString;
+            if (setterName == nullptr) {
+                char firstChar = (char)toupper(propertyName[0]);
+                NSString* capitalLetter = [NSString stringWithFormat:@"%c", firstChar];
+                NSString* reminder = [NSString stringWithUTF8String: propertyName.c_str() + 1];
+                selectorString = [@[@"set", capitalLetter, reminder, @":"] componentsJoinedByString:@""];
+            } else {
+                selectorString = [NSString stringWithUTF8String:setterName];
+            }
+            class_addMethod(extendedClass, NSSelectorFromString(selectorString), impSetter, "v@:@");
+        }
+
+        free(propertyAttrs);
     }
 }
 

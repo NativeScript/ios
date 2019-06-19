@@ -43,10 +43,10 @@ require("./tests/Marshalling/ReferenceTests");
 require("./tests/Marshalling/EnumTests");
 require("./tests/Marshalling/ProtocolTests");
 //
-//// import "./Inheritance/ConstructorResolutionTests";
-//import "./Inheritance/InheritanceTests";
-//import "./Inheritance/ProtocolImplementationTests";
-//import "./Inheritance/TypeScriptTests";
+// import "./Inheritance/ConstructorResolutionTests";
+require("./tests/Inheritance/InheritanceTests");
+require("./tests/Inheritance/ProtocolImplementationTests");
+require("./tests/Inheritance/TypeScriptTests");
 //
 require("./tests/MethodCallsTests");
 //import "./FunctionsTests";

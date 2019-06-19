@@ -642,7 +642,7 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value> &
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
 
-    Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->className_, false);
+    Local<Value> result = item->builder_->InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->className_, true);
     if (!result.IsEmpty()) {
         info.GetReturnValue().Set(result);
     }
@@ -653,7 +653,7 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value> &
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
     Local<Object> receiver = info.This();
     Local<Value> value = info[0];
-    item->builder_->InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->className_, false);
+    item->builder_->InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->className_, true);
 }
 
 void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const PropertyCallbackInfo<Value> &info) {

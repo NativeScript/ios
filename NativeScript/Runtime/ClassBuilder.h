@@ -10,8 +10,6 @@ class ClassBuilder {
 public:
     v8::Local<v8::Function> GetExtendFunction(v8::Local<v8::Context> context, const InterfaceMeta* interfaceMeta);
     Class GetExtendedClass(std::string baseClassName, std::string staticClassName);
-    void ExposeDynamicMethods(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Value> exposedMethods, v8::Local<v8::Object> implementationObject);
-    void ExposeDynamicProtocols(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Array> protocols);
 
     void RegisterBaseTypeScriptExtendsFunction(v8::Isolate* isolate);
     void RegisterNativeTypeScriptExtendsFunction(v8::Isolate* isolate);
@@ -23,7 +21,11 @@ private:
     static void SuperAccessorGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
+    void ExposeDynamicMethods(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Value> exposedMethods, v8::Local<v8::Value> exposedProtocols, v8::Local<v8::Object> implementationObject);
     void ExposeDynamicMembers(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
+    void VisitMethods(v8::Isolate* isolate, Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<Protocol*> exposedProtocols);
+    void VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<std::pair<const PropertyMeta*, objc_property_t>>& propertyMetas, std::vector<Protocol*> exposedProtocols);
+    void ExposeProperties(v8::Isolate* isolate, Class extendedClass, std::vector<std::pair<const PropertyMeta*, objc_property_t>> propertyMetas, v8::Local<v8::Object> implementationObject, v8::Local<v8::Value> getter, v8::Local<v8::Value> setter);
 
     struct CacheItem {
     public:
@@ -35,12 +37,14 @@ private:
 
     struct PropertyCallbackContext {
     public:
-        PropertyCallbackContext(ClassBuilder* classBuilder, v8::Isolate* isolate, v8::Persistent<v8::Function>* callback, v8::Persistent<v8::Object>* implementationObject)
-            : classBuilder_(classBuilder), isolate_(isolate), callback_(callback), implementationObject_(implementationObject) {}
+        PropertyCallbackContext(ClassBuilder* classBuilder, v8::Isolate* isolate, v8::Persistent<v8::Function>* callback, v8::Persistent<v8::Object>* implementationObject, const PropertyMeta* meta)
+            : classBuilder_(classBuilder), isolate_(isolate), callback_(callback), implementationObject_(implementationObject), meta_(meta) {
+            }
         ClassBuilder* classBuilder_;
         v8::Isolate* isolate_;
         v8::Persistent<v8::Function>* callback_;
         v8::Persistent<v8::Object>* implementationObject_;
+        const PropertyMeta* meta_;
     };
 };
 

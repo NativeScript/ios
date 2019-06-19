@@ -176,11 +176,11 @@ describe(module.id, function () {
     afterEach(function () {
         TNSClearOutput();
     });
-    it('should replace the TypeScript-generated constructor function', function () {
-        expect(interop.handleof(TSObject)).toEqual(jasmine.any(interop.Pointer));
-        expect(NSClassFromString(TSObject.name)).toBe(TSObject);
-        expect(TSObject.returnsConstructorMethod()).toBe(TSObject);
-    });
+    // it('should replace the TypeScript-generated constructor function', function () {
+    //     expect(interop.handleof(TSObject)).toEqual(jasmine.any(interop.Pointer));
+    //     expect(NSClassFromString(TSObject.name)).toBe(TSObject);
+    //     expect(TSObject.returnsConstructorMethod()).toBe(TSObject);
+    // });
     it('SimpleInheritance', function () {
         var object = TSObject.alloc().init();
         expect(object.constructor).toBe(TSObject);
@@ -231,13 +231,13 @@ describe(module.id, function () {
             'js getDerivedProperty called' +
             'instance derivedProperty called');
     });
-    it('ExposedMethods', function () {
-        var object = TSObject.alloc().init();
-        TNSTestNativeCallbacks.inheritanceVoidSelector(object);
-        expect(TNSTestNativeCallbacks.inheritanceVariadicSelector(object)).toBe('native');
-        expect(TNSGetOutput()).toBe('voidSelector called' +
-            'variadicSelector:native x:9 called');
-    });
+    // it('ExposedMethods', function () {
+    //     var object = TSObject.alloc().init();
+    //     TNSTestNativeCallbacks.inheritanceVoidSelector(object);
+    //     expect(TNSTestNativeCallbacks.inheritanceVariadicSelector(object)).toBe('native');
+    //     expect(TNSGetOutput()).toBe('voidSelector called' +
+    //         'variadicSelector:native x:9 called');
+    // });
     it('AddedNewProperty', function () {
         var object = TSObject.alloc().init();
         expect(object.method()).toBe(1);
@@ -294,13 +294,13 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('baseProtocolMethod1 called' +
             'baseProtocolMethod2 called');
     });
-    it('TypeScriptDecoratedExposedMethods', function () {
-        var object = TSDecoratedObject.alloc().init();
-        TNSTestNativeCallbacks.inheritanceVoidSelector(object);
-        expect(TNSTestNativeCallbacks.inheritanceVariadicSelector(object)).toBe('native');
-        expect(TNSGetOutput()).toBe('voidSelector called' +
-            'variadicSelector:native x:9 called');
-    });
+    // it('TypeScriptDecoratedExposedMethods', function () {
+    //     var object = TSDecoratedObject.alloc().init();
+    //     TNSTestNativeCallbacks.inheritanceVoidSelector(object);
+    //     expect(TNSTestNativeCallbacks.inheritanceVariadicSelector(object)).toBe('native');
+    //     expect(TNSGetOutput()).toBe('voidSelector called' +
+    //         'variadicSelector:native x:9 called');
+    // });
     it('TypeScriptDecoratedExposedMethodsCalledFromJs', function () {
         var object = TSDecoratedObject.alloc().init();
         object.voidSelector();

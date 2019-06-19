@@ -4,75 +4,75 @@ describe(module.id, function () {
     });
 
     // Should be first
-    it("StaticPropertyNames", function () {
-        expect('baseMethod' in TNSBaseInterface).toBe(true);
-        expect(TNSBaseInterface.hasOwnProperty('baseCategoryMethod')).toBe(true);
+    // it("StaticPropertyNames", function () {
+    //     expect('baseMethod' in TNSBaseInterface).toBe(true);
+    //     expect(TNSBaseInterface.hasOwnProperty('baseCategoryMethod')).toBe(true);
 
-        expect(Object.getOwnPropertyNames(TNSBaseInterface).sort()).toEqual([
-            'baseCategoryMethod',
-            'baseCategoryProperty',
-            'baseCategoryProtocolMethod1',
-            'baseCategoryProtocolMethod1Optional',
-            'baseCategoryProtocolMethod2',
-            'baseCategoryProtocolMethod2Optional',
-            'baseCategoryProtocolProperty1',
-            'baseCategoryProtocolProperty1Optional',
-            'baseCategoryProtocolProperty2',
-            'baseCategoryProtocolProperty2Optional',
-            'baseMethod',
-            'baseProperty',
-            'baseProtocolMethod1',
-            'baseProtocolMethod1Optional',
-            'baseProtocolMethod2',
-            'baseProtocolMethod2Optional',
-            'baseProtocolProperty1',
-            'baseProtocolProperty1Optional',
-            'baseProtocolProperty2',
-            'baseProtocolProperty2Optional',
-            'name'
-        ]);
-    });
+    //     expect(Object.getOwnPropertyNames(TNSBaseInterface).sort()).toEqual([
+    //         'baseCategoryMethod',
+    //         'baseCategoryProperty',
+    //         'baseCategoryProtocolMethod1',
+    //         'baseCategoryProtocolMethod1Optional',
+    //         'baseCategoryProtocolMethod2',
+    //         'baseCategoryProtocolMethod2Optional',
+    //         'baseCategoryProtocolProperty1',
+    //         'baseCategoryProtocolProperty1Optional',
+    //         'baseCategoryProtocolProperty2',
+    //         'baseCategoryProtocolProperty2Optional',
+    //         'baseMethod',
+    //         'baseProperty',
+    //         'baseProtocolMethod1',
+    //         'baseProtocolMethod1Optional',
+    //         'baseProtocolMethod2',
+    //         'baseProtocolMethod2Optional',
+    //         'baseProtocolProperty1',
+    //         'baseProtocolProperty1Optional',
+    //         'baseProtocolProperty2',
+    //         'baseProtocolProperty2Optional',
+    //         'name'
+    //     ]);
+    // });
 
-    it("InstancePropertyNames", function () {
-        expect('baseMethod' in TNSBaseInterface.prototype).toBe(true);
-        expect(TNSBaseInterface.prototype.hasOwnProperty('baseCategoryMethod')).toBe(true);
+    // it("InstancePropertyNames", function () {
+    //     expect('baseMethod' in TNSBaseInterface.prototype).toBe(true);
+    //     expect(TNSBaseInterface.prototype.hasOwnProperty('baseCategoryMethod')).toBe(true);
 
-        expect(Object.getOwnPropertyNames(TNSBaseInterface.prototype).sort()).toEqual([
-            'baseCategoryMethod',
-            'baseCategoryProperty',
-            'baseCategoryProtocolMethod1',
-            'baseCategoryProtocolMethod1Optional',
-            'baseCategoryProtocolMethod2',
-            'baseCategoryProtocolMethod2Optional',
-            'baseCategoryProtocolProperty1',
-            'baseCategoryProtocolProperty1Optional',
-            'baseCategoryProtocolProperty2',
-            'baseCategoryProtocolProperty2Optional',
-            'baseMethod',
-            'baseProperty',
-            'baseProtocolMethod1',
-            'baseProtocolMethod1Optional',
-            'baseProtocolMethod2',
-            'baseProtocolMethod2Optional',
-            'baseProtocolProperty1',
-            'baseProtocolProperty1Optional',
-            'baseProtocolProperty2',
-            'baseProtocolProperty2Optional',
-            'callBaseMethod',
-            'constructor',
-            'initBaseCategoryMethod',
-            'initBaseCategoryProtocolMethod1',
-            'initBaseCategoryProtocolMethod1Optional',
-            'initBaseCategoryProtocolMethod2',
-            'initBaseCategoryProtocolMethod2Optional',
-            'initBaseMethod',
-            'initBaseProtocolMethod1',
-            'initBaseProtocolMethod1Optional',
-            'initBaseProtocolMethod2',
-            'initBaseProtocolMethod2Optional',
-            'methodWithParam'
-        ]);
-    });
+    //     expect(Object.getOwnPropertyNames(TNSBaseInterface.prototype).sort()).toEqual([
+    //         'baseCategoryMethod',
+    //         'baseCategoryProperty',
+    //         'baseCategoryProtocolMethod1',
+    //         'baseCategoryProtocolMethod1Optional',
+    //         'baseCategoryProtocolMethod2',
+    //         'baseCategoryProtocolMethod2Optional',
+    //         'baseCategoryProtocolProperty1',
+    //         'baseCategoryProtocolProperty1Optional',
+    //         'baseCategoryProtocolProperty2',
+    //         'baseCategoryProtocolProperty2Optional',
+    //         'baseMethod',
+    //         'baseProperty',
+    //         'baseProtocolMethod1',
+    //         'baseProtocolMethod1Optional',
+    //         'baseProtocolMethod2',
+    //         'baseProtocolMethod2Optional',
+    //         'baseProtocolProperty1',
+    //         'baseProtocolProperty1Optional',
+    //         'baseProtocolProperty2',
+    //         'baseProtocolProperty2Optional',
+    //         'callBaseMethod',
+    //         'constructor',
+    //         'initBaseCategoryMethod',
+    //         'initBaseCategoryProtocolMethod1',
+    //         'initBaseCategoryProtocolMethod1Optional',
+    //         'initBaseCategoryProtocolMethod2',
+    //         'initBaseCategoryProtocolMethod2Optional',
+    //         'initBaseMethod',
+    //         'initBaseProtocolMethod1',
+    //         'initBaseProtocolMethod1Optional',
+    //         'initBaseProtocolMethod2',
+    //         'initBaseProtocolMethod2Optional',
+    //         'methodWithParam'
+    //     ]);
+    // });
 
     it("SimpleInheritance", function () {
         var JSObject = NSObject.extend({});
@@ -1619,71 +1619,71 @@ describe(module.id, function () {
         TNSClearOutput();
     });
 
-    it('ConstructorOverrideAndVirtualCall: prototype', function () {
-        var JSObject = TNSIConstructorVirtualCalls.extend({
-            initWithXAndY: function initWithXAndY(x, y) {
-                var self = TNSIConstructorVirtualCalls.prototype.initWithXAndY.apply(this, arguments);
-                TNSLog('js initWithX:' + x + 'andY:' + y + ' called');
-                TNSLog('virtual: ' + self.description);
-                return self;
-            },
-            get description() {
-                return 'virtual: ' + Object.getOwnPropertyDescriptor(NSObject.prototype, 'description').get.call(this);
-            }
-        });
+    // it('ConstructorOverrideAndVirtualCall: prototype', function () {
+    //     var JSObject = TNSIConstructorVirtualCalls.extend({
+    //         initWithXAndY: function initWithXAndY(x, y) {
+    //             var self = TNSIConstructorVirtualCalls.prototype.initWithXAndY.apply(this, arguments);
+    //             TNSLog('js initWithX:' + x + 'andY:' + y + ' called');
+    //             TNSLog('virtual: ' + self.description);
+    //             return self;
+    //         },
+    //         get description() {
+    //             return 'virtual: ' + Object.getOwnPropertyDescriptor(NSObject.prototype, 'description').get.call(this);
+    //         }
+    //     });
 
-        var expected = "constructor initWithX:3andY:4 calledjs initWithX:3andY:4 calledvirtual: virtual: x: 3; y: 4virtual: x: 3; y: 4";
-        var actual;
+    //     var expected = "constructor initWithX:3andY:4 calledjs initWithX:3andY:4 calledvirtual: virtual: x: 3; y: 4virtual: x: 3; y: 4";
+    //     var actual;
 
-        (function () {
-            var object = new JSObject(3, 4);
-            TNSLog(object.description);
-        }());
-        actual = TNSGetOutput();
-        expect(actual).toBe(expected);
+    //     (function () {
+    //         var object = new JSObject(3, 4);
+    //         TNSLog(object.description);
+    //     }());
+    //     actual = TNSGetOutput();
+    //     expect(actual).toBe(expected);
 
-        TNSClearOutput();
+    //     TNSClearOutput();
 
-        (function () {
-            var object = JSObject.alloc().initWithXAndY(3, 4);
-            TNSLog(object.description);
-        }());
-        actual = TNSGetOutput();
-        expect(actual).toBe(expected);
-    });
+    //     (function () {
+    //         var object = JSObject.alloc().initWithXAndY(3, 4);
+    //         TNSLog(object.description);
+    //     }());
+    //     actual = TNSGetOutput();
+    //     expect(actual).toBe(expected);
+    // });
 
-    it('ConstructorOverrideAndVirtualCall: super', function () {
-        var JSObject = TNSIConstructorVirtualCalls.extend({
-            initWithXAndY: function initWithXAndY(x, y) {
-                var self = this.super.initWithXAndY(x, y);
-                TNSLog('js initWithX:' + x + 'andY:' + y + ' called');
-                TNSLog('virtual: ' + self.description);
-                return self;
-            },
-            get description() {
-                return 'virtual: ' + this.super.description;
-            }
-        });
+    // it('ConstructorOverrideAndVirtualCall: super', function () {
+    //     var JSObject = TNSIConstructorVirtualCalls.extend({
+    //         initWithXAndY: function initWithXAndY(x, y) {
+    //             var self = this.super.initWithXAndY(x, y);
+    //             TNSLog('js initWithX:' + x + 'andY:' + y + ' called');
+    //             TNSLog('virtual: ' + self.description);
+    //             return self;
+    //         },
+    //         get description() {
+    //             return 'virtual: ' + this.super.description;
+    //         }
+    //     });
 
-        var expected = "constructor initWithX:3andY:4 calledjs initWithX:3andY:4 calledvirtual: virtual: x: 3; y: 4virtual: x: 3; y: 4";
-        var actual;
+    //     var expected = "constructor initWithX:3andY:4 calledjs initWithX:3andY:4 calledvirtual: virtual: x: 3; y: 4virtual: x: 3; y: 4";
+    //     var actual;
 
-        (function () {
-            var object = new JSObject(3, 4);
-            TNSLog(object.description);
-        }());
-        actual = TNSGetOutput();
-        expect(actual).toBe(expected);
+    //     (function () {
+    //         var object = new JSObject(3, 4);
+    //         TNSLog(object.description);
+    //     }());
+    //     actual = TNSGetOutput();
+    //     expect(actual).toBe(expected);
 
-        TNSClearOutput();
+    //     TNSClearOutput();
 
-        (function () {
-            var object = JSObject.alloc().initWithXAndY(3, 4);
-            TNSLog(object.description);
-        }());
-        actual = TNSGetOutput();
-        expect(actual).toBe(expected);
-    });
+    //     (function () {
+    //         var object = JSObject.alloc().initWithXAndY(3, 4);
+    //         TNSLog(object.description);
+    //     }());
+    //     actual = TNSGetOutput();
+    //     expect(actual).toBe(expected);
+    // });
 
     it('NativeName', function () {
         var JSObject = NSObject.extend({}, {
@@ -1721,49 +1721,49 @@ describe(module.id, function () {
         TNSClearOutput();
     });
 
-    it('ExposeVariadicSelector', function () {
-        var JSObject = NSObject.extend({
-            "variadicSelector:x:": function (a, b) {
-                TNSLog('variadicSelector:' + a + ' x:' + b + ' called');
-                return this;
-            }
-        }, {
-            exposedMethods: {
-                'variadicSelector:x:': {returns: NSObject, params: [NSString, interop.types.int32]}
-            }
-        });
-        var object = new JSObject();
+    // it('ExposeVariadicSelector', function () {
+    //     var JSObject = NSObject.extend({
+    //         "variadicSelector:x:": function (a, b) {
+    //             TNSLog('variadicSelector:' + a + ' x:' + b + ' called');
+    //             return this;
+    //         }
+    //     }, {
+    //         exposedMethods: {
+    //             'variadicSelector:x:': {returns: NSObject, params: [NSString, interop.types.int32]}
+    //         }
+    //     });
+    //     var object = new JSObject();
 
-        expect(object['variadicSelector:x:']('js', 8)).toBe(object);
+    //     expect(object['variadicSelector:x:']('js', 8)).toBe(object);
 
-        expect(TNSGetOutput()).toBe('variadicSelector:js x:8 called');
-        TNSClearOutput();
+    //     expect(TNSGetOutput()).toBe('variadicSelector:js x:8 called');
+    //     TNSClearOutput();
 
-        expect(TNSTestNativeCallbacks.inheritanceVariadicSelector(object)).toBe(object);
+    //     expect(TNSTestNativeCallbacks.inheritanceVariadicSelector(object)).toBe(object);
 
-        expect(TNSGetOutput()).toBe('variadicSelector:native x:9 called');
-        TNSClearOutput();
-    });
+    //     expect(TNSGetOutput()).toBe('variadicSelector:native x:9 called');
+    //     TNSClearOutput();
+    // });
 
-    it("InheritanceWithSameOverrideObject", function () {
-        var overrides = {
-            myNewMethod: function () {
-                return 'myNewMethodCalled';
-            }
-        };
-        NSObject.extend(overrides);
-        expect(function () {
-            NSObject.extend(overrides);
-        }).toThrowError();
-    });
+    // it("InheritanceWithSameOverrideObject", function () {
+    //     var overrides = {
+    //         myNewMethod: function () {
+    //             return 'myNewMethodCalled';
+    //         }
+    //     };
+    //     NSObject.extend(overrides);
+    //     expect(function () {
+    //         NSObject.extend(overrides);
+    //     }).toThrowError();
+    // });
 
-    it('ExposeWithoutImplementation', function () {
-        NSObject.extend({}, {
-            exposedMethods: {
-                'nonExistingSelector': { returns: interop.types.void, params: [interop.types.selector] }
-            }
-        });
-    });
+    // it('ExposeWithoutImplementation', function () {
+    //     NSObject.extend({}, {
+    //         exposedMethods: {
+    //             'nonExistingSelector': { returns: interop.types.void, params: [interop.types.selector] }
+    //         }
+    //     });
+    // });
 
     it('ClassName', function () {
         var MyPrivateClass = NSObject.extend({}, {
@@ -1777,124 +1777,124 @@ describe(module.id, function () {
         expect(NSStringFromClass(MyPrivateClass1)).toBe('MyPrivateClassName1');
     });
 
-    it('ExtendDerivedClass', function () {
-        expect(function () {
-            NSObject.extend({}).extend({});
-        }).toThrowError();
-    });
+    // it('ExtendDerivedClass', function () {
+    //     expect(function () {
+    //         NSObject.extend({}).extend({});
+    //     }).toThrowError();
+    // });
 
-    it('OptionalProtocolMethodsAndCategories', function () {
-        const TNSIDerivedInterfaceImpl = TNSIDerivedInterface.extend({
-            baseImplementedOptionalMethod: function () {
-                TNSLog('js baseImplementedOptionalMethod called');
-                TNSIDerivedInterface.prototype.baseImplementedOptionalMethod.apply(this, arguments);
-            },
-            baseNotImplementedOptionalMethodImplementedInJavaScript: function () {
-                TNSLog('js baseNotImplementedOptionalMethodImplementedInJavaScript called');
-            },
-            baseImplementedCategoryMethod: function () {
-                TNSLog('js baseImplementedCategoryMethod called');
-                TNSIDerivedInterface.prototype.baseImplementedCategoryMethod.apply(this, arguments);
-            },
-            baseNotImplementedNativeCategoryMethodOverridenInJavaScript: function () {
-                TNSLog('js baseNotImplementedNativeCategoryMethodOverridenInJavaScript called');
-            },
-            derivedImplementedOptionalMethod: function () {
-                TNSLog('js derivedImplementedOptionalMethod called');
-                TNSIDerivedInterface.prototype.derivedImplementedOptionalMethod.apply(this, arguments);
-            },
-            derivedNotImplementedOptionalMethodImplementedInJavaScript: function () {
-                TNSLog('js derivedNotImplementedOptionalMethodImplementedInJavaScript called');
-            },
-            derivedImplementedCategoryMethod: function () {
-                TNSLog('js derivedImplementedCategoryMethod called');
-                TNSIDerivedInterface.prototype.derivedImplementedCategoryMethod.apply(this, arguments);
-            },
-            derivedNotImplementedNativeCategoryMethodOverridenInJavaScript: function () {
-                TNSLog('js derivedNotImplementedNativeCategoryMethodOverridenInJavaScript called');
-            }
-        });
-        var object = TNSIDerivedInterfaceImpl.alloc().init();
+    // it('OptionalProtocolMethodsAndCategories', function () {
+    //     const TNSIDerivedInterfaceImpl = TNSIDerivedInterface.extend({
+    //         baseImplementedOptionalMethod: function () {
+    //             TNSLog('js baseImplementedOptionalMethod called');
+    //             TNSIDerivedInterface.prototype.baseImplementedOptionalMethod.apply(this, arguments);
+    //         },
+    //         baseNotImplementedOptionalMethodImplementedInJavaScript: function () {
+    //             TNSLog('js baseNotImplementedOptionalMethodImplementedInJavaScript called');
+    //         },
+    //         baseImplementedCategoryMethod: function () {
+    //             TNSLog('js baseImplementedCategoryMethod called');
+    //             TNSIDerivedInterface.prototype.baseImplementedCategoryMethod.apply(this, arguments);
+    //         },
+    //         baseNotImplementedNativeCategoryMethodOverridenInJavaScript: function () {
+    //             TNSLog('js baseNotImplementedNativeCategoryMethodOverridenInJavaScript called');
+    //         },
+    //         derivedImplementedOptionalMethod: function () {
+    //             TNSLog('js derivedImplementedOptionalMethod called');
+    //             TNSIDerivedInterface.prototype.derivedImplementedOptionalMethod.apply(this, arguments);
+    //         },
+    //         derivedNotImplementedOptionalMethodImplementedInJavaScript: function () {
+    //             TNSLog('js derivedNotImplementedOptionalMethodImplementedInJavaScript called');
+    //         },
+    //         derivedImplementedCategoryMethod: function () {
+    //             TNSLog('js derivedImplementedCategoryMethod called');
+    //             TNSIDerivedInterface.prototype.derivedImplementedCategoryMethod.apply(this, arguments);
+    //         },
+    //         derivedNotImplementedNativeCategoryMethodOverridenInJavaScript: function () {
+    //             TNSLog('js derivedNotImplementedNativeCategoryMethodOverridenInJavaScript called');
+    //         }
+    //     });
+    //     var object = TNSIDerivedInterfaceImpl.alloc().init();
 
-        object.baseImplementedOptionalMethod();
-        object.baseNotImplementedOptionalMethodImplementedInJavaScript();
-        object.baseImplementedCategoryMethod();
-        object.baseNotImplementedNativeCategoryMethodOverridenInJavaScript();
-        object.derivedImplementedOptionalMethod();
-        object.derivedNotImplementedOptionalMethodImplementedInJavaScript();
-        object.derivedImplementedCategoryMethod();
-        object.derivedNotImplementedNativeCategoryMethodOverridenInJavaScript();
+    //     object.baseImplementedOptionalMethod();
+    //     object.baseNotImplementedOptionalMethodImplementedInJavaScript();
+    //     object.baseImplementedCategoryMethod();
+    //     object.baseNotImplementedNativeCategoryMethodOverridenInJavaScript();
+    //     object.derivedImplementedOptionalMethod();
+    //     object.derivedNotImplementedOptionalMethodImplementedInJavaScript();
+    //     object.derivedImplementedCategoryMethod();
+    //     object.derivedNotImplementedNativeCategoryMethodOverridenInJavaScript();
 
-        var actual;
-        var expected =
-            "js baseImplementedOptionalMethod called" +
-            "baseImplementedOptionalMethod called" +
-            "js baseNotImplementedOptionalMethodImplementedInJavaScript called" +
-            "js baseImplementedCategoryMethod called" +
-            "baseImplementedCategoryMethod called" +
-            "js baseNotImplementedNativeCategoryMethodOverridenInJavaScript called" +
-            "js derivedImplementedOptionalMethod called" +
-            "derivedImplementedOptionalMethod called" +
-            "js derivedNotImplementedOptionalMethodImplementedInJavaScript called" +
-            "js derivedImplementedCategoryMethod called" +
-            "derivedImplementedCategoryMethod called" +
-            "js derivedNotImplementedNativeCategoryMethodOverridenInJavaScript called";
+    //     var actual;
+    //     var expected =
+    //         "js baseImplementedOptionalMethod called" +
+    //         "baseImplementedOptionalMethod called" +
+    //         "js baseNotImplementedOptionalMethodImplementedInJavaScript called" +
+    //         "js baseImplementedCategoryMethod called" +
+    //         "baseImplementedCategoryMethod called" +
+    //         "js baseNotImplementedNativeCategoryMethodOverridenInJavaScript called" +
+    //         "js derivedImplementedOptionalMethod called" +
+    //         "derivedImplementedOptionalMethod called" +
+    //         "js derivedNotImplementedOptionalMethodImplementedInJavaScript called" +
+    //         "js derivedImplementedCategoryMethod called" +
+    //         "derivedImplementedCategoryMethod called" +
+    //         "js derivedNotImplementedNativeCategoryMethodOverridenInJavaScript called";
 
-        actual = TNSGetOutput();
-        expect(actual).toBe(expected);
-        TNSClearOutput();
+    //     actual = TNSGetOutput();
+    //     expect(actual).toBe(expected);
+    //     TNSClearOutput();
 
-        TNSTestNativeCallbacks.inheritanceOptionalProtocolMethodsAndCategories(object);
+    //     TNSTestNativeCallbacks.inheritanceOptionalProtocolMethodsAndCategories(object);
 
-        actual = TNSGetOutput();
-        expect(actual).toBe(expected);
-        TNSClearOutput();
+    //     actual = TNSGetOutput();
+    //     expect(actual).toBe(expected);
+    //     TNSClearOutput();
 
-        const checkMethodsAvailability = (obj, isStatic) => {
-            let keys = [];
-            for (key in obj) {
-                keys.push(key);
-            }
+    //     const checkMethodsAvailability = (obj, isStatic) => {
+    //         let keys = [];
+    //         for (key in obj) {
+    //             keys.push(key);
+    //         }
 
-            const jsImplementedClassMembersContainer = isStatic
-                ? TNSIDerivedInterfaceImpl /* static properties are provided by the constructor function (and it's prototype chain)*/
-                : TNSIDerivedInterfaceImpl.prototype /* instance properties are provided by the object's prototype and it's chain */;
-            const firstBase = Object.getPrototypeOf(jsImplementedClassMembersContainer);
-            const secondBase = Object.getPrototypeOf(firstBase);
-            const scopes = [firstBase, secondBase];
-            const prefixes = isStatic ? ["staticDerived", "staticBase"] : ["derived", "base"];
+    //         const jsImplementedClassMembersContainer = isStatic
+    //             ? TNSIDerivedInterfaceImpl /* static properties are provided by the constructor function (and it's prototype chain)*/
+    //             : TNSIDerivedInterfaceImpl.prototype /* instance properties are provided by the object's prototype and it's chain */;
+    //         const firstBase = Object.getPrototypeOf(jsImplementedClassMembersContainer);
+    //         const secondBase = Object.getPrototypeOf(firstBase);
+    //         const scopes = [firstBase, secondBase];
+    //         const prefixes = isStatic ? ["staticDerived", "staticBase"] : ["derived", "base"];
 
-            for (i in prefixes) {
-                const prefix = prefixes[i];
-                const scope = scopes[i];
-                const checkFuncOrProp = (scopeObj, suffix, desc, defined) => {
-                    const propName = `${prefix}${suffix}`;
+    //         for (i in prefixes) {
+    //             const prefix = prefixes[i];
+    //             const scope = scopes[i];
+    //             const checkFuncOrProp = (scopeObj, suffix, desc, defined) => {
+    //                 const propName = `${prefix}${suffix}`;
 
-                    if (defined) {
-                        expect(keys).toContain(propName, `${desc} should be listed (${propName})`);
-                        expect(Object.getOwnPropertyDescriptor(scopeObj, propName)).toBeDefined(`${desc} should be directly retrievable (${propName})`);
-                    } else {
-                        expect(keys).not.toContain(propName, `${desc} should not be listed (${propName})`);
-                        expect(Object.getOwnPropertyDescriptor(scopeObj, propName)).toBeUndefined(`${desc} should not be directly retrievable (${propName})`);
-                    }
-                };
-                checkFuncOrProp(scope, `ImplementedOptionalProperty`, "Implemented optional properties", true);
-                checkFuncOrProp(scope, `NotImplementedOptionalProperty`, "Unimplemented optional properties", false);
-                checkFuncOrProp(scope, `ImplementedOptionalMethod`, "Implemented optional methods", true);
-                checkFuncOrProp(scope, `NotImplementedOptionalMethod`, "Unimplemented optional methods", false);
-                // static methods cannot be defined in JavaScript (yet)
-                if (!isStatic) {
-                    checkFuncOrProp(jsImplementedClassMembersContainer, `NotImplementedOptionalMethodImplementedInJavaScript`, "Optional methods implemented in JS", true);
-                }
+    //                 if (defined) {
+    //                     expect(keys).toContain(propName, `${desc} should be listed (${propName})`);
+    //                     expect(Object.getOwnPropertyDescriptor(scopeObj, propName)).toBeDefined(`${desc} should be directly retrievable (${propName})`);
+    //                 } else {
+    //                     expect(keys).not.toContain(propName, `${desc} should not be listed (${propName})`);
+    //                     expect(Object.getOwnPropertyDescriptor(scopeObj, propName)).toBeUndefined(`${desc} should not be directly retrievable (${propName})`);
+    //                 }
+    //             };
+    //             checkFuncOrProp(scope, `ImplementedOptionalProperty`, "Implemented optional properties", true);
+    //             checkFuncOrProp(scope, `NotImplementedOptionalProperty`, "Unimplemented optional properties", false);
+    //             checkFuncOrProp(scope, `ImplementedOptionalMethod`, "Implemented optional methods", true);
+    //             checkFuncOrProp(scope, `NotImplementedOptionalMethod`, "Unimplemented optional methods", false);
+    //             // static methods cannot be defined in JavaScript (yet)
+    //             if (!isStatic) {
+    //                 checkFuncOrProp(jsImplementedClassMembersContainer, `NotImplementedOptionalMethodImplementedInJavaScript`, "Optional methods implemented in JS", true);
+    //             }
 
-                checkFuncOrProp(scope, `ImplementedCategoryMethod`, "Implemented category methods", true);
-                checkFuncOrProp(scope, `NotImplementedCategoryMethod`, "Unimplemented category methods", false);
-            }
-        };
+    //             checkFuncOrProp(scope, `ImplementedCategoryMethod`, "Implemented category methods", true);
+    //             checkFuncOrProp(scope, `NotImplementedCategoryMethod`, "Unimplemented category methods", false);
+    //         }
+    //     };
 
-        checkMethodsAvailability(object, false);
-        checkMethodsAvailability(TNSIDerivedInterfaceImpl, true);
-    });
+    //     checkMethodsAvailability(object, false);
+    //     checkMethodsAvailability(TNSIDerivedInterfaceImpl, true);
+    // });
 
     it('AddedNewProperty', function () {
         var MyObject = NSObject.extend({
@@ -1907,63 +1907,63 @@ describe(module.id, function () {
         expect(object.method()).toBe(1);
     });
 
-    it('CompilerEncodingOfOverridenMethod', function () {
-        var MyObject = TNSBaseInterface.extend({
-            baseMethod: function () {
-                return this.super.baseMethod();
-            }
-        });
-        var method = class_getInstanceMethod(MyObject.class(), "baseMethod");
-        var encoding = method_getTypeEncoding(method);
-        expect(NSString.stringWithCString(encoding).toString()).toBe("v@:");
-    });
+    // it('CompilerEncodingOfOverridenMethod', function () {
+    //     var MyObject = TNSBaseInterface.extend({
+    //         baseMethod: function () {
+    //             return this.super.baseMethod();
+    //         }
+    //     });
+    //     var method = class_getInstanceMethod(MyObject.class(), "baseMethod");
+    //     var encoding = method_getTypeEncoding(method);
+    //     expect(NSString.stringWithCString(encoding).toString()).toBe("v@:");
+    // });
 
-    it("should project Symbol.iterable as NSFastEnumeration", function () {
-        var start = 1;
-        var end = 10;
-        var lastStep = 0;
-        var IterableClass = NSObject.extend({
-            [Symbol.iterator]() {
-                return {
-                    step: start,
+    // it("should project Symbol.iterable as NSFastEnumeration", function () {
+    //     var start = 1;
+    //     var end = 10;
+    //     var lastStep = 0;
+    //     var IterableClass = NSObject.extend({
+    //         [Symbol.iterator]() {
+    //             return {
+    //                 step: start,
 
-                    next() {
-                        if (this.step <= end) {
-                            return { value: this.step++, done: false };
-                        } else {
-                            return { done: true };
-                        }
-                    }
-                    ,
+    //                 next() {
+    //                     if (this.step <= end) {
+    //                         return { value: this.step++, done: false };
+    //                     } else {
+    //                         return { done: true };
+    //                     }
+    //                 }
+    //                 ,
 
-                    return() {
-                        lastStep = this.step;
-                        return {};
-                    }
-                }
-            }
-        });
+    //                 return() {
+    //                     lastStep = this.step;
+    //                     return {};
+    //                 }
+    //             }
+    //         }
+    //     });
 
-        var expected = "12345678910";
-        TNSIterableConsumer.consumeIterable(IterableClass.alloc().init());
-        var actual = TNSGetOutput();
+    //     var expected = "12345678910";
+    //     TNSIterableConsumer.consumeIterable(IterableClass.alloc().init());
+    //     var actual = TNSGetOutput();
 
-        expect(IterableClass.conformsToProtocol(NSFastEnumeration)).toBe(true);
-        expect(actual).toEqual(expected);
-        expect(lastStep).toEqual(end + 1);
+    //     expect(IterableClass.conformsToProtocol(NSFastEnumeration)).toBe(true);
+    //     expect(actual).toEqual(expected);
+    //     expect(lastStep).toEqual(end + 1);
 
-        TNSClearOutput();
-    });
+    //     TNSClearOutput();
+    // });
 
-    it("Method and property with the same name", function () {
-        var JSObject = NSObject.extend({ get conflict() { return true; } },
-                                       { protocols : [ TNSPropertyMethodConflictProtocol ] });
+    // it("Method and property with the same name", function () {
+    //     var JSObject = NSObject.extend({ get conflict() { return true; } },
+    //                                    { protocols : [ TNSPropertyMethodConflictProtocol ] });
 
-        var derived = JSObject.new();
-        var result = TNSTestNativeCallbacks.protocolWithNameConflict(derived);
+    //     var derived = JSObject.new();
+    //     var result = TNSTestNativeCallbacks.protocolWithNameConflict(derived);
 
-        expect(result).toBe(true);
-    });
+    //     expect(result).toBe(true);
+    // });
 
     it("Should not have base class property slot", function () {
         // baseMethod: is declared in the base class (TNSBaseInterface)

@@ -224,7 +224,7 @@ private:
 
 class ObjCClassWrapper: public BaseDataWrapper {
 public:
-    ObjCClassWrapper(Class klazz): BaseDataWrapper(std::string()), klass_(klazz) {
+    ObjCClassWrapper(Class klazz, bool extendedClass = false): BaseDataWrapper(std::string()), klass_(klazz), extendedClass_(extendedClass) {
     }
 
     WrapperType Type() {
@@ -234,8 +234,13 @@ public:
     Class Klass() {
         return this->klass_;
     }
+
+    bool ExtendedClass() {
+        return this->extendedClass_;
+    }
 private:
     Class klass_;
+    bool extendedClass_;
 };
 
 class ObjCProtocolWrapper: public BaseDataWrapper {

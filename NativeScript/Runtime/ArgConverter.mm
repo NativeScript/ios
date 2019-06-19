@@ -41,7 +41,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         std::string className = class_getName(klass);
         MemberType type = instanceMethod ? MemberType::InstanceMethod : MemberType::StaticMethod;
         std::vector<const MethodMeta*> overloads;
-        ArgConverter::FindMethodOverloads(className, methodName, type, overloads);
+        ArgConverter::FindMethodOverloads(klass, methodName, type, overloads);
         if (overloads.size() > 0) {
             for (auto it = overloads.begin(); it != overloads.end(); it++) {
                 const MethodMeta* methodMeta = (*it);
@@ -374,9 +374,9 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, 
     return emptyInstanceCtorFunc;
 }
 
-void ArgConverter::FindMethodOverloads(std::string className, std::string methodName, MemberType type, std::vector<const MethodMeta*>& overloads) {
-    const Meta* meta = ArgConverter::GetMeta(className);
-    if (meta == nullptr || meta->type() != MetaType::Interface) {
+void ArgConverter::FindMethodOverloads(Class klass, std::string methodName, MemberType type, std::vector<const MethodMeta*>& overloads) {
+    const Meta* meta = ArgConverter::FindMeta(klass);
+    if (klass == nullptr || meta == nullptr || meta->type() != MetaType::Interface) {
         return;
     }
 
@@ -388,7 +388,8 @@ void ArgConverter::FindMethodOverloads(std::string className, std::string method
     }
 
     if (interfaceMeta->baseName() != nullptr) {
-        ArgConverter::FindMethodOverloads(interfaceMeta->baseName(), methodName, type, overloads);
+        Class baseClass = objc_getClass(interfaceMeta->baseName());
+        ArgConverter::FindMethodOverloads(baseClass, methodName, type, overloads);
     }
 }
 
