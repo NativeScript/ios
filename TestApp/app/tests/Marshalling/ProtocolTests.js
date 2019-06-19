@@ -38,14 +38,14 @@ describe(module.id, function () {
         expect(TNSBaseProtocol2.baseProtocolMethod1.call(TNSDerivedInterface));
         expect(TNSBaseProtocol2.prototype.baseProtocolMethod1.call(instance));
 
-        // var descriptor = Object.getOwnPropertyDescriptor(TNSBaseProtocol1.prototype, 'baseProtocolProperty1');
-        // descriptor.set.call(instance, 1);
-        // descriptor.get.call(instance);
+        var descriptor = Object.getOwnPropertyDescriptor(TNSBaseProtocol1.prototype, 'baseProtocolProperty1');
+        descriptor.set.call(instance, 1);
+        descriptor.get.call(instance);
 
-        // expect(TNSGetOutput()).toBe(
-        //     'static baseProtocolMethod1 called' +
-        //     'instance baseProtocolMethod1 called' +
-        //     'instance setBaseProtocolProperty1: called' +
-        //     'instance baseProtocolProperty1 called');
+        expect(TNSGetOutput()).toBe(
+            'static baseProtocolMethod1 called' +
+            'instance baseProtocolMethod1 called' +
+            'instance setBaseProtocolProperty1: called' +
+            'instance baseProtocolProperty1 called');
     });
 });

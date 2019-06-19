@@ -29,8 +29,8 @@ private:
     static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void CFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
-    static void PropertyGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info);
-    static void PropertySetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
+    static void PropertyGetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+    static void PropertySetterCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void PropertyNameGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
     static void PropertyNameSetterCallback(v8::Local<v8::Name> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void> &info);
     static void StructConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

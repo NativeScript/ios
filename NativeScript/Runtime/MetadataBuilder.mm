@@ -429,8 +429,8 @@ void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFun
 
         std::string name = propMeta->jsName();
         if (std::find(names.begin(), names.end(), name) == names.end()) {
-            AccessorGetterCallback getter = nullptr;
-            AccessorSetterCallback setter = nullptr;
+            FunctionCallback getter = nullptr;
+            FunctionCallback setter = nullptr;
             if (propMeta->hasGetter()) {
                 getter = PropertyGetterCallback;
             }
@@ -443,7 +443,7 @@ void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFun
                 CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className, this);
                 Local<External> ext = External::New(isolate_, item);
                 Local<v8::String> propName = tns::ToV8String(isolate_, name);
-                proto->SetAccessor(propName, getter, setter, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
+                proto->SetAccessorProperty(propName, FunctionTemplate::New(isolate_, getter, ext), FunctionTemplate::New(isolate_, setter, ext), PropertyAttribute::DontDelete, AccessControl::DEFAULT);
                 names.push_back(name);
             }
         }
@@ -632,7 +632,7 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
     }
 }
 
-void MetadataBuilder::PropertyGetterCallback(Local<v8::String> name, const PropertyCallbackInfo<Value> &info) {
+void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value> &info) {
     Local<Object> receiver = info.This();
 
     if (receiver->InternalFieldCount() < 1) {
@@ -648,10 +648,11 @@ void MetadataBuilder::PropertyGetterCallback(Local<v8::String> name, const Prope
     }
 }
 
-void MetadataBuilder::PropertySetterCallback(Local<v8::String> name, Local<Value> value, const PropertyCallbackInfo<void> &info) {
+void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value> &info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
     Local<Object> receiver = info.This();
+    Local<Value> value = info[0];
     item->builder_->InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->className_, false);
 }
 
