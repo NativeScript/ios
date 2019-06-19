@@ -1777,11 +1777,11 @@ describe(module.id, function () {
         expect(NSStringFromClass(MyPrivateClass1)).toBe('MyPrivateClassName1');
     });
 
-    // it('ExtendDerivedClass', function () {
-    //     expect(function () {
-    //         NSObject.extend({}).extend({});
-    //     }).toThrowError();
-    // });
+    it('ExtendDerivedClass', function () {
+        expect(function () {
+            NSObject.extend({}).extend({});
+        }).toThrowError();
+    });
 
     // it('OptionalProtocolMethodsAndCategories', function () {
     //     const TNSIDerivedInterfaceImpl = TNSIDerivedInterface.extend({

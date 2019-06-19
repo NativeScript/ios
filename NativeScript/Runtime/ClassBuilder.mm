@@ -41,6 +41,9 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(baseWrapper);
         if (classWrapper->ExtendedClass()) {
             Local<v8::String> errorMessage = tns::ToV8String(isolate, "Cannot extend an already extended class");
+            // The Isolate::Scope here is necessary because the Exception::Error method internally relies on the
+            // Isolate::GetCurrent method which might return null if we do not use the proper scope
+            v8::Isolate::Scope sc(isolate);
             Local<Value> exception = Exception::Error(errorMessage);
             isolate->ThrowException(exception);
             return;
