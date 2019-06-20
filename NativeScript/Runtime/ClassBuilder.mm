@@ -271,7 +271,8 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             assert(methodSignature->IsObject());
             Local<Value> method = implementationObject->Get(methodName);
             if (method.IsEmpty() || !method->IsFunction()) {
-                assert(false);
+                NSLog(@"No implementation found for exposed method \"%s\"", tns::ToString(isolate, methodName).c_str());
+                continue;
             }
 
             BinaryTypeEncodingType returnType = BinaryTypeEncodingType::VoidEncoding;

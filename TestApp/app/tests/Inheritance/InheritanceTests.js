@@ -1757,13 +1757,13 @@ describe(module.id, function () {
     //     }).toThrowError();
     // });
 
-    // it('ExposeWithoutImplementation', function () {
-    //     NSObject.extend({}, {
-    //         exposedMethods: {
-    //             'nonExistingSelector': { returns: interop.types.void, params: [interop.types.selector] }
-    //         }
-    //     });
-    // });
+    it('ExposeWithoutImplementation', function () {
+        NSObject.extend({}, {
+            exposedMethods: {
+                'nonExistingSelector': { returns: interop.types.void, params: [interop.types.selector] }
+            }
+        });
+    });
 
     it('ClassName', function () {
         var MyPrivateClass = NSObject.extend({}, {
