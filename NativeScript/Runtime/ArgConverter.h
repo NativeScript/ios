@@ -31,6 +31,7 @@ public:
     static const Meta* FindMeta(Class klass);
     static const Meta* GetMeta(std::string name);
     static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData);
+    static void SetValue(v8::Isolate* isolate, void* retValue, v8::Local<v8::Value> value, BinaryTypeEncodingType type);
 private:
     static v8::Persistent<v8::Function>* poEmptyObjCtorFunc_;
     static v8::Persistent<v8::Function>* poEmptyStructCtorFunc_;

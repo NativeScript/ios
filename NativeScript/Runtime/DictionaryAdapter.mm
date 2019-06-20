@@ -1,6 +1,6 @@
 #import <Foundation/NSString.h>
 #include "DictionaryAdapter.h"
-#include "ArrayAdapter.h"
+#include "Interop.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
 
@@ -154,48 +154,9 @@ using namespace tns;
         assert(false);
     }
 
-    if (value.IsEmpty() || value->IsNullOrUndefined()) {
-        return nil;
-    }
+    id result = Interop::ToObject(self->isolate_, value);
 
-    if (tns::IsString(value)) {
-        std::string str = tns::ToString(self->isolate_, value);
-        return [NSString stringWithUTF8String:str.c_str()];
-    }
-
-    if (tns::IsNumber(value)) {
-        double result = tns::ToNumber(value);
-        return @(result);
-    }
-
-    if (tns::IsBool(value)) {
-        bool result = tns::ToBool(value);
-        return @(result);
-    }
-
-    if (value->IsArray()) {
-        ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:value.As<v8::Array>() isolate:self->isolate_];
-        return adapter;
-    }
-
-    if (value->IsObject()) {
-        Local<Object> obj = value.As<Object>();
-        if (obj->InternalFieldCount() > 0) {
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-            if (wrapper->Type() == WrapperType::ObjCObject) {
-                ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                id data = objCDataWrapper->Data();
-                return data;
-            }
-            // TODO: Handle other possible wrapper types such as Enum, Record or Primitive
-        }
-
-        DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:self->isolate_];
-        return adapter;
-    }
-
-    assert(false);
+    return result;
 }
 
 - (NSEnumerator*)keyEnumerator {

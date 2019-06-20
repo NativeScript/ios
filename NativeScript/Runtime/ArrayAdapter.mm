@@ -1,6 +1,6 @@
 #import <Foundation/NSString.h>
 #include "ArrayAdapter.h"
-#include "DictionaryAdapter.h"
+#include "Interop.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
 
@@ -48,60 +48,8 @@ using namespace v8;
         return nil;
     }
 
-    if (tns::IsString(item)) {
-        std::string value = tns::ToString(self->isolate_, item);
-        NSString* result = [NSString stringWithUTF8String:value.c_str()];
-        return result;
-    }
-
-    if (tns::IsNumber(item)) {
-        double value = tns::ToNumber(item);
-        return @(value);
-    }
-
-    if (tns::IsBool(item)) {
-        bool value = tns::ToBool(item);
-        return @(value);
-    }
-
-    if (item->IsArray()) {
-        ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:item.As<v8::Array>() isolate:self->isolate_];
-        return adapter;
-    }
-
-    if (item->IsObject()) {
-        Local<Object> obj = item.As<Object>();
-
-        if (BaseDataWrapper* wrapper = tns::GetValue(self->isolate_, obj)) {
-            switch (wrapper->Type()) {
-                case WrapperType::ObjCObject: {
-                    ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
-                    return wr->Data();
-                    break;
-                }
-                case WrapperType::ObjCClass: {
-                    ObjCClassWrapper* wr = static_cast<ObjCClassWrapper*>(wrapper);
-                    return wr->Klass();
-                    break;
-                }
-                case WrapperType::ObjCProtocol: {
-                    ObjCProtocolWrapper* wr = static_cast<ObjCProtocolWrapper*>(wrapper);
-                    return wr->Proto();
-                    break;
-                }
-                default:
-                    // TODO: Unsupported object type
-                    assert(false);
-                    break;
-            }
-        } else {
-            DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:item.As<Object>() isolate:self->isolate_];
-            return adapter;
-        }
-    }
-
-    // TODO: Handle other possible types
-    assert(false);
+    id value = Interop::ToObject(self->isolate_, item);
+    return value;
 }
 
 - (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *)state objects:(id __unsafe_unretained _Nullable [_Nonnull])buffer count:(NSUInteger)len {

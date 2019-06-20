@@ -299,6 +299,55 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
     }
 }
 
+id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
+    if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
+        return nil;
+    } else if (tns::IsString(arg)) {
+        std::string value = tns::ToString(isolate, arg);
+        NSString* result = [NSString stringWithUTF8String:value.c_str()];
+        return result;
+    } else if (tns::IsNumber(arg)) {
+        double value = tns::ToNumber(arg);
+        return @(value);
+    } else if (tns::IsBool(arg)) {
+        bool value = tns::ToBool(arg);
+        return @(value);
+    } else if (arg->IsArray()) {
+        ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:arg.As<v8::Array>() isolate:isolate];
+        return adapter;
+    } else if (arg->IsObject()) {
+        if (BaseDataWrapper* wrapper = tns::GetValue(isolate, arg)) {
+            switch (wrapper->Type()) {
+                case WrapperType::ObjCObject: {
+                    ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
+                    return wr->Data();
+                    break;
+                }
+                case WrapperType::ObjCClass: {
+                    ObjCClassWrapper* wr = static_cast<ObjCClassWrapper*>(wrapper);
+                    return wr->Klass();
+                    break;
+                }
+                case WrapperType::ObjCProtocol: {
+                    ObjCProtocolWrapper* wr = static_cast<ObjCProtocolWrapper*>(wrapper);
+                    return wr->Proto();
+                    break;
+                }
+                default:
+                    // TODO: Unsupported object type
+                    assert(false);
+                    break;
+            }
+        } else {
+            DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:arg.As<Object>() isolate:isolate];
+            return adapter;
+        }
+    }
+
+    // TODO: Handle other possible types
+    assert(false);
+}
+
 void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<StructField> fields, Local<Value> inititalizer) {
     ptrdiff_t position = 0;
     Interop::InitializeStruct(isolate, destBuffer, fields, inititalizer, position);

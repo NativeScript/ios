@@ -123,74 +123,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             assert(false);
         }
 
-        if (!result.IsEmpty() && !result->IsNullOrUndefined()) {
-            // TODO: Refactor this to reuse some existing logic in Interop::SetFFIParams
-
-            if (tns::IsNumber(result)) {
-                double value = tns::ToNumber(result);
-                switch (data->typeEncoding_->type) {
-                    case BinaryTypeEncodingType::UShortEncoding: {
-                        *static_cast<unsigned short*>(retValue) = (unsigned short)value;
-                        return;
-                    }
-                    case BinaryTypeEncodingType::ShortEncoding: {
-                        *static_cast<short*>(retValue) = (short)value;
-                        return;
-                    }
-                    case BinaryTypeEncodingType::UIntEncoding: {
-                        *static_cast<unsigned int*>(retValue) = (unsigned int)value;
-                        return;
-                    }
-                    case BinaryTypeEncodingType::IntEncoding: {
-                        *static_cast<int*>(retValue) = (int)value;
-                        return;
-                    }
-                    case BinaryTypeEncodingType::ULongEncoding: {
-                        *static_cast<unsigned long*>(retValue) = (unsigned long)value;
-                        return;
-                    }
-                    case BinaryTypeEncodingType::LongEncoding: {
-                        *static_cast<long*>(retValue) = (long)value;
-                        return;
-                    }
-                    case BinaryTypeEncodingType::ULongLongEncoding: {
-                        *static_cast<unsigned long long*>(retValue) = (unsigned long long)value;
-                        return;
-                    }
-                    case BinaryTypeEncodingType::LongLongEncoding: {
-                        *static_cast<long long*>(retValue) = (long long)value;
-                        return;
-                    }
-                    case BinaryTypeEncodingType::FloatEncoding: {
-                        *static_cast<float*>(retValue) = (float)value;
-                        return;
-                    }
-                    case BinaryTypeEncodingType::DoubleEncoding: {
-                        *static_cast<double*>(retValue) = value;
-                        return;
-                    }
-                    default:
-                        break;
-                }
-            } else if (result->IsObject()) {
-                if (data->typeEncoding_->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
-                    data->typeEncoding_->type == BinaryTypeEncodingType::InstanceTypeEncoding ||
-                    data->typeEncoding_->type == BinaryTypeEncodingType::IdEncoding) {
-                    Local<External> ext = result.As<Object>()->GetInternalField(0).As<External>();
-                    ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
-                    id data = wrapper->Data();
-                    *(ffi_arg*)retValue = (unsigned long)data;
-                    return;
-                }
-            } else if (result->IsBoolean()) {
-                bool boolValue = result.As<v8::Boolean>()->Value();
-                *(ffi_arg *)retValue = (bool)boolValue;
-                return;
-            }
-
-            // TODO: Handle other return types, i.e. assign the retValue parameter from the v8 result
-            assert(false);
-        }
+        ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_->type);
     };
 
     if ([NSThread isMainThread]) {
@@ -207,6 +140,90 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             assert(false);
         }
     }
+}
+
+void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value, BinaryTypeEncodingType type) {
+    if (value.IsEmpty() || value->IsNullOrUndefined()) {
+        void* nullPtr = nullptr;
+        *(ffi_arg *)retValue = (unsigned long)nullPtr;
+        return;
+    }
+
+    // TODO: Refactor this to reuse some existing logic in Interop::SetFFIParams
+
+    if (tns::IsBool(value)) {
+        bool boolValue = value.As<v8::Boolean>()->Value();
+        *(ffi_arg *)retValue = (bool)boolValue;
+        return;
+    } else if (tns::IsNumber(value)) {
+        double numValue = tns::ToNumber(value);
+        switch (type) {
+            case BinaryTypeEncodingType::UShortEncoding: {
+                *static_cast<unsigned short*>(retValue) = (unsigned short)numValue;
+                return;
+            }
+            case BinaryTypeEncodingType::ShortEncoding: {
+                *static_cast<short*>(retValue) = (short)numValue;
+                return;
+            }
+            case BinaryTypeEncodingType::UIntEncoding: {
+                *static_cast<unsigned int*>(retValue) = (unsigned int)numValue;
+                return;
+            }
+            case BinaryTypeEncodingType::IntEncoding: {
+                *static_cast<int*>(retValue) = (int)numValue;
+                return;
+            }
+            case BinaryTypeEncodingType::ULongEncoding: {
+                *static_cast<unsigned long*>(retValue) = (unsigned long)numValue;
+                return;
+            }
+            case BinaryTypeEncodingType::LongEncoding: {
+                *static_cast<long*>(retValue) = (long)numValue;
+                return;
+            }
+            case BinaryTypeEncodingType::ULongLongEncoding: {
+                *static_cast<unsigned long long*>(retValue) = (unsigned long long)numValue;
+                return;
+            }
+            case BinaryTypeEncodingType::LongLongEncoding: {
+                *static_cast<long long*>(retValue) = (long long)numValue;
+                return;
+            }
+            case BinaryTypeEncodingType::FloatEncoding: {
+                *static_cast<float*>(retValue) = (float)numValue;
+                return;
+            }
+            case BinaryTypeEncodingType::DoubleEncoding: {
+                *static_cast<double*>(retValue) = numValue;
+                return;
+            }
+            default:
+                return;
+        }
+    } else if (value->IsString()) {
+        std::string strValue = tns::ToString(isolate, value);
+        if (type == BinaryTypeEncodingType::IdEncoding) {
+            id data = [NSString stringWithUTF8String:strValue.c_str()];
+            *(ffi_arg*)retValue = (unsigned long)data;
+            return;
+        }
+    } else if (value->IsObject()) {
+        if (type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
+            type == BinaryTypeEncodingType::InstanceTypeEncoding ||
+            type == BinaryTypeEncodingType::IdEncoding) {
+            BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
+            if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::ObjCObject) {
+                ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(baseWrapper);
+                id data = wrapper->Data();
+                *(ffi_arg*)retValue = (unsigned long)data;
+                return;
+            }
+        }
+    }
+
+    // TODO: Handle other return types, i.e. assign the retValue parameter from the v8 result
+    assert(false);
 }
 
 Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver) {

@@ -24,6 +24,7 @@ public:
     static void SetStructPropertyValue(StructWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer);
     static void WriteValue(v8::Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, v8::Local<v8::Value> arg);
+    static id ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg);
 private:
     static v8::Persistent<v8::Function>* sliceFunc_;
 

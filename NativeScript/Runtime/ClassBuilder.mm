@@ -1,6 +1,8 @@
 #include <Foundation/Foundation.h>
 #include <numeric>
+#include <sstream>
 #include "ClassBuilder.h"
+#include "FastEnumerationAdapter.h"
 #include "ArgConverter.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
@@ -233,6 +235,127 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
     this->ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject);
 }
 
+std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
+    BinaryTypeEncodingType type = typeEncoding->type;
+    switch (type) {
+        case BinaryTypeEncodingType::VoidEncoding: {
+            return "v";
+        }
+        case BinaryTypeEncodingType::BoolEncoding: {
+            return "B";
+        }
+        case BinaryTypeEncodingType::UnicharEncoding:
+        case BinaryTypeEncodingType::UShortEncoding: {
+            return "S";
+        }
+        case BinaryTypeEncodingType::ShortEncoding: {
+            return "s";
+        }
+        case BinaryTypeEncodingType::UIntEncoding: {
+            return "I";
+        }
+        case BinaryTypeEncodingType::IntEncoding: {
+            return "i";
+        }
+        case BinaryTypeEncodingType::ULongEncoding: {
+            return "L";
+        }
+        case BinaryTypeEncodingType::LongEncoding: {
+            return "l";
+        }
+        case BinaryTypeEncodingType::ULongLongEncoding: {
+            return "Q";
+        }
+        case BinaryTypeEncodingType::LongLongEncoding: {
+            return "q";
+        }
+        case BinaryTypeEncodingType::UCharEncoding: {
+            return "C";
+        }
+        case BinaryTypeEncodingType::CharEncoding: {
+            return "c";
+        }
+        case BinaryTypeEncodingType::FloatEncoding: {
+            return "f";
+        }
+        case BinaryTypeEncodingType::DoubleEncoding: {
+            return "d";
+        }
+        case BinaryTypeEncodingType::CStringEncoding: {
+            return "*";
+        }
+        case BinaryTypeEncodingType::ClassEncoding: {
+            return "#";
+        }
+        case BinaryTypeEncodingType::SelectorEncoding: {
+            return ":";
+        }
+        case BinaryTypeEncodingType::BlockEncoding: {
+            return "@?";
+        }
+        case BinaryTypeEncodingType::StructDeclarationReference: {
+            const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
+            const Meta* meta = ArgConverter::GetMeta(structName);
+            assert(meta != nullptr && meta->type() == MetaType::Struct);
+            const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+            const TypeEncoding* fieldEncoding = structMeta->fieldsEncodings()->first();
+
+            std::stringstream ss;
+            ss << "{" << structName << "=";
+            for (int i = 0; i < structMeta->fieldsCount(); i++) {
+                ss << GetTypeEncoding(fieldEncoding);
+                fieldEncoding = fieldEncoding->next();
+            }
+            ss << "}";
+            return ss.str();
+        }
+        case BinaryTypeEncodingType::PointerEncoding: {
+            return "^";
+        }
+        case BinaryTypeEncodingType::ProtocolEncoding:
+        case BinaryTypeEncodingType::InterfaceDeclarationReference:
+        case BinaryTypeEncodingType::InstanceTypeEncoding:
+        case BinaryTypeEncodingType::IdEncoding: {
+            return "@";
+        }
+
+        default:
+            // TODO: Handle the other possible types
+            assert(false);
+    }
+}
+
+std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, int argsCount) {
+    std::stringstream compilerEncoding;
+    compilerEncoding << GetTypeEncoding(typeEncoding);
+    compilerEncoding << "@:"; // id self, SEL _cmd
+
+    for (int i = 0; i < argsCount; i++) {
+        typeEncoding = typeEncoding->next();
+        compilerEncoding << GetTypeEncoding(typeEncoding);
+    }
+
+    return compilerEncoding.str();
+}
+
+BinaryTypeEncodingType ClassBuilder::GetTypeEncodingType(Isolate* isolate, Local<Value> value) {
+    if (BaseDataWrapper* wrapper = tns::GetValue(isolate, value)) {
+        if (wrapper->Type() == WrapperType::ObjCClass) {
+            return BinaryTypeEncodingType::IdEncoding;
+        } else if (wrapper->Type() == WrapperType::ObjCProtocol) {
+            return BinaryTypeEncodingType::IdEncoding;
+        } else if (wrapper->Type() == WrapperType::Primitive) {
+            PrimitiveDataWrapper* pdw = static_cast<PrimitiveDataWrapper*>(wrapper);
+            return pdw->EncodingType();
+        } else if (wrapper->Type() == WrapperType::ObjCObject) {
+            return BinaryTypeEncodingType::IdEncoding;
+        }
+    }
+
+    //  TODO: Unknown encoding type
+    assert(false);
+}
+
 void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, Local<Value> exposedMethods, Local<Value> exposedProtocols, Local<Object> implementationObject) {
     Local<Context> context = isolate->GetCurrentContext();
 
@@ -275,36 +398,41 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
                 continue;
             }
 
-            BinaryTypeEncodingType returnType = BinaryTypeEncodingType::VoidEncoding;
-
             Local<Value> returnsVal = methodSignature.As<Object>()->Get(tns::ToV8String(isolate, "returns"));
-            if (!returnsVal.IsEmpty() && returnsVal->IsObject()) {
-                Local<Object> returnsObj = returnsVal.As<Object>();
-                if (BaseDataWrapper* wrapper = tns::GetValue(isolate, returnsObj)) {
-                    if (wrapper->Type() == WrapperType::Primitive) {
-                        PrimitiveDataWrapper* pdw = static_cast<PrimitiveDataWrapper*>(wrapper);
-                        returnType = pdw->EncodingType();
-                    } else {
-                        returnType = BinaryTypeEncodingType::PointerEncoding;
-                    }
-                }
+            Local<Value> paramsVal = methodSignature.As<Object>()->Get(tns::ToV8String(isolate, "params"));
+            if (returnsVal.IsEmpty() || !returnsVal->IsObject()) {
+                // Incorrect exposedMethods definition: missing returns property
+                assert(false);
             }
 
-            // TODO: Prepare the TypeEncoding* from the v8 arguments and return type.
-            std::string typeInfo = "v@:@";
-            int argsCount = 1;
-            std::string methodNameStr = tns::ToString(isolate, methodName);
-            SEL selector = NSSelectorFromString([NSString stringWithUTF8String:(methodNameStr).c_str()]);
+            int argsCount = 0;
+            if (!paramsVal.IsEmpty() && paramsVal->IsArray()) {
+                argsCount = paramsVal.As<v8::Array>()->Length();
+            }
 
-            TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc(2, sizeof(TypeEncoding)));
+            BinaryTypeEncodingType returnType = GetTypeEncodingType(isolate, returnsVal);
+
+            std::string methodNameStr = tns::ToString(isolate, methodName);
+            SEL selector = sel_registerName(methodNameStr.c_str());
+
+            TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc(argsCount + 1, sizeof(TypeEncoding)));
             typeEncoding->type = returnType;
-            TypeEncoding* next = reinterpret_cast<TypeEncoding*>(reinterpret_cast<char*>(typeEncoding) + sizeof(BinaryTypeEncodingType));
-            next->type = BinaryTypeEncodingType::InterfaceDeclarationReference;
+
+            if (!paramsVal.IsEmpty() && paramsVal->IsArray()) {
+                Local<v8::Array> params = paramsVal.As<v8::Array>();
+                TypeEncoding* next = typeEncoding;
+                for (int i = 0; i < params->Length(); i++) {
+                    next = reinterpret_cast<TypeEncoding*>(reinterpret_cast<char*>(next) + sizeof(next->type));
+                    Local<Value> param = params->Get(i);
+                    next->type = GetTypeEncodingType(isolate, param);
+                }
+            }
 
             Persistent<Value>* poCallback = new Persistent<Value>(isolate, method);
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
             IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
-            class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str());
+            std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);
+            assert(class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str()));
         }
     }
 
@@ -316,6 +444,23 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
     const BaseClassMeta* extendedClassMeta = static_cast<const BaseClassMeta*>(m);
 
     Local<v8::Array> propertyNames;
+
+    Local<Value> symbolIterator = implementationObject->Get(Symbol::GetIterator(isolate));
+    if (!symbolIterator.IsEmpty() && symbolIterator->IsFunction()) {
+        Local<v8::Function> symbolIteratorFunc = symbolIterator.As<v8::Function>();
+
+        class_addProtocol(extendedClass, @protocol(NSFastEnumeration));
+        class_addProtocol(object_getClass(extendedClass), @protocol(NSFastEnumeration));
+
+        Persistent<v8::Function>* poIteratorFunc = new Persistent<v8::Function>(isolate, symbolIteratorFunc);
+        IMP imp = imp_implementationWithBlock(^NSUInteger(id self, NSFastEnumerationState* state, __unsafe_unretained id buffer[], NSUInteger length) {
+            return tns::FastEnumerationAdapter(isolate, self, state, buffer, length, poIteratorFunc);
+        });
+
+        struct objc_method_description fastEnumerationMethodDescription = protocol_getMethodDescription(@protocol(NSFastEnumeration), @selector(countByEnumeratingWithState:objects:count:), YES, YES);
+        assert(class_addMethod(extendedClass, @selector(countByEnumeratingWithState:objects:count:), imp, fastEnumerationMethodDescription.types));
+    }
+
     assert(implementationObject->GetOwnPropertyNames(context).ToLocal(&propertyNames));
     for (uint32_t i = 0; i < propertyNames->Length(); i++) {
         Local<Value> key = propertyNames->Get(i);
@@ -334,7 +479,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
         Local<Value> getter = propertyDescriptor.As<Object>()->Get(tns::ToV8String(isolate, "get"));
         Local<Value> setter = propertyDescriptor.As<Object>()->Get(tns::ToV8String(isolate, "set"));
         if ((!getter.IsEmpty() || !setter.IsEmpty()) && (getter->IsFunction() || setter->IsFunction())) {
-            std::vector<std::pair<const PropertyMeta*, objc_property_t>> propertyMetas;
+            std::vector<const PropertyMeta*> propertyMetas;
             VisitProperties(methodName, extendedClassMeta, propertyMetas, protocols);
             ExposeProperties(isolate, extendedClass, propertyMetas, implementationObject, getter, setter);
             continue;
@@ -356,12 +501,13 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
             SEL selector = methodMeta->selector();
             IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
-            class_addMethod(extendedClass, selector, methodBody, "v@:@");
+            std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);
+            assert(class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str()));
         }
     }
 }
 
-void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<std::pair<const PropertyMeta*, objc_property_t>>& propertyMetas, std::vector<Protocol*> exposedProtocols) {
+void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<const PropertyMeta*>& propertyMetas, std::vector<Protocol*> exposedProtocols) {
     for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
         const PropertyMeta* propertyMeta = (*it).valuePtr();
         if (propertyMeta->jsName() == propertyName) {
@@ -376,10 +522,8 @@ void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta
                 property = class_getProperty(klass, propertyName.c_str());
             }
 
-            if (property != nullptr) {
-                if (std::find_if(propertyMetas.begin(), propertyMetas.end(), [&propertyMeta](const std::pair<const PropertyMeta*, objc_property_t>& x) { return x.first == propertyMeta; }) == propertyMetas.end()) {
-                    propertyMetas.push_back(std::make_pair(propertyMeta, property));
-                }
+            if (std::find(propertyMetas.begin(), propertyMetas.end(), propertyMeta) == propertyMetas.end()) {
+                propertyMetas.push_back(propertyMeta);
             }
         }
     }
@@ -452,15 +596,10 @@ void ClassBuilder::VisitMethods(Isolate* isolate, Class extendedClass, std::stri
     }
 }
 
-void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::vector<std::pair<const PropertyMeta*, objc_property_t>> propertyMetas, Local<Object> implementationObject, Local<Value> getter, Local<Value> setter) {
+void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::vector<const PropertyMeta*> propertyMetas, Local<Object> implementationObject, Local<Value> getter, Local<Value> setter) {
     for (int j = 0; j < propertyMetas.size(); j++) {
-        objc_property_t property = propertyMetas[j].second;
-        const PropertyMeta* propertyMeta = propertyMetas[j].first;
+        const PropertyMeta* propertyMeta = propertyMetas[j];
         std::string propertyName = propertyMeta->name();
-
-        uint attrsCount;
-        objc_property_attribute_t* propertyAttrs = property_copyAttributeList(property, &attrsCount);
-        class_addProperty(extendedClass, propertyMeta->name(), propertyAttrs, attrsCount);
 
         if (!getter.IsEmpty() && getter->IsFunction() && propertyMeta->hasGetter()) {
             Persistent<v8::Function>* poGetterFunc = new Persistent<v8::Function>(isolate, getter.As<v8::Function>());
@@ -479,26 +618,13 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
                     : context->implementationObject_->Get(context->isolate_);
                 assert(getterFunc->Call(context->isolate_->GetCurrentContext(), self_, 0, nullptr).ToLocal(&res));
 
-                BaseDataWrapper* wrapper = tns::GetValue(context->isolate_, res);
-                if (wrapper != nullptr) {
-                    if (wrapper->Type() == WrapperType::ObjCObject) {
-                        ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
-                        *(ffi_arg *)retValue = (unsigned long)wr->Data();
-                    } else {
-                        // TODO: Implement other object wrappers
-                        assert(false);
-                    }
-                } else {
-                    void* nullPtr = nullptr;
-                    *(ffi_arg *)retValue = (unsigned long)nullPtr;
-                }
+                const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
+                ArgConverter::SetValue(context->isolate_, retValue, res, typeEncoding->type);
             };
             const TypeEncoding* typeEncoding = propertyMeta->getter()->encodings()->first();
             IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback , userData);
 
-            const char *getterName = property_copyAttributeValue(property, "G");
-            NSString* selectorStr = getterName != nullptr ? [NSString stringWithUTF8String:getterName] : [NSString stringWithUTF8String:propertyName.c_str()];
-            class_addMethod(extendedClass, NSSelectorFromString(selectorStr), impGetter, "@@:");
+            class_addMethod(extendedClass, propertyMeta->getter()->selector(), impGetter, "@@:");
         }
 
         if (!setter.IsEmpty() && setter->IsFunction() && propertyMeta->hasSetter()) {
@@ -529,20 +655,8 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
             const TypeEncoding* typeEncoding = propertyMeta->setter()->encodings()->first();
             IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
 
-            const char *setterName = property_copyAttributeValue(property, "S");
-            NSString* selectorString;
-            if (setterName == nullptr) {
-                char firstChar = (char)toupper(propertyName[0]);
-                NSString* capitalLetter = [NSString stringWithFormat:@"%c", firstChar];
-                NSString* reminder = [NSString stringWithUTF8String: propertyName.c_str() + 1];
-                selectorString = [@[@"set", capitalLetter, reminder, @":"] componentsJoinedByString:@""];
-            } else {
-                selectorString = [NSString stringWithUTF8String:setterName];
-            }
-            class_addMethod(extendedClass, NSSelectorFromString(selectorString), impSetter, "v@:@");
+            class_addMethod(extendedClass, propertyMeta->setter()->selector(), impSetter, "v@:@");
         }
-
-        free(propertyAttrs);
     }
 }
 

@@ -112,8 +112,8 @@ describe(module.id, function () {
         instance.setValueForKey(NSMutableString.alloc().initWithString('test'), 'x');
 
         // TODO
-        // expect(instance.valueForKey('x') instanceof NSMutableString).toBe(false);
-        // expect(instance.valueForKey('x').description).toBeUndefined();
+        expect(instance.valueForKey('x') instanceof NSMutableString).toBe(false);
+        expect(instance.valueForKey('x').description).toBeUndefined();
 
         // expect(instance.x() instanceof NSMutableString).toBe(true);
         // expect(instance.x().description).toBe('test');

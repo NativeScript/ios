@@ -31,16 +31,16 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     RegisterInteropType(isolate, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
     RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(ffi_type_void.size, BinaryTypeEncodingType::VoidEncoding));
     RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(sizeof(bool), BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, BinaryTypeEncodingType::BoolEncoding));
+    RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, BinaryTypeEncodingType::UShortEncoding));
+    RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, BinaryTypeEncodingType::ShortEncoding));
+    RegisterInteropType(isolate, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, BinaryTypeEncodingType::UIntEncoding));
+    RegisterInteropType(isolate, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, BinaryTypeEncodingType::IntEncoding));
+    RegisterInteropType(isolate, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, BinaryTypeEncodingType::ULongEncoding));
+    RegisterInteropType(isolate, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, BinaryTypeEncodingType::LongEncoding));
+    RegisterInteropType(isolate, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, BinaryTypeEncodingType::ULongLongEncoding));
+    RegisterInteropType(isolate, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, BinaryTypeEncodingType::LongLongEncoding));
+    RegisterInteropType(isolate, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, BinaryTypeEncodingType::FloatEncoding));
+    RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, BinaryTypeEncodingType::DoubleEncoding));
 
     RegisterInteropType(isolate, types, "id", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::IdEncoding));
     RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
