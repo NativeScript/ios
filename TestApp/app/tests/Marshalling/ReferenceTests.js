@@ -12,9 +12,9 @@ describe(module.id, function () {
     it("ReferenceValue", function () {
         var reference = new interop.Reference();
         expect(reference.value).toBeUndefined();
-        // expect(function () {
-        //     interop.handleof(reference);
-        // }).toThrow();
+        expect(function () {
+            interop.handleof(reference);
+        }).toThrow();
 
         reference.value = 5;
         expect(reference.value).toBe(5);

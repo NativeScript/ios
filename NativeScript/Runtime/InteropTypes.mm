@@ -214,8 +214,8 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
         }
 
         if (!hasHandle) {
-            // TODO: throw a javascript exception for an unknown type
-            assert(false);
+            tns::ThrowError(isolate, "Unknown type");
+            return;
         }
 
         if (handle == nullptr) {
