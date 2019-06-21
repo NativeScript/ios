@@ -6837,6 +6837,8 @@ typedef void (*FailedAccessCheckCallback)(Local<Object> target,
  */
 typedef bool (*AllowCodeGenerationFromStringsCallback)(Local<Context> context,
                                                        Local<String> source);
+typedef MaybeLocal<String> (*ModifyCodeGenerationFromStringsCallback)(
+    Local<Context> context, Local<Value> source);
 
 // --- WebAssembly compilation callbacks ---
 typedef bool (*ExtensionCallback)(const FunctionCallbackInfo<Value>&);
@@ -7631,6 +7633,8 @@ class V8_EXPORT Isolate {
     kRegExpMatchIsFalseishOnJSRegExp = 73,
     kDateGetTimezoneOffset = 74,
     kStringNormalize = 75,
+    kCallSiteAPIGetFunctionSloppyCall = 76,
+    kCallSiteAPIGetThisSloppyCall = 77,
 
     // If you add new values here, you'll also need to update Chromium's:
     // web_feature.mojom, UseCounterCallback.cpp, and enums.xml. V8 changes to
@@ -8435,6 +8439,8 @@ class V8_EXPORT Isolate {
    */
   void SetAllowCodeGenerationFromStringsCallback(
       AllowCodeGenerationFromStringsCallback callback);
+  void SetModifyCodeGenerationFromStringsCallback(
+      ModifyCodeGenerationFromStringsCallback callback);
 
   /**
    * Set the callback to invoke to check if wasm code generation should

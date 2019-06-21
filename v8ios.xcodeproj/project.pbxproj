@@ -46,13 +46,10 @@
 		C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937512229FC1600075CB16 /* TNSObjCTypes.m */; };
 		C2937529229FC1600075CB16 /* TNSPrimitivePointers.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */; };
 		C293752E22A10C490075CB16 /* Interop_impl.h in Sources */ = {isa = PBXBuildFile; fileRef = C293752D22A10C490075CB16 /* Interop_impl.h */; };
+		C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */; };
+		C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */; };
 		C2DDEB36229EAB3B00345BFE /* NativeScript.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB34229EAB3B00345BFE /* NativeScript.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3E229EABFF00345BFE /* libffi.a */; };
-		C2DDEB57229EAC1F00345BFE /* platform-ios.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB52229EAC1F00345BFE /* platform-ios.cpp */; };
-		C2DDEB58229EAC1F00345BFE /* timezone-cache.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB53229EAC1F00345BFE /* timezone-cache.h */; };
-		C2DDEB59229EAC1F00345BFE /* platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB54229EAC1F00345BFE /* platform.h */; };
-		C2DDEB5A229EAC1F00345BFE /* stack_trace.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB55229EAC1F00345BFE /* stack_trace.h */; };
-		C2DDEB5B229EAC1F00345BFE /* stack_trace_posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB56229EAC1F00345BFE /* stack_trace_posix.cpp */; };
 		C2DDEB60229EAC3C00345BFE /* snapshot_blob.x86_64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5C229EAC3C00345BFE /* snapshot_blob.x86_64.h */; };
 		C2DDEB61229EAC3C00345BFE /* snapshot_blob.arm64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5D229EAC3C00345BFE /* snapshot_blob.arm64.h */; };
 		C2DDEB62229EAC3C00345BFE /* natives_blob.x86_64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5E229EAC3C00345BFE /* natives_blob.x86_64.h */; };
@@ -209,17 +206,14 @@
 		C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSPrimitivePointers.m; sourceTree = "<group>"; };
 		C2937516229FC1600075CB16 /* TNSRecords.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSRecords.h; sourceTree = "<group>"; };
 		C293752D22A10C490075CB16 /* Interop_impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Interop_impl.h; sourceTree = "<group>"; };
+		C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = FastEnumerationAdapter.mm; sourceTree = "<group>"; };
+		C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FastEnumerationAdapter.h; sourceTree = "<group>"; };
 		C2DDEB16229EA89000345BFE /* TestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB26229EA89200345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C2DDEB32229EAB3B00345BFE /* NativeScript.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScript.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB34229EAB3B00345BFE /* NativeScript.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeScript.h; sourceTree = "<group>"; };
 		C2DDEB35229EAB3B00345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C2DDEB3E229EABFF00345BFE /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
-		C2DDEB52229EAC1F00345BFE /* platform-ios.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "platform-ios.cpp"; sourceTree = "<group>"; };
-		C2DDEB53229EAC1F00345BFE /* timezone-cache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "timezone-cache.h"; sourceTree = "<group>"; };
-		C2DDEB54229EAC1F00345BFE /* platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = platform.h; sourceTree = "<group>"; };
-		C2DDEB55229EAC1F00345BFE /* stack_trace.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = stack_trace.h; sourceTree = "<group>"; };
-		C2DDEB56229EAC1F00345BFE /* stack_trace_posix.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = stack_trace_posix.cpp; sourceTree = "<group>"; };
 		C2DDEB5C229EAC3C00345BFE /* snapshot_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.x86_64.h; sourceTree = "<group>"; };
 		C2DDEB5D229EAC3C00345BFE /* snapshot_blob.arm64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.arm64.h; sourceTree = "<group>"; };
 		C2DDEB5E229EAC3C00345BFE /* natives_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.x86_64.h; sourceTree = "<group>"; };
@@ -447,7 +441,6 @@
 			children = (
 				C2DDEBB7229EB00800345BFE /* Headers */,
 				C2DDEB3D229EABBB00345BFE /* Frameworks */,
-				C2DDEB3C229EAB9600345BFE /* V8Platform */,
 				C2DDEB3B229EAB8600345BFE /* Runtime */,
 				C2DDEB3A229EAB7400345BFE /* Snapshot */,
 				C2DDEB34229EAB3B00345BFE /* NativeScript.h */,
@@ -485,6 +478,8 @@
 				C2DDEB72229EAC8200345BFE /* DataWrapper.h */,
 				C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */,
 				C2DDEB8B229EAC8300345BFE /* DictionaryAdapter.mm */,
+				C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */,
+				C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */,
 				C2DDEB78229EAC8200345BFE /* FFICall.h */,
 				C2DDEB68229EAC8100345BFE /* FFICall.cpp */,
 				C266569D22B282BA00EE15CC /* FunctionReference.h */,
@@ -524,18 +519,6 @@
 				C2DDEB69229EAC8100345BFE /* WeakRef.cpp */,
 			);
 			path = Runtime;
-			sourceTree = "<group>";
-		};
-		C2DDEB3C229EAB9600345BFE /* V8Platform */ = {
-			isa = PBXGroup;
-			children = (
-				C2DDEB52229EAC1F00345BFE /* platform-ios.cpp */,
-				C2DDEB54229EAC1F00345BFE /* platform.h */,
-				C2DDEB56229EAC1F00345BFE /* stack_trace_posix.cpp */,
-				C2DDEB55229EAC1F00345BFE /* stack_trace.h */,
-				C2DDEB53229EAC1F00345BFE /* timezone-cache.h */,
-			);
-			path = V8Platform;
 			sourceTree = "<group>";
 		};
 		C2DDEB3D229EABBB00345BFE /* Frameworks */ = {
@@ -635,11 +618,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				C2DDEBBF229EB02500345BFE /* v8.h in Headers */,
-				C2DDEB59229EAC1F00345BFE /* platform.h in Headers */,
 				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
 				C2DDEB61229EAC3C00345BFE /* snapshot_blob.arm64.h in Headers */,
 				C2DDEB63229EAC3C00345BFE /* natives_blob.arm64.h in Headers */,
+				C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */,
 				C2DDEBBE229EB02500345BFE /* v8-version.h in Headers */,
 				C2DDEBAD229EAC8300345BFE /* Caches.h in Headers */,
 				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
@@ -654,7 +637,6 @@
 				C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */,
 				C2DDEBC3229EB02500345BFE /* v8-platform.h in Headers */,
 				C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */,
-				C2DDEB58229EAC1F00345BFE /* timezone-cache.h in Headers */,
 				C2DDEBCB229EB06500345BFE /* v8-tracing.h in Headers */,
 				C2DDEBA2229EAC8300345BFE /* Console.h in Headers */,
 				C2DDEBC0229EB02500345BFE /* libffi.h in Headers */,
@@ -674,7 +656,6 @@
 				C2DDEBD4229EB06E00345BFE /* ffi.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
 				C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */,
-				C2DDEB5A229EAC1F00345BFE /* stack_trace.h in Headers */,
 				C2DDEBD5229EB06E00345BFE /* ffitarget.h in Headers */,
 				C2DDEB9B229EAC8300345BFE /* DataWrapper.h in Headers */,
 				C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */,
@@ -839,7 +820,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C2DDEB5B229EAC1F00345BFE /* stack_trace_posix.cpp in Sources */,
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.cpp in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
@@ -847,9 +827,9 @@
 				C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */,
 				C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */,
 				C2DDEB9E229EAC8300345BFE /* SymbolLoader.mm in Sources */,
+				C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */,
 				C2DDEB99229EAC8300345BFE /* Metadata.mm in Sources */,
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
-				C2DDEB57229EAC1F00345BFE /* platform-ios.cpp in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
