@@ -33,22 +33,22 @@ describe(module.id, function () {
         TNSTestNativeCallbacks.apiCustomGetterAndSetter(object);
     });
 
-    // it("OverrideWithCustomGetterAndSetter", function () {
-    //     var JSApi = TNSApi.extend({
-    //         get property() {
-    //             return -Object.getOwnPropertyDescriptor(TNSApi.prototype, 'property').get.call(this);
-    //         },
-    //         set property(x) {
-    //             Object.getOwnPropertyDescriptor(TNSApi.prototype, 'property').set.call(this, x * 2);
-    //         },
-    //     });
-    //     var object = new JSApi();
-    //     expect(object.property).toBe(0);
-    //     object.property = 3;
-    //     expect(object.property).toBe(-6);
+    it("OverrideWithCustomGetterAndSetter", function () {
+        var JSApi = TNSApi.extend({
+            get property() {
+                return -Object.getOwnPropertyDescriptor(TNSApi.prototype, 'property').get.call(this);
+            },
+            set property(x) {
+                Object.getOwnPropertyDescriptor(TNSApi.prototype, 'property').set.call(this, x * 2);
+            },
+        });
+        var object = new JSApi();
+        expect(object.property).toBe(0);
+        object.property = 3;
+        expect(object.property).toBe(-6);
 
-    //     TNSTestNativeCallbacks.apiOverrideWithCustomGetterAndSetter(object);
-    // });
+        TNSTestNativeCallbacks.apiOverrideWithCustomGetterAndSetter(object);
+    });
 
     // TODO
     // it("BigIntMethods", function() {
@@ -123,72 +123,72 @@ describe(module.id, function () {
         TNSTestNativeCallbacks.apiReadonlyPropertyInProtocolAndOverrideWithSetterInInterface(object);
     });
 
-//     it("DescriptionOverride", function () {
-//         var object = NSObject.extend({
-//             get description() {
-//                 return 'js description';
-//             }
-//         }).alloc().init();
+    it("DescriptionOverride", function () {
+        var object = NSObject.extend({
+            get description() {
+                return 'js description';
+            }
+        }).alloc().init();
 
-//         expect(object.description).toBe('js description');
-//         expect(object.toString()).toBe('js description');
+        expect(object.description).toBe('js description');
+        expect(object.toString()).toBe('js description');
 
-//         TNSTestNativeCallbacks.apiDescriptionOverride(object);
-//     });
+        TNSTestNativeCallbacks.apiDescriptionOverride(object);
+    });
 
     it("ProtocolClassConflict", function () {
         expect(NSProtocolFromString("NSObject")).toBe(NSObjectProtocol);
     });
 
-//     it("NSMutableArrayMethods", function () {
-//         var JSMutableArray = NSMutableArray.extend({
-//             init: function () {
-//                 var self = NSMutableArray.prototype.init.apply(this, arguments);
-//                 self._array = [];
-//                 return self;
-//             },
-// // TODO
-// //            dealloc: function() {
-// //                TNSLog(this.count);
-// //                delete this._array;
-// //                NSMutableArray.prototype.dealloc.apply(this, arguments);
-// //            },
-//             insertObjectAtIndex: function (anObject, index) {
-//                 this._array.splice(index, 0, anObject);
-//             },
-//             removeObjectAtIndex: function (index) {
-//                 this._array.splice(index, 1);
-//             },
-//             addObject: function (anObject) {
-//                 this._array.push(anObject);
-//             },
-//             removeLastObject: function () {
-//                 this._array.pop();
-//             },
-//             replaceObjectAtIndexWithObject: function (index, anObject) {
-//                 this._array[index] = anObject;
-//             },
-//             objectAtIndex: function (index) {
-//                 return this._array[index];
-//             },
-//             get count() {
-//                 return this._array.length;
-//             },
-//             get hash() {
-//                 return this.count;
-//             }
-//         }, {
-//             name: 'JSMutableArray'
-//         });
+    it("NSMutableArrayMethods", function () {
+        var JSMutableArray = NSMutableArray.extend({
+            init: function () {
+                var self = NSMutableArray.prototype.init.apply(this, arguments);
+                self._array = [];
+                return self;
+            },
+// TODO
+//            dealloc: function() {
+//                TNSLog(this.count);
+//                delete this._array;
+//                NSMutableArray.prototype.dealloc.apply(this, arguments);
+//            },
+            insertObjectAtIndex: function (anObject, index) {
+                this._array.splice(index, 0, anObject);
+            },
+            removeObjectAtIndex: function (index) {
+                this._array.splice(index, 1);
+            },
+            addObject: function (anObject) {
+                this._array.push(anObject);
+            },
+            removeLastObject: function () {
+                this._array.pop();
+            },
+            replaceObjectAtIndexWithObject: function (index, anObject) {
+                this._array[index] = anObject;
+            },
+            objectAtIndex: function (index) {
+                return this._array[index];
+            },
+            get count() {
+                return this._array.length;
+            },
+            get hash() {
+                return this.count;
+            }
+        }, {
+            name: 'JSMutableArray'
+        });
 
-//         (function () {
-//             var array = new JSMutableArray();
-//             TNSTestNativeCallbacks.apiNSMutableArrayMethods(array);
-//         }());
-//         __collect();
+        (function () {
+            var array = new JSMutableArray();
+            TNSTestNativeCallbacks.apiNSMutableArrayMethods(array);
+        }());
+        gc();
 
-//         expect(TNSGetOutput()).toBe('44abcd');
-//     });
+        expect(TNSGetOutput()).toBe('44abcd');
+    });
 
     it("SpecialCaseProperty_When_InstancesRespondToSelector:_IsFalse", function () {
         var field = new UITextField();
@@ -620,14 +620,14 @@ describe(module.id, function () {
 //         }).toThrow();
 //     });
 
-//     it('methods can be recursively called', function() {
-//         var result = TNSTestNativeCallbacks.callRecursively(function() {
-//             return TNSTestNativeCallbacks.callRecursively(function() {
-//                  return "InnerRecursiveResult";
-//             });
-//         });
-//         expect(result).toBe("InnerRecursiveResult");
-//     });
+    it('methods can be recursively called', function() {
+        var result = TNSTestNativeCallbacks.callRecursively(function() {
+            return TNSTestNativeCallbacks.callRecursively(function() {
+                 return "InnerRecursiveResult";
+            });
+        });
+        expect(result).toBe("InnerRecursiveResult");
+    });
 
 //     it('methods returning blocks can be recursively called', function() {
 //         var i = 0;
