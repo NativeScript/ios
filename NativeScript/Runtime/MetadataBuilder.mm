@@ -98,14 +98,25 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
             }
 
             id result = *static_cast<const id*>(dataSymbol);
+            if (result == nil) {
+                info.GetReturnValue().Set(Null(isolate));
+                return;
+            }
+
             if ([result isKindOfClass:[NSString class]]) {
                 Local<v8::String> strResult = tns::ToV8String(isolate, [result UTF8String]);
                 info.GetReturnValue().Set(strResult);
                 return;
+            } else if ([result isKindOfClass:[NSNumber class]]) {
+                Local<Number> numResult = Number::New(isolate, [result doubleValue]);
+                info.GetReturnValue().Set(numResult);
+                return;
             }
 
-            // TODO: Handle other data variable types than NSString
-            assert(false);
+            std::string className = object_getClassName(result);
+            ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, result);
+            Local<Value> jsResult = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>());
+            info.GetReturnValue().Set(jsResult);
         } else if (meta->type() == MetaType::JsCode) {
             const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
             std::string jsCode = jsCodeMeta->jsCode();
