@@ -220,8 +220,8 @@ describe(module.id, function () {
         var actual = TNSGetOutput();
         expect(actual).toBe("i");
 
-        // expect(function () {
-        //     functionWithUnichar('iPhone');
-        // }).toThrowError();
+        expect(function () {
+            functionWithUnichar('iPhone');
+        }).toThrowError();
     });
 });

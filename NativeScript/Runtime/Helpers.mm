@@ -132,6 +132,17 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
     return static_cast<BaseDataWrapper*>(metadataProp.As<External>()->Value());
 }
 
+void tns::ThrowError(Isolate* isolate, std::string message) {
+    // The Isolate::Scope here is necessary because the Exception::Error method internally relies on the
+    // Isolate::GetCurrent method which might return null if we do not use the proper scope
+    Isolate::Scope scope(isolate);
+
+    Local<v8::String> errorMessage = tns::ToV8String(isolate, message);
+    Local<Value> error = Exception::Error(errorMessage);
+    isolate->ThrowException(error);
+}
+
+
 bool tns::IsString(Local<Value> value) {
     return !value.IsEmpty() && (value->IsString() || value->IsStringObject());
 }

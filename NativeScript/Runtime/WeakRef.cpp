@@ -27,10 +27,7 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
 
     if (info.Length() < 1 || !info[0]->IsObject()) {
-        Isolate::Scope sc(isolate);
-        Local<v8::String> errorMessage = tns::ToV8String(isolate, "Argument must be an object.");
-        Local<Value> exception = Exception::Error(errorMessage);
-        isolate->ThrowException(exception);
+        tns::ThrowError(isolate, "Argument must be an object.");
         return;
     }
 

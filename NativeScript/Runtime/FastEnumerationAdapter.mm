@@ -53,10 +53,7 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
         }
 
         if (nextResult.IsEmpty() || !nextResult->IsObject()) {
-            Isolate::Scope sc(isolate);
-            Local<v8::String> errorMessage = tns::ToV8String(isolate, "The \"next\" method must return an object with at least the \"value\" or \"done\" properties");
-            Local<Value> exception = Exception::TypeError(errorMessage);
-            isolate->ThrowException(exception);
+            tns::ThrowError(isolate, "The \"next\" method must return an object with at least the \"value\" or \"done\" properties");
             return 0;
         }
 

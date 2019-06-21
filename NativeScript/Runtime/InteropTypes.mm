@@ -363,10 +363,7 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
         }
 
         if (size == 0) {
-            Isolate::Scope sc(isolate);
-            Local<v8::String> errorMessage = tns::ToV8String(isolate, "Unknown type");
-            Local<Value> exception = Exception::Error(errorMessage);
-            isolate->ThrowException(exception);
+            tns::ThrowError(isolate, "Unknown type");
         } else {
             info.GetReturnValue().Set(Number::New(isolate, size));
         }

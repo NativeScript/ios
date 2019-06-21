@@ -84,7 +84,8 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         v8::String::Utf8Value utf8Value(isolate, arg);
         const char* strCopy = strdup(*utf8Value);
         if (strlen(strCopy) > 1) {
-            assert(false);
+            tns::ThrowError(isolate, "Only one character string can be converted to unichar.");
+            return;
         }
         unichar c = (strlen(strCopy) == 0) ? 0 : strCopy[0];
         Interop::SetValue(dest, c);
@@ -130,25 +131,40 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg.As<Object>());
         if (innerType->type == BinaryTypeEncodingType::VoidEncoding) {
-            assert(wrapper != nullptr && wrapper->Type() == WrapperType::Pointer);
-            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
-            void* data = pointerWrapper->Data();
-            Interop::SetValue(dest, data);
+            assert(wrapper != nullptr);
+
+            if (wrapper->Type() == WrapperType::Pointer) {
+                PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+                void* data = pointerWrapper->Data();
+                Interop::SetValue(dest, data);
+            } else {
+                // TODO:
+                assert(false);
+            }
         } else {
-            assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
+            assert(wrapper != nullptr);
 
-            ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
+            void* data = nullptr;
 
-            ffi_type* ffiType = FFICall::GetArgumentType(innerType);
-            void* data = calloc(ffiType->size, 1);
+            if (wrapper->Type() == WrapperType::Pointer) {
+                PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+                data = pointerWrapper->Data();
+            } else if (wrapper->Type() == WrapperType::Reference) {
+                ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
+                ffi_type* ffiType = FFICall::GetArgumentType(innerType);
+                data = calloc(ffiType->size, 1);
 
-            if (referenceWrapper->Value() != nullptr) {
-                // Initialize the ref/out parameter value before passing it to the function call
-                Interop::WriteValue(isolate, innerType, data, referenceWrapper->Value()->Get(isolate));
+                if (referenceWrapper->Value() != nullptr) {
+                    // Initialize the ref/out parameter value before passing it to the function call
+                    Interop::WriteValue(isolate, innerType, data, referenceWrapper->Value()->Get(isolate));
+                }
+
+                referenceWrapper->SetData(data);
+                referenceWrapper->SetEncoding(innerType);
+            } else {
+                assert(false);
             }
 
-            referenceWrapper->SetData(data);
-            referenceWrapper->SetEncoding(innerType);
             Interop::SetValue(dest, data);
         }
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::FunctionPointerEncoding) {

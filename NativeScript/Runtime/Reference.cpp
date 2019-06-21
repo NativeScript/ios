@@ -83,7 +83,7 @@ void Reference::SetValueCallback(Local<Name> name, Local<Value> value, const Pro
 
     if (argWrapper != nullptr && argWrapper->Type() == WrapperType::Pointer) {
         PointerWrapper* pw = static_cast<PointerWrapper*>(argWrapper);
-        pw->SetData(pw->Data());
+        wrapper->SetData(pw->Data());
     } else {
         Persistent<Value>* poValue = new Persistent<Value>(isolate, value);
         wrapper->SetValue(poValue);
@@ -99,7 +99,7 @@ void Reference::SetValueCallback(Local<Name> name, Local<Value> value, const Pro
 }
 
 Local<Value> Reference::GetInteropReferenceValue(Isolate* isolate, ReferenceWrapper* wrapper) {
-    if (wrapper->Data() != nullptr) {
+    if (wrapper->Data() != nullptr && wrapper->Encoding() != nullptr) {
         const TypeEncoding* encoding = wrapper->Encoding();
         uint8_t* data = (uint8_t*)wrapper->Data();
 

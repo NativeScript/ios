@@ -61,10 +61,7 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
 
     if (info.Length() == 1) {
         if (!tns::IsNumber(info[0])) {
-            Isolate::Scope sc(isolate);
-            Local<v8::String> errorMessage = tns::ToV8String(isolate, "Pointer constructor's first arg must be an integer.");
-            Local<Value> exception = Exception::Error(errorMessage);
-            isolate->ThrowException(exception);
+            tns::ThrowError(isolate, "Pointer constructor's first arg must be an integer.");
             return;
         }
 
