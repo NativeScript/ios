@@ -669,6 +669,7 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<Name> property, const Prope
 
     superValue->SetPrototype(context, thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype()).ToChecked();
     superValue->SetInternalField(0, thiz->GetInternalField(0));
+    superValue->SetInternalField(1, tns::ToV8String(isolate, "super"));
 
     info.GetReturnValue().Set(superValue);
 }

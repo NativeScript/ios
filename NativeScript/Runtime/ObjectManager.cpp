@@ -36,6 +36,14 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         return;
     }
 
+    if (obj->InternalFieldCount() > 1) {
+        Local<Value> superValue = obj->GetInternalField(1);
+        if (!superValue.IsEmpty() && superValue->IsString()) {
+            // Do not dispose the ObjCWrapper contained in a "super" instance
+            return;
+        }
+    }
+
     Local<Value> internalField = obj->GetInternalField(0);
     if (internalField.IsEmpty() || internalField->IsNullOrUndefined() || !internalField->IsExternal()) {
         return;
@@ -77,6 +85,7 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             if (referenceWrapper->Value() != nullptr) {
                 Local<Value> value = referenceWrapper->Value()->Get(isolate);
                 ObjectManager::DisposeValue(isolate, value);
+                DisposeValue(isolate, referenceWrapper->Value()->Get(isolate));
                 referenceWrapper->Value()->Reset();
             }
 
@@ -106,6 +115,7 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         case WrapperType::FunctionReference: {
             FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
             if (funcWrapper->Function() != nullptr) {
+                DisposeValue(isolate, funcWrapper->Function()->Get(isolate));
                 funcWrapper->Function()->Reset();
             }
             break;

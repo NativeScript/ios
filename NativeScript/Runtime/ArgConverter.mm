@@ -379,7 +379,7 @@ Local<Object> ArgConverter::CreateEmptyInstance(Local<Context> context, Persiste
 Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, GenericNamedPropertyGetterCallback propertyGetter, GenericNamedPropertySetterCallback propertySetter) {
     Local<FunctionTemplate> emptyInstanceCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
     Local<ObjectTemplate> instanceTemplate = emptyInstanceCtorFuncTemplate->InstanceTemplate();
-    instanceTemplate->SetInternalFieldCount(1);
+    instanceTemplate->SetInternalFieldCount(2);
 
     NamedPropertyHandlerConfiguration config(propertyGetter, propertySetter);
     instanceTemplate->SetHandler(config);
