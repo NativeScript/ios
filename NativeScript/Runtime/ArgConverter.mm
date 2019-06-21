@@ -203,7 +203,8 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
         }
     } else if (value->IsString()) {
         std::string strValue = tns::ToString(isolate, value);
-        if (type == BinaryTypeEncodingType::IdEncoding) {
+        if (type == BinaryTypeEncodingType::IdEncoding ||
+            type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             id data = [NSString stringWithUTF8String:strValue.c_str()];
             *(ffi_arg*)retValue = (unsigned long)data;
             return;
