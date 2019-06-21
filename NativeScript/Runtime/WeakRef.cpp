@@ -24,18 +24,22 @@ void WeakRef::Init(Isolate* isolate) {
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.IsConstructCall());
-    assert(info.Length() == 1);
-    Local<Value> target = info[0];
-    assert(target->IsObject());
-
     Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
 
-    Local<Object> targetObj = target.As<Object>();
+    if (info.Length() < 1 || !info[0]->IsObject()) {
+        Isolate::Scope sc(isolate);
+        Local<v8::String> errorMessage = tns::ToV8String(isolate, "Argument must be an object.");
+        Local<Value> exception = Exception::Error(errorMessage);
+        isolate->ThrowException(exception);
+        return;
+    }
+
+    Local<Object> target = info[0].As<Object>();
+    Local<Context> context = isolate->GetCurrentContext();
 
     Local<Object> weakRef = ArgConverter::CreateEmptyObject(context);
 
-    Persistent<Object>* poTarget = new Persistent<Object>(isolate, targetObj);
+    Persistent<Object>* poTarget = new Persistent<Object>(isolate, target);
     Persistent<Object>* poHolder = new Persistent<Object>(isolate, weakRef);
     CallbackState* callbackState = new CallbackState(poTarget, poHolder);
 

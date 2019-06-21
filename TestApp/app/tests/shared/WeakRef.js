@@ -8,7 +8,7 @@ describe("WeakRef", function () {
         var weakref = new WeakRef(obj);
 
         obj = null;
-        __collect();
+        gc();
 
         expect(weakref.get()).toBe(null);
     });
