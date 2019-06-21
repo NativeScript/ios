@@ -170,18 +170,33 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isol
 }
 
 void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value>& info) {
-    assert(info.IsConstructCall());
+    Isolate* isolate = info.GetIsolate();
 
     StructTypeWrapper* typeWrapper = static_cast<StructTypeWrapper*>(info.Data().As<External>()->Value());
 
     std::vector<StructField> fields;
     ffi_type* ffiType = FFICall::GetStructFFIType(typeWrapper->Meta(), fields);
 
-    Local<Value> initializer = info.Length() > 0 ? info[0] : Local<Value>();
-    void* dest = malloc(ffiType->size);
-    Interop::InitializeStruct(info.GetIsolate(), dest, fields, initializer);
+    void* dest = nullptr;
 
-    Isolate* isolate = info.GetIsolate();
+    if (info.IsConstructCall()) {
+        // A new structure is allocated
+        Local<Value> initializer = info.Length() > 0 ? info[0] : Local<Value>();
+        dest = malloc(ffiType->size);
+        Interop::InitializeStruct(info.GetIsolate(), dest, fields, initializer);
+    } else {
+        // The structure is not used as constructor and in this case we assume a pointer is passed to the function
+        // This pointer will be used as backing memory for the structure
+        BaseDataWrapper* wrapper = nullptr;
+        if (info.Length() < 1 || !(wrapper = tns::GetValue(isolate, info[0])) || wrapper->Type() != WrapperType::Pointer) {
+            tns::ThrowError(isolate, "A pointer instance must be passed to the structure initializer");
+            return;
+        }
+
+        PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
+        dest = pw->Data();
+    }
+
     StructWrapper* wrapper = new StructWrapper(typeWrapper->Meta(), dest, ffiType);
     Local<Value> result = ArgConverter::ConvertArgument(isolate, wrapper);
     info.GetReturnValue().Set(result);

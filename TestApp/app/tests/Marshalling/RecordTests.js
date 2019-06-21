@@ -41,31 +41,31 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('1 2 3 4');
     });
 
-    // it("RecordConstructorPointer", function () {
-    //     (function () {
-    //         var size = interop.sizeof(TNSNestedStruct);
-    //         expect(size).toBeGreaterThan(0);
-    //         expect(size).toBe(2 * interop.sizeof(TNSSimpleStruct));
-    //         var buffer = interop.alloc(size);
-    //         var record = new TNSNestedStruct(buffer);
-    //         TNSTestNativeCallbacks.recordsNestedStruct(record);
-    //         expect(TNSGetOutput()).toBe('0 0 0 0');
-    //     }());
-    //     __collect();
-    // });
+    it("RecordConstructorPointer", function () {
+        (function () {
+            var size = interop.sizeof(TNSNestedStruct);
+            expect(size).toBeGreaterThan(0);
+            expect(size).toBe(2 * interop.sizeof(TNSSimpleStruct));
+            var buffer = interop.alloc(size);
+            var record = new TNSNestedStruct(buffer);
+            TNSTestNativeCallbacks.recordsNestedStruct(record);
+            expect(TNSGetOutput()).toBe('0 0 0 0');
+        }());
+        gc();
+    });
 
-    // it("RecordFunctionPointer", function () {
-    //     (function () {
-    //         var size = interop.sizeof(TNSNestedStruct);
-    //         expect(size).toBeGreaterThan(0);
-    //         var buffer = interop.alloc(size);
-    //         var record = TNSNestedStruct(buffer);
-    //         TNSTestNativeCallbacks.recordsNestedStruct(record);
-    //         expect(TNSGetOutput()).toBe('0 0 0 0');
-    //         expect(interop.handleof(record)).toBe(buffer);
-    //     }());
-    //     __collect();
-    // });
+    it("RecordFunctionPointer", function () {
+        (function () {
+            var size = interop.sizeof(TNSNestedStruct);
+            expect(size).toBeGreaterThan(0);
+            var buffer = interop.alloc(size);
+            var record = TNSNestedStruct(buffer);
+            TNSTestNativeCallbacks.recordsNestedStruct(record);
+            expect(TNSGetOutput()).toBe('0 0 0 0');
+            expect(interop.handleof(record)).toBe(buffer);
+        }());
+        gc();
+    });
 
    //  it("RecordStrings", function () {
    //      var record = new TNSNestedStruct();
