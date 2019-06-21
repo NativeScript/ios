@@ -1134,26 +1134,26 @@ describe(module.id, function () {
     //     });
     }
 
-    //  it('Override: More than one methods with same jsname', function () {
+     it('Override: More than one methods with same jsname', function () {
 
-    //     var i = TNSBaseInterface.extend({
-    //       baseMethod: function (x) {
-    //         if (typeof x === "undefined") {
-    //             this.zeroArgs = true;
-    //         } else {
-    //             this.x = x;
-    //         }
-    //       }
-    //     }).alloc().init();
+        var i = TNSBaseInterface.extend({
+          baseMethod: function (x) {
+            if (typeof x === "undefined") {
+                this.zeroArgs = true;
+            } else {
+                this.x = x;
+            }
+          }
+        }).alloc().init();
 
-    //     i.callBaseMethod(false);
+        i.callBaseMethod(false);
 
-    //     expect(i.zeroArgs).toBe(true);
+        expect(i.zeroArgs).toBe(true);
 
-    //     i.callBaseMethod(true);
+        i.callBaseMethod(true);
 
-    //     expect(i.x).toBe(2);
-    // });
+        expect(i.x).toBe(2);
+    });
 
     //  it("Prototype.put", function () {
     //     var i = TNSBaseInterface.extend({}).alloc().init();
