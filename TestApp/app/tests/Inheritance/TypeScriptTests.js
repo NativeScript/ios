@@ -294,13 +294,13 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('baseProtocolMethod1 called' +
             'baseProtocolMethod2 called');
     });
-    // it('TypeScriptDecoratedExposedMethods', function () {
-    //     var object = TSDecoratedObject.alloc().init();
-    //     TNSTestNativeCallbacks.inheritanceVoidSelector(object);
-    //     expect(TNSTestNativeCallbacks.inheritanceVariadicSelector(object)).toBe('native');
-    //     expect(TNSGetOutput()).toBe('voidSelector called' +
-    //         'variadicSelector:native x:9 called');
-    // });
+    it('TypeScriptDecoratedExposedMethods', function () {
+        var object = TSDecoratedObject.alloc().init();
+        TNSTestNativeCallbacks.inheritanceVoidSelector(object);
+        expect(TNSTestNativeCallbacks.inheritanceVariadicSelector(object)).toBe('native');
+        expect(TNSGetOutput()).toBe('voidSelector called' +
+            'variadicSelector:native x:9 called');
+    });
     it('TypeScriptDecoratedExposedMethodsCalledFromJs', function () {
         var object = TSDecoratedObject.alloc().init();
         object.voidSelector();
