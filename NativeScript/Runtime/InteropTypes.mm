@@ -1,7 +1,7 @@
 #include <Foundation/Foundation.h>
 #include "SymbolLoader.h"
 #include "Interop.h"
-#include "ArgConverter.h"
+#include "ObjectManager.h"
 #include "Helpers.h"
 #include "FunctionReference.h"
 #include "Reference.h"
@@ -29,7 +29,7 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     RegisterSizeOfFunction(isolate, interop);
 
     RegisterInteropType(isolate, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(ffi_type_void.size, BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(0, BinaryTypeEncodingType::VoidEncoding));
     RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(sizeof(bool), BinaryTypeEncodingType::BoolEncoding));
     RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, BinaryTypeEncodingType::UShortEncoding));
     RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, BinaryTypeEncodingType::ShortEncoding));
@@ -43,12 +43,11 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, BinaryTypeEncodingType::DoubleEncoding));
 
     RegisterInteropType(isolate, types, "id", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::IdEncoding));
-    RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "unichar", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "instancetype", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "protocol", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(isolate, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(isolate, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
 
     bool success = interop->Set(tns::ToV8String(isolate, "types"), types);
     assert(success);
@@ -59,9 +58,25 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
 
 void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::string name, PrimitiveDataWrapper* wrapper) {
     Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> obj = ArgConverter::CreateEmptyObject(context);
-    tns::SetValue(isolate, obj, wrapper);
-    bool success = types->Set(tns::ToV8String(isolate, name), obj);
+    Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
+    ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, name));
+    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+
+    Local<v8::Function> ctorFunc;
+    if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
+        assert(false);
+    }
+
+    Local<Value> value;
+    if (!ctorFunc->CallAsConstructor(context, 0, nullptr).ToLocal(&value) || value.IsEmpty() || !value->IsObject()) {
+        assert(false);
+    }
+    Local<Object> result = value.As<Object>();
+
+    ObjectManager::Register(isolate, result);
+
+    tns::SetValue(isolate, result, wrapper);
+    bool success = types->Set(tns::ToV8String(isolate, name), result);
     assert(success);
 }
 
@@ -347,7 +362,14 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
             }
         }
 
-        info.GetReturnValue().Set(Number::New(isolate, size));
+        if (size == 0) {
+            Isolate::Scope sc(isolate);
+            Local<v8::String> errorMessage = tns::ToV8String(isolate, "Unknown type");
+            Local<Value> exception = Exception::Error(errorMessage);
+            isolate->ThrowException(exception);
+        } else {
+            info.GetReturnValue().Set(Number::New(isolate, size));
+        }
     }).ToLocal(&func);
     assert(success);
 
