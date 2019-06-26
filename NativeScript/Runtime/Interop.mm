@@ -788,6 +788,11 @@ void Interop::SetStructPropertyValue(StructWrapper* wrapper, StructField field, 
             *static_cast<unsigned long*>((void*)destBuffer) = val;
             break;
         }
+        case BinaryTypeEncodingType::LongEncoding: {
+            long val = value.As<Number>()->Value();
+            *static_cast<long*>((void*)destBuffer) = val;
+            break;
+        }
         case BinaryTypeEncodingType::ULongLongEncoding: {
             unsigned long long val = value.As<Number>()->Value();
             *static_cast<unsigned long long*>((void*)destBuffer) = val;
