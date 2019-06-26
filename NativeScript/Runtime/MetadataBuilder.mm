@@ -62,7 +62,7 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
 
     global->SetHandler(NamedPropertyHandlerConfiguration([](Local<Name> property, const PropertyCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        std::string propName = tns::ToString(info.GetIsolate(), property);
+        std::string propName = tns::ToString(isolate, property);
         const Meta* meta = ArgConverter::GetMeta(propName);
         if (meta == nullptr) {
             return;
