@@ -55,7 +55,7 @@ extern "C" {
 
 /* ---- System configuration information --------------------------------- */
 
-#include <ffitarget.h>
+#include "ffitarget.h"
 
 #ifndef LIBFFI_ASM
 
@@ -269,7 +269,7 @@ typedef ffi_raw ffi_java_raw;
 #endif
 
 
-FFI_API 
+FFI_API
 void ffi_raw_call (ffi_cif *cif,
 		   void (*fn)(void),
 		   void *rvalue,
@@ -363,8 +363,8 @@ typedef struct {
 
 #if !FFI_NATIVE_RAW_API
 
-  /* If this is enabled, then a raw closure has the same layout 
-     as a regular closure.  We use this to install an intermediate 
+  /* If this is enabled, then a raw closure has the same layout
+     as a regular closure.  We use this to install an intermediate
      handler to do the transaltion, void** -> ffi_raw*.  */
 
   void     (*translate_args)(ffi_cif*,void*,void**,void*);
@@ -389,8 +389,8 @@ typedef struct {
 
 #if !FFI_NATIVE_RAW_API
 
-  /* If this is enabled, then a raw closure has the same layout 
-     as a regular closure.  We use this to install an intermediate 
+  /* If this is enabled, then a raw closure has the same layout
+     as a regular closure.  We use this to install an intermediate
      handler to do the translation, void** -> ffi_raw*.  */
 
   void     (*translate_args)(ffi_cif*,void*,void**,void*);
@@ -451,7 +451,7 @@ FFI_API void ffi_call_go (ffi_cif *cif, void (*fn)(void), void *rvalue,
 
 /* ---- Public interface definition -------------------------------------- */
 
-FFI_API 
+FFI_API
 ffi_status ffi_prep_cif(ffi_cif *cif,
 			ffi_abi abi,
 			unsigned int nargs,
@@ -484,18 +484,18 @@ ffi_status ffi_get_struct_offsets (ffi_abi abi, ffi_type *struct_type,
 #endif
 
 /* If these change, update src/mips/ffitarget.h. */
-#define FFI_TYPE_VOID       0    
+#define FFI_TYPE_VOID       0
 #define FFI_TYPE_INT        1
-#define FFI_TYPE_FLOAT      2    
+#define FFI_TYPE_FLOAT      2
 #define FFI_TYPE_DOUBLE     3
 #if 0
 #define FFI_TYPE_LONGDOUBLE 4
 #else
 #define FFI_TYPE_LONGDOUBLE FFI_TYPE_DOUBLE
 #endif
-#define FFI_TYPE_UINT8      5   
+#define FFI_TYPE_UINT8      5
 #define FFI_TYPE_SINT8      6
-#define FFI_TYPE_UINT16     7 
+#define FFI_TYPE_UINT16     7
 #define FFI_TYPE_SINT16     8
 #define FFI_TYPE_UINT32     9
 #define FFI_TYPE_SINT32     10
