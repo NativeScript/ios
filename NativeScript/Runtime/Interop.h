@@ -48,13 +48,13 @@ private:
     }
 
     template <typename T>
-    static void SetNumericValue(void* dest, T value) {
+    static void SetNumericValue(void* dest, double value) {
         if (value < std::numeric_limits<T>::min()) {
             Interop::SetValue(dest, std::numeric_limits<T>::min());
         } else if (value > std::numeric_limits<T>::max()) {
             Interop::SetValue(dest, std::numeric_limits<T>::max());
         } else {
-            Interop::SetValue(dest, value);
+            Interop::SetValue(dest, (T)value);
         }
     }
 
