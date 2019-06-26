@@ -46,6 +46,7 @@
 		C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937512229FC1600075CB16 /* TNSObjCTypes.m */; };
 		C2937529229FC1600075CB16 /* TNSPrimitivePointers.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */; };
 		C293752E22A10C490075CB16 /* Interop_impl.h in Sources */ = {isa = PBXBuildFile; fileRef = C293752D22A10C490075CB16 /* Interop_impl.h */; };
+		C2BF3F3E22C3ABEA00A76BDE /* libv8_crash_keys.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2BF3F3D22C3ABEA00A76BDE /* libv8_crash_keys.a */; };
 		C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */; };
 		C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */; };
 		C2DDEB36229EAB3B00345BFE /* NativeScript.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB34229EAB3B00345BFE /* NativeScript.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -206,6 +207,7 @@
 		C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSPrimitivePointers.m; sourceTree = "<group>"; };
 		C2937516229FC1600075CB16 /* TNSRecords.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSRecords.h; sourceTree = "<group>"; };
 		C293752D22A10C490075CB16 /* Interop_impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Interop_impl.h; sourceTree = "<group>"; };
+		C2BF3F3D22C3ABEA00A76BDE /* libv8_crash_keys.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_crash_keys.a; sourceTree = "<group>"; };
 		C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = FastEnumerationAdapter.mm; sourceTree = "<group>"; };
 		C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FastEnumerationAdapter.h; sourceTree = "<group>"; };
 		C2DDEB16229EA89000345BFE /* TestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -300,6 +302,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C26656B022B3760900EE15CC /* libv8_initializers.a in Frameworks */,
+				C2BF3F3E22C3ABEA00A76BDE /* libv8_crash_keys.a in Frameworks */,
 				C26656AA22B3760900EE15CC /* libv8_base_without_compiler.a in Frameworks */,
 				C2DDEBD7229EB1C500345BFE /* UIKit.framework in Frameworks */,
 				C26656AE22B3760900EE15CC /* libv8_libplatform.a in Frameworks */,
@@ -526,6 +529,7 @@
 			children = (
 				C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */,
 				C26656A122B3760800EE15CC /* libv8_base_without_compiler.a */,
+				C2BF3F3D22C3ABEA00A76BDE /* libv8_crash_keys.a */,
 				C26656A022B3760800EE15CC /* libv8_compiler.a */,
 				C26656A422B3760800EE15CC /* libv8_external_snapshot.a */,
 				C26656A622B3760800EE15CC /* libv8_init.a */,

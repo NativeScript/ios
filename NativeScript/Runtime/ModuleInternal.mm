@@ -46,7 +46,8 @@ void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
     requireFunction_ = new Persistent<v8::Function>(isolate, requireFuncTemplate->GetFunction(context).ToLocalChecked());
 
     Local<v8::Function> globalRequire = GetRequireFunction(baseDir);
-    global->Set(tns::ToV8String(isolate, "require"), globalRequire);
+    bool success = global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
+    assert(success);
 }
 
 Local<v8::Function> ModuleInternal::GetRequireFunction(const std::string& dirName) {
@@ -73,7 +74,10 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& args) {
     std::string callingModuleDirName = tns::ToString(isolate, args[1].As<v8::String>());
     Local<Object> moduleObj = moduleInternal->LoadImpl(moduleName, callingModuleDirName);
 
-    Local<Value> exportsObj = moduleObj->Get(tns::ToV8String(isolate, "exports"));
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> exportsObj;
+    bool success = moduleObj->Get(context, tns::ToV8String(isolate, "exports")).ToLocal(&exportsObj);
+    assert(success);
     args.GetReturnValue().Set(exportsObj);
 }
 
@@ -88,12 +92,13 @@ Local<Object> ModuleInternal::LoadImpl(const std::string& moduleName, const std:
 
     Local<Object> moduleObj = Object::New(isolate_);
     Local<Object> exportsObj = Object::New(isolate_);
-    moduleObj->Set(tns::ToV8String(isolate_, "exports"), exportsObj);
+    Local<Context> context = isolate_->GetCurrentContext();
+    bool success = moduleObj->Set(context, tns::ToV8String(isolate_, "exports"), exportsObj).FromMaybe(false);
+    assert(success);
 
     const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
-    Local<Context> context = isolate_->GetCurrentContext();
     Local<v8::String> fileName = tns::ToV8String(isolate_, baseDir + "/" + moduleName + ".js");
-    bool success = moduleObj->DefineOwnProperty(context, tns::ToV8String(isolate_, "id"), fileName, readOnlyFlags).FromMaybe(false);
+    success = moduleObj->DefineOwnProperty(context, tns::ToV8String(isolate_, "id"), fileName, readOnlyFlags).FromMaybe(false);
     assert(success);
 
     Local<Script> script = LoadScript(moduleName, baseDir);
@@ -110,7 +115,8 @@ Local<Object> ModuleInternal::LoadImpl(const std::string& moduleName, const std:
         moduleObj, exportsObj, require, tns::ToV8String(isolate_, baseDir.c_str()), tns::ToV8String(isolate_, baseDir.c_str())
     };
 
-    moduleObj->Set(tns::ToV8String(isolate_, "require"), require);
+    success = moduleObj->Set(context, tns::ToV8String(isolate_, "require"), require).FromMaybe(false);
+    assert(success);
 
     Local<Object> thiz = Object::New(isolate_);
     Local<Value> result;

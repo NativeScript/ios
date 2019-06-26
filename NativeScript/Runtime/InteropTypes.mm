@@ -49,10 +49,10 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
     RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
 
-    bool success = interop->Set(tns::ToV8String(isolate, "types"), types);
+    bool success = interop->Set(context, tns::ToV8String(isolate, "types"), types).FromMaybe(false);
     assert(success);
 
-    success = global->Set(tns::ToV8String(isolate, "interop"), interop);
+    success = global->Set(context, tns::ToV8String(isolate, "interop"), interop).FromMaybe(false);
     assert(success);
 }
 
@@ -76,7 +76,7 @@ void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::st
     ObjectManager::Register(isolate, result);
 
     tns::SetValue(isolate, result, wrapper);
-    bool success = types->Set(tns::ToV8String(isolate, name), result);
+    bool success = types->Set(context, tns::ToV8String(isolate, name), result).FromMaybe(false);
     assert(success);
 }
 
@@ -103,7 +103,8 @@ void Interop::RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8:
     }).ToLocal(&func);
     assert(success);
 
-    interop->Set(tns::ToV8String(isolate, "bufferFromData"), func);
+    success = interop->Set(context, tns::ToV8String(isolate, "bufferFromData"), func).FromMaybe(false);
+    assert(success);
 }
 
 void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) {
@@ -228,7 +229,8 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
     }).ToLocal(&func);
     assert(success);
 
-    interop->Set(tns::ToV8String(isolate, "handleof"), func);
+    success = interop->Set(context, tns::ToV8String(isolate, "handleof"), func).FromMaybe(false);
+    assert(success);
 }
 
 void Interop::RegisterAllocFunction(Isolate* isolate, Local<Object> interop) {
@@ -255,7 +257,8 @@ void Interop::RegisterAllocFunction(Isolate* isolate, Local<Object> interop) {
     }).ToLocal(&func);
     assert(success);
 
-    interop->Set(tns::ToV8String(isolate, "alloc"), func);
+    success = interop->Set(context, tns::ToV8String(isolate, "alloc"), func).FromMaybe(false);
+    assert(success);
 }
 
 void Interop::RegisterFreeFunction(Isolate* isolate, Local<Object> interop) {
@@ -284,7 +287,8 @@ void Interop::RegisterFreeFunction(Isolate* isolate, Local<Object> interop) {
     }).ToLocal(&func);
     assert(success);
 
-    interop->Set(tns::ToV8String(isolate, "free"), func);
+    success = interop->Set(context, tns::ToV8String(isolate, "free"), func).FromMaybe(false);
+    assert(success);
 }
 
 void Interop::RegisterAdoptFunction(Isolate* isolate, Local<Object> interop) {
@@ -306,7 +310,8 @@ void Interop::RegisterAdoptFunction(Isolate* isolate, Local<Object> interop) {
     }).ToLocal(&func);
     assert(success);
 
-    interop->Set(tns::ToV8String(isolate, "adopt"), func);
+    success = interop->Set(context, tns::ToV8String(isolate, "adopt"), func).FromMaybe(false);
+    assert(success);
 }
 
 void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
@@ -370,7 +375,8 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
     }).ToLocal(&func);
     assert(success);
 
-    interop->Set(tns::ToV8String(isolate, "sizeof"), func);
+    success = interop->Set(context, tns::ToV8String(isolate, "sizeof"), func).FromMaybe(false);
+    assert(success);
 }
 
 }

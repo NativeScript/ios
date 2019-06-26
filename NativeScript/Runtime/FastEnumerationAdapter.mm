@@ -39,8 +39,10 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
 
     Persistent<Object>* poIteratorObj = reinterpret_cast<Persistent<Object>*>(state->extra[0]);
     Local<Object> iteratorObj = poIteratorObj->Get(isolate);
-    Local<Value> next = iteratorObj->Get(tns::ToV8String(isolate, "next"));
-    assert(!next.IsEmpty() && next->IsFunction());
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> next;
+    bool success = iteratorObj->Get(context, tns::ToV8String(isolate, "next")).ToLocal(&next);
+    assert(success && !next.IsEmpty() && next->IsFunction());
 
     NSUInteger count = 0;
     state->itemsPtr = buffer;
@@ -57,66 +59,23 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
             return 0;
         }
 
-        Local<Value> done = nextResult.As<Object>()->Get(tns::ToV8String(isolate, "done"));
-        assert(tns::IsBool(done));
+        Local<Value> done;
+        bool success = nextResult.As<Object>()->Get(context, tns::ToV8String(isolate, "done")).ToLocal(&done);
+        assert(success && tns::IsBool(done));
 
         if (tns::ToBool(done)) {
-            Local<Value> ret = iteratorObj->Get(tns::ToV8String(isolate, "return"));
-            if (!ret.IsEmpty() && ret->IsFunction()) {
-
-            }
-
             poIteratorObj->Reset();
             poIteratorFunc->Reset();
             state->state = State::Done;
             break;
         }
 
-        Local<Value> value = nextResult.As<Object>()->Get(tns::ToV8String(isolate, "value"));
-        assert(!value.IsEmpty());
+        Local<Value> value;
+        success = nextResult.As<Object>()->Get(context, tns::ToV8String(isolate, "value")).ToLocal(&value);
+        assert(success && !value.IsEmpty());
 
         id result = Interop::ToObject(isolate, value);
         *buffer++ = result;
-
-//        if (tns::IsString(value)) {
-//            NSString* result = [NSString stringWithUTF8String:tns::ToString(isolate, value).c_str()];
-//            *buffer++ = result;
-//        } else if (tns::IsNumber(value)) {
-//            *buffer++ = @(tns::ToNumber(value));
-//        } else if (tns::IsBool(value)) {
-//            *buffer++ = @(tns::ToBool(value));
-//        } else if (value->IsArray()) {
-//            ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:value.As<v8::Array>() isolate:isolate];
-//            *buffer++ = adapter;
-//        } else if (value->IsObject()) {
-//            if (BaseDataWrapper* wrapper = tns::GetValue(isolate, value)) {
-//                switch (wrapper->Type()) {
-//                    case WrapperType::ObjCObject: {
-//                        ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
-//                        *buffer++ = wr->Data();
-//                        break;
-//                    }
-//                    case WrapperType::ObjCClass: {
-//                        ObjCClassWrapper* wr = static_cast<ObjCClassWrapper*>(wrapper);
-//                        *buffer++ = wr->Klass();
-//                        break;
-//                    }
-//                    case WrapperType::ObjCProtocol: {
-//                        ObjCProtocolWrapper* wr = static_cast<ObjCProtocolWrapper*>(wrapper);
-//                        *buffer++ = wr->Proto();
-//                        break;
-//                    }
-//                    default:
-//                        // TODO: Unsupported object type
-//                        assert(false);
-//                        break;
-//                }
-//            } else {
-//                DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:value isolate:isolate];
-//                *buffer++ = adapter;
-//            }
-//        }
-
         count++;
     }
 

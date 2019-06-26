@@ -9,7 +9,9 @@ namespace tns {
 
 void Reference::Register(Isolate* isolate, Local<Object> interop) {
     Local<v8::Function> ctorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
-    interop->Set(tns::ToV8String(isolate, "Reference"), ctorFunc);
+    Local<Context> context = isolate->GetCurrentContext();
+    bool success = interop->Set(context, tns::ToV8String(isolate, "Reference"), ctorFunc).FromMaybe(false);
+    assert(success);
 }
 
 Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
@@ -30,7 +32,10 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     }
 
     tns::SetValue(isolate, ctorFunc, new ReferenceTypeWrapper());
-    Local<Object> prototype = ctorFunc->Get(tns::ToV8String(isolate, "prototype")).As<Object>();
+    Local<Value> prototypeValue;
+    bool success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
+    assert(success && prototypeValue->IsObject());
+    Local<Object> prototype = prototypeValue.As<Object>();
     Reference::RegisterToStringMethod(isolate, prototype);
 
     interopReferenceCtorFunc_ = new Persistent<v8::Function>(isolate, ctorFunc);
@@ -148,7 +153,9 @@ void Reference::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype
     Local<v8::Function> func;
     assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func));
 
-    prototype->Set(tns::ToV8String(isolate, "toString"), func);
+    Local<Context> context = isolate->GetCurrentContext();
+    bool success = prototype->Set(context, tns::ToV8String(isolate, "toString"), func).FromMaybe(false);
+    assert(success);
 }
 
 Persistent<v8::Function>* Reference::interopReferenceCtorFunc_ = nullptr;

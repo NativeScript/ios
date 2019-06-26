@@ -128,7 +128,9 @@ void Runtime::DefinePerformanceObject(Local<Context> context) {
     if (!Function::New(context, PerformanceNowCallback).ToLocal(&nowFunc)) {
         assert(false);
     }
-    performance->ToObject(context).ToLocalChecked()->Set(ToV8String(context->GetIsolate(), "now"), nowFunc);
+
+    bool success = performance->ToObject(context).ToLocalChecked()->Set(context, ToV8String(context->GetIsolate(), "now"), nowFunc).FromMaybe(false);
+    assert(success);
 }
 
 void Runtime::PerformanceNowCallback(const FunctionCallbackInfo<Value>& args) {
@@ -156,7 +158,8 @@ void Runtime::DefineTimeMethod(Local<Context> context) {
     }).ToLocal(&timeFunction);
     assert(success);
 
-    global->Set(ToV8String(isolate, "__time"), timeFunction);
+    success = global->Set(context, ToV8String(isolate, "__time"), timeFunction).FromMaybe(false);
+    assert(success);
 }
 
 }

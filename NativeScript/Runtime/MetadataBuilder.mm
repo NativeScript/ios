@@ -161,7 +161,9 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isol
     Local<v8::Function> equalsFunc;
     success = v8::Function::New(context, StructEqualsCallback).ToLocal(&equalsFunc);
     assert(success);
-    structCtorFunc->Set(tns::ToV8String(isolate, "equals"), equalsFunc);
+
+    success = structCtorFunc->Set(context, tns::ToV8String(isolate, "equals"), equalsFunc).FromMaybe(false);
+    assert(success);
 
     Persistent<v8::Function>* poStructCtorFunc = new Persistent<v8::Function>(isolate, structCtorFunc);
     Caches::StructConstructorFunctions.insert(std::make_pair(structMeta, poStructCtorFunc));
@@ -320,10 +322,6 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         assert(false);
     }
 
-    if (MetaType::Interface) {
-    } else {
-    }
-
     if (meta->type() == MetaType::ProtocolType) {
         tns::SetValue(isolate_, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name())));
         Caches::ProtocolCtorFuncs.insert(std::make_pair(meta->name(), new Persistent<v8::Function>(isolate_, ctorFunc)));
@@ -333,7 +331,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     }
 
     Local<Object> global = context->Global();
-    global->Set(tns::ToV8String(isolate_, meta->jsName()), ctorFunc);
+    bool success = global->Set(context, tns::ToV8String(isolate_, meta->jsName()), ctorFunc).FromMaybe(false);
+    assert(success);
 
     if (!baseCtorFunc.IsEmpty()) {
         bool success;
@@ -348,7 +347,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         RegisterAllocMethod(ctorFunc, interfaceMeta);
 
         Local<v8::Function> extendFunc = classBuilder_.GetExtendFunction(context, interfaceMeta);
-        ctorFunc->Set(tns::ToV8String(isolate_, "extend"), extendFunc);
+        success = ctorFunc->Set(context, tns::ToV8String(isolate_, "extend"), extendFunc).FromMaybe(false);
+        assert(success);
     }
     RegisterStaticMethods(ctorFunc, meta, staticMembers);
     RegisterStaticProperties(ctorFunc, meta, meta->name(), staticMembers);
@@ -356,8 +356,13 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 
     Caches::CtorFuncTemplates.insert(std::make_pair(meta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
 
-    Local<Object> prototype = ctorFunc->Get(tns::ToV8String(isolate_, "prototype")).As<Object>();
-    prototype->Set(tns::ToV8String(isolate_, "toString"), poToStringFunction_->Get(isolate_));
+    Local<Value> prototypeValue;
+    success = ctorFunc->Get(context, tns::ToV8String(isolate_, "prototype")).ToLocal(&prototypeValue);
+    assert(success);
+    Local<Object> prototype = prototypeValue.As<Object>();
+
+    success = prototype->Set(context, tns::ToV8String(isolate_, "toString"), poToStringFunction_->Get(isolate_)).FromMaybe(false);
+    assert(success);
 
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate_, prototype);
     Caches::Prototypes.insert(std::make_pair(meta, poPrototype));
@@ -414,7 +419,9 @@ void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {
 
     tns::SetValue(isolate_, func, new FunctionWrapper(funcMeta));
     DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
-    global->Set(tns::ToV8String(isolate_, funcMeta->jsName()), func);
+
+    bool success = global->Set(context, tns::ToV8String(isolate_, funcMeta->jsName()), func).FromMaybe(false);
+    assert(success);
 }
 
 void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {
@@ -427,7 +434,9 @@ void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const In
     if (!allocFuncTemplate->GetFunction(context).ToLocal(&allocFunc)) {
         assert(false);
     }
-    ctorFunc->Set(tns::ToV8String(isolate_, "alloc"), allocFunc);
+
+    bool success = ctorFunc->Set(context, tns::ToV8String(isolate_, "alloc"), allocFunc).FromMaybe(false);
+    assert(success);
 }
 
 void MetadataBuilder::RegisterInstanceMethods(Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::vector<std::string>& names) {
@@ -508,7 +517,10 @@ void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const 
             }
 
             DefineFunctionLengthProperty(context, methodMeta->encodings(), staticMethod);
-            ctorFunc->Set(tns::ToV8String(isolate_, methodMeta->jsName()), staticMethod);
+
+            bool success = ctorFunc->Set(context, tns::ToV8String(isolate_, methodMeta->jsName()), staticMethod).FromMaybe(false);
+            assert(success);
+
             names.push_back(name);
         }
     }

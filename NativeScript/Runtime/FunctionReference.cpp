@@ -8,7 +8,9 @@ namespace tns {
 
 void FunctionReference::Register(Isolate* isolate, Local<Object> interop) {
     Local<v8::Function> ctorFunc = FunctionReference::GetFunctionReferenceCtorFunc(isolate);
-    interop->Set(tns::ToV8String(isolate, "FunctionReference"), ctorFunc);
+    Local<Context> context = isolate->GetCurrentContext();
+    bool success = interop->Set(context, tns::ToV8String(isolate, "FunctionReference"), ctorFunc).FromMaybe(false);
+    assert(success);
 }
 
 Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* isolate) {

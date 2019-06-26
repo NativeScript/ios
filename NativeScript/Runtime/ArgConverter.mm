@@ -428,7 +428,10 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
         auto it = Caches::StructConstructorFunctions.find(structMeta);
         if (it != Caches::StructConstructorFunctions.end()) {
             Local<v8::Function> structCtorFunc = it->second->Get(isolate);
-            Local<Value> proto = structCtorFunc->Get(tns::ToV8String(isolate, "prototype"));
+            Local<Value> proto;
+            bool success = structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto);
+            assert(success);
+
             if (!proto.IsEmpty()) {
                 bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
                 assert(success);

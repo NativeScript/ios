@@ -42,7 +42,10 @@ using namespace v8;
     }
 
     Local<Object> object = self->object_->Get(self->isolate_);
-    Local<Value> item = object->Get((uint)index);
+    Local<Context> context = self->isolate_->GetCurrentContext();
+    Local<Value> item;
+    bool success = object->Get(context, (uint)index).ToLocal(&item);
+    assert(success);
 
     if (item->IsNullOrUndefined()) {
         return nil;

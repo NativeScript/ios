@@ -82,8 +82,10 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         assert(false);
     }
 
-    bool success;
-    Local<Value> baseProto = baseCtorFunc->Get(tns::ToV8String(isolate, "prototype"));
+    Local<Value> baseProto;
+    bool success = baseCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&baseProto);
+    assert(success);
+
     if (!implementationObject->SetPrototype(context, baseProto).To(&success) || !success) {
         assert(false);
     }
@@ -92,7 +94,10 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     }
 
     extendClassCtorFunc->SetName(tns::ToV8String(isolate, class_getName(extendedClass)));
-    Local<Object> extendFuncPrototype = extendClassCtorFunc->Get(tns::ToV8String(isolate, "prototype")).As<Object>();
+    Local<Value> extendFuncPrototypeValue;
+    success = extendClassCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&extendFuncPrototypeValue);
+    assert(success && extendFuncPrototypeValue->IsObject());
+    Local<Object> extendFuncPrototype = extendFuncPrototypeValue.As<Object>();
     if (!extendFuncPrototype->SetPrototype(context, implementationObject).To(&success) || !success) {
         assert(false);
     }
@@ -187,8 +192,19 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         assert(extendedClassCtorFunc->SetPrototype(context, baseCtorFunc).ToChecked());
 
         Local<v8::String> prototypeProp = tns::ToV8String(isolate, "prototype");
-        Local<Object> extendedClassCtorFuncPrototype = extendedClassCtorFunc->Get(prototypeProp).As<Object>();
-        extendedClassCtorFuncPrototype->SetPrototype(context, baseCtorFunc->Get(prototypeProp).As<Object>()).ToChecked();
+
+        Local<Value> extendedClassCtorFuncPrototypeValue;
+        bool success = extendedClassCtorFunc->Get(context, prototypeProp).ToLocal(&extendedClassCtorFuncPrototypeValue);
+        assert(success && extendedClassCtorFuncPrototypeValue->IsObject());
+        Local<Object> extendedClassCtorFuncPrototype = extendedClassCtorFuncPrototypeValue.As<Object>();
+
+        Local<Value> prototypePropValue;
+        success = baseCtorFunc->Get(context, prototypeProp).ToLocal(&prototypePropValue);
+        assert(success && prototypePropValue->IsObject());
+
+        success = extendedClassCtorFuncPrototype->SetPrototype(context, prototypePropValue.As<Object>()).FromMaybe(false);
+        assert(success);
+
         Caches::ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendedClassCtorFuncPrototype)));
 
         Persistent<v8::Function>* poExtendedClassCtorFunc = new Persistent<v8::Function>(isolate, extendedClassCtorFunc);
@@ -196,15 +212,25 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         Caches::CtorFuncs.emplace(std::make_pair(extendedClassName, poExtendedClassCtorFunc));
 
         IMP newInitialize = imp_implementationWithBlock(^(id self) {
+            Local<Context> context = isolate->GetCurrentContext();
             Local<v8::Function> extendedClassCtorFunc = poExtendedClassCtorFunc->Get(isolate);
 
-            Local<Value> exposedMethods = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "ObjCExposedMethods"));
-            Local<Value> implementationObject = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "prototype"));
+            Local<Value> exposedMethods;
+            bool success = extendedClassCtorFunc->Get(context, tns::ToV8String(isolate, "ObjCExposedMethods")).ToLocal(&exposedMethods);
+            assert(success);
+
+            Local<Value> implementationObject;
+            success = extendedClassCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&implementationObject);
+            assert(success);
+
             if (implementationObject.IsEmpty() || exposedMethods.IsEmpty()) {
                 return;
             }
 
-            Local<Value> exposedProtocols = extendedClassCtorFunc->Get(tns::ToV8String(isolate, "ObjCProtocols"));
+            Local<Value> exposedProtocols;
+            success = extendedClassCtorFunc->Get(context, tns::ToV8String(isolate, "ObjCProtocols")).ToLocal(&exposedProtocols);
+            assert(success);
+
             builder->ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject.As<Object>());
         });
         class_addMethod(object_getClass(extendedClass), @selector(initialize), newInitialize, "v@:");
@@ -212,12 +238,21 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         info.GetReturnValue().Set(v8::Undefined(isolate));
     }, External::New(isolate, this)).ToLocalChecked();
 
-    global->Set(tns::ToV8String(isolate, "__extends"), extendsFunc);
+    bool success = global->Set(context, tns::ToV8String(isolate, "__extends"), extendsFunc).FromMaybe(false);
+    assert(success);
 }
 
 void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
-    Local<Value> exposedMethods = nativeSignature->Get(tns::ToV8String(isolate, "exposedMethods"));
-    Local<Value> exposedProtocols = nativeSignature->Get(tns::ToV8String(isolate, "protocols"));
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Value> exposedMethods;
+    bool success = nativeSignature->Get(context, tns::ToV8String(isolate, "exposedMethods")).ToLocal(&exposedMethods);
+    assert(success);
+
+    Local<Value> exposedProtocols;
+    success = nativeSignature->Get(context, tns::ToV8String(isolate, "protocols")).ToLocal(&exposedProtocols);
+    assert(success);
+
     this->ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject);
 }
 
@@ -349,8 +384,9 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
     if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
         Local<v8::Array> protocolsArray = exposedProtocols.As<v8::Array>();
         for (uint32_t i = 0; i < protocolsArray->Length(); i++) {
-            Local<Value> element = protocolsArray->Get(i);
-            assert(!element.IsEmpty() && element->IsFunction());
+            Local<Value> element;
+            bool success = protocolsArray->Get(context, i).ToLocal(&element);
+            assert(success && !element.IsEmpty() && element->IsFunction());
 
             Local<v8::Function> protoObj = element.As<v8::Function>();
             BaseDataWrapper* wrapper = tns::GetValue(isolate, protoObj);
@@ -375,17 +411,31 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
         }
 
         for (int i = 0; i < methodNames->Length(); i++) {
-            Local<Value> methodName = methodNames->Get(i);
-            Local<Value> methodSignature = exposedMethods.As<Object>()->Get(methodName);
-            assert(methodSignature->IsObject());
-            Local<Value> method = implementationObject->Get(methodName);
+            Local<Value> methodName;
+            bool success = methodNames->Get(context, i).ToLocal(&methodName);
+            assert(success);
+
+            Local<Value> methodSignature;
+            success = exposedMethods.As<Object>()->Get(context, methodName).ToLocal(&methodSignature);
+            assert(success && methodSignature->IsObject());
+
+            Local<Value> method;
+            success = implementationObject->Get(context, methodName).ToLocal(&method);
+            assert(success);
+
             if (method.IsEmpty() || !method->IsFunction()) {
                 NSLog(@"No implementation found for exposed method \"%s\"", tns::ToString(isolate, methodName).c_str());
                 continue;
             }
 
-            Local<Value> returnsVal = methodSignature.As<Object>()->Get(tns::ToV8String(isolate, "returns"));
-            Local<Value> paramsVal = methodSignature.As<Object>()->Get(tns::ToV8String(isolate, "params"));
+            Local<Value> returnsVal;
+            success = methodSignature.As<Object>()->Get(context, tns::ToV8String(isolate, "returns")).ToLocal(&returnsVal);
+            assert(success);
+
+            Local<Value> paramsVal;
+            success = methodSignature.As<Object>()->Get(context, tns::ToV8String(isolate, "params")).ToLocal(&paramsVal);
+            assert(success);
+
             if (returnsVal.IsEmpty() || !returnsVal->IsObject()) {
                 // Incorrect exposedMethods definition: missing returns property
                 assert(false);
@@ -409,7 +459,10 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
                 TypeEncoding* next = typeEncoding;
                 for (int i = 0; i < params->Length(); i++) {
                     next = reinterpret_cast<TypeEncoding*>(reinterpret_cast<char*>(next) + sizeof(next->type));
-                    Local<Value> param = params->Get(i);
+                    Local<Value> param;
+                    success = params->Get(context, i).ToLocal(&param);
+                    assert(success);
+
                     next->type = GetTypeEncodingType(isolate, param);
                 }
             }
@@ -431,7 +484,10 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
 
     Local<v8::Array> propertyNames;
 
-    Local<Value> symbolIterator = implementationObject->Get(Symbol::GetIterator(isolate));
+    Local<Value> symbolIterator;
+    bool success = implementationObject->Get(context, Symbol::GetIterator(isolate)).ToLocal(&symbolIterator);
+    assert(success);
+
     if (!symbolIterator.IsEmpty() && symbolIterator->IsFunction()) {
         Local<v8::Function> symbolIteratorFunc = symbolIterator.As<v8::Function>();
 
@@ -449,7 +505,9 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
 
     assert(implementationObject->GetOwnPropertyNames(context).ToLocal(&propertyNames));
     for (uint32_t i = 0; i < propertyNames->Length(); i++) {
-        Local<Value> key = propertyNames->Get(i);
+        Local<Value> key;
+        bool success = propertyNames->Get(context, i).ToLocal(&key);
+        assert(success);
         if (!key->IsName()) {
             continue;
         }
@@ -462,8 +520,14 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             continue;
         }
 
-        Local<Value> getter = propertyDescriptor.As<Object>()->Get(tns::ToV8String(isolate, "get"));
-        Local<Value> setter = propertyDescriptor.As<Object>()->Get(tns::ToV8String(isolate, "set"));
+        Local<Value> getter;
+        success = propertyDescriptor.As<Object>()->Get(context, tns::ToV8String(isolate, "get")).ToLocal(&getter);
+        assert(success);
+
+        Local<Value> setter;
+        success = propertyDescriptor.As<Object>()->Get(context, tns::ToV8String(isolate, "set")).ToLocal(&setter);
+        assert(success);
+
         if ((!getter.IsEmpty() || !setter.IsEmpty()) && (getter->IsFunction() || setter->IsFunction())) {
             std::vector<const PropertyMeta*> propertyMetas;
             VisitProperties(methodName, extendedClassMeta, propertyMetas, protocols);
@@ -471,7 +535,10 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             continue;
         }
 
-        Local<Value> method = propertyDescriptor.As<Object>()->Get(tns::ToV8String(isolate, "value"));
+        Local<Value> method;
+        success = propertyDescriptor.As<Object>()->Get(context, tns::ToV8String(isolate, "value")).ToLocal(&method);
+        assert(success);
+
         if (method.IsEmpty() || !method->IsFunction()) {
             continue;
         }

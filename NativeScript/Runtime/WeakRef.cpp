@@ -19,7 +19,8 @@ void WeakRef::Init(Isolate* isolate) {
 
     Local<v8::String> name = tns::ToV8String(isolate, "WeakRef");
     weakRefCtorFunc->SetName(name);
-    global->Set(name, weakRefCtorFunc);
+    bool success = global->Set(context, name, weakRefCtorFunc).FromMaybe(false);
+    assert(success);
 }
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
@@ -43,8 +44,12 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     poTarget->SetWeak(callbackState, WeakTargetCallback, WeakCallbackType::kFinalizer);
     poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kFinalizer);
 
-    weakRef->Set(tns::ToV8String(isolate, "get"), GetGetterFunction(isolate));
-    weakRef->Set(tns::ToV8String(isolate, "clear"), GetClearFunction(isolate));
+    bool success = weakRef->Set(context, tns::ToV8String(isolate, "get"), GetGetterFunction(isolate)).FromMaybe(false);
+    assert(success);
+
+    success = weakRef->Set(context, tns::ToV8String(isolate, "clear"), GetClearFunction(isolate)).FromMaybe(false);
+    assert(success);
+
     tns::SetPrivateValue(isolate, weakRef, tns::ToV8String(isolate, "target"), External::New(isolate, poTarget));
 
     info.GetReturnValue().Set(weakRef);

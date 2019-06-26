@@ -372,12 +372,14 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
 }
 
 void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<StructField> fields, Local<Value> inititalizer, ptrdiff_t& position) {
+    Local<Context> context = isolate->GetCurrentContext();
     for (auto it = fields.begin(); it != fields.end(); it++) {
         StructField field = *it;
 
         Local<Value> value;
         if (!inititalizer.IsEmpty() && !inititalizer->IsNullOrUndefined() && inititalizer->IsObject()) {
-            value = inititalizer.As<Object>()->Get(tns::ToV8String(isolate, field.Name()));
+            bool success = inititalizer.As<Object>()->Get(context, tns::ToV8String(isolate, field.Name())).ToLocal(&value);
+            assert(success);
         }
 
         BinaryTypeEncodingType type = field.Encoding()->type;
