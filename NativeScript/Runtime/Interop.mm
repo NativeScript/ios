@@ -305,10 +305,12 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
             void* data = pointerWrapper->Data();
             Interop::SetValue(dest, data);
-        } else {
+        } else if (wrapper->Type() == WrapperType::ObjCObject) {
             ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
             id data = objCDataWrapper->Data();
             Interop::SetValue(dest, data);
+        } else {
+            assert(false);
         }
     } else {
         assert(false);
@@ -481,10 +483,17 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
-        const char* name = class_getName(result);
-        auto it = Caches::CtorFuncs.find(name);
-        if (it != Caches::CtorFuncs.end()) {
-            return it->second->Get(isolate);
+        while (true) {
+            const char* name = class_getName(result);
+            auto it = Caches::CtorFuncs.find(name);
+            if (it != Caches::CtorFuncs.end()) {
+                return it->second->Get(isolate);
+            }
+
+            result = class_getSuperclass(result);
+            if (!result) {
+                break;
+            }
         }
 
         assert(false);
@@ -523,11 +532,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             ffi_cif* cif = FFICall::GetCif(enc, 1, argsCount);
             FFICall call(cif);
 
-            std::vector<Local<Value>> args;
-            for (int i = 0; i < info.Length(); i++) {
-                args.push_back(info[i]);
-            }
-
+            std::vector<Local<Value>> args = tns::ArgsToVector(info);
             Isolate* isolate = info.GetIsolate();
             Interop::SetValue(call.ArgumentBuffer(0), block);
             Interop::SetFFIParams(isolate, enc, &call, argsCount, 1, args);

@@ -115,18 +115,9 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
     Isolate* isolate = info.GetIsolate();
 
     CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
+    Class klass = item->data_;
 
-    id obj = [[item->data_ alloc] init];
-
-    const char* className = class_getName(item->data_);
-    Local<Object> thiz = info.This();
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, obj);
-    tns::SetValue(isolate, thiz, wrapper);
-
-    Persistent<Value>* poThiz = new Persistent<Value>(isolate, thiz);
-    Caches::Instances.insert(std::make_pair(obj, poThiz));
-
-    ObjectManager::Register(isolate, thiz);
+    ArgConverter::ConstructObject(isolate, info, klass);
 }
 
 void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {

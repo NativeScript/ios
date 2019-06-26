@@ -2,6 +2,7 @@
 #include <UIKit/UIKit.h>
 #include <sys/stat.h>
 #include <map>
+#include "SymbolLoader.h"
 
 namespace tns {
 
@@ -117,13 +118,9 @@ namespace tns {
             return true;
         }
 
-        return false;
-
-        /**
-
         // Some members are implemented by extension of classes defined in a different
         // module than the class, ensure they've been initialized
-        NativeScript::SymbolLoader::instance().ensureModule(this->topLevelModule());
+        SymbolLoader::instance().ensureModule(this->topLevelModule());
 
         if (isStatic) {
             return [klass respondsToSelector:this->selector()] || ([klass resolveClassMethod:this->selector()]);
@@ -147,7 +144,6 @@ namespace tns {
             id sampleInstance = it->second;
             return [sampleInstance respondsToSelector:this->selector()];
         }
-        **/
     }
 
     // BaseClassMeta

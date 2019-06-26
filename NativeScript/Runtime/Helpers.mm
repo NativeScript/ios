@@ -132,6 +132,14 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
     return static_cast<BaseDataWrapper*>(metadataProp.As<External>()->Value());
 }
 
+std::vector<Local<Value>> tns::ArgsToVector(const FunctionCallbackInfo<Value>& info) {
+    std::vector<Local<Value>> args;
+    for (int i = 0; i < info.Length(); i++) {
+        args.push_back(info[i]);
+    }
+    return args;
+}
+
 void tns::ThrowError(Isolate* isolate, std::string message) {
     // The Isolate::Scope here is necessary because the Exception::Error method internally relies on the
     // Isolate::GetCurrent method which might return null if we do not use the proper scope

@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include <sstream>
 #include "ArgConverter.h"
 #include "ObjectManager.h"
 #include "Caches.h"
@@ -225,6 +226,189 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
 
     // TODO: Handle other return types, i.e. assign the retValue parameter from the v8 result
     assert(false);
+}
+
+void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<Value>& info, Class klass, const InterfaceMeta* interfaceMeta) {
+    assert(klass != nullptr);
+
+    id result = nil;
+
+    if (info.Length() == 1) {
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, info[0]);
+        if (wrapper != nullptr && wrapper->Type() == WrapperType::Pointer) {
+            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+            result = CFBridgingRelease(pointerWrapper->Data());
+        }
+    }
+
+    std::string className = class_getName(klass);
+
+    if (result == nil && interfaceMeta == nullptr) {
+        const Meta* meta = ArgConverter::FindMeta(klass);
+        if (meta != nullptr && meta->type() == MetaType::Interface) {
+            interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+        }
+    }
+
+    if (result == nil && interfaceMeta != nullptr) {
+        className = interfaceMeta->name();
+
+        const MethodMeta* initializer = ArgConverter::FindInitializer(isolate, klass, interfaceMeta, info);
+        if (initializer == nullptr) {
+            return;
+        }
+
+        result = [klass alloc];
+
+        std::vector<Local<Value>> args = tns::ArgsToVector(info);
+        Local<Value> obj = Interop::CallFunction(isolate, initializer, result, klass, args);
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
+        if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+            ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
+            result = wr->Data();
+        }
+    }
+
+    if (result == nil) {
+        result = [[klass alloc] init];
+    }
+
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, result);
+    Local<Object> thiz = info.This();
+    ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
+
+    Persistent<Value>* poThiz = ObjectManager::Register(isolate, thiz);
+
+    auto it = Caches::Instances.find(result);
+    if (it == Caches::Instances.end()) {
+        Caches::Instances.insert(std::make_pair(result, poThiz));
+    } else {
+        Local<Value> obj = it->second->Get(isolate);
+        info.GetReturnValue().Set(obj);
+    }
+}
+
+const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, const InterfaceMeta* interfaceMeta, const FunctionCallbackInfo<Value>& info) {
+    std::vector<const MethodMeta*> candidates;
+    do {
+        std::vector<const MethodMeta*> initializers = interfaceMeta->initializersWithProtocols(klass);
+        for (const MethodMeta* candidate: initializers) {
+            if (ArgConverter::CanInvoke(isolate, candidate, info)) {
+                candidates.push_back(candidate);
+            }
+        }
+        interfaceMeta = interfaceMeta->baseMeta();
+    } while (interfaceMeta);
+
+    if (candidates.size() == 0) {
+        tns::ThrowError(isolate, "No initializer found that matches constructor invocation.");
+        return nullptr;
+    } else if (candidates.size() > 1) {
+        if (info.Length() == 0) {
+            auto it = std::find_if(candidates.begin(), candidates.end(), [](const MethodMeta* c) -> bool { return strcmp(c->name(), "init") == 0; });
+            if (it != candidates.end()) {
+                return (*it);
+            }
+        }
+
+        std::stringstream ss;
+        ss << "More than one initializer found that matches constructor invocation:";
+        for (int i = 0; i < candidates.size(); i++) {
+            ss << " ";
+            ss << candidates[i]->selectorAsString();
+        }
+        std::string errorMessage = ss.str();
+        tns::ThrowError(isolate, errorMessage);
+        return nullptr;
+    }
+
+    return candidates[0];
+}
+
+bool ArgConverter::CanInvoke(Isolate* isolate, const MethodMeta* candidate, const FunctionCallbackInfo<Value>& info) {
+    if (candidate->encodings()->count - 1 != info.Length()) {
+        return false;
+    }
+
+    if (info.Length() == 0) {
+        return true;
+    }
+
+    const TypeEncoding* typeEncoding = candidate->encodings()->first();
+    for (int i = 0; i < info.Length(); i++) {
+        typeEncoding = typeEncoding->next();
+        Local<Value> arg = info[i];
+
+        if (!CanInvoke(isolate, typeEncoding, arg)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool ArgConverter::CanInvoke(Isolate* isolate, const TypeEncoding* typeEncoding, Local<Value> arg) {
+    if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
+        return true;
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+        const char* name = typeEncoding->details.declarationReference.name.valuePtr();
+        if (strcmp(name, "NSNumber") == 0 && tns::IsNumber(arg)) {
+            return true;
+        }
+
+        if (strcmp(name, "NSString") == 0 && tns::IsString(arg)) {
+            return true;
+        }
+
+        if (strcmp(name, "NSArray") == 0 && arg->IsArray()) {
+            return true;
+        }
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
+        return arg->IsObject();
+    }
+
+    if (tns::IsBool(arg)) {
+        return typeEncoding->type == BinaryTypeEncodingType::BoolEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::IdEncoding;
+    }
+
+    if (tns::IsNumber(arg)) {
+        return typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::UShortEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::ShortEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::UIntEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::IntEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::ULongEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::LongEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::ULongLongEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::LongLongEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::FloatEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::DoubleEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::UCharEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::CharEncoding;
+    }
+
+    if (tns::IsString(arg)) {
+        return typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::UnicharEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::CStringEncoding;
+    }
+
+    if (arg->IsFunction()) {
+        return typeEncoding->type == BinaryTypeEncodingType::BlockEncoding ||
+            typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding;
+    }
+
+    if (arg->IsArrayBuffer() || arg->IsArrayBufferView()) {
+        return typeEncoding->type == BinaryTypeEncodingType::IncompleteArrayEncoding;
+    }
+
+    return false;
 }
 
 Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver) {

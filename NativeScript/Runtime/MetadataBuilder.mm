@@ -565,43 +565,12 @@ void MetadataBuilder::RegisterStaticProtocols(Local<v8::Function> ctorFunc, cons
 
 void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.IsConstructCall());
-
     Isolate* isolate = info.GetIsolate();
-
-    id obj = nil;
-
-    if (info.Length() == 1) {
-        BaseDataWrapper* wrapper = tns::GetValue(isolate, info[0]);
-        if (wrapper != nullptr && wrapper->Type() == WrapperType::Pointer) {
-            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
-            obj = CFBridgingRelease(pointerWrapper->Data());
-        }
-    }
-
     CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
-    const BaseClassMeta* meta = item->meta_;
+    Class klass = objc_getClass(item->meta_->name());
 
-    assert(meta->type() == MetaType::Interface);
-
-    if (obj == nil) {
-        Class klass = objc_getClass(meta->name());
-        obj = [[klass alloc] init];
-    }
-
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(meta->name(), obj);
-
-    Local<Object> thiz = info.This();
-    ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
-
-    Persistent<Value>* poThiz = ObjectManager::Register(isolate, thiz);
-
-    auto it = Caches::Instances.find(obj);
-    if (it == Caches::Instances.end()) {
-        Caches::Instances.insert(std::make_pair(obj, poThiz));
-    } else {
-        Local<Value> result = it->second->Get(isolate);
-        info.GetReturnValue().Set(result);
-    }
+    const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
+    ArgConverter::ConstructObject(isolate, info, klass, interfaceMeta);
 }
 
 void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
@@ -634,10 +603,7 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
     CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(info.Data().As<External>()->Value());
 
     bool instanceMethod = info.This()->InternalFieldCount() > 0;
-    std::vector<Local<Value>> args;
-    for (int i = 0; i < info.Length(); i++) {
-        args.push_back(info[i]);
-    }
+    std::vector<Local<Value>> args = tns::ArgsToVector(info);
 
     std::string className = item->className_;
 
@@ -797,11 +763,7 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
         return;
     }
 
-    std::vector<Local<Value>> args;
-    for (int i = 0; i < info.Length(); i++) {
-        args.push_back(info[i]);
-    }
-
+    std::vector<Local<Value>> args = tns::ArgsToVector(info);
     Local<Value> result = Interop::CallFunction(isolate, item->meta_, nil, nil, args);
     if (item->meta_->encodings()->first()->type != BinaryTypeEncodingType::VoidEncoding) {
         info.GetReturnValue().Set(result);
