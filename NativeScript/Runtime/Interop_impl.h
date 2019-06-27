@@ -17,6 +17,10 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
     if constexpr(std::is_same_v<TMeta, FunctionMeta>) {
         const FunctionMeta* functionMeta = static_cast<const FunctionMeta*>(meta);
         functionPointer = SymbolLoader::instance().loadFunctionSymbol(functionMeta->topLevelModule(), meta->name());
+        if (!functionPointer) {
+            NSLog(@"Unable to load \"%s\" function", functionMeta->name());
+            assert(false);
+        }
         typeEncoding = functionMeta->encodings()->first();
         isPrimitiveFunction = true;
     } else if constexpr(std::is_same_v<TMeta, MethodMeta>) {

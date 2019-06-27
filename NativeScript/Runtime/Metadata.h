@@ -750,11 +750,16 @@ namespace tns {
         // Remove all optional methods/properties which are not implemented in the class
         template <typename TMemberMeta>
         static void filterUnavailableMembers(MembersCollection& members, Class klass, bool isStatic) {
-            /**
-            members.remove_if([klass, isStatic](const MemberMeta* memberMeta) {
-                return !static_cast<const TMemberMeta*>(memberMeta)->isAvailableInClass(klass, isStatic);
-            });
-             **/
+            for (auto it{members.begin()}, end{members.end()}; it != end;) {
+                const MemberMeta* memberMeta = *it;
+                bool isAvailable = static_cast<const TMemberMeta*>(memberMeta)->isAvailableInClass(klass, isStatic);
+                if (!isAvailable) {
+                    it = members.erase(it);
+                }
+                else {
+                    ++it;
+                }
+            }
         }
 
         /// instance properties
