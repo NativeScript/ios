@@ -203,11 +203,11 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
                 return;
         }
     } else if (value->IsString()) {
-        std::string strValue = tns::ToString(isolate, value);
         if (type == BinaryTypeEncodingType::IdEncoding ||
             type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+            std::string strValue = tns::ToString(isolate, value);
             id data = [NSString stringWithUTF8String:strValue.c_str()];
-            *(ffi_arg*)retValue = (unsigned long)data;
+            *(CFTypeRef*)retValue = CFBridgingRetain(data);
             return;
         }
     } else if (value->IsObject()) {
