@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C24ECA9322C4FF3700AEBA9A /* exported-symbols.txt in Sources */ = {isa = PBXBuildFile; fileRef = C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */; };
 		C266567822AA405100EE15CC /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C266567722AA405100EE15CC /* Default-568h@2x.png */; };
 		C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C266567922AA630F00EE15CC /* NSDataAdapter.mm */; };
 		C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C266567A22AA630F00EE15CC /* NSDataAdapter.h */; };
@@ -123,13 +124,6 @@
 			remoteGlobalIDString = C29374E1229FC0F60075CB16;
 			remoteInfo = TestFixtures;
 		};
-		C2CC8EFC22C3991700B78928 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = C27E277822202663009C10A3 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = C2DDEB31229EAB3B00345BFE;
-			remoteInfo = NativeScript;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -145,6 +139,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "exported-symbols.txt"; sourceTree = "<group>"; };
 		C266567722AA405100EE15CC /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		C266567922AA630F00EE15CC /* NSDataAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NSDataAdapter.mm; sourceTree = "<group>"; };
 		C266567A22AA630F00EE15CC /* NSDataAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NSDataAdapter.h; sourceTree = "<group>"; };
@@ -362,6 +357,7 @@
 				C29374F8229FC1600075CB16 /* TNSTestCommon.m */,
 				C2937507229FC1600075CB16 /* TNSTestNativeCallbacks.h */,
 				C29374F4229FC1600075CB16 /* TNSTestNativeCallbacks.m */,
+				C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */,
 			);
 			path = TestFixtures;
 			sourceTree = "<group>";
@@ -700,7 +696,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				C2CC8EFD22C3991700B78928 /* PBXTargetDependency */,
 				C293752B229FC4740075CB16 /* PBXTargetDependency */,
 			);
 			name = TestApp;
@@ -804,6 +799,7 @@
 				C2937525229FC1600075CB16 /* TNSFunctionPointers.m in Sources */,
 				C2937520229FC1600075CB16 /* TNSVersions.m in Sources */,
 				C293751B229FC1600075CB16 /* TNSTestNativeCallbacks.m in Sources */,
+				C24ECA9322C4FF3700AEBA9A /* exported-symbols.txt in Sources */,
 				C293751D229FC1600075CB16 /* TNSTestCommon.m in Sources */,
 				C293751F229FC1600075CB16 /* TNSBridgedTypes.m in Sources */,
 				C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */,
@@ -862,11 +858,6 @@
 			target = C29374E1229FC0F60075CB16 /* TestFixtures */;
 			targetProxy = C293752A229FC4740075CB16 /* PBXContainerItemProxy */;
 		};
-		C2CC8EFD22C3991700B78928 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
-			targetProxy = C2CC8EFC22C3991700B78928 /* PBXContainerItemProxy */;
-		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -922,11 +913,12 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				VALID_ARCHS = "arm64 arm64e x86_64";
 			};
 			name = Debug;
 		};
@@ -976,11 +968,12 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				VALIDATE_PRODUCT = YES;
+				VALID_ARCHS = "arm64 arm64e x86_64";
 			};
 			name = Release;
 		};
@@ -1021,6 +1014,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = CHSQ3M3P37;
+				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/TestApp/Frameworks",
@@ -1044,6 +1038,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
@@ -1053,6 +1048,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = CHSQ3M3P37;
+				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/TestApp/Frameworks",
@@ -1076,6 +1072,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
