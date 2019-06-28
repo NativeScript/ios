@@ -4,7 +4,6 @@
 #include "ObjectManager.h"
 #include "Caches.h"
 #include "Interop.h"
-#include "Interop_impl.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -261,12 +260,8 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
         result = [klass alloc];
 
         std::vector<Local<Value>> args = tns::ArgsToVector(info);
-        Local<Value> obj = Interop::CallFunction(isolate, initializer, result, klass, args);
-        BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
-        if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-            ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
-            result = wr->Data();
-        }
+
+        result = Interop::CallInitializer(isolate, initializer, result, klass, args);
     }
 
     if (result == nil) {

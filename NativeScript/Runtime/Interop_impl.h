@@ -7,7 +7,7 @@ using namespace v8;
 namespace tns {
 
 template <typename TMeta>
-Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id target, Class clazz, const std::vector<Local<Value>> args, bool callSuper) {
+inline Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id target, Class clazz, const std::vector<Local<Value>> args, bool callSuper) {
     void* functionPointer = nullptr;
     SEL selector = nil;
     int initialParameterIndex = 0;
@@ -95,6 +95,28 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const TMeta* meta, id targe
 
         return result;
     }
+}
+
+inline id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, const std::vector<Local<Value>> args) {
+    const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
+    SEL selector = methodMeta->selector();
+    void* functionPointer = (void*)objc_msgSend;
+
+    int initialParameterIndex = 2;
+    int argsCount = initialParameterIndex + (int)args.size();
+
+    ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, argsCount);
+    FFICall call(cif);
+
+    Interop::SetValue(call.ArgumentBuffer(0), target);
+    Interop::SetValue(call.ArgumentBuffer(1), selector);
+    Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
+
+    ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+
+    id result = call.GetResult<id>();
+
+    return result;
 }
 
 }

@@ -1,6 +1,5 @@
 #include <Foundation/Foundation.h>
 #include "Interop.h"
-#include "Interop_impl.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
 #include "ArgConverter.h"
