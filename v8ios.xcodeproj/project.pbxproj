@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C24ECA9322C4FF3700AEBA9A /* exported-symbols.txt in Sources */ = {isa = PBXBuildFile; fileRef = C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */; };
 		C266567822AA405100EE15CC /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C266567722AA405100EE15CC /* Default-568h@2x.png */; };
 		C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C266567922AA630F00EE15CC /* NSDataAdapter.mm */; };
 		C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C266567A22AA630F00EE15CC /* NSDataAdapter.h */; };
@@ -109,7 +108,6 @@
 		C2DDEBD4229EB06E00345BFE /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBCF229EB06E00345BFE /* ffi.h */; };
 		C2DDEBD5229EB06E00345BFE /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBD1229EB06E00345BFE /* ffitarget.h */; };
 		C2DDEBD6229EB06E00345BFE /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEBD2229EB06E00345BFE /* ffi.h */; };
-		C2DDEBD7229EB1C500345BFE /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2FF301C2252062A00933782 /* UIKit.framework */; };
 		C2DDEBDC229EB37A00345BFE /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEBDB229EB37A00345BFE /* main.mm */; };
 		C2DDEBDE229EB4A900345BFE /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2DDEBDD229EB4A900345BFE /* app */; };
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
@@ -117,7 +115,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		C22C091922CA247A0080D176 /* PBXContainerItemProxy */ = {
+		C22C091E22CA2E860080D176 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = C27E277822202663009C10A3 /* Project object */;
 			proxyType = 1;
@@ -323,7 +321,6 @@
 				C26656B022B3760900EE15CC /* libv8_initializers.a in Frameworks */,
 				C2BF3F3E22C3ABEA00A76BDE /* libv8_crash_keys.a in Frameworks */,
 				C26656AA22B3760900EE15CC /* libv8_base_without_compiler.a in Frameworks */,
-				C2DDEBD7229EB1C500345BFE /* UIKit.framework in Frameworks */,
 				C26656AE22B3760900EE15CC /* libv8_libplatform.a in Frameworks */,
 				C26656A922B3760800EE15CC /* libv8_compiler.a in Frameworks */,
 				C26656B122B3760900EE15CC /* libtorque_generated_initializers.a in Frameworks */,
@@ -737,7 +734,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				C22C091A22CA247A0080D176 /* PBXTargetDependency */,
+				C22C091F22CA2E860080D176 /* PBXTargetDependency */,
 				C293752B229FC4740075CB16 /* PBXTargetDependency */,
 				C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */,
 			);
@@ -901,7 +898,6 @@
 				C2937525229FC1600075CB16 /* TNSFunctionPointers.m in Sources */,
 				C2937520229FC1600075CB16 /* TNSVersions.m in Sources */,
 				C293751B229FC1600075CB16 /* TNSTestNativeCallbacks.m in Sources */,
-				C24ECA9322C4FF3700AEBA9A /* exported-symbols.txt in Sources */,
 				C293751D229FC1600075CB16 /* TNSTestCommon.m in Sources */,
 				C293751F229FC1600075CB16 /* TNSBridgedTypes.m in Sources */,
 				C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */,
@@ -962,10 +958,10 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		C22C091A22CA247A0080D176 /* PBXTargetDependency */ = {
+		C22C091F22CA2E860080D176 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
-			targetProxy = C22C091922CA247A0080D176 /* PBXContainerItemProxy */;
+			targetProxy = C22C091E22CA2E860080D176 /* PBXContainerItemProxy */;
 		};
 		C293752B229FC4740075CB16 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -1119,6 +1115,7 @@
 				CLANG_WARN_STRICT_PROTOTYPES = NO;
 				CODE_SIGN_STYLE = Automatic;
 				DEFINES_MODULE = YES;
+				ENABLE_NS_ASSERTIONS = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
@@ -1214,7 +1211,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = YES;
+				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = CHSQ3M3P37;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -1236,7 +1233,11 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/NativeScript/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript.NativeScript;
+				OTHER_LDFLAGS = (
+					"-framework",
+					UIKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1254,7 +1255,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = YES;
+				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = CHSQ3M3P37;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -1273,7 +1274,11 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/NativeScript/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript.NativeScript;
+				OTHER_LDFLAGS = (
+					"-framework",
+					UIKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1291,6 +1296,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.14;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				VALID_ARCHS = x86_64;
 			};
 			name = Debug;
 		};
@@ -1302,6 +1308,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.14;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				VALID_ARCHS = x86_64;
 			};
 			name = Release;
 		};

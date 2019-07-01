@@ -8,7 +8,7 @@ namespace tns {
 
 class SetTimeout {
 public:
-    static void Init(v8::Isolate* isolate);
+    static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
 private:
     struct CacheEntry;
     static void SetTimeoutCallback(const v8::FunctionCallbackInfo<v8::Value>& args);

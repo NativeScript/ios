@@ -6,21 +6,12 @@ using namespace v8;
 
 namespace tns {
 
-void WeakRef::Init(Isolate* isolate) {
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> global = context->Global();
-
+void WeakRef::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
     Local<FunctionTemplate> weakRefCtorFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback, Local<Value>());
 
-    Local<v8::Function> weakRefCtorFunc;
-    if (!weakRefCtorFuncTemplate->GetFunction(context).ToLocal(&weakRefCtorFunc)) {
-        assert(false);
-    }
-
     Local<v8::String> name = tns::ToV8String(isolate, "WeakRef");
-    weakRefCtorFunc->SetName(name);
-    bool success = global->Set(context, name, weakRefCtorFunc).FromMaybe(false);
-    assert(success);
+    weakRefCtorFuncTemplate->SetClassName(name);
+    globalTemplate->Set(name, weakRefCtorFuncTemplate);
 }
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {

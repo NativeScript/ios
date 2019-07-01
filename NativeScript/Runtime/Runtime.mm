@@ -63,19 +63,21 @@ Isolate* Runtime::InitInternal(const string& baseDir) {
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<FunctionTemplate> globalTemplateFunction = FunctionTemplate::New(isolate);
+    globalTemplateFunction->SetClassName(tns::ToV8String(isolate, "NativeScriptGlobalObject"));
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
+    DefineNativeScriptVersion(isolate, globalTemplate);
     metadataBuilder_.RegisterConstantsOnGlobalObject(isolate, globalTemplate);
+    DefinePerformanceObject(isolate, globalTemplate);
+    DefineTimeMethod(isolate, globalTemplate);
+    WeakRef::Init(isolate, globalTemplate);
+    SetTimeout::Init(isolate, globalTemplate);
+
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
 
     baseDir_ = baseDir;
     DefineGlobalObject(context);
-    DefineNativeScriptVersion(context);
-    DefineTimeMethod(context);
-    DefinePerformanceObject(context);
     Console::Init(isolate);
-    SetTimeout::Init(isolate);
-    WeakRef::Init(isolate);
     moduleInternal_.Init(isolate, baseDir);
     metadataBuilder_.Init(isolate);
     InlineFunctions::Init(isolate);
@@ -108,32 +110,21 @@ void Runtime::RunScript(string file) {
 
 void Runtime::DefineGlobalObject(Local<Context> context) {
     Local<Object> global = context->Global();
-    PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+    const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     if (!global->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "global"), global, readOnlyFlags).FromMaybe(false)) {
         assert(false);
     }
 }
 
-void Runtime::DefinePerformanceObject(Local<Context> context) {
-    Local<Object> global = context->Global();
-    Local<v8::String> performancePropertyName = ToV8String(context->GetIsolate(), "performance");
-    PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
-    if (!global->DefineOwnProperty(context, performancePropertyName, global, readOnlyFlags).FromMaybe(false)) {
-        assert(false);
-    }
+void Runtime::DefinePerformanceObject(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+    Local<ObjectTemplate> performanceTemplate = ObjectTemplate::New(isolate);
 
-    Local<Value> performance;
-    if (!global->Get(context, performancePropertyName).ToLocal(&performance) || !performance->IsObject()) {
-        assert(false);
-    }
+    Local<FunctionTemplate> nowFuncTemplate = FunctionTemplate::New(isolate, PerformanceNowCallback);
+    performanceTemplate->Set(tns::ToV8String(isolate, "now"), nowFuncTemplate);
 
-    Local<v8::Function> nowFunc;
-    if (!Function::New(context, PerformanceNowCallback).ToLocal(&nowFunc)) {
-        assert(false);
-    }
-
-    bool success = performance->ToObject(context).ToLocalChecked()->Set(context, ToV8String(context->GetIsolate(), "now"), nowFunc).FromMaybe(false);
-    assert(success);
+    const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+    Local<v8::String> performancePropertyName = ToV8String(isolate, "performance");
+    globalTemplate->Set(performancePropertyName, performanceTemplate, readOnlyFlags);
 }
 
 void Runtime::PerformanceNowCallback(const FunctionCallbackInfo<Value>& args) {
@@ -143,26 +134,18 @@ void Runtime::PerformanceNowCallback(const FunctionCallbackInfo<Value>& args) {
     args.GetReturnValue().Set(result);
 }
 
-void Runtime::DefineNativeScriptVersion(Local<Context> context) {
-    Local<Object> global = context->Global();
-    Isolate* isolate = context->GetIsolate();
-    Maybe<bool> success = global->Set(context, ToV8String(isolate, "__runtimeVersion"), ToV8String(isolate, STRINGIZE_VALUE_OF(NATIVESCRIPT_VERSION)));
-    assert(success.FromMaybe(false));
+void Runtime::DefineNativeScriptVersion(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+    const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+    globalTemplate->Set(ToV8String(isolate, "__runtimeVersion"), ToV8String(isolate, STRINGIZE_VALUE_OF(NATIVESCRIPT_VERSION)), readOnlyFlags);
 }
 
-void Runtime::DefineTimeMethod(Local<Context> context) {
-    Local<Object> global = context->Global();
-    Isolate* isolate = context->GetIsolate();
-    Local<v8::Function> timeFunction;
-    bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate) {
+    Local<FunctionTemplate> timeFunctionTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         auto nano = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now());
         double duration = nano.time_since_epoch().count() / 1000000.0;
         info.GetReturnValue().Set(duration);
-    }).ToLocal(&timeFunction);
-    assert(success);
-
-    success = global->Set(context, ToV8String(isolate, "__time"), timeFunction).FromMaybe(false);
-    assert(success);
+    });
+    globalTemplate->Set(ToV8String(isolate, "__time"), timeFunctionTemplate);
 }
 
 }

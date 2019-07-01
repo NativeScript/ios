@@ -17,9 +17,9 @@ public:
 private:
     v8::Isolate* InitInternal(const std::string& baseDir);
     void DefineGlobalObject(v8::Local<v8::Context> context);
-    void DefineNativeScriptVersion(v8::Local<v8::Context> context);
-    void DefineTimeMethod(v8::Local<v8::Context> context);
-    void DefinePerformanceObject(v8::Local<v8::Context> context);
+    void DefineNativeScriptVersion(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+    void DefinePerformanceObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+    void DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     static void PerformanceNowCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     v8::Platform* platform_;
     v8::Isolate* isolate_;

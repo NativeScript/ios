@@ -6,27 +6,12 @@ using namespace v8;
 
 namespace tns {
 
-void SetTimeout::Init(Isolate* isolate) {
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> global = context->Global();
+void SetTimeout::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+    Local<FunctionTemplate> setTimeoutFuncTemplate = FunctionTemplate::New(isolate, SetTimeoutCallback);
+    globalTemplate->Set(ToV8String(isolate, "setTimeout"), setTimeoutFuncTemplate);
 
-    Local<v8::Function> setTimeoutFunc;
-    if (!Function::New(context, SetTimeoutCallback).ToLocal(&setTimeoutFunc)) {
-        assert(false);
-    }
-
-    if (!global->Set(context, ToV8String(isolate, "setTimeout"), setTimeoutFunc).FromMaybe(false)) {
-        assert(false);
-    }
-
-    Local<v8::Function> clearTimeoutFunc;
-    if (!Function::New(context, ClearTimeoutCallback).ToLocal(&clearTimeoutFunc)) {
-        assert(false);
-    }
-
-    if (!global->Set(context, ToV8String(isolate, "clearTimeout"), clearTimeoutFunc).FromMaybe(false)) {
-        assert(false);
-    }
+    Local<FunctionTemplate> clearTimeoutFuncTemplate = FunctionTemplate::New(isolate, ClearTimeoutCallback);
+    globalTemplate->Set(ToV8String(isolate, "clearTimeout"), clearTimeoutFuncTemplate);
 }
 
 void SetTimeout::SetTimeoutCallback(const FunctionCallbackInfo<Value>& args) {

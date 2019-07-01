@@ -7,7 +7,7 @@ namespace tns {
 
 class WeakRef {
 public:
-    static void Init(v8::Isolate* isolate);
+    static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
 private:
     static v8::Persistent<v8::Function>* poGetterFunc_;
     static v8::Persistent<v8::Function>* poClearFunc_;
