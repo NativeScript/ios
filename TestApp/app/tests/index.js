@@ -50,7 +50,7 @@ require("./tests/Inheritance/TypeScriptTests");
 //
 require("./tests/MethodCallsTests");
 //import "./FunctionsTests";
-//require("./tests/VersionDiffTests");
+require("./tests/VersionDiffTests");
 require("./tests/ObjCConstructors");
 //
 require("./tests/MetadataTests");
