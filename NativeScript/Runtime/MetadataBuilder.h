@@ -14,11 +14,6 @@ public:
     void Init(v8::Isolate* isolate);
     void RegisterConstantsOnGlobalObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> global);
 
-    static MetadataBuilder* Load(const std::string& baseDir) {
-        static MetadataBuilder *b = new MetadataBuilder(baseDir);
-        return b;
-    }
-
 private:
     v8::Isolate* isolate_;
     ClassBuilder classBuilder_;
@@ -54,25 +49,6 @@ private:
     void RegisterStaticProperties(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names);
     void RegisterStaticProtocols(v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names);
     void DefineFunctionLengthProperty(v8::Local<v8::Context> context, const TypeEncodingsList<ArrayCount>* encodings, v8::Local<v8::Function> func);
-
-    MetadataBuilder(const std::string& baseDir) {
-        std::string fileName = baseDir + "/metadata-x86_64.bin";
-        std::string mode = "rb";
-        auto file = fopen(fileName.c_str(), mode.c_str());
-        if (!file) {
-            assert(false);
-        }
-
-        fseek(file, 0, SEEK_END);
-        long length = ftell(file);
-        rewind(file);
-
-        uint8_t* data = new uint8_t[length];
-        fread(data, sizeof(uint8_t), length, file);
-        fclose(file);
-
-        MetaFile::setInstance(data);
-    }
 
     template<class T>
     struct CacheItem {

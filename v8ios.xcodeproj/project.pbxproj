@@ -124,6 +124,13 @@
 			remoteGlobalIDString = C29374E1229FC0F60075CB16;
 			remoteInfo = TestFixtures;
 		};
+		C2F4CBBB22C61CF20036B56F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2F4CBB222C60BFD0036B56F;
+			remoteInfo = "metadata-generator";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -135,6 +142,15 @@
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C2F4CBB122C60BFD0036B56F /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
@@ -270,6 +286,7 @@
 		C2DDEBD2229EB06E00345BFE /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
 		C2DDEBDB229EB37A00345BFE /* main.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		C2DDEBDD229EB4A900345BFE /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
+		C2F4CBB322C60BFD0036B56F /* metadata-generator */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "metadata-generator"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InlineFunctions.cpp; sourceTree = "<group>"; };
 		C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InlineFunctions.h; sourceTree = "<group>"; };
 		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -311,6 +328,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C2F4CBB022C60BFD0036B56F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -321,6 +345,7 @@
 				C2DDEB17229EA89000345BFE /* TestApp */,
 				C2DDEB33229EAB3B00345BFE /* NativeScript */,
 				C29374E3229FC0F60075CB16 /* TestFixtures */,
+				C2F4CBB422C60BFD0036B56F /* metadata-generator */,
 				C27E278122202664009C10A3 /* Products */,
 				C2FF3016225203FD00933782 /* Frameworks */,
 			);
@@ -332,6 +357,7 @@
 				C2DDEB16229EA89000345BFE /* TestApp.app */,
 				C2DDEB32229EAB3B00345BFE /* NativeScript.framework */,
 				C29374E2229FC0F60075CB16 /* libTestFixtures.a */,
+				C2F4CBB322C60BFD0036B56F /* metadata-generator */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -600,6 +626,13 @@
 			path = "Source Files";
 			sourceTree = "<group>";
 		};
+		C2F4CBB422C60BFD0036B56F /* metadata-generator */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "metadata-generator";
+			sourceTree = "<group>";
+		};
 		C2FF3016225203FD00933782 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -689,6 +722,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestApp" */;
 			buildPhases = (
+				C2F4CBBD22C61D480036B56F /* ShellScript */,
 				C2DDEB12229EA89000345BFE /* Sources */,
 				C2DDEB13229EA89000345BFE /* Frameworks */,
 				C2DDEB14229EA89000345BFE /* Resources */,
@@ -697,6 +731,7 @@
 			);
 			dependencies = (
 				C293752B229FC4740075CB16 /* PBXTargetDependency */,
+				C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */,
 			);
 			name = TestApp;
 			productName = TestApp;
@@ -721,6 +756,24 @@
 			productReference = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		C2F4CBB222C60BFD0036B56F /* metadata-generator */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C2F4CBB722C60BFD0036B56F /* Build configuration list for PBXNativeTarget "metadata-generator" */;
+			buildPhases = (
+				C2F4CBAF22C60BFD0036B56F /* Sources */,
+				C2F4CBB022C60BFD0036B56F /* Frameworks */,
+				C2F4CBB122C60BFD0036B56F /* CopyFiles */,
+				C2F4CBBA22C60C0F0036B56F /* ShellScript */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "metadata-generator";
+			productName = "metadata-generator";
+			productReference = C2F4CBB322C60BFD0036B56F /* metadata-generator */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -737,6 +790,9 @@
 						CreatedOnToolsVersion = 10.2.1;
 					};
 					C2DDEB31229EAB3B00345BFE = {
+						CreatedOnToolsVersion = 10.2.1;
+					};
+					C2F4CBB222C60BFD0036B56F = {
 						CreatedOnToolsVersion = 10.2.1;
 					};
 				};
@@ -757,6 +813,7 @@
 				C2DDEB15229EA89000345BFE /* TestApp */,
 				C2DDEB31229EAB3B00345BFE /* NativeScript */,
 				C29374E1229FC0F60075CB16 /* TestFixtures */,
+				C2F4CBB222C60BFD0036B56F /* metadata-generator */,
 			);
 		};
 /* End PBXProject section */
@@ -779,6 +836,43 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		C2F4CBBA22C60C0F0036B56F /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator\n/Applications/CMake.app/Contents/bin/cmake .\nmake\n";
+		};
+		C2F4CBBD22C61D480036B56F /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator/bin\ncp ../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C29374DE229FC0F60075CB16 /* Sources */ = {
@@ -850,6 +944,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C2F4CBAF22C60BFD0036B56F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -857,6 +958,11 @@
 			isa = PBXTargetDependency;
 			target = C29374E1229FC0F60075CB16 /* TestFixtures */;
 			targetProxy = C293752A229FC4740075CB16 /* PBXContainerItemProxy */;
+		};
+		C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2F4CBB222C60BFD0036B56F /* metadata-generator */;
+			targetProxy = C2F4CBBB22C61CF20036B56F /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -982,6 +1088,7 @@
 			buildSettings = {
 				CLANG_WARN_STRICT_PROTOTYPES = NO;
 				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
@@ -998,6 +1105,7 @@
 			buildSettings = {
 				CLANG_WARN_STRICT_PROTOTYPES = NO;
 				CODE_SIGN_STYLE = Automatic;
+				DEFINES_MODULE = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
@@ -1015,12 +1123,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = CHSQ3M3P37;
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/TestApp/Frameworks",
-					"$(PROJECT_DIR)",
+				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/NativeScript/**",
+					"$(SRCROOT)/TestFixtures",
 				);
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/**";
 				INFOPLIST_FILE = TestApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1035,6 +1143,10 @@
 					NativeScript,
 					"-force_load",
 					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libTestFixtures.a",
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1049,12 +1161,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = CHSQ3M3P37;
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/TestApp/Frameworks",
-					"$(PROJECT_DIR)",
+				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/NativeScript/**",
+					"$(SRCROOT)/TestFixtures",
 				);
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/**";
 				INFOPLIST_FILE = TestApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1069,6 +1181,10 @@
 					NativeScript,
 					"-force_load",
 					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libTestFixtures.a",
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1154,6 +1270,28 @@
 			};
 			name = Release;
 		};
+		C2F4CBB822C60BFD0036B56F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		C2F4CBB922C60BFD0036B56F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1189,6 +1327,15 @@
 			buildConfigurations = (
 				C2DDEB38229EAB3B00345BFE /* Debug */,
 				C2DDEB39229EAB3B00345BFE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C2F4CBB722C60BFD0036B56F /* Build configuration list for PBXNativeTarget "metadata-generator" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2F4CBB822C60BFD0036B56F /* Debug */,
+				C2F4CBB922C60BFD0036B56F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

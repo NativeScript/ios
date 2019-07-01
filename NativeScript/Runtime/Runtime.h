@@ -10,6 +10,7 @@ namespace tns {
 
 class Runtime {
 public:
+    static void InitializeMetadata(void* metadataPtr);
     Runtime();
     void Init(const std::string& baseDir);
     void RunScript(std::string file);

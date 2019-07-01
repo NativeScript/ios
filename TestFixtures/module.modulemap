@@ -1,0 +1,5 @@
+module TestFixtures {
+  umbrella header "TestFixtures.h"
+  export *
+  module * { export * }
+}

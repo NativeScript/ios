@@ -26,11 +26,14 @@ using namespace std;
 
 namespace tns {
 
+void Runtime::InitializeMetadata(void* metadataPtr) {
+    MetaFile::setInstance(metadataPtr);
+}
+
 Runtime::Runtime() {
 }
 
 void Runtime::Init(const string& baseDir) {
-    MetadataBuilder::Load(baseDir);
     isolate_ = InitInternal(baseDir);
     RunScript("index.js");
     tns::Tasks::Drain();
