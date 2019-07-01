@@ -117,6 +117,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		C22C091922CA247A0080D176 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2DDEB31229EAB3B00345BFE;
+			remoteInfo = NativeScript;
+		};
 		C293752A229FC4740075CB16 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = C27E277822202663009C10A3 /* Project object */;
@@ -730,6 +737,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				C22C091A22CA247A0080D176 /* PBXTargetDependency */,
 				C293752B229FC4740075CB16 /* PBXTargetDependency */,
 				C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */,
 			);
@@ -954,6 +962,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		C22C091A22CA247A0080D176 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
+			targetProxy = C22C091922CA247A0080D176 /* PBXContainerItemProxy */;
+		};
 		C293752B229FC4740075CB16 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C29374E1229FC0F60075CB16 /* TestFixtures */;
