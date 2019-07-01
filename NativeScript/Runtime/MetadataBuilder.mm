@@ -32,6 +32,10 @@ void MetadataBuilder::Init(Isolate* isolate) {
     for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
         const Meta* meta = (*it);
 
+        if (!meta->isAvailable()) {
+            continue;
+        }
+
         switch (meta->type()) {
         case MetaType::Function: {
             const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
@@ -63,7 +67,7 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
         Isolate* isolate = info.GetIsolate();
         std::string propName = tns::ToString(isolate, property);
         const Meta* meta = ArgConverter::GetMeta(propName);
-        if (meta == nullptr) {
+        if (meta == nullptr || !meta->isAvailable()) {
             return;
         }
 
@@ -290,19 +294,28 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 
     if (meta->type() == MetaType::Interface) {
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+        const InterfaceMeta* currentMeta = interfaceMeta;
         while (true) {
-            const char* baseName = interfaceMeta->baseName();
+            const char* baseName = currentMeta->baseName();
             if (baseName != nullptr) {
                 const Meta* baseClassMeta = ArgConverter::GetMeta(baseName);
-                if (baseClassMeta && baseClassMeta->type() == MetaType::Interface) {
-                    const InterfaceMeta* baseMeta = static_cast<const InterfaceMeta*>(baseClassMeta);
-                    if (baseMeta != nullptr) {
-                        Local<FunctionTemplate> baseCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
-                        ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
-                        auto it = Caches::CtorFuncs.find(baseMeta->name());
-                        if (it != Caches::CtorFuncs.end()) {
-                            baseCtorFunc = Local<v8::Function>::New(isolate_, *it->second);
-                        }
+                if (baseClassMeta == nullptr || baseClassMeta->type() != MetaType::Interface) {
+                    break;
+                }
+
+                if (!baseClassMeta->isAvailable()) {
+                    // Skip base classes that are not available in the current iOS version
+                    currentMeta = static_cast<const InterfaceMeta*>(baseClassMeta);
+                    continue;
+                }
+
+                const InterfaceMeta* baseMeta = static_cast<const InterfaceMeta*>(baseClassMeta);
+                if (baseMeta != nullptr) {
+                    Local<FunctionTemplate> baseCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
+                    ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
+                    auto it = Caches::CtorFuncs.find(baseMeta->name());
+                    if (it != Caches::CtorFuncs.end()) {
+                        baseCtorFunc = Local<v8::Function>::New(isolate_, *it->second);
                     }
                 }
             }
@@ -443,6 +456,9 @@ void MetadataBuilder::RegisterInstanceMethods(Local<FunctionTemplate> ctorFuncTe
 
     for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
         const MethodMeta* methodMeta = (*it).valuePtr();
+        if (!methodMeta->isAvailable()) {
+            continue;
+        }
 
         std::string name = methodMeta->jsName();
         if (std::find(names.begin(), names.end(), name) == names.end()) {
@@ -460,6 +476,9 @@ void MetadataBuilder::RegisterInstanceProperties(Local<FunctionTemplate> ctorFun
 
     for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
         const PropertyMeta* propMeta = (*it).valuePtr();
+        if (!propMeta->isAvailable()) {
+            continue;
+        }
 
         std::string name = propMeta->jsName();
         if (std::find(names.begin(), names.end(), name) == names.end()) {
@@ -504,6 +523,9 @@ void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const 
     Local<Context> context = isolate_->GetCurrentContext();
     for (auto it = meta->staticMethods->begin(); it != meta->staticMethods->end(); it++) {
         const MethodMeta* methodMeta = (*it).valuePtr();
+        if (!methodMeta->isAvailable()) {
+            continue;
+        }
 
         std::string name = methodMeta->jsName();
         if (std::find(names.begin(), names.end(), name) == names.end()) {
@@ -528,6 +550,9 @@ void MetadataBuilder::RegisterStaticMethods(Local<v8::Function> ctorFunc, const 
 void MetadataBuilder::RegisterStaticProperties(Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names) {
     for (auto it = meta->staticProps->begin(); it != meta->staticProps->end(); it++) {
         const PropertyMeta* propMeta = (*it).valuePtr();
+        if (!propMeta->isAvailable()) {
+            continue;
+        }
 
         std::string name = propMeta->jsName();
         if (std::find(names.begin(), names.end(), name) == names.end()) {

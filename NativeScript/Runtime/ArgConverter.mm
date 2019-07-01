@@ -528,7 +528,7 @@ const Meta* ArgConverter::GetMeta(std::string name) {
     }
 
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-    const Meta* result = globalTable->findMeta(name.c_str());
+    const Meta* result = globalTable->findMeta(name.c_str(), false /** onlyIfAvailable **/);
 
     if (result == nullptr) {
         return nullptr;
