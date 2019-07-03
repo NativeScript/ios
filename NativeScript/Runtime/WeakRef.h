@@ -2,6 +2,7 @@
 #define WeakRef_h
 
 #include "Common.h"
+#include <map>
 
 namespace tns {
 
@@ -9,8 +10,8 @@ class WeakRef {
 public:
     static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
 private:
-    static v8::Persistent<v8::Function>* poGetterFunc_;
-    static v8::Persistent<v8::Function>* poClearFunc_;
+    static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> poGetterFuncs_;
+    static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> poClearFuncs_;
 
     struct CallbackState {
         CallbackState(v8::Persistent<v8::Object>* target, v8::Persistent<v8::Object>* holder)

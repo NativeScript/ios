@@ -7,6 +7,7 @@
 #include "Helpers.h"
 #include "Tasks.h"
 #include "WeakRef.h"
+#include "Worker.h"
 
 #if defined __arm64 && __arm64__
 #include "natives_blob.arm64.h"
@@ -34,17 +35,24 @@ Runtime::Runtime() {
 }
 
 void Runtime::Init(const string& baseDir) {
-    isolate_ = InitInternal(baseDir);
+    InitInternal(baseDir);
     RunScript("index.js");
     tns::Tasks::Drain();
 }
 
-Isolate* Runtime::InitInternal(const string& baseDir) {
-    platform_ = platform::NewDefaultPlatform().release();
-    V8::InitializePlatform(platform_);
-    V8::Initialize();
-    std::string flags = "--expose_gc --jitless";
-    V8::SetFlagsFromString(flags.c_str(), (int)flags.size());
+void Runtime::Init(const string& baseDir, const string& script) {
+    InitInternal(baseDir);
+    RunScript(script);
+}
+
+void Runtime::InitInternal(const string& baseDir) {
+    if (!mainThreadInitialized_) {
+        Runtime::platform_ = platform::NewDefaultPlatform().release();
+        V8::InitializePlatform(Runtime::platform_);
+        V8::Initialize();
+        std::string flags = "--expose_gc --jitless";
+        V8::SetFlagsFromString(flags.c_str(), (int)flags.size());
+    }
 
     auto* nativesBlobStartupData = new StartupData();
     nativesBlobStartupData->data = reinterpret_cast<const char*>(&natives_blob_bin[0]);
@@ -66,6 +74,13 @@ Isolate* Runtime::InitInternal(const string& baseDir) {
     globalTemplateFunction->SetClassName(tns::ToV8String(isolate, "NativeScriptGlobalObject"));
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
     DefineNativeScriptVersion(isolate, globalTemplate);
+
+    if (!mainThreadInitialized_) {
+        Worker::Init(isolate, globalTemplate);
+    } else {
+        Worker::RegisterGlobals(isolate, globalTemplate);
+    }
+
     metadataBuilder_.RegisterConstantsOnGlobalObject(isolate, globalTemplate);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
@@ -82,7 +97,9 @@ Isolate* Runtime::InitInternal(const string& baseDir) {
     metadataBuilder_.Init(isolate);
     InlineFunctions::Init(isolate);
 
-    return isolate;
+    mainThreadInitialized_ = true;
+
+    isolate_ = isolate;
 }
 
 void Runtime::RunScript(string file) {
@@ -108,10 +125,18 @@ void Runtime::RunScript(string file) {
     }
 }
 
+Isolate* Runtime::GetIsolate() {
+    return this->isolate_;
+}
+
 void Runtime::DefineGlobalObject(Local<Context> context) {
     Local<Object> global = context->Global();
     const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     if (!global->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "global"), global, readOnlyFlags).FromMaybe(false)) {
+        assert(false);
+    }
+
+    if (mainThreadInitialized_ && !global->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "self"), global, readOnlyFlags).FromMaybe(false)) {
         assert(false);
     }
 }
@@ -147,5 +172,8 @@ void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplat
     });
     globalTemplate->Set(ToV8String(isolate, "__time"), timeFunctionTemplate);
 }
+
+Platform* Runtime::platform_ = nullptr;
+bool Runtime::mainThreadInitialized_ = false;
 
 }

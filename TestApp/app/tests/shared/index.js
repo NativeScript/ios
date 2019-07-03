@@ -23,5 +23,5 @@ exports.runAllTests = function() {
 //    exports.runRequireTests();
     exports.runWeakRefTests();
     exports.runRuntimeTests();
-//    exports.runWorkerTests();
+    exports.runWorkerTests();
 }

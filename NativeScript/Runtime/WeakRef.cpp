@@ -87,24 +87,26 @@ void WeakRef::WeakHolderCallback(const WeakCallbackInfo<CallbackState>& data) {
 }
 
 Local<v8::Function> WeakRef::GetGetterFunction(Isolate* isolate) {
-    if (poGetterFunc_ != nullptr) {
-        return poGetterFunc_->Get(isolate);
+    auto it = poGetterFuncs_.find(isolate);
+    if (it != poGetterFuncs_.end()) {
+        return it->second->Get(isolate);
     }
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> getterFunc = FunctionTemplate::New(isolate, GetCallback)->GetFunction(context).ToLocalChecked();
-    poGetterFunc_ = new Persistent<v8::Function>(isolate, getterFunc);
+    poGetterFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, getterFunc)));
     return getterFunc;
 }
 
 Local<v8::Function> WeakRef::GetClearFunction(Isolate* isolate) {
-    if (poClearFunc_ != nullptr) {
-        return poClearFunc_->Get(isolate);
+    auto it = poClearFuncs_.find(isolate);
+    if (it != poClearFuncs_.end()) {
+        return it->second->Get(isolate);
     }
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction(context).ToLocalChecked();
-    poClearFunc_ = new Persistent<v8::Function>(isolate, clearFunc);
+    poClearFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, clearFunc)));
     return clearFunc;
 }
 
@@ -128,7 +130,7 @@ void WeakRef::ClearCallback(const FunctionCallbackInfo<Value>& info) {
     tns::SetPrivateValue(isolate, holder, tns::ToV8String(isolate, "target"), External::New(isolate, nullptr));
 }
 
-Persistent<v8::Function>* WeakRef::poGetterFunc_;
-Persistent<v8::Function>* WeakRef::poClearFunc_;
+std::map<Isolate*, Persistent<v8::Function>*> WeakRef::poGetterFuncs_;
+std::map<Isolate*, Persistent<v8::Function>*> WeakRef::poClearFuncs_;
 
 }

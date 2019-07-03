@@ -27,8 +27,9 @@ Local<Value> Pointer::NewInstance(Isolate* isolate, void* handle) {
 }
 
 Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
-    if (pointerCtorFunc_ != nullptr) {
-        return pointerCtorFunc_->Get(isolate);
+    auto it = pointerCtorFuncs_.find(isolate);
+    if (it != pointerCtorFuncs_.end()) {
+        return it->second->Get(isolate);
     }
 
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, PointerConstructorCallback);
@@ -55,7 +56,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
     Pointer::RegisterToDecimalStringMethod(isolate, prototype);
     Pointer::RegisterToNumberMethod(isolate, prototype);
 
-    pointerCtorFunc_ = new Persistent<v8::Function>(isolate, ctorFunc);
+    pointerCtorFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, ctorFunc)));
 
     return ctorFunc;
 }
@@ -91,8 +92,8 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
 #endif
     }
 
-    auto it = Caches::PointerInstances.find(ptr);
-    if (it != Caches::PointerInstances.end()) {
+    auto it = Caches::Get(isolate)->PointerInstances.find(ptr);
+    if (it != Caches::Get(isolate)->PointerInstances.end()) {
         info.GetReturnValue().Set(it->second->Get(isolate));
         return;
     }
@@ -102,7 +103,7 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
 
     ObjectManager::Register(isolate, info.This());
 
-    Caches::PointerInstances.insert(std::make_pair(ptr, new Persistent<Object>(isolate, info.This())));
+    Caches::Get(isolate)->PointerInstances.insert(std::make_pair(ptr, new Persistent<Object>(isolate, info.This())));
 }
 
 void Pointer::RegisterAddMethod(Isolate* isolate, Local<Object> prototype) {
@@ -143,7 +144,7 @@ void Pointer::RegisterSubtractMethod(Isolate* isolate, Local<Object> prototype) 
         void* newValue = reinterpret_cast<void*>(reinterpret_cast<char*>(value) - offset);
         intptr_t newValuePtr = static_cast<intptr_t>(reinterpret_cast<size_t>(newValue));
 
-        Local<v8::Function> ctorFunc = pointerCtorFunc_->Get(isolate);
+        Local<v8::Function> ctorFunc = Pointer::GetPointerCtorFunc(isolate);
         Local<Value> arg = Number::New(isolate, newValuePtr);
         Local<Value> args[1] { arg };
         Local<Value> result;
@@ -243,6 +244,6 @@ void Pointer::RegisterToNumberMethod(Isolate* isolate, Local<Object> prototype) 
     assert(success);
 }
 
-Persistent<v8::Function>* Pointer::pointerCtorFunc_ = nullptr;
+std::map<Isolate*, Persistent<v8::Function>*> Pointer::pointerCtorFuncs_;
 
 }

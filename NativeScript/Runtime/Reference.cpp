@@ -15,8 +15,9 @@ void Reference::Register(Isolate* isolate, Local<Object> interop) {
 }
 
 Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
-    if (interopReferenceCtorFunc_ != nullptr) {
-        return interopReferenceCtorFunc_->Get(isolate);
+    auto it = interopReferenceCtorFuncs_.find(isolate);
+    if (it != interopReferenceCtorFuncs_.end()) {
+        return it->second->Get(isolate);
     }
 
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, ReferenceConstructorCallback);
@@ -38,7 +39,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     Local<Object> prototype = prototypeValue.As<Object>();
     Reference::RegisterToStringMethod(isolate, prototype);
 
-    interopReferenceCtorFunc_ = new Persistent<v8::Function>(isolate, ctorFunc);
+    interopReferenceCtorFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, ctorFunc)));
 
     return ctorFunc;
 }
@@ -158,6 +159,6 @@ void Reference::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype
     assert(success);
 }
 
-Persistent<v8::Function>* Reference::interopReferenceCtorFunc_ = nullptr;
+std::map<Isolate*, Persistent<v8::Function>*> Reference::interopReferenceCtorFuncs_;
 
 }

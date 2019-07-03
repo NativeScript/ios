@@ -27,7 +27,7 @@ public:
     static void WriteValue(v8::Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, v8::Local<v8::Value> arg);
     static id ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg);
 private:
-    static v8::Persistent<v8::Function>* sliceFunc_;
+    static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> sliceFuncs_;
 
     template <typename T>
     static void SetStructValue(v8::Local<v8::Value> value, void* destBuffer, ptrdiff_t position);

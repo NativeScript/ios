@@ -12,8 +12,8 @@ using namespace std;
 namespace tns {
 
 void ArgConverter::Init(Isolate* isolate, GenericNamedPropertyGetterCallback structPropertyGetter, GenericNamedPropertySetterCallback structPropertySetter) {
-    poEmptyObjCtorFunc_ = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate));
-    poEmptyStructCtorFunc_ = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter));
+    poEmptyObjCtorFuncs_.emplace(std::make_pair(isolate, new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate))));
+    poEmptyStructCtorFuncs_.emplace(std::make_pair(isolate, new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter))));
 }
 
 Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const MethodMeta* meta, bool isMethodCallback) {
@@ -29,9 +29,9 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         target = wrapper->Data();
 
         std::string className = object_getClassName(target);
-        auto it = Caches::ClassPrototypes.find(className);
+        auto it = Caches::Get(isolate)->ClassPrototypes.find(className);
         // For extended classes we will call the base method
-        callSuper = isMethodCallback && it != Caches::ClassPrototypes.end();
+        callSuper = isMethodCallback && it != Caches::Get(isolate)->ClassPrototypes.end();
     }
 
     // TODO: Take into account an optional error out parameter when considering for method overloads - meta->hasErrorOutParameter()
@@ -97,16 +97,16 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         Local<Object> thiz = context->Global();
         if (data->initialParamIndex_ > 0) {
             id self_ = *static_cast<const id*>(argValues[0]);
-            auto it = Caches::Instances.find(self_);
-            if (it != Caches::Instances.end()) {
+            auto it = Caches::Get(isolate)->Instances.find(self_);
+            if (it != Caches::Get(isolate)->Instances.end()) {
                 thiz = it->second->Get(data->isolate_).As<Object>();
             } else {
                 std::string className = object_getClassName(self_);
                 ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, self_);
                 thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
 
-                auto it = Caches::ClassPrototypes.find(className);
-                if (it != Caches::ClassPrototypes.end()) {
+                auto it = Caches::Get(isolate)->ClassPrototypes.find(className);
+                if (it != Caches::Get(isolate)->ClassPrototypes.end()) {
                     Local<Context> context = isolate->GetCurrentContext();
                     thiz->SetPrototype(context, it->second->Get(isolate)).ToChecked();
                 }
@@ -114,7 +114,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
                 //TODO: We are creating a persistent object here that will never be GCed
                 // We need to determine the lifetime of this object
                 Persistent<Value>* poObj = new Persistent<Value>(data->isolate_, thiz);
-                Caches::Instances.insert(std::make_pair(self_, poObj));
+                Caches::Get(isolate)->Instances.insert(std::make_pair(self_, poObj));
             }
         }
 
@@ -274,9 +274,9 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
 
     Persistent<Value>* poThiz = ObjectManager::Register(isolate, thiz);
 
-    auto it = Caches::Instances.find(result);
-    if (it == Caches::Instances.end()) {
-        Caches::Instances.insert(std::make_pair(result, poThiz));
+    auto it = Caches::Get(isolate)->Instances.find(result);
+    if (it == Caches::Get(isolate)->Instances.end()) {
+        Caches::Get(isolate)->Instances.insert(std::make_pair(result, poThiz));
     } else {
         Local<Value> obj = it->second->Get(isolate);
         info.GetReturnValue().Set(obj);
@@ -420,8 +420,8 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
 
         StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
         const StructMeta* structMeta = structWrapper->Meta();
-        auto it = Caches::StructConstructorFunctions.find(structMeta);
-        if (it != Caches::StructConstructorFunctions.end()) {
+        auto it = Caches::Get(isolate)->StructConstructorFunctions.find(structMeta);
+        if (it != Caches::Get(isolate)->StructConstructorFunctions.end()) {
             Local<v8::Function> structCtorFunc = it->second->Get(isolate);
             Local<Value> proto;
             bool success = structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto);
@@ -449,12 +449,12 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
     }
 
    if (receiver.IsEmpty()) {
-       auto it = Caches::Instances.find(target);
-       if (it != Caches::Instances.end()) {
+       auto it = Caches::Get(isolate)->Instances.find(target);
+       if (it != Caches::Get(isolate)->Instances.end()) {
            receiver = it->second->Get(isolate).As<Object>();
        } else {
            receiver = CreateEmptyObject(context);
-           Caches::Instances.insert(std::make_pair(target, new Persistent<Value>(isolate, receiver)));
+           Caches::Get(isolate)->Instances.insert(std::make_pair(target, new Persistent<Value>(isolate, receiver)));
        }
    }
 
@@ -462,16 +462,16 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
     const Meta* meta = FindMeta(klass);
     if (meta != nullptr) {
         std::string className = object_getClassName(target);
-        auto it = Caches::ClassPrototypes.find(className);
-        if (it != Caches::ClassPrototypes.end()) {
+        auto it = Caches::Get(isolate)->ClassPrototypes.find(className);
+        if (it != Caches::Get(isolate)->ClassPrototypes.end()) {
             Local<Value> prototype = it->second->Get(isolate);
             bool success;
             if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
                 assert(false);
             }
         } else {
-            auto it = Caches::Prototypes.find(meta);
-            if (it != Caches::Prototypes.end()) {
+            auto it = Caches::Get(isolate)->Prototypes.find(meta);
+            if (it != Caches::Get(isolate)->Prototypes.end()) {
                 Local<Value> prototype = it->second->Get(isolate);
                 bool success;
                 if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
@@ -538,11 +538,17 @@ const Meta* ArgConverter::GetMeta(std::string name) {
 }
 
 Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {
-    return ArgConverter::CreateEmptyInstance(context, poEmptyObjCtorFunc_);
+    Isolate* isolate = context->GetIsolate();
+    auto it = poEmptyObjCtorFuncs_.find(isolate);
+    assert(it != poEmptyObjCtorFuncs_.end());
+    return ArgConverter::CreateEmptyInstance(context, it->second);
 }
 
 Local<Object> ArgConverter::CreateEmptyStruct(Local<Context> context) {
-    return ArgConverter::CreateEmptyInstance(context, poEmptyStructCtorFunc_);
+    Isolate* isolate = context->GetIsolate();
+    auto it = poEmptyStructCtorFuncs_.find(isolate);
+    assert(it != poEmptyStructCtorFuncs_.end());
+    return ArgConverter::CreateEmptyInstance(context, it->second);
 }
 
 Local<Object> ArgConverter::CreateEmptyInstance(Local<Context> context, Persistent<v8::Function>* ctorFunc) {
@@ -593,7 +599,7 @@ void ArgConverter::FindMethodOverloads(Class klass, std::string methodName, Memb
     }
 }
 
-Persistent<v8::Function>* ArgConverter::poEmptyObjCtorFunc_;
-Persistent<v8::Function>* ArgConverter::poEmptyStructCtorFunc_;
+std::map<Isolate*, Persistent<v8::Function>*> ArgConverter::poEmptyObjCtorFuncs_;
+std::map<Isolate*, Persistent<v8::Function>*> ArgConverter::poEmptyStructCtorFuncs_;
 
 }

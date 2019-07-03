@@ -69,7 +69,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         item->self_->ExposeDynamicMethods(isolate, extendedClass, Local<Value>(), Local<Value>(), implementationObject);
     }
 
-    Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(item->meta_->name())->second;
+    Persistent<v8::Function>* poBaseCtorFunc = Caches::Get(isolate)->CtorFuncs.find(item->meta_->name())->second;
     Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
 
     CacheItem* cacheItem = new CacheItem(nullptr, extendedClass, item->self_);
@@ -110,8 +110,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass, true);
     tns::SetValue(isolate, extendClassCtorFunc, wrapper);
 
-    Caches::CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
-    Caches::ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendFuncPrototype)));
+    Caches::Get(isolate)->CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
+    Caches::Get(isolate)->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendFuncPrototype)));
 
     info.GetReturnValue().Set(extendClassCtorFunc);
 }
@@ -126,23 +126,24 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 }
 
 void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
-    if (poOriginalExtendsFunc_ != nullptr) {
+    auto it = poOriginalExtendsFuncs_.find(isolate);
+    if (it != poOriginalExtendsFuncs_.end()) {
         return;
     }
 
     std::string extendsFuncScript =
-    "(function() { "
-    "    function __extends(d, b) { "
-    "         for (var p in b) {"
-    "             if (b.hasOwnProperty(p)) {"
-    "                 d[p] = b[p];"
-    "             }"
-    "         }"
-    "         function __() { this.constructor = d; }"
-    "         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());"
-    "    } "
-    "    return __extends;"
-    "})()";
+        "(function() { "
+        "    function __extends(d, b) { "
+        "         for (var p in b) {"
+        "             if (b.hasOwnProperty(p)) {"
+        "                 d[p] = b[p];"
+        "             }"
+        "         }"
+        "         function __() { this.constructor = d; }"
+        "         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());"
+        "    } "
+        "    return __extends;"
+        "})()";
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<Script> script;
@@ -151,7 +152,7 @@ void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
     Local<Value> extendsFunc;
     assert(script->Run(context).ToLocal(&extendsFunc) && extendsFunc->IsFunction());
 
-    poOriginalExtendsFunc_ = new Persistent<v8::Function>(isolate, extendsFunc.As<v8::Function>());
+    poOriginalExtendsFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, extendsFunc.As<v8::Function>())));
 }
 
 void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
@@ -167,7 +168,9 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info[1].As<Object>());
         if (!wrapper) {
             // We are not extending a native object -> call the base __extends function
-            Local<v8::Function> originalExtendsFunc = poOriginalExtendsFunc_->Get(isolate);
+            auto it = poOriginalExtendsFuncs_.find(isolate);
+            assert(it != poOriginalExtendsFuncs_.end());
+            Local<v8::Function> originalExtendsFunc = it->second->Get(isolate);
             Local<Value> args[] = { info[0], info[1] };
             originalExtendsFunc->Call(context, context->Global(), info.Length(), args).ToLocalChecked();
             return;
@@ -186,7 +189,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
 
         const Meta* baseMeta = ArgConverter::FindMeta(baseClass);
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
-        Persistent<v8::Function>* poBaseCtorFunc = Caches::CtorFuncs.find(interfaceMeta->name())->second;
+        Persistent<v8::Function>* poBaseCtorFunc = Caches::Get(isolate)->CtorFuncs.find(interfaceMeta->name())->second;
 
         Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
         assert(extendedClassCtorFunc->SetPrototype(context, baseCtorFunc).ToChecked());
@@ -205,11 +208,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         success = extendedClassCtorFuncPrototype->SetPrototype(context, prototypePropValue.As<Object>()).FromMaybe(false);
         assert(success);
 
-        Caches::ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendedClassCtorFuncPrototype)));
+        Caches::Get(isolate)->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendedClassCtorFuncPrototype)));
 
         Persistent<v8::Function>* poExtendedClassCtorFunc = new Persistent<v8::Function>(isolate, extendedClassCtorFunc);
 
-        Caches::CtorFuncs.emplace(std::make_pair(extendedClassName, poExtendedClassCtorFunc));
+        Caches::Get(isolate)->CtorFuncs.emplace(std::make_pair(extendedClassName, poExtendedClassCtorFunc));
 
         IMP newInitialize = imp_implementationWithBlock(^(id self) {
             Local<Context> context = isolate->GetCurrentContext();
@@ -665,8 +668,8 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
                 Local<Value> res;
 
                 id thiz = *static_cast<const id*>(argValues[0]);
-                auto it = Caches::Instances.find(thiz);
-                Local<Object> self_ = it != Caches::Instances.end()
+                auto it = Caches::Get(context->isolate_)->Instances.find(thiz);
+                Local<Object> self_ = it != Caches::Get(context->isolate_)->Instances.end()
                     ? it->second->Get(context->isolate_).As<Object>()
                     : context->implementationObject_->Get(context->isolate_);
                 assert(getterFunc->Call(context->isolate_->GetCurrentContext(), self_, 0, nullptr).ToLocal(&res));
@@ -691,8 +694,8 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
                 Local<Value> res;
 
                 id thiz = *static_cast<const id*>(argValues[0]);
-                auto it = Caches::Instances.find(thiz);
-                Local<Object> self_ = it != Caches::Instances.end()
+                auto it = Caches::Get(context->isolate_)->Instances.find(thiz);
+                Local<Object> self_ = it != Caches::Get(context->isolate_)->Instances.end()
                     ? it->second->Get(context->isolate_).As<Object>()
                     : context->implementationObject_->Get(context->isolate_);
 
@@ -727,7 +730,7 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<Name> property, const Prope
     info.GetReturnValue().Set(superValue);
 }
 
-Persistent<v8::Function>* ClassBuilder::poOriginalExtendsFunc_ = nullptr;
+std::map<Isolate*, Persistent<v8::Function>*> ClassBuilder::poOriginalExtendsFuncs_;
 unsigned long long ClassBuilder::classNameCounter_ = 0;
 
 }

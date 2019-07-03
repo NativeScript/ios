@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C22C092222CA3F370080D176 /* Worker.mm in Sources */ = {isa = PBXBuildFile; fileRef = C22C092022CA3F370080D176 /* Worker.mm */; };
+		C22C092322CA3F370080D176 /* Worker.h in Headers */ = {isa = PBXBuildFile; fileRef = C22C092122CA3F370080D176 /* Worker.h */; };
+		C23E8F7322CB386F0078FD4C /* ConcurrentQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */; };
 		C266567822AA405100EE15CC /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C266567722AA405100EE15CC /* Default-568h@2x.png */; };
 		C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C266567922AA630F00EE15CC /* NSDataAdapter.mm */; };
 		C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C266567A22AA630F00EE15CC /* NSDataAdapter.h */; };
@@ -160,6 +163,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C22C092022CA3F370080D176 /* Worker.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Worker.mm; sourceTree = "<group>"; };
+		C22C092122CA3F370080D176 /* Worker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Worker.h; sourceTree = "<group>"; };
+		C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConcurrentQueue.h; sourceTree = "<group>"; };
 		C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "exported-symbols.txt"; sourceTree = "<group>"; };
 		C266567722AA405100EE15CC /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		C266567922AA630F00EE15CC /* NSDataAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NSDataAdapter.mm; sourceTree = "<group>"; };
@@ -502,6 +508,7 @@
 				C2DDEB73229EAC8200345BFE /* ClassBuilder.cpp */,
 				C2DDEB8A229EAC8300345BFE /* ClassBuilder.mm */,
 				C2DDEB64229EAC8100345BFE /* Common.h */,
+				C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */,
 				C2DDEB79229EAC8200345BFE /* Console.h */,
 				C2DDEB6B229EAC8200345BFE /* Console.cpp */,
 				C2DDEB72229EAC8200345BFE /* DataWrapper.h */,
@@ -546,6 +553,8 @@
 				C2DDEB8C229EAC8300345BFE /* Tasks.cpp */,
 				C2DDEB82229EAC8200345BFE /* WeakRef.h */,
 				C2DDEB69229EAC8100345BFE /* WeakRef.cpp */,
+				C22C092122CA3F370080D176 /* Worker.h */,
+				C22C092022CA3F370080D176 /* Worker.mm */,
 			);
 			path = Runtime;
 			sourceTree = "<group>";
@@ -661,6 +670,7 @@
 				C2DDEB63229EAC3C00345BFE /* natives_blob.arm64.h in Headers */,
 				C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */,
 				C2DDEBBE229EB02500345BFE /* v8-version.h in Headers */,
+				C23E8F7322CB386F0078FD4C /* ConcurrentQueue.h in Headers */,
 				C2DDEBAD229EAC8300345BFE /* Caches.h in Headers */,
 				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
 				C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */,
@@ -678,6 +688,7 @@
 				C2DDEBA2229EAC8300345BFE /* Console.h in Headers */,
 				C2DDEBC0229EB02500345BFE /* libffi.h in Headers */,
 				C2DDEBC9229EB06500345BFE /* libplatform.h in Headers */,
+				C22C092322CA3F370080D176 /* Worker.h in Headers */,
 				C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */,
 				C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */,
 				C2DDEBAB229EAC8300345BFE /* WeakRef.h in Headers */,
@@ -923,6 +934,7 @@
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
 				C266569322AFFF7E00EE15CC /* Pointer.cpp in Sources */,
 				C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */,
+				C22C092222CA3F370080D176 /* Worker.mm in Sources */,
 				C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */,
 				C2DDEB9E229EAC8300345BFE /* SymbolLoader.mm in Sources */,
 				C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */,

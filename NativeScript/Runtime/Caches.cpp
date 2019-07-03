@@ -4,14 +4,23 @@ using namespace v8;
 
 namespace tns {
 
+
+Caches* Caches::Get(Isolate* isolate) {
+    Caches* caches = nullptr;
+    auto it = Caches::perIsolateCaches_.find(isolate);
+    if (it == Caches::perIsolateCaches_.end()) {
+        caches = new Caches();
+        Caches::perIsolateCaches_.insert(std::make_pair(isolate, caches));
+    } else {
+        caches = it->second;
+    }
+
+    return caches;
+}
+
+std::map<Isolate*, Caches*> Caches::perIsolateCaches_;
+
 std::map<std::string, const Meta*> Caches::Metadata;
-std::map<const Meta*, Persistent<Value>*> Caches::Prototypes;
-std::map<const std::string, Persistent<Object>*> Caches::ClassPrototypes;
-std::map<const BaseClassMeta*, Persistent<FunctionTemplate>*> Caches::CtorFuncTemplates;
-std::map<std::string, Persistent<v8::Function>*> Caches::CtorFuncs;
-std::map<std::string, Persistent<v8::Function>*> Caches::ProtocolCtorFuncs;
-std::map<id, Persistent<Value>*> Caches::Instances;
-std::map<const void*, Persistent<Object>*> Caches::PointerInstances;
-std::map<const StructMeta*, Persistent<v8::Function>*> Caches::StructConstructorFunctions;
+std::map<std::thread::id, Caches::WorkerState*> Caches::Workers;
 
 }

@@ -261,18 +261,18 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             if (klass == [NSArray class]) {
                 Local<v8::Array> array = Interop::ToArray(isolate, obj);
                 ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
-                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
+                Caches::Get(isolate)->Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
                 return;
             } else if ((klass == [NSData class] || klass == [NSMutableData class]) && (arg->IsArrayBuffer() || arg->IsArrayBufferView())) {
                 Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
                 NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
-                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
+                Caches::Get(isolate)->Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
                 return;
             } else if (klass == [NSDictionary class]) {
                 DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
-                Caches::Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
+                Caches::Get(isolate)->Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
                 return;
             }
@@ -470,8 +470,8 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
 
         const char* name = protocol_getName(result);
-        auto it = Caches::ProtocolCtorFuncs.find(name);
-        if (it != Caches::ProtocolCtorFuncs.end()) {
+        auto it = Caches::Get(isolate)->ProtocolCtorFuncs.find(name);
+        if (it != Caches::Get(isolate)->ProtocolCtorFuncs.end()) {
             return it->second->Get(isolate);
         }
 
@@ -486,8 +486,8 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         while (true) {
             const char* name = class_getName(result);
-            auto it = Caches::CtorFuncs.find(name);
-            if (it != Caches::CtorFuncs.end()) {
+            auto it = Caches::Get(isolate)->CtorFuncs.find(name);
+            if (it != Caches::Get(isolate)->CtorFuncs.end()) {
                 return it->second->Get(isolate);
             }
 
@@ -630,8 +630,8 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Number::New(isolate, value);
         }
 
-        auto it = Caches::Instances.find(result);
-        if (it != Caches::Instances.end()) {
+        auto it = Caches::Get(isolate)->Instances.find(result);
+        if (it != Caches::Get(isolate)->Instances.end()) {
             return it->second->Get(isolate);
         }
 
@@ -826,7 +826,13 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
         return object.As<v8::Array>();
     }
 
-    if (sliceFunc_ == nullptr) {
+    Local<v8::Function> sliceFunc;
+
+    auto it = sliceFuncs_.find(isolate);
+
+    if (it != sliceFuncs_.end()) {
+        sliceFunc = it->second->Get(isolate);
+    } else {
         std::string source = "Array.prototype.slice";
         Local<Context> context = isolate->GetCurrentContext();
         Local<Script> script;
@@ -835,16 +841,16 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
         }
         assert(!script.IsEmpty());
 
-        Local<Value> sliceFunc;
-        if (!script->Run(context).ToLocal(&sliceFunc)) {
+        Local<Value> tempSliceFunc;
+        if (!script->Run(context).ToLocal(&tempSliceFunc)) {
             assert(false);
         }
 
-        assert(sliceFunc->IsFunction());
-        sliceFunc_ = new Persistent<v8::Function>(isolate, sliceFunc.As<v8::Function>());
+        assert(tempSliceFunc->IsFunction());
+        sliceFunc = tempSliceFunc.As<v8::Function>();
+        sliceFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, sliceFunc)));
     }
 
-    Local<v8::Function> sliceFunc = sliceFunc_->Get(isolate);
     Local<Value> sliceArgs[1] { object };
 
     Local<Context> context = isolate->GetCurrentContext();
@@ -855,6 +861,6 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
     return result.As<v8::Array>();
 }
 
-Persistent<v8::Function>* Interop::sliceFunc_ = nullptr;
+std::map<Isolate*, Persistent<v8::Function>*> Interop::sliceFuncs_;
 
 }

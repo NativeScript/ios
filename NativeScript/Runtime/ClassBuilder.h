@@ -1,6 +1,7 @@
 #ifndef ClassBuilder_h
 #define ClassBuilder_h
 
+#include <map>
 #include "Common.h"
 #include "Metadata.h"
 
@@ -14,7 +15,7 @@ public:
     void RegisterBaseTypeScriptExtendsFunction(v8::Isolate* isolate);
     void RegisterNativeTypeScriptExtendsFunction(v8::Isolate* isolate);
 private:
-    static v8::Persistent<v8::Function>* poOriginalExtendsFunc_;
+    static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> poOriginalExtendsFuncs_;
     static unsigned long long classNameCounter_;
 
     static void ExtendCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

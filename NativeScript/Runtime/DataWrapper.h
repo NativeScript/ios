@@ -1,8 +1,11 @@
 #ifndef DataWrapper_h
 #define DataWrapper_h
 
+#include <thread>
+#include <functional>
 #include "Metadata.h"
 #include "libffi.h"
+#include "ConcurrentQueue.h"
 #include "Common.h"
 
 namespace tns {
@@ -24,6 +27,7 @@ enum class WrapperType {
     PointerType,
     FunctionReference,
     FunctionReferenceType,
+    Worker,
 };
 
 class BaseDataWrapper {
@@ -357,6 +361,81 @@ public:
 private:
     v8::Persistent<v8::Function>* function_;
     void* data_;
+};
+
+class WorkerWrapper: public BaseDataWrapper {
+public:
+    WorkerWrapper(std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string, v8::Local<v8::Value>&)> onMessage)
+        : BaseDataWrapper(std::string()),
+            workerIsolate_(nullptr),
+            onMessage_(onMessage),
+            thread_{},
+            isRunning_(false),
+            isTerminating_(false) {
+        this->queue_ = new ConcurrentQueue<std::string>();
+    }
+
+    ~WorkerWrapper() {
+        delete this->queue_;
+    }
+
+    WrapperType Type() {
+        return WrapperType::Worker;
+    }
+
+    void PostMessage(std::string message) {
+        if (!this->isTerminating_) {
+            this->queue_->Push(message);
+        }
+    }
+
+    std::thread::id Start(std::function<v8::Isolate* ()> func) {
+        this->thread_ = std::thread([func](WorkerWrapper* thiz) {
+            thiz->workerIsolate_ = func();
+
+            while (!thiz->isTerminating_) {
+                std::string message = thiz->queue_->Pop();
+                if (thiz->isTerminating_) {
+                    break;
+                }
+
+                v8::HandleScope scope(thiz->workerIsolate_);
+                v8::Local<v8::Context> context = thiz->workerIsolate_->GetCurrentContext();
+                v8::Local<v8::Object> global = context->Global();
+                v8::Local<v8::Value> error;
+
+                thiz->onMessage_(thiz->workerIsolate_, global, message, error);
+            }
+        }, this);
+
+        this->isRunning_ = true;
+        this->workerId_ = this->thread_.get_id();
+        return this->workerId_;
+    }
+
+    void Terminate() {
+        if (!this->isTerminating_) {
+            this->queue_->Notify();
+            this->isTerminating_ = true;
+            this->isRunning_ = false;
+        }
+    }
+
+    std::thread::id Id() {
+        return this->workerId_;
+    }
+
+    bool IsRunning() {
+        return this->isRunning_;
+    }
+private:
+    std::thread::id workerId_;
+    v8::Isolate* workerIsolate_;
+    bool isRunning_;
+    bool isTerminating_;
+    std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string, v8::Local<v8::Value>&)> onMessage_;
+    ConcurrentQueue<std::string>* queue_;
+    std::thread thread_;
 };
 
 }

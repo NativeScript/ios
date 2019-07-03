@@ -19,41 +19,45 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
     ObjectWeakCallbackState* state = data.GetParameter();
     Isolate* isolate = data.GetIsolate();
     Local<Value> value = state->target_->Get(isolate);
-    ObjectManager::DisposeValue(isolate, value);
+    bool disposed = ObjectManager::DisposeValue(isolate, value);
 
-    state->target_->Reset();
-    delete state->target_;
-    delete state;
+    if (disposed) {
+        state->target_->Reset();
+        delete state->target_;
+        delete state;
+    } else {
+        state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+    }
 }
 
-void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
+bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
     if (value.IsEmpty() || value->IsNullOrUndefined() || !value->IsObject()) {
-        return;
+        return true;
     }
 
     Local<Object> obj = value.As<Object>();
     if (obj->InternalFieldCount() < 1) {
-        return;
+        return true;
     }
 
     if (obj->InternalFieldCount() > 1) {
         Local<Value> superValue = obj->GetInternalField(1);
         if (!superValue.IsEmpty() && superValue->IsString()) {
             // Do not dispose the ObjCWrapper contained in a "super" instance
-            return;
+            return true;
         }
     }
 
     Local<Value> internalField = obj->GetInternalField(0);
     if (internalField.IsEmpty() || internalField->IsNullOrUndefined() || !internalField->IsExternal()) {
-        return;
+        return true;
     }
 
     void* internalFieldValue = internalField.As<External>()->Value();
     BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(internalFieldValue);
     if (wrapper == nullptr) {
         obj->SetInternalField(0, v8::Undefined(isolate));
-        return;
+        return true;
     }
 
     switch (wrapper->Type()) {
@@ -68,9 +72,9 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         case WrapperType::ObjCObject: {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
             if (objCObjectWrapper->Data() != nil) {
-                auto it = Caches::Instances.find(objCObjectWrapper->Data());
-                if (it != Caches::Instances.end()) {
-                    Caches::Instances.erase(it);
+                auto it = Caches::Get(isolate)->Instances.find(objCObjectWrapper->Data());
+                if (it != Caches::Get(isolate)->Instances.end()) {
+                    Caches::Get(isolate)->Instances.erase(it);
                 }
             }
             break;
@@ -99,10 +103,10 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         case WrapperType::Pointer: {
             PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
             if (pointerWrapper->Data() != nullptr) {
-                auto it = Caches::PointerInstances.find(pointerWrapper->Data());
-                if (it != Caches::PointerInstances.end()) {
+                auto it = Caches::Get(isolate)->PointerInstances.find(pointerWrapper->Data());
+                if (it != Caches::Get(isolate)->PointerInstances.end()) {
                     delete it->second;
-                    Caches::PointerInstances.erase(it);
+                    Caches::Get(isolate)->PointerInstances.erase(it);
                 }
 
                 if (pointerWrapper->IsAdopted()) {
@@ -120,6 +124,20 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             }
             break;
         }
+        case WrapperType::Worker: {
+            WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
+            if (worker->IsRunning()) {
+                return false;
+            }
+
+            std::thread::id workerId = worker->Id();
+            auto it = Caches::Workers.find(workerId);
+            if (it != Caches::Workers.end()) {
+                Caches::Workers.erase(it);
+            }
+
+            break;
+        }
 
         default:
             break;
@@ -128,6 +146,7 @@ void ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
     delete wrapper;
     wrapper = nullptr;
     obj->SetInternalField(0, v8::Undefined(isolate));
+    return true;
 }
 
 }

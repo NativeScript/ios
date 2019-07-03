@@ -146,8 +146,8 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
 }
 
 Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isolate, const StructMeta* structMeta) {
-    auto it = Caches::StructConstructorFunctions.find(structMeta);
-    if (it != Caches::StructConstructorFunctions.end()) {
+    auto it = Caches::Get(isolate)->StructConstructorFunctions.find(structMeta);
+    if (it != Caches::Get(isolate)->StructConstructorFunctions.end()) {
         return it->second->Get(isolate);
     }
 
@@ -169,7 +169,7 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isol
     assert(success);
 
     Persistent<v8::Function>* poStructCtorFunc = new Persistent<v8::Function>(isolate, structCtorFunc);
-    Caches::StructConstructorFunctions.insert(std::make_pair(structMeta, poStructCtorFunc));
+    Caches::Get(isolate)->StructConstructorFunctions.insert(std::make_pair(structMeta, poStructCtorFunc));
 
     return structCtorFunc;
 }
@@ -277,8 +277,8 @@ std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Isolate* isolate, Loc
 
 Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(const BaseClassMeta* meta) {
     Local<FunctionTemplate> ctorFuncTemplate;
-    auto it = Caches::CtorFuncTemplates.find(meta);
-    if (it != Caches::CtorFuncTemplates.end()) {
+    auto it = Caches::Get(isolate_)->CtorFuncTemplates.find(meta);
+    if (it != Caches::Get(isolate_)->CtorFuncTemplates.end()) {
         ctorFuncTemplate = Local<FunctionTemplate>::New(isolate_, *it->second);
         return ctorFuncTemplate;
     }
@@ -313,8 +313,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
                 if (baseMeta != nullptr) {
                     Local<FunctionTemplate> baseCtorFuncTemplate = GetOrCreateConstructorFunctionTemplate(baseMeta);
                     ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
-                    auto it = Caches::CtorFuncs.find(baseMeta->name());
-                    if (it != Caches::CtorFuncs.end()) {
+                    auto it = Caches::Get(isolate_)->CtorFuncs.find(baseMeta->name());
+                    if (it != Caches::Get(isolate_)->CtorFuncs.end()) {
                         baseCtorFunc = Local<v8::Function>::New(isolate_, *it->second);
                     }
                 }
@@ -336,10 +336,10 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 
     if (meta->type() == MetaType::ProtocolType) {
         tns::SetValue(isolate_, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name())));
-        Caches::ProtocolCtorFuncs.insert(std::make_pair(meta->name(), new Persistent<v8::Function>(isolate_, ctorFunc)));
+        Caches::Get(isolate_)->ProtocolCtorFuncs.insert(std::make_pair(meta->name(), new Persistent<v8::Function>(isolate_, ctorFunc)));
     } else {
         tns::SetValue(isolate_, ctorFunc, new ObjCClassWrapper(objc_getClass(meta->name())));
-        Caches::CtorFuncs.insert(std::make_pair(meta->name(), new Persistent<v8::Function>(isolate_, ctorFunc)));
+        Caches::Get(isolate_)->CtorFuncs.insert(std::make_pair(meta->name(), new Persistent<v8::Function>(isolate_, ctorFunc)));
     }
 
     Local<Object> global = context->Global();
@@ -366,7 +366,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     RegisterStaticProperties(ctorFunc, meta, meta->name(), staticMembers);
     RegisterStaticProtocols(ctorFunc, meta, meta->name(), staticMembers);
 
-    Caches::CtorFuncTemplates.insert(std::make_pair(meta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
+    Caches::Get(isolate_)->CtorFuncTemplates.insert(std::make_pair(meta, new Persistent<FunctionTemplate>(isolate_, ctorFuncTemplate)));
 
     Local<Value> prototypeValue;
     success = ctorFunc->Get(context, tns::ToV8String(isolate_, "prototype")).ToLocal(&prototypeValue);
@@ -377,7 +377,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     assert(success);
 
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate_, prototype);
-    Caches::Prototypes.insert(std::make_pair(meta, poPrototype));
+    Caches::Get(isolate_)->Prototypes.insert(std::make_pair(meta, poPrototype));
 
     return ctorFuncTemplate;
 }
