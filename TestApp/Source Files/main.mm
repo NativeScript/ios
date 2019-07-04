@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
         tns::Runtime::InitializeMetadata(&startOfMetadataSection);
         tns::Runtime* runtime = new tns::Runtime();
         std::string baseDir = [path UTF8String];
-        runtime->Init(baseDir);
+        runtime->InitAndRunMainScript(baseDir);
 
         return 0;
     }

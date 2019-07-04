@@ -54,24 +54,33 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     std::string workerPath = ToString(isolate, info[0]);
     // TODO: Validate worker path and call worker.onerror if the script does not exist
 
-    WorkerWrapper* wrapper = new WorkerWrapper(Worker::OnMessageCallback);
+    WorkerWrapper* wrapper = new WorkerWrapper(isolate, Worker::OnMessageCallback);
     tns::SetValue(isolate, thiz, wrapper);
     Persistent<Value>* poWorker = ObjectManager::Register(isolate, thiz);
 
-    std::function<Isolate* ()> func([workerPath]() {
+    std::function<Isolate* ()> func([wrapper, workerPath]() {
         NSString* resourcePath = [[NSBundle mainBundle] resourcePath];
         NSArray* components = [NSArray arrayWithObjects:resourcePath, @"app", nil];
         NSString* path = [NSString pathWithComponents:components];
 
         std::string baseDir = [path UTF8String];
         tns::Runtime* runtime = new tns::Runtime();
-        runtime->Init(baseDir, workerPath);
+        runtime->Init(baseDir);
         Isolate* workerIsolate = runtime->GetIsolate();
+
+        TryCatch tc(workerIsolate);
+        runtime->RunScript(workerPath, tc);
+        if (tc.HasCaught()) {
+            HandleScope scope(workerIsolate);
+            wrapper->PassUncaughtExceptionFromWorkerToMain(workerIsolate, tc);
+            wrapper->Terminate();
+        }
 
         return workerIsolate;
     });
 
-    std::thread::id threadId = wrapper->Start(func);
+    std::thread::id threadId = wrapper->Start(poWorker, func);
+
     Caches::WorkerState* state = new Caches::WorkerState(isolate, poWorker);
     Caches::Workers.insert(std::make_pair(threadId, state));
 }
@@ -106,12 +115,11 @@ void Worker::RegisterGlobals(Isolate* isolate, Local<ObjectTemplate> globalTempl
 
         std::string message = tns::ToString(isolate, result);
 
-        dispatch_async(dispatch_get_main_queue(), ^(void) {
+        tns::ExecuteOnMainThread([state, message]() {
             Isolate* isolate = state->GetIsolate();
             Local<Value> workerInstance = state->GetWorker()->Get(isolate);
             assert(!workerInstance.IsEmpty() && workerInstance->IsObject());
-            Local<Value> error;
-            Worker::OnMessageCallback(isolate, workerInstance, message, error);
+            Worker::OnMessageCallback(isolate, workerInstance, message);
         });
     });
 
@@ -149,7 +157,7 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
     worker->PostMessage(message);
 }
 
-void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::string message, Local<Value>& error) {
+void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::string message) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<Value> onMessageValue;
     bool success = receiver.As<Object>()->Get(context, tns::ToV8String(isolate, "onmessage")).ToLocal(&onMessageValue);
@@ -168,16 +176,7 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::str
     assert(success);
 
     Local<Value> args[1] { arg };
-
-    HandleScope scope(isolate);
-    TryCatch tc(isolate);
     success = onMessageFunc->Call(context, receiver, 1, args).ToLocal(&result);
-    if (!success && tc.HasCaught()) {
-        error = tc.Exception();
-        return;
-    }
-
-    assert(success);
 }
 
 void Worker::TerminateCallback(const FunctionCallbackInfo<Value>& info) {

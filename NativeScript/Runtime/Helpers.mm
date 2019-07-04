@@ -1,3 +1,4 @@
+#include <dispatch/dispatch.h>
 #include <fstream>
 #include "Helpers.h"
 
@@ -161,4 +162,10 @@ bool tns::IsNumber(Local<Value> value) {
 
 bool tns::IsBool(Local<Value> value) {
     return !value.IsEmpty() && (value->IsBoolean() || value->IsBooleanObject());
+}
+
+void tns::ExecuteOnMainThread(std::function<void ()> func) {
+    dispatch_async(dispatch_get_main_queue(), ^(void) {
+        func();
+    });
 }

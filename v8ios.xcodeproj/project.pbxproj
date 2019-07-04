@@ -10,6 +10,7 @@
 		C22C092222CA3F370080D176 /* Worker.mm in Sources */ = {isa = PBXBuildFile; fileRef = C22C092022CA3F370080D176 /* Worker.mm */; };
 		C22C092322CA3F370080D176 /* Worker.h in Headers */ = {isa = PBXBuildFile; fileRef = C22C092122CA3F370080D176 /* Worker.h */; };
 		C23E8F7322CB386F0078FD4C /* ConcurrentQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */; };
+		C23E8F7622CDE88D0078FD4C /* WorkerWrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C23E8F7422CDE88D0078FD4C /* WorkerWrapper.cpp */; };
 		C266567822AA405100EE15CC /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C266567722AA405100EE15CC /* Default-568h@2x.png */; };
 		C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C266567922AA630F00EE15CC /* NSDataAdapter.mm */; };
 		C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C266567A22AA630F00EE15CC /* NSDataAdapter.h */; };
@@ -166,6 +167,7 @@
 		C22C092022CA3F370080D176 /* Worker.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Worker.mm; sourceTree = "<group>"; };
 		C22C092122CA3F370080D176 /* Worker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Worker.h; sourceTree = "<group>"; };
 		C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConcurrentQueue.h; sourceTree = "<group>"; };
+		C23E8F7422CDE88D0078FD4C /* WorkerWrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = WorkerWrapper.cpp; sourceTree = "<group>"; };
 		C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "exported-symbols.txt"; sourceTree = "<group>"; };
 		C266567722AA405100EE15CC /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		C266567922AA630F00EE15CC /* NSDataAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NSDataAdapter.mm; sourceTree = "<group>"; };
@@ -555,6 +557,7 @@
 				C2DDEB69229EAC8100345BFE /* WeakRef.cpp */,
 				C22C092122CA3F370080D176 /* Worker.h */,
 				C22C092022CA3F370080D176 /* Worker.mm */,
+				C23E8F7422CDE88D0078FD4C /* WorkerWrapper.cpp */,
 			);
 			path = Runtime;
 			sourceTree = "<group>";
@@ -945,6 +948,7 @@
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
+				C23E8F7622CDE88D0078FD4C /* WorkerWrapper.cpp in Sources */,
 				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,
 				C293752E22A10C490075CB16 /* Interop_impl.h in Sources */,
 				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,

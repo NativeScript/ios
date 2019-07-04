@@ -13,7 +13,7 @@ private:
     static void ConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void PostMessageCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void TerminateCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
-    static void OnMessageCallback(v8::Isolate* isolate, v8::Local<v8::Value> receiver, std::string message, v8::Local<v8::Value>& error);
+    static void OnMessageCallback(v8::Isolate* isolate, v8::Local<v8::Value> receiver, std::string message);
     static v8::Local<v8::String> Serialize(v8::Isolate* isolate, v8::Local<v8::Value> value, v8::Local<v8::Value>& error);
 };
 

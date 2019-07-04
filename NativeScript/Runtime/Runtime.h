@@ -13,14 +13,13 @@ public:
     static void InitializeMetadata(void* metadataPtr);
     Runtime();
     void Init(const std::string& baseDir);
-    void Init(const std::string& baseDir, const std::string& script);
-    void RunScript(std::string file);
+    void InitAndRunMainScript(const std::string& baseDir);
+    void RunScript(std::string file, v8::TryCatch& tc);
     v8::Isolate* GetIsolate();
 private:
     static bool mainThreadInitialized_;
     static v8::Platform* platform_;
 
-    void InitInternal(const std::string& baseDir);
     void DefineGlobalObject(v8::Local<v8::Context> context);
     void DefineNativeScriptVersion(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     void DefinePerformanceObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);

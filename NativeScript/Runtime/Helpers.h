@@ -1,6 +1,7 @@
 #ifndef Helpers_h
 #define Helpers_h
 
+#include <functional>
 #include <string>
 #include "Common.h"
 #include "DataWrapper.h"
@@ -25,6 +26,8 @@ void ThrowError(v8::Isolate* isolate, std::string message);
 bool IsString(v8::Local<v8::Value> value);
 bool IsNumber(v8::Local<v8::Value> value);
 bool IsBool(v8::Local<v8::Value> value);
+
+void ExecuteOnMainThread(std::function<void ()> func);
 
 }
 

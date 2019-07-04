@@ -34,18 +34,22 @@ void Runtime::InitializeMetadata(void* metadataPtr) {
 Runtime::Runtime() {
 }
 
-void Runtime::Init(const string& baseDir) {
-    InitInternal(baseDir);
-    RunScript("index.js");
+void Runtime::InitAndRunMainScript(const string& baseDir) {
+    this->Init(baseDir);
+
+    v8::TryCatch tc(this->GetIsolate());
+    // TODO: infer main script from package.json or use index.js
+    this->RunScript("index.js", tc);
+
+    if (tc.HasCaught()) {
+        printf("%s\n", tns::ToString(isolate_, tc.Exception()).c_str());
+        assert(false);
+    }
+
     tns::Tasks::Drain();
 }
 
-void Runtime::Init(const string& baseDir, const string& script) {
-    InitInternal(baseDir);
-    RunScript(script);
-}
-
-void Runtime::InitInternal(const string& baseDir) {
+void Runtime::Init(const string& baseDir) {
     if (!mainThreadInitialized_) {
         Runtime::platform_ = platform::NewDefaultPlatform().release();
         V8::InitializePlatform(Runtime::platform_);
@@ -102,26 +106,25 @@ void Runtime::InitInternal(const string& baseDir) {
     isolate_ = isolate;
 }
 
-void Runtime::RunScript(string file) {
+void Runtime::RunScript(string file, TryCatch& tc) {
     Isolate* isolate = isolate_;
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
-    string source = tns::ReadText(baseDir_ + "/" + file);
+    std::string filename = baseDir_ + "/" + file;
+    string source = tns::ReadText(filename);
     Local<v8::String> script_source = v8::String::NewFromUtf8(isolate, source.c_str(), NewStringType::kNormal).ToLocalChecked();
+
+    ScriptOrigin origin(tns::ToV8String(isolate, file));
+
     Local<Script> script;
-    TryCatch tc(isolate);
-    if (!Script::Compile(context, script_source).ToLocal(&script) && tc.HasCaught()) {
-        printf("%s\n", tns::ToString(isolate_, tc.Exception()).c_str());
-        assert(false);
+    if (!Script::Compile(context, script_source, &origin).ToLocal(&script)) {
+        return;
     }
 
     Local<Value> result;
     if (!script->Run(context).ToLocal(&result)) {
-        if (tc.HasCaught()) {
-            printf("%s\n", tns::ToString(isolate_, tc.Exception()).c_str());
-        }
-        assert(false);
+        return;
     }
 }
 

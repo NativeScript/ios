@@ -157,17 +157,17 @@ describe("TNS Workers", () => {
         a.terminate();
     });
 
-    // it("Should keep the worker alive after error", (done) => {
-    //     var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
+    it("Should keep the worker alive after error", (done) => {
+        var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
-    //     worker.postMessage({ eval: "throw new Error('just an error');" });
-    //     worker.postMessage({ eval: "postMessage('pong');" });
-    //     worker.onmessage = function (msg) {
-    //         expect(msg.data).toBe("pong");
-    //         worker.terminate();
-    //         done();
-    //     }
-    // });
+        worker.postMessage({ eval: "throw new Error('just an error');" });
+        worker.postMessage({ eval: "postMessage('pong');" });
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("pong");
+            worker.terminate();
+            done();
+        }
+    });
 
     it("Should not crash if terminate() is called more than once", () => {
         var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
@@ -260,34 +260,34 @@ describe("TNS Workers", () => {
     //     }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
     // });
 
-    // it("Throw error in onerror", (done) => {
-    //     var worker = new Worker("./EvalWorker.js");
+    it("Throw error in onerror", (done) => {
+        var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
-    //     worker.postMessage({
-    //         eval:
-    //         "onerror = () => {\
-    //             postMessage('onerror called');\
-    //             throw new Error('error');\
-    //         };\
-    //         throw new Error('error');"
-    //     });
+        worker.postMessage({
+            eval:
+            "onerror = () => {\
+                postMessage('onerror called');\
+                throw new Error('error');\
+            };\
+            throw new Error('error');"
+        });
 
-    //     var onerrorCounter = 0;
-    //     worker.onerror = (err) => {
-    //         onerrorCounter++;
-    //     };
+        var onerrorCounter = 0;
+        worker.onerror = (err) => {
+            onerrorCounter++;
+        };
 
-    //     var onmessageCounter = 0;
-    //     worker.onmessage = (msg) => {
-    //         onmessageCounter++;
-    //     };
+        var onmessageCounter = 0;
+        worker.onmessage = (msg) => {
+            onmessageCounter++;
+        };
 
-    //     setTimeout(() => {
-    //         expect(onerrorCounter).toBe(2);
-    //         expect(onmessageCounter).toBe(1);
-    //         done();
-    //     }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
-    // });
+        setTimeout(() => {
+            expect(onerrorCounter).toBe(2);
+            expect(onmessageCounter).toBe(1);
+            done();
+        }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
+    });
 
     // it("If error is thrown in close() should call onerror but should not execute any other tasks ", (done) => {
     //     var worker = new Worker("./EvalWorker.js");
@@ -380,61 +380,61 @@ describe("TNS Workers", () => {
     //     }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
     // });
 
-    // it("Test onerror invoked for a script that has invalid syntax", (done) => {
-    //     var worker = new Worker("./WorkerInvalidSyntax.js");
+    it("Test onerror invoked for a script that has invalid syntax", (done) => {
+        var worker = new Worker("./tests/shared/Workers/WorkerInvalidSyntax.js");
 
-    //     worker.onerror = (err) => {
-    //         worker.terminate();
-    //         done();
-    //     };
-    // });
+        worker.onerror = (err) => {
+            worker.terminate();
+            done();
+        };
+    });
 
-    // it("Test onerror invoked on worker scope and propagate to main's onerror when returning false", (done) => {
-    //     var worker = new Worker("./EvalWorker.js");
+    it("Test onerror invoked on worker scope and propagate to main's onerror when returning false", (done) => {
+        var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
-    //     worker.postMessage({
-    //         eval:
-    //         "onerror = function(err) { \
-    //             return false; \
-    //         }; \
-    //         throw 42;"
-    //     });
-    //     worker.onerror = (err) => {
-    //         worker.terminate();
-    //         done();
-    //     }
-    // });
+        worker.postMessage({
+            eval:
+            "onerror = function(err) { \
+                return false; \
+            }; \
+            throw 42;"
+        });
+        worker.onerror = (err) => {
+            worker.terminate();
+            done();
+        }
+    });
 
-    // it("Test onerror invoked on worker scope and do not propagate to main's onerror when returning true", (done) => {
-    //     var worker = new Worker("./EvalWorker.js");
+    it("Test onerror invoked on worker scope and do not propagate to main's onerror when returning true", (done) => {
+        var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
-    //     worker.postMessage({
-    //         eval:
-    //         "onerror = function(err) { \
-    //             postMessage(err); \
-    //             return true; \
-    //         }; \
-    //         throw 42;"
-    //     });
+        worker.postMessage({
+            eval:
+            "onerror = function(err) { \
+                postMessage(err); \
+                return true; \
+            }; \
+            throw 42;"
+        });
 
-    //     var onErrorCalled = false;
-    //     var onMessageCalled = false;
+        var onErrorCalled = false;
+        var onMessageCalled = false;
 
-    //     worker.onerror = (err) => {
-    //         onErrorCalled = true;
-    //     }
+        worker.onerror = (err) => {
+            onErrorCalled = true;
+        }
 
-    //     worker.onmessage = (msg) => {
-    //         onMessageCalled = true;
-    //     }
+        worker.onmessage = (msg) => {
+            onMessageCalled = true;
+        }
 
-    //     setTimeout(() => {
-    //         expect(onErrorCalled).toBe(false);
-    //         expect(onMessageCalled).toBe(true);
-    //         worker.terminate();
-    //         done();
-    //     }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
-    // });
+        setTimeout(() => {
+            expect(onErrorCalled).toBe(false);
+            expect(onMessageCalled).toBe(true);
+            worker.terminate();
+            done();
+        }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
+    });
 
     function generateRandomString(strLen) {
         var chars = "abcAbc defgDEFG 1234567890 ";

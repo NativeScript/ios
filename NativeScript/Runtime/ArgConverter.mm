@@ -119,7 +119,9 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         }
 
         Local<Value> result;
+        TryCatch tc(isolate);
         if (!callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result)) {
+            printf("%s\n", tns::ToString(isolate, tc.Exception()).c_str());
             assert(false);
         }
 
@@ -131,7 +133,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     } else {
         dispatch_group_t group = dispatch_group_create();
         dispatch_group_enter(group);
-        dispatch_async(dispatch_get_main_queue(), ^{
+        tns::ExecuteOnMainThread([cb, group]() {
             cb();
             dispatch_group_leave(group);
         });
