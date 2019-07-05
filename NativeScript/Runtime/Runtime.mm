@@ -46,6 +46,7 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
     this->RunScript("index.js", tc);
 
     if (tc.HasCaught()) {
+        HandleScope scope(this->GetIsolate());
         printf("%s\n", tns::ToString(isolate_, tc.Exception()).c_str());
         assert(false);
     }
