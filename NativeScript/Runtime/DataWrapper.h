@@ -373,11 +373,6 @@ public:
             thread_{},
             isRunning_(false),
             isTerminating_(false) {
-        this->queue_ = new ConcurrentQueue();
-    }
-
-    ~WorkerWrapper() {
-        delete this->queue_;
     }
 
     WrapperType Type() {
@@ -409,7 +404,7 @@ private:
     bool isRunning_;
     bool isTerminating_;
     std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
-    ConcurrentQueue* queue_;
+    ConcurrentQueue queue_;
     std::thread thread_;
 
     void BackgroundLooper(std::function<v8::Isolate* ()> func);

@@ -15,19 +15,25 @@ public:
     }
 
     TValue Get(TKey& key) {
-        std::shared_lock<std::shared_timed_mutex> readerLock(this->containerMutex_);
-        return this->container_[key];
+//      std::shared_lock<std::shared_timed_mutex> readerLock(this->containerMutex_);
+      std::lock_guard<std::shared_timed_mutex> writerLock(this->containerMutex_);
+      return this->container_[key];
     }
 
     bool ContainsKey(TKey& key) {
-        std::shared_lock<std::shared_timed_mutex> readerLock(this->containerMutex_);
+//        std::shared_lock<std::shared_timed_mutex> readerLock(this->containerMutex_);
+        std::lock_guard<std::shared_timed_mutex> writerLock(this->containerMutex_);
         auto it = this->container_.find(key);
         return it != this->container_.end();
     }
 
-    void Remove(TKey& key) {
+    void Remove(TKey& key, TValue& removedElement) {
         std::lock_guard<std::shared_timed_mutex> writerLock(this->containerMutex_);
-        this->container_.erase(key);
+        auto it = this->container_.find(key);
+        if (it != this->container_.end()) {
+            this->container_.erase(it);
+            removedElement = it->second;
+        }
     }
 
     ConcurrentMap() = default;

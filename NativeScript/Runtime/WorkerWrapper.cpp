@@ -10,7 +10,7 @@ namespace tns {
 
 void WorkerWrapper::PostMessage(std::string message) {
     if (!this->isTerminating_) {
-        this->queue_->Push(message);
+        this->queue_.Push(message);
     }
 }
 
@@ -28,7 +28,7 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
     this->workerIsolate_ = func();
 
     while (!this->isTerminating_) {
-        std::string message = this->queue_->Pop();
+        std::string message = this->queue_.Pop();
 
         if (this->isTerminating_) {
             break;
@@ -75,15 +75,14 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
         this->workerIsolate_->TerminateExecution();
     }
 
-    this->workerIsolate_->Dispose();
-
-    Caches::WorkerState* state = Caches::Workers.Get(this->workerId_);
+    Caches::WorkerState* state = nullptr;
+    Caches::Workers.Remove(this->workerId_, state);
     if (state != nullptr) {
-        Caches::Workers.Remove(this->workerId_);
         delete state;
         state = nullptr;
     }
 
+    this->workerIsolate_->Dispose();
     Caches::Remove(this->workerIsolate_);
 
     Runtime* runtime = Runtime::GetCurrentRuntime();
@@ -92,7 +91,7 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
 
 void WorkerWrapper::Terminate() {
     if (!this->isTerminating_) {
-        this->queue_->Notify();
+        this->queue_.Notify();
         this->isTerminating_ = true;
         this->isRunning_ = false;
     }

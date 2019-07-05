@@ -130,8 +130,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
             if (worker->IsRunning()) {
                 return false;
+            } else {
+                return true;
             }
-            break;
         }
 
         default:

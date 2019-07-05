@@ -16,7 +16,11 @@ Caches* Caches::Get(Isolate* isolate) {
 }
 
 void Caches::Remove(v8::Isolate* isolate) {
-    Caches::perIsolateCaches_.Remove(isolate);
+    Caches* caches = nullptr;
+    Caches::perIsolateCaches_.Remove(isolate, caches);
+    if (caches != nullptr) {
+        delete caches;
+    }
 }
 
 ConcurrentMap<Isolate*, Caches*> Caches::perIsolateCaches_;
