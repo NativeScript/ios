@@ -12,8 +12,9 @@ using namespace std;
 namespace tns {
 
 void ArgConverter::Init(Isolate* isolate, GenericNamedPropertyGetterCallback structPropertyGetter, GenericNamedPropertySetterCallback structPropertySetter) {
-    Caches::Get(isolate)->EmptyObjCtorFunc = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate));
-    Caches::Get(isolate)->EmptyStructCtorFunc = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter));
+    auto cache = Caches::Get(isolate);
+    cache->EmptyObjCtorFunc = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate));
+    cache->EmptyStructCtorFunc = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter));
 }
 
 Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const MethodMeta* meta, bool isMethodCallback) {
@@ -29,9 +30,10 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         target = wrapper->Data();
 
         std::string className = object_getClassName(target);
-        auto it = Caches::Get(isolate)->ClassPrototypes.find(className);
+        auto cache = Caches::Get(isolate);
+        auto it = cache->ClassPrototypes.find(className);
         // For extended classes we will call the base method
-        callSuper = isMethodCallback && it != Caches::Get(isolate)->ClassPrototypes.end();
+        callSuper = isMethodCallback && it != cache->ClassPrototypes.end();
     }
 
     // TODO: Take into account an optional error out parameter when considering for method overloads - meta->hasErrorOutParameter()
@@ -97,16 +99,17 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         Local<Object> thiz = context->Global();
         if (data->initialParamIndex_ > 0) {
             id self_ = *static_cast<const id*>(argValues[0]);
-            auto it = Caches::Get(isolate)->Instances.find(self_);
-            if (it != Caches::Get(isolate)->Instances.end()) {
+            auto cache = Caches::Get(isolate);
+            auto it = cache->Instances.find(self_);
+            if (it != cache->Instances.end()) {
                 thiz = it->second->Get(data->isolate_).As<Object>();
             } else {
                 std::string className = object_getClassName(self_);
                 ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, self_);
                 thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
 
-                auto it = Caches::Get(isolate)->ClassPrototypes.find(className);
-                if (it != Caches::Get(isolate)->ClassPrototypes.end()) {
+                auto it = cache->ClassPrototypes.find(className);
+                if (it != cache->ClassPrototypes.end()) {
                     Local<Context> context = isolate->GetCurrentContext();
                     thiz->SetPrototype(context, it->second->Get(isolate)).ToChecked();
                 }
@@ -114,7 +117,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
                 //TODO: We are creating a persistent object here that will never be GCed
                 // We need to determine the lifetime of this object
                 Persistent<Value>* poObj = new Persistent<Value>(data->isolate_, thiz);
-                Caches::Get(isolate)->Instances.insert(std::make_pair(self_, poObj));
+                cache->Instances.insert(std::make_pair(self_, poObj));
             }
         }
 
@@ -276,9 +279,10 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
 
     Persistent<Value>* poThiz = ObjectManager::Register(isolate, thiz);
 
-    auto it = Caches::Get(isolate)->Instances.find(result);
-    if (it == Caches::Get(isolate)->Instances.end()) {
-        Caches::Get(isolate)->Instances.insert(std::make_pair(result, poThiz));
+    auto cache = Caches::Get(isolate);
+    auto it = cache->Instances.find(result);
+    if (it == cache->Instances.end()) {
+        cache->Instances.insert(std::make_pair(result, poThiz));
     } else {
         Local<Value> obj = it->second->Get(isolate);
         info.GetReturnValue().Set(obj);
@@ -422,8 +426,9 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
 
         StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
         const StructMeta* structMeta = structWrapper->Meta();
-        auto it = Caches::Get(isolate)->StructConstructorFunctions.find(structMeta);
-        if (it != Caches::Get(isolate)->StructConstructorFunctions.end()) {
+        auto cache = Caches::Get(isolate);
+        auto it = cache->StructConstructorFunctions.find(structMeta);
+        if (it != cache->StructConstructorFunctions.end()) {
             Local<v8::Function> structCtorFunc = it->second->Get(isolate);
             Local<Value> proto;
             bool success = structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto);
@@ -450,13 +455,14 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
         return Null(isolate);
     }
 
-   if (receiver.IsEmpty()) {
-       auto it = Caches::Get(isolate)->Instances.find(target);
-       if (it != Caches::Get(isolate)->Instances.end()) {
+    auto cache = Caches::Get(isolate);
+    if (receiver.IsEmpty()) {
+       auto it = cache->Instances.find(target);
+       if (it != cache->Instances.end()) {
            receiver = it->second->Get(isolate).As<Object>();
        } else {
            receiver = CreateEmptyObject(context);
-           Caches::Get(isolate)->Instances.insert(std::make_pair(target, new Persistent<Value>(isolate, receiver)));
+           cache->Instances.insert(std::make_pair(target, new Persistent<Value>(isolate, receiver)));
        }
    }
 
@@ -464,16 +470,16 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
     const Meta* meta = FindMeta(klass);
     if (meta != nullptr) {
         std::string className = object_getClassName(target);
-        auto it = Caches::Get(isolate)->ClassPrototypes.find(className);
-        if (it != Caches::Get(isolate)->ClassPrototypes.end()) {
+        auto it = cache->ClassPrototypes.find(className);
+        if (it != cache->ClassPrototypes.end()) {
             Local<Value> prototype = it->second->Get(isolate);
             bool success;
             if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
                 assert(false);
             }
         } else {
-            auto it = Caches::Get(isolate)->Prototypes.find(meta);
-            if (it != Caches::Get(isolate)->Prototypes.end()) {
+            auto it = cache->Prototypes.find(meta);
+            if (it != cache->Prototypes.end()) {
                 Local<Value> prototype = it->second->Get(isolate);
                 bool success;
                 if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {

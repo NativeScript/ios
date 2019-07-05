@@ -27,7 +27,8 @@ Local<Value> Pointer::NewInstance(Isolate* isolate, void* handle) {
 }
 
 Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
-    Persistent<v8::Function>* pointerCtorFunc = Caches::Get(isolate)->PointerCtorFunc;
+    auto cache = Caches::Get(isolate);
+    Persistent<v8::Function>* pointerCtorFunc = cache->PointerCtorFunc;
     if (pointerCtorFunc != nullptr) {
         return pointerCtorFunc->Get(isolate);
     }
@@ -56,7 +57,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
     Pointer::RegisterToDecimalStringMethod(isolate, prototype);
     Pointer::RegisterToNumberMethod(isolate, prototype);
 
-    Caches::Get(isolate)->PointerCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
+    cache->PointerCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
 
     return ctorFunc;
 }
@@ -92,8 +93,9 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
 #endif
     }
 
-    auto it = Caches::Get(isolate)->PointerInstances.find(ptr);
-    if (it != Caches::Get(isolate)->PointerInstances.end()) {
+    auto cache = Caches::Get(isolate);
+    auto it = cache->PointerInstances.find(ptr);
+    if (it != cache->PointerInstances.end()) {
         info.GetReturnValue().Set(it->second->Get(isolate));
         return;
     }
@@ -103,7 +105,7 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
 
     ObjectManager::Register(isolate, info.This());
 
-    Caches::Get(isolate)->PointerInstances.insert(std::make_pair(ptr, new Persistent<Object>(isolate, info.This())));
+    cache->PointerInstances.insert(std::make_pair(ptr, new Persistent<Object>(isolate, info.This())));
 }
 
 void Pointer::RegisterAddMethod(Isolate* isolate, Local<Object> prototype) {

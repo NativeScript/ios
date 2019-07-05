@@ -16,7 +16,8 @@ void Reference::Register(Isolate* isolate, Local<Object> interop) {
 }
 
 Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
-    Persistent<v8::Function>* interopReferenceCtor = Caches::Get(isolate)->InteropReferenceCtorFunc;
+    auto cache = Caches::Get(isolate);
+    Persistent<v8::Function>* interopReferenceCtor = cache->InteropReferenceCtorFunc;
     if (interopReferenceCtor != nullptr) {
         return interopReferenceCtor->Get(isolate);
     }
@@ -40,7 +41,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     Local<Object> prototype = prototypeValue.As<Object>();
     Reference::RegisterToStringMethod(isolate, prototype);
 
-    Caches::Get(isolate)->InteropReferenceCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
+    cache->InteropReferenceCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
 
     return ctorFunc;
 }

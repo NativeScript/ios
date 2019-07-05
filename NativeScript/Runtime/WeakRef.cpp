@@ -88,26 +88,28 @@ void WeakRef::WeakHolderCallback(const WeakCallbackInfo<CallbackState>& data) {
 }
 
 Local<v8::Function> WeakRef::GetGetterFunction(Isolate* isolate) {
-    Persistent<v8::Function>* poGetter = Caches::Get(isolate)->WeakRefGetterFunc;
+    auto cache = Caches::Get(isolate);
+    Persistent<v8::Function>* poGetter = cache->WeakRefGetterFunc;
     if (poGetter != nullptr) {
         return poGetter->Get(isolate);
     }
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> getterFunc = FunctionTemplate::New(isolate, GetCallback)->GetFunction(context).ToLocalChecked();
-    Caches::Get(isolate)->WeakRefGetterFunc = new Persistent<v8::Function>(isolate, getterFunc);
+    cache->WeakRefGetterFunc = new Persistent<v8::Function>(isolate, getterFunc);
     return getterFunc;
 }
 
 Local<v8::Function> WeakRef::GetClearFunction(Isolate* isolate) {
-    Persistent<v8::Function>* poClear = Caches::Get(isolate)->WeakRefClearFunc;
+    auto cache = Caches::Get(isolate);
+    Persistent<v8::Function>* poClear = cache->WeakRefClearFunc;
     if (poClear != nullptr) {
         return poClear->Get(isolate);
     }
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction(context).ToLocalChecked();
-    Caches::Get(isolate)->WeakRefClearFunc = new Persistent<v8::Function>(isolate, clearFunc);
+    cache->WeakRefClearFunc = new Persistent<v8::Function>(isolate, clearFunc);
     return clearFunc;
 }
 

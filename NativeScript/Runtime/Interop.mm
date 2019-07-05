@@ -470,8 +470,9 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
 
         const char* name = protocol_getName(result);
-        auto it = Caches::Get(isolate)->ProtocolCtorFuncs.find(name);
-        if (it != Caches::Get(isolate)->ProtocolCtorFuncs.end()) {
+        auto cache = Caches::Get(isolate);
+        auto it = cache->ProtocolCtorFuncs.find(name);
+        if (it != cache->ProtocolCtorFuncs.end()) {
             return it->second->Get(isolate);
         }
 
@@ -484,10 +485,11 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
+        auto cache = Caches::Get(isolate);
         while (true) {
             const char* name = class_getName(result);
-            auto it = Caches::Get(isolate)->CtorFuncs.find(name);
-            if (it != Caches::Get(isolate)->CtorFuncs.end()) {
+            auto it = cache->CtorFuncs.find(name);
+            if (it != cache->CtorFuncs.end()) {
                 return it->second->Get(isolate);
             }
 
@@ -630,8 +632,9 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Number::New(isolate, value);
         }
 
-        auto it = Caches::Get(isolate)->Instances.find(result);
-        if (it != Caches::Get(isolate)->Instances.end()) {
+        auto cache = Caches::Get(isolate);
+        auto it = cache->Instances.find(result);
+        if (it != cache->Instances.end()) {
             return it->second->Get(isolate);
         }
 
@@ -827,7 +830,8 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
     }
 
     Local<v8::Function> sliceFunc;
-    Persistent<v8::Function>* poSliceFunc = Caches::Get(isolate)->SliceFunc;
+    auto cache = Caches::Get(isolate);
+    Persistent<v8::Function>* poSliceFunc = cache->SliceFunc;
 
     if (poSliceFunc != nullptr) {
         sliceFunc = poSliceFunc->Get(isolate);
@@ -847,7 +851,7 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
 
         assert(tempSliceFunc->IsFunction());
         sliceFunc = tempSliceFunc.As<v8::Function>();
-        Caches::Get(isolate)->SliceFunc = new Persistent<v8::Function>(isolate, sliceFunc);
+        cache->SliceFunc = new Persistent<v8::Function>(isolate, sliceFunc);
     }
 
     Local<Value> sliceArgs[1] { object };

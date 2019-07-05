@@ -60,6 +60,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         return true;
     }
 
+    auto cache = Caches::Get(isolate);
     switch (wrapper->Type()) {
         case WrapperType::Struct: {
             StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
@@ -73,9 +74,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
             id target = objCObjectWrapper->Data();
             if (target != nil) {
-                auto it = Caches::Get(isolate)->Instances.find(target);
-                if (it != Caches::Get(isolate)->Instances.end()) {
-                    Caches::Get(isolate)->Instances.erase(it);
+                auto it = cache->Instances.find(target);
+                if (it != cache->Instances.end()) {
+                    cache->Instances.erase(it);
                 }
             }
             break;
@@ -104,10 +105,10 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         case WrapperType::Pointer: {
             PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
             if (pointerWrapper->Data() != nullptr) {
-                auto it = Caches::Get(isolate)->PointerInstances.find(pointerWrapper->Data());
-                if (it != Caches::Get(isolate)->PointerInstances.end()) {
+                auto it = cache->PointerInstances.find(pointerWrapper->Data());
+                if (it != cache->PointerInstances.end()) {
                     delete it->second;
-                    Caches::Get(isolate)->PointerInstances.erase(it);
+                    cache->PointerInstances.erase(it);
                 }
 
                 if (pointerWrapper->IsAdopted()) {

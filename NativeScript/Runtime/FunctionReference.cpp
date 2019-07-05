@@ -15,7 +15,8 @@ void FunctionReference::Register(Isolate* isolate, Local<Object> interop) {
 }
 
 Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* isolate) {
-    Persistent<v8::Function>* poFunctionReferenceCtor = Caches::Get(isolate)->FunctionReferenceCtorFunc;
+    auto cache = Caches::Get(isolate);
+    Persistent<v8::Function>* poFunctionReferenceCtor = cache->FunctionReferenceCtorFunc;
     if (poFunctionReferenceCtor != nullptr) {
         return poFunctionReferenceCtor->Get(isolate);
     }
@@ -33,7 +34,7 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* iso
 
     tns::SetValue(isolate, ctorFunc, new FunctionReferenceTypeWrapper());
 
-    Caches::Get(isolate)->FunctionReferenceCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
+    cache->FunctionReferenceCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
 
     return ctorFunc;
 }

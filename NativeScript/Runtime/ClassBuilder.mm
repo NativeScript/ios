@@ -69,7 +69,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         item->self_->ExposeDynamicMethods(isolate, extendedClass, Local<Value>(), Local<Value>(), implementationObject);
     }
 
-    Persistent<v8::Function>* poBaseCtorFunc = Caches::Get(isolate)->CtorFuncs.find(item->meta_->name())->second;
+    auto cache = Caches::Get(isolate);
+    Persistent<v8::Function>* poBaseCtorFunc = cache->CtorFuncs.find(item->meta_->name())->second;
     Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
 
     CacheItem* cacheItem = new CacheItem(nullptr, extendedClass, item->self_);
@@ -110,8 +111,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass, true);
     tns::SetValue(isolate, extendClassCtorFunc, wrapper);
 
-    Caches::Get(isolate)->CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
-    Caches::Get(isolate)->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendFuncPrototype)));
+    cache->CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
+    cache->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendFuncPrototype)));
 
     info.GetReturnValue().Set(extendClassCtorFunc);
 }
@@ -126,7 +127,8 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 }
 
 void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
-    if (Caches::Get(isolate)->OriginalExtendsFunc != nullptr) {
+    auto cache = Caches::Get(isolate);
+    if (cache->OriginalExtendsFunc != nullptr) {
         return;
     }
 
@@ -151,7 +153,7 @@ void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
     Local<Value> extendsFunc;
     assert(script->Run(context).ToLocal(&extendsFunc) && extendsFunc->IsFunction());
 
-    Caches::Get(isolate)->OriginalExtendsFunc = new Persistent<v8::Function>(isolate, extendsFunc.As<v8::Function>());
+    cache->OriginalExtendsFunc = new Persistent<v8::Function>(isolate, extendsFunc.As<v8::Function>());
 }
 
 void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
@@ -164,10 +166,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         Local<Context> context = isolate->GetCurrentContext();
         ClassBuilder* builder = static_cast<ClassBuilder*>(info.Data().As<External>()->Value());
 
+        auto cache = Caches::Get(isolate);
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info[1].As<Object>());
         if (!wrapper) {
             // We are not extending a native object -> call the base __extends function
-            Persistent<v8::Function>* poExtendsFunc = Caches::Get(isolate)->OriginalExtendsFunc;
+            Persistent<v8::Function>* poExtendsFunc = cache->OriginalExtendsFunc;
             assert(poExtendsFunc != nullptr);
             Local<v8::Function> originalExtendsFunc = poExtendsFunc->Get(isolate);
             Local<Value> args[] = { info[0], info[1] };
@@ -188,7 +191,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
 
         const Meta* baseMeta = ArgConverter::FindMeta(baseClass);
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
-        Persistent<v8::Function>* poBaseCtorFunc = Caches::Get(isolate)->CtorFuncs.find(interfaceMeta->name())->second;
+        Persistent<v8::Function>* poBaseCtorFunc = cache->CtorFuncs.find(interfaceMeta->name())->second;
 
         Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
         assert(extendedClassCtorFunc->SetPrototype(context, baseCtorFunc).ToChecked());
@@ -207,11 +210,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         success = extendedClassCtorFuncPrototype->SetPrototype(context, prototypePropValue.As<Object>()).FromMaybe(false);
         assert(success);
 
-        Caches::Get(isolate)->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendedClassCtorFuncPrototype)));
+        cache->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendedClassCtorFuncPrototype)));
 
         Persistent<v8::Function>* poExtendedClassCtorFunc = new Persistent<v8::Function>(isolate, extendedClassCtorFunc);
 
-        Caches::Get(isolate)->CtorFuncs.emplace(std::make_pair(extendedClassName, poExtendedClassCtorFunc));
+        cache->CtorFuncs.emplace(std::make_pair(extendedClassName, poExtendedClassCtorFunc));
 
         IMP newInitialize = imp_implementationWithBlock(^(id self) {
             Local<Context> context = isolate->GetCurrentContext();
@@ -667,8 +670,9 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
                 Local<Value> res;
 
                 id thiz = *static_cast<const id*>(argValues[0]);
-                auto it = Caches::Get(context->isolate_)->Instances.find(thiz);
-                Local<Object> self_ = it != Caches::Get(context->isolate_)->Instances.end()
+                auto cache = Caches::Get(context->isolate_);
+                auto it = cache->Instances.find(thiz);
+                Local<Object> self_ = it != cache->Instances.end()
                     ? it->second->Get(context->isolate_).As<Object>()
                     : context->implementationObject_->Get(context->isolate_);
                 assert(getterFunc->Call(context->isolate_->GetCurrentContext(), self_, 0, nullptr).ToLocal(&res));
@@ -693,8 +697,9 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
                 Local<Value> res;
 
                 id thiz = *static_cast<const id*>(argValues[0]);
-                auto it = Caches::Get(context->isolate_)->Instances.find(thiz);
-                Local<Object> self_ = it != Caches::Get(context->isolate_)->Instances.end()
+                auto cache = Caches::Get(context->isolate_);
+                auto it = cache->Instances.find(thiz);
+                Local<Object> self_ = it != cache->Instances.end()
                     ? it->second->Get(context->isolate_).As<Object>()
                     : context->implementationObject_->Get(context->isolate_);
 
