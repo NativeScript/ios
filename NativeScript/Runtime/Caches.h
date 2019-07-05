@@ -2,8 +2,7 @@
 #define Caches_h
 
 #include <string>
-#include <thread>
-#include <map>
+#include "ConcurrentMap.h"
 #include "Common.h"
 #include "Metadata.h"
 
@@ -28,10 +27,11 @@ public:
         v8::Persistent<v8::Value>* worker_;
     };
 
-    static std::map<std::string, const Meta*> Metadata;
-    static std::map<std::thread::id, WorkerState*> Workers;
+    static ConcurrentMap<std::string, const Meta*> Metadata;
+    static ConcurrentMap<int, WorkerState*> Workers;
 
     static Caches* Get(v8::Isolate* isolate);
+    static void Remove(v8::Isolate* isolate);
 
     std::map<const Meta*, v8::Persistent<v8::Value>*> Prototypes;
     std::map<const std::string, v8::Persistent<v8::Object>*> ClassPrototypes;
@@ -41,8 +41,19 @@ public:
     std::map<id, v8::Persistent<v8::Value>*> Instances;
     std::map<const void*, v8::Persistent<v8::Object>*> PointerInstances;
     std::map<const StructMeta*, v8::Persistent<v8::Function>*> StructConstructorFunctions;
+
+    v8::Persistent<v8::Function>* EmptyObjCtorFunc;
+    v8::Persistent<v8::Function>* EmptyStructCtorFunc;
+    v8::Persistent<v8::Function>* SliceFunc;
+    v8::Persistent<v8::Function>* OriginalExtendsFunc;
+    v8::Persistent<v8::Function>* WeakRefGetterFunc;
+    v8::Persistent<v8::Function>* WeakRefClearFunc;
+
+    v8::Persistent<v8::Function>* InteropReferenceCtorFunc;
+    v8::Persistent<v8::Function>* PointerCtorFunc;
+    v8::Persistent<v8::Function>* FunctionReferenceCtorFunc;
 private:
-    static std::map<v8::Isolate*, Caches*> perIsolateCaches_;
+    static ConcurrentMap<v8::Isolate*, Caches*> perIsolateCaches_;
 };
 
 }

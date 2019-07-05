@@ -1,5 +1,6 @@
 #include "WeakRef.h"
 #include "ArgConverter.h"
+#include "Caches.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -87,26 +88,26 @@ void WeakRef::WeakHolderCallback(const WeakCallbackInfo<CallbackState>& data) {
 }
 
 Local<v8::Function> WeakRef::GetGetterFunction(Isolate* isolate) {
-    auto it = poGetterFuncs_.find(isolate);
-    if (it != poGetterFuncs_.end()) {
-        return it->second->Get(isolate);
+    Persistent<v8::Function>* poGetter = Caches::Get(isolate)->WeakRefGetterFunc;
+    if (poGetter != nullptr) {
+        return poGetter->Get(isolate);
     }
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> getterFunc = FunctionTemplate::New(isolate, GetCallback)->GetFunction(context).ToLocalChecked();
-    poGetterFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, getterFunc)));
+    Caches::Get(isolate)->WeakRefGetterFunc = new Persistent<v8::Function>(isolate, getterFunc);
     return getterFunc;
 }
 
 Local<v8::Function> WeakRef::GetClearFunction(Isolate* isolate) {
-    auto it = poClearFuncs_.find(isolate);
-    if (it != poClearFuncs_.end()) {
-        return it->second->Get(isolate);
+    Persistent<v8::Function>* poClear = Caches::Get(isolate)->WeakRefClearFunc;
+    if (poClear != nullptr) {
+        return poClear->Get(isolate);
     }
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction(context).ToLocalChecked();
-    poClearFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, clearFunc)));
+    Caches::Get(isolate)->WeakRefClearFunc = new Persistent<v8::Function>(isolate, clearFunc);
     return clearFunc;
 }
 
@@ -129,8 +130,5 @@ void WeakRef::ClearCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     tns::SetPrivateValue(isolate, holder, tns::ToV8String(isolate, "target"), External::New(isolate, nullptr));
 }
-
-std::map<Isolate*, Persistent<v8::Function>*> WeakRef::poGetterFuncs_;
-std::map<Isolate*, Persistent<v8::Function>*> WeakRef::poClearFuncs_;
 
 }

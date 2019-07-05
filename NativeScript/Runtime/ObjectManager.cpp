@@ -8,7 +8,7 @@ using namespace std;
 
 namespace tns {
 
-Persistent<Value>* ObjectManager::Register(Isolate* isolate, const v8::Local<v8::Value> obj) {
+Persistent<Value>* ObjectManager::Register(Isolate* isolate, const Local<Value> obj) {
     Persistent<Value>* objectHandle = new Persistent<Value>(isolate, obj);
     ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
     objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
@@ -71,8 +71,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         }
         case WrapperType::ObjCObject: {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-            if (objCObjectWrapper->Data() != nil) {
-                auto it = Caches::Get(isolate)->Instances.find(objCObjectWrapper->Data());
+            id target = objCObjectWrapper->Data();
+            if (target != nil) {
+                auto it = Caches::Get(isolate)->Instances.find(target);
                 if (it != Caches::Get(isolate)->Instances.end()) {
                     Caches::Get(isolate)->Instances.erase(it);
                 }
@@ -129,13 +130,6 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             if (worker->IsRunning()) {
                 return false;
             }
-
-            std::thread::id workerId = worker->Id();
-            auto it = Caches::Workers.find(workerId);
-            if (it != Caches::Workers.end()) {
-                Caches::Workers.erase(it);
-            }
-
             break;
         }
 

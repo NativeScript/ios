@@ -1,4 +1,5 @@
 #include "Reference.h"
+#include "Caches.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
 #include "Interop.h"
@@ -15,9 +16,9 @@ void Reference::Register(Isolate* isolate, Local<Object> interop) {
 }
 
 Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
-    auto it = interopReferenceCtorFuncs_.find(isolate);
-    if (it != interopReferenceCtorFuncs_.end()) {
-        return it->second->Get(isolate);
+    Persistent<v8::Function>* interopReferenceCtor = Caches::Get(isolate)->InteropReferenceCtorFunc;
+    if (interopReferenceCtor != nullptr) {
+        return interopReferenceCtor->Get(isolate);
     }
 
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, ReferenceConstructorCallback);
@@ -39,7 +40,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     Local<Object> prototype = prototypeValue.As<Object>();
     Reference::RegisterToStringMethod(isolate, prototype);
 
-    interopReferenceCtorFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, ctorFunc)));
+    Caches::Get(isolate)->InteropReferenceCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
 
     return ctorFunc;
 }
@@ -158,7 +159,5 @@ void Reference::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype
     bool success = prototype->Set(context, tns::ToV8String(isolate, "toString"), func).FromMaybe(false);
     assert(success);
 }
-
-std::map<Isolate*, Persistent<v8::Function>*> Reference::interopReferenceCtorFuncs_;
 
 }

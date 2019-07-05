@@ -12,8 +12,8 @@ using namespace std;
 namespace tns {
 
 void ArgConverter::Init(Isolate* isolate, GenericNamedPropertyGetterCallback structPropertyGetter, GenericNamedPropertySetterCallback structPropertySetter) {
-    poEmptyObjCtorFuncs_.emplace(std::make_pair(isolate, new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate))));
-    poEmptyStructCtorFuncs_.emplace(std::make_pair(isolate, new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter))));
+    Caches::Get(isolate)->EmptyObjCtorFunc = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate));
+    Caches::Get(isolate)->EmptyStructCtorFunc = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter));
 }
 
 Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const MethodMeta* meta, bool isMethodCallback) {
@@ -498,9 +498,9 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
 
 const Meta* ArgConverter::FindMeta(Class klass) {
     std::string origClassName = class_getName(klass);
-    auto it = Caches::Metadata.find(origClassName);
-    if (it != Caches::Metadata.end()) {
-        return it->second;
+    const Meta* meta = Caches::Metadata.Get(origClassName);
+    if (meta != nullptr) {
+        return meta;
     }
 
     std::string className = origClassName;
@@ -508,7 +508,7 @@ const Meta* ArgConverter::FindMeta(Class klass) {
     while (true) {
         const Meta* result = GetMeta(className);
         if (result != nullptr) {
-            Caches::Metadata.insert(std::make_pair(origClassName, result));
+            Caches::Metadata.Insert(origClassName, result);
             return result;
         }
 
@@ -524,9 +524,9 @@ const Meta* ArgConverter::FindMeta(Class klass) {
 }
 
 const Meta* ArgConverter::GetMeta(std::string name) {
-    auto it = Caches::Metadata.find(name);
-    if (it != Caches::Metadata.end()) {
-        return it->second;
+    const Meta* meta = Caches::Metadata.Get(name);
+    if (meta != nullptr) {
+        return meta;
     }
 
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
@@ -541,16 +541,16 @@ const Meta* ArgConverter::GetMeta(std::string name) {
 
 Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {
     Isolate* isolate = context->GetIsolate();
-    auto it = poEmptyObjCtorFuncs_.find(isolate);
-    assert(it != poEmptyObjCtorFuncs_.end());
-    return ArgConverter::CreateEmptyInstance(context, it->second);
+    Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyObjCtorFunc;
+    assert(ctorFunc != nullptr);
+    return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
 
 Local<Object> ArgConverter::CreateEmptyStruct(Local<Context> context) {
     Isolate* isolate = context->GetIsolate();
-    auto it = poEmptyStructCtorFuncs_.find(isolate);
-    assert(it != poEmptyStructCtorFuncs_.end());
-    return ArgConverter::CreateEmptyInstance(context, it->second);
+    Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyStructCtorFunc;
+    assert(ctorFunc != nullptr);
+    return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
 
 Local<Object> ArgConverter::CreateEmptyInstance(Local<Context> context, Persistent<v8::Function>* ctorFunc) {
@@ -600,8 +600,5 @@ void ArgConverter::FindMethodOverloads(Class klass, std::string methodName, Memb
         ArgConverter::FindMethodOverloads(baseClass, methodName, type, overloads);
     }
 }
-
-std::map<Isolate*, Persistent<v8::Function>*> ArgConverter::poEmptyObjCtorFuncs_;
-std::map<Isolate*, Persistent<v8::Function>*> ArgConverter::poEmptyStructCtorFuncs_;
 
 }

@@ -54,11 +54,11 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     std::string workerPath = ToString(isolate, info[0]);
     // TODO: Validate worker path and call worker.onerror if the script does not exist
 
-    WorkerWrapper* wrapper = new WorkerWrapper(isolate, Worker::OnMessageCallback);
-    tns::SetValue(isolate, thiz, wrapper);
+    WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
+    tns::SetValue(isolate, thiz, worker);
     Persistent<Value>* poWorker = ObjectManager::Register(isolate, thiz);
 
-    std::function<Isolate* ()> func([wrapper, workerPath]() {
+    std::function<Isolate* ()> func([worker, workerPath]() {
         NSString* resourcePath = [[NSBundle mainBundle] resourcePath];
         NSArray* components = [NSArray arrayWithObjects:resourcePath, @"app", nil];
         NSString* path = [NSString pathWithComponents:components];
@@ -66,23 +66,25 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         std::string baseDir = [path UTF8String];
         tns::Runtime* runtime = new tns::Runtime();
         runtime->Init(baseDir);
+        runtime->SetWorkerId(worker->WorkerId());
         Isolate* workerIsolate = runtime->GetIsolate();
 
         TryCatch tc(workerIsolate);
         runtime->RunScript(workerPath, tc);
         if (tc.HasCaught()) {
             HandleScope scope(workerIsolate);
-            wrapper->PassUncaughtExceptionFromWorkerToMain(workerIsolate, tc);
-            wrapper->Terminate();
+            worker->PassUncaughtExceptionFromWorkerToMain(workerIsolate, tc, false);
+            worker->Terminate();
         }
 
         return workerIsolate;
     });
 
-    std::thread::id threadId = wrapper->Start(poWorker, func);
+    worker->Start(poWorker, func);
 
     Caches::WorkerState* state = new Caches::WorkerState(isolate, poWorker);
-    Caches::Workers.insert(std::make_pair(threadId, state));
+    int workerId = worker->Id();
+    Caches::Workers.Insert(workerId, state);
 }
 
 void Worker::RegisterGlobals(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
@@ -101,10 +103,10 @@ void Worker::RegisterGlobals(Isolate* isolate, Local<ObjectTemplate> globalTempl
             return;
         }
 
-        std::thread::id threadId = std::this_thread::get_id();
-        auto it = Caches::Workers.find(threadId);
-        assert(it != Caches::Workers.end());
-        Caches::WorkerState* state = it->second;
+        Runtime* runtime = Runtime::GetCurrentRuntime();
+        int workerId = runtime->WorkerId();
+        Caches::WorkerState* state = Caches::Workers.Get(workerId);
+        assert(state != nullptr);
 
         Local<Value> error;
         Local<Value> result = Worker::Serialize(isolate, info[0], error);

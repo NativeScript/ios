@@ -47,9 +47,9 @@ void MetadataBuilder::Init(Isolate* isolate) {
             const BaseClassMeta* classMeta = static_cast<const BaseClassMeta*>(meta);
             GetOrCreateConstructorFunctionTemplate(classMeta);
 
-            auto itMetaCache = Caches::Metadata.find(meta->jsName());
-            if (itMetaCache == Caches::Metadata.end()) {
-                Caches::Metadata.insert(std::make_pair(meta->jsName(), meta));
+            std::string name = meta->jsName();
+            if (!Caches::Metadata.ContainsKey(name)) {
+                Caches::Metadata.Insert(name, meta);
             }
             break;
         }

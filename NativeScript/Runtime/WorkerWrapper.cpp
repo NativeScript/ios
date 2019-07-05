@@ -1,6 +1,8 @@
 #include <dispatch/dispatch.h>
 #include "DataWrapper.h"
+#include "Caches.h"
 #include "Helpers.h"
+#include "Runtime.h"
 
 using namespace v8;
 
@@ -12,14 +14,14 @@ void WorkerWrapper::PostMessage(std::string message) {
     }
 }
 
-std::thread::id WorkerWrapper::Start(Persistent<Value>* poWorker, std::function<Isolate* ()> func) {
+void WorkerWrapper::Start(Persistent<Value>* poWorker, std::function<Isolate* ()> func) {
     this->poWorker_ = poWorker;
+    nextId_++;
+    this->workerId_ = nextId_;
 
     this->thread_ = std::thread(&WorkerWrapper::BackgroundLooper, this, func);
 
     this->isRunning_ = true;
-    this->workerId_ = this->thread_.get_id();
-    return this->workerId_;
 }
 
 void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
@@ -27,6 +29,7 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
 
     while (!this->isTerminating_) {
         std::string message = this->queue_->Pop();
+
         if (this->isTerminating_) {
             break;
         }
@@ -64,6 +67,27 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
             }
         }
     }
+
+    {
+        HandleScope scope(this->workerIsolate_);
+        Local<Context> context = this->workerIsolate_->GetCurrentContext();
+        context->Exit();
+        this->workerIsolate_->TerminateExecution();
+    }
+
+    this->workerIsolate_->Dispose();
+
+    Caches::WorkerState* state = Caches::Workers.Get(this->workerId_);
+    if (state != nullptr) {
+        Caches::Workers.Remove(this->workerId_);
+        delete state;
+        state = nullptr;
+    }
+
+    Caches::Remove(this->workerIsolate_);
+
+    Runtime* runtime = Runtime::GetCurrentRuntime();
+    delete runtime;
 }
 
 void WorkerWrapper::Terminate() {
@@ -74,7 +98,7 @@ void WorkerWrapper::Terminate() {
     }
 }
 
-void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate, TryCatch& tc) {
+void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate, TryCatch& tc, bool async) {
     Local<Context> context = workerIsolate->GetCurrentContext();
     int lineNumber;
     bool success = tc.Message()->GetLineNumber(context).To(&lineNumber);
@@ -117,7 +141,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
                 this->mainIsolate_->ThrowException(error);
             }
         }
-    });
+    }, async);
 }
 
 Local<Object> WorkerWrapper::ConstructErrorObject(Isolate* isolate, std::string message, std::string source, std::string stackTrace, int lineNumber) {
@@ -134,5 +158,7 @@ Local<Object> WorkerWrapper::ConstructErrorObject(Isolate* isolate, std::string 
 
     return obj;
 }
+
+int WorkerWrapper::nextId_ = 0;
 
 }

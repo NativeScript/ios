@@ -373,7 +373,7 @@ public:
             thread_{},
             isRunning_(false),
             isTerminating_(false) {
-        this->queue_ = new ConcurrentQueue<std::string>();
+        this->queue_ = new ConcurrentQueue();
     }
 
     ~WorkerWrapper() {
@@ -384,27 +384,32 @@ public:
         return WrapperType::Worker;
     }
 
-    std::thread::id Start(v8::Persistent<v8::Value>* poWorker, std::function<v8::Isolate* ()> func);
-    void PassUncaughtExceptionFromWorkerToMain(v8::Isolate* workerIsolate, v8::TryCatch& tc);
+    void Start(v8::Persistent<v8::Value>* poWorker, std::function<v8::Isolate* ()> func);
+    void PassUncaughtExceptionFromWorkerToMain(v8::Isolate* workerIsolate, v8::TryCatch& tc, bool async = true);
     void PostMessage(std::string message);
     void Terminate();
 
-    std::thread::id Id() {
+    const int Id() {
         return this->workerId_;
     }
 
-    bool IsRunning() {
+    const bool IsRunning() {
         return this->isRunning_;
     }
+
+    const int WorkerId() {
+        return this->workerId_;
+    }
 private:
-    std::thread::id workerId_;
+    static int nextId_;
+    int workerId_;
     v8::Isolate* mainIsolate_;
     v8::Isolate* workerIsolate_;
     v8::Persistent<v8::Value>* poWorker_;
     bool isRunning_;
     bool isTerminating_;
     std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
-    ConcurrentQueue<std::string>* queue_;
+    ConcurrentQueue* queue_;
     std::thread thread_;
 
     void BackgroundLooper(std::function<v8::Isolate* ()> func);

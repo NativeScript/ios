@@ -1,7 +1,6 @@
 #ifndef Reference_h
 #define Reference_h
 
-#include <map>
 #include "DataWrapper.h"
 #include "Common.h"
 
@@ -12,7 +11,6 @@ public:
     static void Register(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static v8::Local<v8::Function> GetInteropReferenceCtorFunc(v8::Isolate* isolate);
 private:
-    static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> interopReferenceCtorFuncs_;
     static v8::Local<v8::Value> GetInteropReferenceValue(v8::Isolate* isolate, ReferenceWrapper* wrapper);
     static void ReferenceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 

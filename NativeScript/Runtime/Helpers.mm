@@ -164,8 +164,14 @@ bool tns::IsBool(Local<Value> value) {
     return !value.IsEmpty() && (value->IsBoolean() || value->IsBooleanObject());
 }
 
-void tns::ExecuteOnMainThread(std::function<void ()> func) {
-    dispatch_async(dispatch_get_main_queue(), ^(void) {
-        func();
-    });
+void tns::ExecuteOnMainThread(std::function<void ()> func, bool async) {
+    if (async) {
+        dispatch_async(dispatch_get_main_queue(), ^(void) {
+            func();
+        });
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), ^(void) {
+            func();
+        });
+    }
 }

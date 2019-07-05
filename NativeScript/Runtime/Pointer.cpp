@@ -27,9 +27,9 @@ Local<Value> Pointer::NewInstance(Isolate* isolate, void* handle) {
 }
 
 Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
-    auto it = pointerCtorFuncs_.find(isolate);
-    if (it != pointerCtorFuncs_.end()) {
-        return it->second->Get(isolate);
+    Persistent<v8::Function>* pointerCtorFunc = Caches::Get(isolate)->PointerCtorFunc;
+    if (pointerCtorFunc != nullptr) {
+        return pointerCtorFunc->Get(isolate);
     }
 
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, PointerConstructorCallback);
@@ -56,7 +56,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
     Pointer::RegisterToDecimalStringMethod(isolate, prototype);
     Pointer::RegisterToNumberMethod(isolate, prototype);
 
-    pointerCtorFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, ctorFunc)));
+    Caches::Get(isolate)->PointerCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
 
     return ctorFunc;
 }
@@ -243,7 +243,5 @@ void Pointer::RegisterToNumberMethod(Isolate* isolate, Local<Object> prototype) 
     bool success = prototype->Set(context, tns::ToV8String(isolate, "toNumber"), func).FromMaybe(false);
     assert(success);
 }
-
-std::map<Isolate*, Persistent<v8::Function>*> Pointer::pointerCtorFuncs_;
 
 }

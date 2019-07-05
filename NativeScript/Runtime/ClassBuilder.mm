@@ -126,8 +126,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 }
 
 void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
-    auto it = poOriginalExtendsFuncs_.find(isolate);
-    if (it != poOriginalExtendsFuncs_.end()) {
+    if (Caches::Get(isolate)->OriginalExtendsFunc != nullptr) {
         return;
     }
 
@@ -152,7 +151,7 @@ void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
     Local<Value> extendsFunc;
     assert(script->Run(context).ToLocal(&extendsFunc) && extendsFunc->IsFunction());
 
-    poOriginalExtendsFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, extendsFunc.As<v8::Function>())));
+    Caches::Get(isolate)->OriginalExtendsFunc = new Persistent<v8::Function>(isolate, extendsFunc.As<v8::Function>());
 }
 
 void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
@@ -168,9 +167,9 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info[1].As<Object>());
         if (!wrapper) {
             // We are not extending a native object -> call the base __extends function
-            auto it = poOriginalExtendsFuncs_.find(isolate);
-            assert(it != poOriginalExtendsFuncs_.end());
-            Local<v8::Function> originalExtendsFunc = it->second->Get(isolate);
+            Persistent<v8::Function>* poExtendsFunc = Caches::Get(isolate)->OriginalExtendsFunc;
+            assert(poExtendsFunc != nullptr);
+            Local<v8::Function> originalExtendsFunc = poExtendsFunc->Get(isolate);
             Local<Value> args[] = { info[0], info[1] };
             originalExtendsFunc->Call(context, context->Global(), info.Length(), args).ToLocalChecked();
             return;
@@ -730,7 +729,6 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<Name> property, const Prope
     info.GetReturnValue().Set(superValue);
 }
 
-std::map<Isolate*, Persistent<v8::Function>*> ClassBuilder::poOriginalExtendsFuncs_;
 unsigned long long ClassBuilder::classNameCounter_ = 0;
 
 }

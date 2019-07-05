@@ -1,7 +1,6 @@
 #ifndef Pointer_h
 #define Pointer_h
 
-#include <map>
 #include "Common.h"
 #include "DataWrapper.h"
 
@@ -12,8 +11,6 @@ public:
     static void Register(v8::Isolate* isolate, v8::Local<v8::Object> interop);
     static v8::Local<v8::Value> NewInstance(v8::Isolate* isolate, void* handle);
 private:
-    static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> pointerCtorFuncs_;
-
     static v8::Local<v8::Function> GetPointerCtorFunc(v8::Isolate* isolate);
     static void PointerConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void RegisterAddMethod(v8::Isolate* isolate, v8::Local<v8::Object> prototype);

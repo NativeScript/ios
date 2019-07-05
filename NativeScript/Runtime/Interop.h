@@ -2,7 +2,6 @@
 #define Interop_h
 
 #include <CoreFoundation/CFBase.h>
-#include <map>
 #include "libffi.h"
 #include "Common.h"
 #include "Metadata.h"
@@ -27,8 +26,6 @@ public:
     static void WriteValue(v8::Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, v8::Local<v8::Value> arg);
     static id ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg);
 private:
-    static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> sliceFuncs_;
-
     template <typename T>
     static void SetStructValue(v8::Local<v8::Value> value, void* destBuffer, ptrdiff_t position);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer, ptrdiff_t& position);

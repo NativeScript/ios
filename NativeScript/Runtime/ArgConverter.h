@@ -1,7 +1,6 @@
 #ifndef ArgConverter_h
 #define ArgConverter_h
 
-#include <map>
 #include "libffi.h"
 #include "Common.h"
 #include "DataWrapper.h"
@@ -35,9 +34,6 @@ public:
     static void SetValue(v8::Isolate* isolate, void* retValue, v8::Local<v8::Value> value, BinaryTypeEncodingType type);
     static void ConstructObject(v8::Isolate* isolate, const v8::FunctionCallbackInfo<v8::Value>& info, Class klass, const InterfaceMeta* interfaceMeta = nullptr);
 private:
-    static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> poEmptyObjCtorFuncs_;
-    static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> poEmptyStructCtorFuncs_;
-
     static v8::Local<v8::Function> CreateEmptyInstanceFunction(v8::Isolate* isolate, v8::GenericNamedPropertyGetterCallback propertyGetter = nullptr, v8::GenericNamedPropertySetterCallback propertySetter = nullptr);
     static v8::Local<v8::Object> CreateEmptyInstance(v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
     static void FindMethodOverloads(Class klass, std::string methodName, MemberType type, std::vector<const MethodMeta*>& overloads);

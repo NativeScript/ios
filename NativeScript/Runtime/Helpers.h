@@ -27,7 +27,7 @@ bool IsString(v8::Local<v8::Value> value);
 bool IsNumber(v8::Local<v8::Value> value);
 bool IsBool(v8::Local<v8::Value> value);
 
-void ExecuteOnMainThread(std::function<void ()> func);
+void ExecuteOnMainThread(std::function<void ()> func, bool async = true);
 
 }
 

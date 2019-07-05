@@ -827,11 +827,10 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
     }
 
     Local<v8::Function> sliceFunc;
+    Persistent<v8::Function>* poSliceFunc = Caches::Get(isolate)->SliceFunc;
 
-    auto it = sliceFuncs_.find(isolate);
-
-    if (it != sliceFuncs_.end()) {
-        sliceFunc = it->second->Get(isolate);
+    if (poSliceFunc != nullptr) {
+        sliceFunc = poSliceFunc->Get(isolate);
     } else {
         std::string source = "Array.prototype.slice";
         Local<Context> context = isolate->GetCurrentContext();
@@ -848,7 +847,7 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
 
         assert(tempSliceFunc->IsFunction());
         sliceFunc = tempSliceFunc.As<v8::Function>();
-        sliceFuncs_.insert(std::make_pair(isolate, new Persistent<v8::Function>(isolate, sliceFunc)));
+        Caches::Get(isolate)->SliceFunc = new Persistent<v8::Function>(isolate, sliceFunc);
     }
 
     Local<Value> sliceArgs[1] { object };
@@ -860,7 +859,5 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
 
     return result.As<v8::Array>();
 }
-
-std::map<Isolate*, Persistent<v8::Function>*> Interop::sliceFuncs_;
 
 }

@@ -4,6 +4,7 @@
 #include "Console.h"
 #include "SetTimeout.h"
 #include "InlineFunctions.h"
+#include "SimpleAllocator.h"
 #include "Helpers.h"
 #include "Tasks.h"
 #include "WeakRef.h"
@@ -27,11 +28,14 @@ using namespace std;
 
 namespace tns {
 
+SimpleAllocator allocator_;
+
 void Runtime::InitializeMetadata(void* metadataPtr) {
     MetaFile::setInstance(metadataPtr);
 }
 
 Runtime::Runtime() {
+    currentRuntime_ = this;
 }
 
 void Runtime::InitAndRunMainScript(const string& baseDir) {
@@ -69,10 +73,9 @@ void Runtime::Init(const string& baseDir) {
     V8::SetSnapshotDataBlob(snapshotBlobStartupData);
 
     Isolate::CreateParams create_params;
-    create_params.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
+    create_params.array_buffer_allocator = &allocator_;
     Isolate* isolate = Isolate::New(create_params);
 
-    Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<FunctionTemplate> globalTemplateFunction = FunctionTemplate::New(isolate);
     globalTemplateFunction->SetClassName(tns::ToV8String(isolate, "NativeScriptGlobalObject"));
@@ -132,6 +135,14 @@ Isolate* Runtime::GetIsolate() {
     return this->isolate_;
 }
 
+const int Runtime::WorkerId() {
+    return this->workerId_;
+}
+
+void Runtime::SetWorkerId(int workerId) {
+    this->workerId_ = workerId;
+}
+
 void Runtime::DefineGlobalObject(Local<Context> context) {
     Local<Object> global = context->Global();
     const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -178,5 +189,6 @@ void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplat
 
 Platform* Runtime::platform_ = nullptr;
 bool Runtime::mainThreadInitialized_ = false;
+thread_local Runtime* Runtime::currentRuntime_ = nullptr;
 
 }

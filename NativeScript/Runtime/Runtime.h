@@ -10,15 +10,25 @@ namespace tns {
 
 class Runtime {
 public:
-    static void InitializeMetadata(void* metadataPtr);
     Runtime();
     void Init(const std::string& baseDir);
     void InitAndRunMainScript(const std::string& baseDir);
     void RunScript(std::string file, v8::TryCatch& tc);
     v8::Isolate* GetIsolate();
+
+    const int WorkerId();
+
+    void SetWorkerId(int workerId);
+
+    static void InitializeMetadata(void* metadataPtr);
+
+    static Runtime* GetCurrentRuntime() {
+        return currentRuntime_;
+    }
 private:
     static bool mainThreadInitialized_;
     static v8::Platform* platform_;
+    static thread_local Runtime* currentRuntime_;
 
     void DefineGlobalObject(v8::Local<v8::Context> context);
     void DefineNativeScriptVersion(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
@@ -29,6 +39,7 @@ private:
     MetadataBuilder metadataBuilder_;
     ModuleInternal moduleInternal_;
     std::string baseDir_;
+    int workerId_;
 };
 
 }

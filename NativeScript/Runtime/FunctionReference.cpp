@@ -1,4 +1,5 @@
 #include "FunctionReference.h"
+#include "Caches.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
 
@@ -14,9 +15,9 @@ void FunctionReference::Register(Isolate* isolate, Local<Object> interop) {
 }
 
 Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* isolate) {
-    auto it = functionReferenceCtorFuncs_.find(isolate);
-    if (it != functionReferenceCtorFuncs_.end()) {
-        return it->second->Get(isolate);
+    Persistent<v8::Function>* poFunctionReferenceCtor = Caches::Get(isolate)->FunctionReferenceCtorFunc;
+    if (poFunctionReferenceCtor != nullptr) {
+        return poFunctionReferenceCtor->Get(isolate);
     }
 
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, FunctionReferenceConstructorCallback);
@@ -32,7 +33,7 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* iso
 
     tns::SetValue(isolate, ctorFunc, new FunctionReferenceTypeWrapper());
 
-    functionReferenceCtorFuncs_.insert(std::make_pair(isolate,  new Persistent<v8::Function>(isolate, ctorFunc)));
+    Caches::Get(isolate)->FunctionReferenceCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
 
     return ctorFunc;
 }
@@ -50,7 +51,5 @@ void FunctionReference::FunctionReferenceConstructorCallback(const v8::FunctionC
     tns::SetValue(isolate, info.This(), wrapper);
     ObjectManager::Register(isolate, info.This());
 }
-
-std::map<Isolate*, Persistent<v8::Function>*> FunctionReference::functionReferenceCtorFuncs_;
 
 }

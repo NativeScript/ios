@@ -6,21 +6,22 @@ namespace tns {
 
 
 Caches* Caches::Get(Isolate* isolate) {
-    Caches* caches = nullptr;
-    auto it = Caches::perIsolateCaches_.find(isolate);
-    if (it == Caches::perIsolateCaches_.end()) {
+    Caches* caches = Caches::perIsolateCaches_.Get(isolate);
+    if (caches == nullptr) {
         caches = new Caches();
-        Caches::perIsolateCaches_.insert(std::make_pair(isolate, caches));
-    } else {
-        caches = it->second;
+        Caches::perIsolateCaches_.Insert(isolate, caches);
     }
 
     return caches;
 }
 
-std::map<Isolate*, Caches*> Caches::perIsolateCaches_;
+void Caches::Remove(v8::Isolate* isolate) {
+    Caches::perIsolateCaches_.Remove(isolate);
+}
 
-std::map<std::string, const Meta*> Caches::Metadata;
-std::map<std::thread::id, Caches::WorkerState*> Caches::Workers;
+ConcurrentMap<Isolate*, Caches*> Caches::perIsolateCaches_;
+
+ConcurrentMap<std::string, const Meta*> Caches::Metadata;
+ConcurrentMap<int, Caches::WorkerState*> Caches::Workers;
 
 }
