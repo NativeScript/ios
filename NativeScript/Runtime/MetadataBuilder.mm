@@ -37,11 +37,6 @@ void MetadataBuilder::Init(Isolate* isolate) {
         }
 
         switch (meta->type()) {
-        case MetaType::Function: {
-            const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
-            RegisterCFunction(funcMeta);
-            break;
-        }
         case MetaType::Interface:
         case MetaType::ProtocolType: {
             const BaseClassMeta* classMeta = static_cast<const BaseClassMeta*>(meta);
@@ -66,6 +61,35 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
         std::string propName = tns::ToString(isolate, property);
         const Meta* meta = ArgConverter::GetMeta(propName);
         if (meta == nullptr || !meta->isAvailable()) {
+            return;
+        }
+
+        if (meta->type() == MetaType::Function) {
+            auto cache = Caches::Get(isolate);
+            std::string funcName = meta->name();
+            auto it = cache->CFunctions.find(funcName);
+            if (it != cache->CFunctions.end()) {
+                Local<v8::Function> func = it->second->Get(isolate);
+                info.GetReturnValue().Set(func);
+                return;
+            }
+
+            MetadataBuilder* builder = static_cast<MetadataBuilder*>(info.Data().As<External>()->Value());
+            const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
+            Local<Context> context = isolate->GetCurrentContext();
+
+            CacheItem<FunctionMeta>* item = new CacheItem<FunctionMeta>(funcMeta, std::string(), builder);
+            Local<External> ext = External::New(isolate, item);
+            Local<v8::Function> func;
+            bool success = v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func);
+            assert(success);
+
+            tns::SetValue(isolate, func, new FunctionWrapper(funcMeta));
+            builder->DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
+
+            cache->CFunctions.insert(std::make_pair(funcName, new Persistent<v8::Function>(isolate, func)));
+
+            info.GetReturnValue().Set(func);
             return;
         }
 
@@ -415,25 +439,6 @@ void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>
     std::string description = [[target description] UTF8String];
     Local<v8::String> returnValue = tns::ToV8String(info.GetIsolate(), description);
     info.GetReturnValue().Set(returnValue);
-}
-
-void MetadataBuilder::RegisterCFunction(const FunctionMeta* funcMeta) {
-    Local<Context> context = isolate_->GetCurrentContext();
-    Local<Object> global = context->Global();
-
-    Local<v8::Function> func;
-    std::string className;
-    CacheItem<FunctionMeta>* item = new CacheItem<FunctionMeta>(funcMeta, className, this);
-    Local<External> ext = External::New(isolate_, item);
-    if (!v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func)) {
-        assert(false);
-    }
-
-    tns::SetValue(isolate_, func, new FunctionWrapper(funcMeta));
-    DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
-
-    bool success = global->Set(context, tns::ToV8String(isolate_, funcMeta->jsName()), func).FromMaybe(false);
-    assert(success);
 }
 
 void MetadataBuilder::RegisterAllocMethod(Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {

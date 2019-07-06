@@ -48,6 +48,7 @@ public:
     v8::Persistent<v8::Function>* OriginalExtendsFunc;
     v8::Persistent<v8::Function>* WeakRefGetterFunc;
     v8::Persistent<v8::Function>* WeakRefClearFunc;
+    std::map<std::string, v8::Persistent<v8::Function>*> CFunctions;
 
     v8::Persistent<v8::Function>* InteropReferenceCtorFunc;
     v8::Persistent<v8::Function>* PointerCtorFunc;

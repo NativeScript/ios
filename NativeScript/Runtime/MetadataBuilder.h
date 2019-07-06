@@ -40,7 +40,6 @@ private:
     v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const BaseClassMeta* meta);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     v8::Local<v8::Function> GetOrCreateStructCtorFunction(v8::Isolate* isolate, const StructMeta* structMeta);
-    void RegisterCFunction(const FunctionMeta* funcMeta);
     void RegisterAllocMethod(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::vector<std::string>& names);
     void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, std::vector<std::string>& names);
