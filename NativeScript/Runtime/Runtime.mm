@@ -1,6 +1,7 @@
 #include <string>
 #include <chrono>
 #include "Runtime.h"
+#include "Caches.h"
 #include "Console.h"
 #include "SetTimeout.h"
 #include "InlineFunctions.h"
@@ -39,7 +40,11 @@ Runtime::Runtime() {
 }
 
 void Runtime::InitAndRunMainScript(const string& baseDir) {
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     this->Init(baseDir);
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+    printf("Runtime initialization took %llims\n", duration);
 
     v8::TryCatch tc(this->GetIsolate());
     // TODO: infer main script from package.json or use index.js
@@ -77,13 +82,17 @@ void Runtime::Init(const string& baseDir) {
     create_params.array_buffer_allocator = &allocator_;
     Isolate* isolate = Isolate::New(create_params);
 
+    Caches::Get(isolate)->MetaInitializer = [this](const BaseClassMeta* meta) {
+        this->metadataBuilder_.GetOrCreateConstructorFunctionTemplate(meta);
+    };
+
     HandleScope handle_scope(isolate);
     Local<FunctionTemplate> globalTemplateFunction = FunctionTemplate::New(isolate);
     globalTemplateFunction->SetClassName(tns::ToV8String(isolate, "NativeScriptGlobalObject"));
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
     DefineNativeScriptVersion(isolate, globalTemplate);
 
-    metadataBuilder_.RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
+    this->metadataBuilder_.RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
     Worker::Init(isolate, globalTemplate, mainThreadInitialized_);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
@@ -96,8 +105,8 @@ void Runtime::Init(const string& baseDir) {
     baseDir_ = baseDir;
     DefineGlobalObject(context);
     Console::Init(isolate);
-    moduleInternal_.Init(isolate, baseDir);
-    metadataBuilder_.Init(isolate, mainThreadInitialized_);
+    this->moduleInternal_.Init(isolate, baseDir);
+    this->metadataBuilder_.Init(isolate, mainThreadInitialized_);
     InlineFunctions::Init(isolate);
 
     mainThreadInitialized_ = true;

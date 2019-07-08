@@ -13,7 +13,7 @@ public:
     MetadataBuilder();
     void Init(v8::Isolate* isolate, bool isWorkerThread);
     void RegisterConstantsOnGlobalObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> global, bool isWorkerThread);
-
+    v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const BaseClassMeta* meta);
 private:
     v8::Isolate* isolate_;
     ClassBuilder classBuilder_;
@@ -38,7 +38,6 @@ private:
 
     v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, std::string containingClass, bool isMethodCallback);
     v8::Persistent<v8::Function>* CreateToStringFunction(v8::Isolate* isolate);
-    v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(const BaseClassMeta* meta);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
     v8::Local<v8::Function> GetOrCreateStructCtorFunction(v8::Isolate* isolate, const StructMeta* structMeta);
     void RegisterAllocMethod(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);

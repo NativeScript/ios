@@ -30,6 +30,7 @@ public:
     static v8::Local<v8::Object> CreateEmptyStruct(v8::Local<v8::Context> context);
     static const Meta* FindMeta(Class klass);
     static const Meta* GetMeta(std::string name);
+    static const ProtocolMeta* FindProtocolMeta(Protocol* protocol);
     static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData);
     static void SetValue(v8::Isolate* isolate, void* retValue, v8::Local<v8::Value> value, BinaryTypeEncodingType type);
     static void ConstructObject(v8::Isolate* isolate, const v8::FunctionCallbackInfo<v8::Value>& info, Class klass, const InterfaceMeta* interfaceMeta = nullptr);

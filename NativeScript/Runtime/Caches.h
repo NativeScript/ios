@@ -47,6 +47,7 @@ public:
     std::map<const void*, v8::Persistent<v8::Object>*> PointerInstances;
     std::map<const StructMeta*, v8::Persistent<v8::Function>*> StructConstructorFunctions;
 
+    std::function<void (const BaseClassMeta*)> MetaInitializer;
     v8::Persistent<v8::Function>* EmptyObjCtorFunc;
     v8::Persistent<v8::Function>* EmptyStructCtorFunc;
     v8::Persistent<v8::Function>* SliceFunc;

@@ -468,10 +468,17 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
+        Protocol* protocol = static_cast<Protocol*>(result);
+        const ProtocolMeta* protocolMeta = ArgConverter::FindProtocolMeta(protocol);
+        if (protocolMeta == nullptr) {
+            // Unable to find protocol metadata
+            assert(false);
+        }
 
-        const char* name = protocol_getName(result);
         auto cache = Caches::Get(isolate);
-        auto it = cache->ProtocolCtorFuncs.find(name);
+        cache->MetaInitializer(protocolMeta);
+
+        auto it = cache->ProtocolCtorFuncs.find(protocolMeta->name());
         if (it != cache->ProtocolCtorFuncs.end()) {
             return it->second->Get(isolate);
         }

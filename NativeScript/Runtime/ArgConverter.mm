@@ -478,6 +478,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
                 assert(false);
             }
         } else {
+            cache->MetaInitializer(static_cast<const BaseClassMeta*>(meta));
             auto it = cache->Prototypes.find(meta);
             if (it != cache->Prototypes.end()) {
                 Local<Value> prototype = it->second->Get(isolate);
@@ -543,6 +544,29 @@ const Meta* ArgConverter::GetMeta(std::string name) {
     }
 
     return result;
+}
+
+const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
+    std::string protocolName = protocol_getName(protocol);
+    const Meta* meta = ArgConverter::GetMeta(protocolName);
+    if (meta != nullptr && meta->type() != MetaType::ProtocolType) {
+        std::string newProtocolName = protocolName + "Protocol";
+
+        size_t protocolIndex = 2;
+        while (objc_getProtocol(newProtocolName.c_str())) {
+            newProtocolName = protocolName + "Protocol" + std::to_string(protocolIndex++);
+        }
+
+        meta = ArgConverter::GetMeta(newProtocolName);
+    }
+
+    if (meta == nullptr) {
+        return nullptr;
+    }
+
+    assert(meta->type() == MetaType::ProtocolType);
+    const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(meta);
+    return protocolMeta;
 }
 
 Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {

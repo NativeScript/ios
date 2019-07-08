@@ -27,33 +27,8 @@ void MetadataBuilder::Init(Isolate* isolate, bool isWorkerThread) {
     Interop::RegisterInteropTypes(isolate);
     poToStringFunction_ = CreateToStringFunction(isolate);
 
-    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-
     classBuilder_.RegisterBaseTypeScriptExtendsFunction(isolate); // Register the __extends function to the global object
     classBuilder_.RegisterNativeTypeScriptExtendsFunction(isolate); // Override the __extends function for native objects
-
-    for (auto it = globalTable->begin(); it != globalTable->end(); it++) {
-        const Meta* meta = (*it);
-
-        if (!meta->isAvailable()) {
-            continue;
-        }
-
-        switch (meta->type()) {
-        case MetaType::Interface:
-        case MetaType::ProtocolType: {
-            const BaseClassMeta* classMeta = static_cast<const BaseClassMeta*>(meta);
-            GetOrCreateConstructorFunctionTemplate(classMeta);
-
-            std::string name = meta->jsName();
-            Caches::Metadata.Insert(name, meta);
-            break;
-        }
-        default: {
-            continue;
-        }
-        }
-    }
 }
 
 void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<ObjectTemplate> global, bool isWorkerThread) {
@@ -80,7 +55,19 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
             return;
         }
 
-        if (meta->type() == MetaType::Function) {
+        if (meta->type() == MetaType::Interface || meta->type() == MetaType::ProtocolType) {
+            const BaseClassMeta* classMeta = static_cast<const BaseClassMeta*>(meta);
+            builder->GetOrCreateConstructorFunctionTemplate(classMeta);
+
+            bool isInterface = meta->type() == MetaType::Interface;
+            auto cache = isInterface ? Caches::Get(isolate)->CtorFuncs : Caches::Get(isolate)->ProtocolCtorFuncs;
+            std::string name = meta->name();
+            auto it = cache.find(name);
+            if (it != cache.end()) {
+                Local<v8::Function> func = it->second->Get(isolate);
+                info.GetReturnValue().Set(func);
+            }
+        } else if (meta->type() == MetaType::Function) {
             auto cache = Caches::Get(isolate);
             std::string funcName = meta->name();
             auto it = cache->CFunctions.find(funcName);
