@@ -10,20 +10,35 @@ using namespace v8;
 
 namespace tns {
 
-void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
-    Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback);
-    workerFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-    Local<v8::String> workerFuncName = ToV8String(isolate, "Worker");
-    workerFuncTemplate->SetClassName(workerFuncName);
+std::vector<std::string> Worker::GlobalFunctions = {
+    "postMessage",
+    "close"
+};
 
-    Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
-    Local<FunctionTemplate> postMessageFuncTemplate = FunctionTemplate::New(isolate, PostMessageCallback);
-    Local<FunctionTemplate> terminateWorkerFuncTemplate = FunctionTemplate::New(isolate, TerminateCallback);
+void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool isWorkerThread) {
+    if (isWorkerThread) {
+        // Register functions in the worker thread
+        Local<FunctionTemplate> postMessageTemplate = FunctionTemplate::New(isolate, Worker::PostMessageToMainCallback);
+        globalTemplate->Set(tns::ToV8String(isolate, "postMessage"), postMessageTemplate);
 
-    prototype->Set(ToV8String(isolate, "postMessage"), postMessageFuncTemplate);
-    prototype->Set(ToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
+        Local<FunctionTemplate> closeTemplate = FunctionTemplate::New(isolate, Worker::CloseWorkerCallback);
+        globalTemplate->Set(tns::ToV8String(isolate, "close"), closeTemplate);
+    } else {
+        // Register functions in the main thread
+        Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback);
+        workerFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+        Local<v8::String> workerFuncName = ToV8String(isolate, "Worker");
+        workerFuncTemplate->SetClassName(workerFuncName);
 
-    globalTemplate->Set(workerFuncName, workerFuncTemplate);
+        Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
+        Local<FunctionTemplate> postMessageFuncTemplate = FunctionTemplate::New(isolate, PostMessageCallback);
+        Local<FunctionTemplate> terminateWorkerFuncTemplate = FunctionTemplate::New(isolate, TerminateCallback);
+
+        prototype->Set(ToV8String(isolate, "postMessage"), postMessageFuncTemplate);
+        prototype->Set(ToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
+
+        globalTemplate->Set(workerFuncName, workerFuncTemplate);
+    }
 }
 
 void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
@@ -81,50 +96,50 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
     worker->Start(poWorker, func);
 
-    Caches::WorkerState* state = new Caches::WorkerState(isolate, poWorker);
+    Caches::WorkerState* state = new Caches::WorkerState(isolate, poWorker, worker);
     int workerId = worker->Id();
     Caches::Workers.Insert(workerId, state);
 }
 
-void Worker::RegisterGlobals(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
-    Local<FunctionTemplate> postMessageTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
-        // Send message from worker to main
+void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) {
+    // Send message from worker to main
 
-        Isolate* isolate = info.GetIsolate();
+    Isolate* isolate = info.GetIsolate();
 
-        if (info.Length() < 1) {
-            tns::ThrowError(isolate, "Not enough arguments.");
-            return;
-        }
+    if (info.Length() < 1) {
+        tns::ThrowError(isolate, "Not enough arguments.");
+        return;
+    }
 
-        if (info.Length() > 1) {
-            tns::ThrowError(isolate, "Too many arguments passed.");
-            return;
-        }
+    if (info.Length() > 1) {
+        tns::ThrowError(isolate, "Too many arguments passed.");
+        return;
+    }
 
-        Runtime* runtime = Runtime::GetCurrentRuntime();
-        int workerId = runtime->WorkerId();
-        Caches::WorkerState* state = Caches::Workers.Get(workerId);
-        assert(state != nullptr);
+    Runtime* runtime = Runtime::GetCurrentRuntime();
+    int workerId = runtime->WorkerId();
+    Caches::WorkerState* state = Caches::Workers.Get(workerId);
+    assert(state != nullptr);
+    WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
+    if (!worker->IsRunning()) {
+        return;
+    }
 
-        Local<Value> error;
-        Local<Value> result = Worker::Serialize(isolate, info[0], error);
-        if (result.IsEmpty()) {
-            isolate->ThrowException(error);
-            return;
-        }
+    Local<Value> error;
+    Local<Value> result = Worker::Serialize(isolate, info[0], error);
+    if (result.IsEmpty()) {
+        isolate->ThrowException(error);
+        return;
+    }
 
-        std::string message = tns::ToString(isolate, result);
+    std::string message = tns::ToString(isolate, result);
 
-        tns::ExecuteOnMainThread([state, message]() {
-            Isolate* isolate = state->GetIsolate();
-            Local<Value> workerInstance = state->GetWorker()->Get(isolate);
-            assert(!workerInstance.IsEmpty() && workerInstance->IsObject());
-            Worker::OnMessageCallback(isolate, workerInstance, message);
-        });
+    tns::ExecuteOnMainThread([state, message]() {
+        Isolate* isolate = state->GetIsolate();
+        Local<Value> workerInstance = state->GetWorker()->Get(isolate);
+        assert(!workerInstance.IsEmpty() && workerInstance->IsObject());
+        Worker::OnMessageCallback(isolate, workerInstance, message);
     });
-
-    globalTemplate->Set(tns::ToV8String(isolate, "postMessage"), postMessageTemplate);
 }
 
 void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
@@ -145,6 +160,11 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
     assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker);
 
+    WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
+    if (!worker->IsRunning() || worker->IsClosing()) {
+        return;
+    }
+
     Local<Value> error;
     Local<Value> result = Worker::Serialize(isolate, info[0], error);
     if (result.IsEmpty()) {
@@ -153,8 +173,6 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
     }
 
     std::string message = tns::ToString(isolate, result);
-
-    WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
     worker->PostMessage(message);
 }
 
@@ -178,6 +196,37 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::str
 
     Local<Value> args[1] { arg };
     success = onMessageFunc->Call(context, receiver, 1, args).ToLocal(&result);
+}
+
+void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
+    Runtime* runtime = Runtime::GetCurrentRuntime();
+    int workerId = runtime->WorkerId();
+    Caches::WorkerState* state = Caches::Workers.Get(workerId);
+    assert(state != nullptr);
+    WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
+
+    if (!worker->IsRunning() || worker->IsClosing()) {
+        return;
+    }
+
+    worker->Close();
+
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> global = context->Global();
+    Local<Value> onCloseVal;
+    bool success = global->Get(context, tns::ToV8String(isolate, "onclose")).ToLocal(&onCloseVal);
+    assert(success);
+    if (!onCloseVal.IsEmpty() && onCloseVal->IsFunction()) {
+        Local<v8::Function> onCloseFunc = onCloseVal.As<v8::Function>();
+        Local<Value> args[0] { };
+        Local<Value> result;
+        TryCatch tc(isolate);
+        success = onCloseFunc->Call(context, v8::Undefined(isolate), 0, args).ToLocal(&result);
+        if (!success && tc.HasCaught()) {
+            worker->CallOnErrorHandlers(tc);
+        }
+    }
 }
 
 void Worker::TerminateCallback(const FunctionCallbackInfo<Value>& info) {

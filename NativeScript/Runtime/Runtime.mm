@@ -83,13 +83,8 @@ void Runtime::Init(const string& baseDir) {
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
     DefineNativeScriptVersion(isolate, globalTemplate);
 
-    if (!mainThreadInitialized_) {
-        Worker::Init(isolate, globalTemplate);
-    } else {
-        Worker::RegisterGlobals(isolate, globalTemplate);
-    }
-
-    metadataBuilder_.RegisterConstantsOnGlobalObject(isolate, globalTemplate);
+    metadataBuilder_.RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
+    Worker::Init(isolate, globalTemplate, mainThreadInitialized_);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
     WeakRef::Init(isolate, globalTemplate);
@@ -102,7 +97,7 @@ void Runtime::Init(const string& baseDir) {
     DefineGlobalObject(context);
     Console::Init(isolate);
     moduleInternal_.Init(isolate, baseDir);
-    metadataBuilder_.Init(isolate);
+    metadataBuilder_.Init(isolate, mainThreadInitialized_);
     InlineFunctions::Init(isolate);
 
     mainThreadInitialized_ = true;

@@ -11,14 +11,15 @@ namespace tns {
 class MetadataBuilder {
 public:
     MetadataBuilder();
-    void Init(v8::Isolate* isolate);
-    void RegisterConstantsOnGlobalObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> global);
+    void Init(v8::Isolate* isolate, bool isWorkerThread);
+    void RegisterConstantsOnGlobalObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> global, bool isWorkerThread);
 
 private:
     v8::Isolate* isolate_;
     ClassBuilder classBuilder_;
     v8::Persistent<v8::Function>* poToStringFunction_;
     v8::Persistent<v8::Function>* poOriginalExtendsFunc_;
+    bool isWorkerThread_;
 
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

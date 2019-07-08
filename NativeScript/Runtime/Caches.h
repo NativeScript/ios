@@ -12,7 +12,7 @@ class Caches {
 public:
     class WorkerState {
     public:
-        WorkerState(v8::Isolate* isolate, v8::Persistent<v8::Value>* worker): isolate_(isolate), worker_(worker) {
+        WorkerState(v8::Isolate* isolate, v8::Persistent<v8::Value>* poWorker, void* userData): isolate_(isolate), poWorker_(poWorker), userData_(userData) {
         }
 
         v8::Isolate* GetIsolate() {
@@ -20,11 +20,16 @@ public:
         }
 
         v8::Persistent<v8::Value>* GetWorker() {
-            return this->worker_;
+            return this->poWorker_;
+        }
+
+        void* UserData() {
+            return this->userData_;
         }
     private:
         v8::Isolate* isolate_;
-        v8::Persistent<v8::Value>* worker_;
+        v8::Persistent<v8::Value>* poWorker_;
+        void* userData_;
     };
 
     static ConcurrentMap<std::string, const Meta*> Metadata;

@@ -8,6 +8,7 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Interop.h"
+#include "Worker.h"
 #include "Caches.h"
 #include "Tasks.h"
 
@@ -18,8 +19,9 @@ namespace tns {
 MetadataBuilder::MetadataBuilder() {
 }
 
-void MetadataBuilder::Init(Isolate* isolate) {
-    isolate_ = isolate;
+void MetadataBuilder::Init(Isolate* isolate, bool isWorkerThread) {
+    this->isolate_ = isolate;
+    this->isWorkerThread_ = isWorkerThread;
 
     ArgConverter::Init(isolate, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);
     Interop::RegisterInteropTypes(isolate);
@@ -54,12 +56,20 @@ void MetadataBuilder::Init(Isolate* isolate) {
     }
 }
 
-void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<ObjectTemplate> global) {
+void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<ObjectTemplate> global, bool isWorkerThread) {
+    this->isWorkerThread_ = isWorkerThread;
+
     Local<External> ext = External::New(isolate, this);
 
     global->SetHandler(NamedPropertyHandlerConfiguration([](Local<Name> property, const PropertyCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         std::string propName = tns::ToString(isolate, property);
+
+        MetadataBuilder* builder = static_cast<MetadataBuilder*>(info.Data().As<External>()->Value());
+
+        if (builder->isWorkerThread_ && std::find(Worker::GlobalFunctions.begin(), Worker::GlobalFunctions.end(), propName) != Worker::GlobalFunctions.end()) {
+            return;
+        }
 
         if (std::find(InlineFunctions::GlobalFunctions.begin(), InlineFunctions::GlobalFunctions.end(), propName) != InlineFunctions::GlobalFunctions.end()) {
             return;
@@ -80,7 +90,6 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
                 return;
             }
 
-            MetadataBuilder* builder = static_cast<MetadataBuilder*>(info.Data().As<External>()->Value());
             const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
             Local<Context> context = isolate->GetCurrentContext();
 
@@ -96,10 +105,7 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
             cache->CFunctions.insert(std::make_pair(funcName, new Persistent<v8::Function>(isolate, func)));
 
             info.GetReturnValue().Set(func);
-            return;
-        }
-
-        if (meta->type() == MetaType::Var) {
+        } else if (meta->type() == MetaType::Var) {
             void* dataSymbol = SymbolLoader::instance().loadDataSymbol(meta->topLevelModule(), meta->name());
             if (!dataSymbol) {
                 return;
@@ -165,8 +171,6 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
             info.GetReturnValue().Set(result);
         } else if (meta->type() == MetaType::Struct) {
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-            Local<External> ext = info.Data().As<External>();
-            MetadataBuilder* builder = static_cast<MetadataBuilder*>(ext->Value());
             Local<v8::Function> structCtorFunc = builder->GetOrCreateStructCtorFunction(isolate, structMeta);
             info.GetReturnValue().Set(structCtorFunc);
         }

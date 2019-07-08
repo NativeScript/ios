@@ -35,7 +35,7 @@ public:
     BaseDataWrapper(std::string name): name_(name) {
     }
 
-    virtual WrapperType Type() {
+    const virtual WrapperType Type() {
         return WrapperType::Base;
     }
 
@@ -51,7 +51,7 @@ public:
     EnumDataWrapper(std::string name, std::string jsCode): BaseDataWrapper(name), jsCode_(jsCode) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::Enum;
     }
 
@@ -67,7 +67,7 @@ public:
     PointerTypeWrapper(): BaseDataWrapper(std::string()) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::PointerType;
     }
 };
@@ -77,7 +77,7 @@ public:
     PointerWrapper(void* data): BaseDataWrapper(std::string()), data_(data), isAdopted_(false) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::Pointer;
     }
 
@@ -106,7 +106,7 @@ public:
     ReferenceTypeWrapper(): BaseDataWrapper(std::string()) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::ReferenceType;
     }
 };
@@ -116,7 +116,7 @@ public:
     ReferenceWrapper(v8::Persistent<v8::Value>* value): BaseDataWrapper(std::string()), value_(value), encoding_(nullptr), data_(nullptr) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::Reference;
     }
 
@@ -157,7 +157,7 @@ public:
     PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType encodingType): BaseDataWrapper(std::string()), size_(size), encodingType_(encodingType) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::Primitive;
     }
 
@@ -178,7 +178,7 @@ public:
     StructTypeWrapper(const StructMeta* meta): BaseDataWrapper(meta->name()), meta_(meta) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::StructType;
     }
 
@@ -194,7 +194,7 @@ public:
     StructWrapper(const StructMeta* meta, void* data, ffi_type* ffiType): StructTypeWrapper(meta), data_(data), ffiType_(ffiType) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::Struct;
     }
 
@@ -215,7 +215,7 @@ public:
     ObjCDataWrapper(std::string name, id data): BaseDataWrapper(name), data_(data) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::ObjCObject;
     }
 
@@ -231,7 +231,7 @@ public:
     ObjCClassWrapper(Class klazz, bool extendedClass = false): BaseDataWrapper(std::string()), klass_(klazz), extendedClass_(extendedClass) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::ObjCClass;
     }
 
@@ -252,7 +252,7 @@ public:
     ObjCProtocolWrapper(Protocol* proto): BaseDataWrapper(std::string()), proto_(proto) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::ObjCProtocol;
     }
 
@@ -268,7 +268,7 @@ public:
     FunctionWrapper(const FunctionMeta* meta): BaseDataWrapper(std::string()), meta_(meta) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::Function;
     }
 
@@ -285,7 +285,7 @@ public:
         : BaseDataWrapper(std::string()), block_(block), typeEncoding_(typeEncoding) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::Block;
     }
 
@@ -333,7 +333,7 @@ public:
     FunctionReferenceTypeWrapper(): BaseDataWrapper(std::string()) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::FunctionReferenceType;
     }
 };
@@ -343,7 +343,7 @@ public:
     FunctionReferenceWrapper(v8::Persistent<v8::Function>* function): BaseDataWrapper(std::string()), function_(function), data_(nullptr) {
     }
 
-    WrapperType Type() {
+    const WrapperType Type() {
         return WrapperType::FunctionReference;
     }
 
@@ -365,36 +365,20 @@ private:
 
 class WorkerWrapper: public BaseDataWrapper {
 public:
-    WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage)
-        : BaseDataWrapper(std::string()),
-            mainIsolate_(mainIsolate),
-            workerIsolate_(nullptr),
-            onMessage_(onMessage),
-            thread_{},
-            isRunning_(false),
-            isTerminating_(false) {
-    }
-
-    WrapperType Type() {
-        return WrapperType::Worker;
-    }
+    WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage);
 
     void Start(v8::Persistent<v8::Value>* poWorker, std::function<v8::Isolate* ()> func);
+    void CallOnErrorHandlers(v8::TryCatch& tc);
     void PassUncaughtExceptionFromWorkerToMain(v8::Isolate* workerIsolate, v8::TryCatch& tc, bool async = true);
     void PostMessage(std::string message);
+    void Close();
     void Terminate();
 
-    const int Id() {
-        return this->workerId_;
-    }
-
-    const bool IsRunning() {
-        return this->isRunning_;
-    }
-
-    const int WorkerId() {
-        return this->workerId_;
-    }
+    const WrapperType Type();
+    const int Id();
+    const bool IsRunning();
+    const bool IsClosing();
+    const int WorkerId();
 private:
     static int nextId_;
     int workerId_;
@@ -402,6 +386,7 @@ private:
     v8::Isolate* workerIsolate_;
     v8::Persistent<v8::Value>* poWorker_;
     bool isRunning_;
+    bool isClosing_;
     bool isTerminating_;
     std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
     ConcurrentQueue queue_;

@@ -16,9 +16,8 @@ describe("TNS Workers", () => {
 
     afterEach(() => {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+        gc();
     });
-
-    var gC = global.NSObject ? gc : gc;
 
     it("Should have self property equal to global", (done) => {
         var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
@@ -26,6 +25,7 @@ describe("TNS Workers", () => {
         worker.postMessage({ eval: "postMessage(self === global);" });
         worker.onmessage = (msg) => {
             expect(msg.data).toBe(true);
+            worker.terminate();
             done();
         };
     });
@@ -178,11 +178,12 @@ describe("TNS Workers", () => {
         worker.terminate();
     });
 
-    // it("Should not crash if close() is called more than once", () => {
-    //     var worker = new Worker("./EvalWorker.js");
+    it("Should not crash if close() is called more than once", () => {
+        var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
-    //     worker.postMessage({ eval: "close(); close(); close(); close();" });
-    // });
+        worker.postMessage({ eval: "close(); close(); close(); close();" });
+        worker.terminate();
+    });
 
     it("Should not throw error if post message is called with native object", () => {
         var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
@@ -192,7 +193,7 @@ describe("TNS Workers", () => {
         worker.terminate();
     });
 
-    it("Should throw error if post circular object", (done) => {
+    it("Should throw error if post circular object", () => {
         var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
         var parent = { parent: true };
@@ -206,7 +207,6 @@ describe("TNS Workers", () => {
         })).toThrow();
 
         worker.terminate();
-        done();
     });
 
     if (global.NSObject) {
@@ -236,29 +236,30 @@ describe("TNS Workers", () => {
         });
     }
 
-    // it("Call close in onclose", (done) => {
-    //     var worker = new Worker("./EvalWorker.js");
+    it("Call close in onclose", (done) => {
+        var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
-    //     worker.postMessage({
-    //         eval:
-    //         "onclose = () => {\
-    //             postMessage('closed');\
-    //             close();\
-    //         };\
-    //         close()"
-    //     });
+        worker.postMessage({
+            eval:
+            "onclose = () => {\
+                postMessage('closed');\
+                close();\
+            };\
+            close()"
+        });
 
-    //     var responseCounter = 0;
-    //     worker.onmessage = (msg) => {
-    //         expect(msg.data).toBe('closed');
-    //         responseCounter++;
-    //     }
+        var responseCounter = 0;
+        worker.onmessage = (msg) => {
+            expect(msg.data).toBe('closed');
+            responseCounter++;
+        }
 
-    //     setTimeout(() => {
-    //         expect(responseCounter).toBe(1);
-    //         done();
-    //     }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
-    // });
+        setTimeout(() => {
+            expect(responseCounter).toBe(1);
+            worker.terminate();
+            done();
+        }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
+    });
 
     it("Throw error in onerror", (done) => {
         var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
@@ -285,39 +286,40 @@ describe("TNS Workers", () => {
         setTimeout(() => {
             expect(onerrorCounter).toBe(2);
             expect(onmessageCounter).toBe(1);
+            worker.terminate();
             done();
         }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
     });
 
-    // it("If error is thrown in close() should call onerror but should not execute any other tasks ", (done) => {
-    //     var worker = new Worker("./EvalWorker.js");
+    it("If error is thrown in close() should call onerror but should not execute any other tasks ", (done) => {
+        var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
-    //     worker.postMessage({
-    //         eval:
-    //         "onmessage = (msg) => { postMessage(msg.data + ' pong'); };\
-    //         onerror = (err) => { postMessage('pong'); return false; };\
-    //         onclose = () => { throw new Error('error thrown from close()'); };\
-    //         close();"
-    //     });
+        worker.postMessage({
+            eval:
+            "onmessage = (msg) => { postMessage(msg.data + ' pong'); };\
+            onerror = (err) => { postMessage('pong'); return false; };\
+            onclose = () => { throw new Error('error thrown from close()'); };\
+            close();"
+        });
 
-    //     var onerrorCalled = false;
-    //     worker.onerror = (err) => {
-    //         onerrorCalled = true;
-    //     };
+        var onerrorCalled = false;
+        worker.onerror = (err) => {
+            onerrorCalled = true;
+        };
 
-    //     var lastReceivedMessage;
-    //     worker.onmessage = (msg) => {
-    //         lastReceivedMessage = msg.data;
-    //         worker.postMessage(msg.data + " ping");
-    //     };
+        var lastReceivedMessage;
+        worker.onmessage = (msg) => {
+            lastReceivedMessage = msg.data;
+            worker.postMessage(msg.data + " ping");
+        };
 
-    //     setTimeout(() => {
-    //         expect(onerrorCalled).toBe(true);
-    //         expect(lastReceivedMessage).toBe("pong");
-    //         worker.terminate();
-    //         done();
-    //     }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
-    // });
+        setTimeout(() => {
+            expect(onerrorCalled).toBe(true);
+            expect(lastReceivedMessage).toBe("pong");
+            worker.terminate();
+            done();
+        }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
+    });
 
     it("Should not throw or crash when executing too much JS inside Worker", (done) => {
         var worker = new Worker("./tests/shared/Workers/WorkerStressJSTest.js");
@@ -344,10 +346,11 @@ describe("TNS Workers", () => {
             w.postMessage({ eval: "postMessage('pong');" });
             w.onmessage = (msg) => {
                 onmessageCalled = true;
+                w.terminate();
             }
         })();
 
-        gC();
+        gc();
 
         setTimeout(() => {
             expect(onmessageCalled).toBe(true);
@@ -355,30 +358,31 @@ describe("TNS Workers", () => {
         }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
     });
 
-    // it("Test worker should close and not receive messages after close() call", (done) => {
-    //     var messageReceived = false;
-    //     var worker = new Worker("./EvalWorker.js");
+    it("Test worker should close and not receive messages after close() call", (done) => {
+        var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
-    //     worker.postMessage({
-    //         eval: "close(); postMessage('message after close');"
-    //     });
-    //     worker.postMessage({
-    //         eval: "postMessage('pong');"
-    //     });
+        worker.postMessage({
+            eval: "close(); postMessage('message after close');"
+        });
+        setTimeout(() => {
+            worker.postMessage({
+                eval: "postMessage('pong');"
+            });
+        }, 1000);
 
-    //     var responseCounter = 0;
-    //     worker.onmessage = (msg) => {
-    //         expect(responseCounter).toBe(0);
-    //         expect(msg.data).toBe("message after close");
-    //         responseCounter++;
-    //     }
+        var responseCounter = 0;
+        worker.onmessage = (msg) => {
+            expect(responseCounter).toBe(0);
+            expect(msg.data).toBe("message after close");
+            responseCounter++;
+        }
 
-    //     setTimeout(() => {
-    //         expect(responseCounter).toBe(1);
-    //         worker.terminate();
-    //         done();
-    //     }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
-    // });
+        setTimeout(() => {
+            expect(responseCounter).toBe(1);
+            worker.terminate();
+            done();
+        }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
+    });
 
     it("Test onerror invoked for a script that has invalid syntax", (done) => {
         var worker = new Worker("./tests/shared/Workers/WorkerInvalidSyntax.js");

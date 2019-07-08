@@ -1,4 +1,3 @@
-#include <dispatch/dispatch.h>
 #include "DataWrapper.h"
 #include "Caches.h"
 #include "Helpers.h"
@@ -7,6 +6,36 @@
 using namespace v8;
 
 namespace tns {
+
+WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage) : BaseDataWrapper(std::string()),
+    mainIsolate_(mainIsolate),
+    workerIsolate_(nullptr),
+    onMessage_(onMessage),
+    thread_{},
+    isRunning_(false),
+    isClosing_(false),
+    isTerminating_(false) {
+}
+
+const WrapperType WorkerWrapper::Type() {
+    return WrapperType::Worker;
+}
+
+const int WorkerWrapper::Id() {
+    return this->workerId_;
+}
+
+const bool WorkerWrapper::IsRunning() {
+    return this->isRunning_;
+}
+
+const bool WorkerWrapper::IsClosing() {
+    return this->isClosing_;
+}
+
+const int WorkerWrapper::WorkerId() {
+    return this->workerId_;
+}
 
 void WorkerWrapper::PostMessage(std::string message) {
     if (!this->isTerminating_) {
@@ -42,29 +71,7 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
         this->onMessage_(this->workerIsolate_, global, message);
 
         if (tc.HasCaught()) {
-            Local<Value> onErrorVal;
-            bool success = global->Get(context, tns::ToV8String(this->workerIsolate_, "onerror")).ToLocal(&onErrorVal);
-            assert(success);
-
-            if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
-                Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
-                Local<Value> error = tc.Exception();
-                Local<Value> args[1] = { error };
-                Local<Value> result;
-                TryCatch innerTc(this->workerIsolate_);
-                success = onErrorFunc->Call(context, v8::Undefined(this->workerIsolate_), 1, args).ToLocal(&result);
-
-                if (success && !result.IsEmpty() && result->BooleanValue(this->workerIsolate_)) {
-                    // Do nothing, exception is handled and does not need to be raised to the main thread's onerror handler
-                    continue;
-                }
-
-                if (!success && innerTc.HasCaught()) {
-                    this->PassUncaughtExceptionFromWorkerToMain(this->workerIsolate_, innerTc);
-                }
-
-                this->PassUncaughtExceptionFromWorkerToMain(this->workerIsolate_, tc);
-            }
+            this->CallOnErrorHandlers(tc);
         }
     }
 
@@ -89,11 +96,44 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
     delete runtime;
 }
 
+void WorkerWrapper::Close() {
+    this->isClosing_ = true;
+}
+
 void WorkerWrapper::Terminate() {
     if (!this->isTerminating_) {
         this->queue_.Notify();
         this->isTerminating_ = true;
         this->isRunning_ = false;
+    }
+}
+
+void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
+    Local<Context> context = this->workerIsolate_->GetCurrentContext();
+    Local<Object> global = context->Global();
+
+    Local<Value> onErrorVal;
+    bool success = global->Get(context, tns::ToV8String(this->workerIsolate_, "onerror")).ToLocal(&onErrorVal);
+    assert(success);
+
+    if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
+        Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
+        Local<Value> error = tc.Exception();
+        Local<Value> args[1] = { error };
+        Local<Value> result;
+        TryCatch innerTc(this->workerIsolate_);
+        success = onErrorFunc->Call(context, v8::Undefined(this->workerIsolate_), 1, args).ToLocal(&result);
+
+        if (success && !result.IsEmpty() && result->BooleanValue(this->workerIsolate_)) {
+            // Do nothing, exception is handled and does not need to be raised to the main thread's onerror handler
+            return;
+        }
+
+        if (!success && innerTc.HasCaught()) {
+            this->PassUncaughtExceptionFromWorkerToMain(this->workerIsolate_, innerTc);
+        }
+
+        this->PassUncaughtExceptionFromWorkerToMain(this->workerIsolate_, tc);
     }
 }
 
