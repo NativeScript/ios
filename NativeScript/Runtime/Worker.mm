@@ -1,6 +1,5 @@
 #include <Foundation/Foundation.h>
 #include <functional>
-#include "ArgConverter.h"
 #include "ObjectManager.h"
 #include "Worker.h"
 #include "Caches.h"

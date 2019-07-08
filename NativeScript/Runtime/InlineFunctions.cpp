@@ -6,6 +6,21 @@ using namespace v8;
 
 namespace tns {
 
+std::vector<std::string> InlineFunctions::GlobalFunctions = {
+    "CGPointMake",
+    "CGRectMake",
+    "CGSizeMake",
+    "UIEdgeInsetsMake",
+    "NSMakeRange",
+    "__decorate",
+    "__param",
+    "ObjCClass",
+    "ObjCMethod",
+    "ObjC",
+    "ObjCParam",
+    "__tsEnum",
+};
+
 void InlineFunctions::Init(Isolate* isolate) {
 
     std::string inlineFunctionsSource =

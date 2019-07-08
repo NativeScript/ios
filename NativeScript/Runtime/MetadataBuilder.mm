@@ -3,6 +3,7 @@
 #include "MetadataBuilder.h"
 #include "ArgConverter.h"
 #include "ObjectManager.h"
+#include "InlineFunctions.h"
 #include "SymbolLoader.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
@@ -59,6 +60,11 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
     global->SetHandler(NamedPropertyHandlerConfiguration([](Local<Name> property, const PropertyCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         std::string propName = tns::ToString(isolate, property);
+
+        if (std::find(InlineFunctions::GlobalFunctions.begin(), InlineFunctions::GlobalFunctions.end(), propName) != InlineFunctions::GlobalFunctions.end()) {
+            return;
+        }
+
         const Meta* meta = ArgConverter::GetMeta(propName);
         if (meta == nullptr || !meta->isAvailable()) {
             return;
@@ -354,9 +360,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 
     Local<Context> context = isolate_->GetCurrentContext();
     Local<v8::Function> ctorFunc;
-    if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-        assert(false);
-    }
+    bool success = ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc);
+    assert(success);
 
     if (meta->type() == MetaType::ProtocolType) {
         tns::SetValue(isolate_, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name())));
@@ -367,7 +372,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     }
 
     Local<Object> global = context->Global();
-    bool success = global->Set(context, tns::ToV8String(isolate_, meta->jsName()), ctorFunc).FromMaybe(false);
+    success = global->Set(context, tns::ToV8String(isolate_, meta->jsName()), ctorFunc).FromMaybe(false);
     assert(success);
 
     if (!baseCtorFunc.IsEmpty()) {
@@ -383,9 +388,10 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         RegisterAllocMethod(ctorFunc, interfaceMeta);
 
         Local<v8::Function> extendFunc = classBuilder_.GetExtendFunction(context, interfaceMeta);
-        success = ctorFunc->Set(context, tns::ToV8String(isolate_, "extend"), extendFunc).FromMaybe(false);
+        bool success = ctorFunc->Set(context, tns::ToV8String(isolate_, "extend"), extendFunc).FromMaybe(false);
         assert(success);
     }
+
     RegisterStaticMethods(ctorFunc, meta, staticMembers);
     RegisterStaticProperties(ctorFunc, meta, meta->name(), staticMembers);
     RegisterStaticProtocols(ctorFunc, meta, meta->name(), staticMembers);

@@ -8,6 +8,7 @@ namespace tns {
 class InlineFunctions {
 public:
     static void Init(v8::Isolate* isolate);
+    static std::vector<std::string> GlobalFunctions;
 };
 
 }
