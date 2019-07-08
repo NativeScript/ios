@@ -20,6 +20,10 @@ public:
 
     void SetWorkerId(int workerId);
 
+    std::string BaseDir() {
+        return this->baseDir_;
+    }
+
     static void InitializeMetadata(void* metadataPtr);
 
     static Runtime* GetCurrentRuntime() {

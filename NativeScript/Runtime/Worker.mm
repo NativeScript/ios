@@ -1,4 +1,3 @@
-#include <Foundation/Foundation.h>
 #include <functional>
 #include "ObjectManager.h"
 #include "Worker.h"
@@ -66,18 +65,14 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
     Local<Object> thiz = info.This();
     std::string workerPath = ToString(isolate, info[0]);
+    std::string baseDir = Runtime::GetCurrentRuntime()->BaseDir();
     // TODO: Validate worker path and call worker.onerror if the script does not exist
 
     WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
     tns::SetValue(isolate, thiz, worker);
     Persistent<Value>* poWorker = ObjectManager::Register(isolate, thiz);
 
-    std::function<Isolate* ()> func([worker, workerPath]() {
-        NSString* resourcePath = [[NSBundle mainBundle] resourcePath];
-        NSArray* components = [NSArray arrayWithObjects:resourcePath, @"app", nil];
-        NSString* path = [NSString pathWithComponents:components];
-
-        std::string baseDir = [path UTF8String];
+    std::function<Isolate* ()> func([worker, baseDir, workerPath]() {
         tns::Runtime* runtime = new tns::Runtime();
         runtime->Init(baseDir);
         runtime->SetWorkerId(worker->WorkerId());
