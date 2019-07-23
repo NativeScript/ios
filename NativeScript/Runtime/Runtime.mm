@@ -27,6 +27,11 @@
 using namespace v8;
 using namespace std;
 
+#ifdef DEBUG
+#include "v8-inspector-platform.h"
+#include "JsV8InspectorClient.h"
+#endif
+
 namespace tns {
 
 SimpleAllocator allocator_;
@@ -56,12 +61,24 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
         assert(false);
     }
 
+#ifdef DEBUG
+    v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_);
+    inspectorClient->init();
+    inspectorClient->connect();
+#endif
+
     tns::Tasks::Drain();
 }
 
 void Runtime::Init(const string& baseDir) {
     if (!mainThreadInitialized_) {
-        Runtime::platform_ = platform::NewDefaultPlatform().release();
+        Runtime::platform_ =
+#ifdef DEBUG
+            v8_inspector::V8InspectorPlatform::CreateDefaultPlatform();
+#else
+            platform::NewDefaultPlatform().release();
+#endif
+
         V8::InitializePlatform(Runtime::platform_);
         V8::Initialize();
         std::string flags = "--expose_gc --jitless";

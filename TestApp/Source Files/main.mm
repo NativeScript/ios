@@ -8,11 +8,9 @@ int main(int argc, char *argv[]) {
         NSString* resourcePath = [[NSBundle mainBundle] resourcePath];
         NSArray* components = [NSArray arrayWithObjects:resourcePath, @"app", nil];
         NSString* path = [NSString pathWithComponents:components];
-
-        tns::Runtime::InitializeMetadata(&startOfMetadataSection);
-        tns::Runtime* runtime = new tns::Runtime();
         std::string baseDir = [path UTF8String];
-        runtime->InitAndRunMainScript(baseDir);
+        void* metadataPtr = &startOfMetadataSection;
+        tns::NativeScript::Start(metadataPtr, baseDir);
 
         return 0;
     }

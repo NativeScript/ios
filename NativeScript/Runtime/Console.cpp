@@ -1,5 +1,8 @@
 #include "Console.h"
 #include "Helpers.h"
+#ifdef DEBUG
+#include "v8-log-agent-impl.h"
+#endif
 
 using namespace v8;
 
@@ -34,6 +37,9 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     Local<Value> value = args[0];
     Isolate* isolate = args.GetIsolate();
     std::string str = tns::ToString(isolate, value);
+#ifdef DEBUG
+    v8_inspector::V8LogAgentImpl::EntryAdded(str, "info", "", 0);
+#endif
     printf("%s", str.c_str());
 }
 

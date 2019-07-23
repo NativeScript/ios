@@ -138,14 +138,15 @@ Local<Script> ModuleInternal::LoadScript(const std::string& moduleName, const st
     Local<v8::String> scriptText = WrapModuleContent(baseDir + "/" + moduleName + ".js");
     ScriptCompiler::Source source(scriptText, origin);
     TryCatch tc(isolate_);
-    MaybeLocal<Script> maybeScript = ScriptCompiler::Compile(isolate_->GetCurrentContext(), &source, ScriptCompiler::kNoCompileOptions);
-    if (maybeScript.IsEmpty() || tc.HasCaught()) {
+    Local<Script> script;
+    bool success = ScriptCompiler::Compile(isolate_->GetCurrentContext(), &source, ScriptCompiler::kNoCompileOptions).ToLocal(&script);
+    if (!success || tc.HasCaught()) {
         if (tc.HasCaught()) {
             printf("%s\n", tns::ToString(isolate_, tc.Exception()).c_str());
         }
         assert(false);
     }
-    return maybeScript.ToLocalChecked();
+    return script;
 }
 
 Local<v8::String> ModuleInternal::WrapModuleContent(const std::string& path) {

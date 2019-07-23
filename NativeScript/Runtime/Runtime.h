@@ -1,7 +1,7 @@
 #ifndef Runtime_h
 #define Runtime_h
 
-#include "libplatform/libplatform.h"
+#include <libplatform/libplatform.h>
 #include "Common.h"
 #include "ModuleInternal.h"
 #include "MetadataBuilder.h"
