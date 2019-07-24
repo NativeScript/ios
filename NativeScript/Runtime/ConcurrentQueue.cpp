@@ -2,11 +2,13 @@
 
 namespace tns {
 
-std::string ConcurrentQueue::Pop() {
+std::string ConcurrentQueue::Pop(bool& isTerminating) {
     std::unique_lock<std::mutex> mlock(this->mutex_);
+    isTerminating = false;
     while (this->queue_.empty()) {
         this->conditionVar_.wait(mlock);
         if (this->isTerminating_) {
+            isTerminating = true;
             return "";
         }
     }
@@ -22,7 +24,7 @@ void ConcurrentQueue::Push(const std::string& item) {
     this->conditionVar_.notify_one();
 }
 
-void ConcurrentQueue::Notify() {
+void ConcurrentQueue::Terminate() {
     this->isTerminating_ = true;
     this->conditionVar_.notify_one();
 }

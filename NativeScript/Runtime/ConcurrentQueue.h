@@ -9,11 +9,11 @@ namespace tns {
 
 class ConcurrentQueue {
 public:
-    std::string Pop();
+    std::string Pop(bool& isTerminating);
 
     void Push(const std::string& item);
 
-    void Notify();
+    void Terminate();
 
     ConcurrentQueue() = default;
     ConcurrentQueue(const ConcurrentQueue&) = delete;

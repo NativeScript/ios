@@ -131,6 +131,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
 
     tns::ExecuteOnMainThread([state, message]() {
         Isolate* isolate = state->GetIsolate();
+        HandleScope handle_scope(isolate);
         Local<Value> workerInstance = state->GetWorker()->Get(isolate);
         assert(!workerInstance.IsEmpty() && workerInstance->IsObject());
         Worker::OnMessageCallback(isolate, workerInstance, message);

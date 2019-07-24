@@ -57,9 +57,10 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
     this->workerIsolate_ = func();
 
     while (!this->isTerminating_) {
-        std::string message = this->queue_.Pop();
+        bool isTerminating;
+        std::string message = this->queue_.Pop(isTerminating);
 
-        if (this->isTerminating_) {
+        if (this->isTerminating_ || isTerminating) {
             break;
         }
 
@@ -102,7 +103,7 @@ void WorkerWrapper::Close() {
 
 void WorkerWrapper::Terminate() {
     if (!this->isTerminating_) {
-        this->queue_.Notify();
+        this->queue_.Terminate();
         this->isTerminating_ = true;
         this->isRunning_ = false;
     }
@@ -160,6 +161,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
     }
 
     tns::ExecuteOnMainThread([this, message, src, stackTrace, lineNumber]() {
+        HandleScope handle_scope(this->mainIsolate_);
         Local<Object> worker = this->poWorker_->Get(this->mainIsolate_).As<Object>();
         Local<Context> context = this->mainIsolate_->GetCurrentContext();
 
