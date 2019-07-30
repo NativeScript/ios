@@ -8,15 +8,8 @@
 
 namespace v8_inspector {
 
-struct ScriptBreakpoint;
-class V8Debugger;
-class V8DebuggerScript;
 class V8InspectorImpl;
 class V8InspectorSessionImpl;
-class V8Regex;
-
-using protocol::Maybe;
-using protocol::Response;
 
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;

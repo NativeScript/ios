@@ -5,6 +5,7 @@
 #include <vector>
 
 namespace v8_inspector {
+    std::string GetMIMEType(std::string filePath);
     std::string ToStdString(const v8_inspector::StringView& value);
     std::vector<uint16_t> ToVector(const std::string& value);
 }

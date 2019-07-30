@@ -4,7 +4,7 @@
 #include "JsV8InspectorClient.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-log-agent-impl.h"
-#include "InspectorHelpers.h"
+#include "Helpers.h"
 #include "utils.h"
 
 using namespace v8;

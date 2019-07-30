@@ -1,10 +1,9 @@
 #include "v8-page-agent-impl.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-inspector-impl.h"
-#include "MIMETypes.h"
-#include "base64.h"
-#include "utils.h"
-#include "InspectorHelpers.h"
+#include "../../base64.h"
+#include "../../utils.h"
+#include "../../Helpers.h"
 #include <dirent.h>
 
 namespace v8_inspector {
