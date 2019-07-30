@@ -1,3 +1,4 @@
+#include <MobileCoreServices/MobileCoreServices.h>
 #include <Foundation/Foundation.h>
 #include "utils.h"
 #include <codecvt>
@@ -13,28 +14,19 @@ std::string v8_inspector::GetMIMEType(std::string filePath) {
         return std::string();
     }
 
-    NSURL* fileUrl = [NSURL fileURLWithPath:fullPath];
-    NSURLRequest* request = [[NSURLRequest alloc] initWithURL:fileUrl cachePolicy:NSURLRequestReloadRevalidatingCacheData timeoutInterval:.1];
-
-    __block NSURLResponse *response = nil;
-
-    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-    NSURLSession* session = [NSURLSession sharedSession];
-    NSURLSessionDataTask* task = [session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *urlResponse, NSError *error) {
-        if (error == nil) {
-            response = urlResponse;
-        }
-        dispatch_semaphore_signal(sem);
-    }];
-    [task resume];
-    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
-
-    if (response != nil) {
-        NSString* mimeType = [response MIMEType];
-        return [mimeType UTF8String];
+    NSString* fileExtension = [fullPath pathExtension];
+    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (__bridge CFStringRef)fileExtension, nil);
+    if (uti == nil) {
+        return std::string();
     }
 
-    return std::string();
+    NSString* mimeType = (__bridge NSString*)UTTypeCopyPreferredTagWithClass(uti, kUTTagClassMIMEType);
+    if (mimeType == nil) {
+        return std::string();
+    }
+
+    std::string result = [mimeType UTF8String];
+    return result;
 }
 
 std::string v8_inspector::ToStdString(const StringView& value) {
