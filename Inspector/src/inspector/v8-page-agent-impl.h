@@ -1,12 +1,22 @@
 #ifndef v8_page_agent_impl_h
 #define v8_page_agent_impl_h
 
+#include <vector>
+#include <map>
 #include "src/inspector/protocol/Page.h"
 #include "src/inspector/protocol/Protocol.h"
 
 namespace v8_inspector {
-    
+
+struct ScriptBreakpoint;
+class V8Debugger;
+class V8DebuggerScript;
+class V8InspectorImpl;
 class V8InspectorSessionImpl;
+class V8Regex;
+
+using protocol::Maybe;
+using protocol::Response;
 
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
@@ -15,9 +25,9 @@ using protocol::DispatchResponse;
 class V8PageAgentImpl : public protocol::Page::Backend {
 public:
     V8PageAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                    protocol::DictionaryValue* state);
+                    protocol::DictionaryValue* state, const std::string baseDir);
     ~V8PageAgentImpl() override;
-    
+
     DispatchResponse enable() override;
     DispatchResponse disable() override;
     DispatchResponse addScriptToEvaluateOnLoad(const String& in_scriptSource, String* out_identifier) override;
@@ -45,21 +55,36 @@ public:
     DispatchResponse clearCompilationCache() override;
     DispatchResponse generateTestReport(const String& in_message, Maybe<String> in_group) override;
     DispatchResponse waitForDebugger() override;
-    
+
     void restore();
     void reset();
     const bool enabled() {
         return m_enabled;
     };
-    
+
 private:
+    V8InspectorImpl* m_inspector;
     V8InspectorSessionImpl* m_session;
+    v8::Isolate* m_isolate;
     protocol::DictionaryValue* m_state;
     protocol::Page::Frontend m_frontend;
     const std::string m_frameUrl;
     const std::string m_frameIdentifier;
+    const std::string m_baseDir;
     bool m_enabled;
-    
+
+    static std::map<std::string, const char*> s_mimeTypeMap;
+
+    struct PageEntry {
+        std::string Name;
+        std::string Type;
+        std::string MimeType;
+    };
+
+    std::string GetResourceType(std::string fullPath);
+    void ReadEntries(std::string baseDir, std::vector<PageEntry>& entries);
+    bool HasTextContent(std::string type);
+
     DISALLOW_COPY_AND_ASSIGN(V8PageAgentImpl);
 };
 

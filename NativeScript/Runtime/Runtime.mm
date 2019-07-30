@@ -51,6 +51,12 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
     printf("Runtime initialization took %llims\n", duration);
 
+#ifdef DEBUG
+    v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_, baseDir);
+    inspectorClient->init();
+    inspectorClient->connect();
+#endif
+
     v8::TryCatch tc(this->GetIsolate());
     // TODO: infer main script from package.json or use index.js
     this->RunScript("index.js", tc);
@@ -60,12 +66,6 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
         printf("%s\n", tns::ToString(isolate_, tc.Exception()).c_str());
         assert(false);
     }
-
-#ifdef DEBUG
-    v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_);
-    inspectorClient->init();
-    inspectorClient->connect();
-#endif
 
     tns::Tasks::Drain();
 }

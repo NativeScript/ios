@@ -47,7 +47,7 @@ std::unique_ptr<protocol::DictionaryValue> ParseState(const StringView& state) {
   if (IsCBORMessage(state))
     cbor = span<uint8_t>(state.characters8(), state.length());
   else if (ConvertToCBOR(state, &converted).ok())
-    cbor = SpanFrom(converted);
+      cbor = SpanFrom(converted);
   if (!cbor.empty()) {
     std::unique_ptr<protocol::Value> value =
         protocol::Value::parseBinary(cbor.data(), cbor.size());
@@ -167,8 +167,10 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       this, this, agentState(protocol::Overlay::Metainfo::domainName)));
   protocol::Overlay::Dispatcher::wire(&m_dispatcher, m_overlayAgent.get());
 
+  String16 baseDir;
+  m_state->getString("baseDir", &baseDir);
   m_pageAgent.reset(new V8PageAgentImpl(
-      this, this, agentState(protocol::Page::Metainfo::domainName)));
+      this, this, agentState(protocol::Page::Metainfo::domainName), baseDir.utf8()));
   protocol::Page::Dispatcher::wire(&m_dispatcher, m_pageAgent.get());
 
   if (savedState.length()) {

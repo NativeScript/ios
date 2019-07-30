@@ -2,19 +2,16 @@
 #define JsV8InspectorClient_h
 
 #include "include/v8-inspector.h"
-#include <vector>
+#include <string>
 
 namespace v8_inspector {
 
-std::string ToStdString(const v8_inspector::StringView& value);
-std::vector<uint16_t> ToVector(const std::string& value);
-
-class JsV8InspectorClient : public v8_inspector::V8InspectorClient, public v8_inspector::V8Inspector::Channel {
+class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
 public:
-    JsV8InspectorClient(v8::Isolate* isolate);
+    JsV8InspectorClient(v8::Isolate* isolate, std::string baseDir);
     void init();
     void connect();
-    void createInspectorSession(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
+    void createInspectorSession();
     void disconnect();
     void dispatchMessage(const std::string& message);
 
@@ -22,11 +19,12 @@ public:
     void sendNotification(std::unique_ptr<StringBuffer> message) override;
     void flushProtocolNotifications() override;
 
-    void runMessageLoopOnPause(int context_group_id) override;
+    void runMessageLoopOnPause(int contextGroupId) override;
     void quitMessageLoopOnPause() override;
     v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
 private:
     static int contextGroupId;
+    std::string baseDir_;
     bool isConnected_;
     std::unique_ptr<V8Inspector> inspector_;
     v8::Persistent<v8::Context> context_;

@@ -1,12 +1,11 @@
 #include <Foundation/Foundation.h>
-#include <codecvt>
-#include <locale>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include "JsV8InspectorClient.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-log-agent-impl.h"
-#include "Helpers.h"
+#include "InspectorHelpers.h"
+#include "utils.h"
 
 using namespace v8;
 
@@ -268,9 +267,9 @@ void JsV8InspectorClient::enableInspector() {
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.5, false);
 }
 
-
-JsV8InspectorClient::JsV8InspectorClient(Isolate* isolate) {
-    this->isolate_ = isolate;
+JsV8InspectorClient::JsV8InspectorClient(Isolate* isolate, std::string baseDir)
+    : baseDir_(baseDir),
+    isolate_(isolate) {
 }
 
 void JsV8InspectorClient::init() {
@@ -289,7 +288,7 @@ void JsV8InspectorClient::init() {
     v8::Persistent<v8::Context> persistentContext(context->GetIsolate(), JsV8InspectorClient::PersistentToLocal(isolate_, context_));
     context_.Reset(isolate_, persistentContext);
 
-    this->createInspectorSession(isolate_, context);
+    this->createInspectorSession();
 }
 
 void JsV8InspectorClient::connect() {
@@ -297,8 +296,10 @@ void JsV8InspectorClient::connect() {
     this->enableInspector();
 }
 
-void JsV8InspectorClient::createInspectorSession(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
-    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, v8_inspector::StringView());
+void JsV8InspectorClient::createInspectorSession() {
+    std::vector<uint16_t> vector = ToVector("{\"baseDir\":\"" + baseDir_ + "\"}");
+    StringView state(vector.data(), vector.size());
+    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, state);
 }
 
 void JsV8InspectorClient::disconnect() {
@@ -309,10 +310,10 @@ void JsV8InspectorClient::disconnect() {
 
     this->isConnected_ = false;
 
-    this->createInspectorSession(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
+    this->createInspectorSession();
 }
 
-void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
+void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
     terminated_ = false;
 }
 
@@ -335,12 +336,10 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
     StringView stringView = message->string();
     std::string value = ToStdString(stringView);
     NSString* str = [NSString stringWithUTF8String:value.c_str()];
-//    NSData* data = [str dataUsingEncoding:NSUTF8StringEncoding];
 
     if (globalSendMessageToFrontend) {
         globalSendMessageToFrontend(str);
     }
-//    [[BLWebSocketsServer sharedInstance] pushToAll:data];
 }
 
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
@@ -377,30 +376,3 @@ int JsV8InspectorClient::contextGroupId = 1;
 
 }
 
-std::string v8_inspector::ToStdString(const StringView& value) {
-    std::vector<uint16_t> buffer(value.length());
-    for (size_t i = 0; i < value.length(); i++) {
-        if (value.is8Bit()) {
-            buffer[i] = value.characters8()[i];
-        } else {
-            buffer[i] = value.characters16()[i];
-        }
-    }
-
-    std::u16string value16(buffer.begin(), buffer.end());
-
-    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-    std::string result = convert.to_bytes(value16);
-
-    return result;
-}
-
-std::vector<uint16_t> v8_inspector::ToVector(const std::string& value) {
-    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-    std::u16string valueu16 = convert.from_bytes(value);
-
-    const uint16_t *begin = reinterpret_cast<uint16_t const*>(valueu16.data());
-    const uint16_t *end = reinterpret_cast<uint16_t const*>(valueu16.data() + valueu16.size());
-    std::vector<uint16_t> vector(begin, end);
-    return vector;
-}

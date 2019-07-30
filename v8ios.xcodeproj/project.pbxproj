@@ -30,6 +30,8 @@
 		C26656B022B3760900EE15CC /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A722B3760800EE15CC /* libv8_initializers.a */; };
 		C26656B122B3760900EE15CC /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */; };
 		C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */ = {isa = PBXBuildFile; fileRef = C26656B222B3768C00EE15CC /* InteropTypes.mm */; };
+		C286B78022F01CB500795E21 /* base64.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C286B77E22F01CB500795E21 /* base64.cpp */; };
+		C286B78322F01DB900795E21 /* utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C286B78122F01DB900795E21 /* utils.cpp */; };
 		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
 		C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */; };
@@ -157,6 +159,7 @@
 		C2DDEBDC229EB37A00345BFE /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEBDB229EB37A00345BFE /* main.mm */; };
 		C2DDEBDE229EB4A900345BFE /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2DDEBDD229EB4A900345BFE /* app */; };
 		C2F64E8322E870A300EDB057 /* NativeScript.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2F64E8222E870A300EDB057 /* NativeScript.cpp */; };
+		C2F64E8922EEDE7400EDB057 /* MIMETypes.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F64E8822EEDE7400EDB057 /* MIMETypes.mm */; };
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
 		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
 /* End PBXBuildFile section */
@@ -278,6 +281,10 @@
 		C26C3A8122E702E800574872 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
 		C26C3A8322E702E800574872 /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
 		C26C3A8422E702E800574872 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
+		C286B77E22F01CB500795E21 /* base64.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = base64.cpp; sourceTree = "<group>"; };
+		C286B77F22F01CB500795E21 /* base64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = base64.h; sourceTree = "<group>"; };
+		C286B78122F01DB900795E21 /* utils.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = utils.cpp; sourceTree = "<group>"; };
+		C286B78222F01DB900795E21 /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
 		C293748C229EC6780075CB16 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
 		C29374E2229FC0F60075CB16 /* libTestFixtures.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTestFixtures.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		C29374EC229FC1600075CB16 /* TNSMethodCalls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSMethodCalls.h; sourceTree = "<group>"; };
@@ -440,7 +447,7 @@
 		C2BD9D7022E5D0C5005CC701 /* JsV8InspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JsV8InspectorClient.h; sourceTree = "<group>"; };
 		C2BD9D7122E5D0C5005CC701 /* v8-inspector-platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-inspector-platform.h"; sourceTree = "<group>"; };
 		C2BD9D7222E5D0C5005CC701 /* JsV8InspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = JsV8InspectorClient.mm; sourceTree = "<group>"; };
-		C2BD9D7422E5D7FE005CC701 /* Helpers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Helpers.h; sourceTree = "<group>"; };
+		C2BD9D7422E5D7FE005CC701 /* InspectorHelpers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorHelpers.h; sourceTree = "<group>"; };
 		C2BF3F3D22C3ABEA00A76BDE /* libv8_crash_keys.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_crash_keys.a; sourceTree = "<group>"; };
 		C2C3548322E6039000981173 /* v8-dom-agent-impl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-dom-agent-impl.cpp"; sourceTree = "<group>"; };
 		C2C3548422E6039000981173 /* v8-dom-agent-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "v8-dom-agent-impl.h"; sourceTree = "<group>"; };
@@ -513,6 +520,8 @@
 		C2DDEBDD229EB4A900345BFE /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
 		C2F4CBB322C60BFD0036B56F /* metadata-generator */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "metadata-generator"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2F64E8222E870A300EDB057 /* NativeScript.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeScript.cpp; sourceTree = "<group>"; };
+		C2F64E8822EEDE7400EDB057 /* MIMETypes.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MIMETypes.mm; sourceTree = "<group>"; };
+		C2F64E8A22EEDE9400EDB057 /* MIMETypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MIMETypes.h; sourceTree = "<group>"; };
 		C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InlineFunctions.cpp; sourceTree = "<group>"; };
 		C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InlineFunctions.h; sourceTree = "<group>"; };
 		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -757,10 +766,16 @@
 		C2BD9CB022E5CB4E005CC701 /* Inspector */ = {
 			isa = PBXGroup;
 			children = (
-				C2BD9D7422E5D7FE005CC701 /* Helpers.h */,
+				C286B77F22F01CB500795E21 /* base64.h */,
+				C286B77E22F01CB500795E21 /* base64.cpp */,
+				C2BD9D7422E5D7FE005CC701 /* InspectorHelpers.h */,
 				C2BD9D7122E5D0C5005CC701 /* v8-inspector-platform.h */,
 				C2BD9D7022E5D0C5005CC701 /* JsV8InspectorClient.h */,
 				C2BD9D7222E5D0C5005CC701 /* JsV8InspectorClient.mm */,
+				C2F64E8A22EEDE9400EDB057 /* MIMETypes.h */,
+				C2F64E8822EEDE7400EDB057 /* MIMETypes.mm */,
+				C286B78222F01DB900795E21 /* utils.h */,
+				C286B78122F01DB900795E21 /* utils.cpp */,
 				C2BD9CC022E5CBC5005CC701 /* base */,
 				C2BD9CCA22E5CBC5005CC701 /* src */,
 				C2BD9CC422E5CBC5005CC701 /* third_party */,
@@ -1491,7 +1506,9 @@
 				C2BD9D4C22E5CBC6005CC701 /* v8-string-conversions.cc in Sources */,
 				C2BD9D6422E5CBC6005CC701 /* v8-heap-profiler-agent-impl.cc in Sources */,
 				C2BD9D4D22E5CBC6005CC701 /* search-util.cc in Sources */,
+				C286B78022F01CB500795E21 /* base64.cpp in Sources */,
 				C2BD9D5C22E5CBC6005CC701 /* HeapProfiler.cpp in Sources */,
+				C286B78322F01DB900795E21 /* utils.cpp in Sources */,
 				C2BD9D6622E5CBC6005CC701 /* v8-network-agent-impl.cpp in Sources */,
 				C2BD9D6A22E5CBC6005CC701 /* remote-object-id.cc in Sources */,
 				C2BD9D6122E5CBC6005CC701 /* v8-stack-trace-impl.cc in Sources */,
@@ -1501,6 +1518,7 @@
 				C2C3548822E6065500981173 /* v8-overlay-agent-impl.cpp in Sources */,
 				C2BD9D6722E5CBC6005CC701 /* string-16.cc in Sources */,
 				C2BD9D5222E5CBC6005CC701 /* v8-page-agent-impl.cpp in Sources */,
+				C2F64E8922EEDE7400EDB057 /* MIMETypes.mm in Sources */,
 				C2BD9D4922E5CBC6005CC701 /* v8-console.cc in Sources */,
 				C2BD9D4A22E5CBC6005CC701 /* injected-script.cc in Sources */,
 				C2BD9D6922E5CBC6005CC701 /* v8-runtime-agent-impl.cc in Sources */,
