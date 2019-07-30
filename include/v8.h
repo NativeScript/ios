@@ -4786,7 +4786,7 @@ class V8_EXPORT ArrayBuffer : public Object {
    *
    * The Data pointer of ArrayBuffer::Contents must be freed using the provided
    * deleter, which will call ArrayBuffer::Allocator::Free if the buffer
-   * was allocated with ArrayBuffer::Allocator::Allocate.
+   * was allocated with ArraryBuffer::Allocator::Allocate.
    */
   Contents Externalize();
 
@@ -4808,7 +4808,6 @@ class V8_EXPORT ArrayBuffer : public Object {
  private:
   ArrayBuffer();
   static void CheckCast(Value* obj);
-  Contents GetContents(bool externalize);
 };
 
 
@@ -5226,7 +5225,6 @@ class V8_EXPORT SharedArrayBuffer : public Object {
  private:
   SharedArrayBuffer();
   static void CheckCast(Value* obj);
-  Contents GetContents(bool externalize);
 };
 
 
@@ -7666,9 +7664,10 @@ class V8_EXPORT Isolate {
     kStringNormalize = 75,
     kCallSiteAPIGetFunctionSloppyCall = 76,
     kCallSiteAPIGetThisSloppyCall = 77,
+    kRegExpMatchAllWithNonGlobalRegExp = 78,
 
     // If you add new values here, you'll also need to update Chromium's:
-    // web_feature.mojom, UseCounterCallback.cpp, and enums.xml. V8 changes to
+    // web_feature.mojom, use_counter_callback.cc, and enums.xml. V8 changes to
     // this list need to be landed first, then changes on the Chromium side.
     kUseCounterFeatureCount  // This enum value must be last.
   };

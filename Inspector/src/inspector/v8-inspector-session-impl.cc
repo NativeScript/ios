@@ -47,7 +47,7 @@ std::unique_ptr<protocol::DictionaryValue> ParseState(const StringView& state) {
   if (IsCBORMessage(state))
     cbor = span<uint8_t>(state.characters8(), state.length());
   else if (ConvertToCBOR(state, &converted).ok())
-      cbor = SpanFrom(converted);
+    cbor = SpanFrom(converted);
   if (!cbor.empty()) {
     std::unique_ptr<protocol::Value> value =
         protocol::Value::parseBinary(cbor.data(), cbor.size());
@@ -454,7 +454,7 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
                        .setName(protocol::Schema::Metainfo::domainName)
                        .setVersion(protocol::Schema::Metainfo::version)
                        .build());
-  result.push_back(protocol::Schema::Domain::create()
+ result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::CSS::Metainfo::domainName)
                        .setVersion(protocol::CSS::Metainfo::version)
                        .build());
