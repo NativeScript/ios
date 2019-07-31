@@ -5,7 +5,7 @@
 using namespace v8;
 
 Local<String> tns::ToV8String(Isolate* isolate, std::string value) {
-    return v8::String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal).ToLocalChecked();
+    return v8::String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal, (int)value.length()).ToLocalChecked();
 }
 
 std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {

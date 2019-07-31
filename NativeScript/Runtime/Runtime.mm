@@ -57,14 +57,17 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
     inspectorClient->connect();
 #endif
 
-    v8::TryCatch tc(this->GetIsolate());
-    // TODO: infer main script from package.json or use index.js
-    this->RunScript("index.js", tc);
+    {
+        Isolate* isolate = this->GetIsolate();
+        HandleScope scope(isolate);
+        v8::TryCatch tc(isolate);
+        this->moduleInternal_.RunModule(isolate, "./");
 
-    if (tc.HasCaught()) {
-        HandleScope scope(this->GetIsolate());
-        printf("%s\n", tns::ToString(isolate_, tc.Exception()).c_str());
-        assert(false);
+        if (tc.HasCaught()) {
+            HandleScope scope(this->GetIsolate());
+            printf("%s\n", tns::ToString(isolate_, tc.Exception()).c_str());
+            assert(false);
+        }
     }
 
     tns::Tasks::Drain();

@@ -1,26 +1,26 @@
 exports.runImportTests = function() {
-    require("./tests/shared/Import/index");
+    require("./Import/index");
 }
 
 exports.runRequireTests = function() {
-    require("./tests/shared/Require/index");
+    require("./Require/index");
 }
 
 exports.runWeakRefTests = function() {
-    require("./tests/shared/WeakRef");
+    require("./WeakRef");
 }
 
 exports.runRuntimeTests = function() {
-    require("./tests/shared/RuntimeTests");
+    require("./RuntimeTests");
 }
 
 exports.runWorkerTests = function() {
-    require("./tests/shared/Workers/index");
+    require("./Workers/index");
 }
 
 exports.runAllTests = function() {
 //    exports.runImportTests();
-//    exports.runRequireTests();
+    exports.runRequireTests();
     exports.runWeakRefTests();
     exports.runRuntimeTests();
     exports.runWorkerTests();

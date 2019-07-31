@@ -8,9 +8,9 @@
  [jasmine-gem]: http://github.com/pivotal/jasmine-gem
  */
 
-var jasmineRequire = require('./tests/Infrastructure/Jasmine/jasmine-2.0.1/jasmine');
-var JUnitXmlReporter = require('./tests/Infrastructure/Jasmine/jasmine-reporters/junit_reporter').JUnitXmlReporter;
-var TerminalReporter = require('./tests/Infrastructure/Jasmine/jasmine-reporters/terminal_reporter').TerminalReporter;
+var jasmineRequire = require('./jasmine');
+var JUnitXmlReporter = require('../jasmine-reporters/junit_reporter').JUnitXmlReporter;
+var TerminalReporter = require('../jasmine-reporters/terminal_reporter').TerminalReporter;
 
 (function() {
   /**

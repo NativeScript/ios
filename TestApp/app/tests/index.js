@@ -1,8 +1,8 @@
 // Inform the test results runner that the runtime is up.
 console.log('Application Start!');
 
-require("./tests/Infrastructure/timers");
-require("./tests/Infrastructure/simulator");
+require("./Infrastructure/timers");
+require("./Infrastructure/simulator");
 
 global.UNUSED = function (param) {
 };
@@ -23,48 +23,48 @@ global.__JUnitSaveResults = function (text) {
 
 global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
 
-require("./tests/Infrastructure/Jasmine/jasmine-2.0.1/boot");
+require("./Infrastructure/Jasmine/jasmine-2.0.1/boot");
 
-require("./tests/Marshalling/Primitives/Function");
-require("./tests/Marshalling/Primitives/Static");
-require("./tests/Marshalling/Primitives/Instance");
-require("./tests/Marshalling/Primitives/Derived");
+require("./Marshalling/Primitives/Function");
+require("./Marshalling/Primitives/Static");
+require("./Marshalling/Primitives/Instance");
+require("./Marshalling/Primitives/Derived");
 //
-require("./tests/Marshalling/ObjCTypesTests");
-require("./tests/Marshalling/ConstantsTests");
-require("./tests/Marshalling/RecordTests");
+require("./Marshalling/ObjCTypesTests");
+require("./Marshalling/ConstantsTests");
+require("./Marshalling/RecordTests");
 //import "./Marshalling/VectorTests";
 //import "./Marshalling/MatrixTests";
-require("./tests/Marshalling/NSStringTests");
+require("./Marshalling/NSStringTests");
 //import "./Marshalling/TypesTests";
-require("./tests/Marshalling/PointerTests");
-require("./tests/Marshalling/ReferenceTests");
+require("./Marshalling/PointerTests");
+require("./Marshalling/ReferenceTests");
 //import "./Marshalling/FunctionPointerTests";
-require("./tests/Marshalling/EnumTests");
-require("./tests/Marshalling/ProtocolTests");
+require("./Marshalling/EnumTests");
+require("./Marshalling/ProtocolTests");
 //
 // import "./Inheritance/ConstructorResolutionTests";
-require("./tests/Inheritance/InheritanceTests");
-require("./tests/Inheritance/ProtocolImplementationTests");
-require("./tests/Inheritance/TypeScriptTests");
+require("./Inheritance/InheritanceTests");
+require("./Inheritance/ProtocolImplementationTests");
+require("./Inheritance/TypeScriptTests");
 //
-require("./tests/MethodCallsTests");
+require("./MethodCallsTests");
 //import "./FunctionsTests";
-require("./tests/VersionDiffTests");
-require("./tests/ObjCConstructors");
+require("./VersionDiffTests");
+require("./ObjCConstructors");
 //
-require("./tests/MetadataTests");
+require("./MetadataTests");
 //
-require("./tests/ApiTests");
-require("./tests/DeclarationConflicts");
+require("./ApiTests");
+require("./DeclarationConflicts");
 //
-require("./tests/Promises");
-//require("./tests/Modules");
+require("./Promises");
+require("./Modules");
 //
-require("./tests/RuntimeImplementedAPIs");
+require("./RuntimeImplementedAPIs");
 
 // Tests common for all runtimes.
-require("./tests/shared/index").runAllTests();
+require("./shared/index").runAllTests();
 
 execute();
 

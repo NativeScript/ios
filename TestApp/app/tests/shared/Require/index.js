@@ -13,31 +13,31 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe("main started message and main executed");
     });
 
-    it("can circularly require module index", function () {
-        require("./CircularIndexRequire");
-        var expected = 'main started and dependency1 started and dependency2 started'
-            + ' visible undefined visible undefined and dependency2 ended'
-            + ' and dependency1 ended and main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
+    // it("can circularly require module index", function () {
+    //     require("./CircularIndexRequire");
+    //     var expected = 'main started and dependency1 started and dependency2 started'
+    //         + ' visible undefined visible undefined and dependency2 ended'
+    //         + ' and dependency1 ended and main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
 
-    it('can circularly require modules', function () {
-        require("./CircularRequire");
-        var expected = 'main started and dependency1 started'
-            + ' and dependency2 started and dependency3 started'
-            + ' and dependency3 ended and dependency2 ended'
-            + ' and dependency1 ended and main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
+    // it('can circularly require modules', function () {
+    //     require("./CircularRequire");
+    //     var expected = 'main started and dependency1 started'
+    //         + ' and dependency2 started and dependency3 started'
+    //         + ' and dependency3 ended and dependency2 ended'
+    //         + ' and dependency1 ended and main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
 
-    it('can circularly require and export', function () {
-        require("./CircularRequireWithExports");
-        var expected = 'main started and dependency1 started and dependency2 started'
-            + ' and dependency3 started visible from dependency3 undefined'
-            + ' and dependency3 ended and dependency2 ended and dependency1 ended'
-            + ' and main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
+    // it('can circularly require and export', function () {
+    //     require("./CircularRequireWithExports");
+    //     var expected = 'main started and dependency1 started and dependency2 started'
+    //         + ' and dependency3 started visible from dependency3 undefined'
+    //         + ' and dependency3 ended and dependency2 ended and dependency1 ended'
+    //         + ' and main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
 
     it('can bubble exports from one module to another in non-circular require', function () {
         require("./ExportsBubbling");
@@ -46,7 +46,7 @@ describe("TNS require", function () {
 
     it('module has id with the name of the file', function () {
         expect(module.id).toBe(__filename);
-        expect(module.id).toMatch(/\/.*\/app\/shared\/Require\/index.js$/);
+        expect(module.id).toMatch(/\/.*\/app\/tests\/shared\/Require\/index.js$/);
     });
 
     it('modules can require further modules', function () {
@@ -55,12 +55,12 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe(expected);
     });
 
-    if (!global.NSObject) {
-        it('deletes module cache on error', function () {
-            require("./ModuleErrorCache");
-            expect(TNSGetOutput()).toBe('did throw1no throw');
-        });
-    }
+    // if (!global.NSObject) {
+    //     it('deletes module cache on error', function () {
+    //         require("./ModuleErrorCache");
+    //         expect(TNSGetOutput()).toBe('did throw1no throw');
+    //     });
+    // }
 
     it('can export var-s', function () {
         require("./ModuleVariable");
@@ -83,10 +83,10 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe(expected);
     });
 
-    it('throws for missing modules', function () {
-        require("./NotExistingFileRequire");
-        expect(TNSGetOutput()).toBe('main started Error main ended');
-    });
+    // it('throws for missing modules', function () {
+    //     require("./NotExistingFileRequire");
+    //     expect(TNSGetOutput()).toBe('main started Error main ended');
+    // });
 
     it("would load package.json if available, and use its 'main' property for js file name", function () {
         require("./PackageJsonApp");
@@ -103,50 +103,50 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe("4262F53F-2320-419E-8B3C-626FFB88EC92");
     });
 
-    it('would throw if a package.json main file can not be located', function () {
-        require("./PackageJsonSyntaxError");
-        expect(TNSGetOutput()).toBe("ModuleError");
-    });
+    // it('would throw if a package.json main file can not be located', function () {
+    //     require("./PackageJsonSyntaxError");
+    //     expect(TNSGetOutput()).toBe("ModuleError");
+    // });
 
     it("require extensions", function () {
         require("./RequireExtensions");
         expect(TNSGetOutput()).toBe("dependency1 loaded");
     });
 
-    it("package.json main property in tns_modules points to a js file in tns_modules", function () {
-        require("./PackageJsonTns");
-        expect(TNSGetOutput()).toBe("CD11903C-B38B-4D68-BEB6-D72C3FAD906F");
-    });
+    // it("package.json main property in tns_modules points to a js file in tns_modules", function () {
+    //     require("./PackageJsonTns");
+    //     expect(TNSGetOutput()).toBe("CD11903C-B38B-4D68-BEB6-D72C3FAD906F");
+    // });
 
-    it('can require from tns_modules', function () {
-        require("./RequireModuleFolder");
-        expect(TNSGetOutput()).toBe('main started from module folder main ended');
-    });
+    // it('can require from tns_modules', function () {
+    //     require("./RequireModuleFolder");
+    //     expect(TNSGetOutput()).toBe('main started from module folder main ended');
+    // });
 
-    it('searches tns_modules before app', function () {
-        require("./RequireModuleFolderConflict");
-        expect(TNSGetOutput()).toBe('main started from module folder main ended');
-    });
+    // it('searches tns_modules before app', function () {
+    //     require("./RequireModuleFolderConflict");
+    //     expect(TNSGetOutput()).toBe('main started from module folder main ended');
+    // });
 
-    it("when require a tns_module that is a directory name it should load the index js inside it", function () {
-        require("shared/Require/RequirePriority/dependency3");
-        var expected = ' from module folder in index file';
-        expect(TNSGetOutput()).toBe(expected);
-    });
+    // it("when require a tns_module that is a directory name it should load the index js inside it", function () {
+    //     require("shared/Require/RequirePriority/dependency3");
+    //     var expected = ' from module folder in index file';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
 
-    it("when require a tns_module that is a directory name it should load the package json inside it", function () {
-        require("shared/Require/RequirePriority/dependency5");
-        var expected = ' from module folder in dependency5 dir'
-        expect(TNSGetOutput()).toBe(expected);
-    });
+    // it("when require a tns_module that is a directory name it should load the package json inside it", function () {
+    //     require("shared/Require/RequirePriority/dependency5");
+    //     var expected = ' from module folder in dependency5 dir'
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
 
-    it('has a priority to load from tns_module first then from app and relative folder', function () {
-        require("./RequirePriority");
-        var expected = 'main started from module folder from module folder in'
-            + ' index file from root folder in index file from root folder'
-            + ' from root folder in index file main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
+    // it('has a priority to load from tns_module first then from app and relative folder', function () {
+    //     require("./RequirePriority");
+    //     var expected = 'main started from module folder from module folder in'
+    //         + ' index file from root folder in index file from root folder'
+    //         + ' from root folder in index file main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
 
     it("can set properties in the global object", function () {
         require("./SimpleGlobalObject");
@@ -184,22 +184,22 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe(expected);
     });
 
-    it("can can catch a syntax error in module", function () {
-        require("./SyntaxErrorInModule");
-        var expected = 'main started SyntaxError main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
+    // it("can can catch a syntax error in module", function () {
+    //     require("./SyntaxErrorInModule");
+    //     var expected = 'main started SyntaxError main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
 
-    it("can can catch a runtime error in module", function () {
-        require("./RuntimeErrorInModule");
-        var expected = 'main started ReferenceError main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
+    // it("can can catch a runtime error in module", function () {
+    //     require("./RuntimeErrorInModule");
+    //     var expected = 'main started ReferenceError main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
 
-    it("require relative to home", function () {
-       var fileName = __filename.substring(__approot.length + "/app".length);
-       expect(require("~" + fileName)).toBe(global.require(__filename));
-    });
+    // it("require relative to home", function () {
+    //    var fileName = __filename.substring(__approot.length + "/app".length);
+    //    expect(require("~" + fileName)).toBe(global.require(__filename));
+    // });
 
     it('resolve directories containing .js in the name as valid packages', function () {
         require("./ModuleWith.js");
@@ -214,12 +214,12 @@ describe("TNS require", function () {
         expect(result.title).toBe(expected);
     });
 
-    it("require directory with index.json and no package.json", function () {
-        var result = require("./DirectoryWithIndexJson");
-        var expected = 'string from index.json';
+    // it("require directory with index.json and no package.json", function () {
+    //     var result = require("./DirectoryWithIndexJson");
+    //     var expected = 'string from index.json';
 
-        expect(result.title).toBe(expected);
-    });
+    //     expect(result.title).toBe(expected);
+    // });
 
     it("file ending with commented line", function () {
        expect(function () { require("./FileEndingWithCommentedLine"); }).not.toThrow();
@@ -236,15 +236,15 @@ describe("TNS require", function () {
         expect(a === b).toBe(true);
     });
 
-    it("should handle JSON file errors", function () {
-        require('./RequireJsonCorruptFile');
-        expect(TNSGetOutput()).toMatch(/JSON Parse error: Unterminated string$|Unexpected token/)
-    });
+    // it("should handle JSON file errors", function () {
+    //     require('./RequireJsonCorruptFile');
+    //     expect(TNSGetOutput()).toMatch(/JSON Parse error: Unterminated string$|Unexpected token/)
+    // });
 
-    it("shouldn't load invalid JSON file", function () {
-        require("./RequireJsonCorruptFile1");
-        expect(TNSGetOutput()).toMatch(/JSON Parse error: Unable to parse JSON string$|No identifiers allowed directly after numeric literal$/)
-    });
+    // it("shouldn't load invalid JSON file", function () {
+    //     require("./RequireJsonCorruptFile1");
+    //     expect(TNSGetOutput()).toMatch(/JSON Parse error: Unable to parse JSON string$|No identifiers allowed directly after numeric literal$/)
+    // });
 
     it("when using global in a module global should be defined", function () {
         var module = require("./GlobalIsDefined/module");
@@ -252,11 +252,11 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).not.toBe(undefined);
     });
 
-    it("when require a module via app root syntax it should be loaded", function () {
-        var mymodule = require("~/shared/Require/RequireWithTildeSyntax/module.js");
-        var value = mymodule.echo(12345)
-        expect(value).toBe(12345);
-    });
+    // it("when require a module via app root syntax it should be loaded", function () {
+    //     var mymodule = require("~/shared/Require/RequireWithTildeSyntax/module.js");
+    //     var value = mymodule.echo(12345)
+    //     expect(value).toBe(12345);
+    // });
 
     it("should load module with null char in it", function () {
         var text = require("./ModuleWithNullChar/index").text;
@@ -279,14 +279,13 @@ describe("TNS require", function () {
     it("should load module through global.require", function () {
         expect(typeof global.require).toBe("function");
 
-        var module3 = global.require("./shared/Require/GlobalRequire/index");
+        var module3 = global.require("./tests/shared/Require/GlobalRequire/index");
         expect(module3.msg).toBe("module3");
     });
 
     it('Case Sensitive', function () {
         require("./CaseSensitive");
-        // WARNING: The following test is platform specific
-        var expected = global.android ? 'filefolder' : 'file';
+        var expected = 'filefolder';
         expect(TNSGetOutput()).toBe(expected);
     });
 
@@ -299,47 +298,47 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe(' from subdirectory/index.js');
     });
 
-    // node_modules tests
-    it('should traverse correctly through node_modules till outer module is found', function () {
-        require("./node_modules/FindInOuterNodeModules");
-        var expected = 'main started in FindInOuterNodeModules module main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
-    it('should traverse correctly through any folders till outer module is found', function () {
-        require("./node_modules/FindsIndexJs");
-        var expected = 'main started in FindsIndexJs module main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
-    it('should traverse correctly through inner node modules first', function () {
-        require("./node_modules/FindsInnerNodeModulesFirst");
-        var expected = 'main started in FindsInnerNodeModulesFirst module main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
-    it('should traverse correctly through native modules before traversing node_modules', function () {
-        require("./node_modules/FindsNativeModulesFirst");
-        var expected = 'main started from module folder main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
-    it('should traverse node_modules and find package.json if present', function () {
-        require("./node_modules/FindsPackageJson");
-        var expected = 'main started in FindsPackageJson module main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
-    it('should throw error if cant find node module', function () {
-        require("./node_modules/CantFindNodeModule");
-        var expected = 'main started Module Error main ended';
-        expect(TNSGetOutput()).toBe(expected);
-    });
+    // // node_modules tests
+    // it('should traverse correctly through node_modules till outer module is found', function () {
+    //     require("./node_modules/FindInOuterNodeModules");
+    //     var expected = 'main started in FindInOuterNodeModules module main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
+    // it('should traverse correctly through any folders till outer module is found', function () {
+    //     require("./node_modules/FindsIndexJs");
+    //     var expected = 'main started in FindsIndexJs module main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
+    // it('should traverse correctly through inner node modules first', function () {
+    //     require("./node_modules/FindsInnerNodeModulesFirst");
+    //     var expected = 'main started in FindsInnerNodeModulesFirst module main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
+    // it('should traverse correctly through native modules before traversing node_modules', function () {
+    //     require("./node_modules/FindsNativeModulesFirst");
+    //     var expected = 'main started from module folder main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
+    // it('should traverse node_modules and find package.json if present', function () {
+    //     require("./node_modules/FindsPackageJson");
+    //     var expected = 'main started in FindsPackageJson module main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
+    // it('should throw error if cant find node module', function () {
+    //     require("./node_modules/CantFindNodeModule");
+    //     var expected = 'main started Module Error main ended';
+    //     expect(TNSGetOutput()).toBe(expected);
+    // });
 
-    it('should check node_modules hierarchy before checking app/tns_modules', function () {
-        var actual = require("./node_modules/NodeModulesAndTnsModulesConflict");
-        var expected = 'package installed in local node_modules folder';
-        expect(actual).toBe(expected);
-    });
+    // it('should check node_modules hierarchy before checking app/tns_modules', function () {
+    //     var actual = require("./node_modules/NodeModulesAndTnsModulesConflict");
+    //     var expected = 'package installed in local node_modules folder';
+    //     expect(actual).toBe(expected);
+    // });
 
-    it('should resolve to one and the same module with package.json main', function(){
-        var firstModule = require("./ResolveCanonicalPath");
-        var secondModule = require("./ResolveCanonicalPath/second");
-       expect(firstModule).toBe(secondModule);
-    });
+    // it('should resolve to one and the same module with package.json main', function(){
+    //     var firstModule = require("./ResolveCanonicalPath");
+    //     var secondModule = require("./ResolveCanonicalPath/second");
+    //    expect(firstModule).toBe(secondModule);
+    // });
 });
