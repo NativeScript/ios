@@ -13,31 +13,31 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe("main started message and main executed");
     });
 
-    // it("can circularly require module index", function () {
-    //     require("./CircularIndexRequire");
-    //     var expected = 'main started and dependency1 started and dependency2 started'
-    //         + ' visible undefined visible undefined and dependency2 ended'
-    //         + ' and dependency1 ended and main ended';
-    //     expect(TNSGetOutput()).toBe(expected);
-    // });
+    it("can circularly require module index", function () {
+        require("./CircularIndexRequire");
+        var expected = 'main started and dependency1 started and dependency2 started'
+            + ' visible undefined visible undefined and dependency2 ended'
+            + ' and dependency1 ended and main ended';
+        expect(TNSGetOutput()).toBe(expected);
+    });
 
-    // it('can circularly require modules', function () {
-    //     require("./CircularRequire");
-    //     var expected = 'main started and dependency1 started'
-    //         + ' and dependency2 started and dependency3 started'
-    //         + ' and dependency3 ended and dependency2 ended'
-    //         + ' and dependency1 ended and main ended';
-    //     expect(TNSGetOutput()).toBe(expected);
-    // });
+    it('can circularly require modules', function () {
+        require("./CircularRequire");
+        var expected = 'main started and dependency1 started'
+            + ' and dependency2 started and dependency3 started'
+            + ' and dependency3 ended and dependency2 ended'
+            + ' and dependency1 ended and main ended';
+        expect(TNSGetOutput()).toBe(expected);
+    });
 
-    // it('can circularly require and export', function () {
-    //     require("./CircularRequireWithExports");
-    //     var expected = 'main started and dependency1 started and dependency2 started'
-    //         + ' and dependency3 started visible from dependency3 undefined'
-    //         + ' and dependency3 ended and dependency2 ended and dependency1 ended'
-    //         + ' and main ended';
-    //     expect(TNSGetOutput()).toBe(expected);
-    // });
+    it('can circularly require and export', function () {
+        require("./CircularRequireWithExports");
+        var expected = 'main started and dependency1 started and dependency2 started'
+            + ' and dependency3 started visible from dependency3 undefined'
+            + ' and dependency3 ended and dependency2 ended and dependency1 ended'
+            + ' and main ended';
+        expect(TNSGetOutput()).toBe(expected);
+    });
 
     it('can bubble exports from one module to another in non-circular require', function () {
         require("./ExportsBubbling");
@@ -55,12 +55,12 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe(expected);
     });
 
-    // if (!global.NSObject) {
-    //     it('deletes module cache on error', function () {
-    //         require("./ModuleErrorCache");
-    //         expect(TNSGetOutput()).toBe('did throw1no throw');
-    //     });
-    // }
+    if (!global.NSObject) {
+        it('deletes module cache on error', function () {
+            require("./ModuleErrorCache");
+            expect(TNSGetOutput()).toBe('did throw1no throw');
+        });
+    }
 
     it('can export var-s', function () {
         require("./ModuleVariable");
@@ -83,10 +83,10 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe(expected);
     });
 
-    // it('throws for missing modules', function () {
-    //     require("./NotExistingFileRequire");
-    //     expect(TNSGetOutput()).toBe('main started Error main ended');
-    // });
+    it('throws for missing modules', function () {
+        require("./NotExistingFileRequire");
+        expect(TNSGetOutput()).toBe('main started Error main ended');
+    });
 
     it("would load package.json if available, and use its 'main' property for js file name", function () {
         require("./PackageJsonApp");
@@ -103,10 +103,10 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe("4262F53F-2320-419E-8B3C-626FFB88EC92");
     });
 
-    // it('would throw if a package.json main file can not be located', function () {
-    //     require("./PackageJsonSyntaxError");
-    //     expect(TNSGetOutput()).toBe("ModuleError");
-    // });
+    it('would throw if a package.json main file can not be located', function () {
+        require("./PackageJsonSyntaxError");
+        expect(TNSGetOutput()).toBe("ModuleError");
+    });
 
     it("require extensions", function () {
         require("./RequireExtensions");

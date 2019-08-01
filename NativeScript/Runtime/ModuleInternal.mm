@@ -91,50 +91,62 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
     NSString* fileNameOnly = [fullPath lastPathComponent];
     NSString* pathOnly = [fullPath stringByDeletingLastPathComponent];
 
-    Local<Value> resultObj = moduleInternal->LoadImpl(isolate, [fileNameOnly UTF8String], [pathOnly UTF8String]);
+    bool isData = false;
+    Local<Object> moduleObj = moduleInternal->LoadImpl(isolate, [fileNameOnly UTF8String], [pathOnly UTF8String], isData);
+    if (moduleObj.IsEmpty()) {
+        return;
+    }
 
-    info.GetReturnValue().Set(resultObj);
+    if (isData) {
+        assert(!moduleObj.IsEmpty());
+        info.GetReturnValue().Set(moduleObj);
+    } else {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Value> exportsObj;
+        bool success = moduleObj->Get(context, tns::ToV8String(isolate, "exports")).ToLocal(&exportsObj);
+        assert(success);
+        info.GetReturnValue().Set(exportsObj);
+    }
 }
 
-Local<Value> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& moduleName, const std::string& baseDir) {
+Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& moduleName, const std::string& baseDir, bool& isData) {
     size_t lastIndex = moduleName.find_last_of(".");
     std::string moduleNameWithoutExtension = (lastIndex == std::string::npos) ? moduleName : moduleName.substr(0, lastIndex);
     std::string cacheKey = baseDir + "*" + moduleNameWithoutExtension;
-    auto it = loadedModules_.find(cacheKey);
+    auto it = this->loadedModules_.find(cacheKey);
 
-    if (it != loadedModules_.end()) {
-        Local<Object> result = Local<Object>::New(isolate, *it->second);
-        return result;
+    if (it != this->loadedModules_.end()) {
+        return it->second->Get(isolate);
     }
 
     Local<Object> moduleObj;
     Local<Value> exportsObj;
-    std::string path = this->ResolvePath(baseDir, moduleName);
+    std::string path = this->ResolvePath(isolate, baseDir, moduleName);
+    if (path.empty()) {
+        return Local<Object>();
+    }
+
+    auto it2 = this->loadedModules_.find(path);
+    if (it2 != this->loadedModules_.end()) {
+        return it2->second->Get(isolate);
+    }
+
     NSString* pathStr = [NSString stringWithUTF8String:path.c_str()];
     NSString* extension = [pathStr pathExtension];
     if ([extension isEqualToString:@"js"]) {
-        moduleObj = this->LoadModule(isolate, path);
-        Local<Context> context = isolate->GetCurrentContext();
-        bool success = moduleObj->Get(context, tns::ToV8String(isolate, "exports")).ToLocal(&exportsObj);
-        assert(success);
+        moduleObj = this->LoadModule(isolate, path, cacheKey);
     } else if ([extension isEqualToString:@"json"]) {
+        isData = true;
         moduleObj = this->LoadData(isolate, path);
     } else {
         // TODO: throw an error for unsupported file extension
         assert(false);
     }
 
-    Persistent<Object>* poModuleObj = new Persistent<Object>(isolate, moduleObj);
-    loadedModules_.insert(make_pair(cacheKey, poModuleObj));
-
-    if (!exportsObj.IsEmpty()) {
-        return exportsObj;
-    }
-
     return moduleObj;
 }
 
-Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& modulePath) {
+Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& modulePath, const std::string& cacheKey) {
     Local<Object> moduleObj = Object::New(isolate);
     Local<Object> exportsObj = Object::New(isolate);
     Local<Context> context = isolate->GetCurrentContext();
@@ -146,6 +158,9 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     Local<v8::String> fileName = tns::ToV8String(isolate, modulePath);
     success = moduleObj->DefineOwnProperty(context, tns::ToV8String(isolate, "id"), fileName, readOnlyFlags).FromMaybe(false);
     assert(success);
+
+    Persistent<Object>* poModuleObj = new Persistent<Object>(isolate, moduleObj);
+    TempModule tempModule(this, modulePath, cacheKey, poModuleObj);
 
     Local<Script> script = LoadScript(isolate, modulePath);
 
@@ -174,6 +189,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
         assert(false);
     }
 
+    tempModule.SaveToCache();
     return moduleObj;
 }
 
@@ -205,6 +221,9 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
 
     json = value.As<Object>();
 
+    Persistent<Object>* poJson = new Persistent<Object>(isolate, json);
+    this->loadedModules_.insert(std::make_pair(modulePath, poJson));
+
     return json;
 }
 
@@ -235,7 +254,7 @@ Local<v8::String> ModuleInternal::WrapModuleContent(Isolate* isolate, const std:
     return tns::ToV8String(isolate, result);
 }
 
-std::string ModuleInternal::ResolvePath(const std::string& baseDir, const std::string& moduleName) {
+std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& baseDir, const std::string& moduleName) {
     NSString* baseDirStr = [NSString stringWithUTF8String:baseDir.c_str()];
     NSString* moduleNameStr = [NSString stringWithUTF8String:moduleName.c_str()];
     NSString* fullPath = [[baseDirStr stringByAppendingPathComponent:moduleNameStr] stringByStandardizingPath];
@@ -258,8 +277,8 @@ std::string ModuleInternal::ResolvePath(const std::string& baseDir, const std::s
     }
 
     if (exists == NO) {
-        // TODO: throw an exception
-        assert(false);
+        tns::ThrowError(isolate, "The specified module does not exist: " + moduleName);
+        return std::string();
     }
 
     if (isDirectory == NO) {
@@ -268,7 +287,13 @@ std::string ModuleInternal::ResolvePath(const std::string& baseDir, const std::s
 
     // Try to resolve module from main entry in package.json
     NSString* packageJson = [fullPath stringByAppendingPathComponent:@"package.json"];
-    std::string entry = this->ResolvePathFromPackageJson([packageJson UTF8String]);
+    bool error = false;
+    std::string entry = this->ResolvePathFromPackageJson([packageJson UTF8String], error);
+    if (error) {
+        tns::ThrowError(isolate, "Unable to locate main entry in " + std::string([packageJson UTF8String]));
+        return std::string();
+    }
+
     if (!entry.empty()) {
         fullPath = [NSString stringWithUTF8String:entry.c_str()];
     }
@@ -286,15 +311,15 @@ std::string ModuleInternal::ResolvePath(const std::string& baseDir, const std::s
 
     exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
     if (exists == NO) {
-        // TODO: throw an exception
-        assert(false);
+        tns::ThrowError(isolate, "The specified module does not exist: " + moduleName);
+        return std::string();
     }
 
 
     return [fullPath UTF8String];
 }
 
-std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packageJson) {
+std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packageJson, bool& error) {
     NSString* packageJsonStr = [NSString stringWithUTF8String:packageJson.c_str()];
 
     NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -311,6 +336,7 @@ std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packag
 
     NSDictionary* dic = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:nil];
     if (dic == nil) {
+        error = true;
         return std::string();
     }
 
@@ -326,7 +352,7 @@ std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packag
         packageJsonStr = [path stringByAppendingPathComponent:@"package.json"];
         exists = [fileManager fileExistsAtPath:packageJsonStr isDirectory:&isDirectory];
         if (exists == YES && isDirectory == NO) {
-            return this->ResolvePathFromPackageJson([packageJsonStr UTF8String]);
+            return this->ResolvePathFromPackageJson([packageJsonStr UTF8String], error);
         }
     }
 
