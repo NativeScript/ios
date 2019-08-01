@@ -292,7 +292,8 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
 const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, const InterfaceMeta* interfaceMeta, const FunctionCallbackInfo<Value>& info) {
     std::vector<const MethodMeta*> candidates;
     do {
-        std::vector<const MethodMeta*> initializers = interfaceMeta->initializersWithProtocols(klass);
+        KnownUnknownClassPair klasses(klass);
+        std::vector<const MethodMeta*> initializers = interfaceMeta->initializersWithProtocols(klasses, ProtocolMetas());
         for (const MethodMeta* candidate: initializers) {
             if (ArgConverter::CanInvoke(isolate, candidate, info)) {
                 candidates.push_back(candidate);
@@ -619,7 +620,7 @@ void ArgConverter::FindMethodOverloads(Class klass, std::string methodName, Memb
     }
 
     const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
-    MembersCollection members = interfaceMeta->members(methodName.c_str(), methodName.length(), type);
+    MembersCollection members = interfaceMeta->members(methodName.c_str(), methodName.length(), type, true, true, ProtocolMetas());
     for (auto it = members.begin(); it != members.end(); it++) {
         const MethodMeta* methodMeta = static_cast<const MethodMeta*>(*it);
         overloads.push_back(methodMeta);

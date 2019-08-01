@@ -5,6 +5,7 @@
 #include <clang/Lex/Preprocessor.h>
 #include <clang/Tooling/Tooling.h>
 #include <iostream>
+#include <sstream>
 #include <llvm/ADT/StringSwitch.h>
 #include <llvm/Support/Path.h>
 
@@ -12,39 +13,30 @@ using namespace clang;
 namespace path = llvm::sys::path;
 namespace fs = llvm::sys::fs;
 
-static SmallVectorImpl<char>& operator+=(SmallVectorImpl<char>& includes, StringRef rhs)
+static std::error_code addHeaderInclude(StringRef headerName, std::vector<SmallString<256>>& includes)
 {
-    includes.append(rhs.begin(), rhs.end());
-    return includes;
-}
-
-static std::error_code addHeaderInclude(StringRef headerName, SmallVectorImpl<char>& includes)
-{
-    includes += "#import \"";
 
     // Use an absolute path for the include; there's no reason to think whether a relative path will
     // work ('.' might not be on our include path) or that it will find the same file.
     if (path::is_absolute(headerName)) {
-        includes += headerName;
+        includes.push_back(headerName);
     }
     else {
         SmallString<256> header = headerName;
         if (std::error_code err = fs::make_absolute(header))
             return err;
-        includes += header;
+        includes.push_back(header);
     }
-
-    includes += "\"\n";
 
     return std::error_code();
 }
 
-static std::error_code addHeaderInclude(const FileEntry* header, SmallVectorImpl<char>& includes)
+static std::error_code addHeaderInclude(const FileEntry* header, std::vector<SmallString<256>>& includes)
 {
     return addHeaderInclude(header->getName(), includes);
 }
 
-static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleMap& modMap, const Module* module, SmallVectorImpl<char>& includes)
+static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleMap& modMap, const Module* module, std::vector<SmallString<256>>& includes)
 {
     // Don't collect any headers for unavailable modules.
     if (!module->isAvailable())
@@ -91,7 +83,7 @@ static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleM
     return std::error_code();
 }
 
-static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<std::string>& args, std::string* umbrellaHeaderContents, const std::vector<std::string>& moduleBlacklist, std::vector<std::string>& includePaths)
+static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<std::string>& args, std::vector<SmallString<256>>& umbrellaHeaders, const std::vector<std::string>& moduleBlacklist, std::vector<std::string>& includePaths)
 {
     std::unique_ptr<clang::ASTUnit> ast = clang::tooling::buildASTFromCodeWithArgs("", args, "umbrella.h");
     if (!ast)
@@ -106,7 +98,6 @@ static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<s
     ModuleMap& moduleMap = headerSearch.getModuleMap();
     FileManager& fileManager = ast->getFileManager();
     
-    SmallString<256> headerContents;
     std::function<void(const Module*)> collector = [&](const Module* module) {
         // uncomment for debugging unavailable modules
 //        if (!module->isAvailable()) {
@@ -124,24 +115,41 @@ static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<s
             includePaths.push_back(includeString);
         }
         
-        collectModuleHeaderIncludes(fileManager, moduleMap, module, headerContents);
+        collectModuleHeaderIncludes(fileManager, moduleMap, module, umbrellaHeaders);
         std::for_each(module->submodule_begin(), module->submodule_end(), collector);
     };
     
     std::for_each(modules.begin(), modules.end(), collector);
     
-    if (umbrellaHeaderContents)
-        *umbrellaHeaderContents = headerContents.str();
-    
     return std::error_code();
 }
 
+// Sort headers so that -Swift headers come last (see https://github.com/NativeScript/ios-runtime/issues/1153)
+int headerPriority(SmallString<256> h) {
+    if (std::string::npos != h.find("-Swift")) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
 std::string CreateUmbrellaHeader(const std::vector<std::string>& clangArgs, std::vector<std::string>& includePaths)
 {
-    std::string umbrellaHeaderContents;
     std::vector<std::string> moduleBlacklist;
     
     // Generate umbrella header for all modules from the sdk
-    CreateUmbrellaHeaderForAmbientModules(clangArgs, &umbrellaHeaderContents, moduleBlacklist, includePaths);
-    return umbrellaHeaderContents;
+    std::vector<SmallString<256>> umbrellaHeaders;
+    CreateUmbrellaHeaderForAmbientModules(clangArgs, umbrellaHeaders, moduleBlacklist, includePaths);
+   
+    std::sort(umbrellaHeaders.begin(), umbrellaHeaders.end(), [](const SmallString<256>& h1, const SmallString<256>& h2) {
+        return headerPriority(h1) < headerPriority(h2);
+    });
+    
+    std::stringstream umbrellaHeaderContents;
+    for (auto& h : umbrellaHeaders) {
+        umbrellaHeaderContents << "#import \"" << h.c_str() << "\"" << std::endl;
+    }
+
+    return umbrellaHeaderContents.str();
 }

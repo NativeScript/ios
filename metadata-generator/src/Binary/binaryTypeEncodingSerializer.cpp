@@ -124,7 +124,14 @@ unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitProt
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitId(const ::Meta::IdType& type)
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Id); // TODO: Add protocols
+    auto s = llvm::make_unique<binary::IdEncoding>();
+    std::vector<MetaFileOffset> offsets;
+    for (auto protocol : type.protocols) {
+        offsets.push_back(this->_heapWriter.push_string(protocol->jsName));
+    }
+    s->_protocols = this->_heapWriter.push_binaryArray(offsets);
+
+    return unique_ptr<binary::TypeEncoding>(s.release());
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitConstantArray(const ::Meta::ConstantArrayType& type)
@@ -144,8 +151,15 @@ unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitInco
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitInterface(const ::Meta::InterfaceType& type)
 {
-    binary::DeclarationReferenceEncoding* s = new binary::DeclarationReferenceEncoding(BinaryTypeEncodingType::InterfaceDeclarationReference);
+    auto* s = new binary::InterfaceDeclarationReferenceEncoding();
     s->_name = this->_heapWriter.push_string(type.interface->jsName);
+    
+    std::vector<MetaFileOffset> offsets;
+    for (auto protocol : type.protocols) {
+        offsets.push_back(this->_heapWriter.push_string(protocol->jsName));
+    }
+    s->_protocols = this->_heapWriter.push_binaryArray(offsets);
+    
     return unique_ptr<binary::TypeEncoding>(s);
 }
 
@@ -157,8 +171,12 @@ unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitBrid
     if (type.bridgedInterface == nullptr) {
         throw logic_error(std::string("Unresolved bridged interface for BridgedInterfaceType with name '") + type.bridgedInterface->name + "'.");
     }
-    binary::DeclarationReferenceEncoding* s = new binary::DeclarationReferenceEncoding(BinaryTypeEncodingType::InterfaceDeclarationReference);
+    auto s = new binary::InterfaceDeclarationReferenceEncoding();
     s->_name = this->_heapWriter.push_string(type.bridgedInterface->jsName);
+
+    std::vector<MetaFileOffset> offsets;
+    s->_protocols = this->_heapWriter.push_binaryArray(offsets);
+    
     return unique_ptr<binary::TypeEncoding>(s);
 }
 

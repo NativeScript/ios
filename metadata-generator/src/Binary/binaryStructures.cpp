@@ -98,6 +98,13 @@ binary::MetaFileOffset binary::TypeEncoding::save(binary::BinaryWriter& writer)
     return writer.push_byte(this->_type);
 }
 
+binary::MetaFileOffset binary::IdEncoding::save(binary::BinaryWriter& writer)
+{
+    binary::MetaFileOffset offset = TypeEncoding::save(writer);
+    writer.push_pointer(this->_protocols);
+    return offset;
+}
+
 binary::MetaFileOffset binary::IncompleteArrayEncoding::save(binary::BinaryWriter& writer)
 {
     binary::MetaFileOffset offset = TypeEncoding::save(writer);
@@ -125,6 +132,13 @@ binary::MetaFileOffset binary::DeclarationReferenceEncoding::save(binary::Binary
 {
     binary::MetaFileOffset offset = TypeEncoding::save(writer);
     writer.push_pointer(this->_name);
+    return offset;
+}
+
+binary::MetaFileOffset binary::InterfaceDeclarationReferenceEncoding::save(binary::BinaryWriter& writer)
+{
+    binary::MetaFileOffset offset = DeclarationReferenceEncoding::save(writer);
+    writer.push_pointer(this->_protocols);
     return offset;
 }
 

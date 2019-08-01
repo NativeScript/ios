@@ -30,6 +30,8 @@
 		C26656B022B3760900EE15CC /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A722B3760800EE15CC /* libv8_initializers.a */; };
 		C26656B122B3760900EE15CC /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */; };
 		C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */ = {isa = PBXBuildFile; fileRef = C26656B222B3768C00EE15CC /* InteropTypes.mm */; };
+		C27E5D8522F2FDDB00498ED0 /* KnownUnknownClassPair.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */; };
+		C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */ = {isa = PBXBuildFile; fileRef = C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */; };
 		C286B78022F01CB500795E21 /* base64.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C286B77E22F01CB500795E21 /* base64.cpp */; };
 		C286B78322F01DB900795E21 /* utils.mm in Sources */ = {isa = PBXBuildFile; fileRef = C286B78122F01DB900795E21 /* utils.mm */; };
 		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
@@ -280,6 +282,8 @@
 		C26C3A8122E702E800574872 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
 		C26C3A8322E702E800574872 /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
 		C26C3A8422E702E800574872 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
+		C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = KnownUnknownClassPair.cpp; sourceTree = "<group>"; };
+		C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KnownUnknownClassPair.h; sourceTree = "<group>"; };
 		C286B77E22F01CB500795E21 /* base64.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = base64.cpp; sourceTree = "<group>"; };
 		C286B77F22F01CB500795E21 /* base64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = base64.h; sourceTree = "<group>"; };
 		C286B78122F01DB900795E21 /* utils.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = utils.mm; sourceTree = "<group>"; };
@@ -1114,6 +1118,8 @@
 				C293752D22A10C490075CB16 /* Interop_impl.h */,
 				C2DDEB77229EAC8200345BFE /* Interop.mm */,
 				C26656B222B3768C00EE15CC /* InteropTypes.mm */,
+				C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */,
+				C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */,
 				C2DDEB6E229EAC8200345BFE /* Metadata.h */,
 				C2DDEB70229EAC8200345BFE /* Metadata.mm */,
 				C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */,
@@ -1220,6 +1226,7 @@
 				C22C092322CA3F370080D176 /* Worker.h in Headers */,
 				C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */,
 				C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */,
+				C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */,
 				C2DDEBAB229EAC8300345BFE /* WeakRef.h in Headers */,
 				C2DDEBA8229EAC8300345BFE /* SymbolLoader.h in Headers */,
 				C2DDEB62229EAC3C00345BFE /* natives_blob.x86_64.h in Headers */,
@@ -1562,6 +1569,7 @@
 				C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */,
 				C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */,
 				C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */,
+				C27E5D8522F2FDDB00498ED0 /* KnownUnknownClassPair.cpp in Sources */,
 				C2DDEBB5229EAC8300345BFE /* Tasks.cpp in Sources */,
 				C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */,
 			);

@@ -463,7 +463,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
                 Local<v8::Array> params = paramsVal.As<v8::Array>();
                 TypeEncoding* next = typeEncoding;
                 for (int i = 0; i < params->Length(); i++) {
-                    next = reinterpret_cast<TypeEncoding*>(reinterpret_cast<char*>(next) + sizeof(next->type));
+                    next = const_cast<TypeEncoding*>(next->next());
                     Local<Value> param;
                     success = params->Get(context, i).ToLocal(&param);
                     assert(success);

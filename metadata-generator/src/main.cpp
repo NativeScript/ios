@@ -137,7 +137,7 @@ public:
         // (even though the 'suppressIncludeNotFound' setting is false)
         // here we set this explicitly in order to keep the same behavior
         Compiler.getPreprocessor().SetSuppressIncludeNotFoundError(!cla_strictIncludes);
-
+        
         return std::unique_ptr<clang::ASTConsumer>(new MetaGenerationConsumer(Compiler.getASTContext().getSourceManager(), Compiler.getPreprocessor().getHeaderSearchInfo()));
     }
 };
@@ -205,9 +205,9 @@ int main(int argc, const char** argv)
         // Create umbrella header
         umbrellaContent = CreateUmbrellaHeader(clangArgs, includePaths);
     }
-
+    
     clangArgs.insert(clangArgs.end(), includePaths.begin(), includePaths.end());
-
+    
     // Save the umbrella file
     if (!cla_outputUmbrellaHeaderFile.empty()) {
         std::error_code errorCode;
@@ -220,7 +220,7 @@ int main(int argc, const char** argv)
 
     // generate metadata for the intermediate sdk header
     clang::tooling::runToolOnCodeWithArgs(new MetaGenerationFrontendAction(), umbrellaContent, clangArgs, "umbrella.h", "objc-metadata-generator");
-
+    
     std::clock_t end = clock();
     double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
     std::cout << "Done! Running time: " << elapsed_secs << " sec " << std::endl;

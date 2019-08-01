@@ -256,6 +256,18 @@ public:
     virtual ~TypeEncoding() { }
 };
 
+struct IdEncoding : public TypeEncoding {
+public:
+    IdEncoding()
+    : TypeEncoding(BinaryTypeEncodingType::Id)
+    {
+    }
+    
+    MetaFileOffset _protocols;
+
+    virtual MetaFileOffset save(BinaryWriter& writer) override;
+};
+
 struct IncompleteArrayEncoding : public TypeEncoding {
 public:
     IncompleteArrayEncoding()
@@ -302,7 +314,19 @@ public:
     }
 
     MetaFileOffset _name;
+    
+    virtual MetaFileOffset save(BinaryWriter& writer) override;
+};
 
+struct InterfaceDeclarationReferenceEncoding : public DeclarationReferenceEncoding {
+public:
+    InterfaceDeclarationReferenceEncoding()
+    : DeclarationReferenceEncoding(BinaryTypeEncodingType::InterfaceDeclarationReference)
+    {
+    }
+    
+    MetaFileOffset _protocols;
+    
     virtual MetaFileOffset save(BinaryWriter& writer) override;
 };
 

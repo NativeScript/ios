@@ -216,27 +216,44 @@ static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
     path::append(path, library);
 
     if (!fs::exists(path)) {
+        path.append(".tbd");
+        if (fs::exists(path)) {
+            // A TBD file is a text-based file used by Apple. It contains information about a .DYLIB library.
+            // TBD files were introduced in Xcode 7 in September 2015 in order to reduce the size of SDKs
+            // that come with Xcode by linking to DYLIB libraries instead of storing the actual, larger DYLIB libraries.
+            return false;
+        }
+        
         return errc::no_such_file_or_directory;
     }
 
+    auto isDylib = [](MachOObjectFile* machObjectFile) -> bool {
+        uint32_t filetype = (machObjectFile->is64Bit() ? machObjectFile->getHeader64().filetype : machObjectFile->getHeader().filetype);
+        return (filetype == MachO::MH_DYLIB || filetype == MachO::MH_DYLIB_STUB || filetype == MachO::MH_DYLINKER);
+    };
+    
     if (Expected<OwningBinary<Binary> > binaryOrErr = createBinary(path)) {
         Binary& binary = *binaryOrErr.get().getBinary();
 
         if (MachOUniversalBinary* machoBinary = dyn_cast<MachOUniversalBinary>(&binary)) {
             for (const MachOUniversalBinary::ObjectForArch& object : machoBinary->objects()) {
-                // TODO: If built in debug this will crash because the errors are not handled/checked
                 if (Expected<std::unique_ptr<MachOObjectFile> > objectFile = object.getAsObjectFile()) {
                     if (MachOObjectFile* machObjectFile = dyn_cast<MachOObjectFile>(objectFile.get().get())) {
-                        uint32_t filetype = (machObjectFile->is64Bit() ? machObjectFile->getHeader64().filetype : machObjectFile->getHeader().filetype);
-                        if (filetype == MachO::MH_DYLIB || filetype == MachO::MH_DYLIB_STUB) {
+                        if (isDylib(machObjectFile)) {
                             return false;
                         }
                     }
-                }
-                else if (Expected<std::unique_ptr<Archive> > archive = object.getAsArchive()) {
+                } else if (Expected<std::unique_ptr<Archive> > archive = object.getAsArchive()) {
                     return true;
                 }
             }
+            // fallthrough and return error (no static, or dynamic library is detected inside the universal binary)
+        } else if (MachOObjectFile* machObjectFile = dyn_cast<MachOObjectFile>(&binary)) {
+            if (isDylib(machObjectFile)) {
+                return false;
+            }
+        } else if (Archive* archive = dyn_cast<Archive>(&binary)) {
+            return true;
         }
     }
 
@@ -251,9 +268,12 @@ void binary::BinarySerializer::serializeModule(clang::Module* module, binary::Mo
         // System frameworks are always shared, so there's no need to check them anyways.
         if (module->IsSystem) {
             flags |= 1;
-        }
-        else if (llvm::ErrorOr<bool> isStatic = isStaticFramework(module)) {
-            if (!isStatic.get()) {
+        } else {
+            llvm::ErrorOr<bool> isStatic = isStaticFramework(module);
+            assert(isStatic.getError().value() == 0);
+
+            bool isDynamic = isStatic.getError().value() == 0 && !isStatic.get();
+            if (isDynamic) {
                 flags |= 1;
             }
         }
