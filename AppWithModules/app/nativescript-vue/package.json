@@ -1,0 +1,6 @@
+{
+    "main": "starter",
+    "android": {
+        "v8Flags": "--expose_gc"
+    }
+}

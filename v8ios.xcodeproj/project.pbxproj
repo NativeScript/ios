@@ -32,6 +32,13 @@
 		C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */ = {isa = PBXBuildFile; fileRef = C26656B222B3768C00EE15CC /* InteropTypes.mm */; };
 		C27E5D8522F2FDDB00498ED0 /* KnownUnknownClassPair.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */; };
 		C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */ = {isa = PBXBuildFile; fileRef = C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */; };
+		C27E5DA922F31F3D00498ED0 /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
+		C27E5DAA22F31F3D00498ED0 /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C27E5DB122F31FA900498ED0 /* TNSWidgets.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C27E5DAF22F31F7A00498ED0 /* TNSWidgets.framework */; };
+		C27E5DB222F31FA900498ED0 /* TNSWidgets.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C27E5DAF22F31F7A00498ED0 /* TNSWidgets.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C27E5DB522F3206B00498ED0 /* app in Resources */ = {isa = PBXBuildFile; fileRef = C27E5DB422F3206B00498ED0 /* app */; };
+		C27E5DB822F3207800498ED0 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = C27E5DB722F3207800498ED0 /* main.m */; };
+		C27E5DBA22F324C200498ED0 /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C27E5DB922F324C200498ED0 /* Default-568h@2x.png */; };
 		C286B78022F01CB500795E21 /* base64.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C286B77E22F01CB500795E21 /* base64.cpp */; };
 		C286B78322F01DB900795E21 /* utils.mm in Sources */ = {isa = PBXBuildFile; fileRef = C286B78122F01DB900795E21 /* utils.mm */; };
 		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
@@ -107,8 +114,6 @@
 		C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C2C8EE7A22CF64E4001F8CEC /* SimpleAllocator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */; };
 		C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */; };
-		C2C8EE7C22D0ECBD001F8CEC /* TNSWidgets.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C293748C229EC6780075CB16 /* TNSWidgets.framework */; };
-		C2C8EE7D22D0ECBD001F8CEC /* TNSWidgets.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C293748C229EC6780075CB16 /* TNSWidgets.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C2C8F0C522D5D39F001F8CEC /* libinspector_protocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C8F0C422D5D39F001F8CEC /* libinspector_protocol.a */; };
 		C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */; };
 		C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */; };
@@ -173,6 +178,20 @@
 			remoteGlobalIDString = C2DDEB31229EAB3B00345BFE;
 			remoteInfo = NativeScript;
 		};
+		C27E5DA322F31EF900498ED0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2F4CBB222C60BFD0036B56F;
+			remoteInfo = "metadata-generator";
+		};
+		C27E5DAB22F31F3D00498ED0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2DDEB31229EAB3B00345BFE;
+			remoteInfo = NativeScript;
+		};
 		C286B78422F06C7400795E21 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = C27E277822202663009C10A3 /* Project object */;
@@ -197,6 +216,18 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		C27E5DAD22F31F3D00498ED0 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				C27E5DB222F31FA900498ED0 /* TNSWidgets.framework in Embed Frameworks */,
+				C27E5DAA22F31F3D00498ED0 /* NativeScript.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C29374E0229FC0F60075CB16 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -221,7 +252,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				C2C8EE7D22D0ECBD001F8CEC /* TNSWidgets.framework in Embed Frameworks */,
 				C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -284,11 +314,16 @@
 		C26C3A8422E702E800574872 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
 		C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = KnownUnknownClassPair.cpp; sourceTree = "<group>"; };
 		C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KnownUnknownClassPair.h; sourceTree = "<group>"; };
+		C27E5D8B22F31CC900498ED0 /* AppWithModules.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppWithModules.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C27E5D9B22F31CCC00498ED0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C27E5DAF22F31F7A00498ED0 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
+		C27E5DB422F3206B00498ED0 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
+		C27E5DB722F3207800498ED0 /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		C27E5DB922F324C200498ED0 /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		C286B77E22F01CB500795E21 /* base64.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = base64.cpp; sourceTree = "<group>"; };
 		C286B77F22F01CB500795E21 /* base64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = base64.h; sourceTree = "<group>"; };
 		C286B78122F01DB900795E21 /* utils.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = utils.mm; sourceTree = "<group>"; };
 		C286B78222F01DB900795E21 /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
-		C293748C229EC6780075CB16 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
 		C29374E2229FC0F60075CB16 /* libTestFixtures.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTestFixtures.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		C29374EC229FC1600075CB16 /* TNSMethodCalls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSMethodCalls.h; sourceTree = "<group>"; };
 		C29374ED229FC1600075CB16 /* TNSConstructorResolution.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSConstructorResolution.h; sourceTree = "<group>"; };
@@ -531,6 +566,15 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		C27E5D8822F31CC900498ED0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C27E5DB122F31FA900498ED0 /* TNSWidgets.framework in Frameworks */,
+				C27E5DA922F31F3D00498ED0 /* NativeScript.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C29374DF229FC0F60075CB16 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -549,7 +593,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C2C8EE7C22D0ECBD001F8CEC /* TNSWidgets.framework in Frameworks */,
 				C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -652,13 +695,13 @@
 		C27E277722202663009C10A3 = {
 			isa = PBXGroup;
 			children = (
-				C266567722AA405100EE15CC /* Default-568h@2x.png */,
 				C26C3A6C22E702E800574872 /* include */,
 				C2DDEB17229EA89000345BFE /* TestApp */,
 				C2DDEB33229EAB3B00345BFE /* NativeScript */,
 				C29374E3229FC0F60075CB16 /* TestFixtures */,
 				C2F4CBB422C60BFD0036B56F /* metadata-generator */,
 				C2BD9CB022E5CB4E005CC701 /* Inspector */,
+				C27E5D8C22F31CCA00498ED0 /* AppWithModules */,
 				C27E278122202664009C10A3 /* Products */,
 				C2FF3016225203FD00933782 /* Frameworks */,
 			);
@@ -672,16 +715,37 @@
 				C29374E2229FC0F60075CB16 /* libTestFixtures.a */,
 				C2F4CBB322C60BFD0036B56F /* metadata-generator */,
 				C2BD9CAF22E5CB4E005CC701 /* libInspector.a */,
+				C27E5D8B22F31CC900498ED0 /* AppWithModules.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		C293748B229EC6170075CB16 /* Frameworks */ = {
+		C27E5D8C22F31CCA00498ED0 /* AppWithModules */ = {
 			isa = PBXGroup;
 			children = (
-				C293748C229EC6780075CB16 /* TNSWidgets.framework */,
+				C27E5DB922F324C200498ED0 /* Default-568h@2x.png */,
+				C27E5DAE22F31F7A00498ED0 /* Frameworks */,
+				C27E5DB622F3207800498ED0 /* Source Files */,
+				C27E5DB422F3206B00498ED0 /* app */,
+				C27E5D9B22F31CCC00498ED0 /* Info.plist */,
+			);
+			path = AppWithModules;
+			sourceTree = "<group>";
+		};
+		C27E5DAE22F31F7A00498ED0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C27E5DAF22F31F7A00498ED0 /* TNSWidgets.framework */,
 			);
 			path = Frameworks;
+			sourceTree = "<group>";
+		};
+		C27E5DB622F3207800498ED0 /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				C27E5DB722F3207800498ED0 /* main.m */,
+			);
+			path = "Source Files";
 			sourceTree = "<group>";
 		};
 		C29374E3229FC0F60075CB16 /* TestFixtures */ = {
@@ -1051,10 +1115,10 @@
 		C2DDEB17229EA89000345BFE /* TestApp */ = {
 			isa = PBXGroup;
 			children = (
-				C293748B229EC6170075CB16 /* Frameworks */,
 				C2DDEBDD229EB4A900345BFE /* app */,
 				C2DDEBDA229EB37A00345BFE /* Source Files */,
 				C2DDEB26229EA89200345BFE /* Info.plist */,
+				C266567722AA405100EE15CC /* Default-568h@2x.png */,
 			);
 			path = TestApp;
 			sourceTree = "<group>";
@@ -1248,6 +1312,27 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
+		C27E5D8A22F31CC900498ED0 /* AppWithModules */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C27E5D9E22F31CCC00498ED0 /* Build configuration list for PBXNativeTarget "AppWithModules" */;
+			buildPhases = (
+				C27E5DB322F31FF800498ED0 /* ShellScript */,
+				C27E5D8722F31CC900498ED0 /* Sources */,
+				C27E5D8822F31CC900498ED0 /* Frameworks */,
+				C27E5D8922F31CC900498ED0 /* Resources */,
+				C27E5DAD22F31F3D00498ED0 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C27E5DA422F31EF900498ED0 /* PBXTargetDependency */,
+				C27E5DAC22F31F3D00498ED0 /* PBXTargetDependency */,
+			);
+			name = AppWithModules;
+			productName = AppWithModules;
+			productReference = C27E5D8B22F31CC900498ED0 /* AppWithModules.app */;
+			productType = "com.apple.product-type.application";
+		};
 		C29374E1229FC0F60075CB16 /* TestFixtures */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C29374E8229FC0F60075CB16 /* Build configuration list for PBXNativeTarget "TestFixtures" */;
@@ -1350,6 +1435,9 @@
 				LastUpgradeCheck = 1030;
 				ORGANIZATIONNAME = Progress;
 				TargetAttributes = {
+					C27E5D8A22F31CC900498ED0 = {
+						CreatedOnToolsVersion = 10.3;
+					};
 					C29374E1229FC0F60075CB16 = {
 						CreatedOnToolsVersion = 10.2.1;
 					};
@@ -1381,6 +1469,7 @@
 			projectRoot = "";
 			targets = (
 				C2DDEB15229EA89000345BFE /* TestApp */,
+				C27E5D8A22F31CC900498ED0 /* AppWithModules */,
 				C2BD9CAE22E5CB4E005CC701 /* Inspector */,
 				C2DDEB31229EAB3B00345BFE /* NativeScript */,
 				C29374E1229FC0F60075CB16 /* TestFixtures */,
@@ -1390,6 +1479,15 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		C27E5D8922F31CC900498ED0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C27E5DB522F3206B00498ED0 /* app in Resources */,
+				C27E5DBA22F324C200498ED0 /* Default-568h@2x.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C2DDEB14229EA89000345BFE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1409,6 +1507,23 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		C27E5DB322F31FF800498ED0 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator/bin\ncp ../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n";
+		};
 		C2F4CBBA22C60C0F0036B56F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -1446,6 +1561,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C27E5D8722F31CC900498ED0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C27E5DB822F3207800498ED0 /* main.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C29374DE229FC0F60075CB16 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1590,6 +1713,16 @@
 			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
 			targetProxy = C22C091E22CA2E860080D176 /* PBXContainerItemProxy */;
 		};
+		C27E5DA422F31EF900498ED0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2F4CBB222C60BFD0036B56F /* metadata-generator */;
+			targetProxy = C27E5DA322F31EF900498ED0 /* PBXContainerItemProxy */;
+		};
+		C27E5DAC22F31F3D00498ED0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
+			targetProxy = C27E5DAB22F31F3D00498ED0 /* PBXContainerItemProxy */;
+		};
 		C286B78522F06C7400795E21 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C2BD9CAE22E5CB4E005CC701 /* Inspector */;
@@ -1722,6 +1855,80 @@
 			};
 			name = Release;
 		};
+		C27E5D9F22F31CCC00498ED0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_CXX_LIBRARY = "compiler-default";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = CHSQ3M3P37;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/AppWithModules/Frameworks",
+				);
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
+				INFOPLIST_FILE = AppWithModules/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"-Wl,-search_paths_first",
+					"-Wl,-headerpad_max_install_names",
+					"-ObjC",
+					"-framework",
+					NativeScript,
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.AppWithModules;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		C27E5DA022F31CCC00498ED0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_CXX_LIBRARY = "compiler-default";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = CHSQ3M3P37;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/AppWithModules/Frameworks",
+				);
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
+				INFOPLIST_FILE = AppWithModules/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"-Wl,-search_paths_first",
+					"-Wl,-headerpad_max_install_names",
+					"-ObjC",
+					"-framework",
+					NativeScript,
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.AppWithModules;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		C29374E9229FC0F60075CB16 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1801,13 +2008,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = CHSQ3M3P37;
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/TestApp/Frameworks",
-				);
+				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				HEADER_SEARCH_PATHS = (
-					"$(SRCROOT)/include",
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/TestFixtures",
 				);
@@ -1834,7 +2037,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				TARGETED_DEVICE_FAMILY = 1;
-				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/include";
+				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Debug;
 		};
@@ -1846,13 +2049,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = CHSQ3M3P37;
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/TestApp/Frameworks",
-				);
+				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				HEADER_SEARCH_PATHS = (
-					"$(SRCROOT)/include",
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/TestFixtures",
 				);
@@ -1879,7 +2078,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				TARGETED_DEVICE_FAMILY = 1;
-				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/include";
+				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Release;
 		};
@@ -2017,6 +2216,15 @@
 			buildConfigurations = (
 				C27E279422202665009C10A3 /* Debug */,
 				C27E279522202665009C10A3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C27E5D9E22F31CCC00498ED0 /* Build configuration list for PBXNativeTarget "AppWithModules" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C27E5D9F22F31CCC00498ED0 /* Debug */,
+				C27E5DA022F31CCC00498ED0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
