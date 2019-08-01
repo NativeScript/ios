@@ -15,16 +15,8 @@ void Console::Init(Isolate* isolate) {
     bool success = console->SetPrototype(context, Object::New(isolate)).FromMaybe(false);
     assert(success);
 
-    Local<v8::Function> func;
-    if (!Function::New(context, LogCallback, console, 0, ConstructorBehavior::kThrow).ToLocal(&func)) {
-        return;
-    }
-
-    Local<v8::String> logFuncName = tns::ToV8String(isolate, "log");
-    func->SetName(logFuncName);
-    if (!console->CreateDataProperty(context, logFuncName, func).FromMaybe(false)) {
-        assert(false);
-    }
+    Console::AttachLogFunction(isolate, console, "log");
+    Console::AttachLogFunction(isolate, console, "info");
 
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -41,6 +33,21 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     v8_inspector::V8LogAgentImpl::EntryAdded(str, "info", "", 0);
 #endif
     printf("%s", str.c_str());
+}
+
+void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const std::string name) {
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<v8::Function> func;
+    if (!Function::New(context, LogCallback, console, 0, ConstructorBehavior::kThrow).ToLocal(&func)) {
+        assert(false);
+    }
+
+    Local<v8::String> logFuncName = tns::ToV8String(isolate, name);
+    func->SetName(logFuncName);
+    if (!console->CreateDataProperty(context, logFuncName, func).FromMaybe(false)) {
+        assert(false);
+    }
 }
 
 }
