@@ -42,7 +42,7 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     success = weakRef->Set(context, tns::ToV8String(isolate, "clear"), GetClearFunction(isolate)).FromMaybe(false);
     assert(success);
 
-    tns::SetPrivateValue(isolate, weakRef, tns::ToV8String(isolate, "target"), External::New(isolate, poTarget));
+    tns::SetPrivateValue(weakRef, tns::ToV8String(isolate, "target"), External::New(isolate, poTarget));
 
     info.GetReturnValue().Set(weakRef);
 }
@@ -58,7 +58,7 @@ void WeakRef::WeakTargetCallback(const WeakCallbackInfo<CallbackState>& data) {\
     Persistent<Object>* poHolder = callbackState->holder_;
     if (poHolder != nullptr) {
         Local<Object> holder = poHolder->Get(isolate);
-        tns::SetPrivateValue(isolate, holder, tns::ToV8String(isolate, "target"), External::New(isolate, nullptr));
+        tns::SetPrivateValue(holder, tns::ToV8String(isolate, "target"), External::New(isolate, nullptr));
     }
 
     if (callbackState->holder_ == nullptr) {
@@ -72,7 +72,7 @@ void WeakRef::WeakHolderCallback(const WeakCallbackInfo<CallbackState>& data) {
     Isolate* isolate = data.GetIsolate();
     Local<Object> holder = Local<Object>::New(isolate, *poHolder);
 
-    Local<Value> hiddenVal = tns::GetPrivateValue(isolate, holder, tns::ToV8String(isolate, "target"));
+    Local<Value> hiddenVal = tns::GetPrivateValue(holder, tns::ToV8String(isolate, "target"));
     Persistent<Object>* poTarget = reinterpret_cast<Persistent<Object>*>(hiddenVal.As<External>()->Value());
 
     if (poTarget != nullptr) {
@@ -116,7 +116,7 @@ Local<v8::Function> WeakRef::GetClearFunction(Isolate* isolate) {
 void WeakRef::GetCallback(const FunctionCallbackInfo<Value>& info) {
     Local<Object> holder = info.This();
     Isolate* isolate = info.GetIsolate();
-    Local<Value> hiddenVal = tns::GetPrivateValue(isolate, holder, tns::ToV8String(isolate, "target"));
+    Local<Value> hiddenVal = tns::GetPrivateValue(holder, tns::ToV8String(isolate, "target"));
     Persistent<Object>* poTarget = reinterpret_cast<Persistent<Object>*>(hiddenVal.As<External>()->Value());
 
     if (poTarget != nullptr) {
@@ -130,7 +130,7 @@ void WeakRef::GetCallback(const FunctionCallbackInfo<Value>& info) {
 void WeakRef::ClearCallback(const FunctionCallbackInfo<Value>& info) {
     Local<Object> holder = info.This();
     Isolate* isolate = info.GetIsolate();
-    tns::SetPrivateValue(isolate, holder, tns::ToV8String(isolate, "target"), External::New(isolate, nullptr));
+    tns::SetPrivateValue(holder, tns::ToV8String(isolate, "target"), External::New(isolate, nullptr));
 }
 
 }

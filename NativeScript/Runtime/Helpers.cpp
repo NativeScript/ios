@@ -69,18 +69,22 @@ std::string tns::ReadText(const std::string& file) {
     return content;
 }
 
-void tns::SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<v8::String>& propName, const Local<Value>& value) {
+void tns::SetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName, const Local<Value>& value) {
+    Local<Context> context = obj->CreationContext();
+    Isolate* isolate = context->GetIsolate();
     Local<Private> privateKey = Private::ForApi(isolate, propName);
     bool success;
-    if (!obj->SetPrivate(isolate->GetCurrentContext(), privateKey, value).To(&success) || !success) {
+    if (!obj->SetPrivate(context, privateKey, value).To(&success) || !success) {
         assert(false);
     }
 }
 
-Local<Value> tns::GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<v8::String>& propName) {
+Local<Value> tns::GetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName) {
+    Local<Context> context = obj->CreationContext();
+    Isolate* isolate = context->GetIsolate();
     Local<Private> privateKey = Private::ForApi(isolate, propName);
 
-    Maybe<bool> hasPrivate = obj->HasPrivate(isolate->GetCurrentContext(), privateKey);
+    Maybe<bool> hasPrivate = obj->HasPrivate(context, privateKey);
 
     assert(!hasPrivate.IsNothing());
 
@@ -89,7 +93,7 @@ Local<Value> tns::GetPrivateValue(Isolate* isolate, const Local<Object>& obj, co
     }
 
     Local<Value> result;
-    if (!obj->GetPrivate(isolate->GetCurrentContext(), privateKey).ToLocal(&result)) {
+    if (!obj->GetPrivate(context, privateKey).ToLocal(&result)) {
         assert(false);
     }
 
@@ -106,7 +110,7 @@ void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* 
     if (obj->InternalFieldCount() > 0) {
         obj->SetInternalField(0, ext);
     } else {
-        tns::SetPrivateValue(isolate, obj, tns::ToV8String(isolate, "metadata"), ext);
+        tns::SetPrivateValue(obj, tns::ToV8String(isolate, "metadata"), ext);
     }
 }
 
@@ -125,7 +129,7 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
         return static_cast<BaseDataWrapper*>(field.As<External>()->Value());
     }
 
-    Local<Value> metadataProp = tns::GetPrivateValue(isolate, obj, tns::ToV8String(isolate, "metadata"));
+    Local<Value> metadataProp = tns::GetPrivateValue(obj, tns::ToV8String(isolate, "metadata"));
     if (metadataProp.IsEmpty() || metadataProp->IsNullOrUndefined() || !metadataProp->IsExternal()) {
         return nullptr;
     }

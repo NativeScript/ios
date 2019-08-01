@@ -15,8 +15,8 @@ bool ToBool(const v8::Local<v8::Value>& value);
 
 std::string ReadText(const std::string& file);
 
-void SetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName, const v8::Local<v8::Value>& value);
-v8::Local<v8::Value> GetPrivateValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName);
+void SetPrivateValue(const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName, const v8::Local<v8::Value>& value);
+v8::Local<v8::Value> GetPrivateValue(const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName);
 
 void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
 BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
