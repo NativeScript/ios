@@ -1808,7 +1808,6 @@
 				);
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
-					"-Wl,-headerpad_max_install_names",
 					"-ObjC",
 					"-framework",
 					NativeScript,
@@ -1845,7 +1844,6 @@
 				);
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
-					"-Wl,-headerpad_max_install_names",
 					"-ObjC",
 					"-framework",
 					NativeScript,
@@ -1953,7 +1951,6 @@
 				);
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
-					"-Wl,-headerpad_max_install_names",
 					"-ObjC",
 					"-framework",
 					NativeScript,
@@ -1994,7 +1991,6 @@
 				);
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
-					"-Wl,-headerpad_max_install_names",
 					"-ObjC",
 					"-framework",
 					NativeScript,
@@ -2044,7 +2040,6 @@
 				OTHER_CFLAGS = "-fno-rtti";
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
-					"-Wl,-headerpad_max_install_names",
 					"-Werror",
 					"-Wno-unused-result",
 					"-fno-builtin-stpcpy",
@@ -2108,7 +2103,6 @@
 				OTHER_CFLAGS = "-fno-rtti";
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
-					"-Wl,-headerpad_max_install_names",
 					"-Werror",
 					"-Wno-unused-result",
 					"-fno-builtin-stpcpy",
