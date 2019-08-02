@@ -1,4 +1,3 @@
-#import <UIKit/UIKit.h>
 #import <NativeScript/NativeScript.h>
 
 extern char startOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");

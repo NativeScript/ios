@@ -398,7 +398,9 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             assert(wrapper && wrapper->Type() == WrapperType::ObjCProtocol);
             ObjCProtocolWrapper* protoWrapper = static_cast<ObjCProtocolWrapper*>(wrapper);
             Protocol* proto = protoWrapper->Proto();
-            assert(proto != nullptr);
+            if (proto == nil) {
+                continue;
+            }
 
             if (class_conformsToProtocol(extendedClass, proto)) {
                 continue;
