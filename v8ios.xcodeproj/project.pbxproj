@@ -20,15 +20,6 @@
 		C266569822AFFFB000EE15CC /* Reference.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569622AFFFB000EE15CC /* Reference.h */; };
 		C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C266569C22B282BA00EE15CC /* FunctionReference.cpp */; };
 		C266569F22B282BA00EE15CC /* FunctionReference.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569D22B282BA00EE15CC /* FunctionReference.h */; };
-		C26656A922B3760800EE15CC /* libv8_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A022B3760800EE15CC /* libv8_compiler.a */; };
-		C26656AA22B3760900EE15CC /* libv8_base_without_compiler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A122B3760800EE15CC /* libv8_base_without_compiler.a */; };
-		C26656AB22B3760900EE15CC /* libv8_libsampler.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A222B3760800EE15CC /* libv8_libsampler.a */; };
-		C26656AC22B3760900EE15CC /* libv8_libbase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A322B3760800EE15CC /* libv8_libbase.a */; };
-		C26656AD22B3760900EE15CC /* libv8_external_snapshot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A422B3760800EE15CC /* libv8_external_snapshot.a */; };
-		C26656AE22B3760900EE15CC /* libv8_libplatform.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A522B3760800EE15CC /* libv8_libplatform.a */; };
-		C26656AF22B3760900EE15CC /* libv8_init.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A622B3760800EE15CC /* libv8_init.a */; };
-		C26656B022B3760900EE15CC /* libv8_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A722B3760800EE15CC /* libv8_initializers.a */; };
-		C26656B122B3760900EE15CC /* libtorque_generated_initializers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */; };
 		C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */ = {isa = PBXBuildFile; fileRef = C26656B222B3768C00EE15CC /* InteropTypes.mm */; };
 		C27E5D8522F2FDDB00498ED0 /* KnownUnknownClassPair.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */; };
 		C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */ = {isa = PBXBuildFile; fileRef = C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */; };
@@ -102,7 +93,6 @@
 		C2BD9D6B22E5CBC6005CC701 /* v8-inspector-session-impl.cc in Sources */ = {isa = PBXBuildFile; fileRef = C2BD9D2222E5CBC5005CC701 /* v8-inspector-session-impl.cc */; };
 		C2BD9D6C22E5CBC6005CC701 /* value-mirror.cc in Sources */ = {isa = PBXBuildFile; fileRef = C2BD9D2422E5CBC5005CC701 /* value-mirror.cc */; };
 		C2BD9D7322E5D0C5005CC701 /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2BD9D7222E5D0C5005CC701 /* JsV8InspectorClient.mm */; };
-		C2BF3F3E22C3ABEA00A76BDE /* libv8_crash_keys.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2BF3F3D22C3ABEA00A76BDE /* libv8_crash_keys.a */; };
 		C2C3548522E6039000981173 /* v8-dom-agent-impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C3548322E6039000981173 /* v8-dom-agent-impl.cpp */; };
 		C2C3548822E6065500981173 /* v8-overlay-agent-impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C3548622E6065500981173 /* v8-overlay-agent-impl.cpp */; };
 		C2C3548B22E6083D00981173 /* Overlay.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C3548922E6083C00981173 /* Overlay.cpp */; };
@@ -114,11 +104,9 @@
 		C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C2C8EE7A22CF64E4001F8CEC /* SimpleAllocator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */; };
 		C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */; };
-		C2C8F0C522D5D39F001F8CEC /* libinspector_protocol.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C8F0C422D5D39F001F8CEC /* libinspector_protocol.a */; };
 		C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */; };
 		C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */; };
 		C2DDEB36229EAB3B00345BFE /* NativeScript.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB34229EAB3B00345BFE /* NativeScript.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB3E229EABFF00345BFE /* libffi.a */; };
 		C2DDEB60229EAC3C00345BFE /* snapshot_blob.x86_64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5C229EAC3C00345BFE /* snapshot_blob.x86_64.h */; };
 		C2DDEB61229EAC3C00345BFE /* snapshot_blob.arm64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5D229EAC3C00345BFE /* snapshot_blob.arm64.h */; };
 		C2DDEB62229EAC3C00345BFE /* natives_blob.x86_64.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB5E229EAC3C00345BFE /* natives_blob.x86_64.h */; };
@@ -191,13 +179,6 @@
 			proxyType = 1;
 			remoteGlobalIDString = C2DDEB31229EAB3B00345BFE;
 			remoteInfo = NativeScript;
-		};
-		C286B78422F06C7400795E21 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = C27E277822202663009C10A3 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = C2BD9CAE22E5CB4E005CC701;
-			remoteInfo = Inspector;
 		};
 		C293752A229FC4740075CB16 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -283,15 +264,6 @@
 		C266569622AFFFB000EE15CC /* Reference.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Reference.h; sourceTree = "<group>"; };
 		C266569C22B282BA00EE15CC /* FunctionReference.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FunctionReference.cpp; sourceTree = "<group>"; };
 		C266569D22B282BA00EE15CC /* FunctionReference.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FunctionReference.h; sourceTree = "<group>"; };
-		C26656A022B3760800EE15CC /* libv8_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_compiler.a; sourceTree = "<group>"; };
-		C26656A122B3760800EE15CC /* libv8_base_without_compiler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_base_without_compiler.a; sourceTree = "<group>"; };
-		C26656A222B3760800EE15CC /* libv8_libsampler.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libsampler.a; sourceTree = "<group>"; };
-		C26656A322B3760800EE15CC /* libv8_libbase.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libbase.a; sourceTree = "<group>"; };
-		C26656A422B3760800EE15CC /* libv8_external_snapshot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_external_snapshot.a; sourceTree = "<group>"; };
-		C26656A522B3760800EE15CC /* libv8_libplatform.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_libplatform.a; sourceTree = "<group>"; };
-		C26656A622B3760800EE15CC /* libv8_init.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_init.a; sourceTree = "<group>"; };
-		C26656A722B3760800EE15CC /* libv8_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_initializers.a; sourceTree = "<group>"; };
-		C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libtorque_generated_initializers.a; sourceTree = "<group>"; };
 		C26656B222B3768C00EE15CC /* InteropTypes.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = InteropTypes.mm; sourceTree = "<group>"; };
 		C26C3A6D22E702E800574872 /* v8-platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-platform.h"; sourceTree = "<group>"; };
 		C26C3A6E22E702E800574872 /* v8-version.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-version.h"; sourceTree = "<group>"; };
@@ -486,7 +458,6 @@
 		C2BD9D7122E5D0C5005CC701 /* v8-inspector-platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-inspector-platform.h"; sourceTree = "<group>"; };
 		C2BD9D7222E5D0C5005CC701 /* JsV8InspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = JsV8InspectorClient.mm; sourceTree = "<group>"; };
 		C2BD9D7422E5D7FE005CC701 /* Helpers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Helpers.h; sourceTree = "<group>"; };
-		C2BF3F3D22C3ABEA00A76BDE /* libv8_crash_keys.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libv8_crash_keys.a; sourceTree = "<group>"; };
 		C2C3548322E6039000981173 /* v8-dom-agent-impl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-dom-agent-impl.cpp"; sourceTree = "<group>"; };
 		C2C3548422E6039000981173 /* v8-dom-agent-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "v8-dom-agent-impl.h"; sourceTree = "<group>"; };
 		C2C3548622E6065500981173 /* v8-overlay-agent-impl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-overlay-agent-impl.cpp"; sourceTree = "<group>"; };
@@ -501,7 +472,6 @@
 		C2C8EE7322CE3266001F8CEC /* ConcurrentQueue.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConcurrentQueue.cpp; sourceTree = "<group>"; };
 		C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SimpleAllocator.cpp; sourceTree = "<group>"; };
 		C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SimpleAllocator.h; sourceTree = "<group>"; };
-		C2C8F0C422D5D39F001F8CEC /* libinspector_protocol.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libinspector_protocol.a; sourceTree = "<group>"; };
 		C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = FastEnumerationAdapter.mm; sourceTree = "<group>"; };
 		C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FastEnumerationAdapter.h; sourceTree = "<group>"; };
 		C2DDEB16229EA89000345BFE /* TestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -509,7 +479,6 @@
 		C2DDEB32229EAB3B00345BFE /* NativeScript.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScript.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB34229EAB3B00345BFE /* NativeScript.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeScript.h; sourceTree = "<group>"; };
 		C2DDEB35229EAB3B00345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C2DDEB3E229EABFF00345BFE /* libffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libffi.a; sourceTree = "<group>"; };
 		C2DDEB5C229EAC3C00345BFE /* snapshot_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.x86_64.h; sourceTree = "<group>"; };
 		C2DDEB5D229EAC3C00345BFE /* snapshot_blob.arm64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.arm64.h; sourceTree = "<group>"; };
 		C2DDEB5E229EAC3C00345BFE /* natives_blob.x86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.x86_64.h; sourceTree = "<group>"; };
@@ -601,18 +570,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C26656B022B3760900EE15CC /* libv8_initializers.a in Frameworks */,
-				C2BF3F3E22C3ABEA00A76BDE /* libv8_crash_keys.a in Frameworks */,
-				C26656AA22B3760900EE15CC /* libv8_base_without_compiler.a in Frameworks */,
-				C26656A922B3760800EE15CC /* libv8_compiler.a in Frameworks */,
-				C26656AE22B3760900EE15CC /* libv8_libplatform.a in Frameworks */,
-				C26656B122B3760900EE15CC /* libtorque_generated_initializers.a in Frameworks */,
-				C26656AD22B3760900EE15CC /* libv8_external_snapshot.a in Frameworks */,
-				C26656AB22B3760900EE15CC /* libv8_libsampler.a in Frameworks */,
-				C26656AC22B3760900EE15CC /* libv8_libbase.a in Frameworks */,
-				C2C8F0C522D5D39F001F8CEC /* libinspector_protocol.a in Frameworks */,
-				C26656AF22B3760900EE15CC /* libv8_init.a in Frameworks */,
-				C2DDEB48229EAC0000345BFE /* libffi.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1126,7 +1083,6 @@
 		C2DDEB33229EAB3B00345BFE /* NativeScript */ = {
 			isa = PBXGroup;
 			children = (
-				C2DDEB3D229EABBB00345BFE /* Frameworks */,
 				C2DDEB3B229EAB8600345BFE /* Runtime */,
 				C2DDEB3A229EAB7400345BFE /* Snapshot */,
 				C2DDEB34229EAB3B00345BFE /* NativeScript.h */,
@@ -1216,25 +1172,6 @@
 				C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */,
 			);
 			path = Runtime;
-			sourceTree = "<group>";
-		};
-		C2DDEB3D229EABBB00345BFE /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				C2C8F0C422D5D39F001F8CEC /* libinspector_protocol.a */,
-				C26656A822B3760800EE15CC /* libtorque_generated_initializers.a */,
-				C26656A122B3760800EE15CC /* libv8_base_without_compiler.a */,
-				C2BF3F3D22C3ABEA00A76BDE /* libv8_crash_keys.a */,
-				C26656A022B3760800EE15CC /* libv8_compiler.a */,
-				C26656A422B3760800EE15CC /* libv8_external_snapshot.a */,
-				C26656A622B3760800EE15CC /* libv8_init.a */,
-				C26656A722B3760800EE15CC /* libv8_initializers.a */,
-				C26656A322B3760800EE15CC /* libv8_libbase.a */,
-				C26656A522B3760800EE15CC /* libv8_libplatform.a */,
-				C26656A222B3760800EE15CC /* libv8_libsampler.a */,
-				C2DDEB3E229EABFF00345BFE /* libffi.a */,
-			);
-			path = Frameworks;
 			sourceTree = "<group>";
 		};
 		C2DDEBDA229EB37A00345BFE /* Source Files */ = {
@@ -1401,7 +1338,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				C286B78522F06C7400795E21 /* PBXTargetDependency */,
 			);
 			name = NativeScript;
 			productName = NativeScript;
@@ -1722,11 +1658,6 @@
 			isa = PBXTargetDependency;
 			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
 			targetProxy = C27E5DAB22F31F3D00498ED0 /* PBXContainerItemProxy */;
-		};
-		C286B78522F06C7400795E21 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = C2BD9CAE22E5CB4E005CC701 /* Inspector */;
-			targetProxy = C286B78422F06C7400795E21 /* PBXContainerItemProxy */;
 		};
 		C293752B229FC4740075CB16 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -2107,21 +2038,35 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/NativeScript/Frameworks",
-				);
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				OTHER_CFLAGS = "-fno-rtti";
 				OTHER_LDFLAGS = (
+					"-Wl,-search_paths_first",
+					"-Wl,-headerpad_max_install_names",
+					"-Werror",
+					"-Wno-unused-result",
+					"-fno-builtin-stpcpy",
+					"-fno-rtti",
+					"-mstackrealign",
 					"-framework",
 					UIKit,
 					"-framework",
 					MobileCoreServices,
-					"-force_load",
-					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libInspector.a",
+					"-L\"$(SRCROOT)/lib\"",
+					"-lffi",
+					"-linspector_protocol",
+					"-ltorque_generated_initializers",
+					"-lv8_base_without_compiler",
+					"-lv8_compiler",
+					"-lv8_external_snapshot",
+					"-lv8_init",
+					"-lv8_initializers",
+					"-lv8_libbase",
+					"-lv8_libplatform",
+					"-lv8_libsampler",
+					"-lInspector",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -2157,19 +2102,33 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/NativeScript/Frameworks",
-				);
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				OTHER_CFLAGS = "-fno-rtti";
 				OTHER_LDFLAGS = (
+					"-Wl,-search_paths_first",
+					"-Wl,-headerpad_max_install_names",
+					"-Werror",
+					"-Wno-unused-result",
+					"-fno-builtin-stpcpy",
+					"-fno-rtti",
+					"-mstackrealign",
 					"-framework",
 					UIKit,
 					"-framework",
 					MobileCoreServices,
+					"-L\"$(SRCROOT)/lib\"",
+					"-lffi",
+					"-ltorque_generated_initializers",
+					"-lv8_base_without_compiler",
+					"-lv8_compiler",
+					"-lv8_external_snapshot",
+					"-lv8_init",
+					"-lv8_initializers",
+					"-lv8_libbase",
+					"-lv8_libplatform",
+					"-lv8_libsampler"
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
