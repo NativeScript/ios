@@ -186,6 +186,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
 
         __block Class extendedClass = builder->GetExtendedClass(baseClassName, extendedClassName);
+        extendedClassName = class_getName(extendedClass);
 
         tns::SetValue(isolate, extendedClassCtorFunc, new ObjCClassWrapper(extendedClass, true));
 

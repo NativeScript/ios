@@ -12,8 +12,9 @@ Class ClassBuilder::GetExtendedClass(std::string baseClassName, std::string stat
 
     if (clazz != nil) {
         int i = 1;
+        std::string initialName = name;
         while (clazz != nil) {
-            name = name + std::to_string(i++);
+            name = initialName + std::to_string(i++);
             clazz = objc_getClass(name.c_str());
         }
     }
