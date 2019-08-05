@@ -3,7 +3,7 @@
 #include "src/inspector/v8-inspector-impl.h"
 #include "../../base64.h"
 #include "../../utils.h"
-#include "../../Helpers.h"
+#include "Runtime/Helpers.h"
 #include <dirent.h>
 
 namespace v8_inspector {

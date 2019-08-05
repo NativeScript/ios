@@ -10,8 +10,7 @@ namespace CSSAgentState {
 V8CSSAgentImpl::V8CSSAgentImpl(V8InspectorSessionImpl* session,
                                protocol::FrontendChannel* frontendChannel,
                                protocol::DictionaryValue* state)
-    : m_session(session),
-    m_frontend(frontendChannel),
+    : m_frontend(frontendChannel),
     m_state(state),
     m_enabled(false) {
     Instance = this;

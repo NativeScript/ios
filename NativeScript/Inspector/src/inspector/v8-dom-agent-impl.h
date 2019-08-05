@@ -65,9 +65,8 @@ public:
     };
     
     static V8DOMAgentImpl* Instance;
-    protocol::DOM::Frontend m_frontend;
 private:
-    V8InspectorSessionImpl* m_session;
+    protocol::DOM::Frontend m_frontend;
     protocol::DictionaryValue* m_state;
     
     bool m_enabled;

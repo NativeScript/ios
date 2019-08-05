@@ -9,8 +9,7 @@ namespace LogAgentState {
 }
 
 V8LogAgentImpl::V8LogAgentImpl(V8InspectorSessionImpl* session, protocol::FrontendChannel* frontendChannel, protocol::DictionaryValue* state)
-    : m_session(session),
-      m_frontend(frontendChannel),
+    : m_frontend(frontendChannel),
       m_state(state),
       m_enabled(false) {
     V8LogAgentImpl::instance_ = this;

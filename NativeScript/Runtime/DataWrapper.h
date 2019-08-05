@@ -34,6 +34,8 @@ class BaseDataWrapper {
 public:
     BaseDataWrapper(std::string name): name_(name) {
     }
+    
+    virtual ~BaseDataWrapper() = default;
 
     const virtual WrapperType Type() {
         return WrapperType::Base;
@@ -380,17 +382,17 @@ public:
     const bool IsClosing();
     const int WorkerId();
 private:
-    static int nextId_;
-    int workerId_;
     v8::Isolate* mainIsolate_;
     v8::Isolate* workerIsolate_;
-    v8::Persistent<v8::Value>* poWorker_;
     bool isRunning_;
     bool isClosing_;
     bool isTerminating_;
-    std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
-    ConcurrentQueue queue_;
     std::thread thread_;
+    std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
+    v8::Persistent<v8::Value>* poWorker_;
+    ConcurrentQueue queue_;
+    static int nextId_;
+    int workerId_;
 
     void BackgroundLooper(std::function<v8::Isolate* ()> func);
     v8::Local<v8::Object> ConstructErrorObject(v8::Isolate* isolate, std::string message, std::string source, std::string stackTrace, int lineNumber);

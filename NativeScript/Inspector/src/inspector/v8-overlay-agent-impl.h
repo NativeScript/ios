@@ -56,10 +56,8 @@ public:
     DispatchResponse setShowViewportSizeOnResize(bool in_show) override;
     DispatchResponse setSuspended(bool in_suspended) override;
     
-    protocol::Overlay::Frontend m_frontend;
-    
 private:
-    V8InspectorSessionImpl *m_session;
+    protocol::Overlay::Frontend m_frontend;
     protocol::DictionaryValue *m_state;
     bool m_enabled;
     

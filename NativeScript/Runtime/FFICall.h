@@ -25,8 +25,8 @@ public:
         return *static_cast<T*>(this->ResultBuffer());
     }
 protected:
-    size_t returnOffset_;
     uint8_t* buffer_;
+    size_t returnOffset_;
 };
 
 class FFICall: public BaseCall {

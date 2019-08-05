@@ -44,10 +44,9 @@ public:
     DispatchResponse takeCoverageDelta(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) override;
     
     static V8CSSAgentImpl* Instance;
-    protocol::CSS::Frontend m_frontend;
     
 private:
-    V8InspectorSessionImpl* m_session;
+    protocol::CSS::Frontend m_frontend;
     protocol::DictionaryValue* m_state;
     bool m_enabled;
     

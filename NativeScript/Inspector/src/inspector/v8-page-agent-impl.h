@@ -57,14 +57,14 @@ public:
 
 private:
     V8InspectorImpl* m_inspector;
-    V8InspectorSessionImpl* m_session;
     v8::Isolate* m_isolate;
-    protocol::DictionaryValue* m_state;
+    V8InspectorSessionImpl* m_session;
     protocol::Page::Frontend m_frontend;
-    const std::string m_frameUrl;
-    const std::string m_frameIdentifier;
-    const std::string m_baseDir;
+    protocol::DictionaryValue* m_state;
     bool m_enabled;
+    const std::string m_frameIdentifier;
+    const std::string m_frameUrl;
+    const std::string m_baseDir;
 
     static std::map<std::string, const char*> s_mimeTypeMap;
 

@@ -52,7 +52,6 @@ public:
 //    std::map<std::string, v8_inspector::utils::NetworkRequestData*> m_responses;
     
 private:
-    V8InspectorSessionImpl* m_session;
     protocol::Network::Frontend m_frontend;
     protocol::DictionaryValue* m_state;
     bool m_enabled;

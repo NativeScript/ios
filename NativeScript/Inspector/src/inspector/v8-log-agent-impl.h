@@ -22,9 +22,8 @@ public:
     static void EntryAdded(const std::string& text, std::string verbosityLevel, std::string url, int lineNumber);
     
 private:
-    V8InspectorSessionImpl* m_session;
-    protocol::DictionaryValue* m_state;
     protocol::Log::Frontend m_frontend;
+    protocol::DictionaryValue* m_state;
     bool m_enabled;
 
     static V8LogAgentImpl* instance_;

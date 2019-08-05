@@ -12,11 +12,11 @@
 #include "Worker.h"
 
 #if defined __arm64 && __arm64__
-#include "natives_blob.arm64.h"
-#include "snapshot_blob.arm64.h"
+#include "../Snapshot/natives_blob.arm64.h"
+#include "../Snapshot/snapshot_blob.arm64.h"
 #elif defined __x86_64__ && __x86_64__
-#include "natives_blob.x86_64.h"
-#include "snapshot_blob.x86_64.h"
+#include "../Snapshot/natives_blob.x86_64.h"
+#include "../Snapshot/snapshot_blob.x86_64.h"
 #else
 #error Unknown CPU architecture. Only ARM64 and X86_64 architectures are supported
 #endif
@@ -76,7 +76,7 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
 void Runtime::Init(const string& baseDir) {
     if (!mainThreadInitialized_) {
         Runtime::platform_ =
-#ifdef DEBUG
+#ifdef DEBUGG
             v8_inspector::V8InspectorPlatform::CreateDefaultPlatform();
 #else
             platform::NewDefaultPlatform().release();
