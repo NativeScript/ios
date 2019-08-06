@@ -88,16 +88,16 @@ static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<s
     std::unique_ptr<clang::ASTUnit> ast = clang::tooling::buildASTFromCodeWithArgs("", args, "umbrella.h");
     if (!ast)
         return std::error_code(-1, std::generic_category());
-    
+
     ast->getDiagnostics().setClient(new clang::IgnoringDiagConsumer);
-    
+
     clang::SmallVector<clang::Module*, 64> modules;
     HeaderSearch& headerSearch = ast->getPreprocessor().getHeaderSearchInfo();
     headerSearch.collectAllModules(modules);
-    
+
     ModuleMap& moduleMap = headerSearch.getModuleMap();
     FileManager& fileManager = ast->getFileManager();
-    
+
     std::function<void(const Module*)> collector = [&](const Module* module) {
         // uncomment for debugging unavailable modules
 //        if (!module->isAvailable()) {
@@ -108,19 +108,19 @@ static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<s
 //        }
         if (std::find(moduleBlacklist.begin(), moduleBlacklist.end(), module->getFullModuleName()) != moduleBlacklist.end())
             return;
-        
+
         // use -idirafter instead of -I in order  add the directories AFTER the include search paths
         std::string includeString = "-idirafter" + module->Directory->getName().str();
         if (std::find(includePaths.begin(), includePaths.end(), includeString) == includePaths.end() && !module->isPartOfFramework()) {
             includePaths.push_back(includeString);
         }
-        
+
         collectModuleHeaderIncludes(fileManager, moduleMap, module, umbrellaHeaders);
         std::for_each(module->submodule_begin(), module->submodule_end(), collector);
     };
-    
+
     std::for_each(modules.begin(), modules.end(), collector);
-    
+
     return std::error_code();
 }
 
@@ -137,15 +137,15 @@ int headerPriority(SmallString<256> h) {
 std::string CreateUmbrellaHeader(const std::vector<std::string>& clangArgs, std::vector<std::string>& includePaths)
 {
     std::vector<std::string> moduleBlacklist;
-    
+
     // Generate umbrella header for all modules from the sdk
     std::vector<SmallString<256>> umbrellaHeaders;
     CreateUmbrellaHeaderForAmbientModules(clangArgs, umbrellaHeaders, moduleBlacklist, includePaths);
-   
-    std::sort(umbrellaHeaders.begin(), umbrellaHeaders.end(), [](const SmallString<256>& h1, const SmallString<256>& h2) {
+
+    std::stable_sort(umbrellaHeaders.begin(), umbrellaHeaders.end(), [](const SmallString<256>& h1, const SmallString<256>& h2) {
         return headerPriority(h1) < headerPriority(h2);
     });
-    
+
     std::stringstream umbrellaHeaderContents;
     for (auto& h : umbrellaHeaders) {
         umbrellaHeaderContents << "#import \"" << h.c_str() << "\"" << std::endl;
