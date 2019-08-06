@@ -18,10 +18,6 @@ void ArgConverter::Init(Isolate* isolate, GenericNamedPropertyGetterCallback str
 }
 
 Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const MethodMeta* meta, bool isMethodCallback) {
-    if (strcmp(meta->name(), "viewDidLoad") == 0) {
-        printf("ok");
-    }
-    
     id target = nil;
     bool instanceMethod = !receiver.IsEmpty();
     bool callSuper = false;

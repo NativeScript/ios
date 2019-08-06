@@ -1020,11 +1020,10 @@
 		C27E277722202663009C10A3 = {
 			isa = PBXGroup;
 			children = (
-				C2DDEB17229EA89000345BFE /* TestApp */,
 				C2DDEB33229EAB3B00345BFE /* NativeScript */,
-				C29374E3229FC0F60075CB16 /* TestFixtures */,
-				C2F4CBB422C60BFD0036B56F /* metadata-generator */,
+				C2DDEB17229EA89000345BFE /* TestApp */,
 				C27E5D8C22F31CCA00498ED0 /* AppWithModules */,
+				C29374E3229FC0F60075CB16 /* TestFixtures */,
 				C27E278122202664009C10A3 /* Products */,
 				C2FF3016225203FD00933782 /* Frameworks */,
 			);
@@ -1263,13 +1262,6 @@
 				C2DDEBDB229EB37A00345BFE /* main.m */,
 			);
 			path = "Source Files";
-			sourceTree = "<group>";
-		};
-		C2F4CBB422C60BFD0036B56F /* metadata-generator */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = "metadata-generator";
 			sourceTree = "<group>";
 		};
 		C2FF3016225203FD00933782 /* Frameworks */ = {
