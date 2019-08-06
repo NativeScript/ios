@@ -510,25 +510,6 @@
 		C266569C22B282BA00EE15CC /* FunctionReference.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FunctionReference.cpp; sourceTree = "<group>"; };
 		C266569D22B282BA00EE15CC /* FunctionReference.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FunctionReference.h; sourceTree = "<group>"; };
 		C26656B222B3768C00EE15CC /* InteropTypes.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = InteropTypes.mm; sourceTree = "<group>"; };
-		C26C3A6D22E702E800574872 /* v8-platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-platform.h"; sourceTree = "<group>"; };
-		C26C3A6E22E702E800574872 /* v8-version.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-version.h"; sourceTree = "<group>"; };
-		C26C3A7022E702E800574872 /* libplatform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = libplatform.h; sourceTree = "<group>"; };
-		C26C3A7122E702E800574872 /* libplatform-export.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "libplatform-export.h"; sourceTree = "<group>"; };
-		C26C3A7222E702E800574872 /* v8-tracing.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-tracing.h"; sourceTree = "<group>"; };
-		C26C3A7322E702E800574872 /* v8-profiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-profiler.h"; sourceTree = "<group>"; };
-		C26C3A7422E702E800574872 /* v8.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = v8.h; sourceTree = "<group>"; };
-		C26C3A7622E702E800574872 /* Schema.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Schema.h; sourceTree = "<group>"; };
-		C26C3A7722E702E800574872 /* Runtime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Runtime.h; sourceTree = "<group>"; };
-		C26C3A7822E702E800574872 /* Debugger.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Debugger.h; sourceTree = "<group>"; };
-		C26C3A7922E702E800574872 /* v8-util.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-util.h"; sourceTree = "<group>"; };
-		C26C3A7A22E702E800574872 /* libffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = libffi.h; sourceTree = "<group>"; };
-		C26C3A7B22E702E800574872 /* v8config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = v8config.h; sourceTree = "<group>"; };
-		C26C3A7C22E702E800574872 /* v8-inspector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-inspector.h"; sourceTree = "<group>"; };
-		C26C3A7D22E702E800574872 /* v8-internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-internal.h"; sourceTree = "<group>"; };
-		C26C3A8022E702E800574872 /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
-		C26C3A8122E702E800574872 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
-		C26C3A8322E702E800574872 /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
-		C26C3A8422E702E800574872 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
 		C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = KnownUnknownClassPair.cpp; sourceTree = "<group>"; };
 		C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KnownUnknownClassPair.h; sourceTree = "<group>"; };
 		C27E5D8B22F31CC900498ED0 /* AppWithModules.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppWithModules.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -690,18 +671,18 @@
 		C247C14C22F82842001D2CA2 /* include */ = {
 			isa = PBXGroup;
 			children = (
+				C247C14F22F82842001D2CA2 /* libplatform */,
+				C247C15522F82842001D2CA2 /* inspector */,
+				C247C15E22F82842001D2CA2 /* libffi */,
 				C247C14D22F82842001D2CA2 /* v8-platform.h */,
 				C247C14E22F82842001D2CA2 /* v8-version.h */,
-				C247C14F22F82842001D2CA2 /* libplatform */,
 				C247C15322F82842001D2CA2 /* v8-profiler.h */,
 				C247C15422F82842001D2CA2 /* v8.h */,
-				C247C15522F82842001D2CA2 /* inspector */,
 				C247C15922F82842001D2CA2 /* v8-util.h */,
 				C247C15A22F82842001D2CA2 /* libffi.h */,
 				C247C15B22F82842001D2CA2 /* v8config.h */,
 				C247C15C22F82842001D2CA2 /* v8-inspector.h */,
 				C247C15D22F82842001D2CA2 /* v8-internal.h */,
-				C247C15E22F82842001D2CA2 /* libffi */,
 			);
 			path = include;
 			sourceTree = "<group>";
@@ -1036,76 +1017,9 @@
 			path = debug;
 			sourceTree = "<group>";
 		};
-		C26C3A6C22E702E800574872 /* include */ = {
-			isa = PBXGroup;
-			children = (
-				C26C3A7522E702E800574872 /* inspector */,
-				C26C3A6F22E702E800574872 /* libplatform */,
-				C26C3A7E22E702E800574872 /* libffi */,
-				C26C3A6E22E702E800574872 /* v8-version.h */,
-				C26C3A6D22E702E800574872 /* v8-platform.h */,
-				C26C3A7322E702E800574872 /* v8-profiler.h */,
-				C26C3A7422E702E800574872 /* v8.h */,
-				C26C3A7922E702E800574872 /* v8-util.h */,
-				C26C3A7A22E702E800574872 /* libffi.h */,
-				C26C3A7B22E702E800574872 /* v8config.h */,
-				C26C3A7C22E702E800574872 /* v8-inspector.h */,
-				C26C3A7D22E702E800574872 /* v8-internal.h */,
-			);
-			path = include;
-			sourceTree = "<group>";
-		};
-		C26C3A6F22E702E800574872 /* libplatform */ = {
-			isa = PBXGroup;
-			children = (
-				C26C3A7022E702E800574872 /* libplatform.h */,
-				C26C3A7122E702E800574872 /* libplatform-export.h */,
-				C26C3A7222E702E800574872 /* v8-tracing.h */,
-			);
-			path = libplatform;
-			sourceTree = "<group>";
-		};
-		C26C3A7522E702E800574872 /* inspector */ = {
-			isa = PBXGroup;
-			children = (
-				C26C3A7622E702E800574872 /* Schema.h */,
-				C26C3A7722E702E800574872 /* Runtime.h */,
-				C26C3A7822E702E800574872 /* Debugger.h */,
-			);
-			path = inspector;
-			sourceTree = "<group>";
-		};
-		C26C3A7E22E702E800574872 /* libffi */ = {
-			isa = PBXGroup;
-			children = (
-				C26C3A7F22E702E800574872 /* arm64 */,
-				C26C3A8222E702E800574872 /* x86_64 */,
-			);
-			path = libffi;
-			sourceTree = "<group>";
-		};
-		C26C3A7F22E702E800574872 /* arm64 */ = {
-			isa = PBXGroup;
-			children = (
-				C26C3A8022E702E800574872 /* ffitarget.h */,
-				C26C3A8122E702E800574872 /* ffi.h */,
-			);
-			path = arm64;
-			sourceTree = "<group>";
-		};
-		C26C3A8222E702E800574872 /* x86_64 */ = {
-			isa = PBXGroup;
-			children = (
-				C26C3A8322E702E800574872 /* ffitarget.h */,
-				C26C3A8422E702E800574872 /* ffi.h */,
-			);
-			path = x86_64;
-			sourceTree = "<group>";
-		};
 		C27E277722202663009C10A3 = {
 			isa = PBXGroup;
 			children = (
-				C26C3A6C22E702E800574872 /* include */,
 				C2DDEB17229EA89000345BFE /* TestApp */,
 				C2DDEB33229EAB3B00345BFE /* NativeScript */,
 				C29374E3229FC0F60075CB16 /* TestFixtures */,
