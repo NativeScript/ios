@@ -7,10 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C21CFFE422FAB0CB00683E41 /* natives_blob.h in Headers */ = {isa = PBXBuildFile; fileRef = C21CFFDF22FAB0CA00683E41 /* natives_blob.h */; };
-		C21CFFE522FAB0CB00683E41 /* snapshot_blob.h in Headers */ = {isa = PBXBuildFile; fileRef = C21CFFE022FAB0CA00683E41 /* snapshot_blob.h */; };
-		C21CFFE622FAB0CB00683E41 /* snapshot_blob.h in Headers */ = {isa = PBXBuildFile; fileRef = C21CFFE222FAB0CA00683E41 /* snapshot_blob.h */; };
-		C21CFFE722FAB0CB00683E41 /* natives_blob.h in Headers */ = {isa = PBXBuildFile; fileRef = C21CFFE322FAB0CA00683E41 /* natives_blob.h */; };
 		C22C092222CA3F370080D176 /* Worker.mm in Sources */ = {isa = PBXBuildFile; fileRef = C22C092022CA3F370080D176 /* Worker.mm */; };
 		C22C092322CA3F370080D176 /* Worker.h in Headers */ = {isa = PBXBuildFile; fileRef = C22C092122CA3F370080D176 /* Worker.h */; };
 		C23E8F7322CB386F0078FD4C /* ConcurrentQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */; };
@@ -344,10 +340,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		C21CFFDF22FAB0CA00683E41 /* natives_blob.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.h; sourceTree = "<group>"; };
-		C21CFFE022FAB0CA00683E41 /* snapshot_blob.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.h; sourceTree = "<group>"; };
-		C21CFFE222FAB0CA00683E41 /* snapshot_blob.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = snapshot_blob.h; sourceTree = "<group>"; };
-		C21CFFE322FAB0CA00683E41 /* natives_blob.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = natives_blob.h; sourceTree = "<group>"; };
 		C22C092022CA3F370080D176 /* Worker.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Worker.mm; sourceTree = "<group>"; };
 		C22C092122CA3F370080D176 /* Worker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Worker.h; sourceTree = "<group>"; };
 		C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConcurrentQueue.h; sourceTree = "<group>"; };
@@ -668,24 +660,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		C21CFFDE22FAB0CA00683E41 /* x86_64 */ = {
-			isa = PBXGroup;
-			children = (
-				C21CFFDF22FAB0CA00683E41 /* natives_blob.h */,
-				C21CFFE022FAB0CA00683E41 /* snapshot_blob.h */,
-			);
-			path = x86_64;
-			sourceTree = "<group>";
-		};
-		C21CFFE122FAB0CA00683E41 /* arm64 */ = {
-			isa = PBXGroup;
-			children = (
-				C21CFFE322FAB0CA00683E41 /* natives_blob.h */,
-				C21CFFE222FAB0CA00683E41 /* snapshot_blob.h */,
-			);
-			path = arm64;
-			sourceTree = "<group>";
-		};
 		C247C14C22F82842001D2CA2 /* include */ = {
 			isa = PBXGroup;
 			children = (
@@ -752,7 +726,7 @@
 			path = x86_64;
 			sourceTree = "<group>";
 		};
-		C247C29522F828E2001D2CA2 /* Inspector */ = {
+		C247C29522F828E2001D2CA2 /* inspector */ = {
 			isa = PBXGroup;
 			children = (
 				C247C29622F828E2001D2CA2 /* utils.h */,
@@ -766,7 +740,7 @@
 				C247C2A422F828E2001D2CA2 /* base */,
 				C247C2A822F828E2001D2CA2 /* src */,
 			);
-			path = Inspector;
+			path = inspector;
 			sourceTree = "<group>";
 		};
 		C247C29C22F828E2001D2CA2 /* third_party */ = {
@@ -1062,11 +1036,11 @@
 		C27E5D8C22F31CCA00498ED0 /* AppWithModules */ = {
 			isa = PBXGroup;
 			children = (
-				C27E5DB922F324C200498ED0 /* Default-568h@2x.png */,
 				C27E5DAE22F31F7A00498ED0 /* Frameworks */,
 				C27E5DB622F3207800498ED0 /* Source Files */,
 				C27E5DB422F3206B00498ED0 /* app */,
 				C27E5D9B22F31CCC00498ED0 /* Info.plist */,
+				C27E5DB922F324C200498ED0 /* Default-568h@2x.png */,
 			);
 			path = AppWithModules;
 			sourceTree = "<group>";
@@ -1182,9 +1156,8 @@
 			isa = PBXGroup;
 			children = (
 				C247C14C22F82842001D2CA2 /* include */,
-				C2DDEB3B229EAB8600345BFE /* Runtime */,
-				C2DDEB3A229EAB7400345BFE /* Snapshot */,
-				C247C29522F828E2001D2CA2 /* Inspector */,
+				C2DDEB3B229EAB8600345BFE /* runtime */,
+				C247C29522F828E2001D2CA2 /* inspector */,
 				C2DDEB34229EAB3B00345BFE /* NativeScript.h */,
 				C2F64E8222E870A300EDB057 /* NativeScript.mm */,
 				C2DDEB35229EAB3B00345BFE /* Info.plist */,
@@ -1192,16 +1165,7 @@
 			path = NativeScript;
 			sourceTree = "<group>";
 		};
-		C2DDEB3A229EAB7400345BFE /* Snapshot */ = {
-			isa = PBXGroup;
-			children = (
-				C21CFFE122FAB0CA00683E41 /* arm64 */,
-				C21CFFDE22FAB0CA00683E41 /* x86_64 */,
-			);
-			path = Snapshot;
-			sourceTree = "<group>";
-		};
-		C2DDEB3B229EAB8600345BFE /* Runtime */ = {
+		C2DDEB3B229EAB8600345BFE /* runtime */ = {
 			isa = PBXGroup;
 			children = (
 				C2DDEB66229EAC8100345BFE /* ArgConverter.h */,
@@ -1269,7 +1233,7 @@
 				C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */,
 				C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */,
 			);
-			path = Runtime;
+			path = runtime;
 			sourceTree = "<group>";
 		};
 		C2DDEBDA229EB37A00345BFE /* Source Files */ = {
@@ -1314,7 +1278,6 @@
 				C247C16E22F82842001D2CA2 /* Debugger.h in Headers */,
 				C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */,
 				C247C39922F828E3001D2CA2 /* checks.h in Headers */,
-				C21CFFE522FAB0CB00683E41 /* snapshot_blob.h in Headers */,
 				C247C3A622F828E3001D2CA2 /* logging.h in Headers */,
 				C23E8F7322CB386F0078FD4C /* ConcurrentQueue.h in Headers */,
 				C247C3AC22F828E3001D2CA2 /* safe_conversions_impl.h in Headers */,
@@ -1334,7 +1297,6 @@
 				C2DDEBA1229EAC8300345BFE /* FFICall.h in Headers */,
 				C247C35522F828E3001D2CA2 /* search-util.h in Headers */,
 				C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */,
-				C21CFFE422FAB0CB00683E41 /* natives_blob.h in Headers */,
 				C247C35E22F828E3001D2CA2 /* Protocol.h in Headers */,
 				C247C35922F828E3001D2CA2 /* value-mirror.h in Headers */,
 				C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */,
@@ -1343,7 +1305,6 @@
 				C247C16A22F82842001D2CA2 /* v8-profiler.h in Headers */,
 				C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */,
 				C247C33C22F828E3001D2CA2 /* v8-log-agent-impl.h in Headers */,
-				C21CFFE722FAB0CB00683E41 /* natives_blob.h in Headers */,
 				C247C3A122F828E3001D2CA2 /* mutex.h in Headers */,
 				C247C39522F828E3001D2CA2 /* v8-heap-profiler-agent-impl.h in Headers */,
 				C247C34522F828E3001D2CA2 /* v8-debugger.h in Headers */,
@@ -1424,7 +1385,6 @@
 				C247C37C22F828E3001D2CA2 /* string-util.h in Headers */,
 				C247C37722F828E3001D2CA2 /* Profiler.h in Headers */,
 				C247C39222F828E3001D2CA2 /* v8-console-agent-impl.h in Headers */,
-				C21CFFE622FAB0CB00683E41 /* snapshot_blob.h in Headers */,
 				C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */,
 				C2DDEB9B229EAC8300345BFE /* DataWrapper.h in Headers */,
 				C247C39D22F828E3001D2CA2 /* template-utils.h in Headers */,
@@ -2209,7 +2169,8 @@
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/NativeScript/include",
-					"$(SRCROOT)/NativeScript/Inspector",
+					"$(SRCROOT)/NativeScript/lib/include",
+					"$(SRCROOT)/NativeScript/inspector",
 				);
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
@@ -2283,7 +2244,8 @@
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/NativeScript/include",
-					"$(SRCROOT)/NativeScript/Inspector",
+					"$(SRCROOT)/NativeScript/lib/include",
+					"$(SRCROOT)/NativeScript/inspector",
 				);
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";

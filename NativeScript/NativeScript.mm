@@ -1,6 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "NativeScript.h"
-#include "Runtime/Runtime.h"
+#include "runtime/Runtime.h"
 
 @implementation NativeScript
 
