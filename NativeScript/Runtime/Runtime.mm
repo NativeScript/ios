@@ -12,11 +12,11 @@
 #include "Worker.h"
 
 #if defined __arm64 && __arm64__
-#include "../Snapshot/natives_blob.arm64.h"
-#include "../Snapshot/snapshot_blob.arm64.h"
+#include "../Snapshot/arm64/natives_blob.h"
+#include "../Snapshot/arm64/snapshot_blob.h"
 #elif defined __x86_64__ && __x86_64__
-#include "../Snapshot/natives_blob.x86_64.h"
-#include "../Snapshot/snapshot_blob.x86_64.h"
+#include "../Snapshot/x86_64/natives_blob.h"
+#include "../Snapshot/x86_64/snapshot_blob.h"
 #else
 #error Unknown CPU architecture. Only ARM64 and X86_64 architectures are supported
 #endif
