@@ -2134,8 +2134,6 @@
 					"-fno-rtti",
 					"-Wall",
 					"-Wno-documentation",
-					"-ffunction-sections",
-					"-fdata-sections",
 				);
 				OTHER_LDFLAGS = (
 					"-Wl,-dead_strip",
@@ -2210,8 +2208,6 @@
 					"-fno-rtti",
 					"-Wall",
 					"-Wno-documentation",
-					"-ffunction-sections",
-					"-fdata-sections",
 				);
 				OTHER_LDFLAGS = (
 					"-Wl,-dead_strip",
