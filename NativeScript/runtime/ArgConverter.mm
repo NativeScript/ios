@@ -225,6 +225,13 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
                 *(ffi_arg*)retValue = (unsigned long)data;
                 return;
             }
+        } else if (type == BinaryTypeEncodingType::StructDeclarationReference) {
+            BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
+            if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Struct) {
+                StructWrapper* structWrapper = static_cast<StructWrapper*>(baseWrapper);
+                *(ffi_arg*)retValue = (unsigned long)structWrapper->Data();
+                return;
+            }
         }
     }
 
