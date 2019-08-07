@@ -250,6 +250,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         Interop::SetValue(dest, data);
     } else if (arg->IsObject()) {
         Local<Object> obj = arg.As<Object>();
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
 
         if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             const char* name = typeEncoding->details.declarationReference.name.valuePtr();
@@ -259,6 +260,14 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             }
 
             if (klass == [NSArray class]) {
+                if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                    id target = objcWrapper->Data();
+                    if ([target isKindOfClass:[NSArray class]]) {
+                        Interop::SetValue(dest, target);
+                        return;
+                    }
+                }
                 Local<v8::Array> array = Interop::ToArray(isolate, obj);
                 ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
                 Caches::Get(isolate)->Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
@@ -271,6 +280,14 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 Interop::SetValue(dest, adapter);
                 return;
             } else if (klass == [NSDictionary class]) {
+                if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                    id target = objcWrapper->Data();
+                    if ([target isKindOfClass:[NSDictionary class]]) {
+                        Interop::SetValue(dest, target);
+                        return;
+                    }
+                }
                 DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
                 Caches::Get(isolate)->Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
                 Interop::SetValue(dest, adapter);
@@ -278,7 +295,6 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             }
         }
 
-        BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
         assert(wrapper != nullptr);
 
         if (wrapper->Type() == WrapperType::Enum) {
