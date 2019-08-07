@@ -355,7 +355,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
     assert(success);
 
     if (meta->type() == MetaType::ProtocolType) {
-        tns::SetValue(isolate_, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name())));
+        const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
+        tns::SetValue(isolate_, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name()), protoMeta));
         cache->ProtocolCtorFuncs.insert(std::make_pair(meta->name(), new Persistent<v8::Function>(isolate_, ctorFunc)));
     } else {
         tns::SetValue(isolate_, ctorFunc, new ObjCClassWrapper(objc_getClass(meta->name())));

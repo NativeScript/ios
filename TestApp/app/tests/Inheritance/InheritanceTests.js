@@ -1963,6 +1963,18 @@ describe(module.id, function () {
         expect(result).toBe(true);
     });
 
+    it("Should implement methods from unused protocol", function () {
+        var JSObject = NSObject.extend({
+            someMethod: function(a) { }
+        }, {
+            protocols : [ TNSUnusedProtocol ]
+        });
+
+        var obj = JSObject.new();
+
+        expect(obj.respondsToSelector("someMethod:")).toBe(true);
+    });
+
     it("Should not have base class property slot", function () {
         // baseMethod: is declared in the base class (TNSBaseInterface)
         expect(TNSDerivedInterface.prototype.hasOwnProperty('baseMethod')).toBe(false);

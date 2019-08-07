@@ -60,3 +60,7 @@ typedef UIColor NIKColor;
 @interface TNSPropertyMethodConflictClass : NSObject <TNSPropertyMethodConflictProtocol>
 @property BOOL conflict;
 @end
+
+@protocol TNSUnusedProtocol
+- (void)someMethod:(int)a;
+@end

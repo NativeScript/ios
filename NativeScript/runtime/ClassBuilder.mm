@@ -385,8 +385,7 @@ BinaryTypeEncodingType ClassBuilder::GetTypeEncodingType(Isolate* isolate, Local
 
 void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, Local<Value> exposedMethods, Local<Value> exposedProtocols, Local<Object> implementationObject) {
     Local<Context> context = isolate->GetCurrentContext();
-
-    std::vector<Protocol*> protocols;
+    std::vector<const ProtocolMeta*> protocols;
     if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
         Local<v8::Array> protocolsArray = exposedProtocols.As<v8::Array>();
         for (uint32_t i = 0; i < protocolsArray->Length(); i++) {
@@ -399,16 +398,12 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             assert(wrapper && wrapper->Type() == WrapperType::ObjCProtocol);
             ObjCProtocolWrapper* protoWrapper = static_cast<ObjCProtocolWrapper*>(wrapper);
             Protocol* proto = protoWrapper->Proto();
-            if (proto == nil) {
-                continue;
+            if (proto != nil && !class_conformsToProtocol(extendedClass, proto)) {
+                class_addProtocol(extendedClass, proto);
+                class_addProtocol(object_getClass(extendedClass), proto);
             }
 
-            if (class_conformsToProtocol(extendedClass, proto)) {
-                continue;
-            }
-
-            protocols.push_back(proto);
-            class_addProtocol(extendedClass, proto);
+            protocols.push_back(protoWrapper->ProtoMeta());
         }
     }
 
@@ -568,24 +563,11 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
     }
 }
 
-void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<const PropertyMeta*>& propertyMetas, std::vector<Protocol*> exposedProtocols) {
+void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<const PropertyMeta*>& propertyMetas, std::vector<const ProtocolMeta*> exposedProtocols) {
     for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
         const PropertyMeta* propertyMeta = (*it).valuePtr();
-        if (propertyMeta->jsName() == propertyName) {
-            objc_property_t property = nullptr;
-            if (meta->type() == MetaType::ProtocolType) {
-                Protocol* proto = objc_getProtocol(meta->name());
-                assert(proto != nullptr);
-                property = protocol_getProperty(proto, propertyName.c_str(), true, true);
-            } else if (meta->type() == MetaType::Interface) {
-                Class klass = objc_getClass(meta->name());
-                assert(klass != nullptr);
-                property = class_getProperty(klass, propertyName.c_str());
-            }
-
-            if (std::find(propertyMetas.begin(), propertyMetas.end(), propertyMeta) == propertyMetas.end()) {
-                propertyMetas.push_back(propertyMeta);
-            }
+        if (propertyMeta->jsName() == propertyName && std::find(propertyMetas.begin(), propertyMetas.end(), propertyMeta) == propertyMetas.end()) {
+            propertyMetas.push_back(propertyMeta);
         }
     }
 
@@ -600,13 +582,8 @@ void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta
     }
 
     for (auto it = exposedProtocols.begin(); it != exposedProtocols.end(); it++) {
-        Protocol* proto = *it;
-        const char* protocolName = protocol_getName(proto);
-        const Meta* meta = ArgConverter::GetMeta(protocolName);
-        if (meta != nullptr && meta->type() == MetaType::ProtocolType) {
-            const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(meta);
-            VisitProperties(propertyName, protocolMeta, propertyMetas, std::vector<Protocol*>());
-        }
+        const ProtocolMeta* protocolMeta = *it;
+        VisitProperties(propertyName, protocolMeta, propertyMetas, std::vector<const ProtocolMeta*>());
     }
 
     if (meta->type() == MetaType::Interface) {
@@ -618,7 +595,7 @@ void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta
     }
 }
 
-void ClassBuilder::VisitMethods(Isolate* isolate, Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<Protocol*> exposedProtocols) {
+void ClassBuilder::VisitMethods(Isolate* isolate, Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<const ProtocolMeta*> exposedProtocols) {
     for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
         const MethodMeta* methodMeta = (*it).valuePtr();
         if (methodMeta->jsName() == methodName) {
@@ -639,13 +616,8 @@ void ClassBuilder::VisitMethods(Isolate* isolate, Class extendedClass, std::stri
     }
 
     for (auto it = exposedProtocols.begin(); it != exposedProtocols.end(); it++) {
-        Protocol* proto = *it;
-        const char* protocolName = protocol_getName(proto);
-        const Meta* meta = ArgConverter::GetMeta(protocolName);
-        if (meta != nullptr && meta->type() == MetaType::ProtocolType) {
-            const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(meta);
-            VisitMethods(isolate, extendedClass, methodName, protocolMeta, methodMetas, std::vector<Protocol*>());
-        }
+        const ProtocolMeta* protocolMeta = *it;
+        VisitMethods(isolate, extendedClass, methodName, protocolMeta, methodMetas, std::vector<const ProtocolMeta*>());
     }
 
     if (meta->type() == MetaType::Interface) {

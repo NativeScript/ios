@@ -22,8 +22,8 @@ private:
 
     void ExposeDynamicMethods(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Value> exposedMethods, v8::Local<v8::Value> exposedProtocols, v8::Local<v8::Object> implementationObject);
     void ExposeDynamicMembers(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
-    void VisitMethods(v8::Isolate* isolate, Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<Protocol*> exposedProtocols);
-    void VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<const PropertyMeta*>& propertyMetas, std::vector<Protocol*> exposedProtocols);
+    void VisitMethods(v8::Isolate* isolate, Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<const ProtocolMeta*> exposedProtocols);
+    void VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<const PropertyMeta*>& propertyMetas, std::vector<const ProtocolMeta*> exposedProtocols);
     void ExposeProperties(v8::Isolate* isolate, Class extendedClass, std::vector<const PropertyMeta*> propertyMetas, v8::Local<v8::Object> implementationObject, v8::Local<v8::Value> getter, v8::Local<v8::Value> setter);
     std::string GetTypeEncoding(const TypeEncoding* typeEncoding, int argsCount);
     std::string GetTypeEncoding(const TypeEncoding* typeEncoding);

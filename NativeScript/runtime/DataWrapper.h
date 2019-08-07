@@ -34,7 +34,7 @@ class BaseDataWrapper {
 public:
     BaseDataWrapper(std::string name): name_(name) {
     }
-    
+
     virtual ~BaseDataWrapper() = default;
 
     const virtual WrapperType Type() {
@@ -251,7 +251,7 @@ private:
 
 class ObjCProtocolWrapper: public BaseDataWrapper {
 public:
-    ObjCProtocolWrapper(Protocol* proto): BaseDataWrapper(std::string()), proto_(proto) {
+    ObjCProtocolWrapper(Protocol* proto, const ProtocolMeta* protoMeta): BaseDataWrapper(std::string()), proto_(proto), protoMeta_(protoMeta) {
     }
 
     const WrapperType Type() {
@@ -261,8 +261,13 @@ public:
     Protocol* Proto() {
         return this->proto_;
     }
+
+    const ProtocolMeta* ProtoMeta() {
+        return this->protoMeta_;
+    }
 private:
     Protocol* proto_;
+    const ProtocolMeta* protoMeta_;
 };
 
 class FunctionWrapper: public BaseDataWrapper {
