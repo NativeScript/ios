@@ -454,7 +454,7 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
                        .setName(protocol::Schema::Metainfo::domainName)
                        .setVersion(protocol::Schema::Metainfo::version)
                        .build());
- result.push_back(protocol::Schema::Domain::create()
+  result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::CSS::Metainfo::domainName)
                        .setVersion(protocol::CSS::Metainfo::version)
                        .build());
