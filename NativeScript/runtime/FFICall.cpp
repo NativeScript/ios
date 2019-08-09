@@ -17,7 +17,8 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
         case BinaryTypeEncodingType::PointerEncoding:
         case BinaryTypeEncodingType::ProtocolEncoding:
         case BinaryTypeEncodingType::FunctionPointerEncoding:
-        case BinaryTypeEncodingType::IncompleteArrayEncoding: {
+        case BinaryTypeEncodingType::IncompleteArrayEncoding:
+        case BinaryTypeEncodingType::ConstantArrayEncoding: {
             return &ffi_type_pointer;
         }
         case BinaryTypeEncodingType::UnicharEncoding: {

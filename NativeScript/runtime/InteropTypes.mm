@@ -28,26 +28,26 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     RegisterAdoptFunction(isolate, interop);
     RegisterSizeOfFunction(isolate, interop);
 
-    RegisterInteropType(isolate, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(0, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(sizeof(bool), BinaryTypeEncodingType::BoolEncoding));
-    RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, BinaryTypeEncodingType::UShortEncoding));
-    RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, BinaryTypeEncodingType::ShortEncoding));
-    RegisterInteropType(isolate, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, BinaryTypeEncodingType::UIntEncoding));
-    RegisterInteropType(isolate, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, BinaryTypeEncodingType::IntEncoding));
-    RegisterInteropType(isolate, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, BinaryTypeEncodingType::ULongEncoding));
-    RegisterInteropType(isolate, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, BinaryTypeEncodingType::LongEncoding));
-    RegisterInteropType(isolate, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, BinaryTypeEncodingType::ULongLongEncoding));
-    RegisterInteropType(isolate, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, BinaryTypeEncodingType::LongLongEncoding));
-    RegisterInteropType(isolate, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, BinaryTypeEncodingType::FloatEncoding));
-    RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, BinaryTypeEncodingType::DoubleEncoding));
+    RegisterInteropType(isolate, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(0, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(sizeof(bool), CreateEncoding(BinaryTypeEncodingType::BoolEncoding)));
+    RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, CreateEncoding(BinaryTypeEncodingType::UShortEncoding)));
+    RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, CreateEncoding(BinaryTypeEncodingType::ShortEncoding)));
+    RegisterInteropType(isolate, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, CreateEncoding(BinaryTypeEncodingType::UIntEncoding)));
+    RegisterInteropType(isolate, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, CreateEncoding(BinaryTypeEncodingType::IntEncoding)));
+    RegisterInteropType(isolate, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, CreateEncoding(BinaryTypeEncodingType::ULongEncoding)));
+    RegisterInteropType(isolate, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, CreateEncoding(BinaryTypeEncodingType::LongEncoding)));
+    RegisterInteropType(isolate, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, CreateEncoding(BinaryTypeEncodingType::ULongLongEncoding)));
+    RegisterInteropType(isolate, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, CreateEncoding(BinaryTypeEncodingType::LongLongEncoding)));
+    RegisterInteropType(isolate, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, CreateEncoding(BinaryTypeEncodingType::FloatEncoding)));
+    RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, CreateEncoding(BinaryTypeEncodingType::DoubleEncoding)));
 
-    RegisterInteropType(isolate, types, "id", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::IdEncoding));
-    RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
-    RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(isolate, types, "id", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::IdEncoding)));
+    RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(isolate, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(isolate, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
 
     bool success = interop->Set(context, tns::ToV8String(isolate, "types"), types).FromMaybe(false);
     assert(success);
@@ -130,6 +130,10 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
                 ArrayBuffer::Contents contents = bufferView->Buffer()->GetContents();
                 handle = contents.Data();
                 hasHandle = true;
+            } else if (tns::IsString(arg)) {
+                v8::String::Utf8Value result(isolate, arg);
+                handle = *result;
+                hasHandle = true;
             } else if (arg->IsObject()) {
                 Local<Object> obj = arg.As<Object>();
                 if (BaseDataWrapper* wrapper = tns::GetValue(isolate, obj)) {
@@ -171,7 +175,17 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
                         }
                         case WrapperType::Reference: {
                             ReferenceWrapper* w = static_cast<ReferenceWrapper*>(wrapper);
-                            if (w->Data() != nullptr) {
+                            if (w->Value() != nullptr) {
+                                Local<Value> value = w->Value()->Get(isolate);
+                                BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+                                if (wrapper != nullptr && wrapper->Type() == WrapperType::Pointer) {
+                                    info.GetReturnValue().Set(value);
+                                    return;
+                                }
+
+                                handle = w->Value();
+                                hasHandle = true;
+                            } else if (w->Data() != nullptr) {
                                 handle = w->Data();
                                 hasHandle = true;
                             }
@@ -377,6 +391,13 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
 
     success = interop->Set(context, tns::ToV8String(isolate, "sizeof"), func).FromMaybe(false);
     assert(success);
+}
+
+const TypeEncoding* Interop::CreateEncoding(BinaryTypeEncodingType type) {
+    TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc(1, sizeof(TypeEncoding)));
+    typeEncoding->type = type;
+
+    return typeEncoding;
 }
 
 }

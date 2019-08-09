@@ -61,7 +61,7 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
 }
 
 void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
-    if (arg->IsNullOrUndefined()) {
+    if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
         Interop::SetValue(dest, nullptr);
     } else if (tns::IsBool(arg) && typeEncoding->type == BinaryTypeEncodingType::IdEncoding) {
         bool value = tns::ToBool(arg);
@@ -150,16 +150,13 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 data = pointerWrapper->Data();
             } else if (wrapper->Type() == WrapperType::Reference) {
                 ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
+                Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
                 ffi_type* ffiType = FFICall::GetArgumentType(innerType);
                 data = calloc(ffiType->size, 1);
-
-                if (referenceWrapper->Value() != nullptr) {
-                    // Initialize the ref/out parameter value before passing it to the function call
-                    Interop::WriteValue(isolate, innerType, data, referenceWrapper->Value()->Get(isolate));
-                }
-
                 referenceWrapper->SetData(data);
                 referenceWrapper->SetEncoding(innerType);
+                // Initialize the ref/out parameter value before passing it to the function call
+                Interop::WriteValue(isolate, innerType, data, value);
             } else {
                 assert(false);
             }
@@ -235,18 +232,19 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         NSDate* nsDate = [NSDate dateWithTimeIntervalSince1970:(time / 1000)];
         Interop::SetValue(dest, nsDate);
     } else if (typeEncoding->type == BinaryTypeEncodingType::IncompleteArrayEncoding) {
-        v8::ArrayBuffer::Contents contents;
+        void* data = nullptr;
         if (arg->IsArrayBuffer()) {
-            contents = arg.As<ArrayBuffer>()->GetContents();
+            v8::ArrayBuffer::Contents contents = arg.As<ArrayBuffer>()->GetContents();
+            data = contents.Data();
         } else if (arg->IsArrayBufferView()) {
-            contents = arg.As<ArrayBufferView>()->Buffer()->GetContents();
+            v8::ArrayBuffer::Contents contents = arg.As<ArrayBufferView>()->Buffer()->GetContents();
+            data = contents.Data();
         } else {
-            // TODO: Unsupported array reference - throw an exception
-            assert(false);
+            data = Reference::GetWrappedPointer(isolate, typeEncoding, arg.As<Object>());
         }
-
-        void* data = contents.Data();
-
+        Interop::SetValue(dest, data);
+    } else if (typeEncoding->type == BinaryTypeEncodingType::ConstantArrayEncoding) {
+        void* data = Reference::GetWrappedPointer(isolate, typeEncoding, arg.As<Object>());
         Interop::SetValue(dest, data);
     } else if (arg->IsObject()) {
         Local<Object> obj = arg.As<Object>();
@@ -413,7 +411,9 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
         } else {
             ptrdiff_t offset = position + field.Offset();
 
-            if (type == BinaryTypeEncodingType::UShortEncoding) {
+            if (type == BinaryTypeEncodingType::UCharEncoding) {
+                Interop::SetStructValue<unsigned char>(value, destBuffer, offset);
+            } else if (type == BinaryTypeEncodingType::UShortEncoding) {
                 Interop::SetStructValue<ushort>(value, destBuffer, offset);
             } else if (type == BinaryTypeEncodingType::ShortEncoding) {
                 Interop::SetStructValue<short>(value, destBuffer, offset);

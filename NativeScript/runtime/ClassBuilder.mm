@@ -373,7 +373,7 @@ BinaryTypeEncodingType ClassBuilder::GetTypeEncodingType(Isolate* isolate, Local
             return BinaryTypeEncodingType::IdEncoding;
         } else if (wrapper->Type() == WrapperType::Primitive) {
             PrimitiveDataWrapper* pdw = static_cast<PrimitiveDataWrapper*>(wrapper);
-            return pdw->EncodingType();
+            return pdw->TypeEncoding()->type;
         } else if (wrapper->Type() == WrapperType::ObjCObject) {
             return BinaryTypeEncodingType::IdEncoding;
         }

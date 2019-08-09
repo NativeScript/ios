@@ -10,6 +10,8 @@
 
 namespace tns {
 
+class PrimitiveDataWrapper;
+
 enum class WrapperType {
     Base,
     Primitive,
@@ -115,11 +117,20 @@ public:
 
 class ReferenceWrapper: public BaseDataWrapper {
 public:
-    ReferenceWrapper(v8::Persistent<v8::Value>* value): BaseDataWrapper(std::string()), value_(value), encoding_(nullptr), data_(nullptr) {
+    ReferenceWrapper(PrimitiveDataWrapper* typeWrapper, v8::Persistent<v8::Value>* value)
+        : BaseDataWrapper(std::string()),
+          typeWrapper_(typeWrapper),
+          value_(value),
+          encoding_(nullptr),
+          data_(nullptr) {
     }
 
     const WrapperType Type() {
         return WrapperType::Reference;
+    }
+
+    PrimitiveDataWrapper* TypeWrapper() {
+        return this->typeWrapper_;
     }
 
     v8::Persistent<v8::Value>* Value() {
@@ -146,9 +157,13 @@ public:
     }
 
     void SetData(void* data) {
+        if (this->data_ != nullptr) {
+            std::free(this->data_);
+        }
         this->data_ = data;
     }
 private:
+    PrimitiveDataWrapper* typeWrapper_;
     v8::Persistent<v8::Value>* value_;
     const TypeEncoding* encoding_;
     void* data_;
@@ -156,7 +171,7 @@ private:
 
 class PrimitiveDataWrapper: public BaseDataWrapper {
 public:
-    PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType encodingType): BaseDataWrapper(std::string()), size_(size), encodingType_(encodingType) {
+    PrimitiveDataWrapper(size_t size, const TypeEncoding* typeEncoding): BaseDataWrapper(std::string()), size_(size), typeEncoding_(typeEncoding) {
     }
 
     const WrapperType Type() {
@@ -167,12 +182,12 @@ public:
         return this->size_;
     }
 
-    BinaryTypeEncodingType EncodingType() {
-        return this->encodingType_;
+    const TypeEncoding* TypeEncoding() {
+        return this->typeEncoding_;
     }
 private:
     size_t size_;
-    BinaryTypeEncodingType encodingType_;
+    const struct TypeEncoding* typeEncoding_;
 };
 
 class StructTypeWrapper: public BaseDataWrapper {

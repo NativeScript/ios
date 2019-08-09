@@ -29,7 +29,7 @@ describe(module.id, function () {
 
         var oldHandle = interop.handleof(reference);
         functionWithIntPtr(reference);
-        // expect(oldHandle).toBe(interop.handleof(reference));
+        expect(oldHandle).toBe(interop.handleof(reference));
         expect(reference.value).toBe(10);
 
         expect(TNSGetOutput()).toBe('510');
@@ -76,11 +76,11 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('4294967295');
     });
 
-    // // TODO
-    // // it("functionWithULongLongPtr", function () {
-    // //     expect(functionWithULongLongPtr(new interop.Reference(1)).value).toBe(1);
-    // //     expect(TNSGetOutput()).toBe('1');
-    // // });
+    // TODO
+    // it("functionWithULongLongPtr", function () {
+    //     expect(functionWithULongLongPtr(new interop.Reference(1)).value).toBe(1);
+    //     expect(TNSGetOutput()).toBe('1');
+    // });
 
     it("functionWithShortPtr", function () {
         expect(functionWithShortPtr(new interop.Reference(32767)).value).toBe(32767);
@@ -97,11 +97,11 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('2147483647');
     });
 
-    // // TODO
-    // // it("functionWithLongLongPtr", function () {
-    // //     expect(functionWithLongLongPtr(new interop.Reference(1)).value).toBe(0);
-    // //     expect(TNSGetOutput()).toBe('1');
-    // // });
+    // TODO
+    // it("functionWithLongLongPtr", function () {
+    //     expect(functionWithLongLongPtr(new interop.Reference(1)).value).toBe(0);
+    //     expect(TNSGetOutput()).toBe('1');
+    // });
 
     it("functionWithFloatPtr", function () {
         expect(functionWithFloatPtr(new interop.Reference(3.4028234663852886e+38)).value).toBe(3.4028234663852886e+38);
@@ -130,37 +130,37 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('test');
     });
 
-    // it("CString as arg/return value", function () {
-    //     const ptr = interop.alloc(5 * interop.sizeof(interop.types.uint8));
-    //     var reference = new interop.Reference(interop.types.uint8, ptr);
-    //     const str = "test";
-    //     for (ii in str) {
-    //         const i = parseInt(ii);
-    //         reference[i] = str.charCodeAt(i);
-    //     }
-    //     reference[str.length] = 0;
+    it("CString as arg/return value", function () {
+        const ptr = interop.alloc(5 * interop.sizeof(interop.types.uint8));
+        var reference = new interop.Reference(interop.types.uint8, ptr);
+        const str = "test";
+        for (ii in str) {
+            const i = parseInt(ii);
+            reference[i] = str.charCodeAt(i);
+        }
+        reference[str.length] = 0;
 
-    //     const result = functionWithCharPtr(ptr);
+        const result = functionWithCharPtr(ptr);
 
-    //     expect(TNSGetOutput()).toBe('test');
-    //     expect(interop.handleof(result).toNumber() == interop.handleof(ptr).toNumber());
-    //     expect(NSString.stringWithUTF8String(result).toString()).toBe('test');
-    // });
+        expect(TNSGetOutput()).toBe('test');
+        // expect(interop.handleof(result).toNumber() == interop.handleof(ptr).toNumber());
+        expect(NSString.stringWithUTF8String(result).toString()).toBe('test');
+    });
 
-    // // TODO: Create array type and constructor
-    // it("IncompleteCArrayParameter", function () {
-    //     var handle = interop.alloc(4 * interop.sizeof(interop.types.int32));
-    //     var reference = new interop.Reference(interop.types.int32, handle);
-    //     expect(interop.handleof(reference)).toBe(handle);
+    // TODO: Create array type and constructor
+    it("IncompleteCArrayParameter", function () {
+        var handle = interop.alloc(4 * interop.sizeof(interop.types.int32));
+        var reference = new interop.Reference(interop.types.int32, handle);
+        expect(interop.handleof(reference)).toBe(handle);
 
-    //     reference[0] = 1;
-    //     reference[1] = 2;
-    //     reference[2] = 3;
-    //     reference[3] = 0;
+        reference[0] = 1;
+        reference[1] = 2;
+        reference[2] = 3;
+        reference[3] = 0;
 
-    //     functionWithIntIncompleteArray(reference);
-    //     expect(TNSGetOutput()).toBe('123');
-    // });
+        functionWithIntIncompleteArray(reference);
+        expect(TNSGetOutput()).toBe('123');
+    });
 
     // it("ConstantArrayAssignment", function () {
     //     var s1 = getSimpleStruct();
@@ -175,45 +175,45 @@ describe(module.id, function () {
     //     expect(s1.y1[1].x2).toBe(30);
     // });
 
-    // it("ConstantCArrayParameter", function () {
-    //     var handle = interop.alloc(5 * interop.sizeof(interop.types.int32));
-    //     var reference = new interop.Reference(interop.types.int32, handle);
-    //     reference[0] = 1;
-    //     reference[1] = 2;
-    //     reference[2] = 3;
-    //     reference[3] = 4;
-    //     reference[4] = 5;
+    it("ConstantCArrayParameter", function () {
+        var handle = interop.alloc(5 * interop.sizeof(interop.types.int32));
+        var reference = new interop.Reference(interop.types.int32, handle);
+        reference[0] = 1;
+        reference[1] = 2;
+        reference[2] = 3;
+        reference[3] = 4;
+        reference[4] = 5;
 
-    //     functionWithIntConstantArray(reference);
-    //     expect(TNSGetOutput()).toBe('12345');
-    // });
+        functionWithIntConstantArray(reference);
+        expect(TNSGetOutput()).toBe('12345');
+    });
 
-    // it("ConstantCArrayParameter2", function () {
-    //     var handle = interop.alloc(4 * interop.sizeof(interop.types.int32));
-    //     var reference = new interop.Reference(interop.types.int32, handle);
-    //     reference[0] = 1;
-    //     reference[1] = 2;
-    //     reference[2] = 3;
-    //     reference[3] = 4;
+    it("ConstantCArrayParameter2", function () {
+        var handle = interop.alloc(4 * interop.sizeof(interop.types.int32));
+        var reference = new interop.Reference(interop.types.int32, handle);
+        reference[0] = 1;
+        reference[1] = 2;
+        reference[2] = 3;
+        reference[3] = 4;
 
-    //     functionWithIntConstantArray2(reference);
-    //     expect(TNSGetOutput()).toBe('1234');
-    // });
+        functionWithIntConstantArray2(reference);
+        expect(TNSGetOutput()).toBe('1234');
+    });
 
-    // it("NSArrayWithObjects", function () {
-    //     var handle = interop.alloc(4 * interop.sizeof(interop.types.id));
-    //     var reference = new interop.Reference(interop.types.id, handle);
-    //     reference[0] = new NSObject();
-    //     reference[1] = new NSObject();
-    //     reference[2] = new NSObject();
-    //     reference[3] = new NSObject();
+    it("NSArrayWithObjects", function () {
+        var handle = interop.alloc(4 * interop.sizeof(interop.types.id));
+        var reference = new interop.Reference(interop.types.id, handle);
+        reference[0] = new NSObject();
+        reference[1] = new NSObject();
+        reference[2] = new NSObject();
+        reference[3] = new NSObject();
 
-    //     var array = NSArray.arrayWithObjectsCount(reference, 4);
-    //     expect(array[0].class()).toBe(NSObject);
-    //     expect(array[1].class()).toBe(NSObject);
-    //     expect(array[2].class()).toBe(NSObject);
-    //     expect(array[3].class()).toBe(NSObject);
-    // });
+        var array = NSArray.arrayWithObjectsCount(reference, 4);
+        expect(array.objectAtIndex(0).class()).toBe(NSObject);
+        expect(array.objectAtIndex(1).class()).toBe(NSObject);
+        expect(array.objectAtIndex(2).class()).toBe(NSObject);
+        expect(array.objectAtIndex(3).class()).toBe(NSObject);
+    });
 
     it("SmallArrayBuffer", function () {
         var view = new Int32Array([1, 2, 3, 4, 5, 0]);
@@ -296,13 +296,13 @@ describe(module.id, function () {
         //     expect(buffer).toEqual(jasmine.any(interop.Pointer));
         // });
 
-        // it("should accept type and pointer arguments", function () {
-        //     var pointer = interop.alloc(1);
-        //     var reference = new interop.Reference(interop.types.bool, pointer);
+        it("should accept type and pointer arguments", function () {
+            var pointer = interop.alloc(1);
+            var reference = new interop.Reference(interop.types.bool, pointer);
 
-        //     expect(reference).toEqual(jasmine.any(interop.Reference));
-        //     expect(interop.handleof(reference)).toBe(pointer);
-        // });
+            expect(reference).toEqual(jasmine.any(interop.Reference));
+            expect(interop.handleof(reference)).toBe(pointer);
+        });
 
         // it("should accept type and record arguments", function () {
         //     var record = new CGPoint();
