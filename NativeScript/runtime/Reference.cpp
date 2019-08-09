@@ -50,18 +50,17 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
 void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     Persistent<Value>* val = nullptr;
-    PrimitiveDataWrapper* primitiveWrapper = nullptr;
+    BaseDataWrapper* typeWrapper = nullptr;
     if (info.Length() == 1) {
         val = new Persistent<Value>(isolate, info[0]);
     } else if (info.Length() > 1) {
         Local<Value> typeValue = info[0];
-        BaseDataWrapper* typeValueWrapper = tns::GetValue(isolate, typeValue);
-        assert(typeValueWrapper != nullptr && typeValueWrapper->Type() == WrapperType::Primitive);
-        primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeValueWrapper);
+        typeWrapper = tns::GetValue(isolate, typeValue);
+        assert(typeWrapper != nullptr);
         val = new Persistent<Value>(isolate, info[1]);
     }
 
-    ReferenceWrapper* wrapper = new ReferenceWrapper(primitiveWrapper, val);
+    ReferenceWrapper* wrapper = new ReferenceWrapper(typeWrapper, val);
     Local<Object> thiz = info.This();
     tns::SetValue(isolate, thiz, wrapper);
 
@@ -76,7 +75,8 @@ void Reference::IndexedPropertySetCallback(uint32_t index, v8::Local<v8::Value> 
     assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
     ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
 
-    if (refWrapper->TypeWrapper() == nullptr) {
+    BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
+    if (typeWrapper == nullptr) {
         // TODO: Missing type when creating the Reference instance
         assert(false);
     }
@@ -90,9 +90,18 @@ void Reference::IndexedPropertySetCallback(uint32_t index, v8::Local<v8::Value> 
     PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
     void* data = pw->Data();
 
-    PrimitiveDataWrapper* typeWrapper = refWrapper->TypeWrapper();
-    const TypeEncoding* typeEncoding = typeWrapper->TypeEncoding();
-    size_t size = typeWrapper->Size();
+    const TypeEncoding* typeEncoding = nullptr;
+    size_t size = 0;
+    if (typeWrapper->Type() == WrapperType::Primitive) {
+        PrimitiveDataWrapper* wrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
+        typeEncoding = wrapper->TypeEncoding();
+        size = wrapper->Size();
+    } else {
+        // TODO: Currently only PrimitiveDataWrappers are supported as type parameters
+        // Objective C class classes and structures should also be handled
+        assert(false);
+    }
+
     void* ptr = (uint8_t*)data + index * size;
     Interop::WriteValue(isolate, typeEncoding, ptr, value);
 }
@@ -159,7 +168,7 @@ Local<Value> Reference::GetReferredValue(Isolate* isolate, Local<Value> value) {
     return innerValue;
 }
 
-void* Reference::GetWrappedPointer(Isolate* isolate, const TypeEncoding* typeEncoding, Local<Object> reference) {
+void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference) {
     if (reference.IsEmpty()) {
         return nullptr;
     }

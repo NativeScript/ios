@@ -117,7 +117,7 @@ public:
 
 class ReferenceWrapper: public BaseDataWrapper {
 public:
-    ReferenceWrapper(PrimitiveDataWrapper* typeWrapper, v8::Persistent<v8::Value>* value)
+    ReferenceWrapper(BaseDataWrapper* typeWrapper, v8::Persistent<v8::Value>* value)
         : BaseDataWrapper(std::string()),
           typeWrapper_(typeWrapper),
           value_(value),
@@ -129,7 +129,7 @@ public:
         return WrapperType::Reference;
     }
 
-    PrimitiveDataWrapper* TypeWrapper() {
+    BaseDataWrapper* TypeWrapper() {
         return this->typeWrapper_;
     }
 
@@ -163,7 +163,7 @@ public:
         this->data_ = data;
     }
 private:
-    PrimitiveDataWrapper* typeWrapper_;
+    BaseDataWrapper* typeWrapper_;
     v8::Persistent<v8::Value>* value_;
     const TypeEncoding* encoding_;
     void* data_;

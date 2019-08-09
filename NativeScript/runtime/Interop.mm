@@ -240,11 +240,11 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             v8::ArrayBuffer::Contents contents = arg.As<ArrayBufferView>()->Buffer()->GetContents();
             data = contents.Data();
         } else {
-            data = Reference::GetWrappedPointer(isolate, typeEncoding, arg.As<Object>());
+            data = Reference::GetWrappedPointer(isolate, arg);
         }
         Interop::SetValue(dest, data);
     } else if (typeEncoding->type == BinaryTypeEncodingType::ConstantArrayEncoding) {
-        void* data = Reference::GetWrappedPointer(isolate, typeEncoding, arg.As<Object>());
+        void* data = Reference::GetWrappedPointer(isolate, arg);
         Interop::SetValue(dest, data);
     } else if (arg->IsObject()) {
         Local<Object> obj = arg.As<Object>();
