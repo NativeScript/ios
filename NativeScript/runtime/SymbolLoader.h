@@ -1,7 +1,7 @@
 #ifndef SymbolLoader_h
 #define SymbolLoader_h
 
-#include <map>
+#include <unordered_map>
 #include "Metadata.h"
 
 namespace tns {
@@ -19,7 +19,7 @@ public:
 private:
     SymbolResolver* resolveModule(const ModuleMeta*);
 
-    std::map<const ModuleMeta*, std::unique_ptr<SymbolResolver>> _cache;
+    std::unordered_map<const ModuleMeta*, std::unique_ptr<SymbolResolver>> _cache;
 };
 
 }

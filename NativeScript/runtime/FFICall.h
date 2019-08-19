@@ -62,8 +62,9 @@ public:
         free(this->buffer_);
     }
 
-    static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding);
-    static ffi_type* GetStructFFIType(const StructMeta* structMeta, std::vector<StructField>& fields);
+    static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding, bool innerStructCall = false);
+    static StructInfo GetStructInfo(const StructMeta* structMeta);
+    static StructInfo GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldEncoding, const String* fieldNames, std::string structName = "");
     static ffi_cif* GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
 
     void* ArgumentBuffer(unsigned index) {
@@ -74,7 +75,8 @@ public:
         return this->argsArray_;
     }
 private:
-    static std::map<const TypeEncoding*, ffi_cif*> cifCache_;
+    static std::unordered_map<const TypeEncoding*, ffi_cif*> cifCache_;
+    static std::unordered_map<std::string, StructInfo> structInfosCache_;
     void** argsArray_;
 };
 

@@ -5,7 +5,6 @@
 #include "ObjectManager.h"
 #include "InlineFunctions.h"
 #include "SymbolLoader.h"
-#include "DataWrapper.h"
 #include "Helpers.h"
 #include "Interop.h"
 #include "Worker.h"
@@ -138,7 +137,7 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
             }
 
             std::string className = object_getClassName(result);
-            ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, result);
+            ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
             Local<Value> jsResult = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>());
             info.GetReturnValue().Set(jsResult);
         } else if (meta->type() == MetaType::JsCode) {
@@ -158,22 +157,23 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
             info.GetReturnValue().Set(result);
         } else if (meta->type() == MetaType::Struct) {
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-            Local<v8::Function> structCtorFunc = builder->GetOrCreateStructCtorFunction(isolate, structMeta);
+            StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+            Local<v8::Function> structCtorFunc = builder->GetOrCreateStructCtorFunction(isolate, structInfo);
             info.GetReturnValue().Set(structCtorFunc);
         }
     }, nullptr, nullptr, nullptr, nullptr, ext));
 }
 
-Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isolate, const StructMeta* structMeta) {
+Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isolate, StructInfo structInfo) {
     auto cache = Caches::Get(isolate);
-    auto it = cache->StructConstructorFunctions.find(structMeta);
+    auto it = cache->StructConstructorFunctions.find(structInfo.Name());
     if (it != cache->StructConstructorFunctions.end()) {
         return it->second->Get(isolate);
     }
 
     Local<Context> context = isolate->GetCurrentContext();
 
-    StructTypeWrapper* wrapper = new StructTypeWrapper(structMeta);
+    StructTypeWrapper* wrapper = new StructTypeWrapper(structInfo);
     Local<External> ext = External::New(isolate, wrapper);
     Local<v8::Function> structCtorFunc;
     bool success = v8::Function::New(context, StructConstructorCallback, ext).ToLocal(&structCtorFunc);
@@ -189,7 +189,7 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isol
     assert(success);
 
     Persistent<v8::Function>* poStructCtorFunc = new Persistent<v8::Function>(isolate, structCtorFunc);
-    cache->StructConstructorFunctions.insert(std::make_pair(structMeta, poStructCtorFunc));
+    cache->StructConstructorFunctions.insert(std::make_pair(structInfo.Name(), poStructCtorFunc));
 
     return structCtorFunc;
 }
@@ -199,16 +199,15 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
 
     StructTypeWrapper* typeWrapper = static_cast<StructTypeWrapper*>(info.Data().As<External>()->Value());
 
-    std::vector<StructField> fields;
-    ffi_type* ffiType = FFICall::GetStructFFIType(typeWrapper->Meta(), fields);
+    StructInfo structInfo = typeWrapper->StructInfo();
 
     void* dest = nullptr;
 
     if (info.IsConstructCall()) {
         // A new structure is allocated
         Local<Value> initializer = info.Length() > 0 ? info[0] : Local<Value>();
-        dest = malloc(ffiType->size);
-        Interop::InitializeStruct(info.GetIsolate(), dest, fields, initializer);
+        dest = malloc(structInfo.FFIType()->size);
+        Interop::InitializeStruct(info.GetIsolate(), dest, structInfo.Fields(), initializer);
     } else {
         // The structure is not used as constructor and in this case we assume a pointer is passed to the function
         // This pointer will be used as backing memory for the structure
@@ -222,7 +221,7 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
         dest = pw->Data();
     }
 
-    StructWrapper* wrapper = new StructWrapper(typeWrapper->Meta(), dest, ffiType);
+    StructWrapper* wrapper = new StructWrapper(structInfo, dest);
     Local<Value> result = ArgConverter::ConvertArgument(isolate, wrapper);
     info.GetReturnValue().Set(result);
 }
@@ -247,10 +246,10 @@ void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& in
     }
 
     StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(wrapper);
-    const StructMeta* structMeta = structTypeWrapper->Meta();
+    StructInfo structInfo = structTypeWrapper->StructInfo();
 
-    std::pair<ffi_type*, void*> pair1 = MetadataBuilder::GetStructData(isolate, arg1, structMeta);
-    std::pair<ffi_type*, void*> pair2 = MetadataBuilder::GetStructData(isolate, arg2, structMeta);
+    std::pair<ffi_type*, void*> pair1 = MetadataBuilder::GetStructData(isolate, arg1, structInfo);
+    std::pair<ffi_type*, void*> pair2 = MetadataBuilder::GetStructData(isolate, arg2, structInfo);
 
     if (pair1.first == nullptr || pair1.second == nullptr ||
         pair2.first == nullptr || pair2.second == nullptr) {
@@ -268,28 +267,24 @@ void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& in
     info.GetReturnValue().Set(areEqual);
 }
 
-std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Isolate* isolate, Local<Object> initializer, const StructMeta* structMeta) {
+std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Isolate* isolate, Local<Object> initializer, StructInfo structInfo) {
     ffi_type* ffiType = nullptr;
     void* data = nullptr;
 
     if (initializer->InternalFieldCount() < 1) {
-        std::vector<StructField> fields;
-        ffiType = FFICall::GetStructFFIType(structMeta, fields);
+        ffiType = structInfo.FFIType();
         data = malloc(ffiType->size);
-        Interop::InitializeStruct(isolate, data, fields, initializer);
+        Interop::InitializeStruct(isolate, data, structInfo.Fields(), initializer);
     } else {
         Local<External> ext = initializer->GetInternalField(0).As<External>();
         BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
         if (wrapper->Type() != WrapperType::Struct) {
             return std::make_pair(ffiType, data);
         }
-        StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
-        if (structWrapper->Meta() != structMeta) {
-            return std::make_pair(ffiType, data);
-        }
 
+        StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
         data = structWrapper->Data();
-        ffiType = structWrapper->FFIType();
+        ffiType = structWrapper->StructInfo().FFIType();
     }
 
     return std::make_pair(ffiType, data);
@@ -633,7 +628,7 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
     id obj = [klass alloc];
 
     std::string className = class_getName(klass);
-    Local<Value> result = ArgConverter::CreateJsWrapper(isolate, new ObjCDataWrapper(className, obj), Local<Object>());
+    Local<Value> result = ArgConverter::CreateJsWrapper(isolate, new ObjCDataWrapper(obj), Local<Object>());
     info.GetReturnValue().Set(result);
 }
 
@@ -715,10 +710,9 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<Name> property, const P
 
     Local<External> ext = thiz->GetInternalField(0).As<External>();
     StructWrapper* wrapper = static_cast<StructWrapper*>(ext->Value());
-    const StructMeta* structMeta = wrapper->Meta();
 
-    std::vector<StructField> fields;
-    FFICall::GetStructFFIType(structMeta, fields);
+    StructInfo structInfo = wrapper->StructInfo();
+    std::vector<StructField> fields = structInfo.Fields();
     auto it = std::find_if(fields.begin(), fields.end(), [&propertyName](StructField &f) { return f.Name() == propertyName; });
     if (it == fields.end()) {
         info.GetReturnValue().Set(v8::Undefined(isolate));
@@ -731,7 +725,7 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<Name> property, const P
     void* buffer = wrapper->Data();
     BaseCall call((uint8_t*)buffer, offset);
 
-    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, &call, false, field.FFIType());
+    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, &call, false);
 
     info.GetReturnValue().Set(result);
 }
@@ -749,10 +743,9 @@ void MetadataBuilder::StructPropertySetterCallback(Local<Name> property, Local<V
 
     Local<External> ext = thiz->GetInternalField(0).As<External>();
     StructWrapper* wrapper = static_cast<StructWrapper*>(ext->Value());
-    const StructMeta* structMeta = wrapper->Meta();
 
-    std::vector<StructField> fields;
-    FFICall::GetStructFFIType(structMeta, fields);
+    StructInfo structInfo = wrapper->StructInfo();
+    std::vector<StructField> fields = structInfo.Fields();
 
     auto it = std::find_if(fields.begin(), fields.end(), [&propertyName](StructField &f) { return f.Name() == propertyName; });
     if (it == fields.end()) {

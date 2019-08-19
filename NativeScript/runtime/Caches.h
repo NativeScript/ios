@@ -38,14 +38,14 @@ public:
     static Caches* Get(v8::Isolate* isolate);
     static void Remove(v8::Isolate* isolate);
 
-    std::map<const Meta*, v8::Persistent<v8::Value>*> Prototypes;
-    std::map<const std::string, v8::Persistent<v8::Object>*> ClassPrototypes;
-    std::map<const BaseClassMeta*, v8::Persistent<v8::FunctionTemplate>*> CtorFuncTemplates;
-    std::map<std::string, v8::Persistent<v8::Function>*> CtorFuncs;
-    std::map<std::string, v8::Persistent<v8::Function>*> ProtocolCtorFuncs;
+    std::unordered_map<const Meta*, v8::Persistent<v8::Value>*> Prototypes;
+    std::unordered_map<std::string, v8::Persistent<v8::Object>*> ClassPrototypes;
+    std::unordered_map<const BaseClassMeta*, v8::Persistent<v8::FunctionTemplate>*> CtorFuncTemplates;
+    std::unordered_map<std::string, v8::Persistent<v8::Function>*> CtorFuncs;
+    std::unordered_map<std::string, v8::Persistent<v8::Function>*> ProtocolCtorFuncs;
     std::map<id, v8::Persistent<v8::Value>*> Instances;
-    std::map<const void*, v8::Persistent<v8::Object>*> PointerInstances;
-    std::map<const StructMeta*, v8::Persistent<v8::Function>*> StructConstructorFunctions;
+    std::unordered_map<const void*, v8::Persistent<v8::Object>*> PointerInstances;
+    std::unordered_map<std::string, v8::Persistent<v8::Function>*> StructConstructorFunctions;
 
     std::function<void (const BaseClassMeta*)> MetaInitializer;
     v8::Persistent<v8::Function>* EmptyObjCtorFunc;
@@ -54,7 +54,7 @@ public:
     v8::Persistent<v8::Function>* OriginalExtendsFunc;
     v8::Persistent<v8::Function>* WeakRefGetterFunc;
     v8::Persistent<v8::Function>* WeakRefClearFunc;
-    std::map<std::string, v8::Persistent<v8::Function>*> CFunctions;
+    std::unordered_map<std::string, v8::Persistent<v8::Function>*> CFunctions;
 
     v8::Persistent<v8::Function>* InteropReferenceCtorFunc;
     v8::Persistent<v8::Function>* PointerCtorFunc;

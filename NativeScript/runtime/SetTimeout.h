@@ -2,7 +2,7 @@
 #define SetTimeout_h
 
 #include "Common.h"
-#include <map>
+#include <unordered_map>
 
 namespace tns {
 
@@ -15,7 +15,7 @@ private:
     static void ClearTimeoutCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void Elapsed(const uint32_t key);
     static void RemoveKey(const uint32_t key);
-    static std::map<uint32_t, CacheEntry> cache_;
+    static std::unordered_map<uint32_t, CacheEntry> cache_;
     static uint32_t count_;
 
     struct CacheEntry {

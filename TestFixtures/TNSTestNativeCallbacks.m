@@ -277,8 +277,8 @@
                                       object.y1[0].y2.x3[0],
                                       object.y1[0].y2.x3[1],
                                       object.y1[1].x2,
-                                      object.y1[2].y2.x3[0],
-                                      object.y1[3].y2.x3[1]]);
+                                      object.y1[1].y2.x3[0],
+                                      object.y1[1].y2.x3[1]]);
     return object;
 }
 

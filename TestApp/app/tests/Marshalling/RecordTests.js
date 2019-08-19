@@ -137,18 +137,17 @@ describe(module.id, function () {
     //     }).toThrowError(/marshall.*TNSSimpleStruct/);
     // });
 
-    // TODO
-    // it("StructWithArray", function() {
-    //     var object = {
-    //         x: 1,
-    //         arr: [2, 3, 4, 5],
-    //     };
+    it("StructWithArray", function() {
+        var object = {
+            x: 1,
+            arr: [2, 3, 4, 5],
+        };
 
-    //     var result = TNSTestNativeCallbacks.recordsStructWithArray(object);
-    //     expect(TNSGetOutput()).toBe('1 2 3 4 5');
+        var result = TNSTestNativeCallbacks.recordsStructWithArray(object);
+        expect(TNSGetOutput()).toBe('1 2 3 4 5');
 
-    //     expect(result).toEqual(object);
-    // });
+        // expect(result).toEqual(object);
+    });
 
     // it("NestedAnonymousStruct", function () {
     //     var object = {
@@ -182,28 +181,28 @@ describe(module.id, function () {
     //     expect(record.z.value.z).toBe(null);
     // });
 
-    // it("simpleStructWithConstArray", function(){
-    //     //{.x1 = 100, .y1 = {{.x2 = 10, .x3 = 20}, {.x2 = 30, .x3 = 40}}}
-    //    var struct = getSimpleStruct();
-    //    expect(struct.x1).toBe(100);
-    //    expect(struct.y1[0].x2).toBe(10);
-    //    expect(struct.y1[0].x3).toBe(20);
-    //    expect(struct.y1[1].x2).toBe(30);
-    //    expect(struct.y1[1].x3).toBe(40);
-    // });
+    it("simpleStructWithConstArray", function(){
+        //{.x1 = 100, .y1 = {{.x2 = 10, .x3 = 20}, {.x2 = 30, .x3 = 40}}}
+       var struct = getSimpleStruct();
+       expect(struct.x1).toBe(100);
+       expect(struct.y1[0].x2).toBe(10);
+       expect(struct.y1[0].x3).toBe(20);
+       expect(struct.y1[1].x2).toBe(30);
+       expect(struct.y1[1].x3).toBe(40);
+    });
 
-    // it("complexStructWithConstArray", function(){
-    //     //{.x1 = 100, .y1 = {{.x2 = 10, .y2 = {.x3 = {1, 2}}},{.x2 = 20, .y2 = {.x3 = {3, 4}}}}};
-    //     var struct = getComplexStruct();
-    //     expect(struct.x1).toBe(100);
-    //     expect(struct.y1[0].x2).toBe(10);
-    //     expect(struct.y1[0].y2.x3[0]).toBe(1);
-    //     expect(struct.y1[0].y2.x3[1]).toBe(2);
-    //     expect(struct.y1[1].x2).toBe(20);
-    //     expect(struct.y1[1].y2.x3[0]).toBe(3);
-    //     expect(struct.y1[1].y2.x3[1]).toBe(4);
-    //    expect(struct.x4).toBe(123456);
-    // });
+    it("complexStructWithConstArray", function(){
+        //{.x1 = 100, .y1 = {{.x2 = 10, .y2 = {.x3 = {1, 2}}},{.x2 = 20, .y2 = {.x3 = {3, 4}}}}};
+        var struct = getComplexStruct();
+        expect(struct.x1).toBe(100);
+        expect(struct.y1[0].x2).toBe(10);
+        expect(struct.y1[0].y2.x3[0]).toBe(1);
+        expect(struct.y1[0].y2.x3[1]).toBe(2);
+        expect(struct.y1[1].x2).toBe(20);
+        expect(struct.y1[1].y2.x3[0]).toBe(3);
+        expect(struct.y1[1].y2.x3[1]).toBe(4);
+       expect(struct.x4).toBe(123456);
+    });
 
     // it("getStructWithFloat2", function(){
     //     var struct = getStructWithFloat2();
@@ -269,25 +268,24 @@ describe(module.id, function () {
     //     expect(struct.dbl).toBe(1.67);
     // });
 
-    // TODO
-    // it("ComplexStruct", function() {
-    //     var object = {
-    //         x1: 1,
-    //         y1: [{
-    //             x2: 2,
-    //             y2: {
-    //                 x3: [3, 4],
-    //             },
-    //         }, {
-    //             x2: 5,
-    //             y2: {
-    //                 x3: [6, 7],
-    //             },
-    //         }],
-    //     };
+    it("ComplexStruct", function() {
+        var object = {
+            x1: 1,
+            y1: [{
+                x2: 2,
+                y2: {
+                    x3: [3, 4],
+                },
+            }, {
+                x2: 5,
+                y2: {
+                    x3: [6, 7],
+                },
+            }],
+        };
 
-    //     var result = TNSTestNativeCallbacks.recordsComplexStruct(object);
-    //     expect(TNSGetOutput()).toBe('1 2 3 4 5 6 7');
-    //     expect(result).toEqual(object);
-    // });
+        var result = TNSTestNativeCallbacks.recordsComplexStruct(object);
+        expect(TNSGetOutput()).toBe('1 2 3 4 5 6 7');
+        // expect(result).toEqual(object);
+    });
 });

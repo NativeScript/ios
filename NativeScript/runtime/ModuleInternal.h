@@ -2,7 +2,7 @@
 #define ModuleInternal_h
 
 #include "Common.h"
-#include <map>
+#include <unordered_map>
 
 namespace tns {
 
@@ -23,7 +23,7 @@ private:
     std::string ResolvePathFromPackageJson(const std::string& packageJson, bool& error);
     v8::Persistent<v8::Function>* requireFunction_;
     v8::Persistent<v8::Function>* requireFactoryFunction_;
-    std::map<std::string, v8::Persistent<v8::Object>*> loadedModules_;
+    std::unordered_map<std::string, v8::Persistent<v8::Object>*> loadedModules_;
 
     class TempModule {
     public:

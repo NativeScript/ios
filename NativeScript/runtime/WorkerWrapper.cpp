@@ -7,14 +7,14 @@ using namespace v8;
 
 namespace tns {
 
-WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage) : BaseDataWrapper(std::string()),
-    mainIsolate_(mainIsolate),
-    workerIsolate_(nullptr),
-    isRunning_(false),
-    isClosing_(false),
-    isTerminating_(false),
-    thread_{},
-    onMessage_(onMessage) {
+WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage)
+    : mainIsolate_(mainIsolate),
+      workerIsolate_(nullptr),
+      isRunning_(false),
+      isClosing_(false),
+      isTerminating_(false),
+      thread_{},
+      onMessage_(onMessage) {
 }
 
 const WrapperType WorkerWrapper::Type() {

@@ -1,8 +1,9 @@
 #include "FFICall.h"
+#include <sstream>
 
 namespace tns {
 
-ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
+ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool innerStructCall) {
     switch (typeEncoding->type) {
         case BinaryTypeEncodingType::VoidEncoding: {
             return &ffi_type_void;
@@ -17,8 +18,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
         case BinaryTypeEncodingType::PointerEncoding:
         case BinaryTypeEncodingType::ProtocolEncoding:
         case BinaryTypeEncodingType::FunctionPointerEncoding:
-        case BinaryTypeEncodingType::IncompleteArrayEncoding:
-        case BinaryTypeEncodingType::ConstantArrayEncoding: {
+        case BinaryTypeEncodingType::IncompleteArrayEncoding: {
             return &ffi_type_pointer;
         }
         case BinaryTypeEncodingType::UnicharEncoding: {
@@ -75,8 +75,31 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
             assert(meta->type() == MetaType::Struct);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
 
-            std::vector<StructField> fields;
-            return FFICall::GetStructFFIType(structMeta, fields);
+            StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+            return structInfo.FFIType();
+        }
+        case BinaryTypeEncodingType::ConstantArrayEncoding: {
+            if (innerStructCall) {
+                const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
+                ffi_type* innerFFIType = FFICall::GetArgumentType(innerType);
+                int32_t size = typeEncoding->details.constantArray.size;
+                ffi_type* ffiType = new ffi_type({ .size = size * innerFFIType->size, .alignment = innerFFIType->alignment, .type = FFI_TYPE_STRUCT });
+                ffiType->elements = new ffi_type*[size + 1];
+                for (int32_t i = 0; i < size; i++) {
+                    ffiType->elements[i] = innerFFIType;
+                }
+                ffiType->elements[size] = nullptr;
+                return ffiType;
+            }
+
+            return &ffi_type_pointer;
+        }
+        case BinaryTypeEncodingType::AnonymousStructEncoding: {
+            size_t count = typeEncoding->details.anonymousRecord.fieldsCount;
+            const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
+            const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
+            StructInfo structInfo = FFICall::GetStructInfo(count, fieldEncoding, fieldNames);
+            return structInfo.FFIType();
         }
         default: {
             break;
@@ -87,15 +110,46 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding) {
     assert(false);
 }
 
-ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::vector<StructField>& fields) {
+StructInfo FFICall::GetStructInfo(const StructMeta* structMeta) {
+    size_t fieldsCount = structMeta->fieldsCount();
+    const TypeEncoding* fieldEncoding = structMeta->fieldsEncodings()->first();
+    const String* fieldNames = structMeta->fieldNames().first();
+    std::string structName = structMeta->name();
+    StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames, structName);
+    return structInfo;
+}
+
+StructInfo FFICall::GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldEncoding, const String* fieldNames, std::string structName) {
+    if (structName.empty()) {
+        const TypeEncoding* temp = fieldEncoding;
+        std::stringstream ss;
+        for (int i = 0; i < fieldsCount; i++) {
+            std::string fieldName = fieldNames[i].valuePtr();
+            ss << fieldName << "_" << temp->type;
+            temp = temp->next();
+        }
+        structName = ss.str();
+    }
+
+    auto it = structInfosCache_.find(structName);
+    if (it != structInfosCache_.end()) {
+        return it->second;
+    }
+
+    std::vector<StructField> fields;
     ffi_type* ffiType = new ffi_type({ .size = 0, .alignment = 0, .type = FFI_TYPE_STRUCT });
 
-    size_t count = structMeta->fieldsCount();
-    ffiType->elements = new ffi_type*[count + 1];
-    const TypeEncoding* fieldEncoding = structMeta->fieldsEncodings()->first();
+    ffiType->elements = new ffi_type*[fieldsCount + 1];
 
-    for (int i = 0; i < count; i++) {
-        ffi_type* fieldFFIType = FFICall::GetArgumentType(fieldEncoding);
+#if defined(__x86_64__)
+    bool hasNestedStruct = false;
+#endif
+
+    for (int i = 0; i < fieldsCount; i++) {
+        ffi_type* fieldFFIType = FFICall::GetArgumentType(fieldEncoding, true);
+#if defined(__x86_64__)
+        hasNestedStruct = hasNestedStruct || (fieldFFIType->type == FFI_TYPE_STRUCT);
+#endif
         ffiType->elements[i] = fieldFFIType;
 
         size_t offset = ffiType->size;
@@ -103,7 +157,7 @@ ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::vector<St
 
         size_t padding = (alignment - (offset % alignment)) % alignment;
 
-        std::string fieldName = structMeta->fieldNames()[i].valuePtr();
+        std::string fieldName = fieldNames[i].valuePtr();
         offset += padding;
         StructField field(offset, fieldFFIType, fieldName, fieldEncoding);
 
@@ -115,9 +169,46 @@ ffi_type* FFICall::GetStructFFIType(const StructMeta* structMeta, std::vector<St
         fieldEncoding = fieldEncoding->next();
     }
 
-    ffiType->elements[count] = nullptr;
+    ffiType->elements[fieldsCount] = nullptr;
 
-    return ffiType;
+#if defined(__x86_64__)
+    /*
+     If on 64-bit architecture, flatten the nested structures, because libffi can't handle them.
+     */
+    if (hasNestedStruct) {
+        std::vector<ffi_type*> flattenedFfiTypes;
+        std::vector<ffi_type*> stack; // simulate recursion with stack (no need of other function)
+        stack.push_back(ffiType);
+        while (!stack.empty()) {
+            ffi_type* currentType = stack.back();
+            stack.pop_back();
+            if (currentType->type != FFI_TYPE_STRUCT) {
+                flattenedFfiTypes.push_back(currentType);
+            } else {
+                ffi_type** nullPtr = currentType->elements; // the end of elements array
+                while (*nullPtr != nullptr) {
+                    nullPtr++;
+                }
+
+                // add fields' ffi types in reverse order in the stack, so they will be popped in correct order
+                for (ffi_type** field = nullPtr - 1; field >= currentType->elements; field--) {
+                    stack.push_back(*field);
+                }
+            }
+        }
+
+        delete[] ffiType->elements;
+        ffiType->elements = new ffi_type*[flattenedFfiTypes.size() + 1];
+        memcpy(ffiType->elements, flattenedFfiTypes.data(), flattenedFfiTypes.size() * sizeof(ffi_type*));
+        ffiType->elements[flattenedFfiTypes.size()] = nullptr;
+    }
+#endif
+
+    StructInfo structInfo(structName, ffiType, fields);
+
+    structInfosCache_.insert(std::make_pair(structName, structInfo));
+
+    return structInfo;
 }
 
 ffi_cif* FFICall::GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) {
@@ -149,6 +240,7 @@ ffi_cif* FFICall::GetCif(const TypeEncoding* typeEncoding, const int initialPara
     return cif;
 }
 
-std::map<const TypeEncoding*, ffi_cif*> FFICall::cifCache_;
+std::unordered_map<const TypeEncoding*, ffi_cif*> FFICall::cifCache_;
+std::unordered_map<std::string, StructInfo> FFICall::structInfosCache_;
 
 }

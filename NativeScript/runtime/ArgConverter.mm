@@ -105,7 +105,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
                 thiz = it->second->Get(data->isolate_).As<Object>();
             } else {
                 std::string className = object_getClassName(self_);
-                ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, self_);
+                ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
                 thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
 
                 auto it = cache->ClassPrototypes.find(className);
@@ -252,8 +252,6 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
         }
     }
 
-    std::string className = class_getName(klass);
-
     if (result == nil && interfaceMeta == nullptr) {
         const Meta* meta = ArgConverter::FindMeta(klass);
         if (meta != nullptr && meta->type() == MetaType::Interface) {
@@ -262,8 +260,6 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
     }
 
     if (result == nil && interfaceMeta != nullptr) {
-        className = interfaceMeta->name();
-
         const MethodMeta* initializer = ArgConverter::FindInitializer(isolate, klass, interfaceMeta, info);
         if (initializer == nullptr) {
             return;
@@ -280,7 +276,7 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
         result = [[klass alloc] init];
     }
 
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, result);
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
     Local<Object> thiz = info.This();
     ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
 
@@ -433,9 +429,9 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
         }
 
         StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
-        const StructMeta* structMeta = structWrapper->Meta();
+        StructInfo structInfo = structWrapper->StructInfo();
         auto cache = Caches::Get(isolate);
-        auto it = cache->StructConstructorFunctions.find(structMeta);
+        auto it = cache->StructConstructorFunctions.find(structInfo.Name());
         if (it != cache->StructConstructorFunctions.end()) {
             Local<v8::Function> structCtorFunc = it->second->Get(isolate);
             Local<Value> proto;

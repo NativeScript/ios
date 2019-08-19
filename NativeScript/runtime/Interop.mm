@@ -193,25 +193,41 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         Interop::SetValue(dest, blockPtr);
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         Local<Object> obj = arg.As<Object>();
-        if (obj->InternalFieldCount() > 0) {
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            StructWrapper* wrapper = static_cast<StructWrapper*>(ext->Value());
-            void* buffer = wrapper->Data();
-            size_t size = wrapper->FFIType()->size;
-            memcpy(dest, buffer, size);
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
+        if (wrapper != nullptr) {
+            if (wrapper->Type() == WrapperType::Struct) {
+                StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
+                void* buffer = structWrapper->Data();
+                size_t size = structWrapper->StructInfo().FFIType()->size;
+                memcpy(dest, buffer, size);
+            } else if (wrapper->Type() == WrapperType::Reference) {
+                void* data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
+                assert(data != nullptr);
+                ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
+                size_t size = ffiType->size;
+                memcpy(dest, data, size);
+            } else {
+                assert(false);
+            }
         } else {
             // Create the structure using the struct initializer syntax
             const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
             const Meta* meta = ArgConverter::GetMeta(structName);
-            if (meta != nullptr && meta->type() == MetaType::Struct) {
-                const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-                std::vector<StructField> fields;
-                FFICall::GetStructFFIType(structMeta, fields);
-                Interop::InitializeStruct(isolate, dest, fields, obj);
-            } else {
-                assert(false);
-            }
+            assert(meta != nullptr && meta->type() == MetaType::Struct);
+            const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+            StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+            Interop::InitializeStruct(isolate, dest, structInfo.Fields(), obj);
         }
+    } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::AnonymousStructEncoding) {
+        Local<Object> obj = arg.As<Object>();
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
+        // Anonymous structs can only be initialized with plain javascript objects
+        assert(wrapper == nullptr);
+        size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
+        const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
+        const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
+        StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+        Interop::InitializeStruct(isolate, dest, structInfo.Fields(), obj);
     } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
         Local<Object> obj = arg.As<Object>();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
@@ -240,11 +256,11 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             v8::ArrayBuffer::Contents contents = arg.As<ArrayBufferView>()->Buffer()->GetContents();
             data = contents.Data();
         } else {
-            data = Reference::GetWrappedPointer(isolate, arg);
+            data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
         }
         Interop::SetValue(dest, data);
     } else if (typeEncoding->type == BinaryTypeEncodingType::ConstantArrayEncoding) {
-        void* data = Reference::GetWrappedPointer(isolate, arg);
+        void* data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
         Interop::SetValue(dest, data);
     } else if (arg->IsObject()) {
         Local<Object> obj = arg.As<Object>();
@@ -399,14 +415,44 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
 
         if (type == BinaryTypeEncodingType::StructDeclarationReference) {
             const Meta* meta = ArgConverter::GetMeta(field.Encoding()->details.declarationReference.name.valuePtr());
-            if (meta != nullptr && meta->type() == MetaType::Struct) {
-                const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-                std::vector<StructField> nestedFields;
-                ffi_type* nestedStructFFIType = FFICall::GetStructFFIType(structMeta, nestedFields);
-                Interop::InitializeStruct(isolate, destBuffer, nestedFields, value, position);
-                position += nestedStructFFIType->size;
+            assert(meta != nullptr && meta->type() == MetaType::Struct);
+            const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+            StructInfo nestedStructInfo = FFICall::GetStructInfo(structMeta);
+            Interop::InitializeStruct(isolate, destBuffer, nestedStructInfo.Fields(), value, position);
+            position += nestedStructInfo.FFIType()->size;
+        } else if (type == BinaryTypeEncodingType::AnonymousStructEncoding) {
+            size_t fieldsCount = field.Encoding()->details.anonymousRecord.fieldsCount;
+            const TypeEncoding* fieldEncoding = field.Encoding()->details.anonymousRecord.getFieldsEncodings();
+            const String* fieldNames = field.Encoding()->details.anonymousRecord.getFieldNames();
+            StructInfo nestedStructInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+            ptrdiff_t offset = position + field.Offset();
+            uint8_t* dst = (uint8_t*)destBuffer + offset;
+            Interop::InitializeStruct(isolate, dst, nestedStructInfo.Fields(), value, position);
+            position += nestedStructInfo.FFIType()->size;
+        } else if (type == BinaryTypeEncodingType::ConstantArrayEncoding) {
+            const TypeEncoding* innerType = field.Encoding()->details.constantArray.getInnerType();
+            ffi_type* ffiType = FFICall::GetArgumentType(innerType);
+            uint32_t length = field.Encoding()->details.constantArray.size;
+            ptrdiff_t offset = position + field.Offset();
+
+            if (value.IsEmpty()) {
+                position += length;
+            } else if (value->IsArray()) {
+                Local<v8::Array> array = value.As<v8::Array>();
+                uint32_t min = std::min(length, array->Length());
+                for (uint32_t index = 0; index < min; index++) {
+                    Local<Value> element;
+                    bool success = array->Get(context, index).ToLocal(&element);
+                    assert(success);
+                    uint8_t* dst = (uint8_t*)destBuffer + offset;
+                    Interop::WriteValue(isolate, innerType, dst, element);
+                    offset += ffiType->size;
+                }
             } else {
-                assert(false);
+                void* data = Reference::GetWrappedPointer(isolate, value, field.Encoding());
+                assert(data != nullptr);
+                uint8_t* dst = (uint8_t*)destBuffer + offset;
+                memcpy(dst, data, length * ffiType->size);
             }
         } else {
             ptrdiff_t offset = position + field.Offset();
@@ -448,24 +494,54 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
 }
 
-Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, ffi_type* structFieldFFIType) {
+Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive) {
     if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
-        // TODO: Cache the metadata
-        const Meta* meta = MetaFile::instance()->globalTable()->findMeta(structName);
+        const Meta* meta = ArgConverter::GetMeta(structName);
         assert(meta != nullptr && meta->type() == MetaType::Struct);
-        const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
 
         void* result = call->ResultBuffer();
 
-        ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
-        ffi_type* ffiType = (structFieldFFIType != nullptr) ? structFieldFFIType : returnType;
+        const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+        StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+        ffi_type* ffiType = structInfo.FFIType();
 
         void* dest = malloc(ffiType->size);
         memcpy(dest, result, ffiType->size);
 
-        StructWrapper* wrapper = new StructWrapper(structMeta, dest, ffiType);
+        StructWrapper* wrapper = new StructWrapper(structInfo, dest);
         return ArgConverter::ConvertArgument(isolate, wrapper);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::AnonymousStructEncoding) {
+        size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
+        const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
+        const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
+        StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+        void* result = call->ResultBuffer();
+        size_t size = structInfo.FFIType()->size;
+        void* dest = malloc(size);
+        memcpy(dest, result, size);
+
+        StructWrapper* wrapper = new StructWrapper(structInfo, dest);
+        return ArgConverter::ConvertArgument(isolate, wrapper);
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::ConstantArrayEncoding) {
+        const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
+        ffi_type* innerFFIType = FFICall::GetArgumentType(innerType);
+        int length = typeEncoding->details.constantArray.size;
+        Local<v8::Array> array = v8::Array::New(isolate, length);
+        Local<Context> context = isolate->GetCurrentContext();
+
+        for (int i = 0; i < length; i++) {
+            size_t offset = i * innerFFIType->size;
+            BaseCall bc((uint8_t*)call->ResultBuffer(), offset);
+            Local<Value> element = Interop::GetResult(isolate, innerType, &bc, false);
+            bool success = array->Set(context, i, element).FromMaybe(false);
+            assert(success);
+        }
+        return array;
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
@@ -661,8 +737,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return it->second->Get(isolate);
         }
 
-        std::string className = object_getClassName(result);
-        ObjCDataWrapper* wrapper = new ObjCDataWrapper(className, result);
+        ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
         Local<Value> jsResult = ArgConverter::ConvertArgument(isolate, wrapper);
 
         return jsResult;

@@ -363,15 +363,13 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
                         }
                         case WrapperType::Struct: {
                             StructWrapper* sw = static_cast<StructWrapper*>(wrapper);
-                            size = sw->FFIType()->size;
+                            size = sw->StructInfo().FFIType()->size;
                             break;
                         }
                         case WrapperType::StructType: {
                             StructTypeWrapper* sw = static_cast<StructTypeWrapper*>(wrapper);
-                            const StructMeta* structMeta = sw->Meta();
-                            std::vector<StructField> fields;
-                            ffi_type* ffiType = FFICall::GetStructFFIType(structMeta, fields);
-                            size = ffiType->size;
+                            StructInfo structInfo = sw->StructInfo();
+                            size = structInfo.FFIType()->size;
                             break;
                         }
                         default:

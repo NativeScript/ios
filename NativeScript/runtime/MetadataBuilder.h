@@ -5,6 +5,7 @@
 #include "Common.h"
 #include "Metadata.h"
 #include "ClassBuilder.h"
+#include "DataWrapper.h"
 
 namespace tns {
 
@@ -34,12 +35,12 @@ private:
     static void StructPropertySetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void StructEqualsCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void ToStringFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
-    static std::pair<ffi_type*, void*> GetStructData(v8::Isolate* isolate, v8::Local<v8::Object> initializer, const StructMeta* structMeta);
+    static std::pair<ffi_type*, void*> GetStructData(v8::Isolate* isolate, v8::Local<v8::Object> initializer, StructInfo structInfo);
 
     v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, std::string containingClass, bool isMethodCallback);
     v8::Persistent<v8::Function>* CreateToStringFunction(v8::Isolate* isolate);
     v8::Local<v8::Function> CreateEmptyObjectFunction(v8::Isolate* isolate);
-    v8::Local<v8::Function> GetOrCreateStructCtorFunction(v8::Isolate* isolate, const StructMeta* structMeta);
+    v8::Local<v8::Function> GetOrCreateStructCtorFunction(v8::Isolate* isolate, StructInfo structInfo);
     void RegisterAllocMethod(v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     void RegisterInstanceMethods(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::vector<std::string>& names);
     void RegisterInstanceProperties(v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, std::vector<std::string>& names);

@@ -6,6 +6,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <map>
 #include <set>
 #include <vector>
 #include "KnownUnknownClassPair.h"

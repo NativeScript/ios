@@ -168,7 +168,7 @@ Local<Value> Reference::GetReferredValue(Isolate* isolate, Local<Value> value) {
     return innerValue;
 }
 
-void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference) {
+void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, const TypeEncoding* typeEncoding) {
     if (reference.IsEmpty()) {
         return nullptr;
     }
@@ -176,17 +176,44 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, reference);
     assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
     ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
+    if (refWrapper->Data() != nullptr) {
+        return refWrapper->Data();
+    }
 
     Local<Value> value = refWrapper->Value()->Get(isolate);
     BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
-    if (wrappedValue == nullptr || wrappedValue->Type() != WrapperType::Pointer) {
-        return nullptr;
+
+    if (wrappedValue == nullptr) {
+        if (refWrapper->TypeWrapper() == nullptr) {
+            return nullptr;
+        }
+
+        if (refWrapper->TypeWrapper()->Type() != WrapperType::StructType) {
+            return nullptr;
+        }
+
+        StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
+
+        StructInfo structInfo = structTypeWrapper->StructInfo();
+        void* data = malloc(structInfo.FFIType()->size);
+        Interop::InitializeStruct(isolate, data, structInfo.Fields(), value);
+        refWrapper->SetData(data);
+        refWrapper->SetEncoding(typeEncoding);
+        return data;
     }
 
-    PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
-    void* data = pw->Data();
+    if (wrappedValue->Type() == WrapperType::Struct) {
+        StructWrapper* structWrapper = static_cast<StructWrapper*>(wrappedValue);
+        return structWrapper->Data();
+    }
 
-    return data;
+    if (wrappedValue->Type() == WrapperType::Pointer) {
+        PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
+        void* data = pw->Data();
+        return data;
+    }
+
+    return nullptr;
 }
 
 void Reference::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype) {

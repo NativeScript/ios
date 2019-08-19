@@ -96,7 +96,7 @@ void SetTimeout::RemoveKey(const uint32_t key) {
     cache_.erase(it);
 }
 
-std::map<uint32_t, SetTimeout::CacheEntry> SetTimeout::cache_;
+std::unordered_map<uint32_t, SetTimeout::CacheEntry> SetTimeout::cache_;
 uint32_t SetTimeout::count_ = 0;
 
 }
