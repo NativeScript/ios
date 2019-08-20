@@ -86,9 +86,24 @@ void functionWithIntIncompleteArray(int x[]) {
         TNSLog([NSString stringWithFormat:@"%d", x[i]]);
     }
 }
+void functionWithShortConstantArray(short x[5]) {
+    for (int i = 0; i < 5; i++) {
+        TNSLog([NSString stringWithFormat:@"%d", x[i]]);
+    }
+}
 void functionWithIntConstantArray(int x[5]) {
     for (int i = 0; i < 5; i++) {
         TNSLog([NSString stringWithFormat:@"%d", x[i]]);
+    }
+}
+void functionWithLongConstantArray(long x[5]) {
+    for (int i = 0; i < 5; i++) {
+        TNSLog([NSString stringWithFormat:@"%ld", x[i]]);
+    }
+}
+void functionWithLongLongConstantArray(long long x[5]) {
+    for (int i = 0; i < 5; i++) {
+        TNSLog([NSString stringWithFormat:@"%lld", x[i]]);
     }
 }
 void functionWithIntConstantArray2(int x[2][2]) {

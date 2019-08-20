@@ -20,7 +20,10 @@ void functionWithOutStructPtr(TNSSimpleStruct* str);
 void* functionWithIdPointer(void* x);
 
 void functionWithIntIncompleteArray(int x[]);
+void functionWithShortConstantArray(short x[5]);
 void functionWithIntConstantArray(int x[5]);
+void functionWithLongConstantArray(long x[5]);
+void functionWithLongLongConstantArray(long long x[5]);
 void functionWithIntConstantArray2(int x[2][2]);
 
 char** functionWithDoubleCharPtr(char** x);

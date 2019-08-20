@@ -31,14 +31,16 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     RegisterInteropType(isolate, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
     RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(0, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
     RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(sizeof(bool), CreateEncoding(BinaryTypeEncodingType::BoolEncoding)));
-    RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, CreateEncoding(BinaryTypeEncodingType::UShortEncoding)));
-    RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, CreateEncoding(BinaryTypeEncodingType::ShortEncoding)));
-    RegisterInteropType(isolate, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, CreateEncoding(BinaryTypeEncodingType::UIntEncoding)));
-    RegisterInteropType(isolate, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, CreateEncoding(BinaryTypeEncodingType::IntEncoding)));
-    RegisterInteropType(isolate, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, CreateEncoding(BinaryTypeEncodingType::ULongEncoding)));
-    RegisterInteropType(isolate, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, CreateEncoding(BinaryTypeEncodingType::LongEncoding)));
-    RegisterInteropType(isolate, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, CreateEncoding(BinaryTypeEncodingType::ULongLongEncoding)));
-    RegisterInteropType(isolate, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, CreateEncoding(BinaryTypeEncodingType::LongLongEncoding)));
+    RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, CreateEncoding(BinaryTypeEncodingType::UCharEncoding)));
+    RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, CreateEncoding(BinaryTypeEncodingType::CharEncoding)));
+    RegisterInteropType(isolate, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, CreateEncoding(BinaryTypeEncodingType::UShortEncoding)));
+    RegisterInteropType(isolate, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, CreateEncoding(BinaryTypeEncodingType::ShortEncoding)));
+    RegisterInteropType(isolate, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, CreateEncoding(BinaryTypeEncodingType::UIntEncoding)));
+    RegisterInteropType(isolate, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, CreateEncoding(BinaryTypeEncodingType::IntEncoding)));
+    RegisterInteropType(isolate, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, CreateEncoding(BinaryTypeEncodingType::ULongEncoding)));
+    RegisterInteropType(isolate, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, CreateEncoding(BinaryTypeEncodingType::LongEncoding)));
+    RegisterInteropType(isolate, types, "ulong", new PrimitiveDataWrapper(ffi_type_ulong.size, CreateEncoding(BinaryTypeEncodingType::ULongLongEncoding)));
+    RegisterInteropType(isolate, types, "slong", new PrimitiveDataWrapper(ffi_type_slong.size, CreateEncoding(BinaryTypeEncodingType::LongLongEncoding)));
     RegisterInteropType(isolate, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, CreateEncoding(BinaryTypeEncodingType::FloatEncoding)));
     RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, CreateEncoding(BinaryTypeEncodingType::DoubleEncoding)));
 
@@ -116,130 +118,13 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
         Isolate* isolate = info.GetIsolate();
         Local<Value> arg = info[0];
 
-        void* handle = nullptr;
-        bool hasHandle = false;
-
-        if (!arg->IsNullOrUndefined()) {
-            if (arg->IsArrayBuffer()) {
-                Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
-                ArrayBuffer::Contents contents = buffer->GetContents();
-                handle = contents.Data();
-                hasHandle = true;
-            } else if (arg->IsArrayBufferView()) {
-                Local<ArrayBufferView> bufferView = arg.As<ArrayBufferView>();
-                ArrayBuffer::Contents contents = bufferView->Buffer()->GetContents();
-                handle = contents.Data();
-                hasHandle = true;
-            } else if (tns::IsString(arg)) {
-                v8::String::Utf8Value result(isolate, arg);
-                handle = *result;
-                hasHandle = true;
-            } else if (arg->IsObject()) {
-                Local<Object> obj = arg.As<Object>();
-                if (BaseDataWrapper* wrapper = tns::GetValue(isolate, obj)) {
-                    switch (wrapper->Type()) {
-                        case WrapperType::ObjCClass: {
-                            ObjCClassWrapper* cw = static_cast<ObjCClassWrapper*>(wrapper);
-                            @autoreleasepool {
-                                CFTypeRef ref = CFBridgingRetain(cw->Klass());
-                                handle = const_cast<void*>(ref);
-                                CFRelease(ref);
-                                hasHandle = true;
-                            }
-                            break;
-                        }
-                        case WrapperType::ObjCProtocol: {
-                            ObjCProtocolWrapper* pw = static_cast<ObjCProtocolWrapper*>(wrapper);
-                            CFTypeRef ref = CFBridgingRetain(pw->Proto());
-                            handle = const_cast<void*>(ref);
-                            CFRelease(ref);
-                            hasHandle = true;
-                            break;
-                        }
-                        case WrapperType::ObjCObject: {
-                            ObjCDataWrapper* w = static_cast<ObjCDataWrapper*>(wrapper);
-                            @autoreleasepool {
-                                id target = w->Data();
-                                CFTypeRef ref = CFBridgingRetain(target);
-                                handle = const_cast<void*>(ref);
-                                hasHandle = true;
-                                CFRelease(ref);
-                            }
-                            break;
-                        }
-                        case WrapperType::Struct: {
-                            StructWrapper* w = static_cast<StructWrapper*>(wrapper);
-                            handle = w->Data();
-                            hasHandle = true;
-                            break;
-                        }
-                        case WrapperType::Reference: {
-                            ReferenceWrapper* w = static_cast<ReferenceWrapper*>(wrapper);
-                            if (w->Value() != nullptr) {
-                                Local<Value> value = w->Value()->Get(isolate);
-                                BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                                if (wrapper != nullptr && wrapper->Type() == WrapperType::Pointer) {
-                                    info.GetReturnValue().Set(value);
-                                    return;
-                                }
-
-                                handle = w->Value();
-                                hasHandle = true;
-                            } else if (w->Data() != nullptr) {
-                                handle = w->Data();
-                                hasHandle = true;
-                            }
-                            break;
-                        }
-                        case WrapperType::Pointer: {
-                            PointerWrapper* w = static_cast<PointerWrapper*>(wrapper);
-                            handle = w->Data();
-                            hasHandle = true;
-                            break;
-                        }
-                        case WrapperType::Function: {
-                            FunctionWrapper* w = static_cast<FunctionWrapper*>(wrapper);
-                            const FunctionMeta* meta = w->Meta();
-                            handle = SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
-                            hasHandle = true;
-                            break;
-                        }
-                        case WrapperType::FunctionReference: {
-                            FunctionReferenceWrapper* w = static_cast<FunctionReferenceWrapper*>(wrapper);
-                            if (w->Data() != nullptr) {
-                                handle = w->Data();
-                                hasHandle = true;
-                            }
-                            break;
-                        }
-                        case WrapperType::Block: {
-                            BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
-                            handle = blockWrapper->Block();
-                            hasHandle = true;
-                            break;
-                        }
-
-                        default:
-                            break;
-                    }
-                }
-            }
-        } else if (arg->IsNull()) {
-            hasHandle = true;
-        }
-
-        if (!hasHandle) {
+        Local<Value> result = Interop::HandleOf(isolate, arg);
+        if (result.IsEmpty()) {
             tns::ThrowError(isolate, "Unknown type");
             return;
         }
 
-        if (handle == nullptr) {
-            info.GetReturnValue().Set(Null(isolate));
-            return;
-        }
-
-        Local<Value> pointerInstance = Pointer::NewInstance(isolate, handle);
-        info.GetReturnValue().Set(pointerInstance);
+        info.GetReturnValue().Set(result);
     }).ToLocal(&func);
     assert(success);
 
@@ -396,6 +281,105 @@ const TypeEncoding* Interop::CreateEncoding(BinaryTypeEncodingType type) {
     typeEncoding->type = type;
 
     return typeEncoding;
+}
+
+Local<Value> Interop::HandleOf(Isolate* isolate, Local<Value> value) {
+    if (!value->IsNullOrUndefined()) {
+        if (value->IsArrayBuffer()) {
+            Local<ArrayBuffer> buffer = value.As<ArrayBuffer>();
+            ArrayBuffer::Contents contents = buffer->GetContents();
+            return Pointer::NewInstance(isolate, contents.Data());
+        } else if (value->IsArrayBufferView()) {
+            Local<ArrayBufferView> bufferView = value.As<ArrayBufferView>();
+            ArrayBuffer::Contents contents = bufferView->Buffer()->GetContents();
+            return Pointer::NewInstance(isolate, contents.Data());
+        } else if (tns::IsString(value)) {
+            v8::String::Utf8Value result(isolate, value);
+            return Pointer::NewInstance(isolate, *result);
+        } else if (value->IsObject()) {
+            Local<Object> obj = value.As<Object>();
+            if (BaseDataWrapper* wrapper = tns::GetValue(isolate, obj)) {
+                switch (wrapper->Type()) {
+                    case WrapperType::Primitive: {
+                        PrimitiveDataWrapper* pdw = static_cast<PrimitiveDataWrapper*>(wrapper);
+                        void* handle = pdw;
+                        return Pointer::NewInstance(isolate, handle);
+                    }
+                    case WrapperType::ObjCClass: {
+                        ObjCClassWrapper* cw = static_cast<ObjCClassWrapper*>(wrapper);
+                        @autoreleasepool {
+                            CFTypeRef ref = CFBridgingRetain(cw->Klass());
+                            void* handle = const_cast<void*>(ref);
+                            CFRelease(ref);
+                            return Pointer::NewInstance(isolate, handle);
+                        }
+                        break;
+                    }
+                    case WrapperType::ObjCProtocol: {
+                        ObjCProtocolWrapper* pw = static_cast<ObjCProtocolWrapper*>(wrapper);
+                        CFTypeRef ref = CFBridgingRetain(pw->Proto());
+                        void* handle = const_cast<void*>(ref);
+                        CFRelease(ref);
+                        return Pointer::NewInstance(isolate, handle);
+                    }
+                    case WrapperType::ObjCObject: {
+                        ObjCDataWrapper* w = static_cast<ObjCDataWrapper*>(wrapper);
+                        @autoreleasepool {
+                            id target = w->Data();
+                            CFTypeRef ref = CFBridgingRetain(target);
+                            void* handle = const_cast<void*>(ref);
+                            CFRelease(ref);
+                            return Pointer::NewInstance(isolate, handle);
+                        }
+                        break;
+                    }
+                    case WrapperType::Struct: {
+                        StructWrapper* w = static_cast<StructWrapper*>(wrapper);
+                        return Pointer::NewInstance(isolate, w->Data());
+                    }
+                    case WrapperType::Reference: {
+                        ReferenceWrapper* w = static_cast<ReferenceWrapper*>(wrapper);
+                        if (w->Value() != nullptr) {
+                            Local<Value> wrappedValue = w->Value()->Get(isolate);
+                            if (tns::GetValue(isolate, wrappedValue) == nullptr) {
+                                return Pointer::NewInstance(isolate, w->Value());
+                            }
+                            return HandleOf(isolate, wrappedValue);
+                        } else if (w->Data() != nullptr) {
+                            return Pointer::NewInstance(isolate, w->Data());
+                        }
+                        break;
+                    }
+                    case WrapperType::Pointer: {
+                        return value;
+                    }
+                    case WrapperType::Function: {
+                        FunctionWrapper* w = static_cast<FunctionWrapper*>(wrapper);
+                        const FunctionMeta* meta = w->Meta();
+                        void* handle = SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
+                        return Pointer::NewInstance(isolate, handle);
+                    }
+                    case WrapperType::FunctionReference: {
+                        FunctionReferenceWrapper* w = static_cast<FunctionReferenceWrapper*>(wrapper);
+                        if (w->Data() != nullptr) {
+                            return Pointer::NewInstance(isolate, w->Data());
+                        }
+                        break;
+                    }
+                    case WrapperType::Block: {
+                        BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
+                        return Pointer::NewInstance(isolate, blockWrapper->Block());
+                    }
+                    default:
+                        break;
+                }
+            }
+        }
+    } else if (value->IsNull()) {
+        return v8::Null(isolate);
+    }
+
+    return Local<Value>();
 }
 
 }

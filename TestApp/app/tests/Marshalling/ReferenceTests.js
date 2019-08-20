@@ -175,7 +175,20 @@ describe(module.id, function () {
     //     expect(s1.y1[1].x2).toBe(30);
     // });
 
-    it("ConstantCArrayParameter", function () {
+    it("ConstantCArrayParameterShort", function () {
+        var handle = interop.alloc(5 * interop.sizeof(interop.types.int16));
+        var reference = new interop.Reference(interop.types.int16, handle);
+        reference[0] = 1;
+        reference[1] = 2;
+        reference[2] = 3;
+        reference[3] = 4;
+        reference[4] = 5;
+
+        functionWithShortConstantArray(reference);
+        expect(TNSGetOutput()).toBe('12345');
+    });
+
+    it("ConstantCArrayParameterInt", function () {
         var handle = interop.alloc(5 * interop.sizeof(interop.types.int32));
         var reference = new interop.Reference(interop.types.int32, handle);
         reference[0] = 1;
@@ -185,6 +198,19 @@ describe(module.id, function () {
         reference[4] = 5;
 
         functionWithIntConstantArray(reference);
+        expect(TNSGetOutput()).toBe('12345');
+    });
+
+    it("ConstantCArrayParameterLong", function () {
+        var handle = interop.alloc(5 * interop.sizeof(interop.types.int64));
+        var reference = new interop.Reference(interop.types.int64, handle);
+        reference[0] = 1;
+        reference[1] = 2;
+        reference[2] = 3;
+        reference[3] = 4;
+        reference[4] = 5;
+
+        functionWithLongConstantArray(reference);
         expect(TNSGetOutput()).toBe('12345');
     });
 
@@ -279,22 +305,22 @@ describe(module.id, function () {
             expect(reference.value).toBe(value);
         });
 
-        // it("should accept a single type argument", function () {
-        //     var reference = new interop.Reference(interop.types.bool);
+        it("should accept a single type argument", function () {
+            var reference = new interop.Reference(interop.types.bool);
 
-        //     expect(reference).toEqual(jasmine.any(interop.Reference));
-        //     expect(interop.handleof(reference)).toEqual(jasmine.any(interop.Pointer));
-        // });
+            expect(reference).toEqual(jasmine.any(interop.Reference));
+            expect(interop.handleof(reference)).toEqual(jasmine.any(interop.Pointer));
+        });
 
-        // it("should accept type and value arguments", function () {
-        //     var value = NSObject.alloc().init();
-        //     var reference = new interop.Reference(NSObject, value);
-        //     var buffer = interop.handleof(reference);
+        it("should accept type and value arguments", function () {
+            var value = NSObject.alloc().init();
+            var reference = new interop.Reference(NSObject, value);
+            var buffer = interop.handleof(reference);
 
-        //     expect(reference).toEqual(jasmine.any(interop.Reference));
-        //     expect(reference.value).toBe(value);
-        //     expect(buffer).toEqual(jasmine.any(interop.Pointer));
-        // });
+            expect(reference).toEqual(jasmine.any(interop.Reference));
+            expect(reference.value).toBe(value);
+            expect(buffer).toEqual(jasmine.any(interop.Pointer));
+        });
 
         it("should accept type and pointer arguments", function () {
             var pointer = interop.alloc(1);
@@ -304,21 +330,21 @@ describe(module.id, function () {
             expect(interop.handleof(reference)).toBe(pointer);
         });
 
-        // it("should accept type and record arguments", function () {
-        //     var record = new CGPoint();
-        //     var reference = new interop.Reference(CGPoint, record);
+        it("should accept type and record arguments", function () {
+            var record = new CGPoint();
+            var reference = new interop.Reference(CGPoint, record);
 
-        //     expect(reference).toEqual(jasmine.any(interop.Reference));
-        //     expect(interop.handleof(reference)).toBe(interop.handleof(record));
-        // });
+            expect(reference).toEqual(jasmine.any(interop.Reference));
+            expect(interop.handleof(reference)).toBe(interop.handleof(record));
+        });
 
-        // it("should accept type and pointer-backed reference arguments", function () {
-        //     var ref = new interop.Reference(interop.types.bool);
-        //     var reference = new interop.Reference(interop.types.bool, ref);
+        it("should accept type and pointer-backed reference arguments", function () {
+            var ref = new interop.Reference(interop.types.bool);
+            var reference = new interop.Reference(interop.types.bool, ref);
 
-        //     expect(reference).toEqual(jasmine.any(interop.Reference));
-        //     expect(interop.handleof(reference)).toBe(interop.handleof(ref));
-        // });
+            expect(reference).toEqual(jasmine.any(interop.Reference));
+            expect(interop.handleof(reference)).toBe(interop.handleof(ref));
+        });
 
         it("should accept type and uninitialized reference arguments", function () {
             var ref = new interop.Reference(123);

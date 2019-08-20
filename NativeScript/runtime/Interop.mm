@@ -156,7 +156,9 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 referenceWrapper->SetData(data);
                 referenceWrapper->SetEncoding(innerType);
                 // Initialize the ref/out parameter value before passing it to the function call
-                Interop::WriteValue(isolate, innerType, data, value);
+                if (!value.IsEmpty()) {
+                    Interop::WriteValue(isolate, innerType, data, value);
+                }
             } else {
                 assert(false);
             }

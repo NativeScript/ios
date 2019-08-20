@@ -40,6 +40,7 @@ private:
     static v8::Local<v8::Array> ToArray(v8::Isolate* isolate, v8::Local<v8::Object> object);
     static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call);
     static const TypeEncoding* CreateEncoding(BinaryTypeEncodingType type);
+    static v8::Local<v8::Value> HandleOf(v8::Isolate* isolate, v8::Local<v8::Value> value);
 
     template <typename T>
     static void SetValue(void* dest, T value) {
