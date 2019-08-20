@@ -266,7 +266,8 @@ const MembersCollection BaseClassMeta::members(const char* identifier, size_t le
         std::map<int, const MemberMeta*> membersMap;
         collectInheritanceChainMembers(identifier, length, type, onlyIfAvailable, this, [&](const MemberMeta* member) {
             const MethodMeta* method = static_cast<const MethodMeta*>(member);
-            membersMap.emplace(method->encodings()->count, member);
+            ArrayCount count = method->encodings()->count;
+            membersMap.emplace(count, member);
         });
         for (std::map<int, const MemberMeta*>::iterator it = membersMap.begin(); it != membersMap.end(); ++it) {
             result.insert(it->second);
