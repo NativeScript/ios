@@ -2,7 +2,7 @@
 #define ConcurrentMap_h
 
 #include <shared_mutex>
-#include <map>
+#include <unordered_map>
 
 namespace tns {
 
@@ -31,8 +31,8 @@ public:
         std::lock_guard<std::shared_timed_mutex> writerLock(this->containerMutex_);
         auto it = this->container_.find(key);
         if (it != this->container_.end()) {
-            this->container_.erase(it);
             removedElement = it->second;
+            this->container_.erase(it);
         }
     }
 
@@ -41,7 +41,7 @@ public:
     ConcurrentMap& operator=(const ConcurrentMap&) = delete;
 private:
     std::shared_timed_mutex containerMutex_;
-    std::map<TKey, TValue> container_;
+    std::unordered_map<TKey, TValue> container_;
 };
 
 }
