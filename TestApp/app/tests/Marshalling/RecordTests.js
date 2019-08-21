@@ -175,11 +175,11 @@ describe(module.id, function () {
         })).toBe(true);
     });
 
-    // it("LinkedList", function () {
-    //     var record = new TNSStructWithPointers();
-    //     record.z = new TNSStructWithPointers();
-    //     expect(record.z.value.z).toBe(null);
-    // });
+    it("LinkedList", function () {
+        var record = new TNSStructWithPointers();
+        record.z = new TNSStructWithPointers();
+        expect(record.z.value.z).toBe(null);
+    });
 
     it("simpleStructWithConstArray", function(){
         //{.x1 = 100, .y1 = {{.x2 = 10, .x3 = 20}, {.x2 = 30, .x3 = 40}}}

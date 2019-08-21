@@ -485,6 +485,11 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
                 uint8_t* dst = (uint8_t*)destBuffer + offset;
                 memcpy(dst, data, length * ffiType->size);
             }
+        } else if (type == BinaryTypeEncodingType::FunctionPointerEncoding) {
+            Interop::WriteValue(isolate, field.Encoding(), destBuffer, value);
+        } else if (type == BinaryTypeEncodingType::PointerEncoding) {
+            const TypeEncoding* innerType = field.Encoding()->details.pointer.getInnerType();
+            Interop::WriteValue(isolate, innerType, destBuffer, value);
         } else {
             ptrdiff_t offset = position + field.Offset();
 
@@ -898,6 +903,14 @@ void Interop::SetStructPropertyValue(Isolate* isolate, StructWrapper* wrapper, S
         }
         case BinaryTypeEncodingType::ConstantArrayEncoding: {
             Interop::WriteValue(isolate, fieldEncoding, destBuffer, value);
+            break;
+        }
+        case BinaryTypeEncodingType::PointerEncoding: {
+            BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+            assert(wrapper != nullptr && wrapper->Type() == WrapperType::Struct);
+            StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
+            void* data = structWrapper->Data();
+            Interop::SetValue(destBuffer, data);
             break;
         }
         case BinaryTypeEncodingType::UShortEncoding: {
