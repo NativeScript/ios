@@ -3,7 +3,7 @@
 
 namespace tns {
 
-ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool innerStructCall) {
+ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStructMember) {
     switch (typeEncoding->type) {
         case BinaryTypeEncodingType::VoidEncoding: {
             return &ffi_type_void;
@@ -79,7 +79,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool innerS
             return structInfo.FFIType();
         }
         case BinaryTypeEncodingType::ConstantArrayEncoding: {
-            if (innerStructCall) {
+            if (isStructMember) {
                 const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
                 ffi_type* innerFFIType = FFICall::GetArgumentType(innerType);
                 int32_t size = typeEncoding->details.constantArray.size;

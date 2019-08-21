@@ -62,7 +62,9 @@ void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, F
 
 void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
     if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
-        Interop::SetValue(dest, nullptr);
+        ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, true);
+        size_t size = ffiType->size;
+        memset(dest, 0, size);
     } else if (tns::IsBool(arg) && typeEncoding->type == BinaryTypeEncodingType::IdEncoding) {
         bool value = tns::ToBool(arg);
         NSObject* o = @(value);
@@ -223,13 +225,25 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::AnonymousStructEncoding) {
         Local<Object> obj = arg.As<Object>();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
-        // Anonymous structs can only be initialized with plain javascript objects
-        assert(wrapper == nullptr);
-        size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
-        const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
-        const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
-        StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
-        Interop::InitializeStruct(isolate, dest, structInfo.Fields(), obj);
+        if (wrapper != nullptr && wrapper->Type() == WrapperType::Struct) {
+            size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
+            const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
+            const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
+            StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+
+            StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
+            void* data = structWrapper->Data();
+            size_t size = structInfo.FFIType()->size;
+            memcpy(dest, data, size);
+        } else {
+            // Anonymous structs can only be initialized with plain javascript objects
+            assert(wrapper == nullptr);
+            size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
+            const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
+            const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
+            StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+            Interop::InitializeStruct(isolate, dest, structInfo.Fields(), obj);
+        }
     } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
         Local<Object> obj = arg.As<Object>();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
@@ -262,8 +276,23 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         }
         Interop::SetValue(dest, data);
     } else if (typeEncoding->type == BinaryTypeEncodingType::ConstantArrayEncoding) {
-        void* data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
-        Interop::SetValue(dest, data);
+        if (arg->IsArray()) {
+            Local<v8::Array> array = arg.As<v8::Array>();
+            Local<Context> context = isolate->GetCurrentContext();
+            const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
+            ffi_type* ffiType = FFICall::GetArgumentType(innerType);
+            uint32_t length = array->Length();
+            for (uint32_t i = 0; i < length; i++) {
+                Local<Value> element;
+                bool success = array->Get(context, i).ToLocal(&element);
+                assert(success);
+                void* ptr = (uint8_t*)dest + i * ffiType->size;
+                Interop::WriteValue(isolate, innerType, ptr, element);
+            }
+        } else {
+            void* data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
+            Interop::SetValue(dest, data);
+        }
     } else if (arg->IsObject()) {
         Local<Object> obj = arg.As<Object>();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
@@ -847,7 +876,7 @@ Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodin
     return Local<Value>();
 }
 
-void Interop::SetStructPropertyValue(StructWrapper* wrapper, StructField field, Local<Value> value) {
+void Interop::SetStructPropertyValue(Isolate* isolate, StructWrapper* wrapper, StructField field, Local<Value> value) {
     if (value.IsEmpty()) {
         return;
     }
@@ -865,6 +894,10 @@ void Interop::SetStructPropertyValue(StructWrapper* wrapper, StructField field, 
             void* sourceBuffer = targetStruct->Data();
             size_t fieldSize = field.FFIType()->size;
             memcpy(destBuffer, sourceBuffer, fieldSize);
+            break;
+        }
+        case BinaryTypeEncodingType::ConstantArrayEncoding: {
+            Interop::WriteValue(isolate, fieldEncoding, destBuffer, value);
             break;
         }
         case BinaryTypeEncodingType::UShortEncoding: {

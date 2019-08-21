@@ -21,7 +21,7 @@ public:
     static inline v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const TMeta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper = false);
     static id CallInitializer(v8::Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args);
     static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive);
-    static void SetStructPropertyValue(StructWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
+    static void SetStructPropertyValue(v8::Isolate* isolate, StructWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer);
     static void WriteValue(v8::Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, v8::Local<v8::Value> arg);
     static id ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg);

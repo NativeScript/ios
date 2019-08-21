@@ -149,24 +149,24 @@ describe(module.id, function () {
         // expect(result).toEqual(object);
     });
 
-    // it("NestedAnonymousStruct", function () {
-    //     var object = {
-    //         x1: 1,
-    //         y1: {
-    //             x2: 2,
-    //             y2: {
-    //                 x3: 3
-    //             }
-    //         }
-    //     };
+    it("NestedAnonymousStruct", function () {
+        var object = {
+            x1: 1,
+            y1: {
+                x2: 2,
+                y2: {
+                    x3: 3
+                }
+            }
+        };
 
-    //     var result = TNSTestNativeCallbacks.recordsNestedAnonymousStruct(object);
-    //     expect(TNSGetOutput()).toBe('1 2 3');
+        var result = TNSTestNativeCallbacks.recordsNestedAnonymousStruct(object);
+        expect(TNSGetOutput()).toBe('1 2 3');
 
-    //     expect(result.x1).toBe(object.x1);
-    //     expect(result.y1.x2).toBe(object.y1.x2);
-    //     expect(result.y1.y2.x3).toBe(object.y1.y2.x3);
-    // });
+        expect(result.x1).toBe(object.x1);
+        expect(result.y1.x2).toBe(object.y1.x2);
+        expect(result.y1.y2.x3).toBe(object.y1.y2.x3);
+    });
 
     it("NSRangeMake", function () {
         expect(NSRange.equals(NSMakeRange(1, 2), {

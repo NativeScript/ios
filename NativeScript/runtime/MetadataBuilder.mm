@@ -753,7 +753,7 @@ void MetadataBuilder::StructPropertySetterCallback(Local<Name> property, Local<V
     }
 
     StructField field = *it;
-    Interop::SetStructPropertyValue(wrapper, field, value);
+    Interop::SetStructPropertyValue(isolate, wrapper, field, value);
 }
 
 void MetadataBuilder::DefineFunctionLengthProperty(Local<Context> context, const TypeEncodingsList<ArrayCount>* encodings, Local<v8::Function> func) {
