@@ -85,7 +85,7 @@ void Runtime::Init(const string& baseDir) {
         V8::InitializePlatform(Runtime::platform_);
         V8::Initialize();
         std::string flags = "--expose_gc --jitless";
-        V8::SetFlagsFromString(flags.c_str(), (int)flags.size());
+        V8::SetFlagsFromString(flags.c_str(), flags.size());
     }
 
     auto* nativesBlobStartupData = new StartupData();

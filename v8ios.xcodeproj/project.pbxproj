@@ -2119,7 +2119,9 @@
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"'NATIVESCRIPT_VERSION=1.0.0'",
-					"HAVE_GETIFADDRS=1",
+					"V8_IMMINENT_DEPRECATION_WARNINGS=1",
+					"V8_DEPRECATION_WARNINGS=1",
+					"V8_TARGET_ARCH_ARM64=1",
 				);
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
@@ -2133,13 +2135,12 @@
 				OTHER_CFLAGS = (
 					"-fno-rtti",
 					"-Wall",
+					"-Werror",
 					"-Wno-documentation",
 				);
 				OTHER_LDFLAGS = (
 					"-Wl,-dead_strip",
 					"-Wl,-search_paths_first",
-					"-Werror",
-					"-Wall",
 					"-fno-builtin-stpcpy",
 					"-fno-rtti",
 					"-mstackrealign",
@@ -2194,7 +2195,11 @@
 					"$(SRCROOT)/NativeScript/inspector/src/inspector/protocol/*",
 				);
 				GCC_C_LANGUAGE_STANDARD = c11;
-				GCC_PREPROCESSOR_DEFINITIONS = "'NATIVESCRIPT_VERSION=1.0.0'";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"'NATIVESCRIPT_VERSION=1.0.0'",
+					"V8_IMMINENT_DEPRECATION_WARNINGS=1",
+					"V8_DEPRECATION_WARNINGS=1",
+				);
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
@@ -2207,6 +2212,7 @@
 				OTHER_CFLAGS = (
 					"-fno-rtti",
 					"-Wall",
+					"-Werror",
 					"-Wno-documentation",
 				);
 				OTHER_LDFLAGS = (
