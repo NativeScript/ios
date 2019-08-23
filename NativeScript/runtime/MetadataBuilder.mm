@@ -790,13 +790,13 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
                 Local<Value> arg = context->args_[i]->Get(context->isolate_);
                 args.push_back(arg);
             }
-            Interop::CallFunction(context->isolate_, context->meta_, nil, nil, args);
+            Interop::CallFunction(context->isolate_, context->meta_, args);
         }, userData);
         return;
     }
 
     std::vector<Local<Value>> args = tns::ArgsToVector(info);
-    Local<Value> result = Interop::CallFunction(isolate, item->meta_, nil, nil, args);
+    Local<Value> result = Interop::CallFunction(isolate, item->meta_, args);
     if (item->meta_->encodings()->first()->type != BinaryTypeEncodingType::VoidEncoding) {
         info.GetReturnValue().Set(result);
     }

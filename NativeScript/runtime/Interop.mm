@@ -1,9 +1,11 @@
 #include <Foundation/Foundation.h>
+#include <objc/message.h>
 #include "Interop.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
 #include "ArgConverter.h"
 #include "DictionaryAdapter.h"
+#include "SymbolLoader.h"
 #include "ArrayAdapter.h"
 #include "NSDataAdapter.h"
 #include "Caches.h"
@@ -48,6 +50,62 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
     object_setClass((__bridge id)blockPointer, objc_getClass("__NSMallocBlock__"));
 
     return blockPointer;
+}
+
+Local<Value> Interop::CallFunction(Isolate* isolate, const FunctionMeta* meta, const std::vector<Local<Value>> args) {
+    void* functionPointer = SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
+    if (!functionPointer) {
+        NSLog(@"Unable to load \"%s\" function", meta->name());
+        assert(false);
+    }
+
+    const TypeEncoding* typeEncoding = meta->encodings()->first();;
+    return Interop::CallFunction(isolate, functionPointer, typeEncoding, args);
+}
+
+Local<Value> Interop::CallFunction(Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args) {
+    return Interop::CallFunctionInternal(isolate, true, functionPointer, typeEncoding, args, nil, nil, nil, false, MetaType::Undefined);
+}
+
+Local<Value> Interop::CallFunction(Isolate* isolate, const MethodMeta* meta, id target, Class clazz, const std::vector<Local<Value>> args, bool callSuper) {
+    SEL selector = nil;
+    void* functionPointer = nullptr;
+    const TypeEncoding* typeEncoding = nullptr;
+    bool isPrimitiveFunction = false;
+    MetaType metaType = MetaType::Undefined;
+
+    metaType = meta->type();
+    selector = meta->selector();
+    typeEncoding = meta->encodings()->first();
+    if (callSuper) {
+        functionPointer = (void*)objc_msgSendSuper;
+    } else {
+        functionPointer = (void*)objc_msgSend;
+    }
+
+    return Interop::CallFunctionInternal(isolate, isPrimitiveFunction, functionPointer, typeEncoding, args, target, clazz, selector, callSuper, metaType);
+}
+
+id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, const std::vector<Local<Value>> args) {
+    const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
+    SEL selector = methodMeta->selector();
+    void* functionPointer = (void*)objc_msgSend;
+
+    int initialParameterIndex = 2;
+    int argsCount = initialParameterIndex + (int)args.size();
+
+    ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, argsCount);
+    FFICall call(cif);
+
+    Interop::SetValue(call.ArgumentBuffer(0), target);
+    Interop::SetValue(call.ArgumentBuffer(1), selector);
+    Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
+
+    ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+
+    id result = call.GetResult<id>();
+
+    return result;
 }
 
 void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<Local<Value>> args) {
@@ -172,9 +230,11 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         assert(wrapper != nullptr && wrapper->Type() == WrapperType::FunctionReference);
         FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
         const TypeEncoding* functionTypeEncoding = typeEncoding->details.functionPointer.signature.first();
-        int argsCount = typeEncoding->details.block.signature.count - 1;
+        int argsCount = typeEncoding->details.functionPointer.signature.count - 1;
 
-        Local<v8::Function> callback = funcWrapper->Function()->Get(isolate);
+        Local<Value> callbackValue = funcWrapper->Function()->Get(isolate);
+        assert(callbackValue->IsFunction());
+        Local<v8::Function> callback = callbackValue.As<v8::Function>();
         Persistent<Value>* poCallback = new Persistent<Value>(isolate, callback);
         MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 0, argsCount, functionTypeEncoding);
 
@@ -620,7 +680,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
-        auto cache = Caches::Get(isolate);
+        Caches* cache = Caches::Get(isolate);
         while (true) {
             const char* name = class_getName(result);
             auto it = cache->CtorFuncs.find(name);
@@ -686,6 +746,40 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         tns::SetValue(isolate, callback, blockWrapper);
 
         return callback;
+    }
+
+    if (typeEncoding->type == BinaryTypeEncodingType::FunctionPointerEncoding) {
+        uint8_t* functionPointer = call->GetResult<uint8_t*>();
+        if (functionPointer == nullptr) {
+            return Null(isolate);
+        }
+
+        const TypeEncoding* parametersEncoding = typeEncoding->details.functionPointer.signature.first();
+        size_t parametersCount = typeEncoding->details.functionPointer.signature.count;
+        AnonymousFunctionWrapper* wrapper = new AnonymousFunctionWrapper(functionPointer, parametersEncoding, parametersCount);
+        Local<External> ext = External::New(isolate, wrapper);
+
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<v8::Function> func;
+        bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            AnonymousFunctionWrapper* wrapper = static_cast<AnonymousFunctionWrapper*>(info.Data().As<External>()->Value());
+            assert(wrapper != nullptr);
+
+            const std::vector<Local<Value>> args = tns::ArgsToVector(info);
+            void* functionPointer = wrapper->Data();
+            const TypeEncoding* typeEncoding = wrapper->ParametersEncoding();
+
+            Local<Value> result = Interop::CallFunction(isolate, functionPointer, typeEncoding, args);
+
+            info.GetReturnValue().Set(result);
+        }, ext).ToLocal(&func);
+        assert(success);
+
+        tns::SetValue(isolate, func, wrapper);
+        ObjectManager::Register(isolate, func);
+
+        return func;
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::PointerEncoding) {
@@ -1008,6 +1102,69 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
     assert(success);
 
     return result.As<v8::Array>();
+}
+
+Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType) {
+    int initialParameterIndex = isPrimitiveFunction ? 0 : 2;
+
+    int argsCount = initialParameterIndex + (int)args.size();
+
+    ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, argsCount);
+
+    FFICall call(cif);
+
+    std::unique_ptr<objc_super> sup = std::unique_ptr<objc_super>(new objc_super());
+
+    bool isInstanceMethod = (target && target != nil);
+
+    if (initialParameterIndex > 1) {
+#if defined(__x86_64__)
+        if (metaType == MetaType::Undefined || metaType == MetaType::Union) {
+            const unsigned UNIX64_FLAG_RET_IN_MEM = (1 << 10);
+
+            ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
+
+            if (returnType->type == FFI_TYPE_LONGDOUBLE) {
+                functionPointer = (void*)objc_msgSend_fpret;
+            } else if (returnType->type == FFI_TYPE_STRUCT && (cif->flags & UNIX64_FLAG_RET_IN_MEM)) {
+                if (callSuper) {
+                    functionPointer = (void*)objc_msgSendSuper_stret;
+                } else {
+                    functionPointer = (void*)objc_msgSend_stret;
+                }
+            }
+        }
+#endif
+
+        if (isInstanceMethod) {
+            if (callSuper) {
+                sup->receiver = target;
+                sup->super_class = class_getSuperclass(object_getClass(target));
+                Interop::SetValue(call.ArgumentBuffer(0), sup.get());
+            } else {
+                Interop::SetValue(call.ArgumentBuffer(0), target);
+            }
+        } else {
+            Interop::SetValue(call.ArgumentBuffer(0), clazz);
+        }
+
+        Interop::SetValue(call.ArgumentBuffer(1), selector);
+    }
+
+    bool isInstanceReturnType = typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding;
+    bool marshalToPrimitive = isPrimitiveFunction || !isInstanceReturnType;
+
+    @autoreleasepool {
+        Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
+    }
+
+    ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+
+    @autoreleasepool {
+        Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, marshalToPrimitive);
+
+        return result;
+    }
 }
 
 }

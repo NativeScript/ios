@@ -22,6 +22,7 @@ enum class WrapperType {
     ObjCClass,
     ObjCProtocol,
     Function,
+    AnonymousFunction,
     Block,
     Reference,
     ReferenceType,
@@ -350,6 +351,29 @@ private:
     const FunctionMeta* meta_;
 };
 
+class AnonymousFunctionWrapper: public BaseDataWrapper {
+public:
+    AnonymousFunctionWrapper(void* functionPointer, const TypeEncoding* parametersEncoding, size_t parametersCount)
+        : data_(functionPointer),
+          parametersEncoding_(parametersEncoding) {
+    }
+
+    const WrapperType Type() {
+        return WrapperType::AnonymousFunction;
+    }
+
+    void* Data() {
+        return this->data_;
+    }
+
+    const TypeEncoding* ParametersEncoding() {
+        return this->parametersEncoding_;
+    }
+private:
+    void* data_;
+    const TypeEncoding* parametersEncoding_;
+};
+
 class BlockWrapper: public BaseDataWrapper {
 public:
     BlockWrapper(void* block, const TypeEncoding* typeEncoding)
@@ -382,7 +406,7 @@ public:
 
 class FunctionReferenceWrapper: public BaseDataWrapper {
 public:
-    FunctionReferenceWrapper(v8::Persistent<v8::Function>* function)
+    FunctionReferenceWrapper(v8::Persistent<v8::Value>* function)
         : function_(function),
           data_(nullptr) {
     }
@@ -391,7 +415,7 @@ public:
         return WrapperType::FunctionReference;
     }
 
-    v8::Persistent<v8::Function>* Function() {
+    v8::Persistent<v8::Value>* Function() {
         return this->function_;
     }
 
@@ -403,7 +427,7 @@ public:
         this->data_ = data;
     }
 private:
-    v8::Persistent<v8::Function>* function_;
+    v8::Persistent<v8::Value>* function_;
     void* data_;
 };
 

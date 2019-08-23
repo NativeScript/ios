@@ -36,10 +36,6 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
     }
 
     Local<Object> obj = value.As<Object>();
-    if (obj->InternalFieldCount() < 1) {
-        return true;
-    }
-
     if (obj->InternalFieldCount() > 1) {
         Local<Value> superValue = obj->GetInternalField(1);
         if (!superValue.IsEmpty() && superValue->IsString()) {
@@ -48,19 +44,13 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         }
     }
 
-    Local<Value> internalField = obj->GetInternalField(0);
-    if (internalField.IsEmpty() || internalField->IsNullOrUndefined() || !internalField->IsExternal()) {
-        return true;
-    }
-
-    void* internalFieldValue = internalField.As<External>()->Value();
-    BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(internalFieldValue);
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
     if (wrapper == nullptr) {
-        obj->SetInternalField(0, v8::Undefined(isolate));
+        tns::SetValue(isolate, obj, nullptr);
         return true;
     }
 
-    auto cache = Caches::Get(isolate);
+    Caches* cache = Caches::Get(isolate);
     switch (wrapper->Type()) {
         case WrapperType::Struct: {
             StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
@@ -121,9 +111,11 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         case WrapperType::FunctionReference: {
             FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
             if (funcWrapper->Function() != nullptr) {
-                DisposeValue(isolate, funcWrapper->Function()->Get(isolate));
                 funcWrapper->Function()->Reset();
             }
+            break;
+        }
+        case WrapperType::AnonymousFunction: {
             break;
         }
         case WrapperType::Worker: {
@@ -141,7 +133,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
 
     delete wrapper;
     wrapper = nullptr;
-    obj->SetInternalField(0, v8::Undefined(isolate));
+    tns::SetValue(isolate, obj, nullptr);
     return true;
 }
 

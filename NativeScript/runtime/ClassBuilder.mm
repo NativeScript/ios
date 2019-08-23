@@ -653,7 +653,7 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
                 assert(getterFunc->Call(context->isolate_->GetCurrentContext(), self_, 0, nullptr).ToLocal(&res));
 
                 const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
-                ArgConverter::SetValue(context->isolate_, retValue, res, typeEncoding->type);
+                ArgConverter::SetValue(context->isolate_, retValue, res, typeEncoding);
             };
             const TypeEncoding* typeEncoding = propertyMeta->getter()->encodings()->first();
             IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback , userData);

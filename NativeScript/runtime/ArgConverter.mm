@@ -128,7 +128,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             assert(false);
         }
 
-        ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_->type);
+        ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_);
     };
 
     if ([NSThread isMainThread]) {
@@ -147,7 +147,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     }
 }
 
-void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value, BinaryTypeEncodingType type) {
+void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value, const TypeEncoding* typeEncoding) {
     if (value.IsEmpty() || value->IsNullOrUndefined()) {
         void* nullPtr = nullptr;
         *(ffi_arg *)retValue = (unsigned long)nullPtr;
@@ -155,6 +155,7 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
     }
 
     // TODO: Refactor this to reuse some existing logic in Interop::SetFFIParams
+    BinaryTypeEncodingType type = typeEncoding->type;
 
     if (tns::IsBool(value)) {
         bool boolValue = value.As<v8::Boolean>()->Value();
@@ -227,7 +228,15 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
             }
         } else if (type == BinaryTypeEncodingType::StructDeclarationReference) {
             BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
-            if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Struct) {
+            if (baseWrapper == nullptr) {
+                const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
+                const Meta* meta = ArgConverter::GetMeta(structName);
+                assert(meta != nullptr && meta->type() == MetaType::Struct);
+                const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+                StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+                Interop::InitializeStruct(isolate, retValue, structInfo.Fields(), value);
+                return;
+            } else if (baseWrapper->Type() == WrapperType::Struct) {
                 StructWrapper* structWrapper = static_cast<StructWrapper*>(baseWrapper);
                 *(ffi_arg*)retValue = (unsigned long)structWrapper->Data();
                 return;

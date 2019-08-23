@@ -39,18 +39,17 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* iso
     return ctorFunc;
 }
 
-void FunctionReference::FunctionReferenceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+void FunctionReference::FunctionReferenceConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.Length() == 1);
     assert(info[0]->IsFunction());
 
     Isolate* isolate = info.GetIsolate();
 
     Local<v8::Function> arg = info[0].As<v8::Function>();
-    Persistent<v8::Function>* poArg = new Persistent<v8::Function>(isolate, arg);
-
+    Persistent<v8::Value>* poArg = ObjectManager::Register(isolate, arg);
     FunctionReferenceWrapper* wrapper = new FunctionReferenceWrapper(poArg);
-    tns::SetValue(isolate, info.This(), wrapper);
-    ObjectManager::Register(isolate, info.This());
+    tns::SetValue(isolate, arg, wrapper);
+    info.GetReturnValue().Set(arg);
 }
 
 }
