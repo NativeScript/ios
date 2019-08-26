@@ -8,6 +8,15 @@
 
 namespace tns {
 
+struct pair_hash
+{
+    template <class T1, class T2>
+    std::size_t operator() (const std::pair<T1, T2> &pair) const
+    {
+        return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
+    }
+};
+
 class Caches {
 public:
     class WorkerState {
@@ -59,6 +68,8 @@ public:
     v8::Persistent<v8::Function>* InteropReferenceCtorFunc;
     v8::Persistent<v8::Function>* PointerCtorFunc;
     v8::Persistent<v8::Function>* FunctionReferenceCtorFunc;
+
+    std::unordered_map<std::pair<void*, std::string>, v8::Persistent<v8::Value>*, pair_hash> StructInstances;
 private:
     static ConcurrentMap<v8::Isolate*, Caches*> perIsolateCaches_;
 };

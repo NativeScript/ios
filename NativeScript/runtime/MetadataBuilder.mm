@@ -223,6 +223,12 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
 
     StructWrapper* wrapper = new StructWrapper(structInfo, dest);
     Local<Value> result = ArgConverter::ConvertArgument(isolate, wrapper);
+
+    Caches* cache = Caches::Get(isolate);
+    Persistent<Value>* poResult = new Persistent<Value>(isolate, result);
+    std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
+    cache->StructInstances.emplace(std::make_pair(key, poResult));
+
     info.GetReturnValue().Set(result);
 }
 
@@ -708,8 +714,9 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<Name> property, const P
         return;
     }
 
-    Local<External> ext = thiz->GetInternalField(0).As<External>();
-    StructWrapper* wrapper = static_cast<StructWrapper*>(ext->Value());
+    BaseDataWrapper* baseWrapper = tns::GetValue(isolate, thiz);
+    assert(baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Struct);
+    StructWrapper* wrapper = static_cast<StructWrapper*>(baseWrapper);
 
     StructInfo structInfo = wrapper->StructInfo();
     std::vector<StructField> fields = structInfo.Fields();

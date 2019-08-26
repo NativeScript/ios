@@ -201,9 +201,6 @@ public:
     }
 
     void SetData(void* data) {
-        if (this->data_ != nullptr) {
-            std::free(this->data_);
-        }
         this->data_ = data;
     }
 private:
