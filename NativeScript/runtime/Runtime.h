@@ -40,7 +40,6 @@ private:
     void DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     static void PerformanceNowCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     v8::Isolate* isolate_;
-    MetadataBuilder metadataBuilder_;
     ModuleInternal moduleInternal_;
     std::string baseDir_;
     int workerId_;

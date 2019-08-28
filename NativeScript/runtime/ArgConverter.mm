@@ -442,17 +442,14 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
         StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
         StructInfo structInfo = structWrapper->StructInfo();
         auto cache = Caches::Get(isolate);
-        auto it = cache->StructConstructorFunctions.find(structInfo.Name());
-        if (it != cache->StructConstructorFunctions.end()) {
-            Local<v8::Function> structCtorFunc = it->second->Get(isolate);
-            Local<Value> proto;
-            bool success = structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto);
-            assert(success);
+        Local<v8::Function> structCtorFunc = cache->StructCtorInitializer(isolate, structInfo);
+        Local<Value> proto;
+        bool success = structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto);
+        assert(success);
 
-            if (!proto.IsEmpty()) {
-                bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
-                assert(success);
-            }
+        if (!proto.IsEmpty()) {
+            bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
+            assert(success);
         }
 
         tns::SetValue(isolate, receiver, structWrapper);
@@ -493,7 +490,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
                 assert(false);
             }
         } else {
-            cache->MetaInitializer(static_cast<const BaseClassMeta*>(meta));
+            cache->ObjectCtorInitializer(isolate, static_cast<const BaseClassMeta*>(meta));
             auto it = cache->Prototypes.find(meta);
             if (it != cache->Prototypes.end()) {
                 Local<Value> prototype = it->second->Get(isolate);

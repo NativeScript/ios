@@ -682,7 +682,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         }
 
         auto cache = Caches::Get(isolate);
-        cache->MetaInitializer(protocolMeta);
+        cache->ObjectCtorInitializer(isolate, protocolMeta);
 
         auto it = cache->ProtocolCtorFuncs.find(protocolMeta->name());
         if (it != cache->ProtocolCtorFuncs.end()) {
@@ -701,6 +701,13 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         Caches* cache = Caches::Get(isolate);
         while (true) {
             const char* name = class_getName(result);
+
+            const Meta* meta = ArgConverter::GetMeta(name);
+            if (meta != nullptr && (meta->type() == MetaType::Interface || meta->type() == MetaType::ProtocolType)) {
+                const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
+                cache->ObjectCtorInitializer(isolate, baseMeta);
+            }
+
             auto it = cache->CtorFuncs.find(name);
             if (it != cache->CtorFuncs.end()) {
                 return it->second->Get(isolate);

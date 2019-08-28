@@ -303,6 +303,7 @@ describe(module.id, function () {
             }
         }));
 
+        expect(actual instanceof CGRect).toBe(true);
         expect(actual.origin.x).toBe(100);
         expect(actual.origin.y).toBe(200);
         expect(actual.size.width).toBe(300);
@@ -314,6 +315,7 @@ describe(module.id, function () {
             return CGRectMake(100, 200, 300, 400);
         }));
 
+        expect(actual instanceof CGRect).toBe(true);
         expect(actual.origin.x).toBe(100);
         expect(actual.origin.y).toBe(200);
         expect(actual.size.width).toBe(300);

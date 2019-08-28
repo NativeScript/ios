@@ -15,7 +15,7 @@ namespace tns {
 
 Local<v8::Function> ClassBuilder::GetExtendFunction(Local<Context> context, const InterfaceMeta* interfaceMeta) {
     Isolate* isolate = context->GetIsolate();
-    CacheItem* item = new CacheItem(interfaceMeta, nullptr, this);
+    CacheItem* item = new CacheItem(interfaceMeta, nullptr);
     Local<External> ext = External::New(isolate, item);
 
     Local<v8::Function> extendFunc;
@@ -62,18 +62,18 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         }
     }
 
-    Class extendedClass = item->self_->GetExtendedClass(baseClassName, staticClassName);
+    Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName);
     if (!nativeSignature.IsEmpty()) {
-        item->self_->ExposeDynamicMembers(isolate, extendedClass, implementationObject, nativeSignature);
+        ClassBuilder::ExposeDynamicMembers(isolate, extendedClass, implementationObject, nativeSignature);
     } else {
-        item->self_->ExposeDynamicMethods(isolate, extendedClass, Local<Value>(), Local<Value>(), implementationObject);
+        ClassBuilder::ExposeDynamicMethods(isolate, extendedClass, Local<Value>(), Local<Value>(), implementationObject);
     }
 
     auto cache = Caches::Get(isolate);
     Persistent<v8::Function>* poBaseCtorFunc = cache->CtorFuncs.find(item->meta_->name())->second;
     Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
 
-    CacheItem* cacheItem = new CacheItem(nullptr, extendedClass, item->self_);
+    CacheItem* cacheItem = new CacheItem(nullptr, extendedClass);
     Local<External> ext = External::New(isolate, cacheItem);
     Local<FunctionTemplate> extendedClassCtorFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
     extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
@@ -164,7 +164,6 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         assert(info.Length() == 2);
         Isolate* isolate = info.GetIsolate();
         Local<Context> context = isolate->GetCurrentContext();
-        ClassBuilder* builder = static_cast<ClassBuilder*>(info.Data().As<External>()->Value());
 
         auto cache = Caches::Get(isolate);
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info[1].As<Object>());
@@ -185,7 +184,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
         std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
 
-        __block Class extendedClass = builder->GetExtendedClass(baseClassName, extendedClassName);
+        __block Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, extendedClassName);
         extendedClassName = class_getName(extendedClass);
 
         tns::SetValue(isolate, extendedClassCtorFunc, new ObjCClassWrapper(extendedClass, true));
@@ -237,12 +236,12 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
             success = extendedClassCtorFunc->Get(context, tns::ToV8String(isolate, "ObjCProtocols")).ToLocal(&exposedProtocols);
             assert(success);
 
-            builder->ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject.As<Object>());
+            ClassBuilder::ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject.As<Object>());
         });
         class_addMethod(object_getClass(extendedClass), @selector(initialize), newInitialize, "v@:");
 
         info.GetReturnValue().Set(v8::Undefined(isolate));
-    }, External::New(isolate, this)).ToLocalChecked();
+    }).ToLocalChecked();
 
     bool success = global->Set(context, tns::ToV8String(isolate, "__extends"), extendsFunc).FromMaybe(false);
     assert(success);
@@ -259,7 +258,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
     success = nativeSignature->Get(context, tns::ToV8String(isolate, "protocols")).ToLocal(&exposedProtocols);
     assert(success);
 
-    this->ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject);
+    ClassBuilder::ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject);
 }
 
 std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
@@ -636,7 +635,7 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
 
         if (!getter.IsEmpty() && getter->IsFunction() && propertyMeta->hasGetter()) {
             Persistent<v8::Function>* poGetterFunc = new Persistent<v8::Function>(isolate, getter.As<v8::Function>());
-            PropertyCallbackContext* userData = new PropertyCallbackContext(this, isolate, poGetterFunc, new Persistent<Object>(isolate, implementationObject), propertyMeta);
+            PropertyCallbackContext* userData = new PropertyCallbackContext(isolate, poGetterFunc, new Persistent<Object>(isolate, implementationObject), propertyMeta);
 
             FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                 PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
@@ -663,7 +662,7 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
 
         if (!setter.IsEmpty() && setter->IsFunction() && propertyMeta->hasSetter()) {
             Persistent<v8::Function>* poSetterFunc = new Persistent<v8::Function>(isolate, setter.As<v8::Function>());
-            PropertyCallbackContext* userData = new PropertyCallbackContext(this, isolate, poSetterFunc, new Persistent<Object>(isolate, implementationObject), propertyMeta);
+            PropertyCallbackContext* userData = new PropertyCallbackContext(isolate, poSetterFunc, new Persistent<Object>(isolate, implementationObject), propertyMeta);
 
             FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                 PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);

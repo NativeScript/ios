@@ -4,6 +4,8 @@
 #include "Caches.h"
 #include "Console.h"
 #include "SetTimeout.h"
+#include "ArgConverter.h"
+#include "Interop.h"
 #include "InlineFunctions.h"
 #include "SimpleAllocator.h"
 #include "Helpers.h"
@@ -102,9 +104,9 @@ void Runtime::Init(const string& baseDir) {
     create_params.array_buffer_allocator = &allocator_;
     Isolate* isolate = Isolate::New(create_params);
 
-    Caches::Get(isolate)->MetaInitializer = [this](const BaseClassMeta* meta) {
-        this->metadataBuilder_.GetOrCreateConstructorFunctionTemplate(meta);
-    };
+    Caches* cache = Caches::Get(isolate);
+    cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
+    cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
 
     HandleScope handle_scope(isolate);
     Local<FunctionTemplate> globalTemplateFunction = FunctionTemplate::New(isolate);
@@ -112,7 +114,7 @@ void Runtime::Init(const string& baseDir) {
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
     DefineNativeScriptVersion(isolate, globalTemplate);
 
-    this->metadataBuilder_.RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
+    MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
     Worker::Init(isolate, globalTemplate, mainThreadInitialized_);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
@@ -126,7 +128,14 @@ void Runtime::Init(const string& baseDir) {
     DefineGlobalObject(context);
     Console::Init(isolate);
     this->moduleInternal_.Init(isolate, baseDir);
-    this->metadataBuilder_.Init(isolate, mainThreadInitialized_);
+
+    ArgConverter::Init(isolate, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);
+    Interop::RegisterInteropTypes(isolate);
+    cache->ToStringFunc = MetadataBuilder::CreateToStringFunction(isolate);
+
+    ClassBuilder::RegisterBaseTypeScriptExtendsFunction(isolate); // Register the __extends function to the global object
+    ClassBuilder::RegisterNativeTypeScriptExtendsFunction(isolate); // Override the __extends function for native objects
+
     InlineFunctions::Init(isolate);
 
     mainThreadInitialized_ = true;

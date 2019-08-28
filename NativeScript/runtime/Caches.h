@@ -8,6 +8,8 @@
 
 namespace tns {
 
+struct StructInfo;
+
 struct pair_hash
 {
     template <class T1, class T2>
@@ -56,7 +58,10 @@ public:
     std::unordered_map<const void*, v8::Persistent<v8::Object>*> PointerInstances;
     std::unordered_map<std::string, v8::Persistent<v8::Function>*> StructConstructorFunctions;
 
-    std::function<void (const BaseClassMeta*)> MetaInitializer;
+    std::function<v8::Local<v8::FunctionTemplate>(v8::Isolate* isolate, const BaseClassMeta*)> ObjectCtorInitializer;
+    std::function<v8::Local<v8::Function>(v8::Isolate*, StructInfo)> StructCtorInitializer;
+    v8::Persistent<v8::Function>* ToStringFunc;
+
     v8::Persistent<v8::Function>* EmptyObjCtorFunc;
     v8::Persistent<v8::Function>* EmptyStructCtorFunc;
     v8::Persistent<v8::Function>* SliceFunc;
