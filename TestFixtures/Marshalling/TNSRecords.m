@@ -263,7 +263,7 @@ matrix_double4x4 getMatrixDouble4x4() {
     return result;
 }
 
-#pragma warning( pop ) 
+#pragma warning( pop )
 
 matrix_float2x2 doubleMatrixFloat2x2(matrix_float2x2 m) {
     for (int i = 0; i < 4; i++) {
@@ -494,4 +494,9 @@ SCNVector4 _SCNVector4FromFloat4(simd_float4 v) {
 
 SCNMatrix4 _SCNMatrix4FromMat4(simd_float4x4 m) {
     return SCNMatrix4FromMat4(m);
+}
+
+CGRect getStructFromCallback(CGRect (*f)()) {
+    CGRect rect = f();
+    return rect;
 }

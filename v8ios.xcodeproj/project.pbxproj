@@ -1080,14 +1080,14 @@
 		C29374EB229FC1600075CB16 /* Interfaces */ = {
 			isa = PBXGroup;
 			children = (
-				C29374EC229FC1600075CB16 /* TNSMethodCalls.h */,
-				C29374ED229FC1600075CB16 /* TNSConstructorResolution.h */,
-				C29374EE229FC1600075CB16 /* TNSInheritance.m */,
-				C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */,
 				C29374F0229FC1600075CB16 /* TNSInheritance.h */,
-				C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */,
+				C29374EE229FC1600075CB16 /* TNSInheritance.m */,
+				C29374EC229FC1600075CB16 /* TNSMethodCalls.h */,
 				C29374F2229FC1600075CB16 /* TNSMethodCalls.m */,
+				C29374ED229FC1600075CB16 /* TNSConstructorResolution.h */,
+				C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */,
 				C29374F3229FC1600075CB16 /* TNSClassWithPlaceholder.h */,
+				C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */,
 			);
 			path = Interfaces;
 			sourceTree = "<group>";
@@ -1123,18 +1123,18 @@
 		C293750A229FC1600075CB16 /* Marshalling */ = {
 			isa = PBXGroup;
 			children = (
-				C293750B229FC1600075CB16 /* TNSAllocLog.m */,
-				C293750C229FC1600075CB16 /* TNSFunctionPointers.m */,
-				C293750D229FC1600075CB16 /* TNSObjCTypes.h */,
-				C293750E229FC1600075CB16 /* TNSPrimitives.h */,
-				C293750F229FC1600075CB16 /* TNSPrimitivePointers.h */,
-				C2937510229FC1600075CB16 /* TNSRecords.m */,
-				C2937511229FC1600075CB16 /* TNSPrimitives.m */,
-				C2937512229FC1600075CB16 /* TNSObjCTypes.m */,
-				C2937513229FC1600075CB16 /* TNSFunctionPointers.h */,
 				C2937514229FC1600075CB16 /* TNSAllocLog.h */,
+				C293750B229FC1600075CB16 /* TNSAllocLog.m */,
+				C293750D229FC1600075CB16 /* TNSObjCTypes.h */,
+				C2937512229FC1600075CB16 /* TNSObjCTypes.m */,
+				C293750E229FC1600075CB16 /* TNSPrimitives.h */,
+				C2937511229FC1600075CB16 /* TNSPrimitives.m */,
+				C293750F229FC1600075CB16 /* TNSPrimitivePointers.h */,
 				C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */,
+				C2937513229FC1600075CB16 /* TNSFunctionPointers.h */,
+				C293750C229FC1600075CB16 /* TNSFunctionPointers.m */,
 				C2937516229FC1600075CB16 /* TNSRecords.h */,
+				C2937510229FC1600075CB16 /* TNSRecords.m */,
 			);
 			path = Marshalling;
 			sourceTree = "<group>";

@@ -288,4 +288,35 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('1 2 3 4 5 6 7');
         // expect(result).toEqual(object);
     });
+
+    it("Marshaling struct as anonymous object from javascript callback", () => {
+        const actual = getStructFromCallback(new interop.FunctionReference(() => {
+            return {
+                origin: {
+                    x: 100,
+                    y: 200
+                },
+                size: {
+                    width: 300,
+                    height: 400
+                }
+            }
+        }));
+
+        expect(actual.origin.x).toBe(100);
+        expect(actual.origin.y).toBe(200);
+        expect(actual.size.width).toBe(300);
+        expect(actual.size.height).toBe(400);
+    });
+
+    it("Marshaling struct from javascript callback", () => {
+        const actual = getStructFromCallback(new interop.FunctionReference(() => {
+            return CGRectMake(100, 200, 300, 400);
+        }));
+
+        expect(actual.origin.x).toBe(100);
+        expect(actual.origin.y).toBe(200);
+        expect(actual.size.width).toBe(300);
+        expect(actual.size.height).toBe(400);
+    });
 });
