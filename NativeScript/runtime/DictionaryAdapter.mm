@@ -155,13 +155,15 @@ using namespace tns;
         assert(success);
     } else if ([aKey isKindOfClass:[NSString class]]) {
         const char* key = [aKey UTF8String];
+        Local<v8::String> keyV8Str = tns::ToV8String(isolate, key);
 
         if (obj->IsMap()) {
-            Local<Context> context = self->isolate_->GetCurrentContext();
-            bool success = obj.As<Map>()->Get(context, tns::ToV8String(self->isolate_, key)).ToLocal(&value);
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Map> map = obj.As<Map>();
+            bool success = map->Get(context, keyV8Str).ToLocal(&value);
             assert(success);
         } else {
-            bool success = obj->Get(context, tns::ToV8String(self->isolate_, key)).ToLocal(&value);
+            bool success = obj->Get(context, keyV8Str).ToLocal(&value);
             assert(success);
         }
     } else {

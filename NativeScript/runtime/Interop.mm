@@ -59,11 +59,11 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const FunctionMeta* meta, c
         assert(false);
     }
 
-    const TypeEncoding* typeEncoding = meta->encodings()->first();;
+    const TypeEncoding* typeEncoding = meta->encodings()->first();
     return Interop::CallFunction(isolate, functionPointer, typeEncoding, args);
 }
 
-Local<Value> Interop::CallFunction(Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args) {
+    Local<Value> Interop::CallFunction(Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args) {
     return Interop::CallFunctionInternal(isolate, true, functionPointer, typeEncoding, args, nil, nil, nil, false, MetaType::Undefined);
 }
 

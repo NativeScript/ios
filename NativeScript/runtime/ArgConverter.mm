@@ -238,7 +238,9 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
                 return;
             } else if (baseWrapper->Type() == WrapperType::Struct) {
                 StructWrapper* structWrapper = static_cast<StructWrapper*>(baseWrapper);
-                *(ffi_arg*)retValue = (unsigned long)structWrapper->Data();
+                size_t size = structWrapper->StructInfo().FFIType()->size;
+                void* data = structWrapper->Data();
+                memcpy(retValue, data, size);
                 return;
             }
         }

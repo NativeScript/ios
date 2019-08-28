@@ -99,47 +99,10 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
 
             const VarMeta* varMeta = static_cast<const VarMeta*>(meta);
 
-            if (varMeta->encoding()->type == BinaryTypeEncodingType::IntEncoding) {
-                int value = *static_cast<int*>(dataSymbol);
-                Local<Number> numResult = Number::New(isolate, value);
-                info.GetReturnValue().Set(numResult);
-                return;
-            }
-
-            if (varMeta->encoding()->type == BinaryTypeEncodingType::DoubleEncoding) {
-                double value = *static_cast<double*>(dataSymbol);
-                Local<Number> numResult = Number::New(isolate, value);
-                info.GetReturnValue().Set(numResult);
-                return;
-            }
-
-            if (varMeta->encoding()->type == BinaryTypeEncodingType::BoolEncoding) {
-                bool value = *static_cast<bool*>(dataSymbol);
-                Local<Value> numResult = v8::Boolean::New(isolate, value);
-                info.GetReturnValue().Set(numResult);
-                return;
-            }
-
-            id result = *static_cast<const id*>(dataSymbol);
-            if (result == nil) {
-                info.GetReturnValue().Set(Null(isolate));
-                return;
-            }
-
-            if ([result isKindOfClass:[NSString class]]) {
-                Local<v8::String> strResult = tns::ToV8String(isolate, [result UTF8String]);
-                info.GetReturnValue().Set(strResult);
-                return;
-            } else if ([result isKindOfClass:[NSNumber class]]) {
-                Local<Number> numResult = Number::New(isolate, [result doubleValue]);
-                info.GetReturnValue().Set(numResult);
-                return;
-            }
-
-            std::string className = object_getClassName(result);
-            ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
-            Local<Value> jsResult = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>());
-            info.GetReturnValue().Set(jsResult);
+            BaseCall bc((uint8_t*)dataSymbol);
+            const TypeEncoding* typeEncoding = varMeta->encoding();
+            Local<Value> result = Interop::GetResult(isolate, typeEncoding, &bc, true);
+            info.GetReturnValue().Set(result);
         } else if (meta->type() == MetaType::JsCode) {
             const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
             std::string jsCode = jsCodeMeta->jsCode();
