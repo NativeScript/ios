@@ -17,6 +17,7 @@ void Console::Init(Isolate* isolate) {
 
     Console::AttachLogFunction(isolate, console, "log");
     Console::AttachLogFunction(isolate, console, "info");
+    Console::AttachLogFunction(isolate, console, "error");
 
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
