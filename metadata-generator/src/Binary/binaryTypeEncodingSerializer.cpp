@@ -169,7 +169,7 @@ unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitBrid
         return this->visitId(::Meta::IdType());
     }
     if (type.bridgedInterface == nullptr) {
-        throw logic_error(std::string("Unresolved bridged interface for BridgedInterfaceType with name '") + type.bridgedInterface->name + "'.");
+        throw logic_error(std::string("Unresolved bridged interface for BridgedInterfaceType with name '") + type.name + "'.");
     }
     auto s = new binary::InterfaceDeclarationReferenceEncoding();
     s->_name = this->_heapWriter.push_string(type.bridgedInterface->jsName);

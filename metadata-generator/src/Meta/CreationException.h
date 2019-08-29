@@ -7,6 +7,19 @@
 #include <clang/AST/Type.h>
 #include <string>
 
+
+#define DEFINE_POLYMORPHIC_THROW \
+virtual void polymorhicThrow() override { \
+    throw *this; \
+}
+
+
+#define POLYMORPHIC_THROW(ex) do \
+{ \
+    ex->polymorhicThrow(); \
+    throw std::logic_error("polymorphicThrow should never return"); \
+} while(false)
+
 namespace Meta {
 class CreationException {
 public:
@@ -20,7 +33,11 @@ public:
         , _isError(isError)
     {
     }
+    
+    virtual ~CreationException() { }
 
+    virtual void polymorhicThrow() = 0;
+    
     std::string getMessage() const
     {
         return _message;
@@ -49,7 +66,7 @@ public:
     {
     }
 
-    std::string getDetailedMessage() const
+    std::string getDetailedMessage() const override
     {
         return _meta->identificationString() + " : " + this->getMessage();
     }
@@ -58,6 +75,8 @@ public:
     {
         return _meta;
     }
+
+    DEFINE_POLYMORPHIC_THROW;
 
 private:
     const Meta* _meta;
@@ -71,7 +90,7 @@ public:
     {
     }
 
-    std::string getDetailedMessage() const
+    std::string getDetailedMessage() const override
     {
         return std::string("[Type ") + (_type == nullptr ? "" : _type->getTypeClassName()) + "] : " + this->getMessage();
     }
@@ -80,6 +99,8 @@ public:
     {
         return _type;
     }
+
+    DEFINE_POLYMORPHIC_THROW;
 
 private:
     const clang::Type* _type;

@@ -195,15 +195,13 @@ int main(int argc, const char** argv)
     if (it != clangArgs.end() && ++it != clangArgs.end()) {
         isysroot = *it;
     }
-    std::string umbrellaContent;
     std::vector<std::string> includePaths;
+    std::string umbrellaContent = CreateUmbrellaHeader(clangArgs, includePaths);
+    
     if (!cla_inputUmbrellaHeaderFile.empty()) {
         std::ifstream fs(cla_inputUmbrellaHeaderFile);
         umbrellaContent = std::string((std::istreambuf_iterator<char>(fs)),
                                       std::istreambuf_iterator<char>());
-    } else {
-        // Create umbrella header
-        umbrellaContent = CreateUmbrellaHeader(clangArgs, includePaths);
     }
     
     clangArgs.insert(clangArgs.end(), includePaths.begin(), includePaths.end());

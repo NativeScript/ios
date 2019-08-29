@@ -99,8 +99,6 @@ enum MetaType {
 };
 
 class Meta {
-    MAKE_NONCOPYABLE(Meta);
-
 public:
     MetaType type = MetaType::Undefined;
     MetaFlags flags = MetaFlags::None;
@@ -108,8 +106,8 @@ public:
     std::string name;
     std::string jsName;
     std::string fileName;
-    clang::Module* module;
-    const clang::Decl* declaration;
+    clang::Module* module = nullptr;
+    const clang::Decl* declaration = nullptr;
 
     // Availability
     Version introducedIn = UNKNOWN_VERSION;
@@ -187,8 +185,8 @@ public:
         this->type = MetaType::Property;
     }
 
-    MethodMeta* getter;
-    MethodMeta* setter;
+    MethodMeta* getter = nullptr;
+    MethodMeta* setter = nullptr;
 
     virtual void visit(MetaVisitor* visitor) override;
 };
@@ -281,7 +279,7 @@ public:
 
     std::string value;
 
-    bool isScoped;
+    bool isScoped = false;
 
     virtual void visit(MetaVisitor* visitor) override;
 };
@@ -312,8 +310,8 @@ public:
         this->type = MetaType::Var;
     }
 
-    Type* signature;
-    bool hasValue;
+    Type* signature = nullptr;
+    bool hasValue = false;
     std::string value;
 
     virtual void visit(MetaVisitor* visitor) override;

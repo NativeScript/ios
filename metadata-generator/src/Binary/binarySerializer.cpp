@@ -197,34 +197,51 @@ void binary::BinarySerializer::serializeContainer(std::vector<std::pair<clang::M
     this->finish(container);
 }
 
-static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
-{
+static llvm::ErrorOr<llvm::SmallString<128>> getFrameworkLib(clang::Module* framework, const std::string& library) {
     using namespace llvm;
-    using namespace llvm::object;
     using namespace llvm::sys;
-
-    if (framework->LinkLibraries.size() == 0) {
-        return errc::no_such_file_or_directory;
-    }
-
-    std::string library = framework->LinkLibraries[0].Library;
 
     SmallString<128> path;
     if (!path::is_absolute(library)) {
         path::append(path, framework->Directory->getName());
     }
     path::append(path, library);
-
+    
     if (!fs::exists(path)) {
         path.append(".tbd");
         if (fs::exists(path)) {
             // A TBD file is a text-based file used by Apple. It contains information about a .DYLIB library.
             // TBD files were introduced in Xcode 7 in September 2015 in order to reduce the size of SDKs
             // that come with Xcode by linking to DYLIB libraries instead of storing the actual, larger DYLIB libraries.
-            return false;
+            return path;
         }
         
         return errc::no_such_file_or_directory;
+    }
+    
+    return path;
+}
+
+static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
+{
+    using namespace llvm;
+    using namespace llvm::object;
+    using namespace llvm::sys;
+
+    llvm::ErrorOr<SmallString<128>> path = getFrameworkLib(framework, framework->Name);
+    
+    if(path.getError()) {
+        if (framework->LinkLibraries.size() == 0) {
+            return errc::no_such_file_or_directory;
+        }
+        
+        path = getFrameworkLib(framework, framework->LinkLibraries[0].Library);
+    }
+
+    if (path.getError()) {
+        return path.getError();
+    } else if (path.get().endswith(".tbd")) {
+        return true;
     }
 
     auto isDylib = [](MachOObjectFile* machObjectFile) -> bool {
@@ -232,7 +249,7 @@ static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
         return (filetype == MachO::MH_DYLIB || filetype == MachO::MH_DYLIB_STUB || filetype == MachO::MH_DYLINKER);
     };
     
-    if (Expected<OwningBinary<Binary> > binaryOrErr = createBinary(path)) {
+    if (Expected<OwningBinary<Binary> > binaryOrErr = createBinary(path.get())) {
         Binary& binary = *binaryOrErr.get().getBinary();
 
         if (MachOUniversalBinary* machoBinary = dyn_cast<MachOUniversalBinary>(&binary)) {

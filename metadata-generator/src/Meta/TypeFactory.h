@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CreationException.h"
 #include "MetaEntities.h"
 #include "TypeEntities.h"
 #include <clang/AST/RecursiveASTVisitor.h>
@@ -105,7 +106,7 @@ private:
     bool isSpecificTypedefType(const clang::TypedefType* type, const std::vector<std::string>& typedefNames);
 
     MetaFactory* _metaFactory;
-    typedef std::unordered_map<const clang::Type*, std::pair<std::shared_ptr<Type>, std::string> > Cache;
+    typedef std::unordered_map<const clang::Type*, std::pair<std::shared_ptr<Type>, std::unique_ptr<CreationException> > > Cache;
     Cache _cache;
 };
 }

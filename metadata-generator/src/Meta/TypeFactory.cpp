@@ -139,21 +139,21 @@ shared_ptr<Type> TypeFactory::create(const clang::Type* type)
 {
     const clang::Type& typeRef = *type;
     shared_ptr<Type> resultType(nullptr);
-    
+
     try {
         // check for cached Type
-        unordered_map<const clang::Type*, pair<shared_ptr<Type>, string> >::const_iterator cachedTypeIt = _cache.find(type);
+        Cache::const_iterator cachedTypeIt = _cache.find(type);
         if (cachedTypeIt != _cache.end()) {
             shared_ptr<Type> resultType = cachedTypeIt->second.first;
-            string errorMessage = cachedTypeIt->second.second;
-            if (errorMessage.empty()) {
-                // revalidate in case the Type's metadata creation has failed after it was returned
-                // (e.g. from a forward declaration)
-                this->_metaFactory->validate(resultType.get());
-                
-                return resultType;
+            if (auto creationException = cachedTypeIt->second.second.get()) {
+                POLYMORPHIC_THROW(creationException);
             }
-            throw TypeCreationException(type, errorMessage, false);
+
+            // revalidate in case the Type's metadata creation has failed after it was returned
+            // (e.g. from a forward declaration)
+            this->_metaFactory->validate(resultType.get());
+
+            return resultType;
         }
 
         if (const clang::BuiltinType* concreteType = clang::dyn_cast<clang::BuiltinType>(type))
@@ -197,23 +197,23 @@ shared_ptr<Type> TypeFactory::create(const clang::Type* type)
     }
     catch (TypeCreationException& e) {
         if (e.getType() == type) {
-            _cache.insert(make_pair<Cache::key_type, Cache::mapped_type>(&typeRef, make_pair<shared_ptr<Type>, string>(nullptr, e.getMessage())));
+            _cache.insert(make_pair(&typeRef, make_pair(nullptr, llvm::make_unique<TypeCreationException>(e))));
             throw;
         };
-        pair<Cache::iterator, bool> insertionResult = _cache.insert(make_pair<Cache::key_type, Cache::mapped_type>(&typeRef, make_pair<shared_ptr<Type>, string>(nullptr, "")));
+        pair<Cache::iterator, bool> insertionResult = _cache.insert(make_pair(&typeRef, make_pair(nullptr, nullptr)));
         string message = CreationException::constructMessage("Can't create type dependency.", e.getDetailedMessage());
-        insertionResult.first->second.second = message;
-        throw TypeCreationException(type, message, e.isError());
+        insertionResult.first->second.second = llvm::make_unique<TypeCreationException>(type, message, e.isError());
+        POLYMORPHIC_THROW(insertionResult.first->second.second);
     }
     catch (MetaCreationException& e) {
-        pair<Cache::iterator, bool> insertionResult = _cache.insert(make_pair<Cache::key_type, Cache::mapped_type>(&typeRef, make_pair<shared_ptr<Type>, string>(nullptr, "")));
+        pair<Cache::iterator, bool> insertionResult = _cache.insert(make_pair(&typeRef, make_pair(nullptr, nullptr)));
         string message = CreationException::constructMessage("Can't create meta dependency.", e.getDetailedMessage());
-        insertionResult.first->second.second = message;
-        throw TypeCreationException(type, message, e.isError());
+        insertionResult.first->second.second = llvm::make_unique<TypeCreationException>(type, message, e.isError());
+        POLYMORPHIC_THROW(insertionResult.first->second.second);
     }
-    
+
     assert(resultType != nullptr);
-    pair<Cache::iterator, bool> insertionResult = _cache.insert(make_pair<Cache::key_type, Cache::mapped_type>(&typeRef, make_pair<shared_ptr<Type>, string>(nullptr, "")));
+    pair<Cache::iterator, bool> insertionResult = _cache.insert(make_pair(&typeRef, make_pair(nullptr, nullptr)));
     if (insertionResult.second) {
         assert(insertionResult.first->second.first.get() == nullptr);
         insertionResult.first->second.first = resultType;
@@ -269,7 +269,7 @@ shared_ptr<Type> TypeFactory::createFromBuiltinType(const clang::BuiltinType* ty
         return TypeFactory::getLong();
     case clang::BuiltinType::Kind::LongLong:
         return TypeFactory::getLongLong();
-    case clang::BuiltinType::Kind::UChar: 
+    case clang::BuiltinType::Kind::UChar:
         return TypeFactory::getUnsignedChar();
     case clang::BuiltinType::Kind::UShort:
         return TypeFactory::getUShort();
@@ -356,13 +356,14 @@ shared_ptr<Type> TypeFactory::createFromPointerType(const clang::PointerType* ty
 shared_ptr<Type> TypeFactory::createFromEnumType(const clang::EnumType* type)
 {
     Type* innerType = this->create(type->getDecl()->getIntegerType()).get();
-    EnumMeta* enumMeta = &this->_metaFactory->create(*type->getDecl()->getDefinition())->as<EnumMeta>();
+    auto& enumDecl = type->getDecl()->getDefinition() ? *type->getDecl()->getDefinition() : *type->getDecl();
+    EnumMeta* enumMeta = &this->_metaFactory->create(enumDecl)->as<EnumMeta>();
     return make_shared<EnumType>(innerType, enumMeta);
 }
 
 shared_ptr<Type> TypeFactory::createFromRecordType(const clang::RecordType* type)
 {
-    
+
     clang::RecordDecl* recordDef = type->getDecl()->getDefinition();
     if (!recordDef) {
         return TypeFactory::getVoid();
@@ -428,7 +429,7 @@ shared_ptr<Type> TypeFactory::createFromTypedefType(const clang::TypedefType* ty
     }
     return this->create(type->getDecl()->getUnderlyingType());
 }
-    
+
 shared_ptr<Type> TypeFactory::createFromExtVectorType(const clang::ExtVectorType* type)
 {
     return make_shared<ExtVectorType>(this->create(type->getElementType()).get(), type->getNumElements());
@@ -521,7 +522,7 @@ void TypeFactory::resolveCachedBridgedInterfaceTypes(unordered_map<string, Inter
 {
     unordered_map<string, InterfaceMeta*>::const_iterator nsObjectIt = interfaceMap.find("NSObject");
     for (Cache::value_type& typeEntry : _cache) {
-        if (typeEntry.second.second.empty()) {
+        if (typeEntry.second.second.get() == nullptr) {
             Type* type = typeEntry.second.first.get();
             if (type->is(TypeType::TypeBridgedInterface)) {
                 BridgedInterfaceType* bridgedType = &type->as<BridgedInterfaceType>();

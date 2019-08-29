@@ -24,7 +24,6 @@ static bool metasComparerByJsName(Meta* meta1, Meta* meta2)
     return compareJsNames(meta1->jsName, meta2->jsName);
 }
 
-    
 void MetaFactory::validate(Type* type)
 {
     ValidateMetaTypeVisitor validator(*this);
@@ -38,12 +37,12 @@ void MetaFactory::validate(Meta* meta)
     if (declIt == this->_metaToDecl.end()) {
         throw MetaCreationException(meta, "Metadata not created", true);
     }
-    
+
     auto metaIt = this->_cache.find(declIt->second);
     assert(metaIt != this->_cache.end());
-    if (!metaIt->second.second.empty()) {
+    if (metaIt->second.second.get() != nullptr) {
 //        printf("**** Validation failed for %s: %s ***\n\n", meta->name.c_str(), metaIt->second.second.c_str());
-        throw MetaCreationException(meta, metaIt->second.second, false);
+        POLYMORPHIC_THROW(metaIt->second.second);
     }
 }
     
@@ -68,85 +67,96 @@ string MetaFactory::getTypedefOrOwnName(const clang::TagDecl* tagDecl)
     return tagDecl->getNameAsString();
 }
 
-Meta* MetaFactory::create(const clang::Decl& decl)
+template<class T>
+void resetMetaAndAddToMap(std::unique_ptr<Meta>& metaPtrRef, MetaToDeclMap& metaToDecl, const clang::Decl& decl) {
+    if (metaPtrRef.get()) {
+        // The pointer has been previously allocated. Reset it's value and assert that it's already present in the map
+        static_cast<T&>(*metaPtrRef) = T();
+        assert(metaToDecl[metaPtrRef.get()] == &decl);
+    } else {
+        // Allocate memory and add to map
+        metaPtrRef.reset(new T());
+        metaToDecl[metaPtrRef.get()] = &decl;
+    }
+    
+    if (decl.isInvalidDecl()) {
+        std::string declDump;
+        llvm::raw_string_ostream os(declDump);
+        decl.dump(os);
+        throw MetaCreationException(metaPtrRef.get(), CreationException::constructMessage("Invalid decl.", os.str()), true);
+    }
+}
+
+Meta* MetaFactory::create(const clang::Decl& decl, bool resetCached /* = false*/)
 {
-    // check for cached Meta
-    Cache::const_iterator cachedMetaIt = _cache.find(&decl);
-    if (cachedMetaIt != _cache.end()) {
+    // Check for cached Meta
+    Cache::iterator cachedMetaIt = _cache.find(&decl);
+    if (!resetCached && cachedMetaIt != _cache.end()) {
         Meta* meta = cachedMetaIt->second.first.get();
-        std::string errorMessage = cachedMetaIt->second.second;
-        if (errorMessage.empty()) {
-            /* TODO: The meta object is not guaranteed to be fully initialized. If the meta object is in the creation stack
-                 * it will appear in cache, but will not be fully initialized. This may cause some inconsistent results.
-                 * */
-            return meta;
+        if (auto creationException = cachedMetaIt->second.second.get()) {
+            POLYMORPHIC_THROW(creationException);
         }
-        throw MetaCreationException(meta, errorMessage, false);
+
+        /* TODO: The meta object is not guaranteed to be fully initialized. If the meta object is in the creation stack
+             * it will appear in cache, but will not be fully initialized. This may cause some inconsistent results.
+             * */
+        
+        return meta;
     }
 
-    std::pair<Cache::iterator, bool> insertionResult = _cache.insert(std::make_pair<Cache::key_type, Cache::mapped_type>(&decl, std::make_pair<std::unique_ptr<Meta>, std::string>(nullptr, std::string())));
-
-    assert(insertionResult.second);
-    Cache::iterator insertionIt = insertionResult.first;
-    std::unique_ptr<Meta>& insertedMetaPtrRef = insertionIt->second.first;
-    std::string& insertedErrorMessageRef = insertionIt->second.second;
+    if (cachedMetaIt == _cache.end()) {
+        std::pair<Cache::iterator, bool> insertionResult = _cache.insert(std::make_pair(&decl, std::make_pair(nullptr, nullptr)));
+        assert(insertionResult.second);
+        cachedMetaIt = insertionResult.first;
+    }
+    std::unique_ptr<Meta>& insertedMetaPtrRef = cachedMetaIt->second.first;
+    std::unique_ptr<CreationException>& insertedException = cachedMetaIt->second.second;
 
     try {
         if (const clang::FunctionDecl* function = clang::dyn_cast<clang::FunctionDecl>(&decl)) {
-            insertedMetaPtrRef.reset(new FunctionMeta());
-            _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+            resetMetaAndAddToMap<FunctionMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
             populateIdentificationFields(*function, *insertedMetaPtrRef.get());
             createFromFunction(*function, insertedMetaPtrRef.get()->as<FunctionMeta>());
         } else if (const clang::RecordDecl* record = clang::dyn_cast<clang::RecordDecl>(&decl)) {
             if (record->isStruct()) {
-                insertedMetaPtrRef.reset(new StructMeta());
-                _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+                resetMetaAndAddToMap<StructMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
                 populateIdentificationFields(*record, *insertedMetaPtrRef.get());
                 createFromStruct(*record, insertedMetaPtrRef.get()->as<StructMeta>());
             } else {
-                insertedMetaPtrRef.reset(new UnionMeta());
-                _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+                resetMetaAndAddToMap<UnionMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
                 populateIdentificationFields(*record, *insertedMetaPtrRef.get());
                 throw MetaCreationException(insertedMetaPtrRef.get(), "The record is union.", false);
             }
         } else if (const clang::VarDecl* var = clang::dyn_cast<clang::VarDecl>(&decl)) {
-            insertedMetaPtrRef.reset(new VarMeta());
-            _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+            resetMetaAndAddToMap<VarMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
             populateIdentificationFields(*var, *insertedMetaPtrRef.get());
             createFromVar(*var, insertedMetaPtrRef.get()->as<VarMeta>());
         } else if (const clang::EnumDecl* enumDecl = clang::dyn_cast<clang::EnumDecl>(&decl)) {
-            insertedMetaPtrRef.reset(new EnumMeta());
-            _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+            resetMetaAndAddToMap<EnumMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
             populateIdentificationFields(*enumDecl, *insertedMetaPtrRef.get());
             createFromEnum(*enumDecl, insertedMetaPtrRef.get()->as<EnumMeta>());
         } else if (const clang::EnumConstantDecl* enumConstantDecl = clang::dyn_cast<clang::EnumConstantDecl>(&decl)) {
-            insertedMetaPtrRef.reset(new EnumConstantMeta());
-            _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+            resetMetaAndAddToMap<EnumConstantMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
             populateIdentificationFields(*enumConstantDecl, *insertedMetaPtrRef.get());
             createFromEnumConstant(*enumConstantDecl, insertedMetaPtrRef.get()->as<EnumConstantMeta>());
         } else if (const clang::ObjCInterfaceDecl* interface = clang::dyn_cast<clang::ObjCInterfaceDecl>(&decl)) {
-            insertedMetaPtrRef.reset(new InterfaceMeta());
-            _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+            resetMetaAndAddToMap<InterfaceMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
             populateIdentificationFields(*interface, *insertedMetaPtrRef.get());
             createFromInterface(*interface, insertedMetaPtrRef.get()->as<InterfaceMeta>());
         } else if (const clang::ObjCProtocolDecl* protocol = clang::dyn_cast<clang::ObjCProtocolDecl>(&decl)) {
-            insertedMetaPtrRef.reset(new ProtocolMeta());
-            _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+            resetMetaAndAddToMap<ProtocolMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
             populateIdentificationFields(*protocol, *insertedMetaPtrRef.get());
             createFromProtocol(*protocol, insertedMetaPtrRef.get()->as<ProtocolMeta>());
         } else if (const clang::ObjCCategoryDecl* category = clang::dyn_cast<clang::ObjCCategoryDecl>(&decl)) {
-            insertedMetaPtrRef.reset(new CategoryMeta());
-            _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+            resetMetaAndAddToMap<CategoryMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
             populateIdentificationFields(*category, *insertedMetaPtrRef.get());
             createFromCategory(*category, insertedMetaPtrRef.get()->as<CategoryMeta>());
         } else if (const clang::ObjCMethodDecl* method = clang::dyn_cast<clang::ObjCMethodDecl>(&decl)) {
-            insertedMetaPtrRef.reset(new MethodMeta());
-            _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+            resetMetaAndAddToMap<MethodMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
             populateIdentificationFields(*method, *insertedMetaPtrRef.get());
             createFromMethod(*method, insertedMetaPtrRef.get()->as<MethodMeta>());
         } else if (const clang::ObjCPropertyDecl* property = clang::dyn_cast<clang::ObjCPropertyDecl>(&decl)) {
-            insertedMetaPtrRef.reset(new PropertyMeta());
-            _metaToDecl[insertedMetaPtrRef.get()] = &decl;
+            resetMetaAndAddToMap<PropertyMeta>(insertedMetaPtrRef, this->_metaToDecl, decl);
             populateIdentificationFields(*property, *insertedMetaPtrRef.get());
             createFromProperty(*property, insertedMetaPtrRef.get()->as<PropertyMeta>());
         } else {
@@ -156,16 +166,16 @@ Meta* MetaFactory::create(const clang::Decl& decl)
         return insertedMetaPtrRef.get();
     } catch (MetaCreationException& e) {
         if (e.getMeta() == insertedMetaPtrRef.get()) {
-            insertedErrorMessageRef = e.getMessage();
+            insertedException = llvm::make_unique<MetaCreationException>(e);
             throw;
         }
         std::string message = CreationException::constructMessage("Can't create meta dependency.", e.getDetailedMessage());
-        insertedErrorMessageRef = message;
-        throw MetaCreationException(insertedMetaPtrRef.get(), message, e.isError());
+        insertedException = llvm::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
+        POLYMORPHIC_THROW(insertedException);
     } catch (TypeCreationException& e) {
         std::string message = CreationException::constructMessage("Can't create type dependency.", e.getDetailedMessage());
-        insertedErrorMessageRef = message;
-        throw MetaCreationException(insertedMetaPtrRef.get(), message, e.isError());
+        insertedException = llvm::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
+        POLYMORPHIC_THROW(insertedException);
     }
 }
 
@@ -344,7 +354,7 @@ void MetaFactory::createFromInterface(const clang::ObjCInterfaceDecl& interface,
 
     // set base interface
     clang::ObjCInterfaceDecl* super = interface.getSuperClass();
-    interfaceMeta.base = (super == nullptr) ? nullptr : &this->create(*super->getDefinition())->as<InterfaceMeta>();
+    interfaceMeta.base = (super == nullptr || super->getDefinition() == nullptr) ? nullptr : &this->create(*super->getDefinition())->as<InterfaceMeta>();
 }
 
 void MetaFactory::createFromProtocol(const clang::ObjCProtocolDecl& protocol, ProtocolMeta& protocolMeta)
@@ -586,7 +596,8 @@ void MetaFactory::populateBaseClassMetaFields(const clang::ObjCContainerDecl& de
 {
     for (clang::ObjCProtocolDecl* protocol : this->getProtocols(&decl)) {
         Meta* protocolMeta;
-        if (this->tryCreate(*protocol->getDefinition(), &protocolMeta)) {
+        
+        if (protocol->getDefinition() != nullptr && this->tryCreate(*protocol->getDefinition(), &protocolMeta)) {
             baseClass.protocols.push_back(&protocolMeta->as<ProtocolMeta>());
         }
     }

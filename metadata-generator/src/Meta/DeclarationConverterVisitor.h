@@ -52,12 +52,35 @@ private:
     bool Visit(T* decl)
     {
         try {
-            Meta* meta = this->_metaFactory.create(*decl);
+            // Remove from cache if present to have a chance to process any errors
+            // in dependant types which have been pending when it was cached the 1st time.
+            // If we have the following (inspired from Tcl_HashTable):
+            // struct HashTable;
+            //
+            // struct HashEntry {
+            //  HashTable*table;
+            //  union {
+            //  }
+            // }
+            //
+            // struct HashTable {
+            //  HashEntry **entries;
+            // }
+            // We do not support unions, so HashEntry is not included in the metadata.
+            // But before the cache purge we were leaving HashTable and it caused crashes
+            // if accessed at runtime.
+
+            Meta* meta = this->_metaFactory.create(*decl, /*resetCached*/ true);
             _metaContainer.push_back(meta);
             log(std::stringstream() << "verbose: Included " << meta->jsName << " from " << meta->module->getFullModuleName());
         } catch (MetaCreationException& e) {
-            if(e.isError()) {
+            if (e.isError()) {
                 log(std::stringstream() << "verbose: Exception " << e.getDetailedMessage());
+            } else {
+                  // Uncomment for maximum verbosity when debugging metadata generation issues
+//                auto namedDecl = clang::dyn_cast<clang::NamedDecl>(decl);
+//                auto name = namedDecl ? namedDecl->getNameAsString() : "<unknown>";
+//                log(std::stringstream() << "verbose: Skipping " << name << ": " << e.getMessage());
             }
         }
         return true;

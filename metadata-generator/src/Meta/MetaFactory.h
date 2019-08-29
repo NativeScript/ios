@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CreationException.h"
 #include "MetaEntities.h"
 #include "TypeFactory.h"
 #include "Utils/Noncopyable.h"
@@ -10,7 +11,7 @@
 
 namespace Meta {
 
-typedef std::unordered_map<const clang::Decl*, std::pair<std::unique_ptr<Meta>, std::string> > Cache;
+typedef std::unordered_map<const clang::Decl*, std::pair<std::unique_ptr<Meta>, std::unique_ptr<CreationException>> > Cache;
 typedef std::unordered_map<const Meta*, const clang::Decl*> MetaToDeclMap;
 
 class MetaFactory {
@@ -22,7 +23,7 @@ public:
     {
     }
 
-    Meta* create(const clang::Decl& decl);
+    Meta* create(const clang::Decl& decl, bool resetCached = false);
 
     bool tryCreate(const clang::Decl& decl, Meta** meta);
 
