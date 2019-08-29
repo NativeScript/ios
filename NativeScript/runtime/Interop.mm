@@ -568,9 +568,10 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
                 }
             } else {
                 void* data = Reference::GetWrappedPointer(isolate, value, field.Encoding());
-                assert(data != nullptr);
-                uint8_t* dst = (uint8_t*)destBuffer + offset;
-                memcpy(dst, data, length * ffiType->size);
+                if (data != nullptr) {
+                    uint8_t* dst = (uint8_t*)destBuffer + offset;
+                    memcpy(dst, data, length * ffiType->size);
+                }
             }
         } else if (type == BinaryTypeEncodingType::FunctionPointerEncoding) {
             Interop::WriteValue(isolate, field.Encoding(), destBuffer, value);

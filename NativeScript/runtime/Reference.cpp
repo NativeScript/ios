@@ -169,7 +169,7 @@ Local<Value> Reference::GetReferredValue(Isolate* isolate, Local<Value> value) {
 }
 
 void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, const TypeEncoding* typeEncoding) {
-    if (reference.IsEmpty()) {
+    if (reference.IsEmpty() || reference->IsNullOrUndefined()) {
         return nullptr;
     }
 
