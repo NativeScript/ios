@@ -148,6 +148,10 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 }
 
 void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value, const TypeEncoding* typeEncoding) {
+    if (typeEncoding->type == BinaryTypeEncodingType::VoidEncoding) {
+        return;
+    }
+
     if (value.IsEmpty() || value->IsNullOrUndefined()) {
         void* nullPtr = nullptr;
         *(ffi_arg *)retValue = (unsigned long)nullPtr;
