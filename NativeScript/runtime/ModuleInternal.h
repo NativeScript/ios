@@ -21,6 +21,8 @@ private:
     v8::Local<v8::Object> LoadData(v8::Isolate* isolate, const std::string& modulePath);
     std::string ResolvePath(v8::Isolate* isolate, const std::string& baseDir, const std::string& moduleName);
     std::string ResolvePathFromPackageJson(const std::string& packageJson, bool& error);
+
+    std::string baseDir_;
     v8::Persistent<v8::Function>* requireFunction_;
     v8::Persistent<v8::Function>* requireFactoryFunction_;
     std::unordered_map<std::string, v8::Persistent<v8::Object>*> loadedModules_;

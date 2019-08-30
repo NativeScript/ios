@@ -118,35 +118,35 @@ describe("TNS require", function () {
     //     expect(TNSGetOutput()).toBe("CD11903C-B38B-4D68-BEB6-D72C3FAD906F");
     // });
 
-    // it('can require from tns_modules', function () {
-    //     require("./RequireModuleFolder");
-    //     expect(TNSGetOutput()).toBe('main started from module folder main ended');
-    // });
+    it('can require from tns_modules', function () {
+        require("./RequireModuleFolder");
+        expect(TNSGetOutput()).toBe('main started from module folder main ended');
+    });
 
-    // it('searches tns_modules before app', function () {
-    //     require("./RequireModuleFolderConflict");
-    //     expect(TNSGetOutput()).toBe('main started from module folder main ended');
-    // });
+    it('searches tns_modules before app', function () {
+        require("./RequireModuleFolderConflict");
+        expect(TNSGetOutput()).toBe('main started from module folder main ended');
+    });
 
-    // it("when require a tns_module that is a directory name it should load the index js inside it", function () {
-    //     require("shared/Require/RequirePriority/dependency3");
-    //     var expected = ' from module folder in index file';
-    //     expect(TNSGetOutput()).toBe(expected);
-    // });
+    it("when require a tns_module that is a directory name it should load the index js inside it", function () {
+        require("tns-core-modules/shared/Require/RequirePriority/dependency3");
+        var expected = ' from module folder in index file';
+        expect(TNSGetOutput()).toBe(expected);
+    });
 
-    // it("when require a tns_module that is a directory name it should load the package json inside it", function () {
-    //     require("shared/Require/RequirePriority/dependency5");
-    //     var expected = ' from module folder in dependency5 dir'
-    //     expect(TNSGetOutput()).toBe(expected);
-    // });
+    it("when require a tns_module that is a directory name it should load the package json inside it", function () {
+        require("tns-core-modules/shared/Require/RequirePriority/dependency5");
+        var expected = ' from module folder in dependency5 dir'
+        expect(TNSGetOutput()).toBe(expected);
+    });
 
-    // it('has a priority to load from tns_module first then from app and relative folder', function () {
-    //     require("./RequirePriority");
-    //     var expected = 'main started from module folder from module folder in'
-    //         + ' index file from root folder in index file from root folder'
-    //         + ' from root folder in index file main ended';
-    //     expect(TNSGetOutput()).toBe(expected);
-    // });
+    it('has a priority to load from tns_module first then from app and relative folder', function () {
+        require("./RequirePriority");
+        var expected = 'main started from module folder from module folder in'
+            + ' index file from root folder in index file from root folder'
+            + ' from root folder in index file main ended';
+        expect(TNSGetOutput()).toBe(expected);
+    });
 
     it("can set properties in the global object", function () {
         require("./SimpleGlobalObject");
@@ -252,11 +252,11 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).not.toBe(undefined);
     });
 
-    // it("when require a module via app root syntax it should be loaded", function () {
-    //     var mymodule = require("~/shared/Require/RequireWithTildeSyntax/module.js");
-    //     var value = mymodule.echo(12345)
-    //     expect(value).toBe(12345);
-    // });
+    it("when require a module via app root syntax it should be loaded", function () {
+        var mymodule = require("~/tests/shared/Require/RequireWithTildeSyntax/module.js");
+        var value = mymodule.echo(12345)
+        expect(value).toBe(12345);
+    });
 
     it("should load module with null char in it", function () {
         var text = require("./ModuleWithNullChar/index").text;

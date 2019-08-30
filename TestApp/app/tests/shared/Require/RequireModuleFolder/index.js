@@ -1,3 +1,3 @@
 TNSLog('main started');
-var module = require('shared/Require/RequireModuleFolder/dependency');
+var module = require('tns-core-modules/shared/Require/RequireModuleFolder/dependency');
 TNSLog(' main ended');

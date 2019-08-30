@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include <string>
+#include <sys/stat.h>
 #include "ModuleInternal.h"
 #include "Helpers.h"
 
@@ -7,11 +8,23 @@ using namespace v8;
 
 namespace tns {
 
+template <mode_t mode>
+static mode_t stat(NSString* path) {
+    struct stat statbuf;
+    if (stat(path.fileSystemRepresentation, &statbuf) == 0) {
+        return (statbuf.st_mode & S_IFMT) & mode;
+    }
+
+    return 0;
+}
+
 ModuleInternal::ModuleInternal()
     : requireFunction_(nullptr), requireFactoryFunction_(nullptr) {
 }
 
 void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
+    this->baseDir_ = baseDir;
+
     std::string requireFactoryScript =
         "(function() { "
         "    function require_factory(requireInternal, dirName) { "
@@ -85,9 +98,25 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
     std::string moduleName = tns::ToString(isolate, info[0].As<v8::String>());
     std::string callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
 
-    NSString* fullPath = (moduleName.length() > 0 && moduleName[0] == '/')
-        ? [NSString stringWithUTF8String:moduleName.c_str()]
-        : [[NSString stringWithUTF8String:callingModuleDirName.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+    NSString* fullPath;
+    if (moduleName.length() > 0 && moduleName[0] != '/') {
+        if (moduleName[0] == '.') {
+            fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+        } else if (moduleName[0] == '~') {
+            moduleName = moduleName.substr(2);
+            fullPath = [[NSString stringWithUTF8String:moduleInternal->baseDir_.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+        } else {
+            NSString* tnsModulesPath = [[NSString stringWithUTF8String:moduleInternal->baseDir_.c_str()] stringByAppendingPathComponent:@"tns_modules"];
+            fullPath = [tnsModulesPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            if (!stat<S_IFDIR | S_IFREG>(fullPath) && !stat<S_IFDIR | S_IFREG>([fullPath stringByAppendingPathExtension:@"js"])) {
+                fullPath = [tnsModulesPath stringByAppendingPathComponent:@"tns-core-modules"];
+                fullPath = [fullPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            }
+        }
+    } else {
+        fullPath = [NSString stringWithUTF8String:moduleName.c_str()];
+    }
+
     NSString* fileNameOnly = [fullPath lastPathComponent];
     NSString* pathOnly = [fullPath stringByDeletingLastPathComponent];
 
@@ -126,17 +155,20 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
         return Local<Object>();
     }
 
+    NSString* pathStr = [NSString stringWithUTF8String:path.c_str()];
+    NSString* extension = [pathStr pathExtension];
+    if ([extension isEqualToString:@"json"]) {
+        isData = true;
+    }
+
     auto it2 = this->loadedModules_.find(path);
     if (it2 != this->loadedModules_.end()) {
         return it2->second->Get(isolate);
     }
 
-    NSString* pathStr = [NSString stringWithUTF8String:path.c_str()];
-    NSString* extension = [pathStr pathExtension];
     if ([extension isEqualToString:@"js"]) {
         moduleObj = this->LoadModule(isolate, path, cacheKey);
     } else if ([extension isEqualToString:@"json"]) {
-        isData = true;
         moduleObj = this->LoadData(isolate, path);
     } else {
         // TODO: throw an error for unsupported file extension
