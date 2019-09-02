@@ -1,5 +1,7 @@
 #include <dispatch/dispatch.h>
 #include <fstream>
+#include <codecvt>
+#include <locale>
 #include "Helpers.h"
 
 using namespace v8;
@@ -28,8 +30,8 @@ std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {
     return std::string(*result);
 }
 
-double tns::ToNumber(const Local<Value>& value) {
-    double result = 0;
+double tns::ToNumber(Isolate* isolate, const Local<Value>& value) {
+    double result = NAN;
 
     if (value.IsEmpty()) {
         return result;
@@ -39,6 +41,13 @@ double tns::ToNumber(const Local<Value>& value) {
         result = value.As<NumberObject>()->ValueOf();
     } else if (value->IsNumber()) {
         result = value.As<Number>()->Value();
+    } else {
+        Local<Number> number;
+        Local<Context> context = isolate->GetCurrentContext();
+        bool success = value->ToNumber(context).ToLocal(&number);
+        if (success) {
+            result = number->Value();
+        }
     }
 
     return result;
@@ -58,6 +67,16 @@ bool tns::ToBool(const Local<Value>& value) {
     }
 
     return result;
+}
+
+std::vector<uint16_t> tns::ToVector(const std::string& value) {
+    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
+    std::u16string valueu16 = convert.from_bytes(value);
+
+    const uint16_t *begin = reinterpret_cast<uint16_t const*>(valueu16.data());
+    const uint16_t *end = reinterpret_cast<uint16_t const*>(valueu16.data() + valueu16.size());
+    std::vector<uint16_t> vector(begin, end);
+    return vector;
 }
 
 std::string tns::ReadText(const std::string& file) {

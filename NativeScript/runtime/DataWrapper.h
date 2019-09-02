@@ -166,7 +166,8 @@ public:
         : typeWrapper_(typeWrapper),
           value_(value),
           encoding_(nullptr),
-          data_(nullptr) {
+          data_(nullptr),
+          disposeData_(false) {
     }
 
     const WrapperType Type() {
@@ -200,14 +201,20 @@ public:
         return this->data_;
     }
 
-    void SetData(void* data) {
+    void SetData(void* data, bool disposeData = false) {
         this->data_ = data;
+        this->disposeData_ = disposeData;
+    }
+
+    bool ShouldDisposeData() {
+        return this->disposeData_;
     }
 private:
     BaseDataWrapper* typeWrapper_;
     v8::Persistent<v8::Value>* value_;
     const TypeEncoding* encoding_;
     void* data_;
+    bool disposeData_;
 };
 
 class PrimitiveDataWrapper: public BaseDataWrapper {

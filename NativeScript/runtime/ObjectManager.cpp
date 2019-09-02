@@ -81,11 +81,13 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             if (referenceWrapper->Value() != nullptr) {
                 Local<Value> value = referenceWrapper->Value()->Get(isolate);
                 ObjectManager::DisposeValue(isolate, value);
-                DisposeValue(isolate, referenceWrapper->Value()->Get(isolate));
                 referenceWrapper->Value()->Reset();
             }
 
             if (referenceWrapper->Data() != nullptr) {
+                if (referenceWrapper->ShouldDisposeData()) {
+                    std::free(referenceWrapper->Data());
+                }
                 referenceWrapper->SetData(nullptr);
                 referenceWrapper->SetEncoding(nullptr);
             }

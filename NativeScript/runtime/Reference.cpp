@@ -184,11 +184,22 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, con
     BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
 
     if (wrappedValue == nullptr) {
-        if (refWrapper->TypeWrapper() == nullptr) {
+        BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
+        if (typeWrapper == nullptr) {
             return nullptr;
         }
 
-        if (refWrapper->TypeWrapper()->Type() != WrapperType::StructType) {
+        if (typeWrapper->Type() == WrapperType::Primitive) {
+            PrimitiveDataWrapper* primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
+            const TypeEncoding* enc = primitiveWrapper->TypeEncoding();
+            size_t size = primitiveWrapper->Size();
+            void* data = malloc(size);
+            Interop::WriteValue(isolate, enc, data, value);
+            refWrapper->SetData(data, true);
+            return data;
+        }
+
+        if (typeWrapper->Type() != WrapperType::StructType) {
             return nullptr;
         }
 
@@ -197,8 +208,14 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, con
         StructInfo structInfo = structTypeWrapper->StructInfo();
         void* data = malloc(structInfo.FFIType()->size);
         Interop::InitializeStruct(isolate, data, structInfo.Fields(), value);
-        refWrapper->SetData(data);
+        refWrapper->SetData(data, true);
         refWrapper->SetEncoding(typeEncoding);
+        return data;
+    }
+
+    if (wrappedValue->Type() == WrapperType::ObjCClass) {
+        ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrappedValue);
+        void* data = classWrapper->Klass();
         return data;
     }
 

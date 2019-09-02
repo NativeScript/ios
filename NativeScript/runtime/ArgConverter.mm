@@ -166,7 +166,7 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
         *(ffi_arg *)retValue = (bool)boolValue;
         return;
     } else if (tns::IsNumber(value)) {
-        double numValue = tns::ToNumber(value);
+        double numValue = tns::ToNumber(isolate, value);
         switch (type) {
             case BinaryTypeEncodingType::UShortEncoding: {
                 *static_cast<unsigned short*>(retValue) = (unsigned short)numValue;

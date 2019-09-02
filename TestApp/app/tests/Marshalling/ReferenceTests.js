@@ -289,6 +289,206 @@ describe(module.id, function () {
         expect(array.firstObject).toBe(object);
     });
 
+    it("NSInvocation_methodWithBool", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:B");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithBool:";
+        var ref = new interop.Reference(interop.types.uint8, true);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('1');
+    });
+
+    it("NSInvocation_methodWithBool2", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:B");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithBool2:";
+        var ref = new interop.Reference(interop.types.uint8, true);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('1');
+    });
+
+    it("NSInvocation_methodWithBool3", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:B");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithBool3:";
+        var ref = new interop.Reference(interop.types.uint8, true);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('1');
+    });
+
+    it("NSInvocation_methodWithUnichar", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:S");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithUnichar:";
+        var ref = new interop.Reference(interop.types.unichar, "i");
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('i');
+    });
+
+    it("NSInvocation_methodWithUChar", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:C");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithUChar:";
+        var ref = new interop.Reference(interop.types.uint8, 255);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('255');
+    });
+
+    it("NSInvocation_methodWithChar1", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:c");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithChar:";
+        var ref = new interop.Reference(interop.types.int8, 127);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('127');
+    });
+
+    it("NSInvocation_methodWithChar2", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:c");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithChar:";
+        var ref = new interop.Reference(interop.types.int8, -128);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('-128');
+    });
+
+    it("NSInvocation_methodWithUShort", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:S");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithUShort:";
+        var ref = new interop.Reference(interop.types.uint16, 65535);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('65535');
+    });
+
+    it("NSInvocation_methodWithUShort1", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:s");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithShort:";
+        var ref = new interop.Reference(interop.types.int16, 32767);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('32767');
+    });
+
+    it("NSInvocation_methodWithUShort2", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:s");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithShort:";
+        var ref = new interop.Reference(interop.types.int16, -32768);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('-32768');
+    });
+
+    it("NSInvocation_methodWithUInt", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:I");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithUInt:";
+        var ref = new interop.Reference(interop.types.uint32, 4294967295);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('4294967295');
+    });
+
+    it("NSInvocation_methodWithInt1", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:i");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithInt:";
+        var ref = new interop.Reference(interop.types.int32, 2147483647);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('2147483647');
+    });
+
+    it("NSInvocation_methodWithInt2", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:i");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithInt:";
+        var ref = new interop.Reference(interop.types.int32, -2147483648);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('-2147483648');
+    });
+
+    it("NSInvocation_methodWithULong", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:L");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithULong:";
+        var ref = new interop.Reference(interop.types.uint64, 4294967295);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('4294967295');
+    });
+
+    it("NSInvocation_methodWithLong", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:l");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithLong:";
+        var ref = new interop.Reference(interop.types.int64, 2147483647);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('2147483647');
+    });
+
+    it("NSInvocation_methodWithFloat", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:f");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithFloat:";
+        var ref = new interop.Reference(interop.types.float, 3.40282347e+38);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('340282346638528859811704183484516925440.000000000000000000000000000000000000000000000');
+    });
+
+    it("NSInvocation_methodWithDouble1", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:d");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithDouble:";
+        var ref = new interop.Reference(interop.types.double, 1.7976931348623157e+308);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000');
+    });
+
+    it("NSInvocation_methodWithDouble2", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:d");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithDouble:";
+        var ref = new interop.Reference(interop.types.double, 2.2250738585072014e-308);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000222507385850720138');
+    });
+
+    it("NSInvocation_methodWithClass", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:#");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithClass:";
+        var ref = new interop.Reference(interop.types.class, NSMutableString.class());
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('NSMutableString');
+    });
+
+    it("NSInvocation_methodWithSelector", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@::");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithSelector:";
+        var ref = new interop.Reference(interop.types.selector, "init:");
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('init:');
+    });
+
     describe("ReferenceConstructor", function () {
         it("should accept empty arguments", function () {
             var reference = new interop.Reference();

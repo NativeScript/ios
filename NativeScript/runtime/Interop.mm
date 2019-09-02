@@ -141,19 +141,19 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         Interop::SetValue(dest, strCopy);
     } else if (arg->IsString() && typeEncoding->type == BinaryTypeEncodingType::UnicharEncoding) {
         v8::String::Utf8Value utf8Value(isolate, arg);
-        const char* strCopy = strdup(*utf8Value);
-        if (strlen(strCopy) > 1) {
+        std::vector<uint16_t> vector = tns::ToVector(*utf8Value);
+        if (vector.size() > 1) {
             tns::ThrowError(isolate, "Only one character string can be converted to unichar.");
             return;
         }
-        unichar c = (strlen(strCopy) == 0) ? 0 : strCopy[0];
+        unichar c = (vector.size() == 0) ? 0 : vector[0];
         Interop::SetValue(dest, c);
     } else if (tns::IsString(arg) && (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference || typeEncoding->type == BinaryTypeEncodingType::IdEncoding)) {
         std::string str = tns::ToString(isolate, arg);
         NSString* result = [NSString stringWithUTF8String:str.c_str()];
         Interop::SetValue(dest, result);
-    } else if (tns::IsNumber(arg)) {
-        double value = tns::ToNumber(arg);
+    } else if (Interop::IsNumbericType(typeEncoding->type) || tns::IsNumber(arg)) {
+        double value = tns::ToNumber(isolate, arg);
 
         if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference || typeEncoding->type == BinaryTypeEncodingType::IdEncoding) {
             // NSNumber
@@ -195,6 +195,9 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             if (wrapper->Type() == WrapperType::Pointer) {
                 PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
                 void* data = pointerWrapper->Data();
+                Interop::SetValue(dest, data);
+            } else if (wrapper->Type() == WrapperType::Reference) {
+                void* data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
                 Interop::SetValue(dest, data);
             } else {
                 // TODO:
@@ -429,6 +432,10 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
             id data = objCDataWrapper->Data();
             Interop::SetValue(dest, data);
+        } else if (wrapper->Type() == WrapperType::ObjCClass) {
+            ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
+            id data = classWrapper->Klass();
+            Interop::SetValue(dest, data);
         } else {
             assert(false);
         }
@@ -445,7 +452,7 @@ id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
         NSString* result = [NSString stringWithUTF8String:value.c_str()];
         return result;
     } else if (tns::IsNumber(arg)) {
-        double value = tns::ToNumber(arg);
+        double value = tns::ToNumber(isolate, arg);
         return @(value);
     } else if (tns::IsBool(arg)) {
         bool value = tns::ToBool(arg);
@@ -999,6 +1006,22 @@ Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodin
     // TODO: Handle all the possible return types https://nshipster.com/type-encodings/
 
     return Local<Value>();
+}
+
+bool Interop::IsNumbericType(BinaryTypeEncodingType type) {
+    return
+        type == BinaryTypeEncodingType::UCharEncoding ||
+        type == BinaryTypeEncodingType::CharEncoding ||
+        type == BinaryTypeEncodingType::UShortEncoding ||
+        type == BinaryTypeEncodingType::ShortEncoding ||
+        type == BinaryTypeEncodingType::UIntEncoding ||
+        type == BinaryTypeEncodingType::IntEncoding ||
+        type == BinaryTypeEncodingType::ULongEncoding ||
+        type == BinaryTypeEncodingType::LongEncoding ||
+        type == BinaryTypeEncodingType::ULongLongEncoding ||
+        type == BinaryTypeEncodingType::LongLongEncoding ||
+        type == BinaryTypeEncodingType::FloatEncoding ||
+        type == BinaryTypeEncodingType::DoubleEncoding;
 }
 
 void Interop::SetStructPropertyValue(Isolate* isolate, StructWrapper* wrapper, StructField field, Local<Value> value) {

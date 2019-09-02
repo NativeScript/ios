@@ -10,8 +10,9 @@ namespace tns {
 
 v8::Local<v8::String> ToV8String(v8::Isolate* isolate, std::string value);
 std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
-double ToNumber(const v8::Local<v8::Value>& value);
+double ToNumber(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
 bool ToBool(const v8::Local<v8::Value>& value);
+std::vector<uint16_t> ToVector(const std::string& value);
 
 std::string ReadText(const std::string& file);
 

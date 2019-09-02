@@ -45,11 +45,11 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, CreateEncoding(BinaryTypeEncodingType::DoubleEncoding)));
 
     RegisterInteropType(isolate, types, "id", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::IdEncoding)));
-    RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(isolate, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(isolate, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+//    RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(isolate, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, CreateEncoding(BinaryTypeEncodingType::UnicharEncoding)));
+//    RegisterInteropType(isolate, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ProtocolEncoding)));
+    RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ClassEncoding)));
+    RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::SelectorEncoding)));
 
     bool success = interop->Set(context, tns::ToV8String(isolate, "types"), types).FromMaybe(false);
     assert(success);

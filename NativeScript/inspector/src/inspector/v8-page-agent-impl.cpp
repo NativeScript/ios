@@ -112,7 +112,7 @@ void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String&
         content = base64_encode(content.c_str(), (uint)content.length());
     }
 
-    std::vector<uint16_t> vector = ToVector(content);
+    std::vector<uint16_t> vector = tns::ToVector(content);
     String16 result(vector.data(), vector.size());
 
     callback->sendSuccess(result, shouldEncode);

@@ -46,13 +46,3 @@ std::string v8_inspector::ToStdString(const StringView& value) {
 
     return result;
 }
-
-std::vector<uint16_t> v8_inspector::ToVector(const std::string& value) {
-    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-    std::u16string valueu16 = convert.from_bytes(value);
-
-    const uint16_t *begin = reinterpret_cast<uint16_t const*>(valueu16.data());
-    const uint16_t *end = reinterpret_cast<uint16_t const*>(valueu16.data() + valueu16.size());
-    std::vector<uint16_t> vector(begin, end);
-    return vector;
-}

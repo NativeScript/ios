@@ -297,7 +297,7 @@ void JsV8InspectorClient::connect() {
 }
 
 void JsV8InspectorClient::createInspectorSession() {
-    std::vector<uint16_t> vector = ToVector("{\"baseDir\":\"" + baseDir_ + "\"}");
+    std::vector<uint16_t> vector = tns::ToVector("{\"baseDir\":\"" + baseDir_ + "\"}");
     StringView state(vector.data(), vector.size());
     this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, state);
 }
@@ -343,7 +343,7 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
 }
 
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
-    std::vector<uint16_t> vector = ToVector(message);
+    std::vector<uint16_t> vector = tns::ToVector(message);
     StringView messageView(vector.data(), vector.size());
     this->session_->dispatchProtocolMessage(messageView);
 }

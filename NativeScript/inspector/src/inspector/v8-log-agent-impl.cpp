@@ -1,6 +1,7 @@
 #include "v8-log-agent-impl.h"
 #include "JsV8InspectorClient.h"
 #include "utils.h"
+#include "Helpers.h"
 
 namespace v8_inspector {
 
@@ -51,7 +52,7 @@ void V8LogAgentImpl::EntryAdded(const std::string& text, std::string verbosityLe
     auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
     double timestamp = nano.time_since_epoch().count();
 
-    std::vector<uint16_t> vector = v8_inspector::ToVector(text);
+    std::vector<uint16_t> vector = tns::ToVector(text);
     String16 textString16 = String16(vector.data(), vector.size());
 
     auto logEntry = protocol::Log::LogEntry::create()
