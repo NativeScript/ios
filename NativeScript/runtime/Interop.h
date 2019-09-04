@@ -57,8 +57,8 @@ private:
 
     template <typename T>
     static void SetNumericValue(void* dest, double value) {
-        if (value < std::numeric_limits<T>::min()) {
-            Interop::SetValue(dest, std::numeric_limits<T>::min());
+        if (value < std::numeric_limits<T>::lowest()) {
+            Interop::SetValue(dest, std::numeric_limits<T>::lowest());
         } else if (value > std::numeric_limits<T>::max()) {
             Interop::SetValue(dest, std::numeric_limits<T>::max());
         } else {
