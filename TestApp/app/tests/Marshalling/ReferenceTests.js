@@ -469,16 +469,6 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000222507385850720138');
     });
 
-    it("NSInvocation_methodWithClass", function () {
-        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:#");
-        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
-        invocation.selector = "methodWithClass:";
-        var ref = new interop.Reference(interop.types.class, NSMutableString.class());
-        invocation.setArgumentAtIndex(ref, 2);
-        invocation.invokeWithTarget(TNSPrimitives.class());
-        expect(TNSGetOutput()).toBe('NSMutableString');
-    });
-
     it("NSInvocation_methodWithSelector", function () {
         var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@::");
         var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
