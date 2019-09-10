@@ -78,7 +78,7 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
 void Runtime::Init(const string& baseDir) {
     if (!mainThreadInitialized_) {
         Runtime::platform_ =
-#ifdef DEBUGG
+#ifdef DEBUG
             v8_inspector::V8InspectorPlatform::CreateDefaultPlatform();
 #else
             platform::NewDefaultPlatform().release();
