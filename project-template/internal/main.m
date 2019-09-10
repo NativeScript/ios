@@ -33,7 +33,8 @@ int main(int argc, char *argv[]) {
 
         void* metadataPtr = &startOfMetadataSection;
 
-        [NativeScript start:metadataPtr];
+        NSString* applicationPath = [[NSBundle mainBundle] resourcePath];
+        [NativeScript start:metadataPtr fromApplicationPath:applicationPath];
 
         return 0;
     }

@@ -6,7 +6,8 @@ int main(int argc, char *argv[]) {
     @autoreleasepool {
         void* metadataPtr = &startOfMetadataSection;
 
-        [NativeScript start:metadataPtr];
+        NSString* applicationPath = [[NSBundle mainBundle] resourcePath];
+        [NativeScript start:metadataPtr fromApplicationPath:applicationPath];
 
         return 0;
     }

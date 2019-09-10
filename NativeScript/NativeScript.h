@@ -2,7 +2,7 @@
 
 @interface NativeScript : NSObject
 
-+ (void)start:(void*)metadataPtr;
++ (void)start:(void*)metadataPtr fromApplicationPath:(NSString*)path;
 + (bool)liveSync;
 
 @end

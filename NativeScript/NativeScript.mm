@@ -10,11 +10,9 @@ using namespace tns;
 
 static Runtime* runtime_ = nullptr;
 
-+ (void)start:(void*)metadataPtr {
-    NSString* resourcePath = [[NSBundle mainBundle] resourcePath];
-    NSArray* components = [NSArray arrayWithObjects:resourcePath, @"app", nil];
-    NSString* path = [NSString pathWithComponents:components];
-    const char* baseDir = [path UTF8String];
++ (void)start:(void*)metadataPtr fromApplicationPath:(NSString*)path {
+    NSString* appPath = [path stringByAppendingPathComponent:@"app"];
+    const char* baseDir = [appPath UTF8String];
 
     Runtime::InitializeMetadata(metadataPtr);
     runtime_ = new Runtime();
