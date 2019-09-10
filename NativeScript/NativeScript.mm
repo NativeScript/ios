@@ -42,7 +42,7 @@ static Runtime* runtime_ = nullptr;
 
     TryCatch tc(isolate);
     success = liveSyncFunc->Call(context, v8::Undefined(isolate), 0, args).ToLocal(&result);
-    if (!success) {
+    if (!success || tc.HasCaught()) {
         if (tc.HasCaught()) {
             printf("%s\n", tns::ToString(isolate, tc.Exception()).c_str());
         }
