@@ -202,6 +202,9 @@ public:
     }
 
     void SetData(void* data, bool disposeData = false) {
+        if (this->data_ != nullptr && data != nullptr && this->disposeData_) {
+            std::free(this->data_);
+        }
         this->data_ = data;
         this->disposeData_ = disposeData;
     }

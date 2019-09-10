@@ -245,14 +245,14 @@ void JsV8InspectorClient::enableInspector() {
             current_connection_inspector_io = io;
         }
 
-        return ^(NSString* message, NSError* error) {
-            tns::ExecuteOnMainThread([this, message]() {
-                if (message) {
-                    std::string msg = [message UTF8String];
-                    this->dispatchMessage(msg);
-                }
-            });
-        };
+       return ^(NSString* message, NSError* error) {
+           tns::ExecuteOnMainThread([this, message]() {
+               if (message) {
+                   std::string msg = [message UTF8String];
+                   this->dispatchMessage(msg);
+               }
+           });
+       };
     };
 
     TNSInspectorIoErrorHandler ioErrorHandler = ^(NSObject* dummy, NSError* error) {

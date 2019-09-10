@@ -479,6 +479,37 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('init:');
     });
 
+    it("NSInvocation_methodWithClass", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:#");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithClass:";
+        var ref = new interop.Reference(interop.types.class, NSMutableString.class());
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('NSMutableString');
+    });
+
+    it("NSInvocation_methodWithProtocol", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:@");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithProtocol:";
+        var ref = new interop.Reference(interop.types.protocol, TNSBaseProtocol1);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toBe('TNSBaseProtocol1');
+    });
+
+    it("NSInvocation_methodWithId", function () {
+        var methodSignature = NSMethodSignature.signatureWithObjCTypes("v@:@");
+        var invocation = NSInvocation.invocationWithMethodSignature(methodSignature);
+        invocation.selector = "methodWithId:";
+        var value = TNSIBaseInterface.alloc().init();
+        var ref = new interop.Reference(interop.types.id, value);
+        invocation.setArgumentAtIndex(ref, 2);
+        invocation.invokeWithTarget(TNSPrimitives.class());
+        expect(TNSGetOutput()).toMatch(/^<TNSIBaseInterface: 0x\w+>$/);
+    });
+
     describe("ReferenceConstructor", function () {
         it("should accept empty arguments", function () {
             var reference = new interop.Reference();

@@ -78,11 +78,11 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         }
         case WrapperType::Reference: {
             ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
-            if (referenceWrapper->Value() != nullptr) {
-                Local<Value> value = referenceWrapper->Value()->Get(isolate);
-                ObjectManager::DisposeValue(isolate, value);
-                referenceWrapper->Value()->Reset();
-            }
+//            if (referenceWrapper->Value() != nullptr) {
+//                Local<Value> value = referenceWrapper->Value()->Get(isolate);
+//                ObjectManager::DisposeValue(isolate, value);
+//                referenceWrapper->Value()->Reset();
+//            }
 
             if (referenceWrapper->Data() != nullptr) {
                 if (referenceWrapper->ShouldDisposeData()) {

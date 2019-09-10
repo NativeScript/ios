@@ -162,6 +162,10 @@ unichar functionWithUnichar(unichar x) {
     TNSLog([NSString stringWithFormat:@"%C", x]);
     return x;
 }
++ (id)methodWithId:(id)x {
+    TNSLog([x description]);
+    return x;
+}
 
 + (int)methodVariadicSum:(int)count, ... {
     va_list ap;
