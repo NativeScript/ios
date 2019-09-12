@@ -62,14 +62,14 @@ void V8PageAgentImpl::restore() {
 
 DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) {
     std::unique_ptr<protocol::Page::Frame> frameObject = protocol::Page::Frame::create()
-    .setId(m_frameIdentifier.c_str())
-    .setLoaderId("NSLoaderIdentifier")
-    .setMimeType("text/directory")
-    .setSecurityOrigin("")
-    .setUrl(m_frameUrl.c_str())
-    .build();
+        .setId(m_frameIdentifier.c_str())
+        .setLoaderId("NSLoaderIdentifier")
+        .setMimeType("text/directory")
+        .setSecurityOrigin("")
+        .setUrl(m_frameUrl.c_str())
+        .build();
 
-    std::unique_ptr<protocol::Array<protocol::Page::FrameResource>> subresources = std::unique_ptr<protocol::Array<protocol::Page::FrameResource>>(new protocol::Array<protocol::Page::FrameResource>());
+    std::unique_ptr<protocol::Array<protocol::Page::FrameResource>> subresources = std::make_unique<protocol::Array<protocol::Page::FrameResource>>();
 
     std::vector<V8PageAgentImpl::PageEntry> entries;
     this->ReadEntries(m_baseDir, entries);

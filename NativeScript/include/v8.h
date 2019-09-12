@@ -4883,7 +4883,7 @@ class V8_EXPORT ArrayBuffer : public Object {
    *
    * The Data pointer of ArrayBuffer::Contents must be freed using the provided
    * deleter, which will call ArrayBuffer::Allocator::Free if the buffer
-   * was allocated with ArraryBuffer::Allocator::Allocate.
+   * was allocated with ArrayBuffer::Allocator::Allocate.
    */
   Contents Externalize();
 
@@ -4905,6 +4905,7 @@ class V8_EXPORT ArrayBuffer : public Object {
  private:
   ArrayBuffer();
   static void CheckCast(Value* obj);
+  Contents GetContents(bool externalize);
 };
 
 
@@ -5322,6 +5323,7 @@ class V8_EXPORT SharedArrayBuffer : public Object {
  private:
   SharedArrayBuffer();
   static void CheckCast(Value* obj);
+  Contents GetContents(bool externalize);
 };
 
 
@@ -7567,6 +7569,8 @@ struct DeserializeInternalFieldsCallback {
 };
 typedef DeserializeInternalFieldsCallback DeserializeEmbedderFieldsCallback;
 
+enum class MeasureMemoryMode { kSummary, kDetailed };
+
 /**
  * Isolate represents an isolated instance of the V8 engine.  V8 isolates have
  * completely separate states.  Objects from one isolate must not be used in
@@ -8086,6 +8090,17 @@ class V8_EXPORT Isolate {
    * \returns true on success.
    */
   bool GetHeapCodeAndMetadataStatistics(HeapCodeStatistics* object_statistics);
+
+  /**
+   * Enqueues a memory measurement request for the given context and mode.
+   * This API is experimental and may change significantly.
+   *
+   * \param mode Indicates whether the result should include per-context
+   *   memory usage or just the total memory usage.
+   * \returns a promise that will be resolved with memory usage estimate.
+   */
+  v8::MaybeLocal<v8::Promise> MeasureMemory(v8::Local<v8::Context> context,
+                                            MeasureMemoryMode mode);
 
   /**
    * Get a call stack sample from the isolate.

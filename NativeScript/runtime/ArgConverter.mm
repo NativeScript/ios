@@ -80,8 +80,6 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         ObjectWeakCallbackState* weakCallbackState = new ObjectWeakCallbackState(poCallback);
         poCallback->SetWeak(weakCallbackState, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
 
-        Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
-
         std::vector<Local<Value>> v8Args;
         const TypeEncoding* typeEncoding = data->typeEncoding_;
         for (int i = 0; i < data->paramsCount_; i++) {
@@ -123,6 +121,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
         Local<Value> result;
         TryCatch tc(isolate);
+        Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
         if (!callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result)) {
             printf("%s\n", tns::ToString(isolate, tc.Exception()).c_str());
             assert(false);
@@ -618,8 +617,10 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, 
     Local<ObjectTemplate> instanceTemplate = emptyInstanceCtorFuncTemplate->InstanceTemplate();
     instanceTemplate->SetInternalFieldCount(2);
 
-    NamedPropertyHandlerConfiguration config(propertyGetter, propertySetter);
-    instanceTemplate->SetHandler(config);
+    if (propertyGetter != nullptr || propertySetter != nullptr) {
+        NamedPropertyHandlerConfiguration config(propertyGetter, propertySetter);
+        instanceTemplate->SetHandler(config);
+    }
 
     Local<v8::Function> emptyInstanceCtorFunc;
     if (!emptyInstanceCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyInstanceCtorFunc)) {

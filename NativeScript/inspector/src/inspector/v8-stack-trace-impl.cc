@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include "src/base/template-utils.h"
 #include "src/inspector/v8-debugger.h"
 #include "src/inspector/v8-inspector-impl.h"
 #include "src/inspector/wasm-translation.h"
@@ -74,7 +73,7 @@ std::unique_ptr<protocol::Runtime::StackTrace> buildInspectorObjectCommon(
   }
 
   auto inspectorFrames =
-      v8::base::make_unique<protocol::Array<protocol::Runtime::CallFrame>>();
+      std::make_unique<protocol::Array<protocol::Runtime::CallFrame>>();
   for (const std::shared_ptr<StackFrame>& frame : frames) {
     V8InspectorClient* client = nullptr;
     if (debugger && debugger->inspector())
@@ -115,6 +114,11 @@ V8StackTraceId::V8StackTraceId() : id(0), debugger_id(std::make_pair(0, 0)) {}
 V8StackTraceId::V8StackTraceId(uintptr_t id,
                                const std::pair<int64_t, int64_t> debugger_id)
     : id(id), debugger_id(debugger_id) {}
+
+V8StackTraceId::V8StackTraceId(uintptr_t id,
+                               const std::pair<int64_t, int64_t> debugger_id,
+                               bool should_pause)
+    : id(id), debugger_id(debugger_id), should_pause(should_pause) {}
 
 bool V8StackTraceId::IsInvalid() const { return !id; }
 
