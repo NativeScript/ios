@@ -2,6 +2,7 @@
 #define ConcurrentQueue_h
 
 #include <condition_variable>
+#include <string>
 #include <queue>
 #include <mutex>
 
