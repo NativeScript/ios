@@ -7,7 +7,7 @@ echo "Building for iphone simulator"
 xcodebuild -project v8ios.xcodeproj -target "NativeScript" -configuration Release -arch x86_64 -sdk iphonesimulator
 
 echo "Building for ARM64 device"
-xcodebuild -project v8ios.xcodeproj -target "NativeScript" -configuration Release -arch arm64 -sdk iphoneos archive
+xcodebuild -project v8ios.xcodeproj -target "NativeScript" -configuration Release -arch arm64 -sdk iphoneos OTHER_CFLAGS="-fembed-bitcode"
 
 echo "Creating fat library"
 OUTPUT_DIR="dist/NativeScript.framework"
