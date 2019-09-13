@@ -3,7 +3,7 @@
 #include "Runtime.h"
 #include "Caches.h"
 #include "Console.h"
-#include "SetTimeout.h"
+//#include "SetTimeout.h"
 #include "ArgConverter.h"
 #include "Interop.h"
 #include "InlineFunctions.h"
@@ -119,7 +119,7 @@ void Runtime::Init(const string& baseDir) {
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
     WeakRef::Init(isolate, globalTemplate);
-    SetTimeout::Init(isolate, globalTemplate);
+    //SetTimeout::Init(isolate, globalTemplate);
 
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
