@@ -423,17 +423,17 @@ describe(module.id, function () {
         return Array.from({ length: Math.abs(start - end) + (inclusive ? 1 : 0) }, mapper);
     }
 
-    // it("should be able to iterate over NSArray", function () {
-    //     var expected = range(0, 256);
-    //     var actual = new Array();
+    it("should be able to iterate over NSArray", function () {
+        var expected = range(0, 256);
+        var actual = new Array();
 
-    //     var array = NSArray.arrayWithArray(expected);
-    //     for (var x of array) {
-    //         actual.push(x);
-    //     }
+        var array = NSArray.arrayWithArray(expected);
+        for (var x of array) {
+            actual.push(x);
+        }
 
-    //     expect(actual).toEqual(expected);
-    // });
+        expect(actual).toEqual(expected);
+    });
 
 //     it("should be able to iterate over NSEnumerator", function () {
 //         var expected = range(0, 256);

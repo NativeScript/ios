@@ -11,6 +11,7 @@
 #include "Caches.h"
 #include "Reference.h"
 #include "Pointer.h"
+#include "SymbolIterator.h"
 
 using namespace v8;
 
@@ -902,6 +903,11 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
         Local<Value> jsResult = ArgConverter::ConvertArgument(isolate, wrapper);
+
+        if ([result isKindOfClass:[NSArray class]]) {
+            // attach Symbol.iterator to the instance
+            SymbolIterator::Set(isolate, jsResult);
+        }
 
         return jsResult;
     }
