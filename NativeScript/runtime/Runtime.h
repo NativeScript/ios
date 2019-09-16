@@ -35,6 +35,7 @@ private:
     static thread_local Runtime* currentRuntime_;
 
     void DefineGlobalObject(v8::Local<v8::Context> context);
+    void DefineCollectFunction(v8::Local<v8::Context> context);
     void DefineNativeScriptVersion(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     void DefinePerformanceObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     void DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);

@@ -126,6 +126,7 @@ void Runtime::Init(const string& baseDir) {
 
     baseDir_ = baseDir;
     DefineGlobalObject(context);
+    DefineCollectFunction(context);
     Console::Init(isolate);
     this->moduleInternal_.Init(isolate, baseDir);
 
@@ -187,6 +188,23 @@ void Runtime::DefineGlobalObject(Local<Context> context) {
     if (mainThreadInitialized_ && !global->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "self"), global, readOnlyFlags).FromMaybe(false)) {
         assert(false);
     }
+}
+
+void Runtime::DefineCollectFunction(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
+    Local<Object> global = context->Global();
+    Local<Value> value;
+    bool success = global->Get(context, tns::ToV8String(isolate, "gc")).ToLocal(&value);
+    assert(success);
+
+    if (value.IsEmpty() || !value->IsFunction()) {
+        return;
+    }
+
+    Local<v8::Function> gcFunc = value.As<v8::Function>();
+    const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+    success = global->DefineOwnProperty(context, tns::ToV8String(isolate, "__collect"), gcFunc, readOnlyFlags).FromMaybe(false);
+    assert(success);
 }
 
 void Runtime::DefinePerformanceObject(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
