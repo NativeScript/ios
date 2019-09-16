@@ -10,11 +10,11 @@ using namespace tns;
 
 static Runtime* runtime_ = nullptr;
 
-+ (void)start:(void*)metadataPtr fromApplicationPath:(NSString*)path {
++ (void)start:(void*)metadataPtr fromApplicationPath:(NSString*)path fromNativesPtr:(const char*)nativesPtr fromNativesSize:(size_t)nativesSize fromSnapshotPtr:(const char*)snapshotPtr fromSnapshotSize:(size_t)snapshotSize {
     NSString* appPath = [path stringByAppendingPathComponent:@"app"];
     const char* baseDir = [appPath UTF8String];
 
-    Runtime::InitializeMetadata(metadataPtr);
+    Runtime::Initialize(metadataPtr, nativesPtr, nativesSize, snapshotPtr, snapshotSize);
     runtime_ = new Runtime();
     runtime_->InitAndRunMainScript(baseDir);
 }

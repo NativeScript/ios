@@ -2515,6 +2515,14 @@
 					__DATA,
 					__TNSMetadata,
 					"$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin",
+					"-sectcreate",
+					__DATA,
+					__TNSNatives,
+					"$(SRCROOT)/project-template/internal/snapshots/natives_blob-$(CURRENT_ARCH).bin",
+					"-sectcreate",
+					__DATA,
+					__TNSSnapshot,
+					"$(SRCROOT)/project-template/internal/snapshots/snapshot_blob-$(CURRENT_ARCH).bin",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.AppWithModules;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2551,6 +2559,14 @@
 					__DATA,
 					__TNSMetadata,
 					"$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin",
+					"-sectcreate",
+					__DATA,
+					__TNSNatives,
+					"$(SRCROOT)/project-template/internal/snapshots/natives_blob-$(CURRENT_ARCH).bin",
+					"-sectcreate",
+					__DATA,
+					__TNSSnapshot,
+					"$(SRCROOT)/project-template/internal/snapshots/snapshot_blob-$(CURRENT_ARCH).bin",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.AppWithModules;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2662,6 +2678,14 @@
 					__DATA,
 					__TNSMetadata,
 					"$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin",
+					"-sectcreate",
+					__DATA,
+					__TNSNatives,
+					"$(SRCROOT)/project-template/internal/snapshots/natives_blob-$(CURRENT_ARCH).bin",
+					"-sectcreate",
+					__DATA,
+					__TNSSnapshot,
+					"$(SRCROOT)/project-template/internal/snapshots/snapshot_blob-$(CURRENT_ARCH).bin",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2702,6 +2726,14 @@
 					__DATA,
 					__TNSMetadata,
 					"$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin",
+					"-sectcreate",
+					__DATA,
+					__TNSNatives,
+					"$(SRCROOT)/project-template/internal/snapshots/natives_blob-$(CURRENT_ARCH).bin",
+					"-sectcreate",
+					__DATA,
+					__TNSSnapshot,
+					"$(SRCROOT)/project-template/internal/snapshots/snapshot_blob-$(CURRENT_ARCH).bin",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2783,7 +2815,6 @@
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/NativeScript/include",
-					"$(SRCROOT)/NativeScript/lib/include",
 					"$(SRCROOT)/NativeScript/inspector",
 				);
 				VERSIONING_SYSTEM = "apple-generic";
@@ -2861,7 +2892,6 @@
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/NativeScript/include",
-					"$(SRCROOT)/NativeScript/lib/include",
 					"$(SRCROOT)/NativeScript/inspector",
 				);
 				VERSIONING_SYSTEM = "apple-generic";

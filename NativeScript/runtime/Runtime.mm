@@ -13,16 +13,6 @@
 #include "WeakRef.h"
 #include "Worker.h"
 
-#if defined __arm64 && __arm64__
-#include "arm64/natives_blob.h"
-#include "arm64/snapshot_blob.h"
-#elif defined __x86_64__ && __x86_64__
-#include "x86_64/natives_blob.h"
-#include "x86_64/snapshot_blob.h"
-#else
-#error Unknown CPU architecture. Only ARM64 and X86_64 architectures are supported
-#endif
-
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
@@ -38,8 +28,12 @@ namespace tns {
 
 SimpleAllocator allocator_;
 
-void Runtime::InitializeMetadata(void* metadataPtr) {
+void Runtime::Initialize(void* metadataPtr, const char* nativesPtr, size_t nativesSize, const char* snapshotPtr, size_t snapshotSize) {
     MetaFile::setInstance(metadataPtr);
+    nativesPtr_ = nativesPtr;
+    nativesSize_ = nativesSize;
+    snapshotPtr_ = snapshotPtr;
+    snapshotSize_ = snapshotSize;
 }
 
 Runtime::Runtime() {
@@ -91,13 +85,13 @@ void Runtime::Init(const string& baseDir) {
     }
 
     auto* nativesBlobStartupData = new StartupData();
-    nativesBlobStartupData->data = reinterpret_cast<const char*>(&natives_blob_bin[0]);
-    nativesBlobStartupData->raw_size = natives_blob_bin_len;
+    nativesBlobStartupData->data = nativesPtr_;
+    nativesBlobStartupData->raw_size = (int)nativesSize_;
     V8::SetNativesDataBlob(nativesBlobStartupData);
 
     auto* snapshotBlobStartupData = new StartupData();
-    snapshotBlobStartupData->data = reinterpret_cast<const char*>(&snapshot_blob_bin[0]);
-    snapshotBlobStartupData->raw_size = snapshot_blob_bin_len;
+    snapshotBlobStartupData->data = snapshotPtr_;
+    snapshotBlobStartupData->raw_size = (int)snapshotSize_;
     V8::SetSnapshotDataBlob(snapshotBlobStartupData);
 
     Isolate::CreateParams create_params;
@@ -240,6 +234,10 @@ void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplat
 }
 
 Platform* Runtime::platform_ = nullptr;
+const char* Runtime::nativesPtr_ = nullptr;
+size_t Runtime::nativesSize_ = 0;
+const char* Runtime::snapshotPtr_ = nullptr;
+size_t Runtime::snapshotSize_ = 0;
 bool Runtime::mainThreadInitialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;
 

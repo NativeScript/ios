@@ -24,7 +24,7 @@ public:
         return this->baseDir_;
     }
 
-    static void InitializeMetadata(void* metadataPtr);
+    static void Initialize(void* metadataPtr, const char* nativesPtr, size_t nativesSize, const char* snapshotPtr, size_t snapshotSize);
 
     static Runtime* GetCurrentRuntime() {
         return currentRuntime_;
@@ -32,6 +32,11 @@ public:
 private:
     static bool mainThreadInitialized_;
     static v8::Platform* platform_;
+    static const char* nativesPtr_;
+    static size_t nativesSize_;
+    static const char* snapshotPtr_;
+    static size_t snapshotSize_;
+
     static thread_local Runtime* currentRuntime_;
 
     void DefineGlobalObject(v8::Local<v8::Context> context);
