@@ -41,6 +41,8 @@ private:
     static const MethodMeta* FindInitializer(v8::Isolate* isolate, Class klass, const InterfaceMeta* interfaceMeta, const v8::FunctionCallbackInfo<v8::Value>& info);
     static bool CanInvoke(v8::Isolate* isolate, const TypeEncoding* typeEncoding, v8::Local<v8::Value> arg);
     static bool CanInvoke(v8::Isolate* isolate, const MethodMeta* candidate, const v8::FunctionCallbackInfo<v8::Value>& info);
+    static void IndexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& args);
+    static void IndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& args);
 };
 
 }

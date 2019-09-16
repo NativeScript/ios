@@ -622,11 +622,66 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, 
         instanceTemplate->SetHandler(config);
     }
 
+    instanceTemplate->SetIndexedPropertyHandler(IndexedPropertyGetterCallback, IndexedPropertySetterCallback);
+
     Local<v8::Function> emptyInstanceCtorFunc;
     if (!emptyInstanceCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyInstanceCtorFunc)) {
         assert(false);
     }
     return emptyInstanceCtorFunc;
+}
+
+void ArgConverter::IndexedPropertyGetterCallback(uint32_t index, const PropertyCallbackInfo<Value>& args) {
+    Local<Object> thiz = args.This();
+    Isolate* isolate = args.GetIsolate();
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
+    if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
+        return;
+    }
+
+    ObjCDataWrapper* objcDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+    id target = objcDataWrapper->Data();
+    if (![target isKindOfClass:[NSArray class]]) {
+        return;
+    }
+
+    NSArray* array = (NSArray*)target;
+    if (index >= [array count]) {
+        return;
+    }
+
+    id obj = [array objectAtIndex:index];
+    Local<Value> result = ArgConverter::ConvertArgument(isolate, new ObjCDataWrapper(obj));
+    args.GetReturnValue().Set(result);
+}
+
+void ArgConverter::IndexedPropertySetterCallback(uint32_t index, Local<Value> value, const PropertyCallbackInfo<Value>& args) {
+    Local<Object> thiz = args.This();
+    Isolate* isolate = args.GetIsolate();
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
+    if (wrapper == nullptr && wrapper->Type() != WrapperType::ObjCObject) {
+        return;
+    }
+
+    ObjCDataWrapper* objcDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+    id target = objcDataWrapper->Data();
+    if (![target isKindOfClass:[NSMutableArray class]]) {
+        return;
+    }
+
+    NSMutableArray* array = (NSMutableArray*)target;
+    if (index >= [array count]) {
+        return;
+    }
+
+    BaseDataWrapper* itemWrapper = tns::GetValue(isolate, value);
+    if (itemWrapper == nullptr || itemWrapper->Type() != WrapperType::ObjCObject) {
+        return;
+    }
+
+    ObjCDataWrapper* objcItemDataWrapper = static_cast<ObjCDataWrapper*>(itemWrapper);
+    id item = objcItemDataWrapper->Data();
+    [target replaceObjectAtIndex:index withObject:item];
 }
 
 void ArgConverter::FindMethodOverloads(Class klass, std::string methodName, MemberType type, std::vector<const MethodMeta*>& overloads) {
