@@ -1649,7 +1649,11 @@
 				C2DDEB7C229EAC8200345BFE /* Runtime.mm */,
 				C2DDEB74229EAC8200345BFE /* SetTimeout.h */,
 				C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */,
+				C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */,
+				C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */,
 				C2DDEB87229EAC8300345BFE /* StringHasher.h */,
+				C2F4D0AC232F85E20008A2EB /* SymbolIterator.h */,
+				C2F4D0AB232F85E20008A2EB /* SymbolIterator.mm */,
 				C2DDEB7F229EAC8200345BFE /* SymbolLoader.h */,
 				C2DDEB75229EAC8200345BFE /* SymbolLoader.mm */,
 				C2DDEB76229EAC8200345BFE /* Tasks.h */,
@@ -1659,10 +1663,6 @@
 				C22C092122CA3F370080D176 /* Worker.h */,
 				C22C092022CA3F370080D176 /* Worker.mm */,
 				C23E8F7422CDE88D0078FD4C /* WorkerWrapper.cpp */,
-				C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */,
-				C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */,
-				C2F4D0AC232F85E20008A2EB /* SymbolIterator.h */,
-				C2F4D0AB232F85E20008A2EB /* SymbolIterator.mm */,
 			);
 			path = runtime;
 			sourceTree = "<group>";
