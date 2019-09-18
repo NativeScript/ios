@@ -207,9 +207,8 @@ void Runtime::DefinePerformanceObject(Isolate* isolate, Local<ObjectTemplate> gl
     Local<FunctionTemplate> nowFuncTemplate = FunctionTemplate::New(isolate, PerformanceNowCallback);
     performanceTemplate->Set(tns::ToV8String(isolate, "now"), nowFuncTemplate);
 
-    const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     Local<v8::String> performancePropertyName = ToV8String(isolate, "performance");
-    globalTemplate->Set(performancePropertyName, performanceTemplate, readOnlyFlags);
+    globalTemplate->Set(performancePropertyName, performanceTemplate);
 }
 
 void Runtime::PerformanceNowCallback(const FunctionCallbackInfo<Value>& args) {
