@@ -19,21 +19,20 @@
 using namespace v8;
 using namespace std;
 
-#ifdef DEBUG
 #include "v8-inspector-platform.h"
 #include "JsV8InspectorClient.h"
-#endif
 
 namespace tns {
 
 SimpleAllocator allocator_;
 
-void Runtime::Initialize(void* metadataPtr, const char* nativesPtr, size_t nativesSize, const char* snapshotPtr, size_t snapshotSize) {
+void Runtime::Initialize(void* metadataPtr, const char* nativesPtr, size_t nativesSize, const char* snapshotPtr, size_t snapshotSize, bool isDebug) {
     MetaFile::setInstance(metadataPtr);
     nativesPtr_ = nativesPtr;
     nativesSize_ = nativesSize;
     snapshotPtr_ = snapshotPtr;
     snapshotSize_ = snapshotSize;
+    isDebug_ = isDebug;
 }
 
 Runtime::Runtime() {
@@ -47,11 +46,11 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
     printf("Runtime initialization took %llims\n", duration);
 
-#ifdef DEBUG
-    v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_, baseDir);
-    inspectorClient->init();
-    inspectorClient->connect();
-#endif
+    if (isDebug_) {
+        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_, baseDir);
+        inspectorClient->init();
+        inspectorClient->connect();
+    }
 
     {
         Isolate* isolate = this->GetIsolate();
@@ -71,12 +70,9 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
 
 void Runtime::Init(const string& baseDir) {
     if (!mainThreadInitialized_) {
-        Runtime::platform_ =
-#ifdef DEBUG
-            v8_inspector::V8InspectorPlatform::CreateDefaultPlatform();
-#else
-            platform::NewDefaultPlatform().release();
-#endif
+        Runtime::platform_ = isDebug_
+            ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
+            : platform::NewDefaultPlatform().release();
 
         V8::InitializePlatform(Runtime::platform_);
         V8::Initialize();
@@ -121,7 +117,7 @@ void Runtime::Init(const string& baseDir) {
     baseDir_ = baseDir;
     DefineGlobalObject(context);
     DefineCollectFunction(context);
-    Console::Init(isolate);
+    Console::Init(isolate, isDebug_);
     this->moduleInternal_.Init(isolate, baseDir);
 
     ArgConverter::Init(isolate, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);
@@ -233,6 +229,7 @@ void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplat
 }
 
 Platform* Runtime::platform_ = nullptr;
+bool Runtime::isDebug_ = false;
 const char* Runtime::nativesPtr_ = nullptr;
 size_t Runtime::nativesSize_ = 0;
 const char* Runtime::snapshotPtr_ = nullptr;

@@ -2,7 +2,7 @@
 
 @interface NativeScript : NSObject
 
-+ (void)start:(void*)metadataPtr fromApplicationPath:(NSString*)path fromNativesPtr:(const char*)nativesPtr fromNativesSize:(size_t)nativesSize fromSnapshotPtr:(const char*)snapshotPtr fromSnapshotSize:(size_t)snapshotSize;
++ (void)start:(void*)metadataPtr fromApplicationPath:(NSString*)path fromNativesPtr:(const char*)nativesPtr fromNativesSize:(size_t)nativesSize fromSnapshotPtr:(const char*)snapshotPtr fromSnapshotSize:(size_t)snapshotSize isDebug:(bool)value;
 + (bool)liveSync;
 
 @end

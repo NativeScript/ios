@@ -1,14 +1,13 @@
 #include "Console.h"
 #include "Helpers.h"
-#ifdef DEBUG
 #include "v8-log-agent-impl.h"
-#endif
 
 using namespace v8;
 
 namespace tns {
 
-void Console::Init(Isolate* isolate) {
+void Console::Init(Isolate* isolate, bool isDebug) {
+    isDebug_ = isDebug;
     Local<Context> context = isolate->GetCurrentContext();
     Context::Scope context_scope(context);
     Local<Object> console = Object::New(isolate);
@@ -30,9 +29,9 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     Local<Value> value = args[0];
     Isolate* isolate = args.GetIsolate();
     std::string str = tns::ToString(isolate, value);
-#ifdef DEBUG
-    v8_inspector::V8LogAgentImpl::EntryAdded(str, "info", "", 0);
-#endif
+    if (isDebug_) {
+        v8_inspector::V8LogAgentImpl::EntryAdded(str, "info", "", 0);
+    }
     printf("%s", str.c_str());
 }
 
@@ -50,5 +49,7 @@ void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const s
         assert(false);
     }
 }
+
+bool Console::isDebug_ = false;
 
 }

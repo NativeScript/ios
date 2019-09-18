@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 ARM64_OUT="aarch64-apple-darwin13"
 export CC="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -arch arm64 -fembed-bitcode -miphoneos-version-min=10.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS12.2.sdk"

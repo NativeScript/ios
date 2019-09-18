@@ -59,7 +59,6 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
 }
 
 Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, BaseDataWrapper* wrapper) {
-    // TODO: Check the actual DataWrapper type
     if (wrapper == nullptr) {
         return Null(isolate);
     }

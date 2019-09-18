@@ -24,7 +24,7 @@ public:
         return this->baseDir_;
     }
 
-    static void Initialize(void* metadataPtr, const char* nativesPtr, size_t nativesSize, const char* snapshotPtr, size_t snapshotSize);
+    static void Initialize(void* metadataPtr, const char* nativesPtr, size_t nativesSize, const char* snapshotPtr, size_t snapshotSize, bool isDebug);
 
     static Runtime* GetCurrentRuntime() {
         return currentRuntime_;
@@ -36,6 +36,7 @@ private:
     static size_t nativesSize_;
     static const char* snapshotPtr_;
     static size_t snapshotSize_;
+    static bool isDebug_;
 
     static thread_local Runtime* currentRuntime_;
 

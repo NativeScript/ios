@@ -1,4 +1,5 @@
 #include "FFICall.h"
+#include "ArgConverter.h"
 #include <sstream>
 
 namespace tns {
@@ -69,9 +70,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
         }
         case BinaryTypeEncodingType::StructDeclarationReference: {
             const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
-            const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-            // TODO: cache metadata
-            const Meta* meta = globalTable->findMeta(structName);
+            const Meta* meta = ArgConverter::GetMeta(structName);
             assert(meta->type() == MetaType::Struct);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
 

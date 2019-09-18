@@ -20,12 +20,20 @@ int main(int argc, char *argv[]) {
 
         NSString* applicationPath = [[NSBundle mainBundle] resourcePath];
 
+        bool isDebug =
+#ifdef DEBUG
+            true;
+#else
+            false;
+#endif
+
         [NativeScript start:metadataPtr
                       fromApplicationPath:applicationPath
                       fromNativesPtr:startNativesPtr
                       fromNativesSize:nativesSize
                       fromSnapshotPtr:startSnapshotPtr
-                      fromSnapshotSize:snapshotSize];
+                      fromSnapshotSize:snapshotSize
+                      isDebug:isDebug];
 
         return 0;
     }

@@ -2623,6 +2623,7 @@
 				HEADER_SEARCH_PATHS = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LIBRARY_SEARCH_PATHS = "";
+				OTHER_CFLAGS = "-fembed-bitcode";
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2640,6 +2641,7 @@
 				HEADER_SEARCH_PATHS = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LIBRARY_SEARCH_PATHS = "";
+				OTHER_CFLAGS = "-fembed-bitcode";
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2756,11 +2758,6 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				EXCLUDED_SOURCE_FILE_NAMES = "";
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/NativeScript/lib",
-				);
 				GCC_C_LANGUAGE_STANDARD = c11;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
@@ -2784,6 +2781,7 @@
 					"-Wall",
 					"-Werror",
 					"-Wno-documentation",
+					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
 					"-Wl,-dead_strip",
@@ -2835,11 +2833,6 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				EXCLUDED_SOURCE_FILE_NAMES = (
-					"$(SRCROOT)/NativeScript/inspector/*",
-					"$(SRCROOT)/NativeScript/inspector/src/inspector/*",
-					"$(SRCROOT)/NativeScript/inspector/src/inspector/protocol/*",
-				);
 				GCC_C_LANGUAGE_STANDARD = c11;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"'NATIVESCRIPT_VERSION=6.2.0-alpha.2-v8'",
@@ -2860,12 +2853,11 @@
 					"-Wall",
 					"-Werror",
 					"-Wno-documentation",
+					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
 					"-Wl,-dead_strip",
 					"-Wl,-search_paths_first",
-					"-Werror",
-					"-Wall",
 					"-fno-builtin-stpcpy",
 					"-fno-rtti",
 					"-mstackrealign",
@@ -2875,6 +2867,7 @@
 					MobileCoreServices,
 					"-L\"$(SRCROOT)/NativeScript/lib\"",
 					"-lffi",
+					"-linspector_protocol",
 					"-ltorque_generated_initializers",
 					"-lv8_base_without_compiler",
 					"-lv8_compiler",

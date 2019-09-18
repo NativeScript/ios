@@ -52,12 +52,20 @@ int main(int argc, char *argv[]) {
         const char* endSnapshotPtr = &endOfSnapshotSection;
         size_t snapshotSize = endSnapshotPtr - startSnapshotPtr;
 
+        bool isDebug =
+#ifdef DEBUG
+            true;
+#else
+            false;
+#endif
+
         [NativeScript start:metadataPtr
                       fromApplicationPath:applicationPath
                       fromNativesPtr:startNativesPtr
                       fromNativesSize:nativesSize
                       fromSnapshotPtr:startSnapshotPtr
-                      fromSnapshotSize:snapshotSize];
+                      fromSnapshotSize:snapshotSize
+                      isDebug:isDebug];
 
         return 0;
     }

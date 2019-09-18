@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 OUTPUT_DIR="dist/npm"
 rm -rf "$OUTPUT_DIR"
