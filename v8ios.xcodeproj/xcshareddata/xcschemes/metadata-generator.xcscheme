@@ -91,7 +91,7 @@
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "-mios-simulator-version-min=10.0"
+            argument = "-mios-simulator-version-min=9.0"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
