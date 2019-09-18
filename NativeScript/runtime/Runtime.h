@@ -26,6 +26,14 @@ public:
 
     static void Initialize(void* metadataPtr, const char* nativesPtr, size_t nativesSize, const char* snapshotPtr, size_t snapshotSize, bool isDebug);
 
+    static bool IsDebug() {
+        return isDebug_;
+    }
+
+    static void SetIsDebug(bool value) {
+        isDebug_ = value;
+    }
+
     static Runtime* GetCurrentRuntime() {
         return currentRuntime_;
     }
