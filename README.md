@@ -1,36 +1,36 @@
 # Overview
 
-POC showing the V8 engine running in an iOS application. Currently only the x86_64 and arm64 architectures are supported.
+POC showing the [{N} iOS runtime](https://github.com/NativeScript/ios-runtime) running with the V8 engine.
+
+Supported architectures:
+
+ - x86_64
+ - arm64
+
+iOS deployment target:
+ - 9.0
 
 The `--jitless` mode in which V8 is running is explained in the following [document](https://docs.google.com/document/d/1YYU17VqFMBeSJ8whCqXknOGXtXDVDLulchsTkmi0YdI/edit#heading=h.mz26kq2dsu6k)
 
-The sample iOS application runs the [Octane 2.0 Benchmark](https://github.com/chromium/octane) and outputs the results.
-
 # Building V8
 
-In order to build the V8 engine for iOS and produce static libraries follow those steps:
+In order to build the V8 engine for iOS and produce the static libraries used in this project follow those steps:
 
-* Get [depot_tools](https://www.chromium.org/developers/how-tos/install-depot-tools)
+1. Get [depot_tools](https://www.chromium.org/developers/how-tos/install-depot-tools)
 
 ```
 git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
 export PATH=`pwd`/depot_tools:"$PATH"
 ```
 
-* `fetch v8` (this will create a `v8` repo folder automatically checking out the `master` branch)
+2. `fetch v8` (this will create a `v8` repo folder automatically checking out the `master` branch)
 
-* Apply patches: `apply_patch.sh`
+3. Apply patches: `apply_patch.sh`
 
-* Run `build.sh`
+4. Run `build_v8.sh`
 
 The compiled fat static libraries will be placed inside the `v8/dist` folder.
 
-# Octane Benchmark Results
+# Building a Distribution Package
 
-Using the Octane benchmark we have compared the performance of V8 against JSC used in the [ios-runtime](https://github.com/NativeScript/ios-runtime).
-
-The tests have been executed on an iPhone 7 (iOS version 11.2.1)
-
-| V8 | JSC |
-| --- | --- |
-| 1843 | 1507 |
+Use the `build_all.sh` script included in this repository to produce the `dist/npm/tns-ios-{version}.tgz` NPM package.
