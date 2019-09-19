@@ -1,4 +1,4 @@
-#include <CoreFoundation/CoreFoundation.h>
+#include <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 #include <fstream>
 #include <codecvt>
@@ -7,8 +7,6 @@
 #include "Helpers.h"
 
 using namespace v8;
-
-extern "C" void NSLogv(CFStringRef format, va_list args);
 
 Local<String> tns::ToV8String(Isolate* isolate, std::string value) {
     return v8::String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal, (int)value.length()).ToLocalChecked();
@@ -238,17 +236,16 @@ void tns::ExecuteOnMainThread(std::function<void ()> func, bool async) {
     }
 }
 
-void tns::Log(Isolate* isolate, TryCatch& tc) {
+void tns::LogError(Isolate* isolate, TryCatch& tc) {
     if (!tc.HasCaught()) {
         return;
     }
 
-    Local<Value> exception = tc.Exception();
-    std::string exceptionString = tns::ToString(isolate, exception);
-    tns::Log("%s", exceptionString.c_str());
+    NSLog(@"Native stack trace:");
+    NSLog(@"%@", [NSThread callStackSymbols]);
 
-    Local<Context> context = isolate->GetCurrentContext();
     Local<Value> stack;
+    Local<Context> context = isolate->GetCurrentContext();
     bool success = tc.StackTrace(context).ToLocal(&stack);
     if (!success || stack.IsEmpty()) {
         return;
@@ -260,15 +257,16 @@ void tns::Log(Isolate* isolate, TryCatch& tc) {
         return;
     }
 
-    std::string stackStr = tns::ToString(isolate, stackV8Str);
-    tns::Log("%s", stackStr.c_str());
+    std::string stackTraceStr = tns::ToString(isolate, stackV8Str);
+
+    NSLog(@"JavaScript error:");
+    tns::Log("%s", stackTraceStr.c_str());
 }
 
 void tns::Log(const char* format, ...) {
     va_list vargs;
     va_start(vargs, format);
-    CFStringRef formatStr = CFStringCreateWithCString(kCFAllocatorDefault, format, kCFStringEncodingUTF8);
+    NSString* formatStr = [NSString stringWithUTF8String:format];
     NSLogv(formatStr, vargs);
     va_end(vargs);
-    CFRelease(formatStr);
 }

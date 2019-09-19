@@ -347,7 +347,7 @@
 		C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB7A229EAC8200345BFE /* ArrayAdapter.mm */; };
 		C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB7B229EAC8200345BFE /* Runtime.h */; };
 		C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB7C229EAC8200345BFE /* Runtime.mm */; };
-		C2DDEBA6229EAC8300345BFE /* Helpers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB7D229EAC8200345BFE /* Helpers.cpp */; };
+		C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB7D229EAC8200345BFE /* Helpers.mm */; };
 		C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB7E229EAC8200345BFE /* ClassBuilder.h */; };
 		C2DDEBA8229EAC8300345BFE /* SymbolLoader.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB7F229EAC8200345BFE /* SymbolLoader.h */; };
 		C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB81229EAC8200345BFE /* ModuleInternal.mm */; };
@@ -856,7 +856,7 @@
 		C2DDEB7A229EAC8200345BFE /* ArrayAdapter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ArrayAdapter.mm; sourceTree = "<group>"; };
 		C2DDEB7B229EAC8200345BFE /* Runtime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Runtime.h; sourceTree = "<group>"; };
 		C2DDEB7C229EAC8200345BFE /* Runtime.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Runtime.mm; sourceTree = "<group>"; };
-		C2DDEB7D229EAC8200345BFE /* Helpers.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Helpers.cpp; sourceTree = "<group>"; };
+		C2DDEB7D229EAC8200345BFE /* Helpers.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Helpers.mm; sourceTree = "<group>"; };
 		C2DDEB7E229EAC8200345BFE /* ClassBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ClassBuilder.h; sourceTree = "<group>"; };
 		C2DDEB7F229EAC8200345BFE /* SymbolLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SymbolLoader.h; sourceTree = "<group>"; };
 		C2DDEB81229EAC8200345BFE /* ModuleInternal.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ModuleInternal.mm; sourceTree = "<group>"; };
@@ -1623,7 +1623,7 @@
 				C266569D22B282BA00EE15CC /* FunctionReference.h */,
 				C266569C22B282BA00EE15CC /* FunctionReference.cpp */,
 				C2DDEB6D229EAC8200345BFE /* Helpers.h */,
-				C2DDEB7D229EAC8200345BFE /* Helpers.cpp */,
+				C2DDEB7D229EAC8200345BFE /* Helpers.mm */,
 				C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */,
 				C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */,
 				C2DDEB65229EAC8100345BFE /* Interop.h */,
@@ -2296,7 +2296,7 @@
 				C247C38E22F828E3001D2CA2 /* string-16.cc in Sources */,
 				C23E8F7622CDE88D0078FD4C /* WorkerWrapper.cpp in Sources */,
 				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,
-				C2DDEBA6229EAC8300345BFE /* Helpers.cpp in Sources */,
+				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,
 				C247C39322F828E3001D2CA2 /* v8-inspector-session-impl.cc in Sources */,
 				C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */,
 				C2F4D0AD232F85E20008A2EB /* SymbolIterator.mm in Sources */,

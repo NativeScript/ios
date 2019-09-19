@@ -43,7 +43,7 @@ static Runtime* runtime_ = nullptr;
     success = liveSyncFunc->Call(context, v8::Undefined(isolate), 0, args).ToLocal(&result);
     if (!success || tc.HasCaught()) {
         if (tc.HasCaught()) {
-            tns::Log(isolate, tc);
+            tns::LogError(isolate, tc);
         }
         return false;
     }

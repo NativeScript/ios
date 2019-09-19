@@ -42,14 +42,14 @@ void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
     Local<Script> script;
     TryCatch tc(isolate);
     if (!Script::Compile(context, tns::ToV8String(isolate, requireFactoryScript.c_str())).ToLocal(&script) && tc.HasCaught()) {
-        tns::Log(isolate, tc);
+        tns::LogError(isolate, tc);
         assert(false);
     }
     assert(!script.IsEmpty());
 
     Local<Value> result;
     if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
-        tns::Log(isolate, tc);
+        tns::LogError(isolate, tc);
         assert(false);
     }
     assert(!result.IsEmpty() && result->IsFunction());
@@ -201,7 +201,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     TryCatch tc(isolate);
     Local<v8::Function> moduleFunc = script->Run(context).ToLocalChecked().As<v8::Function>();
     if (tc.HasCaught()) {
-        tns::Log(isolate, tc);
+        tns::LogError(isolate, tc);
         assert(false);
     }
 
@@ -218,7 +218,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     Local<Value> result;
     if (!moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs).ToLocal(&result)) {
         if (tc.HasCaught()) {
-            tns::Log(isolate, tc);
+            tns::LogError(isolate, tc);
         }
         assert(false);
     }
@@ -281,7 +281,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pa
     bool success = ScriptCompiler::Compile(context, &source, options).ToLocal(&script);
     if (!success || tc.HasCaught()) {
         if (tc.HasCaught()) {
-            tns::Log(isolate, tc);
+            tns::LogError(isolate, tc);
         }
         assert(false);
     }
@@ -443,11 +443,9 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
     Local<UnboundScript> unboundScript = script->GetUnboundScript();
     ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
 
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        int length = cachedData->length;
-        std::string cachePath = GetCacheFileName(path + ".cache");
-        tns::WriteBinary(cachePath, cachedData->data, length);
-    });
+    int length = cachedData->length;
+    std::string cachePath = GetCacheFileName(path + ".cache");
+    tns::WriteBinary(cachePath, cachedData->data, length);
 }
 
 std::string ModuleInternal::GetCacheFileName(const std::string& path) {

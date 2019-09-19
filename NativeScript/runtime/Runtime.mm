@@ -60,7 +60,7 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
 
         if (tc.HasCaught()) {
             HandleScope scope(this->GetIsolate());
-            tns::Log(isolate, tc);
+            tns::LogError(isolate, tc);
             assert(false);
         }
     }

@@ -32,7 +32,7 @@ bool IsBool(v8::Local<v8::Value> value);
 
 void ExecuteOnMainThread(std::function<void ()> func, bool async = true);
 
-void Log(v8::Isolate* isolate, v8::TryCatch& tc);
+void LogError(v8::Isolate* isolate, v8::TryCatch& tc);
 void Log(const char* format, ...);
 
 }
