@@ -8,6 +8,8 @@
 
 using namespace v8;
 
+static std::map<Isolate*, Persistent<v8::Function>*> isolateToPersistentSmartJSONStringify = std::map<Isolate*, Persistent<v8::Function>*>();
+
 Local<String> tns::ToV8String(Isolate* isolate, std::string value) {
     return v8::String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal, (int)value.length()).ToLocalChecked();
 }
@@ -269,4 +271,99 @@ void tns::Log(const char* format, ...) {
     NSString* formatStr = [NSString stringWithUTF8String:format];
     NSLogv(formatStr, vargs);
     va_end(vargs);
+}
+
+Local<v8::String> tns::JsonStringifyObject(Isolate* isolate, Local<Value> value, bool handleCircularReferences) {
+    if (value.IsEmpty()) {
+        return v8::String::Empty(isolate);
+    }
+
+    Local<Context> context = isolate->GetCurrentContext();
+    if (handleCircularReferences) {
+        Local<v8::Function> smartJSONStringifyFunction = tns::GetSmartJSONStringifyFunction(isolate);
+
+        if (!smartJSONStringifyFunction.IsEmpty()) {
+            if (value->IsObject()) {
+                Local<Value> resultValue;
+                TryCatch tc(isolate);
+
+                Local<Value> args[] = {
+                    value->ToObject(context).ToLocalChecked()
+                };
+                bool success = smartJSONStringifyFunction->Call(context, v8::Undefined(isolate), 1, args).ToLocal(&resultValue);
+
+                if (success && !tc.HasCaught()) {
+                    return resultValue->ToString(context).ToLocalChecked();
+                }
+            }
+        }
+    }
+
+    Local<v8::String> resultString;
+    TryCatch tc(isolate);
+    bool success = v8::JSON::Stringify(context, value->ToObject(context).ToLocalChecked()).ToLocal(&resultString);
+
+    if (!success && tc.HasCaught()) {
+        tns::LogError(isolate, tc);
+        return Local<v8::String>();
+    }
+
+    return resultString;
+}
+
+Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
+    auto it = isolateToPersistentSmartJSONStringify.find(isolate);
+    if (it != isolateToPersistentSmartJSONStringify.end()) {
+        auto smartStringifyPersistentFunction = it->second;
+
+        return smartStringifyPersistentFunction->Get(isolate);
+    }
+
+    std::string smartStringifyFunctionScript =
+        "(function () {\n"
+        "    function smartStringify(object) {\n"
+        "        const seen = [];\n"
+        "        var replacer = function (key, value) {\n"
+        "            if (value != null && typeof value == \"object\") {\n"
+        "                if (seen.indexOf(value) >= 0) {\n"
+        "                    if (key) {\n"
+        "                        return \"[Circular]\";\n"
+        "                    }\n"
+        "                    return;\n"
+        "                }\n"
+        "                seen.push(value);\n"
+        "            }\n"
+        "            return value;\n"
+        "        };\n"
+        "        return JSON.stringify(object, replacer, 2);\n"
+        "    }\n"
+        "    return smartStringify;\n"
+        "})();";
+
+    Local<v8::String> source = tns::ToV8String(isolate, smartStringifyFunctionScript);
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Script> script;
+    bool success = Script::Compile(context, source).ToLocal(&script);
+    assert(success);
+
+    if (script.IsEmpty()) {
+        return Local<v8::Function>();
+    }
+
+    Local<Value> result;
+    success = script->Run(context).ToLocal(&result);
+    assert(success);
+
+    if (result.IsEmpty() && !result->IsFunction()) {
+        return Local<v8::Function>();
+    }
+
+    Local<v8::Function> smartStringifyFunction = result.As<v8::Function>();
+
+    Persistent<v8::Function>* smartStringifyPersistentFunction = new Persistent<v8::Function>(isolate, smartStringifyFunction);
+
+    isolateToPersistentSmartJSONStringify.insert(std::make_pair(isolate, smartStringifyPersistentFunction));
+
+    return smartStringifyPersistentFunction->Get(isolate);
 }
