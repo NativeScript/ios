@@ -122,7 +122,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         TryCatch tc(isolate);
         Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
         if (!callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result)) {
-            printf("%s\n", tns::ToString(isolate, tc.Exception()).c_str());
+            tns::Log(isolate, tc);
             assert(false);
         }
 

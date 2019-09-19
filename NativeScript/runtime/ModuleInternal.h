@@ -21,6 +21,9 @@ private:
     v8::Local<v8::Object> LoadData(v8::Isolate* isolate, const std::string& modulePath);
     std::string ResolvePath(v8::Isolate* isolate, const std::string& baseDir, const std::string& moduleName);
     std::string ResolvePathFromPackageJson(const std::string& packageJson, bool& error);
+    v8::ScriptCompiler::CachedData* LoadScriptCache(const std::string& path);
+    void SaveScriptCache(const v8::Local<v8::Script> script, const std::string& path);
+    std::string GetCacheFileName(const std::string& path);
 
     std::string baseDir_;
     v8::Persistent<v8::Function>* requireFunction_;

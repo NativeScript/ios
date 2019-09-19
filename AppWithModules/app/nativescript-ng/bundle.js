@@ -293,8 +293,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _app_app_module__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./app/app.module.ts");
 
             __webpack_require__("../node_modules/nativescript-dev-webpack/load-application-css-angular.js")();
-            
-            
+
+
         if (true) {
             const hmrUpdate = __webpack_require__("../node_modules/nativescript-dev-webpack/hmr/index.js").hmrUpdate;
             global.__initialHmrUpdate = true;
@@ -318,10 +318,10 @@ __webpack_require__.r(__webpack_exports__);
                 global.__initialHmrUpdate = false;
             })
         }
-        
-            
+
+
         __webpack_require__("../node_modules/tns-core-modules/bundle-entry-points.js");
-        
+
 
 var options_Generated = {};
 
@@ -349,9 +349,9 @@ if (true) {
 // that sets up a NativeScript application and can bootstrap the Angular framework.
 nativescript_angular_platform__WEBPACK_IMPORTED_MODULE_0__["platformNativeScriptDynamic"](Object.assign({}, options_Generated)).bootstrapModule(_app_app_module__WEBPACK_IMPORTED_MODULE_1__["AppModule"]);
 
-    
-        
-        
+
+
+
 /* WEBPACK VAR INJECTION */}.call(this, __webpack_require__("../node_modules/webpack/buildin/global.js")))
 
 /***/ }),
@@ -359,7 +359,7 @@ nativescript_angular_platform__WEBPACK_IMPORTED_MODULE_0__["platformNativeScript
 /***/ "./package.json":
 /***/ (function(module) {
 
-module.exports = {"main":"main.js","android":{"v8Flags":"--expose_gc"}};
+module.exports = {"main":"main.js","profiling":"timeline"};
 
 /***/ })
 

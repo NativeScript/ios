@@ -4,7 +4,7 @@ module.exports =
 /***/ "./package.json":
 /***/ (function(module) {
 
-module.exports = {"main":"main.js","android":{"v8Flags":"--expose_gc"}};
+module.exports = {"main":"main.js","profiling":"timeline"};
 
 /***/ })
 

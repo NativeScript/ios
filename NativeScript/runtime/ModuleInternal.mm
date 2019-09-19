@@ -8,6 +8,8 @@ using namespace v8;
 
 namespace tns {
 
+static constexpr bool USE_CODE_CACHE = true;
+
 template <mode_t mode>
 static mode_t stat(NSString* path) {
     struct stat statbuf;
@@ -40,14 +42,14 @@ void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
     Local<Script> script;
     TryCatch tc(isolate);
     if (!Script::Compile(context, tns::ToV8String(isolate, requireFactoryScript.c_str())).ToLocal(&script) && tc.HasCaught()) {
-        printf("%s\n", tns::ToString(isolate, tc.Exception()).c_str());
+        tns::Log(isolate, tc);
         assert(false);
     }
     assert(!script.IsEmpty());
 
     Local<Value> result;
     if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
-        printf("%s\n", tns::ToString(isolate, tc.Exception()).c_str());
+        tns::Log(isolate, tc);
         assert(false);
     }
     assert(!result.IsEmpty() && result->IsFunction());
@@ -199,7 +201,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     TryCatch tc(isolate);
     Local<v8::Function> moduleFunc = script->Run(context).ToLocalChecked().As<v8::Function>();
     if (tc.HasCaught()) {
-        printf("%s\n", tns::ToString(isolate, tc.Exception()).c_str());
+        tns::Log(isolate, tc);
         assert(false);
     }
 
@@ -216,7 +218,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     Local<Value> result;
     if (!moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs).ToLocal(&result)) {
         if (tc.HasCaught()) {
-            printf("%s\n", tns::ToString(isolate, tc.Exception()).c_str());
+            tns::Log(isolate, tc);
         }
         assert(false);
     }
@@ -264,16 +266,30 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pa
     std::string fullRequiredModulePathWithSchema = "file://" + path;
     ScriptOrigin origin(tns::ToV8String(isolate, fullRequiredModulePathWithSchema));
     Local<v8::String> scriptText = WrapModuleContent(isolate, path);
-    ScriptCompiler::Source source(scriptText, origin, nullptr);
+    ScriptCompiler::CachedData* cacheData = LoadScriptCache(path);
+    ScriptCompiler::Source source(scriptText, origin, cacheData);
+
+    ScriptCompiler::CompileOptions options = ScriptCompiler::kNoCompileOptions;
+
     TryCatch tc(isolate);
     Local<Script> script;
-    bool success = ScriptCompiler::Compile(context, &source, ScriptCompiler::kNoCompileOptions).ToLocal(&script);
+
+    if (cacheData != nullptr) {
+        options = ScriptCompiler::kConsumeCodeCache;
+    }
+
+    bool success = ScriptCompiler::Compile(context, &source, options).ToLocal(&script);
     if (!success || tc.HasCaught()) {
         if (tc.HasCaught()) {
-            printf("%s\n", tns::ToString(isolate, tc.Exception()).c_str());
+            tns::Log(isolate, tc);
         }
         assert(false);
     }
+
+    if (cacheData == nullptr) {
+        SaveScriptCache(script, path);
+    }
+
     return script;
 }
 
@@ -389,6 +405,60 @@ std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packag
     }
 
     return [path UTF8String];
+}
+
+ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& path) {
+    if (!USE_CODE_CACHE) {
+        return nullptr;
+    }
+
+    long length = 0;
+    std::string cachePath = GetCacheFileName(path + ".cache");
+
+    struct stat result;
+    if (stat(cachePath.c_str(), &result) == 0) {
+        auto cacheLastModifiedTime = result.st_mtime;
+        if (stat(path.c_str(), &result) == 0) {
+            auto jsLastModifiedTime = result.st_mtime;
+            if (jsLastModifiedTime > 0 && cacheLastModifiedTime > 0 && jsLastModifiedTime > cacheLastModifiedTime) {
+                // The javascript file is more recent than the cache file => ignore the cache
+                return nullptr;
+            }
+        }
+    }
+
+    uint8_t* data = tns::ReadBinary(cachePath, length);
+    if (!data) {
+        return nullptr;
+    }
+
+    return new ScriptCompiler::CachedData(data, (int)length, ScriptCompiler::CachedData::BufferOwned);
+}
+
+void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::string& path) {
+    if (!USE_CODE_CACHE) {
+        return;
+    }
+
+    Local<UnboundScript> unboundScript = script->GetUnboundScript();
+    ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        int length = cachedData->length;
+        std::string cachePath = GetCacheFileName(path + ".cache");
+        tns::WriteBinary(cachePath, cachedData->data, length);
+    });
+}
+
+std::string ModuleInternal::GetCacheFileName(const std::string& path) {
+    std::string key = path.substr(baseDir_.size() + 1);
+    std::replace(key.begin(), key.end(), '/', '-');
+
+    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+    NSString* cachesPath = [paths objectAtIndex:0];
+    NSString* result = [cachesPath stringByAppendingPathComponent:[NSString stringWithUTF8String:key.c_str()]];
+
+    return [result UTF8String];
 }
 
 }

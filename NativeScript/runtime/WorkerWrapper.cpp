@@ -178,7 +178,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
             bool success = onErrorFunc->Call(context, v8::Undefined(this->mainIsolate_), 1, args).ToLocal(&result);
             if (!success && tc.HasCaught()) {
                 Local<Value> error = tc.Exception();
-                printf("%s\n", tns::ToString(this->mainIsolate_, error).c_str());
+                tns::Log("%s", tns::ToString(this->mainIsolate_, error).c_str());
                 this->mainIsolate_->ThrowException(error);
             }
         }

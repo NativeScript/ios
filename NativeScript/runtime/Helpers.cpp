@@ -1,10 +1,14 @@
+#include <CoreFoundation/CoreFoundation.h>
 #include <dispatch/dispatch.h>
 #include <fstream>
 #include <codecvt>
 #include <locale>
+#include <stdio.h>
 #include "Helpers.h"
 
 using namespace v8;
+
+extern "C" void NSLogv(CFStringRef format, va_list args);
 
 Local<String> tns::ToV8String(Isolate* isolate, std::string value) {
     return v8::String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal, (int)value.length()).ToLocalChecked();
@@ -63,7 +67,7 @@ bool tns::ToBool(const Local<Value>& value) {
     if (value->IsBooleanObject()) {
         result = value.As<BooleanObject>()->ValueOf();
     } else if (value->IsBoolean()) {
-        result = value.As<Boolean>()->Value();
+        result = value.As<v8::Boolean>()->Value();
     }
 
     return result;
@@ -86,6 +90,41 @@ std::string tns::ReadText(const std::string& file) {
     }
     std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
     return content;
+}
+
+uint8_t* tns::ReadBinary(const std::string path, long& length) {
+    length = 0;
+    std::ifstream ifs(path);
+    if (ifs.fail()) {
+        return nullptr;
+    }
+
+    FILE* file = fopen(path.c_str(), "rb");
+    if (!file) {
+        return nullptr;
+    }
+
+    fseek(file, 0, SEEK_END);
+    length = ftell(file);
+    rewind(file);
+
+    uint8_t* data = new uint8_t[length];
+    fread(data, sizeof(uint8_t), length, file);
+    fclose(file);
+
+    return data;
+}
+
+bool tns::WriteBinary(const std::string& path, const void* data, long length) {
+    FILE* file = fopen(path.c_str(), "wb");
+    if (!file) {
+        return false;
+    }
+
+    size_t writtenBytes = fwrite(data, sizeof(uint8_t), length, file);
+    fclose(file);
+
+    return writtenBytes == length;
 }
 
 void tns::SetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName, const Local<Value>& value) {
@@ -197,4 +236,39 @@ void tns::ExecuteOnMainThread(std::function<void ()> func, bool async) {
             func();
         });
     }
+}
+
+void tns::Log(Isolate* isolate, TryCatch& tc) {
+    if (!tc.HasCaught()) {
+        return;
+    }
+
+    Local<Value> exception = tc.Exception();
+    std::string exceptionString = tns::ToString(isolate, exception);
+    tns::Log("%s", exceptionString.c_str());
+
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> stack;
+    bool success = tc.StackTrace(context).ToLocal(&stack);
+    if (!success || stack.IsEmpty()) {
+        return;
+    }
+
+    Local<v8::String> stackV8Str;
+    success = stack->ToDetailString(context).ToLocal(&stackV8Str);
+    if (!success || stackV8Str.IsEmpty()) {
+        return;
+    }
+
+    std::string stackStr = tns::ToString(isolate, stackV8Str);
+    tns::Log("%s", stackStr.c_str());
+}
+
+void tns::Log(const char* format, ...) {
+    va_list vargs;
+    va_start(vargs, format);
+    CFStringRef formatStr = CFStringCreateWithCString(kCFAllocatorDefault, format, kCFStringEncodingUTF8);
+    NSLogv(formatStr, vargs);
+    va_end(vargs);
+    CFRelease(formatStr);
 }

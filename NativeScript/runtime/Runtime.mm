@@ -55,12 +55,12 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
     {
         Isolate* isolate = this->GetIsolate();
         HandleScope scope(isolate);
-        v8::TryCatch tc(isolate);
+        TryCatch tc(isolate);
         this->moduleInternal_.RunModule(isolate, "./");
 
         if (tc.HasCaught()) {
             HandleScope scope(this->GetIsolate());
-            printf("%s\n", tns::ToString(isolate_, tc.Exception()).c_str());
+            tns::Log(isolate, tc);
             assert(false);
         }
     }

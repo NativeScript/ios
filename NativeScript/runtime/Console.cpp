@@ -26,13 +26,18 @@ void Console::Init(Isolate* isolate, bool isDebug) {
 }
 
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
+    if (!isDebug_) {
+        // Filter console.log statements in release builds
+        return;
+    }
+
     Local<Value> value = args[0];
     Isolate* isolate = args.GetIsolate();
     std::string str = tns::ToString(isolate, value);
     if (isDebug_) {
         v8_inspector::V8LogAgentImpl::EntryAdded(str, "info", "", 0);
     }
-    printf("%s", str.c_str());
+    tns::Log("%s", str.c_str());
 }
 
 void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const std::string name) {

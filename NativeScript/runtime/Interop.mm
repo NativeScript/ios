@@ -1213,7 +1213,13 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
         Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
     }
 
-    ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+    @try {
+        ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+    } @catch (NSException* e) {
+        std::string message = [[e description] UTF8String];
+        tns::ThrowError(isolate, message);
+        return Local<Value>();
+    }
 
     @autoreleasepool {
         Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, marshalToPrimitive, true);
