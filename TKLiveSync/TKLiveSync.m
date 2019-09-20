@@ -59,7 +59,7 @@ static void trySetLiveSyncApplicationPath() {
         return; // Don't change the app root folder
     }
 
-    if (setenv("TNSApplicationPath", liveSyncPath.UTF8String, 0) == -1) {
+    if (setenv("TNSBaseDir", liveSyncPath.UTF8String, 0) == -1) {
         perror("Could not set application path");
     }
 }

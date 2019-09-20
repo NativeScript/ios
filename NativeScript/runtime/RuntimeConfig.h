@@ -2,9 +2,11 @@
 #define RuntimeConfig_h
 
 #include <sys/types.h>
+#include <string>
 
 struct RuntimeConfig {
-    const char* BaseDir;
+    std::string BaseDir;
+    std::string ApplicationPath;
     void* MetadataPtr;
     const char* NativesPtr;
     size_t NativesSize;

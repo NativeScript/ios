@@ -43,7 +43,7 @@ void Runtime::InitAndRunMainScript() {
     printf("Runtime initialization took %llims\n", duration);
 
     if (RuntimeConfig.IsDebug) {
-        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_, RuntimeConfig.BaseDir);
+        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_, RuntimeConfig.ApplicationPath);
         inspectorClient->init();
         inspectorClient->connect();
     }
@@ -112,8 +112,8 @@ void Runtime::Init() {
 
     DefineGlobalObject(context);
     DefineCollectFunction(context);
-    Console::Init(isolate, RuntimeConfig.IsDebug);
-    this->moduleInternal_.Init(isolate, RuntimeConfig.BaseDir);
+    Console::Init(isolate);
+    this->moduleInternal_.Init(isolate);
 
     ArgConverter::Init(isolate, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);
     Interop::RegisterInteropTypes(isolate);
@@ -134,8 +134,7 @@ void Runtime::RunScript(string file, TryCatch& tc) {
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
-    std::string baseDir = RuntimeConfig.BaseDir;
-    std::string filename = baseDir + "/" + file;
+    std::string filename = RuntimeConfig.ApplicationPath + "/" + file;
     string source = tns::ReadText(filename);
     Local<v8::String> script_source = v8::String::NewFromUtf8(isolate, source.c_str(), NewStringType::kNormal).ToLocalChecked();
 

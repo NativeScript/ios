@@ -21,7 +21,7 @@ extern char endOfSnapshotSection __asm("section$end$__DATA$__TNSSnapshot");
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
-        NSString* applicationPath = [[NSBundle mainBundle] resourcePath];
+        NSString* baseDir = [[NSBundle mainBundle] resourcePath];
 
 #ifdef DEBUG
         int refreshRequestSubscription;
@@ -37,8 +37,8 @@ int main(int argc, char *argv[]) {
         });
 
         TNSInitializeLiveSync();
-        if (getenv("TNSApplicationPath")) {
-            applicationPath = @(getenv("TNSApplicationPath"));
+        if (getenv("TNSBaseDir")) {
+            baseDir = @(getenv("TNSBaseDir"));
         }
 #endif
 
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
         config.NativesSize = nativesSize;
         config.SnapshotPtr = startSnapshotPtr;
         config.SnapshotSize = snapshotSize;
-        config.BaseDir = [applicationPath stringByAppendingPathComponent:@"app"];
+        config.BaseDir = baseDir;
 
         [NativeScript start:config];
 

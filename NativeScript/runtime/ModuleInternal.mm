@@ -2,6 +2,7 @@
 #include <string>
 #include <sys/stat.h>
 #include "ModuleInternal.h"
+#include "RuntimeConfig.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -24,9 +25,7 @@ ModuleInternal::ModuleInternal()
     : requireFunction_(nullptr), requireFactoryFunction_(nullptr) {
 }
 
-void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
-    this->baseDir_ = baseDir;
-
+void ModuleInternal::Init(Isolate* isolate) {
     std::string requireFactoryScript =
         "(function() { "
         "    function require_factory(requireInternal, dirName) { "
@@ -59,7 +58,7 @@ void ModuleInternal::Init(Isolate* isolate, const std::string& baseDir) {
     Local<FunctionTemplate> requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
     requireFunction_ = new Persistent<v8::Function>(isolate, requireFuncTemplate->GetFunction(context).ToLocalChecked());
 
-    Local<v8::Function> globalRequire = GetRequireFunction(isolate, baseDir);
+    Local<v8::Function> globalRequire = GetRequireFunction(isolate, RuntimeConfig.ApplicationPath);
     bool success = global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
     assert(success);
 }
@@ -106,9 +105,9 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
             fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
         } else if (moduleName[0] == '~') {
             moduleName = moduleName.substr(2);
-            fullPath = [[NSString stringWithUTF8String:moduleInternal->baseDir_.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            fullPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
         } else {
-            NSString* tnsModulesPath = [[NSString stringWithUTF8String:moduleInternal->baseDir_.c_str()] stringByAppendingPathComponent:@"tns_modules"];
+            NSString* tnsModulesPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:@"tns_modules"];
             fullPath = [tnsModulesPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
             if (!stat<S_IFDIR | S_IFREG>(fullPath) && !stat<S_IFDIR | S_IFREG>([fullPath stringByAppendingPathExtension:@"js"])) {
                 fullPath = [tnsModulesPath stringByAppendingPathComponent:@"tns-core-modules"];
@@ -449,7 +448,7 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
 }
 
 std::string ModuleInternal::GetCacheFileName(const std::string& path) {
-    std::string key = path.substr(baseDir_.size() + 1);
+    std::string key = path.substr(RuntimeConfig.ApplicationPath.size() + 1);
     std::replace(key.begin(), key.end(), '/', '-');
 
     NSArray* paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);

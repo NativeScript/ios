@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
         const char* endSnapshotPtr = &endOfSnapshotSection;
         size_t snapshotSize = endSnapshotPtr - startSnapshotPtr;
 
-        NSString* applicationPath = [[NSBundle mainBundle] resourcePath];
+        NSString* baseDir = [[NSBundle mainBundle] resourcePath];
 
         bool isDebug =
 #ifdef DEBUG
@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
         config.NativesSize = nativesSize;
         config.SnapshotPtr = startSnapshotPtr;
         config.SnapshotSize = snapshotSize;
-        config.BaseDir = [applicationPath stringByAppendingPathComponent:@"app"];
+        config.BaseDir = baseDir;
 
         [NativeScript start:config];
 

@@ -1,9 +1,14 @@
 #include <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
+#include <execinfo.h>
 #include <fstream>
 #include <codecvt>
 #include <locale>
 #include <stdio.h>
+#include <sstream>
+#include <dlfcn.h>
+#include <cxxabi.h>
+#include "RuntimeConfig.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -244,7 +249,7 @@ void tns::LogError(Isolate* isolate, TryCatch& tc) {
     }
 
     NSLog(@"Native stack trace:");
-    NSLog(@"%@", [NSThread callStackSymbols]);
+    LogBacktrace();
 
     Local<Value> stack;
     Local<Context> context = isolate->GetCurrentContext();
@@ -260,6 +265,7 @@ void tns::LogError(Isolate* isolate, TryCatch& tc) {
     }
 
     std::string stackTraceStr = tns::ToString(isolate, stackV8Str);
+    stackTraceStr = ReplaceAll(stackTraceStr, RuntimeConfig.BaseDir, "");
 
     NSLog(@"JavaScript error:");
     tns::Log("%s", stackTraceStr.c_str());
@@ -366,4 +372,50 @@ Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
     isolateToPersistentSmartJSONStringify.insert(std::make_pair(isolate, smartStringifyPersistentFunction));
 
     return smartStringifyPersistentFunction->Get(isolate);
+}
+
+std::string tns::ReplaceAll(const std::string source, std::string find, std::string replacement) {
+    std::string result = source;
+    size_t pos = result.find(find);
+    while (pos != std::string::npos) {
+        result.replace(pos, find.size(), replacement);
+        pos = result.find(find, pos + replacement.size());
+    }
+
+    return result;
+}
+
+void tns::LogBacktrace(int skip) {
+    void *callstack[128];
+    const int nMaxFrames = sizeof(callstack) / sizeof(callstack[0]);
+    char buf[1024];
+    int nFrames = backtrace(callstack, nMaxFrames);
+    char **symbols = backtrace_symbols(callstack, nFrames);
+
+    for (int i = skip; i < nFrames; i++) {
+        Dl_info info;
+        if (dladdr(callstack[i], &info) && info.dli_sname) {
+            char *demangled = NULL;
+            int status = -1;
+            if (info.dli_sname[0] == '_') {
+                demangled = abi::__cxa_demangle(info.dli_sname, NULL, 0, &status);
+            }
+            snprintf(buf,
+                     sizeof(buf),
+                     "%-3d %*p %s + %zd\n",
+                     i,
+                     int(2 + sizeof(void*) * 2),
+                     callstack[i],
+                     status == 0 ? demangled : info.dli_sname == 0 ? symbols[i] : info.dli_sname,
+                     (char *)callstack[i] - (char *)info.dli_saddr);
+            free(demangled);
+        } else {
+            snprintf(buf, sizeof(buf), "%-3d %*p %s\n", i, int(2 + sizeof(void*) * 2), callstack[i], symbols[i]);
+        }
+        NSLog(@"%s", buf);
+    }
+    free(symbols);
+    if (nFrames == nMaxFrames) {
+        NSLog(@"[truncated]");
+    }
 }

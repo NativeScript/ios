@@ -1,13 +1,13 @@
 #include "Console.h"
 #include "Helpers.h"
+#include "RuntimeConfig.h"
 #include "v8-log-agent-impl.h"
 
 using namespace v8;
 
 namespace tns {
 
-void Console::Init(Isolate* isolate, bool isDebug) {
-    isDebug_ = isDebug;
+void Console::Init(Isolate* isolate) {
     Local<Context> context = isolate->GetCurrentContext();
     Context::Scope context_scope(context);
     Local<Object> console = Object::New(isolate);
@@ -18,6 +18,7 @@ void Console::Init(Isolate* isolate, bool isDebug) {
     Console::AttachLogFunction(isolate, console, "info");
     Console::AttachLogFunction(isolate, console, "error");
     Console::AttachLogFunction(isolate, console, "warn");
+    Console::AttachLogFunction(isolate, console, "trace");
 
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -27,7 +28,7 @@ void Console::Init(Isolate* isolate, bool isDebug) {
 }
 
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
-    if (!isDebug_) {
+    if (!RuntimeConfig.IsDebug) {
         // Filter console.log statements in release builds
         return;
     }
@@ -42,11 +43,20 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
 
     std::stringstream ss;
     ss << "CONSOLE " << verbosityLevelUpper << ": " << stringResult;
+
+    if (verbosityLevel == "trace") {
+        Local<StackTrace> stack = StackTrace::CurrentStackTrace(isolate, 10, StackTrace::StackTraceOptions::kDetailed);
+        int framesCount = stack->GetFrameCount();
+        ss << std::endl;
+        for (int i = 0; i < framesCount; i++) {
+            Local<StackFrame> frame = stack->GetFrame(isolate, i);
+            ss << BuildStacktraceFrameMessage(isolate, frame) << std::endl;
+        }
+    }
+
     std::string msgToLog = ss.str();
 
-    if (isDebug_) {
-        v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, "info", "", 0);
-    }
+    v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, "info", "", 0);
     tns::Log("%s", msgToLog.c_str());
 }
 
@@ -71,7 +81,7 @@ std::string Console::BuildStringFromArgs(Isolate* isolate, const FunctionCallbac
 
     if (argLen > 0) {
         for (int i = 0; i < argLen; i++) {
-            v8::Local<v8::String> argString;
+            Local<v8::String> argString;
 
             argString = BuildStringFromArg(isolate, args[i]);
 
@@ -154,6 +164,44 @@ const Local<v8::String> Console::TransformJSObject(Isolate* isolate, Local<Objec
     return resultString;
 }
 
-bool Console::isDebug_ = false;
+const std::string Console::BuildStacktraceFrameLocationPart(Isolate* isolate, Local<StackFrame> frame) {
+    std::stringstream ss;
+
+    Local<v8::String> scriptName = frame->GetScriptNameOrSourceURL();
+    std::string scriptNameStr = tns::ToString(isolate, scriptName);
+    scriptNameStr = tns::ReplaceAll(scriptNameStr, RuntimeConfig.BaseDir, "");
+
+    if (scriptNameStr.length() < 1) {
+        ss << "VM";
+    } else {
+        ss << scriptNameStr << ":" << frame->GetLineNumber() << ":" << frame->GetColumn();
+    }
+
+    std::string stringResult = ss.str();
+
+    return stringResult;
+}
+
+const std::string Console::BuildStacktraceFrameMessage(Isolate* isolate, Local<StackFrame> frame) {
+    std::stringstream ss;
+
+    Local<v8::String> functionName = frame->GetFunctionName();
+    std::string functionNameStr = tns::ToString(isolate, functionName);
+    if (functionNameStr.empty()) {
+        functionNameStr = "<anonymous>";
+    }
+
+    if (frame->IsConstructor()) {
+        ss << "at new " << functionNameStr << " (" << BuildStacktraceFrameLocationPart(isolate, frame) << ")";
+    } else if (frame->IsEval()) {
+        ss << "eval at " << BuildStacktraceFrameLocationPart(isolate, frame) << std::endl;
+    } else {
+        ss << "at " << functionNameStr << " (" << BuildStacktraceFrameLocationPart(isolate, frame) << ")";
+    }
+
+    std::string stringResult = ss.str();
+
+    return stringResult;
+}
 
 }

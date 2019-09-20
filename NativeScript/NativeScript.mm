@@ -24,7 +24,8 @@ using namespace tns;
 static Runtime* runtime_ = nullptr;
 
 + (void)start:(Config*)config {
-    RuntimeConfig.BaseDir = [[config BaseDir] UTF8String];
+    RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
+    RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
     RuntimeConfig.MetadataPtr = [config MetadataPtr];
     RuntimeConfig.NativesPtr = [config NativesPtr];
     RuntimeConfig.NativesSize = [config NativesSize];

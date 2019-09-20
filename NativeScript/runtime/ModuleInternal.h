@@ -9,7 +9,7 @@ namespace tns {
 class ModuleInternal {
 public:
     ModuleInternal();
-    void Init(v8::Isolate* isolate, const std::string& baseDir);
+    void Init(v8::Isolate* isolate);
     void RunModule(v8::Isolate* isolate, std::string path);
 private:
     static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -25,7 +25,6 @@ private:
     void SaveScriptCache(const v8::Local<v8::Script> script, const std::string& path);
     std::string GetCacheFileName(const std::string& path);
 
-    std::string baseDir_;
     v8::Persistent<v8::Function>* requireFunction_;
     v8::Persistent<v8::Function>* requireFactoryFunction_;
     std::unordered_map<std::string, v8::Persistent<v8::Object>*> loadedModules_;

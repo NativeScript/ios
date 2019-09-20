@@ -33,10 +33,13 @@ bool IsBool(v8::Local<v8::Value> value);
 void ExecuteOnMainThread(std::function<void ()> func, bool async = true);
 
 void LogError(v8::Isolate* isolate, v8::TryCatch& tc);
+void LogBacktrace(int skip = 1);
 void Log(const char* format, ...);
 
 v8::Local<v8::String> JsonStringifyObject(v8::Isolate* isolate, v8::Local<v8::Value> value, bool handleCircularReferences = false);
 v8::Local<v8::Function> GetSmartJSONStringifyFunction(v8::Isolate* isolate);
+
+std::string ReplaceAll(const std::string source, std::string find, std::string replacement);
 
 }
 
