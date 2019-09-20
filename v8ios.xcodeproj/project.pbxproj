@@ -366,6 +366,8 @@
 		C2DDEBDE229EB4A900345BFE /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2DDEBDD229EB4A900345BFE /* app */; };
 		C2F4D0AD232F85E20008A2EB /* SymbolIterator.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F4D0AB232F85E20008A2EB /* SymbolIterator.mm */; };
 		C2F4D0AE232F85E20008A2EB /* SymbolIterator.h in Headers */ = {isa = PBXBuildFile; fileRef = C2F4D0AC232F85E20008A2EB /* SymbolIterator.h */; };
+		C2F4D0CB2334A6E70008A2EB /* RuntimeConfig.h in Headers */ = {isa = PBXBuildFile; fileRef = C2F4D0C92334A6E70008A2EB /* RuntimeConfig.h */; };
+		C2F4D0CD2334B1BC0008A2EB /* RuntimeConfig.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2F4D0CC2334B1BC0008A2EB /* RuntimeConfig.cpp */; };
 		C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F64E8222E870A300EDB057 /* NativeScript.mm */; };
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
 		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
@@ -876,6 +878,8 @@
 		C2F4CBB322C60BFD0036B56F /* metadata-generator */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "metadata-generator"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2F4D0AB232F85E20008A2EB /* SymbolIterator.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = SymbolIterator.mm; sourceTree = "<group>"; };
 		C2F4D0AC232F85E20008A2EB /* SymbolIterator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SymbolIterator.h; sourceTree = "<group>"; };
+		C2F4D0C92334A6E70008A2EB /* RuntimeConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RuntimeConfig.h; sourceTree = "<group>"; };
+		C2F4D0CC2334B1BC0008A2EB /* RuntimeConfig.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RuntimeConfig.cpp; sourceTree = "<group>"; };
 		C2F64E8222E870A300EDB057 /* NativeScript.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScript.mm; sourceTree = "<group>"; };
 		C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InlineFunctions.cpp; sourceTree = "<group>"; };
 		C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InlineFunctions.h; sourceTree = "<group>"; };
@@ -1647,6 +1651,8 @@
 				C266569522AFFFB000EE15CC /* Reference.cpp */,
 				C2DDEB7B229EAC8200345BFE /* Runtime.h */,
 				C2DDEB7C229EAC8200345BFE /* Runtime.mm */,
+				C2F4D0C92334A6E70008A2EB /* RuntimeConfig.h */,
+				C2F4D0CC2334B1BC0008A2EB /* RuntimeConfig.cpp */,
 				C2DDEB74229EAC8200345BFE /* SetTimeout.h */,
 				C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */,
 				C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */,
@@ -1783,6 +1789,7 @@
 				C247C38A22F828E3001D2CA2 /* v8-console-message.h in Headers */,
 				C247C17722F82842001D2CA2 /* ffi.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
+				C2F4D0CB2334A6E70008A2EB /* RuntimeConfig.h in Headers */,
 				C247C16B22F82842001D2CA2 /* v8.h in Headers */,
 				C247C39422F828E3001D2CA2 /* v8-overlay-agent-impl.h in Headers */,
 				C247C33422F828E3001D2CA2 /* bindings.h in Headers */,
@@ -2294,6 +2301,7 @@
 				C247C36522F828E3001D2CA2 /* Overlay.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
 				C247C38E22F828E3001D2CA2 /* string-16.cc in Sources */,
+				C2F4D0CD2334B1BC0008A2EB /* RuntimeConfig.cpp in Sources */,
 				C23E8F7622CDE88D0078FD4C /* WorkerWrapper.cpp in Sources */,
 				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,
 				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,

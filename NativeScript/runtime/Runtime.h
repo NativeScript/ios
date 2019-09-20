@@ -11,8 +11,8 @@ namespace tns {
 class Runtime {
 public:
     Runtime();
-    void Init(const std::string& baseDir);
-    void InitAndRunMainScript(const std::string& baseDir);
+    void Init();
+    void InitAndRunMainScript();
     void RunScript(std::string file, v8::TryCatch& tc);
     v8::Isolate* GetIsolate();
 
@@ -20,33 +20,15 @@ public:
 
     void SetWorkerId(int workerId);
 
-    std::string BaseDir() {
-        return this->baseDir_;
-    }
-
-    static void Initialize(void* metadataPtr, const char* nativesPtr, size_t nativesSize, const char* snapshotPtr, size_t snapshotSize, bool isDebug);
-
-    static bool IsDebug() {
-        return isDebug_;
-    }
-
-    static void SetIsDebug(bool value) {
-        isDebug_ = value;
-    }
+    static void Initialize();
 
     static Runtime* GetCurrentRuntime() {
         return currentRuntime_;
     }
 private:
-    static bool mainThreadInitialized_;
-    static v8::Platform* platform_;
-    static const char* nativesPtr_;
-    static size_t nativesSize_;
-    static const char* snapshotPtr_;
-    static size_t snapshotSize_;
-    static bool isDebug_;
-
     static thread_local Runtime* currentRuntime_;
+    static v8::Platform* platform_;
+    static bool mainThreadInitialized_;
 
     void DefineGlobalObject(v8::Local<v8::Context> context);
     void DefineCollectFunction(v8::Local<v8::Context> context);
@@ -56,7 +38,6 @@ private:
     static void PerformanceNowCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     v8::Isolate* isolate_;
     ModuleInternal moduleInternal_;
-    std::string baseDir_;
     int workerId_;
 };
 

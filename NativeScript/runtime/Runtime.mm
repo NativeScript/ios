@@ -8,6 +8,7 @@
 #include "Interop.h"
 #include "InlineFunctions.h"
 #include "SimpleAllocator.h"
+#include "RuntimeConfig.h"
 #include "Helpers.h"
 #include "Tasks.h"
 #include "WeakRef.h"
@@ -26,28 +27,23 @@ namespace tns {
 
 SimpleAllocator allocator_;
 
-void Runtime::Initialize(void* metadataPtr, const char* nativesPtr, size_t nativesSize, const char* snapshotPtr, size_t snapshotSize, bool isDebug) {
-    MetaFile::setInstance(metadataPtr);
-    nativesPtr_ = nativesPtr;
-    nativesSize_ = nativesSize;
-    snapshotPtr_ = snapshotPtr;
-    snapshotSize_ = snapshotSize;
-    isDebug_ = isDebug;
+void Runtime::Initialize() {
+    MetaFile::setInstance(RuntimeConfig.MetadataPtr);
 }
 
 Runtime::Runtime() {
     currentRuntime_ = this;
 }
 
-void Runtime::InitAndRunMainScript(const string& baseDir) {
+void Runtime::InitAndRunMainScript() {
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-    this->Init(baseDir);
+    this->Init();
     std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
     printf("Runtime initialization took %llims\n", duration);
 
-    if (isDebug_) {
-        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_, baseDir);
+    if (RuntimeConfig.IsDebug) {
+        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_, RuntimeConfig.BaseDir);
         inspectorClient->init();
         inspectorClient->connect();
     }
@@ -68,9 +64,9 @@ void Runtime::InitAndRunMainScript(const string& baseDir) {
     tns::Tasks::Drain();
 }
 
-void Runtime::Init(const string& baseDir) {
+void Runtime::Init() {
     if (!mainThreadInitialized_) {
-        Runtime::platform_ = isDebug_
+        Runtime::platform_ = RuntimeConfig.IsDebug
             ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
             : platform::NewDefaultPlatform().release();
 
@@ -81,13 +77,13 @@ void Runtime::Init(const string& baseDir) {
     }
 
     auto* nativesBlobStartupData = new StartupData();
-    nativesBlobStartupData->data = nativesPtr_;
-    nativesBlobStartupData->raw_size = (int)nativesSize_;
+    nativesBlobStartupData->data = RuntimeConfig.NativesPtr;
+    nativesBlobStartupData->raw_size = (int)RuntimeConfig.NativesSize;
     V8::SetNativesDataBlob(nativesBlobStartupData);
 
     auto* snapshotBlobStartupData = new StartupData();
-    snapshotBlobStartupData->data = snapshotPtr_;
-    snapshotBlobStartupData->raw_size = (int)snapshotSize_;
+    snapshotBlobStartupData->data = RuntimeConfig.SnapshotPtr;
+    snapshotBlobStartupData->raw_size = (int)RuntimeConfig.SnapshotSize;
     V8::SetSnapshotDataBlob(snapshotBlobStartupData);
 
     Isolate::CreateParams create_params;
@@ -114,11 +110,10 @@ void Runtime::Init(const string& baseDir) {
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
 
-    baseDir_ = baseDir;
     DefineGlobalObject(context);
     DefineCollectFunction(context);
-    Console::Init(isolate, isDebug_);
-    this->moduleInternal_.Init(isolate, baseDir);
+    Console::Init(isolate, RuntimeConfig.IsDebug);
+    this->moduleInternal_.Init(isolate, RuntimeConfig.BaseDir);
 
     ArgConverter::Init(isolate, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);
     Interop::RegisterInteropTypes(isolate);
@@ -139,7 +134,8 @@ void Runtime::RunScript(string file, TryCatch& tc) {
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
-    std::string filename = baseDir_ + "/" + file;
+    std::string baseDir = RuntimeConfig.BaseDir;
+    std::string filename = baseDir + "/" + file;
     string source = tns::ReadText(filename);
     Local<v8::String> script_source = v8::String::NewFromUtf8(isolate, source.c_str(), NewStringType::kNormal).ToLocalChecked();
 
@@ -229,11 +225,6 @@ void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplat
 }
 
 Platform* Runtime::platform_ = nullptr;
-bool Runtime::isDebug_ = false;
-const char* Runtime::nativesPtr_ = nullptr;
-size_t Runtime::nativesSize_ = 0;
-const char* Runtime::snapshotPtr_ = nullptr;
-size_t Runtime::snapshotSize_ = 0;
 bool Runtime::mainThreadInitialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;
 

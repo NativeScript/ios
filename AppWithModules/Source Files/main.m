@@ -27,13 +27,16 @@ int main(int argc, char *argv[]) {
             false;
 #endif
 
-        [NativeScript start:metadataPtr
-                      fromApplicationPath:applicationPath
-                      fromNativesPtr:startNativesPtr
-                      fromNativesSize:nativesSize
-                      fromSnapshotPtr:startSnapshotPtr
-                      fromSnapshotSize:snapshotSize
-                      isDebug:isDebug];
+        Config* config = [[Config alloc] init];
+        config.IsDebug = isDebug;
+        config.MetadataPtr = metadataPtr;
+        config.NativesPtr = startNativesPtr;
+        config.NativesSize = nativesSize;
+        config.SnapshotPtr = startSnapshotPtr;
+        config.SnapshotSize = snapshotSize;
+        config.BaseDir = [applicationPath stringByAppendingPathComponent:@"app"];
+
+        [NativeScript start:config];
 
         return 0;
     }

@@ -65,16 +65,15 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
     Local<Object> thiz = info.This();
     std::string workerPath = ToString(isolate, info[0]);
-    std::string baseDir = Runtime::GetCurrentRuntime()->BaseDir();
     // TODO: Validate worker path and call worker.onerror if the script does not exist
 
     WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
     tns::SetValue(isolate, thiz, worker);
     Persistent<Value>* poWorker = ObjectManager::Register(isolate, thiz);
 
-    std::function<Isolate* ()> func([worker, baseDir, workerPath]() {
+    std::function<Isolate* ()> func([worker, workerPath]() {
         tns::Runtime* runtime = new tns::Runtime();
-        runtime->Init(baseDir);
+        runtime->Init();
         runtime->SetWorkerId(worker->WorkerId());
         Isolate* workerIsolate = runtime->GetIsolate();
 

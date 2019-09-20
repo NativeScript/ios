@@ -1,8 +1,20 @@
 #import <Foundation/Foundation.h>
 
+@interface Config : NSObject
+
+@property (nonatomic) NSString* BaseDir;
+@property (nonatomic) void* MetadataPtr;
+@property (nonatomic) const char* NativesPtr;
+@property size_t NativesSize;
+@property (nonatomic) const char* SnapshotPtr;
+@property size_t SnapshotSize;
+@property BOOL IsDebug;
+
+@end
+
 @interface NativeScript : NSObject
 
-+ (void)start:(void*)metadataPtr fromApplicationPath:(NSString*)path fromNativesPtr:(const char*)nativesPtr fromNativesSize:(size_t)nativesSize fromSnapshotPtr:(const char*)snapshotPtr fromSnapshotSize:(size_t)snapshotSize isDebug:(bool)value;
++ (void)start:(Config*)config;
 + (bool)liveSync;
 
 @end

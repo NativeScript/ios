@@ -37,6 +37,7 @@ void Log(const char* format, ...);
 
 v8::Local<v8::String> JsonStringifyObject(v8::Isolate* isolate, v8::Local<v8::Value> value, bool handleCircularReferences = false);
 v8::Local<v8::Function> GetSmartJSONStringifyFunction(v8::Isolate* isolate);
+
 }
 
 #endif /* Helpers_h */

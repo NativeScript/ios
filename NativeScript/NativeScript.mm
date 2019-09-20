@@ -2,22 +2,39 @@
 #include "NativeScript.h"
 #include "runtime/Runtime.h"
 #include "runtime/Helpers.h"
+#include "runtime/RuntimeConfig.h"
 
 using namespace v8;
 using namespace tns;
+
+@implementation Config
+
+@synthesize BaseDir;
+@synthesize MetadataPtr;
+@synthesize NativesPtr;
+@synthesize NativesSize;
+@synthesize SnapshotPtr;
+@synthesize SnapshotSize;
+@synthesize IsDebug;
+
+@end
 
 @implementation NativeScript
 
 static Runtime* runtime_ = nullptr;
 
-+ (void)start:(void*)metadataPtr fromApplicationPath:(NSString*)path fromNativesPtr:(const char*)nativesPtr fromNativesSize:(size_t)nativesSize fromSnapshotPtr:(const char*)snapshotPtr fromSnapshotSize:(size_t)snapshotSize isDebug:(bool)isDebug {
-    NSString* appPath = [path stringByAppendingPathComponent:@"app"];
-    const char* baseDir = [appPath UTF8String];
++ (void)start:(Config*)config {
+    RuntimeConfig.BaseDir = [[config BaseDir] UTF8String];
+    RuntimeConfig.MetadataPtr = [config MetadataPtr];
+    RuntimeConfig.NativesPtr = [config NativesPtr];
+    RuntimeConfig.NativesSize = [config NativesSize];
+    RuntimeConfig.SnapshotPtr = [config SnapshotPtr];
+    RuntimeConfig.SnapshotSize = [config SnapshotSize];
+    RuntimeConfig.IsDebug = [config IsDebug];
 
-    Runtime::Initialize(metadataPtr, nativesPtr, nativesSize, snapshotPtr, snapshotSize, isDebug);
+    Runtime::Initialize();
     runtime_ = new Runtime();
-    runtime_->SetIsDebug(isDebug);
-    runtime_->InitAndRunMainScript(baseDir);
+    runtime_->InitAndRunMainScript();
 }
 
 + (bool)liveSync {
