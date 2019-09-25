@@ -205,26 +205,38 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 assert(false);
             }
         } else {
-            assert(wrapper != nullptr);
-
             void* data = nullptr;
 
-            if (wrapper->Type() == WrapperType::Pointer) {
-                PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
-                data = pointerWrapper->Data();
-            } else if (wrapper->Type() == WrapperType::Reference) {
-                ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
-                Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
-                ffi_type* ffiType = FFICall::GetArgumentType(innerType);
-                data = calloc(ffiType->size, 1);
-                referenceWrapper->SetData(data);
-                referenceWrapper->SetEncoding(innerType);
-                // Initialize the ref/out parameter value before passing it to the function call
-                if (!value.IsEmpty()) {
-                    Interop::WriteValue(isolate, innerType, data, value);
-                }
+            if (wrapper == nullptr && innerType->type == BinaryTypeEncodingType::StructDeclarationReference) {
+                const Meta* meta = ArgConverter::GetMeta(innerType->details.declarationReference.name.valuePtr());
+                assert(meta != nullptr && meta->type() == MetaType::Struct);
+                const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+                StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+                data = calloc(structInfo.FFIType()->size, 1);
+                Interop::InitializeStruct(isolate, data, structInfo.Fields(), arg);
             } else {
-                assert(false);
+                assert(wrapper != nullptr);
+
+                if (wrapper->Type() == WrapperType::Pointer) {
+                    PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+                    data = pointerWrapper->Data();
+                } else if (wrapper->Type() == WrapperType::Reference) {
+                    ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
+                    Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
+                    ffi_type* ffiType = FFICall::GetArgumentType(innerType);
+                    data = calloc(ffiType->size, 1);
+                    referenceWrapper->SetData(data);
+                    referenceWrapper->SetEncoding(innerType);
+                    // Initialize the ref/out parameter value before passing it to the function call
+                    if (!value.IsEmpty()) {
+                        Interop::WriteValue(isolate, innerType, data, value);
+                    }
+                } else if (wrapper->Type() == WrapperType::Struct) {
+                    StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
+                    data = structWrapper->Data();
+                } else {
+                    assert(false);
+                }
             }
 
             Interop::SetValue(dest, data);

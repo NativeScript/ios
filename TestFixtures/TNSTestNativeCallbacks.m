@@ -282,6 +282,10 @@
     return object;
 }
 
++ (void)recordsPointer:(TNSSimpleStruct*)object {
+    TNSLog([NSString stringWithFormat:@"%d %d", object->x, object->y]);
+}
+
 + (void)apiNSMutableArrayMethods:(NSMutableArray*)object {
     [object addObject:@"b"];
     [object addObject:@"x"];

@@ -321,4 +321,17 @@ describe(module.id, function () {
         expect(actual.size.width).toBe(300);
         expect(actual.size.height).toBe(400);
     });
+
+    it("Marshalling struct pointers", () => {
+        let obj = { x: 1, y: 2 };
+        TNSTestNativeCallbacks.recordsPointer(obj);
+        expect(TNSGetOutput()).toBe("1 2");
+        TNSClearOutput();
+
+        obj = new TNSSimpleStruct();
+        obj.x = 1;
+        obj.y = 2;
+        TNSTestNativeCallbacks.recordsPointer(obj);
+        expect(TNSGetOutput()).toBe("1 2");
+    });
 });

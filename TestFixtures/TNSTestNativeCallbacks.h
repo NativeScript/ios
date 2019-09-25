@@ -56,6 +56,8 @@
 
 + (TNSComplexStruct)recordsComplexStruct:(TNSComplexStruct)object;
 
++ (void)recordsPointer:(TNSSimpleStruct*)object;
+
 + (void)apiNSMutableArrayMethods:(NSMutableArray*)object;
 
 + (void)apiSwizzle:(TNSSwizzleKlass*)object;
