@@ -11,6 +11,7 @@
 #include "RuntimeConfig.h"
 #include "Helpers.h"
 #include "Tasks.h"
+#include "TSHelpers.h"
 #include "WeakRef.h"
 #include "Worker.h"
 
@@ -55,7 +56,6 @@ void Runtime::InitAndRunMainScript() {
         this->moduleInternal_.RunModule(isolate, "./");
 
         if (tc.HasCaught()) {
-            HandleScope scope(this->GetIsolate());
             tns::LogError(isolate, tc);
             assert(false);
         }
@@ -121,6 +121,7 @@ void Runtime::Init() {
 
     ClassBuilder::RegisterBaseTypeScriptExtendsFunction(isolate); // Register the __extends function to the global object
     ClassBuilder::RegisterNativeTypeScriptExtendsFunction(isolate); // Override the __extends function for native objects
+    TSHelpers::Init(isolate);
 
     InlineFunctions::Init(isolate);
 

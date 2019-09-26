@@ -202,6 +202,8 @@
 		C2937527229FC1600075CB16 /* TNSPrimitives.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937511229FC1600075CB16 /* TNSPrimitives.m */; };
 		C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937512229FC1600075CB16 /* TNSObjCTypes.m */; };
 		C2937529229FC1600075CB16 /* TNSPrimitivePointers.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */; };
+		C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C298C025233C9AEA000DDF54 /* TSHelpers.cpp */; };
+		C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */ = {isa = PBXBuildFile; fileRef = C298C026233C9AEA000DDF54 /* TSHelpers.h */; };
 		C2A5DEC82327DCF600A91A76 /* NativeScript.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB34229EAB3B00345BFE /* NativeScript.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C2A5DFE92328C4B900A91A76 /* TKLiveSync.m in Sources */ = {isa = PBXBuildFile; fileRef = C2A5DFE82328C4B900A91A76 /* TKLiveSync.m */; };
 		C2A5DFEA2328C4B900A91A76 /* TKLiveSync.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = C2A5DFE72328C4B900A91A76 /* TKLiveSync.h */; };
@@ -681,6 +683,8 @@
 		C2937514229FC1600075CB16 /* TNSAllocLog.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSAllocLog.h; sourceTree = "<group>"; };
 		C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSPrimitivePointers.m; sourceTree = "<group>"; };
 		C2937516229FC1600075CB16 /* TNSRecords.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSRecords.h; sourceTree = "<group>"; };
+		C298C025233C9AEA000DDF54 /* TSHelpers.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TSHelpers.cpp; sourceTree = "<group>"; };
+		C298C026233C9AEA000DDF54 /* TSHelpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TSHelpers.h; sourceTree = "<group>"; };
 		C2A5DFE52328C4B900A91A76 /* libTKLiveSync.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTKLiveSync.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2A5DFE72328C4B900A91A76 /* TKLiveSync.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TKLiveSync.h; sourceTree = "<group>"; };
 		C2A5DFE82328C4B900A91A76 /* TKLiveSync.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TKLiveSync.m; sourceTree = "<group>"; };
@@ -1664,6 +1668,8 @@
 				C2DDEB75229EAC8200345BFE /* SymbolLoader.mm */,
 				C2DDEB76229EAC8200345BFE /* Tasks.h */,
 				C2DDEB8C229EAC8300345BFE /* Tasks.cpp */,
+				C298C026233C9AEA000DDF54 /* TSHelpers.h */,
+				C298C025233C9AEA000DDF54 /* TSHelpers.cpp */,
 				C2DDEB82229EAC8200345BFE /* WeakRef.h */,
 				C2DDEB69229EAC8100345BFE /* WeakRef.cpp */,
 				C22C092122CA3F370080D176 /* Worker.h */,
@@ -1698,6 +1704,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
 				C2A5DEC82327DCF600A91A76 /* NativeScript.h in Headers */,
 				C247C17122F82842001D2CA2 /* v8config.h in Headers */,
 				C247C36022F828E3001D2CA2 /* Console.h in Headers */,
@@ -2288,6 +2295,7 @@
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
 				C247C34D22F828E3001D2CA2 /* v8-debugger-agent-impl.cc in Sources */,
 				C247C38322F828E3001D2CA2 /* v8-heap-profiler-agent-impl.cc in Sources */,
+				C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */,
 				C247C34722F828E3001D2CA2 /* injected-script.cc in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C247C32F22F828E3001D2CA2 /* utils.mm in Sources */,

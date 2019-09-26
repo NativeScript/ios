@@ -243,8 +243,8 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         info.GetReturnValue().Set(v8::Undefined(isolate));
     }).ToLocalChecked();
 
-    PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
-    bool success = global->DefineOwnProperty(context, tns::ToV8String(isolate, "__extends"), extendsFunc, readOnlyFlags).FromMaybe(false);
+    PropertyAttribute flags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete);
+    bool success = global->DefineOwnProperty(context, tns::ToV8String(isolate, "__extends"), extendsFunc, flags).FromMaybe(false);
     assert(success);
 }
 

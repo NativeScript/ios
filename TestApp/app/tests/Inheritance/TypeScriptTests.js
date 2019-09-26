@@ -310,4 +310,13 @@ describe(module.id, function () {
             'variadicSelector:js x:5 called' +
             'staticFunc:9 called');
     });
+    it("Can use new operator to instantiate native objects", () => {
+        var object = new TSObject();
+        object.baseMethod();
+        object.derivedMethod();
+        expect(TNSGetOutput()).toBe('js baseMethod called' +
+            'instance baseMethod called' +
+            'js derivedMethod called' +
+            'instance derivedMethod called');
+    });
 });
