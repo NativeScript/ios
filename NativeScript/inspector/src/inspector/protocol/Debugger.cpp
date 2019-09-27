@@ -870,6 +870,7 @@ public:
         m_dispatchMap["Debugger.evaluateOnCallFrame"] = &DispatcherImpl::evaluateOnCallFrame;
         m_dispatchMap["Debugger.getPossibleBreakpoints"] = &DispatcherImpl::getPossibleBreakpoints;
         m_dispatchMap["Debugger.getScriptSource"] = &DispatcherImpl::getScriptSource;
+        m_dispatchMap["Debugger.getWasmBytecode"] = &DispatcherImpl::getWasmBytecode;
         m_dispatchMap["Debugger.getStackTrace"] = &DispatcherImpl::getStackTrace;
         m_dispatchMap["Debugger.pause"] = &DispatcherImpl::pause;
         m_dispatchMap["Debugger.pauseOnAsyncCall"] = &DispatcherImpl::pauseOnAsyncCall;
@@ -911,6 +912,7 @@ protected:
     void evaluateOnCallFrame(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void getPossibleBreakpoints(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void getScriptSource(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void getWasmBytecode(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void getStackTrace(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void pause(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void pauseOnAsyncCall(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -1007,6 +1009,12 @@ void DispatcherImpl::enable(int callId, const String& method, const ProtocolMess
         errors->setName("maxScriptsCacheSize");
         in_maxScriptsCacheSize = ValueConversions<double>::fromValue(maxScriptsCacheSizeValue, errors);
     }
+    protocol::Value* supportsWasmDwarfValue = object ? object->get("supportsWasmDwarf") : nullptr;
+    Maybe<bool> in_supportsWasmDwarf;
+    if (supportsWasmDwarfValue) {
+        errors->setName("supportsWasmDwarf");
+        in_supportsWasmDwarf = ValueConversions<bool>::fromValue(supportsWasmDwarfValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -1016,7 +1024,7 @@ void DispatcherImpl::enable(int callId, const String& method, const ProtocolMess
     String out_debuggerId;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->enable(std::move(in_maxScriptsCacheSize), &out_debuggerId);
+    DispatchResponse response = m_backend->enable(std::move(in_maxScriptsCacheSize), std::move(in_supportsWasmDwarf), &out_debuggerId);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
@@ -1177,6 +1185,37 @@ void DispatcherImpl::getScriptSource(int callId, const String& method, const Pro
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("scriptSource", ValueConversions<String>::toValue(out_scriptSource));
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response, std::move(result));
+    return;
+}
+
+void DispatcherImpl::getWasmBytecode(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* scriptIdValue = object ? object->get("scriptId") : nullptr;
+    errors->setName("scriptId");
+    String in_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return;
+    }
+    // Declare output parameters.
+    Binary out_bytecode;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->getWasmBytecode(in_scriptId, &out_bytecode);
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        result->setValue("bytecode", ValueConversions<Binary>::toValue(out_bytecode));
     }
     if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));

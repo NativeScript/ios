@@ -1,0 +1,29 @@
+#ifndef NativeScript_Prefix_pch
+#define NativeScript_Prefix_pch
+
+#define NATIVESCRIPT_VERSION "0.0.0"
+
+#ifdef DEBUG
+#define SIZEOF_OFF_T 8
+#endif
+
+#define V8_USE_SNAPSHOT 1
+#define V8_USE_EXTERNAL_STARTUP_DATA 1
+#define V8_CONCURRENT_MARKING 1
+#define V8_ENABLE_LAZY_SOURCE_POSITIONS 1
+#define V8_EMBEDDED_BUILTINS 1
+#define V8_SHARED_RO_HEAP 1
+#define V8_ENABLE_REGEXP_INTERPRETER_THREADED_DISPATCH 1
+#define V8_31BIT_SMIS_ON_64BIT_ARCH 1
+#define V8_DEPRECATION_WARNINGS 1
+#define V8_HAVE_TARGET_OS 1
+#define V8_TARGET_OS_IOS 1
+#define V8_IMMINENT_DEPRECATION_WARNINGS 1
+
+#if defined __arm64 && __arm64__
+#define V8_TARGET_ARCH_ARM64 1
+#elif defined __x86_64__ && __x86_64__
+#define V8_TARGET_ARCH_X64 1
+#endif
+
+#endif /* NativeScript_Prefix_pch */
