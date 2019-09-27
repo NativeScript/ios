@@ -8,4 +8,4 @@ fi
 
 # Read the version from package.json and replace it inside the NativeScript-Prefix.pch precompiled header
 FULL_VERSION=$(sed -nE "s/.*(\"version\"[[:space:]]*:[[:space:]]*\"(.+)\"[[:space:]]*,).*/\2/p" package.json)
-sed -i.bak "s/#define[[:space:]]*NATIVESCRIPT_VERSION[[:space:]]*\"\(.*\)\"/#define NATIVESCRIPT_VERSION \"$FULL_VERSION\"/g" NativeScript/NativeScript-Prefix.pch && NativeScript/NativeScript-Prefix.pch.bak
+sed -i.bak "s/#define[[:space:]]*NATIVESCRIPT_VERSION[[:space:]]*\"\(.*\)\"/#define NATIVESCRIPT_VERSION \"$FULL_VERSION\"/g" NativeScript/NativeScript-Prefix.pch && rm NativeScript/NativeScript-Prefix.pch.bak
