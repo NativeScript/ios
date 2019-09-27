@@ -72,7 +72,7 @@ void Runtime::Init() {
 
         V8::InitializePlatform(Runtime::platform_);
         V8::Initialize();
-        std::string flags = "--expose_gc --jitless";
+        std::string flags = "--expose_gc --jitless --no-lazy";
         V8::SetFlagsFromString(flags.c_str(), flags.size());
     }
 
