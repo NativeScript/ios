@@ -41,6 +41,10 @@ v8::Local<v8::Function> GetSmartJSONStringifyFunction(v8::Isolate* isolate);
 
 std::string ReplaceAll(const std::string source, std::string find, std::string replacement);
 
+const std::string BuildStacktraceFrameLocationPart(v8::Isolate* isolate, v8::Local<v8::StackFrame> frame);
+const std::string BuildStacktraceFrameMessage(v8::Isolate* isolate, v8::Local<v8::StackFrame> frame);
+const std::string GetStackTrace(v8::Isolate* isolate);
+
 }
 
 #endif /* Helpers_h */

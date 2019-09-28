@@ -14,8 +14,6 @@ private:
     static std::string BuildStringFromArgs(v8::Isolate* isolate, const v8::FunctionCallbackInfo<v8::Value>& args);
     static const v8::Local<v8::String> BuildStringFromArg(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
     static const v8::Local<v8::String> TransformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object);
-    static const std::string BuildStacktraceFrameLocationPart(v8::Isolate* isolate, v8::Local<v8::StackFrame> frame);
-    static const std::string BuildStacktraceFrameMessage(v8::Isolate* isolate, v8::Local<v8::StackFrame> frame);
 };
 
 }

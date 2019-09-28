@@ -419,3 +419,54 @@ void tns::LogBacktrace(int skip) {
         NSLog(@"[truncated]");
     }
 }
+
+const std::string tns::GetStackTrace(Isolate* isolate) {
+    Local<StackTrace> stack = StackTrace::CurrentStackTrace(isolate, 10, StackTrace::StackTraceOptions::kDetailed);
+    int framesCount = stack->GetFrameCount();
+    std::stringstream ss;
+    for (int i = 0; i < framesCount; i++) {
+        Local<StackFrame> frame = stack->GetFrame(isolate, i);
+        ss << BuildStacktraceFrameMessage(isolate, frame) << std::endl;
+    }
+    return ss.str();
+}
+
+const std::string tns::BuildStacktraceFrameLocationPart(Isolate* isolate, Local<StackFrame> frame) {
+    std::stringstream ss;
+
+    Local<v8::String> scriptName = frame->GetScriptNameOrSourceURL();
+    std::string scriptNameStr = tns::ToString(isolate, scriptName);
+    scriptNameStr = tns::ReplaceAll(scriptNameStr, RuntimeConfig.BaseDir, "");
+
+    if (scriptNameStr.length() < 1) {
+        ss << "VM";
+    } else {
+        ss << scriptNameStr << ":" << frame->GetLineNumber() << ":" << frame->GetColumn();
+    }
+
+    std::string stringResult = ss.str();
+
+    return stringResult;
+}
+
+const std::string tns::BuildStacktraceFrameMessage(Isolate* isolate, Local<StackFrame> frame) {
+    std::stringstream ss;
+
+    Local<v8::String> functionName = frame->GetFunctionName();
+    std::string functionNameStr = tns::ToString(isolate, functionName);
+    if (functionNameStr.empty()) {
+        functionNameStr = "<anonymous>";
+    }
+
+    if (frame->IsConstructor()) {
+        ss << "at new " << functionNameStr << " (" << tns::BuildStacktraceFrameLocationPart(isolate, frame) << ")";
+    } else if (frame->IsEval()) {
+        ss << "eval at " << BuildStacktraceFrameLocationPart(isolate, frame) << std::endl;
+    } else {
+        ss << "at " << functionNameStr << " (" << tns::BuildStacktraceFrameLocationPart(isolate, frame) << ")";
+    }
+
+    std::string stringResult = ss.str();
+
+    return stringResult;
+}

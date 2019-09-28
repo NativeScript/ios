@@ -45,13 +45,8 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     ss << "CONSOLE " << verbosityLevelUpper << ": " << stringResult;
 
     if (verbosityLevel == "trace") {
-        Local<StackTrace> stack = StackTrace::CurrentStackTrace(isolate, 10, StackTrace::StackTraceOptions::kDetailed);
-        int framesCount = stack->GetFrameCount();
-        ss << std::endl;
-        for (int i = 0; i < framesCount; i++) {
-            Local<StackFrame> frame = stack->GetFrame(isolate, i);
-            ss << BuildStacktraceFrameMessage(isolate, frame) << std::endl;
-        }
+        std::string stacktrace = tns::GetStackTrace(isolate);
+        ss << std::endl << stacktrace << std::endl;
     }
 
     std::string msgToLog = ss.str();
@@ -162,46 +157,6 @@ const Local<v8::String> Console::TransformJSObject(Isolate* isolate, Local<Objec
     }
 
     return resultString;
-}
-
-const std::string Console::BuildStacktraceFrameLocationPart(Isolate* isolate, Local<StackFrame> frame) {
-    std::stringstream ss;
-
-    Local<v8::String> scriptName = frame->GetScriptNameOrSourceURL();
-    std::string scriptNameStr = tns::ToString(isolate, scriptName);
-    scriptNameStr = tns::ReplaceAll(scriptNameStr, RuntimeConfig.BaseDir, "");
-
-    if (scriptNameStr.length() < 1) {
-        ss << "VM";
-    } else {
-        ss << scriptNameStr << ":" << frame->GetLineNumber() << ":" << frame->GetColumn();
-    }
-
-    std::string stringResult = ss.str();
-
-    return stringResult;
-}
-
-const std::string Console::BuildStacktraceFrameMessage(Isolate* isolate, Local<StackFrame> frame) {
-    std::stringstream ss;
-
-    Local<v8::String> functionName = frame->GetFunctionName();
-    std::string functionNameStr = tns::ToString(isolate, functionName);
-    if (functionNameStr.empty()) {
-        functionNameStr = "<anonymous>";
-    }
-
-    if (frame->IsConstructor()) {
-        ss << "at new " << functionNameStr << " (" << BuildStacktraceFrameLocationPart(isolate, frame) << ")";
-    } else if (frame->IsEval()) {
-        ss << "eval at " << BuildStacktraceFrameLocationPart(isolate, frame) << std::endl;
-    } else {
-        ss << "at " << functionNameStr << " (" << BuildStacktraceFrameLocationPart(isolate, frame) << ")";
-    }
-
-    std::string stringResult = ss.str();
-
-    return stringResult;
 }
 
 }
