@@ -75,6 +75,8 @@ public:
     v8::Persistent<v8::Function>* FunctionReferenceCtorFunc;
 
     std::unordered_map<std::pair<void*, std::string>, v8::Persistent<v8::Value>*, pair_hash> StructInstances;
+
+    std::unordered_map<std::string, double> Timers;
 private:
     static ConcurrentMap<v8::Isolate*, Caches*> perIsolateCaches_;
 };

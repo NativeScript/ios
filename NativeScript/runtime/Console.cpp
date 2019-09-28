@@ -1,4 +1,7 @@
 #include "Console.h"
+#include "Caches.h"
+#include <chrono>
+#include <iomanip>
 #include "Helpers.h"
 #include "RuntimeConfig.h"
 #include "v8-log-agent-impl.h"
@@ -19,6 +22,8 @@ void Console::Init(Isolate* isolate) {
     Console::AttachLogFunction(isolate, console, "error");
     Console::AttachLogFunction(isolate, console, "warn");
     Console::AttachLogFunction(isolate, console, "trace");
+    Console::AttachLogFunction(isolate, console, "time", TimeCallback);
+    Console::AttachLogFunction(isolate, console, "timeEnd", TimeEndCallback);
 
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -55,11 +60,61 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     tns::Log("%s", msgToLog.c_str());
 }
 
-void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const std::string name) {
+void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    std::string label = "default";
+
+    Local<v8::String> labelString;
+    if (args.Length() > 0 && args[0]->ToString(context).ToLocal(&labelString)) {
+        label = tns::ToString(isolate, labelString);
+    }
+
+    Caches* cache = Caches::Get(isolate);
+
+    auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+    double timeStamp = nano.time_since_epoch().count();
+
+    cache->Timers.insert(std::make_pair(label, timeStamp));
+}
+
+void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    std::string label = "default";
+
+    Local<v8::String> labelString;
+    if (args.Length() > 0 && args[0]->ToString(context).ToLocal(&labelString)) {
+        label = tns::ToString(isolate, labelString);
+    }
+
+    Caches* cache = Caches::Get(isolate);
+    auto itTimersMap = cache->Timers.find(label);
+    if (itTimersMap == cache->Timers.end()) {
+        std::string warning = std::string("No such label '" + label + "' for console.timeEnd()");
+        tns::Log("%s", warning.c_str());
+        return;
+    }
+
+    auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+    double endTimeStamp = nano.time_since_epoch().count();
+    double startTimeStamp = itTimersMap->second;
+
+    cache->Timers.erase(label);
+
+    auto diff = endTimeStamp - startTimeStamp;
+
+    std::stringstream ss;
+    ss << label << ": " << std::fixed << std::setprecision(2) << diff << "ms" ;
+    std::string log = ss.str();
+    tns::Log("%s", log.c_str());
+}
+
+void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const std::string name, v8::FunctionCallback callback) {
     Local<Context> context = isolate->GetCurrentContext();
 
     Local<v8::Function> func;
-    if (!Function::New(context, LogCallback, tns::ToV8String(isolate, name), 0, ConstructorBehavior::kThrow).ToLocal(&func)) {
+    if (!Function::New(context, callback, tns::ToV8String(isolate, name), 0, ConstructorBehavior::kThrow).ToLocal(&func)) {
         assert(false);
     }
 
