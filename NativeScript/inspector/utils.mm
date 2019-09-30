@@ -1,8 +1,12 @@
 #include <MobileCoreServices/MobileCoreServices.h>
 #include <Foundation/Foundation.h>
-#include "utils.h"
 #include <codecvt>
 #include <locale>
+#include "utils.h"
+#include "JsV8InspectorClient.h"
+#include "Helpers.h"
+
+using namespace v8;
 
 std::string v8_inspector::GetMIMEType(std::string filePath) {
     NSString* nsFilePath = [NSString stringWithUTF8String:filePath.c_str()];
@@ -45,4 +49,22 @@ std::string v8_inspector::ToStdString(const StringView& value) {
     std::string result = convert.to_bytes(value16);
 
     return result;
+}
+
+Local<v8::Function> v8_inspector::GetDebuggerFunction(Isolate* isolate, std::string domain, std::string functionName, Local<Object>& domainDebugger) {
+    auto it = JsV8InspectorClient::Domains.find(domain);
+    if (it == JsV8InspectorClient::Domains.end()) {
+        return Local<v8::Function>();
+    }
+
+    domainDebugger = it->second->Get(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Value> value;
+    bool success = domainDebugger->Get(context, tns::ToV8String(isolate, functionName)).ToLocal(&value);
+    if (success && !value.IsEmpty() && value->IsFunction()) {
+        return value.As<v8::Function>();
+    }
+
+    return Local<v8::Function>();
 }

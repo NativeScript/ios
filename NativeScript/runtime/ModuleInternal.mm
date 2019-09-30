@@ -63,7 +63,7 @@ void ModuleInternal::Init(Isolate* isolate) {
     assert(success);
 }
 
-void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
+bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> globalObject = context->Global();
     Local<Value> requireObj;
@@ -73,7 +73,7 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
     Local<Value> args[] = { ToV8String(isolate, path) };
     Local<Value> result;
     success = requireFunc->Call(context, globalObject, 1, args).ToLocal(&result);
-    assert(success);
+    return success;
 }
 
 Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const std::string& dirName) {

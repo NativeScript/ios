@@ -47,13 +47,16 @@ void Runtime::InitAndRunMainScript() {
         v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->isolate_, RuntimeConfig.ApplicationPath);
         inspectorClient->init();
         inspectorClient->connect();
+        inspectorClient->registerModules([this](Isolate* isolate, std::string moduleName) {
+            this->moduleInternal_.RunModule(isolate, moduleName);
+        });
     }
 
     {
         Isolate* isolate = this->GetIsolate();
         HandleScope scope(isolate);
         TryCatch tc(isolate);
-        this->moduleInternal_.RunModule(isolate, "./");
+        assert(this->moduleInternal_.RunModule(isolate, "./"));
 
         if (tc.HasCaught()) {
             tns::LogError(isolate, tc);

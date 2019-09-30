@@ -10,7 +10,7 @@ class ModuleInternal {
 public:
     ModuleInternal();
     void Init(v8::Isolate* isolate);
-    void RunModule(v8::Isolate* isolate, std::string path);
+    bool RunModule(v8::Isolate* isolate, std::string path);
 private:
     static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     v8::Local<v8::Function> GetRequireFunction(v8::Isolate* isolate, const std::string& dirName);

@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <chrono>
 #include "JsV8InspectorClient.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-log-agent-impl.h"
@@ -372,7 +373,71 @@ inline v8::Local<TypeName> JsV8InspectorClient::PersistentToLocal(v8::Isolate* i
     }
 }
 
+void JsV8InspectorClient::registerModules(std::function<void(v8::Isolate*, std::string)> runModule) {
+    HandleScope scope(isolate_);
+    Local<Context> context = isolate_->GetCurrentContext();
+    Local<Object> global = context->Global();
+    Local<Object> inspectorObject = Object::New(isolate_);
+
+    assert(global->Set(context, tns::ToV8String(isolate_, "__inspector"), inspectorObject).FromMaybe(false));
+    v8::Local<v8::Function> func;
+    bool success = v8::Function::New(context, registerDomainDispatcherCallback).ToLocal(&func);
+    assert(success && global->Set(context, tns::ToV8String(isolate_, "__registerDomainDispatcher"), func).FromMaybe(false));
+
+    Local<External> data = External::New(isolate_, this);
+    success = v8::Function::New(context, inspectorSendEventCallback, data).ToLocal(&func);
+    assert(success && global->Set(context, tns::ToV8String(isolate_, "__inspectorSendEvent"), func).FromMaybe(false));
+
+    success = v8::Function::New(context, inspectorTimestampCallback).ToLocal(&func);
+    assert(success && global->Set(context, tns::ToV8String(isolate_, "__inspectorTimestamp"), func).FromMaybe(false));
+
+    runModule(isolate_, "inspector_modules");
+}
+
+void JsV8InspectorClient::registerDomainDispatcherCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    std::string domain = tns::ToString(isolate, args[0].As<v8::String>());
+    auto it = Domains.find(domain);
+    if (it == Domains.end()) {
+        Local<v8::Function> domainCtorFunc = args[1].As<v8::Function>();
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Value> ctorArgs[0];
+        Local<Value> domainInstance;
+        bool success = domainCtorFunc->CallAsConstructor(context, 0, ctorArgs).ToLocal(&domainInstance);
+        assert(success && domainInstance->IsObject());
+
+        Local<Object> domainObj = domainInstance.As<Object>();
+        Persistent<Object>* poDomainObj = new Persistent<Object>(isolate, domainObj);
+        Domains.emplace(domain, poDomainObj);
+    }
+}
+
+void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<Value>& args) {
+    Local<External> data = args.Data().As<External>();
+    v8_inspector::JsV8InspectorClient* client = static_cast<v8_inspector::JsV8InspectorClient*>(data->Value());
+    Isolate* isolate = args.GetIsolate();
+    Local<v8::String> arg = args[0].As<v8::String>();
+    std::string message = tns::ToString(isolate, arg);
+
+    if (message.find("\"Network.") != std::string::npos) {
+        // The Network domain is handled directly by the corresponding backend
+        V8InspectorSessionImpl* session = (V8InspectorSessionImpl*)client->session_.get();
+        session->networkArgent()->dispatch(message);
+        return;
+    }
+
+    client->dispatchMessage(message);
+}
+
+void JsV8InspectorClient::inspectorTimestampCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    double timestamp = std::chrono::seconds(std::chrono::seconds(std::time(NULL))).count();
+    Local<Number> result = Number::New(isolate, timestamp);
+    args.GetReturnValue().Set(result);
+}
+
 int JsV8InspectorClient::contextGroupId = 1;
+std::map<std::string, v8::Persistent<v8::Object>*> JsV8InspectorClient::Domains;
 
 }
 

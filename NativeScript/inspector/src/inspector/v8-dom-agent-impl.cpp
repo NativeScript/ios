@@ -1,7 +1,13 @@
 #include "v8-dom-agent-impl.h"
+#include "src/inspector/v8-inspector-session-impl.h"
+#include "JsV8InspectorClient.h"
+#include "utils.h"
+#include "Helpers.h"
+
+using namespace v8;
 
 namespace v8_inspector {
-    
+
 namespace DOMAgentState {
     static const char domEnabled[] = "domEnabled";
 }
@@ -11,8 +17,8 @@ V8DOMAgentImpl::V8DOMAgentImpl(V8InspectorSessionImpl* session,
                                protocol::DictionaryValue* state)
     : m_frontend(frontendChannel),
       m_state(state),
+      m_inspector(session->inspector()),
       m_enabled(false) {
-    Instance = this;
 }
 
 V8DOMAgentImpl::~V8DOMAgentImpl() { }
@@ -21,11 +27,11 @@ DispatchResponse V8DOMAgentImpl::enable() {
     if (m_enabled) {
         return DispatchResponse::OK();
     }
-    
+
     m_state->setBoolean(DOMAgentState::domEnabled, true);
-    
+
     m_enabled = true;
-    
+
     return DispatchResponse::OK();
 }
 
@@ -33,11 +39,11 @@ DispatchResponse V8DOMAgentImpl::disable() {
     if (!m_enabled) {
         return DispatchResponse::OK();
     }
-    
+
     m_state->setBoolean(DOMAgentState::domEnabled, false);
-    
+
     m_enabled = false;
-    
+
     return DispatchResponse::OK();
 }
 
@@ -54,13 +60,76 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
         .setLocalName("Frame")
         .setNodeValue("")
         .build();
-    
-    *out_root = std::move(defaultNode);
-    return DispatchResponse::Error("Error getting DOM tree.");
+
+    Isolate* isolate = m_inspector->isolate();
+    Local<Object> domDomainDebugger;
+    Local<v8::Function> getDocumentFunc = v8_inspector::GetDebuggerFunction(isolate, "DOM", "getDocument", domDomainDebugger);
+    if (getDocumentFunc.IsEmpty() || domDomainDebugger.IsEmpty()) {
+        *out_root = std::move(defaultNode);
+        return DispatchResponse::Error("Error getting DOM tree.");
+    }
+
+    Local<Value> args[0];
+    Local<Context> context = isolate->GetCurrentContext();
+
+    TryCatch tc(isolate);
+    MaybeLocal<Value> maybeResult = getDocumentFunc->Call(context, domDomainDebugger, 0, args);
+    if (tc.HasCaught()) {
+        String16 error = toProtocolString(isolate, tc.Message()->Get());
+        *out_root = std::move(defaultNode);
+        return protocol::DispatchResponse::Error(error);
+    }
+
+    Local<Value> result;
+    if (!maybeResult.ToLocal(&result) || !result->IsObject()) {
+        return protocol::DispatchResponse::Error("Didn't get a proper result from getDocument call. Returning empty visual tree.");
+    }
+
+    Local<Object> resultObj = result.As<Object>();
+    Local<v8::String> resultString;
+    assert(v8::JSON::Stringify(context, resultObj->Get(context, tns::ToV8String(isolate, "root")).ToLocalChecked()).ToLocal(&resultString));
+
+    String16 resultProtocolString = toProtocolString(isolate, resultString);
+    std::unique_ptr<protocol::Value> resultJson = protocol::StringUtil::parseJSON(resultProtocolString);
+    protocol::ErrorSupport errorSupport;
+    std::unique_ptr<protocol::DOM::Node> domNode = protocol::DOM::Node::fromValue(resultJson.get(), &errorSupport);
+
+    std::string errorSupportString = errorSupport.errors().utf8();
+    if (!errorSupportString.empty()) {
+        String16 errorMessage = "Error while parsing debug `DOM Node` object.";
+        return DispatchResponse::Error(errorMessage);
+    }
+
+    *out_root = std::move(domNode);
+    return DispatchResponse::OK();
 }
 
 DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
-    return DispatchResponse::Error("Couldn't remove the selected DOMNode from the visual tree. Global Inspector object not found.");
+    Isolate* isolate = m_inspector->isolate();
+    Local<Object> domDomainDebugger;
+    Local<v8::Function> removeNodeFunc = v8_inspector::GetDebuggerFunction(isolate, "DOM", "removeNode", domDomainDebugger);
+
+    if (removeNodeFunc.IsEmpty() || domDomainDebugger.IsEmpty()) {
+        return DispatchResponse::Error("Couldn't remove the selected DOMNode from the visual tree. \"removeNode\" function not found");
+    }
+
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> param = Object::New(isolate);
+    bool success = param->Set(context, tns::ToV8String(isolate, "nodeId"), Number::New(isolate, in_nodeId)).FromMaybe(false);
+    assert(success);
+
+    Local<Value> args[] = { param };
+    Local<Value> result;
+    TryCatch tc(isolate);
+    assert(removeNodeFunc->Call(context, domDomainDebugger, 1, args).ToLocal(&result));
+
+    if (tc.HasCaught() || result.IsEmpty()) {
+        String16 error = toProtocolString(isolate, tc.Message()->Get());
+        return DispatchResponse::Error(error);
+    }
+
+    return DispatchResponse::OK();
 }
 
 DispatchResponse V8DOMAgentImpl::setAttributeValue(int in_nodeId, const String& in_name, const String& in_value) {
@@ -68,7 +137,31 @@ DispatchResponse V8DOMAgentImpl::setAttributeValue(int in_nodeId, const String& 
 }
 
 DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String& in_text, Maybe<String> in_name) {
-    return DispatchResponse::Error("Couldn't change selected DOM node's attribute. Global Inspector object not found.");
+    Isolate* isolate = m_inspector->isolate();
+    Local<Object> domDomainDebugger;
+    Local<v8::Function> setAttributesAsTextFunc = v8_inspector::GetDebuggerFunction(isolate, "DOM", "setAttributesAsText", domDomainDebugger);
+
+    if (setAttributesAsTextFunc.IsEmpty() || domDomainDebugger.IsEmpty()) {
+        return DispatchResponse::Error("Couldn't change selected DOM node's attribute. \"setAttributesAsText\" function not found");
+    }
+
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> param = Object::New(isolate);
+    assert(param->Set(context, tns::ToV8String(isolate, "nodeId"), Number::New(isolate, in_nodeId)).FromMaybe(false));
+    assert(param->Set(context, tns::ToV8String(isolate, "text"), v8_inspector::toV8String(isolate, in_text)).FromMaybe(false));
+    assert(param->Set(context, tns::ToV8String(isolate, "name"), v8_inspector::toV8String(isolate, in_name.fromJust())).FromMaybe(false));
+
+    Local<Value> args[] = { param };
+    Local<Value> result;
+    TryCatch tc(isolate);
+    assert(setAttributesAsTextFunc->Call(context, domDomainDebugger, 1, args).ToLocal(&result));
+
+    if (tc.HasCaught() || result.IsEmpty()) {
+        String16 error = toProtocolString(isolate, tc.Message()->Get());
+        return DispatchResponse::Error(error);
+    }
+
+    return DispatchResponse::OK();
 }
 
 DispatchResponse V8DOMAgentImpl::removeAttribute(int in_nodeId, const String& in_name) {
@@ -91,9 +184,9 @@ DispatchResponse V8DOMAgentImpl::resolveNode(Maybe<int> in_nodeId, Maybe<int> in
     auto resolvedNode = protocol::Runtime::RemoteObject::create()
         .setType("View")
         .build();
-    
+
     *out_object = std::move(resolvedNode);
-    
+
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
 
@@ -204,8 +297,6 @@ DispatchResponse V8DOMAgentImpl::undo() {
 DispatchResponse V8DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_backendNodeId, Maybe<int>* out_nodeId) {
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
-
-V8DOMAgentImpl* V8DOMAgentImpl::Instance = 0;
 
 }
 

@@ -1,11 +1,12 @@
 #ifndef v8_css_agent_impl_h
 #define v8_css_agent_impl_h
 
+#include "src/inspector/v8-inspector-impl.h"
 #include "src/inspector/protocol/CSS.h"
 #include "src/inspector/protocol/Protocol.h"
 
 namespace v8_inspector {
-    
+
 class V8InspectorSessionImpl;
 
 using v8_inspector::protocol::Maybe;
@@ -17,9 +18,9 @@ class V8CSSAgentImpl : public protocol::CSS::Backend {
 public:
     V8CSSAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
                    protocol::DictionaryValue* state);
-    
+
     ~V8CSSAgentImpl() override;
-    
+
     void enable(std::unique_ptr<EnableCallback> callback) override;
     DispatchResponse disable() override;
     DispatchResponse getMatchedStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle, Maybe<protocol::Array<protocol::CSS::RuleMatch>>* out_matchedCSSRules, Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>* out_pseudoElements, Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited, Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) override;
@@ -42,17 +43,19 @@ public:
     DispatchResponse startRuleUsageTracking() override;
     DispatchResponse stopRuleUsageTracking(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_ruleUsage) override;
     DispatchResponse takeCoverageDelta(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) override;
-    
+
     static V8CSSAgentImpl* Instance;
-    
+
 private:
     protocol::CSS::Frontend m_frontend;
     protocol::DictionaryValue* m_state;
+    V8InspectorImpl* m_inspector;
+
     bool m_enabled;
-    
+
     DISALLOW_COPY_AND_ASSIGN(V8CSSAgentImpl);
 };
-    
+
 }
 
 #endif /* v8_css_agent_impl_h */

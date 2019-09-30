@@ -39,6 +39,14 @@ std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {
     return std::string(*result);
 }
 
+std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
+    std::string valueStr = tns::ToString(isolate, value);
+    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
+    std::u16string value16 = convert.from_bytes(valueStr);
+
+    return value16;
+}
+
 double tns::ToNumber(Isolate* isolate, const Local<Value>& value) {
     double result = NAN;
 
@@ -80,10 +88,10 @@ bool tns::ToBool(const Local<Value>& value) {
 
 std::vector<uint16_t> tns::ToVector(const std::string& value) {
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-    std::u16string valueu16 = convert.from_bytes(value);
+    std::u16string value16 = convert.from_bytes(value);
 
-    const uint16_t *begin = reinterpret_cast<uint16_t const*>(valueu16.data());
-    const uint16_t *end = reinterpret_cast<uint16_t const*>(valueu16.data() + valueu16.size());
+    const uint16_t *begin = reinterpret_cast<uint16_t const*>(value16.data());
+    const uint16_t *end = reinterpret_cast<uint16_t const*>(value16.data() + value16.size());
     std::vector<uint16_t> vector(begin, end);
     return vector;
 }

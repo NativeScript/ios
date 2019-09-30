@@ -1,11 +1,12 @@
 #ifndef v8_dom_agent_impl_h
 #define v8_dom_agent_impl_h
 
+#include "src/inspector/v8-inspector-impl.h"
 #include "src/inspector/protocol/DOM.h"
 #include "src/inspector/protocol/Protocol.h"
 
 namespace v8_inspector {
-    
+
 class V8InspectorSessionImpl;
 
 using v8_inspector::protocol::Maybe;
@@ -16,9 +17,9 @@ class V8DOMAgentImpl : public protocol::DOM::Backend {
 public:
     V8DOMAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
                    protocol::DictionaryValue* state);
-    
+
     ~V8DOMAgentImpl() override;
-    
+
     virtual DispatchResponse enable() override;
     virtual DispatchResponse disable() override;
     virtual DispatchResponse getContentQuads(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::Array<protocol::Array<double>>>* out_quads) override;
@@ -31,7 +32,7 @@ public:
     virtual DispatchResponse getSearchResults(const String& in_searchId, int in_fromIndex, int in_toIndex, std::unique_ptr<protocol::Array<int>>* out_nodeIds) override;
     virtual DispatchResponse discardSearchResults(const String& in_searchId) override;
     virtual DispatchResponse resolveNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectGroup, Maybe<int> in_executionContextId, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) override;
-    
+
     DispatchResponse collectClassNamesFromSubtree(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_classNames) override;
     DispatchResponse copyTo(int in_nodeId, int in_targetNodeId, Maybe<int> in_insertBeforeNodeId, int* out_nodeId) override;
     DispatchResponse describeNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_node) override;
@@ -59,18 +60,17 @@ public:
     DispatchResponse setOuterHTML(int in_nodeId, const String& in_outerHTML) override;
     DispatchResponse undo() override;
     DispatchResponse getFrameOwner(const String& in_frameId, int* out_backendNodeId, Maybe<int>* out_nodeId) override;
-    
+
     const bool enabled() {
         return m_enabled;
     };
-    
-    static V8DOMAgentImpl* Instance;
 private:
     protocol::DOM::Frontend m_frontend;
     protocol::DictionaryValue* m_state;
-    
+    V8InspectorImpl* m_inspector;
+
     bool m_enabled;
-    
+
     DISALLOW_COPY_AND_ASSIGN(V8DOMAgentImpl);
 };
 
