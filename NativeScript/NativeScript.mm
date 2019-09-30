@@ -44,29 +44,7 @@ static Runtime* runtime_ = nullptr;
     }
 
     Isolate* isolate = runtime_->GetIsolate();
-    HandleScope scope(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> global = context->Global();
-    Local<Value> value;
-    bool success = global->Get(context, tns::ToV8String(isolate, "__onLiveSync")).ToLocal(&value);
-    if (!success || value.IsEmpty() || !value->IsFunction()) {
-        return false;
-    }
-
-    Local<v8::Function> liveSyncFunc = value.As<v8::Function>();
-    Local<Value> args[0];
-    Local<Value> result;
-
-    TryCatch tc(isolate);
-    success = liveSyncFunc->Call(context, v8::Undefined(isolate), 0, args).ToLocal(&result);
-    if (!success || tc.HasCaught()) {
-        if (tc.HasCaught()) {
-            tns::LogError(isolate, tc);
-        }
-        return false;
-    }
-
-    return true;
+    return tns::LiveSync(isolate);
 }
 
 @end

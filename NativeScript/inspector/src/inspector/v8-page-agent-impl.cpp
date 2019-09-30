@@ -1,8 +1,8 @@
 #include "v8-page-agent-impl.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-inspector-impl.h"
-#include "../../base64.h"
-#include "../../utils.h"
+#include "base64.h"
+#include "utils.h"
 #include "Helpers.h"
 #include <dirent.h>
 
@@ -143,7 +143,13 @@ DispatchResponse V8PageAgentImpl::getLayoutMetrics(std::unique_ptr<protocol::Pag
 }
 
 DispatchResponse V8PageAgentImpl::reload(Maybe<bool> in_ignoreCache, Maybe<String> in_scriptToEvaluateOnLoad) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    bool success = tns::LiveSync(this->m_isolate);
+    if (!success) {
+        tns::Log("LiveSync failed");
+        return protocol::DispatchResponse::Error("LiveSync failed.");
+    }
+
+    return protocol::DispatchResponse::OK();
 }
 
 DispatchResponse V8PageAgentImpl::removeScriptToEvaluateOnNewDocument(const String& in_identifier) {

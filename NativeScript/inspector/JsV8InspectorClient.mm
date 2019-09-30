@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <notify.h>
 #include <chrono>
 #include "JsV8InspectorClient.h"
 #include "src/inspector/v8-inspector-session-impl.h"
@@ -29,20 +30,26 @@ static int currentInspectorPort = 0;
 static dispatch_io_t inspector_io = nil;
 static TNSInspectorSendMessageBlock globalSendMessageToFrontend = nullptr;
 
-#define CheckError(retval, handler)                                  \
-({                                                                   \
-int errorCode = (int)retval;                                         \
-BOOL success = NO;                                                   \
-if (errorCode == 0)                                                  \
-success = YES;                                                       \
-else if (errorCode == -1)                                            \
-errorCode = errno;                                                   \
-if (!success)                                                        \
-handler(nil, [NSError errorWithDomain:NSPOSIXErrorDomain             \
-code:errorCode                                                       \
-userInfo:nil]);                                                      \
-success;                                                             \
+#define CheckError(retval, handler)                                             \
+({                                                                              \
+    int errorCode = (int)retval;                                                \
+    BOOL success = NO;                                                          \
+    if (errorCode == 0)                                                         \
+        success = YES;                                                          \
+    else if (errorCode == -1)                                                   \
+        errorCode = errno;                                                      \
+    if (!success)                                                               \
+        handler(nil, [NSError errorWithDomain:NSPOSIXErrorDomain                \
+                                         code:errorCode                         \
+                                     userInfo:nil]);                            \
+    success;                                                                    \
 })
+
+#define NOTIFICATION(name)                                                      \
+[[NSString stringWithFormat:@"%@:NativeScript.Debug.%s",                        \
+    [[NSBundle mainBundle] bundleIdentifier], name] UTF8String]
+
+#define LOG_DEBUGGER_PORT NSLog(@"NativeScript debugger has opened inspector socket on port %d for %@.", currentInspectorPort, [[NSBundle mainBundle] bundleIdentifier])
 
 static dispatch_source_t createInspectorServer(TNSInspectorFrontendConnectedHandler connectedHandler, TNSInspectorIoErrorHandler ioErrorHandler, dispatch_block_t clearInspector) {
     dispatch_queue_t queue = dispatch_get_global_queue(0, 0);
@@ -264,6 +271,15 @@ void JsV8InspectorClient::enableInspector() {
     };
 
     listenSource = createInspectorServer(connectionHandler, ioErrorHandler, clearInspector);
+
+    int attachRequestSubscription;
+    notify_register_dispatch(NOTIFICATION("AttachRequest"), &attachRequestSubscription, dispatch_get_main_queue(), ^(int token) {
+        clear();
+        listenSource = createInspectorServer(connectionHandler, ioErrorHandler, clearInspector);
+
+        LOG_DEBUGGER_PORT;
+        notify_post(NOTIFICATION("ReadyForAttach"));
+    });
 
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.5, false);
 }

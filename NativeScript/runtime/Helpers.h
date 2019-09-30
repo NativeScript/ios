@@ -46,6 +46,8 @@ const std::string BuildStacktraceFrameLocationPart(v8::Isolate* isolate, v8::Loc
 const std::string BuildStacktraceFrameMessage(v8::Isolate* isolate, v8::Local<v8::StackFrame> frame);
 const std::string GetStackTrace(v8::Isolate* isolate);
 
+bool LiveSync(v8::Isolate* isolate);
+
 }
 
 #endif /* Helpers_h */
