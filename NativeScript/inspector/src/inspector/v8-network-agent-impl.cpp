@@ -186,7 +186,7 @@ void V8NetworkAgentImpl::RequestWillBeSent(const Local<Object>& obj) {
 
     if (!errorString.empty()) {
         std::string errorMessage = "Error while parsing debug `request` object. ";
-        tns::Log("%s Error: %s", errorMessage.c_str(), errorString.c_str());
+        Log("%s Error: %s", errorMessage.c_str(), errorString.c_str());
         return;
     }
 
@@ -253,7 +253,7 @@ void V8NetworkAgentImpl::ResponseReceived(const Local<Object>& obj) {
 
     if (!errorString.empty()) {
         std::string errorMessage = "Error while parsing debug `response` object.";
-        tns::Log("%s Error: %s", errorMessage.c_str(), errorString.c_str());
+        Log("%s Error: %s", errorMessage.c_str(), errorString.c_str());
         return;
     }
 

@@ -145,7 +145,7 @@ DispatchResponse V8PageAgentImpl::getLayoutMetrics(std::unique_ptr<protocol::Pag
 DispatchResponse V8PageAgentImpl::reload(Maybe<bool> in_ignoreCache, Maybe<String> in_scriptToEvaluateOnLoad) {
     bool success = tns::LiveSync(this->m_isolate);
     if (!success) {
-        tns::Log("LiveSync failed");
+        Log("LiveSync failed");
         return protocol::DispatchResponse::Error("LiveSync failed.");
     }
 

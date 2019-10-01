@@ -127,7 +127,6 @@ static dispatch_source_t createInspectorServer(TNSInspectorFrontendConnectedHand
         }
 
         TNSInspectorSendMessageBlock sender = ^(NSString* message) {
-            // NSLog(@"NativeScript debugger sending: %@", message);
             NSUInteger length = [message lengthOfBytesUsingEncoding:NSUTF16LittleEndianStringEncoding];
 
             uint8_t* buffer = (uint8_t*)malloc(length + sizeof(uint32_t));
@@ -228,7 +227,7 @@ void JsV8InspectorClient::enableInspector() {
 
     dispatch_block_t clear = ^{
         if (listenSource) {
-            NSLog(@"NativeScript debugger closing inspector port.");
+            Log(@"NativeScript debugger closing inspector port.");
             dispatch_source_cancel(listenSource);
             listenSource = nil;
         }
@@ -242,7 +241,7 @@ void JsV8InspectorClient::enableInspector() {
                 clear();
             }
 
-            NSLog(@"NativeScript debugger encountered %@.", error);
+            Log(@"NativeScript debugger encountered %@.", error);
             return nil;
         }
 
@@ -276,7 +275,7 @@ void JsV8InspectorClient::enableInspector() {
     TNSInspectorIoErrorHandler ioErrorHandler = ^(NSObject* dummy, NSError* error) {
         clearInspector();
         if (error) {
-            NSLog(@"NativeScript debugger encountered %@.", error);
+            Log(@"NativeScript debugger encountered %@.", error);
         }
     };
 

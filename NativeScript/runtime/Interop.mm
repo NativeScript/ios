@@ -56,7 +56,7 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
 Local<Value> Interop::CallFunction(Isolate* isolate, const FunctionMeta* meta, const std::vector<Local<Value>> args) {
     void* functionPointer = SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
     if (!functionPointer) {
-        NSLog(@"Unable to load \"%s\" function", meta->name());
+        Log(@"Unable to load \"%s\" function", meta->name());
         assert(false);
     }
 

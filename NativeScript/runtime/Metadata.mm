@@ -2,6 +2,7 @@
 #include <UIKit/UIKit.h>
 #include <sys/stat.h>
 #include "SymbolLoader.h"
+#include "Helpers.h"
 
 namespace tns {
 
@@ -61,7 +62,7 @@ const InterfaceMeta* GlobalTable::findInterfaceMeta(const char* identifierString
     } else {
         const char* baseName = interfaceMeta->baseName();
 
-        NSLog(@"** \"%s\" introduced in iOS SDK %d.%d is currently unavailable, attempting to load its base: \"%s\". **",
+        Log(@"** \"%s\" introduced in iOS SDK %d.%d is currently unavailable, attempting to load its base: \"%s\". **",
               std::string(identifierString, length).c_str(),
               getMajorVersion(interfaceMeta->introducedIn()),
               getMinorVersion(interfaceMeta->introducedIn()),

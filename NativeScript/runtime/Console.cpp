@@ -57,7 +57,7 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     std::string msgToLog = ss.str();
 
     v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, "info", "", 0);
-    tns::Log("%s", msgToLog.c_str());
+    Log("%s", msgToLog.c_str());
 }
 
 void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
@@ -92,7 +92,7 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
     auto itTimersMap = cache->Timers.find(label);
     if (itTimersMap == cache->Timers.end()) {
         std::string warning = std::string("No such label '" + label + "' for console.timeEnd()");
-        tns::Log("%s", warning.c_str());
+        Log("%s", warning.c_str());
         return;
     }
 
@@ -107,7 +107,7 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
     std::stringstream ss;
     ss << label << ": " << std::fixed << std::setprecision(2) << diff << "ms" ;
     std::string log = ss.str();
-    tns::Log("%s", log.c_str());
+    Log("%s", log.c_str());
 }
 
 void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const std::string name, v8::FunctionCallback callback) {

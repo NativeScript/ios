@@ -256,7 +256,7 @@ void tns::LogError(Isolate* isolate, TryCatch& tc) {
         return;
     }
 
-    NSLog(@"Native stack trace:");
+    Log(@"Native stack trace:");
     LogBacktrace();
 
     Local<Value> stack;
@@ -275,16 +275,8 @@ void tns::LogError(Isolate* isolate, TryCatch& tc) {
     std::string stackTraceStr = tns::ToString(isolate, stackV8Str);
     stackTraceStr = ReplaceAll(stackTraceStr, RuntimeConfig.BaseDir, "");
 
-    NSLog(@"JavaScript error:");
-    tns::Log("%s", stackTraceStr.c_str());
-}
-
-void tns::Log(const char* format, ...) {
-    va_list vargs;
-    va_start(vargs, format);
-    NSString* formatStr = [NSString stringWithUTF8String:format];
-    NSLogv(formatStr, vargs);
-    va_end(vargs);
+    Log(@"JavaScript error:");
+    Log(@"%s", stackTraceStr.c_str());
 }
 
 Local<v8::String> tns::JsonStringifyObject(Isolate* isolate, Local<Value> value, bool handleCircularReferences) {
@@ -420,11 +412,11 @@ void tns::LogBacktrace(int skip) {
         } else {
             snprintf(buf, sizeof(buf), "%-3d %*p %s\n", i, int(2 + sizeof(void*) * 2), callstack[i], symbols[i]);
         }
-        NSLog(@"%s", buf);
+        Log(@"%s", buf);
     }
     free(symbols);
     if (nFrames == nMaxFrames) {
-        NSLog(@"[truncated]");
+        Log(@"[truncated]");
     }
 }
 

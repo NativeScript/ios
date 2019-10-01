@@ -427,7 +427,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             assert(success);
 
             if (method.IsEmpty() || !method->IsFunction()) {
-                NSLog(@"No implementation found for exposed method \"%s\"", tns::ToString(isolate, methodName).c_str());
+                Log(@"No implementation found for exposed method \"%s\"", tns::ToString(isolate, methodName).c_str());
                 continue;
             }
 
