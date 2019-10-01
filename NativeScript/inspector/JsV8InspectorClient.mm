@@ -253,14 +253,24 @@ void JsV8InspectorClient::enableInspector() {
             current_connection_inspector_io = io;
         }
 
-       return ^(NSString* message, NSError* error) {
-           tns::ExecuteOnMainThread([this, message]() {
-               if (message) {
-                   std::string msg = [message UTF8String];
-                   this->dispatchMessage(msg);
-               }
-           });
-       };
+        return ^(NSString* message, NSError* error) {
+            if (message != nil) {
+                dispatch_sync(this->messagesQueue_, ^{
+                    this->messages_.push_back([message UTF8String]);
+                });
+            }
+
+            tns::ExecuteOnMainThread([this]() {
+                dispatch_sync(this->messagesQueue_, ^{
+                    while (this->messages_.size() > 0) {
+                        std::string message = this->PumpMessage();
+                        if (!message.empty()) {
+                            this->dispatchMessage(message);
+                        }
+                    }
+                });
+            });
+        };
     };
 
     TNSInspectorIoErrorHandler ioErrorHandler = ^(NSObject* dummy, NSError* error) {
@@ -284,9 +294,13 @@ void JsV8InspectorClient::enableInspector() {
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.5, false);
 }
 
-JsV8InspectorClient::JsV8InspectorClient(Isolate* isolate, std::string baseDir)
+JsV8InspectorClient::JsV8InspectorClient(v8::Platform* platform, Isolate* isolate, std::string baseDir)
     : baseDir_(baseDir),
-    isolate_(isolate) {
+      platform_(platform),
+      isolate_(isolate),
+      messages_(),
+      runningNestedLoops_(false) {
+     this->messagesQueue_ = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 }
 
 void JsV8InspectorClient::init() {
@@ -331,7 +345,24 @@ void JsV8InspectorClient::disconnect() {
 }
 
 void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
+    if (runningNestedLoops_) {
+        return;
+    }
+
     terminated_ = false;
+    this->runningNestedLoops_ = true;
+    while (!terminated_) {
+        std::string message = this->PumpMessage();
+        if (!message.empty()) {
+            this->dispatchMessage(message);
+        }
+
+        while (v8::platform::PumpMessageLoop(platform_, isolate_)) {
+        }
+    }
+
+    terminated_ = false;
+    runningNestedLoops_ = false;
 }
 
 void JsV8InspectorClient::quitMessageLoopOnPause() {
@@ -368,6 +399,18 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
 Local<Context> JsV8InspectorClient::ensureDefaultContextInGroup(int contextGroupId) {
     v8::Local<v8::Context> context = PersistentToLocal(isolate_, context_);
     return context;
+}
+
+std::string JsV8InspectorClient::PumpMessage() {
+    __block std::string result;
+    dispatch_sync(this->messagesQueue_, ^{
+        if (this->messages_.size() > 0) {
+            result = this->messages_.back();
+            this->messages_.pop_back();
+        }
+    });
+
+    return result;
 }
 
 template<class TypeName>
