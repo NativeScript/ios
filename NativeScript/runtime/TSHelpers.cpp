@@ -124,7 +124,7 @@ void TSHelpers::Init(Isolate* isolate) {
         "        }"
         "    }"
         ""
-        "    Object.defineProperty(global, \"__extends\", { value: __extends });"
+        "    Object.defineProperty(global, \"__extends\", { value: __extends, writable: false });"
         "})()";
 
     Local<Context> context = isolate->GetCurrentContext();
