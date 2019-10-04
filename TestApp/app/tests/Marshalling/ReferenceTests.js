@@ -510,6 +510,23 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toMatch(/^<TNSIBaseInterface: 0x\w+>$/);
     });
 
+    it("Marshal returned javascript object as NSDictionaries", () => {
+        var TSObject = NSObject.extend({
+            getData: function () {
+                return { a: "abc", b: 123 };
+            }
+        }, {
+            exposedMethods: {
+                getData: { returns: NSDictionary },
+            }
+        });
+
+        var obj = TSObject.new();
+        TNSObjCTypes.methodWithObject(obj);
+
+        expect(TNSGetOutput()).toBe("abc 123");
+    });
+
     describe("ReferenceConstructor", function () {
         it("should accept empty arguments", function () {
             var reference = new interop.Reference();

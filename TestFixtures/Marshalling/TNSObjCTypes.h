@@ -13,6 +13,7 @@ typedef int (^NumberReturner)(int, int, int);
 
 @interface TNSObjCTypes : NSObject
 + (void)methodWithComplexBlock:(id (^)(int, id, SEL, NSObject*, TNSOStruct))block;
++ (id)methodWithObject:(id)x;
 
 - (void)methodWithIdOutParameter:(NSString**)value;
 - (void)methodWithLongLongOutParameter:(long long*)value;

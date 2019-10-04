@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include <sstream>
 #include "ArgConverter.h"
+#include "DictionaryAdapter.h"
 #include "ObjectManager.h"
 #include "Caches.h"
 #include "Interop.h"
@@ -225,7 +226,13 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
             if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::ObjCObject) {
                 ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(baseWrapper);
                 id data = wrapper->Data();
-                *(ffi_arg*)retValue = (unsigned long)data;
+                memset(retValue, 0, sizeof(id));
+                *static_cast<id __strong *>(retValue) = data;
+                return;
+            } else {
+                id adapter = [[DictionaryAdapter alloc] initWithJSObject:value.As<Object>() isolate:isolate];
+                memset(retValue, 0, sizeof(id));
+                *static_cast<id __strong *>(retValue) = adapter;
                 return;
             }
         } else if (type == BinaryTypeEncodingType::StructDeclarationReference) {

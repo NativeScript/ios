@@ -20,6 +20,15 @@ CFTypeRef TNSFunctionWithCreateCFTypeRefReturn() {
     TNSLog([NSString stringWithFormat:@"\n%@", NSStringFromClass([result class])]);
 }
 
++ (id)methodWithObject:(id)x {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundeclared-selector"
+    NSDictionary* result = [x performSelector:@selector(getData)];
+#pragma clang diagnostic pop
+    TNSLog([NSString stringWithFormat:@"%s %d", [(NSString*)result[@"a"] UTF8String], [(NSNumber*)result[@"b"] intValue]]);
+    return x;
+}
+
 - (void)methodWithIdOutParameter:(NSString**)value {
     TNSLog([NSString stringWithFormat:@"%@", *value]);
     *value = @"test";
