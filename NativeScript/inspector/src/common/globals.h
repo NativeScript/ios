@@ -246,10 +246,9 @@ using AtomicTagged_t = base::AtomicWord;
 
 #endif  // V8_COMPRESS_POINTERS
 
-// Defines whether the branchless or branchful implementation of pointer
+// Defines whether to use smi-corrupting or branchful implementation of pointer
 // decompression should be used.
-constexpr bool kUseBranchlessPtrDecompressionInRuntime = false;
-constexpr bool kUseBranchlessPtrDecompressionInGeneratedCode = false;
+constexpr bool kUseSmiCorruptingPtrDecompression = true;
 
 STATIC_ASSERT(kTaggedSize == (1 << kTaggedSizeLog2));
 STATIC_ASSERT((kTaggedSize == 8) == TAGGED_SIZE_8_BYTES);
@@ -796,8 +795,6 @@ enum InlineCacheState {
   NO_FEEDBACK,
   // Has never been executed.
   UNINITIALIZED,
-  // Has been executed but monomorphic state has been delayed.
-  PREMONOMORPHIC,
   // Has been executed and only one receiver type has been seen.
   MONOMORPHIC,
   // Check failed due to prototype (or map deprecation).
@@ -817,8 +814,6 @@ inline const char* InlineCacheState2String(InlineCacheState state) {
       return "NOFEEDBACK";
     case UNINITIALIZED:
       return "UNINITIALIZED";
-    case PREMONOMORPHIC:
-      return "PREMONOMORPHIC";
     case MONOMORPHIC:
       return "MONOMORPHIC";
     case RECOMPUTE_HANDLER:

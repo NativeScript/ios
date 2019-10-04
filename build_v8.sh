@@ -27,11 +27,6 @@ do
     # OBJECTS="$OBJECTS $OUTFOLDER/obj/v8_crash_keys/*.o"
 
     # ar r $OUTFOLDER/libv8.a $OBJECTS
-
-    pushd $OUTFOLDER
-    xxd -i natives_blob.bin > natives_blob.h
-    xxd -i snapshot_blob.bin > snapshot_blob.h
-    popd
 done
 
 echo "Creating fat libraries"

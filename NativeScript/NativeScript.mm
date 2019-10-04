@@ -11,8 +11,6 @@ using namespace tns;
 
 @synthesize BaseDir;
 @synthesize MetadataPtr;
-@synthesize NativesPtr;
-@synthesize NativesSize;
 @synthesize SnapshotPtr;
 @synthesize SnapshotSize;
 @synthesize IsDebug;
@@ -27,8 +25,6 @@ static Runtime* runtime_ = nullptr;
     RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
     RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
     RuntimeConfig.MetadataPtr = [config MetadataPtr];
-    RuntimeConfig.NativesPtr = [config NativesPtr];
-    RuntimeConfig.NativesSize = [config NativesSize];
     RuntimeConfig.SnapshotPtr = [config SnapshotPtr];
     RuntimeConfig.SnapshotSize = [config SnapshotSize];
     RuntimeConfig.IsDebug = [config IsDebug];

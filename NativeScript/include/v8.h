@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -9003,7 +9004,8 @@ class V8_EXPORT V8 {
    *   handled entirely on the embedders' side.
    * - The call will abort if the data is invalid.
    */
-  static void SetNativesDataBlob(StartupData* startup_blob);
+  V8_DEPRECATED("The natives blob is deprecated (https://crbug.com/v8/7624).",
+                static void SetNativesDataBlob(StartupData* startup_blob));
   static void SetSnapshotDataBlob(StartupData* startup_blob);
 
   /** Set the callback to invoke in case of Dcheck failures. */
@@ -9099,8 +9101,11 @@ class V8_EXPORT V8 {
    *   not perform any file IO.
    */
   static void InitializeExternalStartupData(const char* directory_path);
-  static void InitializeExternalStartupData(const char* natives_blob,
-                                            const char* snapshot_blob);
+  V8_DEPRECATED("The natives blob is deprecated (https://crbug.com/v8/7624).",
+                static void InitializeExternalStartupData(
+                    const char* natives_blob, const char* snapshot_blob));
+  static void InitializeExternalStartupDataFromFile(const char* snapshot_blob);
+
   /**
    * Sets the v8::Platform to use. This should be invoked before V8 is
    * initialized.

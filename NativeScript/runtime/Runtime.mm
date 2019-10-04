@@ -79,12 +79,7 @@ void Runtime::Init() {
         V8::SetFlagsFromString(flags.c_str(), flags.size());
     }
 
-    auto* nativesBlobStartupData = new StartupData();
-    nativesBlobStartupData->data = RuntimeConfig.NativesPtr;
-    nativesBlobStartupData->raw_size = (int)RuntimeConfig.NativesSize;
-    V8::SetNativesDataBlob(nativesBlobStartupData);
-
-    auto* snapshotBlobStartupData = new StartupData();
+    StartupData* snapshotBlobStartupData = new StartupData();
     snapshotBlobStartupData->data = RuntimeConfig.SnapshotPtr;
     snapshotBlobStartupData->raw_size = (int)RuntimeConfig.SnapshotSize;
     V8::SetSnapshotDataBlob(snapshotBlobStartupData);

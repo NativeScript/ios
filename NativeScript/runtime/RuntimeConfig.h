@@ -8,8 +8,6 @@ struct RuntimeConfig {
     std::string BaseDir;
     std::string ApplicationPath;
     void* MetadataPtr;
-    const char* NativesPtr;
-    size_t NativesSize;
     const char* SnapshotPtr;
     size_t SnapshotSize;
     bool IsDebug;
