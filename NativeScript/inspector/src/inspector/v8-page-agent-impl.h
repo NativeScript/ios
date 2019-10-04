@@ -77,6 +77,7 @@ private:
     std::string GetResourceType(std::string fullPath);
     void ReadEntries(std::string baseDir, std::vector<PageEntry>& entries);
     bool HasTextContent(std::string type);
+    String16 GetResourceContent(const String& url, bool& shouldEncode);
 
     DISALLOW_COPY_AND_ASSIGN(V8PageAgentImpl);
 };

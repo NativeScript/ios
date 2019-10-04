@@ -1,10 +1,11 @@
 #include "v8-page-agent-impl.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-inspector-impl.h"
+#include <dirent.h>
+#include "search-util.h"
 #include "base64.h"
 #include "utils.h"
 #include "Helpers.h"
-#include <dirent.h>
 
 namespace v8_inspector {
 
@@ -101,19 +102,8 @@ void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String&
         return;
     }
 
-    std::string fullPath = in_url.utf8();
-    std::string filePath = fullPath;
-    filePath.erase(0, 7); // deletes the 'file://' part before the full file path
-    std::string type = GetResourceType(filePath);
-    bool shouldEncode = !HasTextContent(type);
-    std::string content = tns::ReadText(filePath);
-
-    if (shouldEncode) {
-        content = base64_encode(content.c_str(), (uint)content.length());
-    }
-
-    std::vector<uint16_t> vector = tns::ToVector(content);
-    String16 result(vector.data(), vector.size());
+    bool shouldEncode;
+    String16 result = this->GetResourceContent(in_url, shouldEncode);
 
     callback->sendSuccess(result, shouldEncode);
 }
@@ -157,6 +147,20 @@ DispatchResponse V8PageAgentImpl::removeScriptToEvaluateOnNewDocument(const Stri
 }
 
 void V8PageAgentImpl::searchInResource(const String& in_frameId, const String& in_url, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<SearchInResourceCallback> callback) {
+    bool isRegex = in_isRegex.fromMaybe(false);
+    bool isCaseSensitive = in_caseSensitive.fromMaybe(false);
+
+    std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>> result = std::make_unique<protocol::Array<protocol::Debugger::SearchMatch>>();
+
+    bool shouldEncode;
+    String16 content = this->GetResourceContent(in_url, shouldEncode);
+
+    std::vector<std::unique_ptr<protocol::Debugger::SearchMatch>> matches = v8_inspector::searchInTextByLinesImpl(m_session, content, in_query, isCaseSensitive, isRegex);
+    for (std::unique_ptr<protocol::Debugger::SearchMatch>& match : matches) {
+        result->emplace_back(std::move(match));
+    }
+
+    callback->sendSuccess(std::move(result));
 }
 
 DispatchResponse V8PageAgentImpl::setBypassCSP(bool in_enabled) {
@@ -273,6 +277,24 @@ std::string V8PageAgentImpl::GetResourceType(std::string fullPath) {
     }
 
     return type;
+}
+
+String16 V8PageAgentImpl::GetResourceContent(const String& url, bool& shouldEncode) {
+    std::string fullPath = url.utf8();
+    std::string filePath = fullPath;
+    filePath.erase(0, 7); // deletes the 'file://' part before the full file path
+    std::string type = GetResourceType(filePath);
+    shouldEncode = !HasTextContent(type);
+    std::string content = tns::ReadText(filePath);
+
+    if (shouldEncode) {
+        content = base64_encode(content.c_str(), (uint)content.length());
+    }
+
+    std::vector<uint16_t> vector = tns::ToVector(content);
+    String16 result(vector.data(), vector.size());
+
+    return result;
 }
 
 std::map<std::string, const char*> V8PageAgentImpl::s_mimeTypeMap = {
