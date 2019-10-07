@@ -90,7 +90,11 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             BaseCall call(argBuffer);
             Local<Value> jsWrapper = Interop::GetResult(isolate, typeEncoding, &call, true);
 
-            v8Args.push_back(jsWrapper);
+            if (!jsWrapper.IsEmpty()) {
+                v8Args.push_back(jsWrapper);
+            } else {
+                v8Args.push_back(v8::Undefined(isolate));
+            }
         }
 
         Local<Context> context = isolate->GetCurrentContext();
