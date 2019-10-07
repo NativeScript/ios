@@ -9,8 +9,6 @@ using namespace v8;
 
 namespace tns {
 
-static constexpr bool USE_CODE_CACHE = true;
-
 template <mode_t mode>
 static mode_t stat(NSString* path) {
     struct stat statbuf;
@@ -262,7 +260,8 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
 
 Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const std::string& path) {
     Local<Context> context = isolate->GetCurrentContext();
-    std::string fullRequiredModulePathWithSchema = "file://" + path;
+    std::string baseOrigin = tns::ReplaceAll(path, RuntimeConfig.BaseDir, "");
+    std::string fullRequiredModulePathWithSchema = "file://" + baseOrigin;
     ScriptOrigin origin(tns::ToV8String(isolate, fullRequiredModulePathWithSchema));
     Local<v8::String> scriptText = WrapModuleContent(isolate, path);
     ScriptCompiler::CachedData* cacheData = LoadScriptCache(path);
@@ -407,7 +406,7 @@ std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packag
 }
 
 ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& path) {
-    if (!USE_CODE_CACHE) {
+    if (RuntimeConfig.IsDebug) {
         return nullptr;
     }
 
@@ -435,7 +434,7 @@ ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& p
 }
 
 void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::string& path) {
-    if (!USE_CODE_CACHE) {
+    if (RuntimeConfig.IsDebug) {
         return;
     }
 

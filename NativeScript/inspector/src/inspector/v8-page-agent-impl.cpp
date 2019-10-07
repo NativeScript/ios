@@ -2,6 +2,7 @@
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-inspector-impl.h"
 #include <dirent.h>
+#include "RuntimeConfig.h"
 #include "search-util.h"
 #include "base64.h"
 #include "utils.h"
@@ -13,8 +14,7 @@ namespace PageAgentState {
     static const char pageEnabled[] = "pageEnabled";
 }
 
-V8PageAgentImpl::V8PageAgentImpl(V8InspectorSessionImpl* session, protocol::FrontendChannel* frontendChannel,
-                                 protocol::DictionaryValue* state, const std::string baseDir)
+V8PageAgentImpl::V8PageAgentImpl(V8InspectorSessionImpl* session, protocol::FrontendChannel* frontendChannel, protocol::DictionaryValue* state)
     : m_inspector(session->inspector()),
       m_isolate(m_inspector->isolate()),
       m_session(session),
@@ -22,8 +22,7 @@ V8PageAgentImpl::V8PageAgentImpl(V8InspectorSessionImpl* session, protocol::Fron
       m_state(state),
       m_enabled(false),
       m_frameIdentifier(""),
-      m_frameUrl("file://"),
-      m_baseDir(baseDir) {
+      m_frameUrl("file://") {
 }
 
 V8PageAgentImpl::~V8PageAgentImpl() {
@@ -73,11 +72,13 @@ DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page
     std::unique_ptr<protocol::Array<protocol::Page::FrameResource>> subresources = std::make_unique<protocol::Array<protocol::Page::FrameResource>>();
 
     std::vector<V8PageAgentImpl::PageEntry> entries;
-    this->ReadEntries(m_baseDir, entries);
+    std::string baseDir = RuntimeConfig.ApplicationPath;
+    this->ReadEntries(baseDir, entries);
 
     for (PageEntry entry : entries) {
+        std::string url = tns::ReplaceAll(entry.Name, RuntimeConfig.BaseDir, "");
         std::unique_ptr<protocol::Page::FrameResource> frameResource = protocol::Page::FrameResource::create()
-            .setUrl(entry.Name.c_str())
+            .setUrl(url.c_str())
             .setType(entry.Type.c_str())
             .setMimeType(entry.MimeType.c_str())
             .build();
@@ -285,6 +286,7 @@ String16 V8PageAgentImpl::GetResourceContent(const String& url, bool& shouldEnco
     filePath.erase(0, 7); // deletes the 'file://' part before the full file path
     std::string type = GetResourceType(filePath);
     shouldEncode = !HasTextContent(type);
+    filePath = RuntimeConfig.BaseDir + filePath;
     std::string content = tns::ReadText(filePath);
 
     if (shouldEncode) {

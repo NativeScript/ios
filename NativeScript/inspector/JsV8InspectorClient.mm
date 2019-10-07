@@ -293,9 +293,8 @@ void JsV8InspectorClient::enableInspector() {
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.5, false);
 }
 
-JsV8InspectorClient::JsV8InspectorClient(v8::Platform* platform, Isolate* isolate, std::string baseDir)
-    : baseDir_(baseDir),
-      platform_(platform),
+JsV8InspectorClient::JsV8InspectorClient(v8::Platform* platform, Isolate* isolate)
+    : platform_(platform),
       isolate_(isolate),
       messages_(),
       runningNestedLoops_(false) {
@@ -327,9 +326,7 @@ void JsV8InspectorClient::connect() {
 }
 
 void JsV8InspectorClient::createInspectorSession() {
-    std::vector<uint16_t> vector = tns::ToVector("{\"baseDir\":\"" + baseDir_ + "\"}");
-    StringView state(vector.data(), vector.size());
-    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, state);
+    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, v8_inspector::StringView());
 }
 
 void JsV8InspectorClient::disconnect() {

@@ -13,7 +13,7 @@ namespace v8_inspector {
 
 class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
 public:
-    JsV8InspectorClient(v8::Platform* platform, v8::Isolate* isolate, std::string baseDir);
+    JsV8InspectorClient(v8::Platform* platform, v8::Isolate* isolate);
     void init();
     void connect();
     void createInspectorSession();
@@ -32,7 +32,6 @@ public:
     static std::map<std::string, v8::Persistent<v8::Object>*> Domains;
 private:
     static int contextGroupId;
-    std::string baseDir_;
     bool isConnected_;
     std::unique_ptr<V8Inspector> inspector_;
     v8::Persistent<v8::Context> context_;

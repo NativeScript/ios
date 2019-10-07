@@ -150,11 +150,8 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       this, this, agentState(protocol::Schema::Metainfo::domainName)));
   protocol::Schema::Dispatcher::wire(&m_dispatcher, m_schemaAgent.get());
 
-  String16 baseDir;
-  m_state->getString("baseDir", &baseDir);
-  std::string baseDirStr = v8_inspector::ToStdString(v8_inspector::toStringView(baseDir));
   m_pageAgent.reset(new V8PageAgentImpl(
-      this, this, agentState(protocol::Page::Metainfo::domainName), baseDirStr));
+      this, this, agentState(protocol::Page::Metainfo::domainName)));
   protocol::Page::Dispatcher::wire(&m_dispatcher, m_pageAgent.get());
 
   m_networkAgent.reset(new V8NetworkAgentImpl(

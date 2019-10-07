@@ -17,8 +17,7 @@ using protocol::DispatchResponse;
 
 class V8PageAgentImpl : public protocol::Page::Backend {
 public:
-    V8PageAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                    protocol::DictionaryValue* state, const std::string baseDir);
+    V8PageAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*, protocol::DictionaryValue* state);
     ~V8PageAgentImpl() override;
 
     DispatchResponse enable() override;
@@ -64,7 +63,6 @@ private:
     bool m_enabled;
     const std::string m_frameIdentifier;
     const std::string m_frameUrl;
-    const std::string m_baseDir;
 
     static std::map<std::string, const char*> s_mimeTypeMap;
 

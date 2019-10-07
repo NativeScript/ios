@@ -44,7 +44,7 @@ void Runtime::InitAndRunMainScript() {
     printf("Runtime initialization took %llims\n", duration);
 
     if (RuntimeConfig.IsDebug) {
-        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->platform_, this->isolate_, RuntimeConfig.ApplicationPath);
+        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->platform_, this->isolate_);
         inspectorClient->init();
         inspectorClient->connect();
         inspectorClient->registerModules([this](Isolate* isolate, std::string moduleName) {
