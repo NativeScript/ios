@@ -431,6 +431,17 @@ const std::string tns::GetStackTrace(Isolate* isolate) {
     return ss.str();
 }
 
+const std::string tns::GetCurrentScriptUrl(Isolate* isolate) {
+    Local<StackTrace> stack = StackTrace::CurrentStackTrace(isolate, 1, StackTrace::StackTraceOptions::kDetailed);
+    int framesCount = stack->GetFrameCount();
+    if (framesCount > 0) {
+        Local<StackFrame> frame = stack->GetFrame(isolate, 0);
+        return tns::BuildStacktraceFrameLocationPart(isolate, frame);
+    }
+
+    return "";
+}
+
 const std::string tns::BuildStacktraceFrameLocationPart(Isolate* isolate, Local<StackFrame> frame) {
     std::stringstream ss;
 

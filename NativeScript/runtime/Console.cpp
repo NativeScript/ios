@@ -22,6 +22,8 @@ void Console::Init(Isolate* isolate) {
     Console::AttachLogFunction(isolate, console, "error");
     Console::AttachLogFunction(isolate, console, "warn");
     Console::AttachLogFunction(isolate, console, "trace");
+    Console::AttachLogFunction(isolate, console, "assert", AssertCallback);
+    Console::AttachLogFunction(isolate, console, "dir", DirCallback);
     Console::AttachLogFunction(isolate, console, "time", TimeCallback);
     Console::AttachLogFunction(isolate, console, "timeEnd", TimeEndCallback);
 
@@ -34,7 +36,7 @@ void Console::Init(Isolate* isolate) {
 
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     if (!RuntimeConfig.IsDebug) {
-        // Filter console.log statements in release builds
+        // Filter log statements in release builds
         return;
     }
 
@@ -47,7 +49,7 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     std::transform(verbosityLevelUpper.begin(), verbosityLevelUpper.end(), verbosityLevelUpper.begin(), ::toupper);
 
     std::stringstream ss;
-    ss << "CONSOLE " << verbosityLevelUpper << ": " << stringResult;
+    ss << stringResult;
 
     if (verbosityLevel == "trace") {
         std::string stacktrace = tns::GetStackTrace(isolate);
@@ -56,11 +58,117 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
 
     std::string msgToLog = ss.str();
 
-    v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, "info", "", 0);
+    std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
+    v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
+    std::string msgWithVerbosity = "CONSOLE " + verbosityLevelUpper + ": " + msgToLog;
+    Log("%s", msgWithVerbosity.c_str());
+}
+
+void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
+    if (!RuntimeConfig.IsDebug) {
+        // Filter log statements in release builds
+        return;
+    }
+
+    Isolate* isolate = args.GetIsolate();
+
+    int argsLength = args.Length();
+    bool expressionPasses = argsLength > 0 && args[0]->BooleanValue(isolate);
+    if (!expressionPasses) {
+        std::stringstream ss;
+
+        ss << "Assertion failed: ";
+
+        if (argsLength > 1) {
+            ss << BuildStringFromArgs(isolate, args, 1);
+        } else {
+            ss << "console.assert";
+        }
+
+        std::string log = ss.str();
+        v8_inspector::V8LogAgentImpl::EntryAdded(log, "error", "", 0);
+        Log("%s", log.c_str());
+    }
+}
+
+void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
+    if (!RuntimeConfig.IsDebug) {
+        // Filter log statements in release builds
+        return;
+    }
+
+    int argsLen = args.Length();
+    Isolate* isolate = args.GetIsolate();
+
+    std::stringstream ss;
+    std::string scriptUrl = tns::GetCurrentScriptUrl(isolate);
+    ss << scriptUrl << ":";
+
+    if (argsLen > 0) {
+        if (!args[0]->IsObject()) {
+            std::string logString = BuildStringFromArgs(isolate, args);
+            ss << " " << logString;
+        } else {
+            Local<Context> context = isolate->GetCurrentContext();
+
+            ss << std::endl << "==== object dump start ====" << std::endl;
+            Local<Object> argObject = args[0].As<Object>();
+
+            Local<v8::Array> propNames;
+            bool success = argObject->GetPropertyNames(context).ToLocal(&propNames);
+            assert(success);
+            uint32_t propertiesLength = propNames->Length();
+            for (uint32_t i = 0; i < propertiesLength; i++) {
+                Local<Value> propertyName = propNames->Get(context, i).ToLocalChecked();
+                Local<Value> propertyValue = argObject->Get(context, propertyName).ToLocalChecked();
+
+                bool propIsFunction = propertyValue->IsFunction();
+
+                ss << tns::ToString(isolate, propertyName->ToString(context).ToLocalChecked());
+
+                if (propIsFunction) {
+                    ss << "()";
+                } else if (propertyValue->IsArray()) {
+                    Local<v8::String> stringResult = BuildStringFromArg(isolate, propertyValue);
+                    std::string jsonStringifiedArray = tns::ToString(isolate, stringResult);
+                    ss << ": " << jsonStringifiedArray;
+                } else if (propertyValue->IsObject()) {
+                    Local<Object> obj = propertyValue->ToObject(context).ToLocalChecked();
+                    Local<v8::String> objString = TransformJSObject(isolate, obj);
+                    std::string jsonStringifiedObject = tns::ToString(isolate, objString);
+                    // if object prints out as the error string for circular references, replace with #CR instead for brevity
+                    if (jsonStringifiedObject.find("circular structure") != std::string::npos) {
+                        jsonStringifiedObject = "#CR";
+                    }
+                    ss << ": " << jsonStringifiedObject;
+                } else {
+                    ss << ": \"" << tns::ToString(isolate, propertyValue->ToDetailString(context).ToLocalChecked()) << "\"";
+                }
+
+                ss << std::endl;
+            }
+
+            ss << "==== object dump end ====" << std::endl;
+        }
+    } else {
+        ss << "";
+    }
+
+    std::string msgToLog = ss.str();
+
+    Local<v8::String> data = args.Data().As<v8::String>();
+    std::string verbosityLevel = tns::ToString(isolate, data);
+    std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
+    v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
     Log("%s", msgToLog.c_str());
 }
 
 void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
+    if (!RuntimeConfig.IsDebug) {
+        // Filter log statements in release builds
+        return;
+    }
+
     Isolate* isolate = args.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     std::string label = "default";
@@ -79,6 +187,11 @@ void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
 }
 
 void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
+    if (!RuntimeConfig.IsDebug) {
+        // Filter log statements in release builds
+        return;
+    }
+
     Isolate* isolate = args.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     std::string label = "default";
@@ -106,8 +219,13 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
 
     std::stringstream ss;
     ss << label << ": " << std::fixed << std::setprecision(2) << diff << "ms" ;
-    std::string log = ss.str();
-    Log("%s", log.c_str());
+
+    Local<v8::String> data = args.Data().As<v8::String>();
+    std::string verbosityLevel = tns::ToString(isolate, data);
+    std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
+    std::string msgToLog = ss.str();
+    v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
+    Log("%s", msgToLog.c_str());
 }
 
 void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const std::string name, v8::FunctionCallback callback) {
@@ -125,18 +243,18 @@ void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const s
     }
 }
 
-std::string Console::BuildStringFromArgs(Isolate* isolate, const FunctionCallbackInfo<Value>& args) {
+std::string Console::BuildStringFromArgs(Isolate* isolate, const FunctionCallbackInfo<Value>& args, int startingIndex) {
     int argLen = args.Length();
     std::stringstream ss;
 
     if (argLen > 0) {
-        for (int i = 0; i < argLen; i++) {
+        for (int i = startingIndex; i < argLen; i++) {
             Local<v8::String> argString;
 
             argString = BuildStringFromArg(isolate, args[i]);
 
             // separate args with a space
-            if (i != 0) {
+            if (i != startingIndex) {
                 ss << " ";
             }
 
@@ -212,6 +330,16 @@ const Local<v8::String> Console::TransformJSObject(Isolate* isolate, Local<Objec
     }
 
     return resultString;
+}
+
+const std::string Console::VerbosityToInspectorVerbosity(const std::string level) {
+    if (level == "error") {
+        return "error";
+    } else if (level == "warn") {
+        return "warning";
+    }
+
+    return "info";
 }
 
 }
