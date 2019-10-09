@@ -77,7 +77,7 @@ constexpr int kStackSpaceRequiredForCompilation = 40;
 
 // Determine whether double field unboxing feature is enabled.
 #if V8_TARGET_ARCH_64_BIT && !defined(V8_COMPRESS_POINTERS)
-#define V8_DOUBLE_FIELDS_UNBOXING true
+#define V8_DOUBLE_FIELDS_UNBOXING false
 #else
 #define V8_DOUBLE_FIELDS_UNBOXING false
 #endif
@@ -231,7 +231,7 @@ constexpr int kTaggedSizeLog2 = 2;
 
 // These types define raw and atomic storage types for tagged values stored
 // on V8 heap.
-using Tagged_t = int32_t;
+using Tagged_t = uint32_t;
 using AtomicTagged_t = base::Atomic32;
 
 #else
@@ -245,10 +245,6 @@ using Tagged_t = Address;
 using AtomicTagged_t = base::AtomicWord;
 
 #endif  // V8_COMPRESS_POINTERS
-
-// Defines whether to use smi-corrupting or branchful implementation of pointer
-// decompression should be used.
-constexpr bool kUseSmiCorruptingPtrDecompression = true;
 
 STATIC_ASSERT(kTaggedSize == (1 << kTaggedSizeLog2));
 STATIC_ASSERT((kTaggedSize == 8) == TAGGED_SIZE_8_BYTES);

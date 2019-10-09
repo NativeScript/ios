@@ -69,7 +69,6 @@ void Runtime::Init() {
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
     WeakRef::Init(isolate, globalTemplate);
-    //SetTimeout::Init(isolate, globalTemplate);
 
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();

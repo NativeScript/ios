@@ -1009,12 +1009,6 @@ void DispatcherImpl::enable(int callId, const String& method, const ProtocolMess
         errors->setName("maxScriptsCacheSize");
         in_maxScriptsCacheSize = ValueConversions<double>::fromValue(maxScriptsCacheSizeValue, errors);
     }
-    protocol::Value* supportsWasmDwarfValue = object ? object->get("supportsWasmDwarf") : nullptr;
-    Maybe<bool> in_supportsWasmDwarf;
-    if (supportsWasmDwarfValue) {
-        errors->setName("supportsWasmDwarf");
-        in_supportsWasmDwarf = ValueConversions<bool>::fromValue(supportsWasmDwarfValue, errors);
-    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -1024,7 +1018,7 @@ void DispatcherImpl::enable(int callId, const String& method, const ProtocolMess
     String out_debuggerId;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->enable(std::move(in_maxScriptsCacheSize), std::move(in_supportsWasmDwarf), &out_debuggerId);
+    DispatchResponse response = m_backend->enable(std::move(in_maxScriptsCacheSize), &out_debuggerId);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
