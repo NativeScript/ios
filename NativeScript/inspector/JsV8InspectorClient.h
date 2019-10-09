@@ -6,16 +6,16 @@
 #include <vector>
 #include <map>
 
-#include "include/libplatform/libplatform.h"
 #include "include/v8-inspector.h"
+#include "runtime/Runtime.h"
 
 namespace v8_inspector {
 
 class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
 public:
-    JsV8InspectorClient(v8::Platform* platform, v8::Isolate* isolate);
+    JsV8InspectorClient(tns::Runtime* runtime);
     void init();
-    void connect();
+    void connect(int argc, char** argv);
     void createInspectorSession();
     void disconnect();
     void dispatchMessage(const std::string& message);
@@ -27,7 +27,9 @@ public:
     void runMessageLoopOnPause(int contextGroupId) override;
     void quitMessageLoopOnPause() override;
     v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
-    void registerModules(std::function<void(v8::Isolate*, std::string)> runModule);
+
+    void scheduleBreak();
+    void registerModules();
 
     static std::map<std::string, v8::Persistent<v8::Object>*> Domains;
 private:
@@ -36,14 +38,13 @@ private:
     std::unique_ptr<V8Inspector> inspector_;
     v8::Persistent<v8::Context> context_;
     std::unique_ptr<V8InspectorSession> session_;
-    v8::Platform* platform_;
-    v8::Isolate* isolate_;
+    tns::Runtime* runtime_;
     bool terminated_;
     std::vector<std::string> messages_;
     bool runningNestedLoops_;
     dispatch_queue_t messagesQueue_;
 
-    void enableInspector();
+    void enableInspector(int argc, char** argv);
     void notify(std::unique_ptr<StringBuffer> message);
     template <class TypeName>
     static v8::Local<TypeName> PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent);

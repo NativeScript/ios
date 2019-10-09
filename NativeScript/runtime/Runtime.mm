@@ -3,14 +3,12 @@
 #include "Runtime.h"
 #include "Caches.h"
 #include "Console.h"
-//#include "SetTimeout.h"
 #include "ArgConverter.h"
 #include "Interop.h"
 #include "InlineFunctions.h"
 #include "SimpleAllocator.h"
 #include "RuntimeConfig.h"
 #include "Helpers.h"
-#include "Tasks.h"
 #include "TSHelpers.h"
 #include "WeakRef.h"
 #include "Worker.h"
@@ -22,7 +20,6 @@ using namespace v8;
 using namespace std;
 
 #include "v8-inspector-platform.h"
-#include "JsV8InspectorClient.h"
 
 namespace tns {
 
@@ -34,37 +31,6 @@ void Runtime::Initialize() {
 
 Runtime::Runtime() {
     currentRuntime_ = this;
-}
-
-void Runtime::InitAndRunMainScript() {
-    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-    this->Init();
-    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-    printf("Runtime initialization took %llims\n", duration);
-
-    if (RuntimeConfig.IsDebug) {
-        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(this->platform_, this->isolate_);
-        inspectorClient->init();
-        inspectorClient->connect();
-        inspectorClient->registerModules([this](Isolate* isolate, std::string moduleName) {
-            this->moduleInternal_.RunModule(isolate, moduleName);
-        });
-    }
-
-    {
-        Isolate* isolate = this->GetIsolate();
-        HandleScope scope(isolate);
-        TryCatch tc(isolate);
-        assert(this->moduleInternal_.RunModule(isolate, "./"));
-
-        if (tc.HasCaught()) {
-            tns::LogError(isolate, tc);
-            assert(false);
-        }
-    }
-
-    tns::Tasks::Drain();
 }
 
 void Runtime::Init() {
@@ -128,6 +94,18 @@ void Runtime::Init() {
     isolate_ = isolate;
 }
 
+void Runtime::RunMainScript() {
+    Isolate* isolate = this->GetIsolate();
+    HandleScope scope(isolate);
+    TryCatch tc(isolate);
+    assert(this->moduleInternal_.RunModule(isolate, "./"));
+
+    if (tc.HasCaught()) {
+        tns::LogError(isolate, tc);
+        assert(false);
+    }
+}
+
 void Runtime::RunScript(string file, TryCatch& tc) {
     Isolate* isolate = isolate_;
     Isolate::Scope isolate_scope(isolate);
@@ -148,6 +126,10 @@ void Runtime::RunScript(string file, TryCatch& tc) {
     if (!script->Run(context).ToLocal(&result)) {
         return;
     }
+}
+
+void Runtime::RunModule(const std::string moduleName) {
+    this->moduleInternal_.RunModule(this->isolate_, moduleName);
 }
 
 Isolate* Runtime::GetIsolate() {

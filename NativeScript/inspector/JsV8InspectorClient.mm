@@ -4,6 +4,7 @@
 #include <notify.h>
 #include <chrono>
 #include "JsV8InspectorClient.h"
+#include "include/libplatform/libplatform.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-log-agent-impl.h"
 #include "Helpers.h"
@@ -28,6 +29,7 @@ id inspectorLock() {
 }
 static int currentInspectorPort = 0;
 static dispatch_io_t inspector_io = nil;
+static BOOL isWaitingForDebugger = NO;
 static TNSInspectorSendMessageBlock globalSendMessageToFrontend = nullptr;
 
 #define CheckError(retval, handler)                                             \
@@ -212,7 +214,7 @@ static dispatch_source_t createInspectorServer(TNSInspectorFrontendConnectedHand
     return listenSource;
 }
 
-void JsV8InspectorClient::enableInspector() {
+void JsV8InspectorClient::enableInspector(int argc, char** argv) {
     __block dispatch_source_t listenSource = nil;
     __block dispatch_io_t current_connection_inspector_io = nil;
 
@@ -252,6 +254,16 @@ void JsV8InspectorClient::enableInspector() {
             current_connection_inspector_io = io;
         }
 
+         if (isWaitingForDebugger) {
+             isWaitingForDebugger = NO;
+             CFRunLoopRef runloop = CFRunLoopGetMain();
+             CFRunLoopPerformBlock(runloop, (__bridge CFTypeRef)(NSRunLoopCommonModes), ^{
+                 CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1, false);
+                 this->scheduleBreak();
+             });
+             CFRunLoopWakeUp(runloop);
+         }
+
         return ^(NSString* message, NSError* error) {
             if (message != nil) {
                 dispatch_sync(this->messagesQueue_, ^{
@@ -281,6 +293,27 @@ void JsV8InspectorClient::enableInspector() {
 
     listenSource = createInspectorServer(connectionHandler, ioErrorHandler, clearInspector);
 
+     int waitForDebuggerSubscription;
+     notify_register_dispatch(NOTIFICATION("WaitForDebugger"), &waitForDebuggerSubscription, dispatch_get_main_queue(), ^(int token) {
+         isWaitingForDebugger = YES;
+
+         dispatch_time_t delay = dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 30);
+         dispatch_after(delay, dispatch_get_main_queue(), ^{
+             if (isWaitingForDebugger) {
+                 isWaitingForDebugger = NO;
+                 NSLog(@"NativeScript waiting for debugger timeout elapsed. Continuing execution.");
+             }
+         });
+
+         NSLog(@"NativeScript waiting for debugger.");
+         CFRunLoopPerformBlock(CFRunLoopGetMain(), kCFRunLoopDefaultMode, ^{
+             do {
+                 CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, false);
+             } while (isWaitingForDebugger);
+         });
+         CFRunLoopWakeUp(CFRunLoopGetMain());
+     });
+
     int attachRequestSubscription;
     notify_register_dispatch(NOTIFICATION("AttachRequest"), &attachRequestSubscription, dispatch_get_main_queue(), ^(int token) {
         clear();
@@ -290,12 +323,34 @@ void JsV8InspectorClient::enableInspector() {
         notify_post(NOTIFICATION("ReadyForAttach"));
     });
 
+     notify_post(NOTIFICATION("AppLaunching"));
+
+     for (int i = 1; i < argc; i++) {
+         BOOL startListening = NO;
+         BOOL shouldWaitForDebugger = NO;
+
+         if (strcmp(argv[i], "--nativescript-debug-brk") == 0) {
+             shouldWaitForDebugger = YES;
+         } else if (strcmp(argv[i], "--nativescript-debug-start") == 0) {
+             startListening = YES;
+         }
+
+         if (startListening || shouldWaitForDebugger) {
+             notify_post(NOTIFICATION("AttachRequest"));
+             if (shouldWaitForDebugger) {
+                 notify_post(NOTIFICATION("WaitForDebugger"));
+             }
+
+             break;
+         }
+     }
+
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.5, false);
+    notify_cancel(waitForDebuggerSubscription);
 }
 
-JsV8InspectorClient::JsV8InspectorClient(v8::Platform* platform, Isolate* isolate)
-    : platform_(platform),
-      isolate_(isolate),
+JsV8InspectorClient::JsV8InspectorClient(tns::Runtime* runtime)
+    : runtime_(runtime),
       messages_(),
       runningNestedLoops_(false) {
      this->messagesQueue_ = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
@@ -306,23 +361,24 @@ void JsV8InspectorClient::init() {
         return;
     }
 
-    v8::HandleScope handle_scope(isolate_);
+    Isolate* isolate = runtime_->GetIsolate();
+    HandleScope handle_scope(isolate);
 
-    v8::Local<Context> context = isolate_->GetCurrentContext();
+    Local<Context> context = isolate->GetCurrentContext();
 
-    inspector_ = V8Inspector::create(isolate_, this);
+    inspector_ = V8Inspector::create(isolate, this);
 
     inspector_->contextCreated(v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, v8_inspector::StringView()));
 
-    v8::Persistent<v8::Context> persistentContext(context->GetIsolate(), JsV8InspectorClient::PersistentToLocal(isolate_, context_));
-    context_.Reset(isolate_, persistentContext);
+    Persistent<Context> persistentContext(context->GetIsolate(), JsV8InspectorClient::PersistentToLocal(isolate, context_));
+    context_.Reset(isolate, persistentContext);
 
     this->createInspectorSession();
 }
 
-void JsV8InspectorClient::connect() {
+void JsV8InspectorClient::connect(int argc, char** argv) {
     this->isConnected_ = true;
-    this->enableInspector();
+    this->enableInspector(argc, argv);
 }
 
 void JsV8InspectorClient::createInspectorSession() {
@@ -330,7 +386,8 @@ void JsV8InspectorClient::createInspectorSession() {
 }
 
 void JsV8InspectorClient::disconnect() {
-    v8::HandleScope handleScope(isolate_);
+    Isolate* isolate = runtime_->GetIsolate();
+    HandleScope handleScope(isolate);
 
     session_->resume();
     session_.reset();
@@ -353,7 +410,9 @@ void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
             this->dispatchMessage(message);
         }
 
-        while (v8::platform::PumpMessageLoop(platform_, isolate_)) {
+        Platform* platform = tns::Runtime::GetPlatform();
+        Isolate* isolate = runtime_->GetIsolate();
+        while (platform::PumpMessageLoop(platform, isolate)) {
         }
     }
 
@@ -393,7 +452,8 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
 }
 
 Local<Context> JsV8InspectorClient::ensureDefaultContextInGroup(int contextGroupId) {
-    v8::Local<v8::Context> context = PersistentToLocal(isolate_, context_);
+    Isolate* isolate = runtime_->GetIsolate();
+    Local<Context> context = PersistentToLocal(isolate, context_);
     return context;
 }
 
@@ -410,17 +470,17 @@ std::string JsV8InspectorClient::PumpMessage() {
 }
 
 template<class TypeName>
-inline v8::Local<TypeName> StrongPersistentToLocal(const v8::Persistent<TypeName>& persistent) {
-    return *reinterpret_cast<v8::Local<TypeName> *>(const_cast<v8::Persistent<TypeName> *>(&persistent));
+inline Local<TypeName> StrongPersistentToLocal(const Persistent<TypeName>& persistent) {
+    return *reinterpret_cast<Local<TypeName> *>(const_cast<Persistent<TypeName> *>(&persistent));
 }
 
 template<class TypeName>
-inline v8::Local<TypeName> WeakPersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent) {
-    return v8::Local<TypeName>::New(isolate, persistent);
+inline Local<TypeName> WeakPersistentToLocal(Isolate* isolate, const Persistent<TypeName>& persistent) {
+    return Local<TypeName>::New(isolate, persistent);
 }
 
 template<class TypeName>
-inline v8::Local<TypeName> JsV8InspectorClient::PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent) {
+inline Local<TypeName> JsV8InspectorClient::PersistentToLocal(Isolate* isolate, const Persistent<TypeName>& persistent) {
     if (persistent.IsWeak()) {
         return WeakPersistentToLocal(isolate, persistent);
     } else {
@@ -428,25 +488,32 @@ inline v8::Local<TypeName> JsV8InspectorClient::PersistentToLocal(v8::Isolate* i
     }
 }
 
-void JsV8InspectorClient::registerModules(std::function<void(v8::Isolate*, std::string)> runModule) {
-    HandleScope scope(isolate_);
-    Local<Context> context = isolate_->GetCurrentContext();
+void JsV8InspectorClient::scheduleBreak() {
+    Isolate* isolate = runtime_->GetIsolate();
+    HandleScope scope(isolate);
+    this->session_->schedulePauseOnNextStatement(StringView(), StringView());
+}
+
+void JsV8InspectorClient::registerModules() {
+    Isolate* isolate = runtime_->GetIsolate();
+    HandleScope scope(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
-    Local<Object> inspectorObject = Object::New(isolate_);
+    Local<Object> inspectorObject = Object::New(isolate);
 
-    assert(global->Set(context, tns::ToV8String(isolate_, "__inspector"), inspectorObject).FromMaybe(false));
-    v8::Local<v8::Function> func;
+    assert(global->Set(context, tns::ToV8String(isolate, "__inspector"), inspectorObject).FromMaybe(false));
+    Local<v8::Function> func;
     bool success = v8::Function::New(context, registerDomainDispatcherCallback).ToLocal(&func);
-    assert(success && global->Set(context, tns::ToV8String(isolate_, "__registerDomainDispatcher"), func).FromMaybe(false));
+    assert(success && global->Set(context, tns::ToV8String(isolate, "__registerDomainDispatcher"), func).FromMaybe(false));
 
-    Local<External> data = External::New(isolate_, this);
+    Local<External> data = External::New(isolate, this);
     success = v8::Function::New(context, inspectorSendEventCallback, data).ToLocal(&func);
-    assert(success && global->Set(context, tns::ToV8String(isolate_, "__inspectorSendEvent"), func).FromMaybe(false));
+    assert(success && global->Set(context, tns::ToV8String(isolate, "__inspectorSendEvent"), func).FromMaybe(false));
 
     success = v8::Function::New(context, inspectorTimestampCallback).ToLocal(&func);
-    assert(success && global->Set(context, tns::ToV8String(isolate_, "__inspectorTimestamp"), func).FromMaybe(false));
+    assert(success && global->Set(context, tns::ToV8String(isolate, "__inspectorTimestamp"), func).FromMaybe(false));
 
-    runModule(isolate_, "inspector_modules");
+    runtime_->RunModule("inspector_modules");
 }
 
 void JsV8InspectorClient::registerDomainDispatcherCallback(const FunctionCallbackInfo<Value>& args) {
@@ -484,7 +551,7 @@ void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<
     client->dispatchMessage(message);
 }
 
-void JsV8InspectorClient::inspectorTimestampCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void JsV8InspectorClient::inspectorTimestampCallback(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
     double timestamp = std::chrono::seconds(std::chrono::seconds(std::time(NULL))).count();
     Local<Number> result = Number::New(isolate, timestamp);
@@ -492,7 +559,7 @@ void JsV8InspectorClient::inspectorTimestampCallback(const v8::FunctionCallbackI
 }
 
 int JsV8InspectorClient::contextGroupId = 1;
-std::map<std::string, v8::Persistent<v8::Object>*> JsV8InspectorClient::Domains;
+std::map<std::string, Persistent<Object>*> JsV8InspectorClient::Domains;
 
 }
 

@@ -59,6 +59,8 @@ int main(int argc, char *argv[]) {
         config.SnapshotPtr = startSnapshotPtr;
         config.SnapshotSize = snapshotSize;
         config.BaseDir = baseDir;
+        config.ArgumentsCount = argc;
+        config.Arguments = argv;
 
         [NativeScript start:config];
 

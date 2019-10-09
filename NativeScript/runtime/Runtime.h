@@ -12,7 +12,7 @@ class Runtime {
 public:
     Runtime();
     void Init();
-    void InitAndRunMainScript();
+    void RunMainScript();
     void RunScript(std::string file, v8::TryCatch& tc);
     v8::Isolate* GetIsolate();
 
@@ -20,10 +20,16 @@ public:
 
     void SetWorkerId(int workerId);
 
+    void RunModule(const std::string moduleName);
+
     static void Initialize();
 
     static Runtime* GetCurrentRuntime() {
         return currentRuntime_;
+    }
+
+    static v8::Platform* GetPlatform() {
+        return platform_;
     }
 private:
     static thread_local Runtime* currentRuntime_;
