@@ -2,6 +2,7 @@
 #include <numeric>
 #include <sstream>
 #include "ClassBuilder.h"
+#include "NativeScriptException.h"
 #include "FastEnumerationAdapter.h"
 #include "ArgConverter.h"
 #include "ObjectManager.h"
@@ -31,99 +32,106 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.Length() > 0 && info[0]->IsObject() && info.This()->IsFunction());
 
     Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
+    try {
+        Local<Context> context = isolate->GetCurrentContext();
+        CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
 
-    Local<Object> implementationObject = info[0].As<Object>();
-    Local<v8::Function> baseFunc = info.This().As<v8::Function>();
-    std::string baseClassName = tns::ToString(isolate, baseFunc->GetName());
+        Local<Object> implementationObject = info[0].As<Object>();
+        Local<v8::Function> baseFunc = info.This().As<v8::Function>();
+        std::string baseClassName = tns::ToString(isolate, baseFunc->GetName());
 
-    BaseDataWrapper* baseWrapper = tns::GetValue(isolate, baseFunc);
-    if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::ObjCClass) {
-        ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(baseWrapper);
-        if (classWrapper->ExtendedClass()) {
-            tns::ThrowError(isolate, "Cannot extend an already extended class");
-            return;
+        BaseDataWrapper* baseWrapper = tns::GetValue(isolate, baseFunc);
+        if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::ObjCClass) {
+            ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(baseWrapper);
+            if (classWrapper->ExtendedClass()) {
+                throw NativeScriptException("Cannot extend an already extended class");
+            }
         }
-    }
 
-    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
-    const InterfaceMeta* interfaceMeta = globalTable->findInterfaceMeta(baseClassName.c_str());
-    assert(interfaceMeta != nullptr);
+        const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+        const InterfaceMeta* interfaceMeta = globalTable->findInterfaceMeta(baseClassName.c_str());
+        assert(interfaceMeta != nullptr);
 
-    Local<Object> nativeSignature;
-    std::string staticClassName;
-    if (info.Length() > 1 && info[1]->IsObject()) {
-        nativeSignature = info[1].As<Object>();
-        Local<Value> explicitClassName;
-        assert(nativeSignature->Get(context, tns::ToV8String(isolate, "name")).ToLocal(&explicitClassName));
-        if (!explicitClassName.IsEmpty() && !explicitClassName->IsNullOrUndefined()) {
-            staticClassName = tns::ToString(isolate, explicitClassName);
+        Local<Object> nativeSignature;
+        std::string staticClassName;
+        if (info.Length() > 1 && info[1]->IsObject()) {
+            nativeSignature = info[1].As<Object>();
+            Local<Value> explicitClassName;
+            assert(nativeSignature->Get(context, tns::ToV8String(isolate, "name")).ToLocal(&explicitClassName));
+            if (!explicitClassName.IsEmpty() && !explicitClassName->IsNullOrUndefined()) {
+                staticClassName = tns::ToString(isolate, explicitClassName);
+            }
         }
+
+        Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName);
+        if (!nativeSignature.IsEmpty()) {
+            ClassBuilder::ExposeDynamicMembers(isolate, extendedClass, implementationObject, nativeSignature);
+        } else {
+            ClassBuilder::ExposeDynamicMethods(isolate, extendedClass, Local<Value>(), Local<Value>(), implementationObject);
+        }
+
+        auto cache = Caches::Get(isolate);
+        Persistent<v8::Function>* poBaseCtorFunc = cache->CtorFuncs.find(item->meta_->name())->second;
+        Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
+
+        CacheItem* cacheItem = new CacheItem(nullptr, extendedClass);
+        Local<External> ext = External::New(isolate, cacheItem);
+        Local<FunctionTemplate> extendedClassCtorFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
+        extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+
+        Local<v8::Function> extendClassCtorFunc;
+        if (!extendedClassCtorFuncTemplate->GetFunction(context).ToLocal(&extendClassCtorFunc)) {
+            assert(false);
+        }
+
+        Local<Value> baseProto;
+        bool success = baseCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&baseProto);
+        assert(success);
+
+        if (!implementationObject->SetPrototype(context, baseProto).To(&success) || !success) {
+            assert(false);
+        }
+        if (!implementationObject->SetAccessor(context, tns::ToV8String(isolate, "super"), SuperAccessorGetterCallback, nullptr, ext).To(&success) || !success) {
+            assert(false);
+        }
+
+        extendClassCtorFunc->SetName(tns::ToV8String(isolate, class_getName(extendedClass)));
+        Local<Value> extendFuncPrototypeValue;
+        success = extendClassCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&extendFuncPrototypeValue);
+        assert(success && extendFuncPrototypeValue->IsObject());
+        Local<Object> extendFuncPrototype = extendFuncPrototypeValue.As<Object>();
+        if (!extendFuncPrototype->SetPrototype(context, implementationObject).To(&success) || !success) {
+            assert(false);
+        }
+
+        if (!extendClassCtorFunc->SetPrototype(context, baseCtorFunc).To(&success) || !success) {
+            assert(false);
+        }
+
+        std::string extendedClassName = class_getName(extendedClass);
+        ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass, true);
+        tns::SetValue(isolate, extendClassCtorFunc, wrapper);
+
+        cache->CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
+        cache->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendFuncPrototype)));
+
+        info.GetReturnValue().Set(extendClassCtorFunc);
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
     }
-
-    Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName);
-    if (!nativeSignature.IsEmpty()) {
-        ClassBuilder::ExposeDynamicMembers(isolate, extendedClass, implementationObject, nativeSignature);
-    } else {
-        ClassBuilder::ExposeDynamicMethods(isolate, extendedClass, Local<Value>(), Local<Value>(), implementationObject);
-    }
-
-    auto cache = Caches::Get(isolate);
-    Persistent<v8::Function>* poBaseCtorFunc = cache->CtorFuncs.find(item->meta_->name())->second;
-    Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
-
-    CacheItem* cacheItem = new CacheItem(nullptr, extendedClass);
-    Local<External> ext = External::New(isolate, cacheItem);
-    Local<FunctionTemplate> extendedClassCtorFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
-    extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-
-    Local<v8::Function> extendClassCtorFunc;
-    if (!extendedClassCtorFuncTemplate->GetFunction(context).ToLocal(&extendClassCtorFunc)) {
-        assert(false);
-    }
-
-    Local<Value> baseProto;
-    bool success = baseCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&baseProto);
-    assert(success);
-
-    if (!implementationObject->SetPrototype(context, baseProto).To(&success) || !success) {
-        assert(false);
-    }
-    if (!implementationObject->SetAccessor(context, tns::ToV8String(isolate, "super"), SuperAccessorGetterCallback, nullptr, ext).To(&success) || !success) {
-        assert(false);
-    }
-
-    extendClassCtorFunc->SetName(tns::ToV8String(isolate, class_getName(extendedClass)));
-    Local<Value> extendFuncPrototypeValue;
-    success = extendClassCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&extendFuncPrototypeValue);
-    assert(success && extendFuncPrototypeValue->IsObject());
-    Local<Object> extendFuncPrototype = extendFuncPrototypeValue.As<Object>();
-    if (!extendFuncPrototype->SetPrototype(context, implementationObject).To(&success) || !success) {
-        assert(false);
-    }
-
-    if (!extendClassCtorFunc->SetPrototype(context, baseCtorFunc).To(&success) || !success) {
-        assert(false);
-    }
-
-    std::string extendedClassName = class_getName(extendedClass);
-    ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass, true);
-    tns::SetValue(isolate, extendClassCtorFunc, wrapper);
-
-    cache->CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
-    cache->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendFuncPrototype)));
-
-    info.GetReturnValue().Set(extendClassCtorFunc);
 }
 
 void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
 
-    CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
-    Class klass = item->data_;
+    try {
+        CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
+        Class klass = item->data_;
 
-    ArgConverter::ConstructObject(isolate, info, klass);
+        ArgConverter::ConstructObject(isolate, info, klass);
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
+    }
 }
 
 void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {

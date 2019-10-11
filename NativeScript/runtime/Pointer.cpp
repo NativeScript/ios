@@ -1,6 +1,7 @@
 #include "Pointer.h"
 #include "Caches.h"
 #include "Helpers.h"
+#include "NativeScriptException.h"
 #include "ObjectManager.h"
 
 using namespace v8;
@@ -64,48 +65,51 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
 
 void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
-    void* ptr = nullptr;
+    try {
+        void* ptr = nullptr;
 
-    if (info.Length() == 1) {
-        if (!tns::IsNumber(info[0])) {
-            tns::ThrowError(isolate, "Pointer constructor's first arg must be an integer.");
+        if (info.Length() == 1) {
+            if (!tns::IsNumber(info[0])) {
+                throw NativeScriptException("Pointer constructor's first arg must be an integer.");
+            }
+
+            Local<Number> arg = info[0].As<Number>();
+            Local<Context> context = isolate->GetCurrentContext();
+
+    #if __SIZEOF_POINTER__ == 8
+            // JSC stores 64-bit integers as doubles in JSValue.
+            // Caution: This means that pointers with more than 54 significant bits
+            // are likely to be rounded and misrepresented!
+            // However, current OS and hardware implementations are using 48 bits,
+            // so we're safe at the time being.
+            // See https://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details
+            // and https://en.wikipedia.org/wiki/ARM_architecture#ARMv8-A
+            int64_t value;
+            assert(arg->IntegerValue(context).To(&value));
+            ptr = reinterpret_cast<void*>(value);
+    #else
+            int32_t value;
+            assert(arg->Int32Value(context).To(&value));
+            ptr = reinterpret_cast<void*>(value);
+    #endif
+        }
+
+        auto cache = Caches::Get(isolate);
+        auto it = cache->PointerInstances.find(ptr);
+        if (it != cache->PointerInstances.end()) {
+            info.GetReturnValue().Set(it->second->Get(isolate));
             return;
         }
 
-        Local<Number> arg = info[0].As<Number>();
-        Local<Context> context = isolate->GetCurrentContext();
+        PointerWrapper* wrapper = new PointerWrapper(ptr);
+        tns::SetValue(isolate, info.This(), wrapper);
 
-#if __SIZEOF_POINTER__ == 8
-        // JSC stores 64-bit integers as doubles in JSValue.
-        // Caution: This means that pointers with more than 54 significant bits
-        // are likely to be rounded and misrepresented!
-        // However, current OS and hardware implementations are using 48 bits,
-        // so we're safe at the time being.
-        // See https://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details
-        // and https://en.wikipedia.org/wiki/ARM_architecture#ARMv8-A
-        int64_t value;
-        assert(arg->IntegerValue(context).To(&value));
-        ptr = reinterpret_cast<void*>(value);
-#else
-        int32_t value;
-        assert(arg->Int32Value(context).To(&value));
-        ptr = reinterpret_cast<void*>(value);
-#endif
+        ObjectManager::Register(isolate, info.This());
+
+        cache->PointerInstances.insert(std::make_pair(ptr, new Persistent<Object>(isolate, info.This())));
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
     }
-
-    auto cache = Caches::Get(isolate);
-    auto it = cache->PointerInstances.find(ptr);
-    if (it != cache->PointerInstances.end()) {
-        info.GetReturnValue().Set(it->second->Get(isolate));
-        return;
-    }
-
-    PointerWrapper* wrapper = new PointerWrapper(ptr);
-    tns::SetValue(isolate, info.This(), wrapper);
-
-    ObjectManager::Register(isolate, info.This());
-
-    cache->PointerInstances.insert(std::make_pair(ptr, new Persistent<Object>(isolate, info.This())));
 }
 
 void Pointer::RegisterAddMethod(Isolate* isolate, Local<Object> prototype) {

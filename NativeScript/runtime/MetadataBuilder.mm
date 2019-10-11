@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include <map>
 #include "MetadataBuilder.h"
+#include "NativeScriptException.h"
 #include "ArgConverter.h"
 #include "ObjectManager.h"
 #include "InlineFunctions.h"
@@ -143,40 +144,42 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isol
 
 void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    try {
+        StructTypeWrapper* typeWrapper = static_cast<StructTypeWrapper*>(info.Data().As<External>()->Value());
 
-    StructTypeWrapper* typeWrapper = static_cast<StructTypeWrapper*>(info.Data().As<External>()->Value());
+        StructInfo structInfo = typeWrapper->StructInfo();
 
-    StructInfo structInfo = typeWrapper->StructInfo();
+        void* dest = nullptr;
 
-    void* dest = nullptr;
+        if (info.IsConstructCall()) {
+            // A new structure is allocated
+            Local<Value> initializer = info.Length() > 0 ? info[0] : Local<Value>();
+            dest = malloc(structInfo.FFIType()->size);
+            Interop::InitializeStruct(info.GetIsolate(), dest, structInfo.Fields(), initializer);
+        } else {
+            // The structure is not used as constructor and in this case we assume a pointer is passed to the function
+            // This pointer will be used as backing memory for the structure
+            BaseDataWrapper* wrapper = nullptr;
+            if (info.Length() < 1 || !(wrapper = tns::GetValue(isolate, info[0])) || wrapper->Type() != WrapperType::Pointer) {
+                throw NativeScriptException("A pointer instance must be passed to the structure initializer");
+            }
 
-    if (info.IsConstructCall()) {
-        // A new structure is allocated
-        Local<Value> initializer = info.Length() > 0 ? info[0] : Local<Value>();
-        dest = malloc(structInfo.FFIType()->size);
-        Interop::InitializeStruct(info.GetIsolate(), dest, structInfo.Fields(), initializer);
-    } else {
-        // The structure is not used as constructor and in this case we assume a pointer is passed to the function
-        // This pointer will be used as backing memory for the structure
-        BaseDataWrapper* wrapper = nullptr;
-        if (info.Length() < 1 || !(wrapper = tns::GetValue(isolate, info[0])) || wrapper->Type() != WrapperType::Pointer) {
-            tns::ThrowError(isolate, "A pointer instance must be passed to the structure initializer");
-            return;
+            PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
+            dest = pw->Data();
         }
 
-        PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
-        dest = pw->Data();
+        StructWrapper* wrapper = new StructWrapper(structInfo, dest);
+        Local<Value> result = ArgConverter::ConvertArgument(isolate, wrapper);
+
+        Caches* cache = Caches::Get(isolate);
+        Persistent<Value>* poResult = new Persistent<Value>(isolate, result);
+        std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
+        cache->StructInstances.emplace(std::make_pair(key, poResult));
+
+        info.GetReturnValue().Set(result);
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
     }
-
-    StructWrapper* wrapper = new StructWrapper(structInfo, dest);
-    Local<Value> result = ArgConverter::ConvertArgument(isolate, wrapper);
-
-    Caches* cache = Caches::Get(isolate);
-    Persistent<Value>* poResult = new Persistent<Value>(isolate, result);
-    std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
-    cache->StructInstances.emplace(std::make_pair(key, poResult));
-
-    info.GetReturnValue().Set(result);
 }
 
 void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& info) {
@@ -554,36 +557,43 @@ void MetadataBuilder::RegisterStaticProtocols(Isolate* isolate, Local<v8::Functi
 void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.IsConstructCall());
     Isolate* isolate = info.GetIsolate();
-    CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
-    Class klass = objc_getClass(item->meta_->name());
+    try {
+        CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
+        Class klass = objc_getClass(item->meta_->name());
 
-    const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
-    ArgConverter::ConstructObject(isolate, info, klass, interfaceMeta);
+        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
+        ArgConverter::ConstructObject(isolate, info, klass, interfaceMeta);
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
+    }
 }
 
 void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.Length() == 0);
-
     Isolate* isolate = info.GetIsolate();
 
-    Local<Object> thiz = info.This();
-    Class klass;
+    try {
+        Local<Object> thiz = info.This();
+        Class klass;
 
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
-    if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass) {
-        ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
-        klass = classWrapper->Klass();
-    } else {
-        CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
-        const InterfaceMeta* meta = item->meta_;
-        klass = objc_getClass(meta->name());
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
+        if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass) {
+            ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
+            klass = classWrapper->Klass();
+        } else {
+            CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
+            const InterfaceMeta* meta = item->meta_;
+            klass = objc_getClass(meta->name());
+        }
+
+        id obj = [klass alloc];
+
+        std::string className = class_getName(klass);
+        Local<Value> result = ArgConverter::CreateJsWrapper(isolate, new ObjCDataWrapper(obj), Local<Object>());
+        info.GetReturnValue().Set(result);
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
     }
-
-    id obj = [klass alloc];
-
-    std::string className = class_getName(klass);
-    Local<Value> result = ArgConverter::CreateJsWrapper(isolate, new ObjCDataWrapper(obj), Local<Object>());
-    info.GetReturnValue().Set(result);
 }
 
 void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
@@ -722,38 +732,47 @@ void MetadataBuilder::DefineFunctionLengthProperty(Local<Context> context, const
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass, bool isMethodCallback) {
     Class klass = objc_getClass(containingClass.c_str());
     // TODO: Find out if the isMethodCallback property can be determined based on a UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
-    return ArgConverter::Invoke(isolate, klass, receiver, args, meta, isMethodCallback);
+
+    try {
+        return ArgConverter::Invoke(isolate, klass, receiver, args, meta, isMethodCallback);
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
+        return Local<Value>();
+    }
 }
 
 void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    try {
+        CacheItem<FunctionMeta>* item = static_cast<CacheItem<FunctionMeta>*>(info.Data().As<External>()->Value());
 
-    CacheItem<FunctionMeta>* item = static_cast<CacheItem<FunctionMeta>*>(info.Data().As<External>()->Value());
+        if (strcmp(item->meta_->jsName(), "UIApplicationMain") == 0) {
+            std::vector<Persistent<Value>*> args;
+            for (int i = 0; i < info.Length(); i++) {
+                args.push_back(new Persistent<Value>(isolate, info[i]));
+            }
 
-    if (strcmp(item->meta_->jsName(), "UIApplicationMain") == 0) {
-        std::vector<Persistent<Value>*> args;
-        for (int i = 0; i < info.Length(); i++) {
-            args.push_back(new Persistent<Value>(isolate, info[i]));
+            void* userData = new TaskContext(isolate, item->meta_, args);
+            Tasks::Register([](void* userData) {
+                TaskContext* context = static_cast<TaskContext*>(userData);
+                std::vector<Local<Value>> args;
+                HandleScope handle_scope(context->isolate_);
+                for (int i = 0; i < context->args_.size(); i++) {
+                    Local<Value> arg = context->args_[i]->Get(context->isolate_);
+                    args.push_back(arg);
+                }
+                Interop::CallFunction(context->isolate_, context->meta_, args);
+            }, userData);
+            return;
         }
 
-        void* userData = new TaskContext(isolate, item->meta_, args);
-        Tasks::Register([](void* userData) {
-            TaskContext* context = static_cast<TaskContext*>(userData);
-            std::vector<Local<Value>> args;
-            HandleScope handle_scope(context->isolate_);
-            for (int i = 0; i < context->args_.size(); i++) {
-                Local<Value> arg = context->args_[i]->Get(context->isolate_);
-                args.push_back(arg);
-            }
-            Interop::CallFunction(context->isolate_, context->meta_, args);
-        }, userData);
-        return;
-    }
-
-    std::vector<Local<Value>> args = tns::ArgsToVector(info);
-    Local<Value> result = Interop::CallFunction(isolate, item->meta_, args);
-    if (item->meta_->encodings()->first()->type != BinaryTypeEncodingType::VoidEncoding) {
-        info.GetReturnValue().Set(result);
+        std::vector<Local<Value>> args = tns::ArgsToVector(info);
+        Local<Value> result = Interop::CallFunction(isolate, item->meta_, args);
+        if (item->meta_->encodings()->first()->type != BinaryTypeEncodingType::VoidEncoding) {
+            info.GetReturnValue().Set(result);
+        }
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
     }
 }
 

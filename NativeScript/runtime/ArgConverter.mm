@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include <sstream>
 #include "ArgConverter.h"
+#include "NativeScriptException.h"
 #include "DictionaryAdapter.h"
 #include "ObjectManager.h"
 #include "Caches.h"
@@ -127,20 +128,32 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         TryCatch tc(isolate);
         Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
         if (!callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result)) {
-            tns::LogError(isolate, tc);
-            assert(false);
+            memset(retValue, 0, cif->rtype->size);
+            throw NativeScriptException(isolate, tc, "Error calling function");
         }
 
         ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_);
     };
 
     if ([NSThread isMainThread]) {
-        cb();
+        try {
+            cb();
+        } catch (NativeScriptException& ex) {
+            MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
+            Isolate* isolate = data->isolate_;
+            ex.ReThrowToV8(isolate);
+        }
     } else {
         dispatch_group_t group = dispatch_group_create();
         dispatch_group_enter(group);
-        tns::ExecuteOnMainThread([cb, group]() {
-            cb();
+        tns::ExecuteOnMainThread([cb, group, userData]() {
+            try {
+                cb();
+            } catch (NativeScriptException& ex) {
+                MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
+                Isolate* isolate = data->isolate_;
+                ex.ReThrowToV8(isolate);
+            }
             dispatch_group_leave(group);
         });
 
@@ -330,8 +343,7 @@ const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, c
     } while (interfaceMeta);
 
     if (candidates.size() == 0) {
-        tns::ThrowError(isolate, "No initializer found that matches constructor invocation.");
-        return nullptr;
+        throw NativeScriptException("No initializer found that matches constructor invocation.");
     } else if (candidates.size() > 1) {
         if (info.Length() == 0) {
             auto it = std::find_if(candidates.begin(), candidates.end(), [](const MethodMeta* c) -> bool { return strcmp(c->name(), "init") == 0; });
@@ -347,8 +359,7 @@ const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, c
             ss << candidates[i]->selectorAsString();
         }
         std::string errorMessage = ss.str();
-        tns::ThrowError(isolate, errorMessage);
-        return nullptr;
+        throw NativeScriptException(errorMessage);
     }
 
     return candidates[0];

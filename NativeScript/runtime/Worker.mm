@@ -1,5 +1,6 @@
 #include <functional>
 #include "ObjectManager.h"
+#include "NativeScriptException.h"
 #include "Worker.h"
 #include "Caches.h"
 #include "Helpers.h"
@@ -42,133 +43,135 @@ void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool i
 
 void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
-
-    if (!info.IsConstructCall()) {
-        tns::ThrowError(isolate, "Worker function must be called as a constructor.");
-        return;
-    }
-
-    if (info.Length() < 1) {
-        tns::ThrowError(isolate, "Not enough arguments.");
-        return;
-    }
-
-    if (info.Length() > 1) {
-        tns::ThrowError(isolate, "Too many arguments passed.");
-        return;
-    }
-
-    if (!tns::IsString(info[0])) {
-        tns::ThrowError(isolate, "Worker function must be called as a constructor.");
-        return;
-    }
-
-    Local<Object> thiz = info.This();
-    std::string workerPath = ToString(isolate, info[0]);
-    // TODO: Validate worker path and call worker.onerror if the script does not exist
-
-    WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
-    tns::SetValue(isolate, thiz, worker);
-    Persistent<Value>* poWorker = ObjectManager::Register(isolate, thiz);
-
-    std::function<Isolate* ()> func([worker, workerPath]() {
-        tns::Runtime* runtime = new tns::Runtime();
-        runtime->Init();
-        runtime->SetWorkerId(worker->WorkerId());
-        Isolate* workerIsolate = runtime->GetIsolate();
-
-        TryCatch tc(workerIsolate);
-        runtime->RunScript(workerPath, tc);
-        if (tc.HasCaught()) {
-            HandleScope scope(workerIsolate);
-            worker->PassUncaughtExceptionFromWorkerToMain(workerIsolate, tc, false);
-            worker->Terminate();
+    try {
+        if (!info.IsConstructCall()) {
+            throw NativeScriptException("Worker function must be called as a constructor.");
         }
 
-        return workerIsolate;
-    });
+        if (info.Length() < 1) {
+            throw NativeScriptException("Not enough arguments.");
+        }
 
-    worker->Start(poWorker, func);
+        if (info.Length() > 1) {
+            throw NativeScriptException("Too many arguments passed.");
+        }
 
-    Caches::WorkerState* state = new Caches::WorkerState(isolate, poWorker, worker);
-    int workerId = worker->Id();
-    Caches::Workers.Insert(workerId, state);
+        if (!tns::IsString(info[0])) {
+            throw NativeScriptException("Worker function must be called as a constructor.");
+        }
+
+        Local<Object> thiz = info.This();
+        std::string workerPath = ToString(isolate, info[0]);
+        // TODO: Validate worker path and call worker.onerror if the script does not exist
+
+        WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
+        tns::SetValue(isolate, thiz, worker);
+        Persistent<Value>* poWorker = ObjectManager::Register(isolate, thiz);
+
+        std::function<Isolate* ()> func([worker, workerPath]() {
+            tns::Runtime* runtime = new tns::Runtime();
+            runtime->Init();
+            runtime->SetWorkerId(worker->WorkerId());
+            Isolate* workerIsolate = runtime->GetIsolate();
+
+            TryCatch tc(workerIsolate);
+            runtime->RunScript(workerPath, tc);
+            if (tc.HasCaught()) {
+                HandleScope scope(workerIsolate);
+                worker->PassUncaughtExceptionFromWorkerToMain(workerIsolate, tc, false);
+                worker->Terminate();
+            }
+
+            return workerIsolate;
+        });
+
+        worker->Start(poWorker, func);
+
+        Caches::WorkerState* state = new Caches::WorkerState(isolate, poWorker, worker);
+        int workerId = worker->Id();
+        Caches::Workers.Insert(workerId, state);
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
+    }
 }
 
 void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) {
     // Send message from worker to main
-
     Isolate* isolate = info.GetIsolate();
 
-    if (info.Length() < 1) {
-        tns::ThrowError(isolate, "Not enough arguments.");
-        return;
+    try {
+        if (info.Length() < 1) {
+            throw NativeScriptException("Not enough arguments.");
+        }
+
+        if (info.Length() > 1) {
+            throw NativeScriptException("Too many arguments passed.");
+        }
+
+        Runtime* runtime = Runtime::GetCurrentRuntime();
+        int workerId = runtime->WorkerId();
+        Caches::WorkerState* state = Caches::Workers.Get(workerId);
+        assert(state != nullptr);
+        WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
+        if (!worker->IsRunning()) {
+            return;
+        }
+
+        Local<Value> error;
+        Local<Value> result = Worker::Serialize(isolate, info[0], error);
+        if (result.IsEmpty()) {
+            isolate->ThrowException(error);
+            return;
+        }
+
+        std::string message = tns::ToString(isolate, result);
+
+        tns::ExecuteOnMainThread([state, message]() {
+            Isolate* isolate = state->GetIsolate();
+            HandleScope handle_scope(isolate);
+            Local<Value> workerInstance = state->GetWorker()->Get(isolate);
+            assert(!workerInstance.IsEmpty() && workerInstance->IsObject());
+            Worker::OnMessageCallback(isolate, workerInstance, message);
+        });
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
     }
-
-    if (info.Length() > 1) {
-        tns::ThrowError(isolate, "Too many arguments passed.");
-        return;
-    }
-
-    Runtime* runtime = Runtime::GetCurrentRuntime();
-    int workerId = runtime->WorkerId();
-    Caches::WorkerState* state = Caches::Workers.Get(workerId);
-    assert(state != nullptr);
-    WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
-    if (!worker->IsRunning()) {
-        return;
-    }
-
-    Local<Value> error;
-    Local<Value> result = Worker::Serialize(isolate, info[0], error);
-    if (result.IsEmpty()) {
-        isolate->ThrowException(error);
-        return;
-    }
-
-    std::string message = tns::ToString(isolate, result);
-
-    tns::ExecuteOnMainThread([state, message]() {
-        Isolate* isolate = state->GetIsolate();
-        HandleScope handle_scope(isolate);
-        Local<Value> workerInstance = state->GetWorker()->Get(isolate);
-        assert(!workerInstance.IsEmpty() && workerInstance->IsObject());
-        Worker::OnMessageCallback(isolate, workerInstance, message);
-    });
 }
 
 void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
     // Send message from main to worker
-
     Isolate* isolate = info.GetIsolate();
+    try {
+        if (info.Length() < 1) {
+            throw NativeScriptException("Not enough arguments.");
+            return;
+        }
 
-    if (info.Length() < 1) {
-        tns::ThrowError(isolate, "Not enough arguments.");
-        return;
+        if (info.Length() > 1) {
+            throw NativeScriptException("Too many arguments passed.");
+            return;
+        }
+
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
+        assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker);
+
+        WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
+        if (!worker->IsRunning() || worker->IsClosing()) {
+            return;
+        }
+
+        Local<Value> error;
+        Local<Value> result = Worker::Serialize(isolate, info[0], error);
+        if (result.IsEmpty()) {
+            isolate->ThrowException(error);
+            return;
+        }
+
+        std::string message = tns::ToString(isolate, result);
+        worker->PostMessage(message);
+    } catch(NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
     }
-
-    if (info.Length() > 1) {
-        tns::ThrowError(isolate, "Too many arguments passed.");
-        return;
-    }
-
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-    assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker);
-
-    WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
-    if (!worker->IsRunning() || worker->IsClosing()) {
-        return;
-    }
-
-    Local<Value> error;
-    Local<Value> result = Worker::Serialize(isolate, info[0], error);
-    if (result.IsEmpty()) {
-        isolate->ThrowException(error);
-        return;
-    }
-
-    std::string message = tns::ToString(isolate, result);
-    worker->PostMessage(message);
 }
 
 void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::string message) {

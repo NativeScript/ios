@@ -5,6 +5,7 @@
 #include "Console.h"
 #include "ArgConverter.h"
 #include "Interop.h"
+#include "NativeScriptException.h"
 #include "InlineFunctions.h"
 #include "SimpleAllocator.h"
 #include "RuntimeConfig.h"
@@ -70,6 +71,9 @@ void Runtime::Init() {
     DefineTimeMethod(isolate, globalTemplate);
     WeakRef::Init(isolate, globalTemplate);
 
+    isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
+    isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
+
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
 
@@ -96,13 +100,7 @@ void Runtime::Init() {
 void Runtime::RunMainScript() {
     Isolate* isolate = this->GetIsolate();
     HandleScope scope(isolate);
-    TryCatch tc(isolate);
-    assert(this->moduleInternal_.RunModule(isolate, "./"));
-
-    if (tc.HasCaught()) {
-        tns::LogError(isolate, tc);
-        assert(false);
-    }
+    this->moduleInternal_.RunModule(isolate, "./");
 }
 
 void Runtime::RunScript(string file, TryCatch& tc) {

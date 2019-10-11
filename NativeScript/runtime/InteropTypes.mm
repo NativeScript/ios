@@ -3,6 +3,7 @@
 #include "Interop.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
+#include "NativeScriptException.h"
 #include "FunctionReference.h"
 #include "Reference.h"
 #include "Pointer.h"
@@ -114,17 +115,19 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         assert(info.Length() == 1);
-
         Isolate* isolate = info.GetIsolate();
-        Local<Value> arg = info[0];
+        try {
+            Local<Value> arg = info[0];
 
-        Local<Value> result = Interop::HandleOf(isolate, arg);
-        if (result.IsEmpty()) {
-            tns::ThrowError(isolate, "Unknown type");
-            return;
+            Local<Value> result = Interop::HandleOf(isolate, arg);
+            if (result.IsEmpty()) {
+                throw NativeScriptException("Unknown type");
+            }
+
+            info.GetReturnValue().Set(result);
+        } catch (NativeScriptException& ex) {
+            ex.ReThrowToV8(isolate);
         }
-
-        info.GetReturnValue().Set(result);
     }).ToLocal(&func);
     assert(success);
 
@@ -218,56 +221,60 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         assert(info.Length() == 1);
-        Local<Value> arg = info[0];
         Isolate* isolate = info.GetIsolate();
-        size_t size = 0;
+        try {
+            Local<Value> arg = info[0];
+            size_t size = 0;
 
-        if (!arg->IsNullOrUndefined()) {
-            if (arg->IsObject()) {
-                Local<Object> obj = arg.As<Object>();
-                if (BaseDataWrapper* wrapper = tns::GetValue(isolate, obj)) {
-                    switch (wrapper->Type()) {
-                        case WrapperType::ObjCClass:
-                        case WrapperType::ObjCProtocol:
-                        case WrapperType::ObjCObject:
-                        case WrapperType::PointerType:
-                        case WrapperType::Pointer:
-                        case WrapperType::Reference:
-                        case WrapperType::ReferenceType:
-                        case WrapperType::Block:
-                        case WrapperType::FunctionReference:
-                        case WrapperType::FunctionReferenceType:
-                        case WrapperType::Function: {
-                            size = sizeof(void*);
-                            break;
+            if (!arg->IsNullOrUndefined()) {
+                if (arg->IsObject()) {
+                    Local<Object> obj = arg.As<Object>();
+                    if (BaseDataWrapper* wrapper = tns::GetValue(isolate, obj)) {
+                        switch (wrapper->Type()) {
+                            case WrapperType::ObjCClass:
+                            case WrapperType::ObjCProtocol:
+                            case WrapperType::ObjCObject:
+                            case WrapperType::PointerType:
+                            case WrapperType::Pointer:
+                            case WrapperType::Reference:
+                            case WrapperType::ReferenceType:
+                            case WrapperType::Block:
+                            case WrapperType::FunctionReference:
+                            case WrapperType::FunctionReferenceType:
+                            case WrapperType::Function: {
+                                size = sizeof(void*);
+                                break;
+                            }
+                            case WrapperType::Primitive: {
+                                PrimitiveDataWrapper* pw = static_cast<PrimitiveDataWrapper*>(wrapper);
+                                size = pw->Size();
+                                break;
+                            }
+                            case WrapperType::Struct: {
+                                StructWrapper* sw = static_cast<StructWrapper*>(wrapper);
+                                size = sw->StructInfo().FFIType()->size;
+                                break;
+                            }
+                            case WrapperType::StructType: {
+                                StructTypeWrapper* sw = static_cast<StructTypeWrapper*>(wrapper);
+                                StructInfo structInfo = sw->StructInfo();
+                                size = structInfo.FFIType()->size;
+                                break;
+                            }
+                            default:
+                                break;
                         }
-                        case WrapperType::Primitive: {
-                            PrimitiveDataWrapper* pw = static_cast<PrimitiveDataWrapper*>(wrapper);
-                            size = pw->Size();
-                            break;
-                        }
-                        case WrapperType::Struct: {
-                            StructWrapper* sw = static_cast<StructWrapper*>(wrapper);
-                            size = sw->StructInfo().FFIType()->size;
-                            break;
-                        }
-                        case WrapperType::StructType: {
-                            StructTypeWrapper* sw = static_cast<StructTypeWrapper*>(wrapper);
-                            StructInfo structInfo = sw->StructInfo();
-                            size = structInfo.FFIType()->size;
-                            break;
-                        }
-                        default:
-                            break;
                     }
                 }
             }
-        }
 
-        if (size == 0) {
-            tns::ThrowError(isolate, "Unknown type");
-        } else {
-            info.GetReturnValue().Set(Number::New(isolate, size));
+            if (size == 0) {
+                throw NativeScriptException("Unknown type");
+            } else {
+                info.GetReturnValue().Set(Number::New(isolate, size));
+            }
+        } catch (NativeScriptException& ex) {
+            ex.ReThrowToV8(isolate);
         }
     }).ToLocal(&func);
     assert(success);

@@ -513,7 +513,10 @@ void JsV8InspectorClient::registerModules() {
     success = v8::Function::New(context, inspectorTimestampCallback).ToLocal(&func);
     assert(success && global->Set(context, tns::ToV8String(isolate, "__inspectorTimestamp"), func).FromMaybe(false));
 
-    runtime_->RunModule("inspector_modules");
+    {
+        TryCatch tc(isolate);
+        runtime_->RunModule("inspector_modules");
+    }
 }
 
 void JsV8InspectorClient::registerDomainDispatcherCallback(const FunctionCallbackInfo<Value>& args) {
@@ -562,4 +565,3 @@ int JsV8InspectorClient::contextGroupId = 1;
 std::map<std::string, Persistent<Object>*> JsV8InspectorClient::Domains;
 
 }
-

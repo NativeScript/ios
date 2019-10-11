@@ -4,6 +4,7 @@
 #include "ObjectManager.h"
 #include "Helpers.h"
 #include "ArgConverter.h"
+#include "NativeScriptException.h"
 #include "DictionaryAdapter.h"
 #include "SymbolLoader.h"
 #include "ArrayAdapter.h"
@@ -144,8 +145,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         v8::String::Utf8Value utf8Value(isolate, arg);
         std::vector<uint16_t> vector = tns::ToVector(*utf8Value);
         if (vector.size() > 1) {
-            tns::ThrowError(isolate, "Only one character string can be converted to unichar.");
-            return;
+            throw NativeScriptException("Only one character string can be converted to unichar.");
         }
         unichar c = (vector.size() == 0) ? 0 : vector[0];
         Interop::SetValue(dest, c);
@@ -1229,8 +1229,7 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
         ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
     } @catch (NSException* e) {
         std::string message = [[e description] UTF8String];
-        tns::ThrowError(isolate, message);
-        return Local<Value>();
+        throw NativeScriptException(message);
     }
 
     @autoreleasepool {

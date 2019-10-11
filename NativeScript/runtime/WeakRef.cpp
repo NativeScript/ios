@@ -1,4 +1,5 @@
 #include "WeakRef.h"
+#include "NativeScriptException.h"
 #include "ArgConverter.h"
 #include "Caches.h"
 #include "Helpers.h"
@@ -18,33 +19,35 @@ void WeakRef::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     assert(info.IsConstructCall());
     Isolate* isolate = info.GetIsolate();
+    try {
+        if (info.Length() < 1 || !info[0]->IsObject()) {
+            throw NativeScriptException("Argument must be an object.");
+        }
 
-    if (info.Length() < 1 || !info[0]->IsObject()) {
-        tns::ThrowError(isolate, "Argument must be an object.");
-        return;
+        Local<Object> target = info[0].As<Object>();
+        Local<Context> context = isolate->GetCurrentContext();
+
+        Local<Object> weakRef = ArgConverter::CreateEmptyObject(context);
+
+        Persistent<Object>* poTarget = new Persistent<Object>(isolate, target);
+        Persistent<Object>* poHolder = new Persistent<Object>(isolate, weakRef);
+        CallbackState* callbackState = new CallbackState(poTarget, poHolder);
+
+        poTarget->SetWeak(callbackState, WeakTargetCallback, WeakCallbackType::kFinalizer);
+        poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kFinalizer);
+
+        bool success = weakRef->Set(context, tns::ToV8String(isolate, "get"), GetGetterFunction(isolate)).FromMaybe(false);
+        assert(success);
+
+        success = weakRef->Set(context, tns::ToV8String(isolate, "clear"), GetClearFunction(isolate)).FromMaybe(false);
+        assert(success);
+
+        tns::SetPrivateValue(weakRef, tns::ToV8String(isolate, "target"), External::New(isolate, poTarget));
+
+        info.GetReturnValue().Set(weakRef);
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
     }
-
-    Local<Object> target = info[0].As<Object>();
-    Local<Context> context = isolate->GetCurrentContext();
-
-    Local<Object> weakRef = ArgConverter::CreateEmptyObject(context);
-
-    Persistent<Object>* poTarget = new Persistent<Object>(isolate, target);
-    Persistent<Object>* poHolder = new Persistent<Object>(isolate, weakRef);
-    CallbackState* callbackState = new CallbackState(poTarget, poHolder);
-
-    poTarget->SetWeak(callbackState, WeakTargetCallback, WeakCallbackType::kFinalizer);
-    poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kFinalizer);
-
-    bool success = weakRef->Set(context, tns::ToV8String(isolate, "get"), GetGetterFunction(isolate)).FromMaybe(false);
-    assert(success);
-
-    success = weakRef->Set(context, tns::ToV8String(isolate, "clear"), GetClearFunction(isolate)).FromMaybe(false);
-    assert(success);
-
-    tns::SetPrivateValue(weakRef, tns::ToV8String(isolate, "target"), External::New(isolate, poTarget));
-
-    info.GetReturnValue().Set(weakRef);
 }
 
 void WeakRef::WeakTargetCallback(const WeakCallbackInfo<CallbackState>& data) {\

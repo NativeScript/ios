@@ -2,6 +2,7 @@
 #include <string>
 #include <sys/stat.h>
 #include "ModuleInternal.h"
+#include "NativeScriptException.h"
 #include "RuntimeConfig.h"
 #include "Helpers.h"
 
@@ -91,49 +92,54 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const s
 }
 
 void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
-    ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(info.Data().As<External>()->Value());
     Isolate* isolate = info.GetIsolate();
 
-    std::string moduleName = tns::ToString(isolate, info[0].As<v8::String>());
-    std::string callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
+    try {
+        ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(info.Data().As<External>()->Value());
 
-    NSString* fullPath;
-    if (moduleName.length() > 0 && moduleName[0] != '/') {
-        if (moduleName[0] == '.') {
-            fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
-        } else if (moduleName[0] == '~') {
-            moduleName = moduleName.substr(2);
-            fullPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
-        } else {
-            NSString* tnsModulesPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:@"tns_modules"];
-            fullPath = [tnsModulesPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
-            if (!stat<S_IFDIR | S_IFREG>(fullPath) && !stat<S_IFDIR | S_IFREG>([fullPath stringByAppendingPathExtension:@"js"])) {
-                fullPath = [tnsModulesPath stringByAppendingPathComponent:@"tns-core-modules"];
-                fullPath = [fullPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+        std::string moduleName = tns::ToString(isolate, info[0].As<v8::String>());
+        std::string callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
+
+        NSString* fullPath;
+        if (moduleName.length() > 0 && moduleName[0] != '/') {
+            if (moduleName[0] == '.') {
+                fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            } else if (moduleName[0] == '~') {
+                moduleName = moduleName.substr(2);
+                fullPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            } else {
+                NSString* tnsModulesPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:@"tns_modules"];
+                fullPath = [tnsModulesPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+                if (!stat<S_IFDIR | S_IFREG>(fullPath) && !stat<S_IFDIR | S_IFREG>([fullPath stringByAppendingPathExtension:@"js"])) {
+                    fullPath = [tnsModulesPath stringByAppendingPathComponent:@"tns-core-modules"];
+                    fullPath = [fullPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+                }
             }
+        } else {
+            fullPath = [NSString stringWithUTF8String:moduleName.c_str()];
         }
-    } else {
-        fullPath = [NSString stringWithUTF8String:moduleName.c_str()];
-    }
 
-    NSString* fileNameOnly = [fullPath lastPathComponent];
-    NSString* pathOnly = [fullPath stringByDeletingLastPathComponent];
+        NSString* fileNameOnly = [fullPath lastPathComponent];
+        NSString* pathOnly = [fullPath stringByDeletingLastPathComponent];
 
-    bool isData = false;
-    Local<Object> moduleObj = moduleInternal->LoadImpl(isolate, [fileNameOnly UTF8String], [pathOnly UTF8String], isData);
-    if (moduleObj.IsEmpty()) {
-        return;
-    }
+        bool isData = false;
+        Local<Object> moduleObj = moduleInternal->LoadImpl(isolate, [fileNameOnly UTF8String], [pathOnly UTF8String], isData);
+        if (moduleObj.IsEmpty()) {
+            return;
+        }
 
-    if (isData) {
-        assert(!moduleObj.IsEmpty());
-        info.GetReturnValue().Set(moduleObj);
-    } else {
-        Local<Context> context = isolate->GetCurrentContext();
-        Local<Value> exportsObj;
-        bool success = moduleObj->Get(context, tns::ToV8String(isolate, "exports")).ToLocal(&exportsObj);
-        assert(success);
-        info.GetReturnValue().Set(exportsObj);
+        if (isData) {
+            assert(!moduleObj.IsEmpty());
+            info.GetReturnValue().Set(moduleObj);
+        } else {
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Value> exportsObj;
+            bool success = moduleObj->Get(context, tns::ToV8String(isolate, "exports")).ToLocal(&exportsObj);
+            assert(success);
+            info.GetReturnValue().Set(exportsObj);
+        }
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
     }
 }
 
@@ -195,11 +201,13 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
 
     Local<Script> script = LoadScript(isolate, modulePath);
 
-    TryCatch tc(isolate);
-    Local<v8::Function> moduleFunc = script->Run(context).ToLocalChecked().As<v8::Function>();
-    if (tc.HasCaught()) {
-        tns::LogError(isolate, tc);
-        assert(false);
+    Local<v8::Function> moduleFunc;
+    {
+        TryCatch tc(isolate);
+        moduleFunc = script->Run(context).ToLocalChecked().As<v8::Function>();
+        if (tc.HasCaught()) {
+            throw NativeScriptException(isolate, tc, "Error running script " + modulePath);
+        }
     }
 
     std::string parentDir = [[[NSString stringWithUTF8String:modulePath.c_str()] stringByDeletingLastPathComponent] UTF8String];
@@ -211,13 +219,14 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     success = moduleObj->Set(context, tns::ToV8String(isolate, "require"), require).FromMaybe(false);
     assert(success);
 
-    Local<Object> thiz = Object::New(isolate);
-    Local<Value> result;
-    if (!moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs).ToLocal(&result)) {
-        if (tc.HasCaught()) {
-            tns::LogError(isolate, tc);
+    {
+        TryCatch tc(isolate);
+        Local<Value> result;
+        Local<Object> thiz = Object::New(isolate);
+        success = moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs).ToLocal(&result);
+        if (!success || tc.HasCaught()) {
+            throw NativeScriptException(isolate, tc, "Error calling module function");
         }
-        assert(false);
     }
 
     tempModule.SaveToCache();
@@ -229,25 +238,20 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
 
     std::string jsonData = tns::ReadText(modulePath);
 
-    TryCatch tc(isolate);
-
     Local<v8::String> jsonStr = tns::ToV8String(isolate, jsonData);
 
     Local<Context> context = isolate->GetCurrentContext();
+    TryCatch tc(isolate);
     MaybeLocal<Value> maybeValue = JSON::Parse(context, jsonStr);
-
     if (maybeValue.IsEmpty() || tc.HasCaught()) {
         std::string errMsg = "Cannot parse JSON file " + modulePath;
-        // TODO: throw exception
-        assert(false);
+        throw NativeScriptException(isolate, tc, errMsg);
     }
 
     Local<Value> value = maybeValue.ToLocalChecked();
-
     if (!value->IsObject()) {
         std::string errMsg = "JSON is not valid, file=" + modulePath;
-        // TODO: throw exception
-        assert(false);
+        throw NativeScriptException(errMsg);
     }
 
     json = value.As<Object>();
@@ -269,19 +273,15 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pa
 
     ScriptCompiler::CompileOptions options = ScriptCompiler::kNoCompileOptions;
 
-    TryCatch tc(isolate);
-    Local<Script> script;
-
     if (cacheData != nullptr) {
         options = ScriptCompiler::kConsumeCodeCache;
     }
 
+    Local<Script> script;
+    TryCatch tc(isolate);
     bool success = ScriptCompiler::Compile(context, &source, options).ToLocal(&script);
     if (!success || tc.HasCaught()) {
-        if (tc.HasCaught()) {
-            tns::LogError(isolate, tc);
-        }
-        assert(false);
+        throw NativeScriptException(isolate, tc, "Cannot compile " + path);
     }
 
     if (cacheData == nullptr) {
@@ -323,8 +323,7 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
     }
 
     if (exists == NO) {
-        tns::ThrowError(isolate, "The specified module does not exist: " + moduleName);
-        return std::string();
+        throw NativeScriptException("The specified module does not exist: " + moduleName);
     }
 
     if (isDirectory == NO) {
@@ -336,8 +335,7 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
     bool error = false;
     std::string entry = this->ResolvePathFromPackageJson([packageJson UTF8String], error);
     if (error) {
-        tns::ThrowError(isolate, "Unable to locate main entry in " + std::string([packageJson UTF8String]));
-        return std::string();
+        throw NativeScriptException("Unable to locate main entry in " + std::string([packageJson UTF8String]));
     }
 
     if (!entry.empty()) {
@@ -357,10 +355,8 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
 
     exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
     if (exists == NO) {
-        tns::ThrowError(isolate, "The specified module does not exist: " + moduleName);
-        return std::string();
+        throw NativeScriptException("The specified module does not exist: " + moduleName);
     }
-
 
     return [fullPath UTF8String];
 }
