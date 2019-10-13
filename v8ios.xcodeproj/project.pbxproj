@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2B7EA6AF2353477000E5184E /* NativeScriptException.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.cpp */; };
+		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
 		C22C092222CA3F370080D176 /* Worker.mm in Sources */ = {isa = PBXBuildFile; fileRef = C22C092022CA3F370080D176 /* Worker.mm */; };
 		C22C092322CA3F370080D176 /* Worker.h in Headers */ = {isa = PBXBuildFile; fileRef = C22C092122CA3F370080D176 /* Worker.h */; };
 		C23E8F7322CB386F0078FD4C /* ConcurrentQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */; };
@@ -468,6 +470,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2B7EA6AD2353476F00E5184E /* NativeScriptException.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = NativeScriptException.cpp; sourceTree = "<group>"; };
+		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
 		C22C092022CA3F370080D176 /* Worker.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Worker.mm; sourceTree = "<group>"; };
 		C22C092122CA3F370080D176 /* Worker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Worker.h; sourceTree = "<group>"; };
 		C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConcurrentQueue.h; sourceTree = "<group>"; };
@@ -1608,6 +1612,8 @@
 		C2DDEB3B229EAB8600345BFE /* runtime */ = {
 			isa = PBXGroup;
 			children = (
+				2B7EA6AD2353476F00E5184E /* NativeScriptException.cpp */,
+				2B7EA6AE2353477000E5184E /* NativeScriptException.h */,
 				C2DDEB66229EAC8100345BFE /* ArgConverter.h */,
 				C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */,
 				C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */,
@@ -1770,6 +1776,7 @@
 				C247C33322F828E3001D2CA2 /* encoding.h in Headers */,
 				C247C39A22F828E3001D2CA2 /* globals.h in Headers */,
 				C247C33722F828E3001D2CA2 /* trace_event_common.h in Headers */,
+				2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */,
 				C247C36D22F828E3001D2CA2 /* HeapProfiler.h in Headers */,
 				C247C35122F828E3001D2CA2 /* v8-inspector-impl.h in Headers */,
 				C247C39B22F828E3001D2CA2 /* address-region.h in Headers */,
@@ -2341,6 +2348,7 @@
 				C247C35B22F828E3001D2CA2 /* wasm-translation.cc in Sources */,
 				C2DDEBB5229EAC8300345BFE /* Tasks.cpp in Sources */,
 				C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */,
+				2B7EA6AF2353477000E5184E /* NativeScriptException.cpp in Sources */,
 				C247C34122F828E3001D2CA2 /* v8-log-agent-impl.cpp in Sources */,
 				C247C39022F828E3001D2CA2 /* v8-runtime-agent-impl.cc in Sources */,
 				C247C39622F828E3001D2CA2 /* value-mirror.cc in Sources */,
