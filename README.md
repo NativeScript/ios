@@ -10,6 +10,9 @@ Supported architectures:
 iOS deployment target:
  - 9.0
 
+ Required LLVM version:
+ - [LLVM 8.0](http://releases.llvm.org/download.html#8.0.0) - used to build the [metadata generator](https://github.com/NativeScript/ios-metadata-generator) submodule. Be sure to have the folder containing `llvm-config` in `PATH` or make a symlink to in `/usr/local/bin/`.
+
 The `--jitless` mode in which V8 is running is explained in the following [document](https://docs.google.com/document/d/1YYU17VqFMBeSJ8whCqXknOGXtXDVDLulchsTkmi0YdI/edit#heading=h.mz26kq2dsu6k)
 
 # Building V8
