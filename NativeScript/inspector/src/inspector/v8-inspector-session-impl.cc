@@ -13,7 +13,7 @@
 #include "src/inspector/search-util.h"
 #include "src/inspector/string-util.h"
 #include "src/inspector/v8-console-agent-impl.h"
-#include "src/inspector/v8-debugger-agent-impl.h"
+#include "src/inspector/v8-ns-debugger-agent-impl.h"
 #include "src/inspector/v8-debugger.h"
 #include "src/inspector/v8-heap-profiler-agent-impl.h"
 #include "src/inspector/v8-inspector-impl.h"
@@ -129,7 +129,7 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       this, this, agentState(protocol::Runtime::Metainfo::domainName)));
   protocol::Runtime::Dispatcher::wire(&m_dispatcher, m_runtimeAgent.get());
 
-  m_debuggerAgent.reset(new V8DebuggerAgentImpl(
+  m_debuggerAgent.reset(new NSV8DebuggerAgentImpl(
       this, this, agentState(protocol::Debugger::Metainfo::domainName)));
   protocol::Debugger::Dispatcher::wire(&m_dispatcher, m_debuggerAgent.get());
 
