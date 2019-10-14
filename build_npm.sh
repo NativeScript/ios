@@ -17,4 +17,5 @@ cp -r "dist/TKLiveSync" "$OUTPUT_DIR/framework/internal"
 
 pushd "$OUTPUT_DIR"
 npm pack
+mv *.tgz ../
 popd
