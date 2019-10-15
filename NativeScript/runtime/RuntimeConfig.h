@@ -11,6 +11,7 @@ struct RuntimeConfig {
     const char* SnapshotPtr;
     size_t SnapshotSize;
     bool IsDebug;
+    bool LogToSystemConsole;
 };
 
 extern struct RuntimeConfig RuntimeConfig;

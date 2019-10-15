@@ -23,6 +23,7 @@ int main(int argc, char *argv[]) {
 
         Config* config = [[Config alloc] init];
         config.IsDebug = isDebug;
+        config.LogToSystemConsole = isDebug;
         config.MetadataPtr = metadataPtr;
         config.SnapshotPtr = startSnapshotPtr;
         config.SnapshotSize = snapshotSize;

@@ -30,6 +30,7 @@ static Runtime* runtime_ = nullptr;
     RuntimeConfig.SnapshotPtr = [config SnapshotPtr];
     RuntimeConfig.SnapshotSize = [config SnapshotSize];
     RuntimeConfig.IsDebug = [config IsDebug];
+    RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
 
     Runtime::Initialize();
     runtime_ = new Runtime();

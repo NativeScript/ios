@@ -35,8 +35,7 @@ void Console::Init(Isolate* isolate) {
 }
 
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
-    if (!RuntimeConfig.IsDebug) {
-        // Filter log statements in release builds
+    if (!RuntimeConfig.LogToSystemConsole) {
         return;
     }
 
@@ -65,8 +64,7 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
 }
 
 void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
-    if (!RuntimeConfig.IsDebug) {
-        // Filter log statements in release builds
+    if (!RuntimeConfig.LogToSystemConsole) {
         return;
     }
 
@@ -92,8 +90,7 @@ void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
 }
 
 void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
-    if (!RuntimeConfig.IsDebug) {
-        // Filter log statements in release builds
+    if (!RuntimeConfig.LogToSystemConsole) {
         return;
     }
 
@@ -164,8 +161,7 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
 }
 
 void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
-    if (!RuntimeConfig.IsDebug) {
-        // Filter log statements in release builds
+    if (!RuntimeConfig.LogToSystemConsole) {
         return;
     }
 
@@ -187,8 +183,7 @@ void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
 }
 
 void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
-    if (!RuntimeConfig.IsDebug) {
-        // Filter log statements in release builds
+    if (!RuntimeConfig.LogToSystemConsole) {
         return;
     }
 
