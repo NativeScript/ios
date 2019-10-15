@@ -20,96 +20,99 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
     GlobalHandlerContext* ctx = new GlobalHandlerContext(isWorkerThread);
     Local<External> ext = External::New(isolate, ctx);
 
-    global->SetHandler(NamedPropertyHandlerConfiguration([](Local<Name> property, const PropertyCallbackInfo<Value>& info) {
-        Isolate* isolate = info.GetIsolate();
-        std::string propName = tns::ToString(isolate, property);
+    NamedPropertyHandlerConfiguration config(MetadataBuilder::GlobalPropertyGetter, nullptr, nullptr, nullptr, nullptr, ext, PropertyHandlerFlags::kNonMasking);
+    global->SetHandler(config);
+}
 
-        GlobalHandlerContext* ctx = static_cast<GlobalHandlerContext*>(info.Data().As<External>()->Value());
+void MetadataBuilder::GlobalPropertyGetter(Local<Name> property, const PropertyCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    std::string propName = tns::ToString(isolate, property);
 
-        if (ctx->isWorkerThread_ && std::find(Worker::GlobalFunctions.begin(), Worker::GlobalFunctions.end(), propName) != Worker::GlobalFunctions.end()) {
-            return;
-        }
+    GlobalHandlerContext* ctx = static_cast<GlobalHandlerContext*>(info.Data().As<External>()->Value());
 
-        if (std::find(InlineFunctions::GlobalFunctions.begin(), InlineFunctions::GlobalFunctions.end(), propName) != InlineFunctions::GlobalFunctions.end()) {
-            return;
-        }
+    if (ctx->isWorkerThread_ && std::find(Worker::GlobalFunctions.begin(), Worker::GlobalFunctions.end(), propName) != Worker::GlobalFunctions.end()) {
+        return;
+    }
 
-        const Meta* meta = ArgConverter::GetMeta(propName);
-        if (meta == nullptr || !meta->isAvailable()) {
-            return;
-        }
+    if (std::find(InlineFunctions::GlobalFunctions.begin(), InlineFunctions::GlobalFunctions.end(), propName) != InlineFunctions::GlobalFunctions.end()) {
+        return;
+    }
 
-        if (meta->type() == MetaType::Interface || meta->type() == MetaType::ProtocolType) {
-            const BaseClassMeta* classMeta = static_cast<const BaseClassMeta*>(meta);
-            MetadataBuilder::GetOrCreateConstructorFunctionTemplate(isolate, classMeta);
+    const Meta* meta = ArgConverter::GetMeta(propName);
+    if (meta == nullptr || !meta->isAvailable()) {
+        return;
+    }
 
-            bool isInterface = meta->type() == MetaType::Interface;
-            auto cache = isInterface ? Caches::Get(isolate)->CtorFuncs : Caches::Get(isolate)->ProtocolCtorFuncs;
-            std::string name = meta->name();
-            auto it = cache.find(name);
-            if (it != cache.end()) {
-                Local<v8::Function> func = it->second->Get(isolate);
-                info.GetReturnValue().Set(func);
-            }
-        } else if (meta->type() == MetaType::Function) {
-            auto cache = Caches::Get(isolate);
-            std::string funcName = meta->name();
-            auto it = cache->CFunctions.find(funcName);
-            if (it != cache->CFunctions.end()) {
-                Local<v8::Function> func = it->second->Get(isolate);
-                info.GetReturnValue().Set(func);
-                return;
-            }
+    if (meta->type() == MetaType::Interface || meta->type() == MetaType::ProtocolType) {
+        const BaseClassMeta* classMeta = static_cast<const BaseClassMeta*>(meta);
+        MetadataBuilder::GetOrCreateConstructorFunctionTemplate(isolate, classMeta);
 
-            const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
-            Local<Context> context = isolate->GetCurrentContext();
-
-            CacheItem<FunctionMeta>* item = new CacheItem<FunctionMeta>(funcMeta, std::string());
-            Local<External> ext = External::New(isolate, item);
-            Local<v8::Function> func;
-            bool success = v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func);
-            assert(success);
-
-            tns::SetValue(isolate, func, new FunctionWrapper(funcMeta));
-            MetadataBuilder::DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
-
-            cache->CFunctions.insert(std::make_pair(funcName, new Persistent<v8::Function>(isolate, func)));
-
+        bool isInterface = meta->type() == MetaType::Interface;
+        auto cache = isInterface ? Caches::Get(isolate)->CtorFuncs : Caches::Get(isolate)->ProtocolCtorFuncs;
+        std::string name = meta->name();
+        auto it = cache.find(name);
+        if (it != cache.end()) {
+            Local<v8::Function> func = it->second->Get(isolate);
             info.GetReturnValue().Set(func);
-        } else if (meta->type() == MetaType::Var) {
-            void* dataSymbol = SymbolLoader::instance().loadDataSymbol(meta->topLevelModule(), meta->name());
-            if (!dataSymbol) {
-                return;
-            }
-
-            const VarMeta* varMeta = static_cast<const VarMeta*>(meta);
-
-            BaseCall bc((uint8_t*)dataSymbol);
-            const TypeEncoding* typeEncoding = varMeta->encoding();
-            Local<Value> result = Interop::GetResult(isolate, typeEncoding, &bc, true);
-            info.GetReturnValue().Set(result);
-        } else if (meta->type() == MetaType::JsCode) {
-            const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
-            std::string jsCode = jsCodeMeta->jsCode();
-            Local<Context> context = isolate->GetCurrentContext();
-            Local<Script> script;
-            if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
-                assert(false);
-            }
-            assert(!script.IsEmpty());
-
-            Local<Value> result;
-            if (!script->Run(context).ToLocal(&result)) {
-                assert(false);
-            }
-            info.GetReturnValue().Set(result);
-        } else if (meta->type() == MetaType::Struct) {
-            const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-            StructInfo structInfo = FFICall::GetStructInfo(structMeta);
-            Local<v8::Function> structCtorFunc = MetadataBuilder::GetOrCreateStructCtorFunction(isolate, structInfo);
-            info.GetReturnValue().Set(structCtorFunc);
         }
-    }, nullptr, nullptr, nullptr, nullptr, ext));
+    } else if (meta->type() == MetaType::Function) {
+        auto cache = Caches::Get(isolate);
+        std::string funcName = meta->name();
+        auto it = cache->CFunctions.find(funcName);
+        if (it != cache->CFunctions.end()) {
+            Local<v8::Function> func = it->second->Get(isolate);
+            info.GetReturnValue().Set(func);
+            return;
+        }
+
+        const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
+        Local<Context> context = isolate->GetCurrentContext();
+
+        CacheItem<FunctionMeta>* item = new CacheItem<FunctionMeta>(funcMeta, std::string());
+        Local<External> ext = External::New(isolate, item);
+        Local<v8::Function> func;
+        bool success = v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func);
+        assert(success);
+
+        tns::SetValue(isolate, func, new FunctionWrapper(funcMeta));
+        MetadataBuilder::DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
+
+        cache->CFunctions.insert(std::make_pair(funcName, new Persistent<v8::Function>(isolate, func)));
+
+        info.GetReturnValue().Set(func);
+    } else if (meta->type() == MetaType::Var) {
+        void* dataSymbol = SymbolLoader::instance().loadDataSymbol(meta->topLevelModule(), meta->name());
+        if (!dataSymbol) {
+            return;
+        }
+
+        const VarMeta* varMeta = static_cast<const VarMeta*>(meta);
+
+        BaseCall bc((uint8_t*)dataSymbol);
+        const TypeEncoding* typeEncoding = varMeta->encoding();
+        Local<Value> result = Interop::GetResult(isolate, typeEncoding, &bc, true);
+        info.GetReturnValue().Set(result);
+    } else if (meta->type() == MetaType::JsCode) {
+        const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
+        std::string jsCode = jsCodeMeta->jsCode();
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Script> script;
+        if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
+            assert(false);
+        }
+        assert(!script.IsEmpty());
+
+        Local<Value> result;
+        if (!script->Run(context).ToLocal(&result)) {
+            assert(false);
+        }
+        info.GetReturnValue().Set(result);
+    } else if (meta->type() == MetaType::Struct) {
+        const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
+        StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+        Local<v8::Function> structCtorFunc = MetadataBuilder::GetOrCreateStructCtorFunction(isolate, structInfo);
+        info.GetReturnValue().Set(structCtorFunc);
+    }
 }
 
 Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isolate, StructInfo structInfo) {
