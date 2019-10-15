@@ -567,17 +567,16 @@ const Meta* ArgConverter::FindMeta(Class klass) {
 }
 
 const Meta* ArgConverter::GetMeta(std::string name) {
-    const Meta* meta = Caches::Metadata.Get(name);
-    if (meta != nullptr) {
+    bool found;
+    const Meta* meta = Caches::Metadata.Get(name, found);
+    if (meta != nullptr || found) {
         return meta;
     }
 
     const GlobalTable* globalTable = MetaFile::instance()->globalTable();
     const Meta* result = globalTable->findMeta(name.c_str(), false /** onlyIfAvailable **/);
 
-    if (result == nullptr) {
-        return nullptr;
-    }
+    Caches::Metadata.Insert(name, result);
 
     return result;
 }
