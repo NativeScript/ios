@@ -21,7 +21,6 @@
 #include "src/inspector/v8-profiler-agent-impl.h"
 #include "src/inspector/v8-runtime-agent-impl.h"
 #include "src/inspector/v8-schema-agent-impl.h"
-#include "utils.h"
 
 namespace v8_inspector {
 namespace {
