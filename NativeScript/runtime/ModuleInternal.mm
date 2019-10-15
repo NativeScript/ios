@@ -421,12 +421,13 @@ ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& p
         }
     }
 
-    uint8_t* data = tns::ReadBinary(cachePath, length);
+    bool isNew = false;
+    uint8_t* data = tns::ReadBinary(cachePath, length, isNew);
     if (!data) {
         return nullptr;
     }
 
-    return new ScriptCompiler::CachedData(data, (int)length, ScriptCompiler::CachedData::BufferOwned);
+    return new ScriptCompiler::CachedData(data, (int)length, isNew ? ScriptCompiler::CachedData::BufferOwned : ScriptCompiler::CachedData::BufferNotOwned);
 }
 
 void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::string& path) {

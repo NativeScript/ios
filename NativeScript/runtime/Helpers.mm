@@ -13,6 +13,12 @@
 
 using namespace v8;
 
+namespace {
+    const int BUFFER_SIZE = 1024 * 1024;
+    char* Buffer = new char[BUFFER_SIZE];
+    uint8_t* BinBuffer = new uint8_t[BUFFER_SIZE];
+}
+
 static std::map<Isolate*, Persistent<v8::Function>*> isolateToPersistentSmartJSONStringify = std::map<Isolate*, Persistent<v8::Function>*>();
 
 Local<String> tns::ToV8String(Isolate* isolate, std::string value) {
@@ -96,16 +102,48 @@ std::vector<uint16_t> tns::ToVector(const std::string& value) {
     return vector;
 }
 
-std::string tns::ReadText(const std::string& file) {
-    std::ifstream ifs(file);
-    if (ifs.fail()) {
+const char* tns::ReadText(const std::string& filePath, long& length, bool& isNew) {
+    FILE* file = fopen(filePath.c_str(), "rb");
+    if (file == nullptr) {
         assert(false);
     }
-    std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
-    return content;
+
+    fseek(file, 0, SEEK_END);
+
+    length = ftell(file);
+    isNew = length > BUFFER_SIZE;
+
+    rewind(file);
+
+    if (isNew) {
+        char* newBuffer = new char[length];
+        fread(newBuffer, 1, length, file);
+        fclose(file);
+
+        return newBuffer;
+    }
+
+    fread(Buffer, 1, length, file);
+    fclose(file);
+
+    return Buffer;
 }
 
-uint8_t* tns::ReadBinary(const std::string path, long& length) {
+std::string tns::ReadText(const std::string& file) {
+    long length;
+    bool isNew;
+    const char* content = tns::ReadText(file, length, isNew);
+
+    std::string result(content, length);
+
+    if (isNew) {
+        delete[] content;
+    }
+
+    return result;
+}
+
+uint8_t* tns::ReadBinary(const std::string path, long& length, bool& isNew) {
     length = 0;
     std::ifstream ifs(path);
     if (ifs.fail()) {
@@ -121,11 +159,19 @@ uint8_t* tns::ReadBinary(const std::string path, long& length) {
     length = ftell(file);
     rewind(file);
 
-    uint8_t* data = new uint8_t[length];
-    fread(data, sizeof(uint8_t), length, file);
+    isNew = length > BUFFER_SIZE;
+
+    if (isNew) {
+        uint8_t* data = new uint8_t[length];
+        fread(data, sizeof(uint8_t), length, file);
+        fclose(file);
+        return data;
+    }
+
+    fread(BinBuffer, 1, length, file);
     fclose(file);
 
-    return data;
+    return BinBuffer;
 }
 
 bool tns::WriteBinary(const std::string& path, const void* data, long length) {
