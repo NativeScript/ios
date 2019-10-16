@@ -125,35 +125,22 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         }
 
         Local<Value> result;
-        TryCatch tc(isolate);
         Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
         if (!callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result)) {
             memset(retValue, 0, cif->rtype->size);
-            throw NativeScriptException(isolate, tc, "Error calling function");
+            return;
         }
 
         ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_);
     };
 
     if ([NSThread isMainThread]) {
-        try {
-            cb();
-        } catch (NativeScriptException& ex) {
-            MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
-            Isolate* isolate = data->isolate_;
-            ex.ReThrowToV8(isolate);
-        }
+        cb();
     } else {
         dispatch_group_t group = dispatch_group_create();
         dispatch_group_enter(group);
-        tns::ExecuteOnMainThread([cb, group, userData]() {
-            try {
-                cb();
-            } catch (NativeScriptException& ex) {
-                MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
-                Isolate* isolate = data->isolate_;
-                ex.ReThrowToV8(isolate);
-            }
+        tns::ExecuteOnMainThread([cb, group]() {
+            cb();
             dispatch_group_leave(group);
         });
 

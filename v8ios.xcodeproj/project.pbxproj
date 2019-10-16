@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2B7EA6AF2353477000E5184E /* NativeScriptException.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.cpp */; };
+		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
 		C2229973235449B400C1DFD6 /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2229971235449B300C1DFD6 /* InspectorServer.mm */; };
 		C2229974235449B400C1DFD6 /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = C2229972235449B400C1DFD6 /* InspectorServer.h */; };
@@ -474,7 +474,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2B7EA6AD2353476F00E5184E /* NativeScriptException.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = NativeScriptException.cpp; sourceTree = "<group>"; };
+		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
 		C2229971235449B300C1DFD6 /* InspectorServer.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorServer.mm; sourceTree = "<group>"; };
 		C2229972235449B400C1DFD6 /* InspectorServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
@@ -1624,8 +1624,6 @@
 		C2DDEB3B229EAB8600345BFE /* runtime */ = {
 			isa = PBXGroup;
 			children = (
-				2B7EA6AD2353476F00E5184E /* NativeScriptException.cpp */,
-				2B7EA6AE2353477000E5184E /* NativeScriptException.h */,
 				C2DDEB66229EAC8100345BFE /* ArgConverter.h */,
 				C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */,
 				C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */,
@@ -1665,6 +1663,8 @@
 				C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */,
 				C2DDEB89229EAC8300345BFE /* ModuleInternal.h */,
 				C2DDEB81229EAC8200345BFE /* ModuleInternal.mm */,
+				2B7EA6AE2353477000E5184E /* NativeScriptException.h */,
+				2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */,
 				C266567A22AA630F00EE15CC /* NSDataAdapter.h */,
 				C266567922AA630F00EE15CC /* NSDataAdapter.mm */,
 				C2DDEB83229EAC8300345BFE /* ObjectManager.h */,
@@ -2364,7 +2364,7 @@
 				C247C35B22F828E3001D2CA2 /* wasm-translation.cc in Sources */,
 				C2DDEBB5229EAC8300345BFE /* Tasks.cpp in Sources */,
 				C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */,
-				2B7EA6AF2353477000E5184E /* NativeScriptException.cpp in Sources */,
+				2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */,
 				C247C34122F828E3001D2CA2 /* v8-log-agent-impl.cpp in Sources */,
 				C247C39022F828E3001D2CA2 /* v8-runtime-agent-impl.cc in Sources */,
 				C247C39622F828E3001D2CA2 /* value-mirror.cc in Sources */,
