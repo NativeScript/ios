@@ -1,14 +1,16 @@
 #!/bin/bash
 set -e
 
+DEV_TEAM=${DEVELOPMENT_TEAM:-}
+
 echo "Cleanup"
 xcodebuild -project v8ios.xcodeproj -target "NativeScript" -configuration Release clean
 
 echo "Building for iphone simulator"
-xcodebuild -project v8ios.xcodeproj -target "NativeScript" -configuration Release -arch x86_64 -sdk iphonesimulator -quiet
+xcodebuild -project v8ios.xcodeproj -target "NativeScript" -configuration Release -arch x86_64 -sdk iphonesimulator -quiet DEVELOPMENT_TEAM=$DEV_TEAM
 
 echo "Building for ARM64 device"
-xcodebuild -project v8ios.xcodeproj -target "NativeScript" -configuration Release -arch arm64 -sdk iphoneos -quiet
+xcodebuild -project v8ios.xcodeproj -target "NativeScript" -configuration Release -arch arm64 -sdk iphoneos -quiet DEVELOPMENT_TEAM=$DEV_TEAM
 
 echo "Creating fat library"
 DIST="dist"
