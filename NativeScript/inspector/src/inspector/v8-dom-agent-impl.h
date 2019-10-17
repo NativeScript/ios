@@ -64,12 +64,21 @@ public:
     const bool enabled() {
         return m_enabled;
     };
+
+    void dispatch(std::string message);
 private:
     protocol::DOM::Frontend m_frontend;
     protocol::DictionaryValue* m_state;
     V8InspectorImpl* m_inspector;
 
     bool m_enabled;
+
+    void ChildNodeInserted(const v8::Local<v8::Object>& obj);
+    void ChildNodeRemoved(const v8::Local<v8::Object>& obj);
+    void AttributeModified(const v8::Local<v8::Object>& obj);
+    void AttributeRemoved(const v8::Local<v8::Object>& obj);
+    void DocumentUpdated();
+    std::u16string AddBackendNodeIdProperty(v8::Isolate* isolate, v8::Local<v8::Value> jsonInput);
 
     DISALLOW_COPY_AND_ASSIGN(V8DOMAgentImpl);
 };

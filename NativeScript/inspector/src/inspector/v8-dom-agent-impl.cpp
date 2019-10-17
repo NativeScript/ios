@@ -47,6 +47,27 @@ DispatchResponse V8DOMAgentImpl::disable() {
     return DispatchResponse::OK();
 }
 
+void V8DOMAgentImpl::dispatch(std::string message) {
+    Isolate* isolate = m_inspector->isolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> value;
+    assert(v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&value) && value->IsObject());
+    Local<Object> obj = value.As<Object>();
+    std::string method = GetDomainMethod(isolate, obj, "DOM.");
+
+    if (method == "childNodeInserted") {
+        this->ChildNodeInserted(obj);
+    } else if (method == "childNodeRemoved") {
+        this->ChildNodeRemoved(obj);
+    } else if (method == "attributeModified") {
+        this->AttributeModified(obj);
+    } else if (method == "attributeRemoved") {
+        this->AttributeRemoved(obj);
+    } else if (method == "documentUpdated") {
+        this->DocumentUpdated();
+    }
+}
+
 DispatchResponse V8DOMAgentImpl::getContentQuads(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::Array<protocol::Array<double>>>* out_quads) {
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
@@ -296,6 +317,121 @@ DispatchResponse V8DOMAgentImpl::undo() {
 
 DispatchResponse V8DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_backendNodeId, Maybe<int>* out_nodeId) {
     return protocol::DispatchResponse::Error("Protocol command not supported.");
+}
+
+void V8DOMAgentImpl::ChildNodeInserted(const Local<Object>& obj) {
+    Isolate* isolate = m_inspector->isolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
+    Local<Number> parentNodeId = params->Get(context, tns::ToV8String(isolate, "parentNodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
+    Local<Number> previousNodeId = params->Get(context, tns::ToV8String(isolate, "previousNodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
+    Local<Value> node = params->Get(context, tns::ToV8String(isolate, "node")).ToLocalChecked();
+
+    Local<v8::String> nodeJson;
+    assert(JSON::Stringify(context, node).ToLocal(&nodeJson));
+
+    std::u16string nodeString = AddBackendNodeIdProperty(isolate, nodeJson);
+    auto nodeUtf16Data = nodeString.data();
+
+    std::unique_ptr<protocol::Value> protocolNodeJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) nodeUtf16Data));
+
+    protocol::ErrorSupport errorSupport;
+    auto domNode = protocol::DOM::Node::fromValue(protocolNodeJson.get(), &errorSupport);
+
+    auto errorSupportString = errorSupport.errors().utf8();
+    if (!errorSupportString.empty()) {
+        std::string errorMessage = "Error while parsing debug `DOM Node` object.";
+        Log("%s Error: %s", errorMessage.c_str(), errorSupportString.c_str());
+        return;
+    }
+
+    this->m_frontend.childNodeInserted(parentNodeId->Int32Value(context).ToChecked(), previousNodeId->Int32Value(context).ToChecked(), std::move(domNode));
+}
+
+void V8DOMAgentImpl::ChildNodeRemoved(const Local<Object>& obj) {
+    Isolate* isolate = m_inspector->isolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
+    Local<Number> nodeId = params->Get(context, tns::ToV8String(isolate, "nodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
+    Local<Number> parentNodeId = params->Get(context, tns::ToV8String(isolate, "parentNodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
+
+    this->m_frontend.childNodeRemoved(
+        parentNodeId->Int32Value(context).ToChecked(),
+        nodeId->Int32Value(context).ToChecked()
+    );
+}
+
+void V8DOMAgentImpl::AttributeModified(const Local<Object>& obj) {
+    Isolate* isolate = m_inspector->isolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
+    Local<Number> nodeId = params->Get(context, tns::ToV8String(isolate, "nodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
+    Local<v8::String> attributeName = params->Get(context, tns::ToV8String(isolate, "name")).ToLocalChecked()->ToString(context).ToLocalChecked();
+    Local<v8::String> attributeValue = params->Get(context, tns::ToV8String(isolate, "value")).ToLocalChecked()->ToString(context).ToLocalChecked();
+
+    this->m_frontend.attributeModified(
+        nodeId->Int32Value(context).ToChecked(),
+        v8_inspector::toProtocolString(isolate, attributeName),
+        v8_inspector::toProtocolString(isolate, attributeValue)
+    );
+}
+
+void V8DOMAgentImpl::AttributeRemoved(const Local<Object>& obj) {
+    Isolate* isolate = m_inspector->isolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
+    Local<Number> nodeId = params->Get(context, tns::ToV8String(isolate, "nodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
+    Local<v8::String> attributeName = params->Get(context, tns::ToV8String(isolate, "name")).ToLocalChecked()->ToString(context).ToLocalChecked();
+
+    this->m_frontend.attributeRemoved(
+        nodeId->Int32Value(context).ToChecked(),
+        v8_inspector::toProtocolString(isolate, attributeName)
+    );
+}
+
+void V8DOMAgentImpl::DocumentUpdated() {
+    this->m_frontend.documentUpdated();
+}
+
+std::u16string V8DOMAgentImpl::AddBackendNodeIdProperty(Isolate* isolate, Local<Value> jsonInput) {
+    std::string scriptSource =
+        "(function () {"
+        "   function addBackendNodeId(node) {"
+        "       if (!node.backendNodeId) {"
+        "           node.backendNodeId = 0;"
+        "       }"
+        "       if (node.children) {"
+        "           for (var i = 0; i < node.children.length; i++) {"
+        "               addBackendNodeId(node.children[i]);"
+        "           }"
+        "       }"
+        "   }"
+        "   return function(stringifiedNode) {"
+        "       try {"
+        "           const node = JSON.parse(stringifiedNode);"
+        "           addBackendNodeId(node);"
+        "           return JSON.stringify(node);"
+        "       } catch (e) {"
+        "           return stringifiedNode;"
+        "       }"
+        "   }"
+        "})()";
+
+    auto source = tns::ToV8String(isolate, scriptSource);
+    Local<Script> script;
+    Local<Context> context = isolate->GetCurrentContext();
+    assert(v8::Script::Compile(context, source).ToLocal(&script));
+
+    Local<Value> result;
+    assert(script->Run(context).ToLocal(&result));
+    Local<v8::Function> addBackendNodeIdFunction = result.As<v8::Function>();
+
+    Local<Value> funcArguments[] = { jsonInput };
+    Local<Value> scriptResult;
+    assert(addBackendNodeIdFunction->Call(context, context->Global(), 1, funcArguments).ToLocal(&scriptResult));
+
+    std::u16string resultString = tns::ToUtf16String(isolate, scriptResult->ToString(context).ToLocalChecked());
+    return resultString;
 }
 
 }

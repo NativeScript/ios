@@ -51,6 +51,7 @@ class V8InspectorSessionImpl : public V8InspectorSession,
   V8ProfilerAgentImpl* profilerAgent() { return m_profilerAgent.get(); }
   V8RuntimeAgentImpl* runtimeAgent() { return m_runtimeAgent.get(); }
   V8NetworkAgentImpl* networkArgent() { return m_networkAgent.get(); }
+  V8DOMAgentImpl* domArgent() { return m_domAgent.get(); }
   int contextGroupId() const { return m_contextGroupId; }
   int sessionId() const { return m_sessionId; }
 

@@ -1,6 +1,7 @@
 #include "v8-network-agent-impl.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "Helpers.h"
+#include "utils.h"
 
 using namespace v8;
 
@@ -50,7 +51,7 @@ void V8NetworkAgentImpl::dispatch(std::string message) {
     Local<Value> value;
     assert(v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&value) && value->IsObject());
     Local<Object> obj = value.As<Object>();
-    std::string method = GetMethod(obj);
+    std::string method = GetDomainMethod(isolate, obj, "Network.");
 
     if (method == "requestWillBeSent") {
         this->RequestWillBeSent(obj);
@@ -290,26 +291,6 @@ void V8NetworkAgentImpl::LoadingFinished(const Local<Object>& obj) {
         timestamp,
         encodedDataLength
     );
-}
-
-std::string V8NetworkAgentImpl::GetMethod(const Local<Object>& arg) {
-    Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Value> value;
-    assert(arg->Get(context, tns::ToV8String(isolate, "method")).ToLocal(&value));
-    std::string method = tns::ToString(isolate, value);
-
-    if (method.empty()) {
-        return "";
-    }
-
-    std::string prefix = "Network.";
-    size_t pos = method.find(prefix);
-    if (pos == std::string::npos) {
-        return "";
-    }
-
-    return method.substr(pos + prefix.length());
 }
 
 }

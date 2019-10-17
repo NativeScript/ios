@@ -68,3 +68,21 @@ Local<v8::Function> v8_inspector::GetDebuggerFunction(Isolate* isolate, std::str
 
     return Local<v8::Function>();
 }
+
+std::string v8_inspector::GetDomainMethod(Isolate* isolate, const Local<Object>& arg, std::string domain) {
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> value;
+    assert(arg->Get(context, tns::ToV8String(isolate, "method")).ToLocal(&value));
+    std::string method = tns::ToString(isolate, value);
+
+    if (method.empty()) {
+        return "";
+    }
+
+    size_t pos = method.find(domain);
+    if (pos == std::string::npos) {
+        return "";
+    }
+
+    return method.substr(pos + domain.length());
+}

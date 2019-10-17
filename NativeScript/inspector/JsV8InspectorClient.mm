@@ -312,6 +312,13 @@ void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<
         return;
     }
 
+    if (message.find("\"DOM.") != std::string::npos) {
+        // The DOM domain is handled directly by the corresponding backend
+        V8InspectorSessionImpl* session = (V8InspectorSessionImpl*)client->session_.get();
+        session->domArgent()->dispatch(message);
+        return;
+    }
+
     client->dispatchMessage(message);
 }
 

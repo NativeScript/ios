@@ -10,6 +10,7 @@ namespace v8_inspector {
 std::string GetMIMEType(std::string filePath);
 std::string ToStdString(const v8_inspector::StringView& value);
 v8::Local<v8::Function> GetDebuggerFunction(v8::Isolate* isolate, std::string domain, std::string functionName, v8::Local<v8::Object>& domainDebugger);
+std::string GetDomainMethod(v8::Isolate* isolate, const v8::Local<v8::Object>& arg, std::string domain);
 
 template<typename T>
 static std::unique_ptr<protocol::Array<T>> fromValue(protocol::Value* value, protocol::ErrorSupport* errors) {

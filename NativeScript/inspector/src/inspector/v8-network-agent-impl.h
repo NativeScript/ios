@@ -61,7 +61,6 @@ private:
     void RequestWillBeSent(const v8::Local<v8::Object>& obj);
     void ResponseReceived(const v8::Local<v8::Object>& obj);
     void LoadingFinished(const v8::Local<v8::Object>& obj);
-    std::string GetMethod(const v8::Local<v8::Object>& arg);
 
     DISALLOW_COPY_AND_ASSIGN(V8NetworkAgentImpl);
 };
