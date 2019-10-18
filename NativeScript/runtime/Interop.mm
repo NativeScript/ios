@@ -12,6 +12,7 @@
 #include "Caches.h"
 #include "Reference.h"
 #include "Pointer.h"
+#include "ExtVector.h"
 #include "SymbolIterator.h"
 
 using namespace v8;
@@ -187,9 +188,16 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         } else {
             assert(false);
         }
+    } else if (typeEncoding->type == BinaryTypeEncodingType::ExtVectorEncoding) {
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
+        assert(wrapper != nullptr && wrapper->Type() == WrapperType::ExtVector);
+        ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
+        void* data = extVectorWrapper->Data();
+        size_t size = extVectorWrapper->FFIType()->size;
+        memcpy(dest, data, size);
     } else if (typeEncoding->type == BinaryTypeEncodingType::PointerEncoding) {
         const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
-        BaseDataWrapper* wrapper = tns::GetValue(isolate, arg.As<Object>());
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
         if (innerType->type == BinaryTypeEncodingType::VoidEncoding) {
             assert(wrapper != nullptr);
 
@@ -638,7 +646,17 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
 }
 
-Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, bool copyStructs) {
+Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, bool copyStructs, bool isStructMember) {
+    if (typeEncoding->type == BinaryTypeEncodingType::ExtVectorEncoding) {
+        ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, isStructMember);
+        const TypeEncoding* innerTypeEncoding = typeEncoding->details.extVector.getInnerType();
+        void* buffer = call->ResultBuffer();
+        void* data = malloc(ffiType->size);
+        memcpy(data, buffer, ffiType->size);
+        Local<Value> value = ExtVector::NewInstance(isolate, data, ffiType, innerTypeEncoding);
+        return value;
+    }
+
     if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
         const Meta* meta = ArgConverter::GetMeta(structName);
@@ -647,7 +665,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         void* result = call->ResultBuffer();
 
         const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-        StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+        StructInfo structInfo = FFICall::GetStructInfo(structMeta, structName);
         Local<Value> value = Interop::StructToValue(isolate, result, structInfo, copyStructs);
         return value;
     }
@@ -664,7 +682,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
     if (typeEncoding->type == BinaryTypeEncodingType::ConstantArrayEncoding) {
         const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
-        ffi_type* innerFFIType = FFICall::GetArgumentType(innerType);
+        ffi_type* innerFFIType = FFICall::GetArgumentType(innerType, isStructMember);
         int length = typeEncoding->details.constantArray.size;
         Local<v8::Array> array = v8::Array::New(isolate, length);
         Local<Context> context = isolate->GetCurrentContext();

@@ -693,7 +693,7 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<Name> property, const P
     void* buffer = wrapper->Data();
     BaseCall call((uint8_t*)buffer, offset);
 
-    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, &call, false);
+    Local<Value> result = Interop::GetResult(isolate, fieldEncoding, &call, false, false, true);
 
     info.GetReturnValue().Set(result);
 }

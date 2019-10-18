@@ -63,7 +63,7 @@ public:
     }
 
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding, bool isStructMember = false);
-    static StructInfo GetStructInfo(const StructMeta* structMeta);
+    static StructInfo GetStructInfo(const StructMeta* structMeta, std::string structName = "");
     static StructInfo GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldEncoding, const String* fieldNames, std::string structName = "");
     static ffi_cif* GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
 

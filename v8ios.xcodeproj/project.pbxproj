@@ -322,6 +322,8 @@
 		C2A5E0F22328CA7000A91A76 /* zip_source_layered.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0762328CA6F00A91A76 /* zip_source_layered.c */; };
 		C2A5E0F32328CA7000A91A76 /* zip_error_strerror.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0772328CA6F00A91A76 /* zip_error_strerror.c */; };
 		C2A5E0F62328CC4200A91A76 /* zip_source_window.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E06B2328CA6F00A91A76 /* zip_source_window.c */; };
+		C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2A5F8682359AEB500074AFA /* ExtVector.cpp */; };
+		C2A5F86B2359AEB600074AFA /* ExtVector.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A5F8692359AEB600074AFA /* ExtVector.h */; };
 		C2C8EE7222CE323C001F8CEC /* ConcurrentMap.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7022CE323C001F8CEC /* ConcurrentMap.h */; };
 		C2C8EE7422CE3266001F8CEC /* ConcurrentQueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C8EE7322CE3266001F8CEC /* ConcurrentQueue.cpp */; };
 		C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
@@ -839,6 +841,8 @@
 		C2A5E0772328CA6F00A91A76 /* zip_error_strerror.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = zip_error_strerror.c; sourceTree = "<group>"; };
 		C2A5E0F42328CAC900A91A76 /* zipconf.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = zipconf.h; sourceTree = "<group>"; };
 		C2A5E0F52328CB3A00A91A76 /* config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
+		C2A5F8682359AEB500074AFA /* ExtVector.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ExtVector.cpp; sourceTree = "<group>"; };
+		C2A5F8692359AEB600074AFA /* ExtVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ExtVector.h; sourceTree = "<group>"; };
 		C2C8EE7022CE323C001F8CEC /* ConcurrentMap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConcurrentMap.h; sourceTree = "<group>"; };
 		C2C8EE7322CE3266001F8CEC /* ConcurrentQueue.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConcurrentQueue.cpp; sourceTree = "<group>"; };
 		C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SimpleAllocator.cpp; sourceTree = "<group>"; };
@@ -1642,6 +1646,8 @@
 				C2DDEB72229EAC8200345BFE /* DataWrapper.h */,
 				C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */,
 				C2DDEB8B229EAC8300345BFE /* DictionaryAdapter.mm */,
+				C2A5F8692359AEB600074AFA /* ExtVector.h */,
+				C2A5F8682359AEB500074AFA /* ExtVector.cpp */,
 				C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */,
 				C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */,
 				C2DDEB78229EAC8200345BFE /* FFICall.h */,
@@ -1765,6 +1771,7 @@
 				C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */,
 				C247C35E22F828E3001D2CA2 /* Protocol.h in Headers */,
 				C247C35922F828E3001D2CA2 /* value-mirror.h in Headers */,
+				C2A5F86B2359AEB600074AFA /* ExtVector.h in Headers */,
 				C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */,
 				C247C34022F828E3001D2CA2 /* v8-regex.h in Headers */,
 				C247C36E22F828E3001D2CA2 /* Schema.h in Headers */,
@@ -2290,6 +2297,7 @@
 				C247C34922F828E3001D2CA2 /* v8-string-conversions.cc in Sources */,
 				C247C38C22F828E3001D2CA2 /* v8-network-agent-impl.cpp in Sources */,
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
+				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				C247C33E22F828E3001D2CA2 /* v8-debugger.cc in Sources */,
 				C247C37F22F828E3001D2CA2 /* v8-css-agent-impl.cpp in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.cpp in Sources */,

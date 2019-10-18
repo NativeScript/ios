@@ -120,6 +120,13 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         case WrapperType::AnonymousFunction: {
             break;
         }
+        case WrapperType::ExtVector: {
+            ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
+            void* data = extVectorWrapper->Data();
+            if (data) {
+                std::free(data);
+            }
+        }
         case WrapperType::Worker: {
             WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
             if (worker->IsRunning()) {

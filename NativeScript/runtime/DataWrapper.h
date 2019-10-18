@@ -30,6 +30,7 @@ enum class WrapperType {
     PointerType,
     FunctionReference,
     FunctionReferenceType,
+    ExtVector,
     Worker,
 };
 
@@ -436,6 +437,35 @@ public:
 private:
     v8::Persistent<v8::Value>* function_;
     void* data_;
+};
+
+class ExtVectorWrapper: public BaseDataWrapper {
+public:
+    ExtVectorWrapper(void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding)
+        : data_(data),
+          ffiType_(ffiType),
+          innerTypeEncoding_(innerTypeEncoding) {
+    }
+
+    const WrapperType Type() {
+        return WrapperType::ExtVector;
+    }
+
+    void* Data() {
+        return this->data_;
+    }
+
+    ffi_type* FFIType() {
+        return this->ffiType_;
+    }
+
+    const TypeEncoding* InnerTypeEncoding() {
+        return this->innerTypeEncoding_;
+    }
+private:
+    void* data_;
+    ffi_type* ffiType_;
+    const TypeEncoding* innerTypeEncoding_;
 };
 
 class WorkerWrapper: public BaseDataWrapper {

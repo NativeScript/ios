@@ -21,11 +21,12 @@ public:
     static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const MethodMeta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper);
     static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const FunctionMeta* meta, const std::vector<v8::Local<v8::Value>> args);
     static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<v8::Local<v8::Value>> args);
-    static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, bool copyStructs = false);
+    static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, bool copyStructs = false, bool isStructMember = false);
     static void SetStructPropertyValue(v8::Isolate* isolate, StructWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
     static void InitializeStruct(v8::Isolate* isolate, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer);
     static void WriteValue(v8::Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, v8::Local<v8::Value> arg);
     static id ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg);
+    static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call);
 private:
     template <typename T>
     static void SetStructValue(v8::Local<v8::Value> value, void* destBuffer, ptrdiff_t position);
@@ -40,7 +41,6 @@ private:
     static void SetFFIParams(v8::Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<v8::Local<v8::Value>> args);
     static v8::Local<v8::Array> ToArray(v8::Isolate* isolate, v8::Local<v8::Object> object);
     static v8::Local<v8::Value> StructToValue(v8::Isolate* isolate, void* result, StructInfo structInfo, bool copyStructs);
-    static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call);
     static const TypeEncoding* CreateEncoding(BinaryTypeEncodingType type);
     static v8::Local<v8::Value> HandleOf(v8::Isolate* isolate, v8::Local<v8::Value> value);
     static v8::Local<v8::Value> CallFunctionInternal(v8::Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<v8::Local<v8::Value>> args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType);

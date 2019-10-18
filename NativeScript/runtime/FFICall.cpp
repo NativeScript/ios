@@ -68,19 +68,49 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
         case BinaryTypeEncodingType::DoubleEncoding: {
             return &ffi_type_double;
         }
+        case BinaryTypeEncodingType::ExtVectorEncoding: {
+            size_t size = typeEncoding->details.extVector.size;
+#if defined(__x86_64__)
+            // We need isStructMember because double3 vectors are handled
+            // differently in x86_64. When a vector is a struct field
+            // it is passed in memory but when not - the ST0 register is
+            // used for the third element. In armv8 double3 vector will always
+            // be passed in memory (as it's size > 16).
+            if (size == 3 && isStructMember) {
+#else
+            // For armv8 we always need to pass the array size
+            // as the vector would fill a whole register in order
+            // to calculate the proper flags value.
+            if (size == 3) {
+#endif
+                size = 4;
+            }
+
+            const TypeEncoding* innerType = typeEncoding->details.extVector.getInnerType();
+            ffi_type* innerFFIType = FFICall::GetArgumentType(innerType, isStructMember);
+            ffi_type* type = new ffi_type({ .size = size * innerFFIType->size, .alignment = innerFFIType->alignment, .type = FFI_TYPE_EXT_VECTOR });
+            type->elements = new ffi_type*[size + 1];
+
+            for (size_t i = 0; i < size; i++) {
+                type->elements[i] = innerFFIType;
+            }
+
+            type->elements[size] = nullptr;
+            return type;
+        }
         case BinaryTypeEncodingType::StructDeclarationReference: {
             const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
             const Meta* meta = ArgConverter::GetMeta(structName);
             assert(meta->type() == MetaType::Struct);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
 
-            StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+            StructInfo structInfo = FFICall::GetStructInfo(structMeta, structName);
             return structInfo.FFIType();
         }
         case BinaryTypeEncodingType::ConstantArrayEncoding: {
             if (isStructMember) {
                 const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
-                ffi_type* innerFFIType = FFICall::GetArgumentType(innerType);
+                ffi_type* innerFFIType = FFICall::GetArgumentType(innerType, isStructMember);
                 int32_t size = typeEncoding->details.constantArray.size;
                 ffi_type* ffiType = new ffi_type({ .size = size * innerFFIType->size, .alignment = innerFFIType->alignment, .type = FFI_TYPE_STRUCT });
                 ffiType->elements = new ffi_type*[size + 1];
@@ -109,11 +139,13 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
     assert(false);
 }
 
-StructInfo FFICall::GetStructInfo(const StructMeta* structMeta) {
+StructInfo FFICall::GetStructInfo(const StructMeta* structMeta, std::string structName) {
     size_t fieldsCount = structMeta->fieldsCount();
     const TypeEncoding* fieldEncoding = structMeta->fieldsEncodings()->first();
     const String* fieldNames = structMeta->fieldNames().first();
-    std::string structName = structMeta->name();
+    if (structName.empty()) {
+        structName = structMeta->name();
+    }
     StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames, structName);
     return structInfo;
 }
