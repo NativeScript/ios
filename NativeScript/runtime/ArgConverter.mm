@@ -487,7 +487,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
            receiver = CreateEmptyObject(context);
            cache->Instances.insert(std::make_pair(target, new Persistent<Value>(isolate, receiver)));
        }
-   }
+    }
 
     Class klass = [target class];
     const Meta* meta = FindMeta(klass);
@@ -537,7 +537,7 @@ const Meta* ArgConverter::FindMeta(Class klass) {
 
     while (true) {
         const Meta* result = GetMeta(className);
-        if (result != nullptr) {
+        if (result != nullptr && result->type() == MetaType::Interface) {
             Caches::Metadata.Insert(origClassName, result);
             return result;
         }
