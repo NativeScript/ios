@@ -56,7 +56,7 @@ std::unique_ptr<Domain> Domain::clone() const
 
 std::unique_ptr<StringBuffer> Domain::toJSONString() const
 {
-    String json = toValue()->serializeToJSON();
+    String json = toValue()->toJSONString();
     return StringBufferImpl::adopt(json);
 }
 
@@ -94,11 +94,6 @@ std::unique_ptr<API::Domain> API::Domain::fromBinary(const uint8_t* data, size_t
 void Frontend::flush()
 {
     m_frontendChannel->flushProtocolNotifications();
-}
-
-void Frontend::sendRawJSONNotification(String notification)
-{
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromJSON(std::move(notification)));
 }
 
 void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)

@@ -135,7 +135,7 @@ std::unique_ptr<RemoteObject> RemoteObject::clone() const
 
 std::unique_ptr<StringBuffer> RemoteObject::toJSONString() const
 {
-    String json = toValue()->serializeToJSON();
+    String json = toValue()->toJSONString();
     return StringBufferImpl::adopt(json);
 }
 
@@ -848,7 +848,7 @@ std::unique_ptr<StackTrace> StackTrace::clone() const
 
 std::unique_ptr<StringBuffer> StackTrace::toJSONString() const
 {
-    String json = toValue()->serializeToJSON();
+    String json = toValue()->toJSONString();
     return StringBufferImpl::adopt(json);
 }
 
@@ -919,7 +919,7 @@ std::unique_ptr<StackTraceId> StackTraceId::clone() const
 
 std::unique_ptr<StringBuffer> StackTraceId::toJSONString() const
 {
-    String json = toValue()->serializeToJSON();
+    String json = toValue()->toJSONString();
     return StringBufferImpl::adopt(json);
 }
 
@@ -1358,11 +1358,6 @@ void Frontend::inspectRequested(std::unique_ptr<protocol::Runtime::RemoteObject>
 void Frontend::flush()
 {
     m_frontendChannel->flushProtocolNotifications();
-}
-
-void Frontend::sendRawJSONNotification(String notification)
-{
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromJSON(std::move(notification)));
 }
 
 void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)

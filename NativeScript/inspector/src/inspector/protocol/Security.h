@@ -70,7 +70,6 @@ public:
     void setRecommendations(std::unique_ptr<protocol::Array<String>> value) { m_recommendations = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SecurityStateExplanation> clone() const;
@@ -204,7 +203,6 @@ public:
     void setDisplayedInsecureContentStyle(const String& value) { m_displayedInsecureContentStyle = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<InsecureContentStatus> clone() const;
@@ -333,7 +331,6 @@ public:
     void setRequestURL(const String& value) { m_requestURL = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CertificateErrorNotification> clone() const;
@@ -429,7 +426,6 @@ public:
     void setSummary(const String& value) { m_summary = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SecurityStateChangedNotification> clone() const;
@@ -539,7 +535,6 @@ public:
     void securityStateChanged(const String& securityState, bool schemeIsCryptographic, std::unique_ptr<protocol::Array<protocol::Security::SecurityStateExplanation>> explanations, std::unique_ptr<protocol::Security::InsecureContentStatus> insecureContentStatus, Maybe<String> summary = Maybe<String>());
 
     void flush();
-    void sendRawJSONNotification(String);
     void sendRawCBORNotification(std::vector<uint8_t>);
 private:
     FrontendChannel* m_frontendChannel;

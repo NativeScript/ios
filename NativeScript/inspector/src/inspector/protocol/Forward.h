@@ -98,13 +98,6 @@ namespace protocol {
 
 class  Serializable {
 public:
-    ProtocolMessage serialize(bool binary) {
-      if (binary)
-        return StringUtil::binaryToMessage(serializeToBinary());
-      else
-        return StringUtil::jsonToMessage(serializeToJSON());
-    }
-    virtual String serializeToJSON() = 0;
     virtual std::vector<uint8_t> serializeToBinary() = 0;
     virtual ~Serializable() = default;
 };

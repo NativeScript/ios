@@ -77,7 +77,7 @@ constexpr int kStackSpaceRequiredForCompilation = 40;
 
 // Determine whether double field unboxing feature is enabled.
 #if V8_TARGET_ARCH_64_BIT && !defined(V8_COMPRESS_POINTERS)
-#define V8_DOUBLE_FIELDS_UNBOXING false
+#define V8_DOUBLE_FIELDS_UNBOXING true
 #else
 #define V8_DOUBLE_FIELDS_UNBOXING false
 #endif
@@ -400,6 +400,7 @@ enum TypeofMode : int { INSIDE_TYPEOF, NOT_INSIDE_TYPEOF };
 // Enums used by CEntry.
 enum SaveFPRegsMode { kDontSaveFPRegs, kSaveFPRegs };
 enum ArgvMode { kArgvOnStack, kArgvInRegister };
+enum FunctionDescriptorMode { kNoFunctionDescriptor, kHasFunctionDescriptor };
 
 // This constant is used as an undefined value when passing source positions.
 constexpr int kNoSourcePosition = -1;

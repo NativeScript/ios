@@ -137,7 +137,6 @@ public:
     void setUnreachableUrl(const String& value) { m_unreachableUrl = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Frame> clone() const;
@@ -280,7 +279,6 @@ public:
     void setCanceled(bool value) { m_canceled = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameResource> clone() const;
@@ -397,7 +395,6 @@ public:
     void setResources(std::unique_ptr<protocol::Array<protocol::Page::FrameResource>> value) { m_resources = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameResourceTree> clone() const;
@@ -481,7 +478,6 @@ public:
     void setChildFrames(std::unique_ptr<protocol::Array<protocol::Page::FrameTree>> value) { m_childFrames = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameTree> clone() const;
@@ -561,7 +557,6 @@ public:
     void setClientHeight(int value) { m_clientHeight = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LayoutViewport> clone() const;
@@ -678,7 +673,6 @@ public:
     void setZoom(double value) { m_zoom = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<VisualViewport> clone() const;
@@ -822,7 +816,6 @@ public:
     void setScale(double value) { m_scale = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Viewport> clone() const;
@@ -952,7 +945,6 @@ public:
     void setPictograph(const String& value) { m_pictograph = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FontFamilies> clone() const;
@@ -1061,7 +1053,6 @@ public:
     void setFixed(int value) { m_fixed = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FontSizes> clone() const;
@@ -1130,7 +1121,6 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<DomContentEventFiredNotification> clone() const;
@@ -1202,7 +1192,6 @@ public:
     void setStack(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stack = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameAttachedNotification> clone() const;
@@ -1282,7 +1271,6 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameClearedScheduledNavigationNotification> clone() const;
@@ -1346,7 +1334,6 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameDetachedNotification> clone() const;
@@ -1410,7 +1397,6 @@ public:
     void setFrame(std::unique_ptr<protocol::Page::Frame> value) { m_frame = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameNavigatedNotification> clone() const;
@@ -1493,7 +1479,6 @@ public:
     void setUrl(const String& value) { m_url = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameScheduledNavigationNotification> clone() const;
@@ -1585,7 +1570,6 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameStartedLoadingNotification> clone() const;
@@ -1649,7 +1633,6 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameStoppedLoadingNotification> clone() const;
@@ -1722,7 +1705,6 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LifecycleEventNotification> clone() const;
@@ -1814,7 +1796,6 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LoadEventFiredNotification> clone() const;
@@ -1882,7 +1863,6 @@ public:
     void setUrl(const String& value) { m_url = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<NavigatedWithinDocumentNotification> clone() const;
@@ -1964,7 +1944,6 @@ public:
     void setUserGesture(bool value) { m_userGesture = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WindowOpenNotification> clone() const;
@@ -2059,7 +2038,6 @@ public:
     void setData(const Binary& value) { m_data = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CompilationCacheProducedNotification> clone() const;
@@ -2192,7 +2170,6 @@ public:
     void compilationCacheProduced(const String& url, const Binary& data);
 
     void flush();
-    void sendRawJSONNotification(String);
     void sendRawCBORNotification(std::vector<uint8_t>);
 private:
     FrontendChannel* m_frontendChannel;

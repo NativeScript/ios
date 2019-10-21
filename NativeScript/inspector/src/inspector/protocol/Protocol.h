@@ -95,7 +95,6 @@ public:
     virtual void writeBinary(std::vector<uint8_t>* bytes) const;
     virtual std::unique_ptr<Value> clone() const;
     String toJSONString() const;
-    String serializeToJSON() override;
     std::vector<uint8_t> serializeToBinary() override;
 
 protected:
@@ -758,7 +757,6 @@ public:
     static std::unique_ptr<Serializable> createNotification(const String& notification, std::unique_ptr<Serializable> params = nullptr);
     static std::unique_ptr<Serializable> createErrorResponse(int callId, DispatchResponse::ErrorCode code, const String& message);
 
-    String serializeToJSON() override;
     std::vector<uint8_t> serializeToBinary() override;
 
     ~InternalResponse() override {}
@@ -773,11 +771,6 @@ private:
 
 class InternalRawNotification : public Serializable {
 public:
-    static std::unique_ptr<InternalRawNotification> fromJSON(String notification)
-    {
-        return std::unique_ptr<InternalRawNotification>(new InternalRawNotification(std::move(notification)));
-    }
-
     static std::unique_ptr<InternalRawNotification> fromBinary(std::vector<uint8_t> notification)
     {
         return std::unique_ptr<InternalRawNotification>(new InternalRawNotification(std::move(notification)));
@@ -785,23 +778,15 @@ public:
 
     ~InternalRawNotification() override {}
 
-    String serializeToJSON() override
-    {
-        return std::move(m_jsonNotification);
-    }
-
     std::vector<uint8_t> serializeToBinary() override
     {
         return std::move(m_binaryNotification);
     }
 
 private:
-  explicit InternalRawNotification(String notification)
-    : m_jsonNotification(std::move(notification)) { }
   explicit InternalRawNotification(std::vector<uint8_t> notification)
     : m_binaryNotification(std::move(notification)) { }
 
-  String m_jsonNotification;
   std::vector<uint8_t> m_binaryNotification;
 };
 

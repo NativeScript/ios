@@ -62,7 +62,6 @@ public:
     void setPositionTicks(std::unique_ptr<protocol::Array<protocol::Profiler::PositionTickInfo>> value) { m_positionTicks = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ProfileNode> clone() const;
@@ -178,7 +177,6 @@ public:
     void setTimeDeltas(std::unique_ptr<protocol::Array<int>> value) { m_timeDeltas = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Profile> clone() const;
@@ -279,7 +277,6 @@ public:
     void setTicks(int value) { m_ticks = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PositionTickInfo> clone() const;
@@ -360,7 +357,6 @@ public:
     void setCount(int value) { m_count = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CoverageRange> clone() const;
@@ -451,7 +447,6 @@ public:
     void setIsBlockCoverage(bool value) { m_isBlockCoverage = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FunctionCoverage> clone() const;
@@ -540,7 +535,6 @@ public:
     void setFunctions(std::unique_ptr<protocol::Array<protocol::Profiler::FunctionCoverage>> value) { m_functions = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScriptCoverage> clone() const;
@@ -622,7 +616,6 @@ public:
     void setName(const String& value) { m_name = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<TypeObject> clone() const;
@@ -689,7 +682,6 @@ public:
     void setTypes(std::unique_ptr<protocol::Array<protocol::Profiler::TypeObject>> value) { m_types = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<TypeProfileEntry> clone() const;
@@ -769,7 +761,6 @@ public:
     void setEntries(std::unique_ptr<protocol::Array<protocol::Profiler::TypeProfileEntry>> value) { m_entries = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScriptTypeProfile> clone() const;
@@ -861,7 +852,6 @@ public:
     void setTitle(const String& value) { m_title = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ConsoleProfileFinishedNotification> clone() const;
@@ -957,7 +947,6 @@ public:
     void setTitle(const String& value) { m_title = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
     std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ConsoleProfileStartedNotification> clone() const;
@@ -1056,7 +1045,6 @@ public:
     void consoleProfileStarted(const String& id, std::unique_ptr<protocol::Debugger::Location> location, Maybe<String> title = Maybe<String>());
 
     void flush();
-    void sendRawJSONNotification(String);
     void sendRawCBORNotification(std::vector<uint8_t>);
 private:
     FrontendChannel* m_frontendChannel;

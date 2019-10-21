@@ -268,7 +268,7 @@ std::unique_ptr<SearchMatch> SearchMatch::clone() const
 
 std::unique_ptr<StringBuffer> SearchMatch::toJSONString() const
 {
-    String json = toValue()->serializeToJSON();
+    String json = toValue()->toJSONString();
     return StringBufferImpl::adopt(json);
 }
 
@@ -845,11 +845,6 @@ void Frontend::scriptParsed(const String& scriptId, const String& url, int start
 void Frontend::flush()
 {
     m_frontendChannel->flushProtocolNotifications();
-}
-
-void Frontend::sendRawJSONNotification(String notification)
-{
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromJSON(std::move(notification)));
 }
 
 void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
