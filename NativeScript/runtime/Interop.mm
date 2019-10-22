@@ -251,22 +251,35 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         }
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::FunctionPointerEncoding) {
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg.As<Object>());
-        assert(wrapper != nullptr && wrapper->Type() == WrapperType::FunctionReference);
-        FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
-        const TypeEncoding* functionTypeEncoding = typeEncoding->details.functionPointer.signature.first();
-        int argsCount = typeEncoding->details.functionPointer.signature.count - 1;
+        assert(wrapper != nullptr);
+        if (wrapper->Type() == WrapperType::Pointer) {
+            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+            void* data = pointerWrapper->Data();
+            Interop::SetValue(dest, data);
+        } else if (wrapper->Type() == WrapperType::AnonymousFunction) {
+            AnonymousFunctionWrapper* functionWrapper = static_cast<AnonymousFunctionWrapper*>(wrapper);
+            void* data = functionWrapper->Data();
+            Interop::SetValue(dest, data);
+        } else if (wrapper->Type() == WrapperType::FunctionReference) {
+            assert(wrapper != nullptr && wrapper->Type() == WrapperType::FunctionReference);
+            FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
+            const TypeEncoding* functionTypeEncoding = typeEncoding->details.functionPointer.signature.first();
+            int argsCount = typeEncoding->details.functionPointer.signature.count - 1;
 
-        Local<Value> callbackValue = funcWrapper->Function()->Get(isolate);
-        assert(callbackValue->IsFunction());
-        Local<v8::Function> callback = callbackValue.As<v8::Function>();
-        Persistent<Value>* poCallback = new Persistent<Value>(isolate, callback);
-        MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 0, argsCount, functionTypeEncoding);
+            Local<Value> callbackValue = funcWrapper->Function()->Get(isolate);
+            assert(callbackValue->IsFunction());
+            Local<v8::Function> callback = callbackValue.As<v8::Function>();
+            Persistent<Value>* poCallback = new Persistent<Value>(isolate, callback);
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 0, argsCount, functionTypeEncoding);
 
-        void* functionPointer = (void*)Interop::CreateMethod(0, argsCount, functionTypeEncoding, ArgConverter::MethodCallback, userData);
+            void* functionPointer = (void*)Interop::CreateMethod(0, argsCount, functionTypeEncoding, ArgConverter::MethodCallback, userData);
 
-        funcWrapper->SetData(functionPointer);
+            funcWrapper->SetData(functionPointer);
 
-        Interop::SetValue(dest, functionPointer);
+            Interop::SetValue(dest, functionPointer);
+        } else {
+            assert(false);
+        }
     } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
         const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
         int argsCount = typeEncoding->details.block.signature.count - 1;
