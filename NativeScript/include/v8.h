@@ -1574,9 +1574,17 @@ class V8_EXPORT Module : public Data {
   /**
    * Set this module's exported value for the name export_name to the specified
    * export_value. This method must be called only on Modules created via
-   * CreateSyntheticModule. export_name must be one of the export_names that
-   * were passed in that CreateSyntheticModule call.
+   * CreateSyntheticModule.  An error will be thrown if export_name is not one
+   * of the export_names that were passed in that CreateSyntheticModule call.
+   * Returns Just(true) on success, Nothing<bool>() if an error was thrown.
    */
+  V8_WARN_UNUSED_RESULT Maybe<bool> SetSyntheticModuleExport(
+      Isolate* isolate, Local<String> export_name, Local<Value> export_value);
+  V8_DEPRECATE_SOON(
+      "Use the preceding SetSyntheticModuleExport with an Isolate parameter, "
+      "instead of the one that follows.  The former will throw a runtime "
+      "error if called for an export that doesn't exist (as per spec); "
+      "the latter will crash with a failed CHECK().")
   void SetSyntheticModuleExport(Local<String> export_name,
                                 Local<Value> export_value);
 };
@@ -2206,6 +2214,8 @@ struct UnwindState {
   MemoryRange code_range;
   MemoryRange embedded_code_range;
   JSEntryStub js_entry_stub;
+  JSEntryStub js_construct_entry_stub;
+  JSEntryStub js_run_microtasks_entry_stub;
 };
 
 /**
@@ -4841,6 +4851,10 @@ enum class ArrayBufferCreationMode { kInternalized, kExternalized };
  * V8. Clients should always use standard C++ memory ownership types (i.e.
  * std::unique_ptr and std::shared_ptr) to manage lifetimes of backing stores
  * properly, since V8 internal objects may alias backing stores.
+ *
+ * This object does not keep the underlying |ArrayBuffer::Allocator| alive by
+ * default. Use Isolate::CreateParams::array_buffer_allocator_shared when
+ * creating the Isolate to make it hold a reference to the allocator itself.
  */
 class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
  public:
@@ -4858,9 +4872,23 @@ class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
    */
   size_t ByteLength() const;
 
+  /**
+   * Indicates whether the backing store was created for an ArrayBuffer or
+   * a SharedArrayBuffer.
+   */
+  bool IsShared() const;
+
  private:
   BackingStore();
 };
+
+/**
+ * This callback is used only if the memory block for this backing store cannot
+ * be allocated with an ArrayBuffer::Allocator. In such cases the destructor
+ * of this backing store object invokes the callback to free the memory block.
+ */
+using BackingStoreDeleterCallback = void (*)(void* data, size_t length,
+                                             void* deleter_data);
 
 /**
  * An instance of the built-in ArrayBuffer constructor (ES6 draft 15.13.5).
@@ -5011,6 +5039,29 @@ class V8_EXPORT ArrayBuffer : public Object {
    */
   static Local<ArrayBuffer> New(Isolate* isolate,
                                 std::shared_ptr<BackingStore> backing_store);
+
+  /**
+   * Returns a new standalone BackingStore that is allocated using the array
+   * buffer allocator of the isolate. The result can be later passed to
+   * ArrayBuffer::New.
+   *
+   * If the allocator returns nullptr, then the function may cause GCs in the
+   * given isolate and re-try the allocation. If GCs do not help, then the
+   * function will crash with an out-of-memory error.
+   */
+  static std::unique_ptr<BackingStore> NewBackingStore(Isolate* isolate,
+                                                       size_t byte_length);
+  /**
+   * Returns a new standalone BackingStore that takes over the ownership of
+   * the given buffer. The destructor of the BackingStore invokes the given
+   * deleter callback.
+   *
+   * The result can be later passed to ArrayBuffer::New. The raw pointer
+   * to the buffer must not be passed again to any V8 API function.
+   */
+  static std::unique_ptr<BackingStore> NewBackingStore(
+      void* data, size_t byte_length, BackingStoreDeleterCallback deleter,
+      void* deleter_data);
 
   /**
    * Returns true if ArrayBuffer is externalized, that is, does not
@@ -5463,6 +5514,29 @@ class V8_EXPORT SharedArrayBuffer : public Object {
       Isolate* isolate, std::shared_ptr<BackingStore> backing_store);
 
   /**
+   * Returns a new standalone BackingStore that is allocated using the array
+   * buffer allocator of the isolate. The result can be later passed to
+   * SharedArrayBuffer::New.
+   *
+   * If the allocator returns nullptr, then the function may cause GCs in the
+   * given isolate and re-try the allocation. If GCs do not help, then the
+   * function will crash with an out-of-memory error.
+   */
+  static std::unique_ptr<BackingStore> NewBackingStore(Isolate* isolate,
+                                                       size_t byte_length);
+  /**
+   * Returns a new standalone BackingStore that takes over the ownership of
+   * the given buffer. The destructor of the BackingStore invokes the given
+   * deleter callback.
+   *
+   * The result can be later passed to SharedArrayBuffer::New. The raw pointer
+   * to the buffer must not be passed again to any V8 functions.
+   */
+  static std::unique_ptr<BackingStore> NewBackingStore(
+      void* data, size_t byte_length, BackingStoreDeleterCallback deleter,
+      void* deleter_data);
+
+  /**
    * Create a new SharedArrayBuffer over an existing memory block. Propagate
    * flags to indicate whether the underlying buffer can be grown.
    */
@@ -5668,6 +5742,29 @@ class V8_EXPORT RegExp : public Object {
   static V8_WARN_UNUSED_RESULT MaybeLocal<RegExp> New(Local<Context> context,
                                                       Local<String> pattern,
                                                       Flags flags);
+
+  /**
+   * Like New, but additionally specifies a backtrack limit. If the number of
+   * backtracks done in one Exec call hits the limit, a match failure is
+   * immediately returned.
+   */
+  static V8_WARN_UNUSED_RESULT MaybeLocal<RegExp> NewWithBacktrackLimit(
+      Local<Context> context, Local<String> pattern, Flags flags,
+      uint32_t backtrack_limit);
+
+  /**
+   * Executes the current RegExp instance on the given subject string.
+   * Equivalent to RegExp.prototype.exec as described in
+   *
+   *   https://tc39.es/ecma262/#sec-regexp.prototype.exec
+   *
+   * On success, an Array containing the matched strings is returned. On
+   * failure, returns Null.
+   *
+   * Note: modifies global context state, accessible e.g. through RegExp.input.
+   */
+  V8_WARN_UNUSED_RESULT MaybeLocal<Object> Exec(Local<Context> context,
+                                                Local<String> subject);
 
   /**
    * Returns the value of the source property: a string representing
@@ -7809,6 +7906,7 @@ class V8_EXPORT Isolate {
           create_histogram_callback(nullptr),
           add_histogram_sample_callback(nullptr),
           array_buffer_allocator(nullptr),
+          array_buffer_allocator_shared(),
           external_references(nullptr),
           allow_atomics_wait(true),
           only_terminate_in_safe_scope(false) {}
@@ -7848,8 +7946,14 @@ class V8_EXPORT Isolate {
     /**
      * The ArrayBuffer::Allocator to use for allocating and freeing the backing
      * store of ArrayBuffers.
+     *
+     * If the shared_ptr version is used, the Isolate instance and every
+     * |BackingStore| allocated using this allocator hold a std::shared_ptr
+     * to the allocator, in order to facilitate lifetime
+     * management for the allocator instance.
      */
     ArrayBuffer::Allocator* array_buffer_allocator;
+    std::shared_ptr<ArrayBuffer::Allocator> array_buffer_allocator_shared;
 
     /**
      * Specifies an optional nullptr-terminated array of raw addresses in the
@@ -8071,6 +8175,8 @@ class V8_EXPORT Isolate {
     kCallSiteAPIGetFunctionSloppyCall = 76,
     kCallSiteAPIGetThisSloppyCall = 77,
     kRegExpMatchAllWithNonGlobalRegExp = 78,
+    kRegExpExecCalledOnSlowRegExp = 79,
+    kRegExpReplaceCalledOnSlowRegExp = 80,
 
     // If you add new values here, you'll also need to update Chromium's:
     // web_feature.mojom, use_counter_callback.cc, and enums.xml. V8 changes to
@@ -9132,8 +9238,6 @@ class V8_EXPORT V8 {
    *   handled entirely on the embedders' side.
    * - The call will abort if the data is invalid.
    */
-  V8_DEPRECATED("The natives blob is deprecated (https://crbug.com/v8/7624).")
-  static void SetNativesDataBlob(StartupData* startup_blob);
   static void SetSnapshotDataBlob(StartupData* startup_blob);
 
   /** Set the callback to invoke in case of Dcheck failures. */
@@ -9218,18 +9322,14 @@ class V8_EXPORT V8 {
    * V8 needs to be given those external files during startup. There are
    * three ways to do this:
    * - InitializeExternalStartupData(const char*)
-   *   This will look in the given directory for files "natives_blob.bin"
-   *   and "snapshot_blob.bin" - which is what the default build calls them.
-   * - InitializeExternalStartupData(const char*, const char*)
-   *   As above, but will directly use the two given file names.
-   * - Call SetNativesDataBlob, SetNativesDataBlob.
-   *   This will read the blobs from the given data structures and will
+   *   This will look in the given directory for the file "snapshot_blob.bin".
+   * - InitializeExternalStartupDataFromFile(const char*)
+   *   As above, but will directly use the given file name.
+   * - Call SetSnapshotDataBlob.
+   *   This will read the blobs from the given data structure and will
    *   not perform any file IO.
    */
   static void InitializeExternalStartupData(const char* directory_path);
-  V8_DEPRECATED("The natives blob is deprecated (https://crbug.com/v8/7624).")
-  static void InitializeExternalStartupData(const char* natives_blob,
-                                            const char* snapshot_blob);
   static void InitializeExternalStartupDataFromFile(const char* snapshot_blob);
 
   /**

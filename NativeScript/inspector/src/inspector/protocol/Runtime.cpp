@@ -1789,6 +1789,12 @@ void DispatcherImpl::evaluate(int callId, const String& method, const ProtocolMe
         errors->setName("disableBreaks");
         in_disableBreaks = ValueConversions<bool>::fromValue(disableBreaksValue, errors);
     }
+    protocol::Value* replModeValue = object ? object->get("replMode") : nullptr;
+    Maybe<bool> in_replMode;
+    if (replModeValue) {
+        errors->setName("replMode");
+        in_replMode = ValueConversions<bool>::fromValue(replModeValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -1796,7 +1802,7 @@ void DispatcherImpl::evaluate(int callId, const String& method, const ProtocolMe
     }
 
     std::unique_ptr<EvaluateCallbackImpl> callback(new EvaluateCallbackImpl(weakPtr(), callId, method, message));
-    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(in_timeout), std::move(in_disableBreaks), std::move(callback));
+    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(in_timeout), std::move(in_disableBreaks), std::move(in_replMode), std::move(callback));
     return;
 }
 

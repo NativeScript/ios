@@ -400,7 +400,6 @@ enum TypeofMode : int { INSIDE_TYPEOF, NOT_INSIDE_TYPEOF };
 // Enums used by CEntry.
 enum SaveFPRegsMode { kDontSaveFPRegs, kSaveFPRegs };
 enum ArgvMode { kArgvOnStack, kArgvInRegister };
-enum FunctionDescriptorMode { kNoFunctionDescriptor, kHasFunctionDescriptor };
 
 // This constant is used as an undefined value when passing source positions.
 constexpr int kNoSourcePosition = -1;
@@ -599,7 +598,6 @@ class JSReceiver;
 class JSArray;
 class JSFunction;
 class JSObject;
-class LargeObjectSpace;
 class MacroAssembler;
 class Map;
 class MapSpace;
@@ -617,6 +615,7 @@ class NewSpace;
 class NewLargeObjectSpace;
 class NumberDictionary;
 class Object;
+class OldLargeObjectSpace;
 template <HeapObjectReferenceType kRefType, typename StorageType>
 class TaggedImpl;
 class StrongTaggedValue;
@@ -757,6 +756,17 @@ enum MinimumCapacity {
 };
 
 enum GarbageCollector { SCAVENGER, MARK_COMPACTOR, MINOR_MARK_COMPACTOR };
+
+enum class LocalSpaceKind {
+  kNone,
+  kOffThreadSpace,
+  kCompactionSpaceForScavenge,
+  kCompactionSpaceForMarkCompact,
+  kCompactionSpaceForMinorMarkCompact,
+
+  kFirstCompactionSpace = kCompactionSpaceForScavenge,
+  kLastCompactionSpace = kCompactionSpaceForMinorMarkCompact,
+};
 
 enum Executability { NOT_EXECUTABLE, EXECUTABLE };
 
@@ -1035,6 +1045,8 @@ constexpr uint64_t kHoleNanInt64 =
 
 // ES6 section 20.1.2.6 Number.MAX_SAFE_INTEGER
 constexpr double kMaxSafeInteger = 9007199254740991.0;  // 2^53-1
+
+constexpr double kMaxUInt32Double = double{kMaxUInt32};
 
 // The order of this enum has to be kept in sync with the predicates below.
 enum class VariableMode : uint8_t {
