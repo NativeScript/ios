@@ -29,7 +29,7 @@ ar r ./$X86_64_OUT/libffi.a ./$X86_64_OUT/src/*.o ./$X86_64_OUT/src/x86/*.o
 #lipo ./$ARM64_OUT/libffi.a ./$ARM_OUT/libffi.a ./$X86_64_OUT/libffi.a -create -output ./libffi.a
 lipo ./$ARM64_OUT/libffi.a ./$X86_64_OUT/libffi.a -create -output ./libffi.a
 
-rm -rf ./aarch64-apple-darwin13
-rm -rf ./x86_64-apple-darwin13
+# rm -rf ./aarch64-apple-darwin13
+# rm -rf ./x86_64-apple-darwin13
 
 popd
