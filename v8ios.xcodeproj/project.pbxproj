@@ -15,6 +15,36 @@
 		C2229978235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2229976235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp */; };
 		C22C092222CA3F370080D176 /* Worker.mm in Sources */ = {isa = PBXBuildFile; fileRef = C22C092022CA3F370080D176 /* Worker.mm */; };
 		C22C092322CA3F370080D176 /* Worker.h in Headers */ = {isa = PBXBuildFile; fileRef = C22C092122CA3F370080D176 /* Worker.h */; };
+		C23992CA236C2D6E00D2F720 /* TestRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */; };
+		C23992F8236C364B00D2F720 /* Transport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DA236C364B00D2F720 /* Transport.swift */; };
+		C23992F9236C364B00D2F720 /* FileLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DB236C364B00D2F720 /* FileLogHandler.swift */; };
+		C23992FA236C364B00D2F720 /* HTTPHeaderParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DC236C364B00D2F720 /* HTTPHeaderParser.swift */; };
+		C23992FB236C364B00D2F720 /* TransformLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DD236C364B00D2F720 /* TransformLogHandler.swift */; };
+		C23992FC236C364B00D2F720 /* SystemLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DE236C364B00D2F720 /* SystemLibrary.swift */; };
+		C23992FD236C364B00D2F720 /* HeapSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E0236C364B00D2F720 /* HeapSort.swift */; };
+		C23992FE236C364B00D2F720 /* KqueueSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E1236C364B00D2F720 /* KqueueSelector.swift */; };
+		C23992FF236C364B00D2F720 /* TCPSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E2236C364B00D2F720 /* TCPSocket.swift */; };
+		C2399300236C364B00D2F720 /* LogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E3236C364B00D2F720 /* LogHandler.swift */; };
+		C2399301236C364B00D2F720 /* DefaultLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E4236C364B00D2F720 /* DefaultLogger.swift */; };
+		C2399302236C364B00D2F720 /* DefaultLogFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E5236C364B00D2F720 /* DefaultLogFormatter.swift */; };
+		C2399303236C364B00D2F720 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E6236C364B00D2F720 /* Logger.swift */; };
+		C2399304236C364B00D2F720 /* Selector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E7236C364B00D2F720 /* Selector.swift */; };
+		C2399305236C364B00D2F720 /* SelectSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E8236C364B00D2F720 /* SelectSelector.swift */; };
+		C2399306236C364B00D2F720 /* HTTPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E9236C364B00D2F720 /* HTTPRequest.swift */; };
+		C2399307236C364B00D2F720 /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EA236C364B00D2F720 /* HTTPServer.swift */; };
+		C2399308236C364B00D2F720 /* EventLoop.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EB236C364B00D2F720 /* EventLoop.swift */; };
+		C2399309236C364B00D2F720 /* SWSGI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EC236C364B00D2F720 /* SWSGI.swift */; };
+		C239930A236C364B00D2F720 /* LogFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992ED236C364B00D2F720 /* LogFormatter.swift */; };
+		C239930B236C364B00D2F720 /* MultiDictionary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EE236C364B00D2F720 /* MultiDictionary.swift */; };
+		C239930C236C364B00D2F720 /* SelectorEventLoop.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EF236C364B00D2F720 /* SelectorEventLoop.swift */; };
+		C239930D236C364B00D2F720 /* Atomic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F0236C364B00D2F720 /* Atomic.swift */; };
+		C239930E236C364B00D2F720 /* IOUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F1236C364B00D2F720 /* IOUtils.swift */; };
+		C239930F236C364B00D2F720 /* PropagateLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F2236C364B00D2F720 /* PropagateLogHandler.swift */; };
+		C2399310236C364B00D2F720 /* PrintLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F3236C364B00D2F720 /* PrintLogHandler.swift */; };
+		C2399311236C364B00D2F720 /* Errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F4236C364B00D2F720 /* Errors.swift */; };
+		C2399312236C364B00D2F720 /* DefaultHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F5236C364B00D2F720 /* DefaultHTTPServer.swift */; };
+		C2399313236C364B00D2F720 /* HTTPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F6236C364B00D2F720 /* HTTPConnection.swift */; };
+		C2399314236C364B00D2F720 /* SWSGIUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F7236C364B00D2F720 /* SWSGIUtils.swift */; };
 		C23E8F7322CB386F0078FD4C /* ConcurrentQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */; };
 		C23E8F7622CDE88D0078FD4C /* WorkerWrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C23E8F7422CDE88D0078FD4C /* WorkerWrapper.cpp */; };
 		C247C16522F82842001D2CA2 /* v8-platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C14D22F82842001D2CA2 /* v8-platform.h */; };
@@ -391,6 +421,13 @@
 			remoteGlobalIDString = C2DDEB31229EAB3B00345BFE;
 			remoteInfo = NativeScript;
 		};
+		C23992CC236C2D6E00D2F720 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2DDEB15229EA89000345BFE;
+			remoteInfo = TestRunner;
+		};
 		C27E5DA322F31EF900498ED0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = C27E277822202663009C10A3 /* Project object */;
@@ -484,6 +521,39 @@
 		C2229976235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-ns-debugger-agent-impl.cpp"; sourceTree = "<group>"; };
 		C22C092022CA3F370080D176 /* Worker.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Worker.mm; sourceTree = "<group>"; };
 		C22C092122CA3F370080D176 /* Worker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Worker.h; sourceTree = "<group>"; };
+		C23992C7236C2D6E00D2F720 /* TestRunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TestRunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestRunnerTests.swift; sourceTree = "<group>"; };
+		C23992CB236C2D6E00D2F720 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C23992DA236C364B00D2F720 /* Transport.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Transport.swift; sourceTree = "<group>"; };
+		C23992DB236C364B00D2F720 /* FileLogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FileLogHandler.swift; sourceTree = "<group>"; };
+		C23992DC236C364B00D2F720 /* HTTPHeaderParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPHeaderParser.swift; sourceTree = "<group>"; };
+		C23992DD236C364B00D2F720 /* TransformLogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TransformLogHandler.swift; sourceTree = "<group>"; };
+		C23992DE236C364B00D2F720 /* SystemLibrary.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SystemLibrary.swift; sourceTree = "<group>"; };
+		C23992DF236C364B00D2F720 /* Embassy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Embassy.h; sourceTree = "<group>"; };
+		C23992E0236C364B00D2F720 /* HeapSort.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HeapSort.swift; sourceTree = "<group>"; };
+		C23992E1236C364B00D2F720 /* KqueueSelector.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KqueueSelector.swift; sourceTree = "<group>"; };
+		C23992E2236C364B00D2F720 /* TCPSocket.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TCPSocket.swift; sourceTree = "<group>"; };
+		C23992E3236C364B00D2F720 /* LogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogHandler.swift; sourceTree = "<group>"; };
+		C23992E4236C364B00D2F720 /* DefaultLogger.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DefaultLogger.swift; sourceTree = "<group>"; };
+		C23992E5236C364B00D2F720 /* DefaultLogFormatter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DefaultLogFormatter.swift; sourceTree = "<group>"; };
+		C23992E6236C364B00D2F720 /* Logger.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
+		C23992E7236C364B00D2F720 /* Selector.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Selector.swift; sourceTree = "<group>"; };
+		C23992E8236C364B00D2F720 /* SelectSelector.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SelectSelector.swift; sourceTree = "<group>"; };
+		C23992E9236C364B00D2F720 /* HTTPRequest.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPRequest.swift; sourceTree = "<group>"; };
+		C23992EA236C364B00D2F720 /* HTTPServer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
+		C23992EB236C364B00D2F720 /* EventLoop.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EventLoop.swift; sourceTree = "<group>"; };
+		C23992EC236C364B00D2F720 /* SWSGI.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SWSGI.swift; sourceTree = "<group>"; };
+		C23992ED236C364B00D2F720 /* LogFormatter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogFormatter.swift; sourceTree = "<group>"; };
+		C23992EE236C364B00D2F720 /* MultiDictionary.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MultiDictionary.swift; sourceTree = "<group>"; };
+		C23992EF236C364B00D2F720 /* SelectorEventLoop.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SelectorEventLoop.swift; sourceTree = "<group>"; };
+		C23992F0236C364B00D2F720 /* Atomic.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Atomic.swift; sourceTree = "<group>"; };
+		C23992F1236C364B00D2F720 /* IOUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IOUtils.swift; sourceTree = "<group>"; };
+		C23992F2236C364B00D2F720 /* PropagateLogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PropagateLogHandler.swift; sourceTree = "<group>"; };
+		C23992F3236C364B00D2F720 /* PrintLogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PrintLogHandler.swift; sourceTree = "<group>"; };
+		C23992F4236C364B00D2F720 /* Errors.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Errors.swift; sourceTree = "<group>"; };
+		C23992F5236C364B00D2F720 /* DefaultHTTPServer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DefaultHTTPServer.swift; sourceTree = "<group>"; };
+		C23992F6236C364B00D2F720 /* HTTPConnection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPConnection.swift; sourceTree = "<group>"; };
+		C23992F7236C364B00D2F720 /* SWSGIUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SWSGIUtils.swift; sourceTree = "<group>"; };
 		C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConcurrentQueue.h; sourceTree = "<group>"; };
 		C23E8F7422CDE88D0078FD4C /* WorkerWrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = WorkerWrapper.cpp; sourceTree = "<group>"; };
 		C247C14D22F82842001D2CA2 /* v8-platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-platform.h"; sourceTree = "<group>"; };
@@ -910,6 +980,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		C23992C4236C2D6E00D2F720 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C27E5D8822F31CC900498ED0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -958,6 +1035,53 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C23992C8236C2D6E00D2F720 /* TestRunnerTests */ = {
+			isa = PBXGroup;
+			children = (
+				C23992D9236C364B00D2F720 /* Embassy */,
+				C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */,
+				C23992CB236C2D6E00D2F720 /* Info.plist */,
+			);
+			path = TestRunnerTests;
+			sourceTree = "<group>";
+		};
+		C23992D9236C364B00D2F720 /* Embassy */ = {
+			isa = PBXGroup;
+			children = (
+				C23992DA236C364B00D2F720 /* Transport.swift */,
+				C23992DB236C364B00D2F720 /* FileLogHandler.swift */,
+				C23992DC236C364B00D2F720 /* HTTPHeaderParser.swift */,
+				C23992DD236C364B00D2F720 /* TransformLogHandler.swift */,
+				C23992DE236C364B00D2F720 /* SystemLibrary.swift */,
+				C23992DF236C364B00D2F720 /* Embassy.h */,
+				C23992E0236C364B00D2F720 /* HeapSort.swift */,
+				C23992E1236C364B00D2F720 /* KqueueSelector.swift */,
+				C23992E2236C364B00D2F720 /* TCPSocket.swift */,
+				C23992E3236C364B00D2F720 /* LogHandler.swift */,
+				C23992E4236C364B00D2F720 /* DefaultLogger.swift */,
+				C23992E5236C364B00D2F720 /* DefaultLogFormatter.swift */,
+				C23992E6236C364B00D2F720 /* Logger.swift */,
+				C23992E7236C364B00D2F720 /* Selector.swift */,
+				C23992E8236C364B00D2F720 /* SelectSelector.swift */,
+				C23992E9236C364B00D2F720 /* HTTPRequest.swift */,
+				C23992EA236C364B00D2F720 /* HTTPServer.swift */,
+				C23992EB236C364B00D2F720 /* EventLoop.swift */,
+				C23992EC236C364B00D2F720 /* SWSGI.swift */,
+				C23992ED236C364B00D2F720 /* LogFormatter.swift */,
+				C23992EE236C364B00D2F720 /* MultiDictionary.swift */,
+				C23992EF236C364B00D2F720 /* SelectorEventLoop.swift */,
+				C23992F0236C364B00D2F720 /* Atomic.swift */,
+				C23992F1236C364B00D2F720 /* IOUtils.swift */,
+				C23992F2236C364B00D2F720 /* PropagateLogHandler.swift */,
+				C23992F3236C364B00D2F720 /* PrintLogHandler.swift */,
+				C23992F4236C364B00D2F720 /* Errors.swift */,
+				C23992F5236C364B00D2F720 /* DefaultHTTPServer.swift */,
+				C23992F6236C364B00D2F720 /* HTTPConnection.swift */,
+				C23992F7236C364B00D2F720 /* SWSGIUtils.swift */,
+			);
+			path = Embassy;
+			sourceTree = "<group>";
+		};
 		C247C14C22F82842001D2CA2 /* include */ = {
 			isa = PBXGroup;
 			children = (
@@ -1316,6 +1440,7 @@
 			children = (
 				C2DDEB33229EAB3B00345BFE /* NativeScript */,
 				C2DDEB17229EA89000345BFE /* TestRunner */,
+				C23992C8236C2D6E00D2F720 /* TestRunnerTests */,
 				C27E5D8C22F31CCA00498ED0 /* AppWithModules */,
 				C29374E3229FC0F60075CB16 /* TestFixtures */,
 				C2A5DFE62328C4B900A91A76 /* TKLiveSync */,
@@ -1333,6 +1458,7 @@
 				C2F4CBB322C60BFD0036B56F /* metadata-generator */,
 				C27E5D8B22F31CC900498ED0 /* AppWithModules.app */,
 				C2A5DFE52328C4B900A91A76 /* libTKLiveSync.a */,
+				C23992C7236C2D6E00D2F720 /* TestRunnerTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1879,6 +2005,24 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
+		C23992C6236C2D6E00D2F720 /* TestRunnerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C23992D0236C2D6E00D2F720 /* Build configuration list for PBXNativeTarget "TestRunnerTests" */;
+			buildPhases = (
+				C23992C3236C2D6E00D2F720 /* Sources */,
+				C23992C4236C2D6E00D2F720 /* Frameworks */,
+				C23992C5236C2D6E00D2F720 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C23992CD236C2D6E00D2F720 /* PBXTargetDependency */,
+			);
+			name = TestRunnerTests;
+			productName = TestRunnerTests;
+			productReference = C23992C7236C2D6E00D2F720 /* TestRunnerTests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		C27E5D8A22F31CC900498ED0 /* AppWithModules */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C27E5D9E22F31CCC00498ED0 /* Build configuration list for PBXNativeTarget "AppWithModules" */;
@@ -1998,9 +2142,14 @@
 		C27E277822202663009C10A3 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				LastSwiftUpdateCheck = 1110;
 				LastUpgradeCheck = 1030;
 				ORGANIZATIONNAME = Progress;
 				TargetAttributes = {
+					C23992C6236C2D6E00D2F720 = {
+						CreatedOnToolsVersion = 11.1;
+						TestTargetID = C2DDEB15229EA89000345BFE;
+					};
 					C27E5D8A22F31CC900498ED0 = {
 						CreatedOnToolsVersion = 10.3;
 					};
@@ -2040,11 +2189,19 @@
 				C29374E1229FC0F60075CB16 /* TestFixtures */,
 				C2F4CBB222C60BFD0036B56F /* metadata-generator */,
 				C2A5DFE42328C4B900A91A76 /* TKLiveSync */,
+				C23992C6236C2D6E00D2F720 /* TestRunnerTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		C23992C5236C2D6E00D2F720 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C27E5D8922F31CC900498ED0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -2105,7 +2262,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator\n/Applications/CMake.app/Contents/bin/cmake .\nmake\n";
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator\ncmake .\nmake\n";
 		};
 		C2F4CBBD22C61D480036B56F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -2127,6 +2284,43 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C23992C3236C2D6E00D2F720 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2399313236C364B00D2F720 /* HTTPConnection.swift in Sources */,
+				C2399308236C364B00D2F720 /* EventLoop.swift in Sources */,
+				C23992FE236C364B00D2F720 /* KqueueSelector.swift in Sources */,
+				C2399305236C364B00D2F720 /* SelectSelector.swift in Sources */,
+				C2399307236C364B00D2F720 /* HTTPServer.swift in Sources */,
+				C239930B236C364B00D2F720 /* MultiDictionary.swift in Sources */,
+				C2399300236C364B00D2F720 /* LogHandler.swift in Sources */,
+				C2399301236C364B00D2F720 /* DefaultLogger.swift in Sources */,
+				C2399311236C364B00D2F720 /* Errors.swift in Sources */,
+				C2399302236C364B00D2F720 /* DefaultLogFormatter.swift in Sources */,
+				C239930F236C364B00D2F720 /* PropagateLogHandler.swift in Sources */,
+				C2399314236C364B00D2F720 /* SWSGIUtils.swift in Sources */,
+				C2399312236C364B00D2F720 /* DefaultHTTPServer.swift in Sources */,
+				C2399306236C364B00D2F720 /* HTTPRequest.swift in Sources */,
+				C239930E236C364B00D2F720 /* IOUtils.swift in Sources */,
+				C23992FC236C364B00D2F720 /* SystemLibrary.swift in Sources */,
+				C23992FB236C364B00D2F720 /* TransformLogHandler.swift in Sources */,
+				C239930C236C364B00D2F720 /* SelectorEventLoop.swift in Sources */,
+				C2399309236C364B00D2F720 /* SWSGI.swift in Sources */,
+				C239930A236C364B00D2F720 /* LogFormatter.swift in Sources */,
+				C2399304236C364B00D2F720 /* Selector.swift in Sources */,
+				C2399310236C364B00D2F720 /* PrintLogHandler.swift in Sources */,
+				C23992F9236C364B00D2F720 /* FileLogHandler.swift in Sources */,
+				C23992FD236C364B00D2F720 /* HeapSort.swift in Sources */,
+				C23992CA236C2D6E00D2F720 /* TestRunnerTests.swift in Sources */,
+				C2399303236C364B00D2F720 /* Logger.swift in Sources */,
+				C23992F8236C364B00D2F720 /* Transport.swift in Sources */,
+				C23992FF236C364B00D2F720 /* TCPSocket.swift in Sources */,
+				C23992FA236C364B00D2F720 /* HTTPHeaderParser.swift in Sources */,
+				C239930D236C364B00D2F720 /* Atomic.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C27E5D8722F31CC900498ED0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -2397,6 +2591,11 @@
 			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
 			targetProxy = C22C091E22CA2E860080D176 /* PBXContainerItemProxy */;
 		};
+		C23992CD236C2D6E00D2F720 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2DDEB15229EA89000345BFE /* TestRunner */;
+			targetProxy = C23992CC236C2D6E00D2F720 /* PBXContainerItemProxy */;
+		};
 		C27E5DA422F31EF900498ED0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C2F4CBB222C60BFD0036B56F /* metadata-generator */;
@@ -2420,6 +2619,56 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		C23992CE236C2D6E00D2F720 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CODE_SIGN_STYLE = Automatic;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
+				INFOPLIST_FILE = TestRunnerTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TestRunnerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TestRunner;
+			};
+			name = Debug;
+		};
+		C23992CF236C2D6E00D2F720 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CODE_SIGN_STYLE = Automatic;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
+				INFOPLIST_FILE = TestRunnerTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TestRunnerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TestRunner;
+			};
+			name = Release;
+		};
 		C27E279422202665009C10A3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -2927,6 +3176,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		C23992D0236C2D6E00D2F720 /* Build configuration list for PBXNativeTarget "TestRunnerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C23992CE236C2D6E00D2F720 /* Debug */,
+				C23992CF236C2D6E00D2F720 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		C27E277B22202663009C10A3 /* Build configuration list for PBXProject "v8ios" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
