@@ -1,0 +1,12 @@
+matrix:
+  include:
+    - os: osx
+      osx_image: xcode11
+    - stage: "Build"
+      language: objective-c
+      git:
+        submodules: false
+        depth: 1
+      xcode_project: v8ios.xcodeproj
+      xcode_scheme: TestRunner
+      xcode_destination: platform=iOS Simulator,OS=13.1,name=iPhone 11 Pro Max
