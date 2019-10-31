@@ -849,7 +849,7 @@
 		C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SimpleAllocator.h; sourceTree = "<group>"; };
 		C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = FastEnumerationAdapter.mm; sourceTree = "<group>"; };
 		C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FastEnumerationAdapter.h; sourceTree = "<group>"; };
-		C2DDEB16229EA89000345BFE /* TestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2DDEB16229EA89000345BFE /* TestRunner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestRunner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB26229EA89200345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C2DDEB32229EAB3B00345BFE /* NativeScript.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScript.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB34229EAB3B00345BFE /* NativeScript.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeScript.h; sourceTree = "<group>"; };
@@ -1315,7 +1315,7 @@
 			isa = PBXGroup;
 			children = (
 				C2DDEB33229EAB3B00345BFE /* NativeScript */,
-				C2DDEB17229EA89000345BFE /* TestApp */,
+				C2DDEB17229EA89000345BFE /* TestRunner */,
 				C27E5D8C22F31CCA00498ED0 /* AppWithModules */,
 				C29374E3229FC0F60075CB16 /* TestFixtures */,
 				C2A5DFE62328C4B900A91A76 /* TKLiveSync */,
@@ -1327,7 +1327,7 @@
 		C27E278122202664009C10A3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C2DDEB16229EA89000345BFE /* TestApp.app */,
+				C2DDEB16229EA89000345BFE /* TestRunner.app */,
 				C2DDEB32229EAB3B00345BFE /* NativeScript.framework */,
 				C29374E2229FC0F60075CB16 /* libTestFixtures.a */,
 				C2F4CBB322C60BFD0036B56F /* metadata-generator */,
@@ -1600,7 +1600,7 @@
 			path = libzip;
 			sourceTree = "<group>";
 		};
-		C2DDEB17229EA89000345BFE /* TestApp */ = {
+		C2DDEB17229EA89000345BFE /* TestRunner */ = {
 			isa = PBXGroup;
 			children = (
 				C2DDEBDD229EB4A900345BFE /* app */,
@@ -1608,7 +1608,7 @@
 				C2DDEB26229EA89200345BFE /* Info.plist */,
 				C266567722AA405100EE15CC /* Default-568h@2x.png */,
 			);
-			path = TestApp;
+			path = TestRunner;
 			sourceTree = "<group>";
 		};
 		C2DDEB33229EAB3B00345BFE /* NativeScript */ = {
@@ -1934,9 +1934,9 @@
 			productReference = C2A5DFE52328C4B900A91A76 /* libTKLiveSync.a */;
 			productType = "com.apple.product-type.library.static";
 		};
-		C2DDEB15229EA89000345BFE /* TestApp */ = {
+		C2DDEB15229EA89000345BFE /* TestRunner */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestApp" */;
+			buildConfigurationList = C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestRunner" */;
 			buildPhases = (
 				C2F4CBBD22C61D480036B56F /* ShellScript */,
 				C2DDEB12229EA89000345BFE /* Sources */,
@@ -1951,9 +1951,9 @@
 				C293752B229FC4740075CB16 /* PBXTargetDependency */,
 				C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */,
 			);
-			name = TestApp;
-			productName = TestApp;
-			productReference = C2DDEB16229EA89000345BFE /* TestApp.app */;
+			name = TestRunner;
+			productName = TestRunner;
+			productReference = C2DDEB16229EA89000345BFE /* TestRunner.app */;
 			productType = "com.apple.product-type.application";
 		};
 		C2DDEB31229EAB3B00345BFE /* NativeScript */ = {
@@ -2034,7 +2034,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				C2DDEB15229EA89000345BFE /* TestApp */,
+				C2DDEB15229EA89000345BFE /* TestRunner */,
 				C27E5D8A22F31CC900498ED0 /* AppWithModules */,
 				C2DDEB31229EAB3B00345BFE /* NativeScript */,
 				C29374E1229FC0F60075CB16 /* TestFixtures */,
@@ -2695,7 +2695,7 @@
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/TestFixtures",
 				);
-				INFOPLIST_FILE = TestApp/Info.plist;
+				INFOPLIST_FILE = TestRunner/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2717,7 +2717,7 @@
 					__TNSSnapshot,
 					"$(SRCROOT)/project-template/internal/snapshots/snapshot_blob-$(CURRENT_ARCH).bin",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TestRunner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = $NATIVESCRIPT_PROVISIONING_PROFILE_SPECIFIER;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
@@ -2738,7 +2738,7 @@
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/TestFixtures",
 				);
-				INFOPLIST_FILE = TestApp/Info.plist;
+				INFOPLIST_FILE = TestRunner/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2760,7 +2760,7 @@
 					__TNSSnapshot,
 					"$(SRCROOT)/project-template/internal/snapshots/snapshot_blob-$(CURRENT_ARCH).bin",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.testapp.TestApp;
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TestRunner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = $NATIVESCRIPT_PROVISIONING_PROFILE_SPECIFIER;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
@@ -2963,7 +2963,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestApp" */ = {
+		C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestRunner" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C2DDEB2A229EA89200345BFE /* Debug */,

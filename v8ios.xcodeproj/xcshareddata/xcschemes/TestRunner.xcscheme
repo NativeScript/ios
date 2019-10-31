@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "C2DDEB15229EA89000345BFE"
-               BuildableName = "TestApp.app"
-               BlueprintName = "TestApp"
+               BuildableName = "TestRunner.app"
+               BlueprintName = "TestRunner"
                ReferencedContainer = "container:v8ios.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -31,8 +31,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "C2DDEB15229EA89000345BFE"
-            BuildableName = "TestApp.app"
-            BlueprintName = "TestApp"
+            BuildableName = "TestRunner.app"
+            BlueprintName = "TestRunner"
             ReferencedContainer = "container:v8ios.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -48,7 +48,6 @@
       useCustomWorkingDirectory = "NO"
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
-      stopOnEveryUBSanitizerIssue = "YES"
       migratedStopOnEveryIssue = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
@@ -57,8 +56,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "C2DDEB15229EA89000345BFE"
-            BuildableName = "TestApp.app"
-            BlueprintName = "TestApp"
+            BuildableName = "TestRunner.app"
+            BlueprintName = "TestRunner"
             ReferencedContainer = "container:v8ios.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -74,8 +73,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "C2DDEB15229EA89000345BFE"
-            BuildableName = "TestApp.app"
-            BlueprintName = "TestApp"
+            BuildableName = "TestRunner.app"
+            BlueprintName = "TestRunner"
             ReferencedContainer = "container:v8ios.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
