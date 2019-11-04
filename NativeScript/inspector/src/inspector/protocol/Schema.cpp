@@ -62,7 +62,7 @@ std::unique_ptr<StringBuffer> Domain::toJSONString() const
 
 void Domain::writeBinary(std::vector<uint8_t>* out) const
 {
-    toValue()->writeBinary(out);
+    toValue()->AppendSerialized(out);
 }
 
 // static

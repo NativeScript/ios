@@ -101,7 +101,9 @@ void Interop::RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8:
         size_t length = [obj length];
         void* data = const_cast<void*>([obj bytes]);
 
-        Local<ArrayBuffer> result = ArrayBuffer::New(isolate, data, length);
+        std::unique_ptr<v8::BackingStore> backingStore = ArrayBuffer::NewBackingStore(data, length, [](void*, size_t, void*) { }, nullptr);
+
+        Local<ArrayBuffer> result = ArrayBuffer::New(isolate, std::move(backingStore));
         info.GetReturnValue().Set(result);
     }).ToLocal(&func);
     assert(success);
@@ -294,12 +296,12 @@ Local<Value> Interop::HandleOf(Isolate* isolate, Local<Value> value) {
     if (!value->IsNullOrUndefined()) {
         if (value->IsArrayBuffer()) {
             Local<ArrayBuffer> buffer = value.As<ArrayBuffer>();
-            ArrayBuffer::Contents contents = buffer->GetContents();
-            return Pointer::NewInstance(isolate, contents.Data());
+            std::shared_ptr<BackingStore> backingStore = buffer->GetBackingStore();
+            return Pointer::NewInstance(isolate, backingStore->Data());
         } else if (value->IsArrayBufferView()) {
             Local<ArrayBufferView> bufferView = value.As<ArrayBufferView>();
-            ArrayBuffer::Contents contents = bufferView->Buffer()->GetContents();
-            return Pointer::NewInstance(isolate, contents.Data());
+            std::shared_ptr<BackingStore> backingStore = bufferView->Buffer()->GetBackingStore();
+            return Pointer::NewInstance(isolate, backingStore->Data());
         } else if (tns::IsString(value)) {
             v8::String::Utf8Value result(isolate, value);
             return Pointer::NewInstance(isolate, *result);

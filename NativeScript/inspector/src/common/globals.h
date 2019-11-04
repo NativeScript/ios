@@ -283,6 +283,8 @@ constexpr int kMaxRegularHeapObjectSize = (1 << (kPageSizeBits - 1));
 constexpr int kBitsPerByte = 8;
 constexpr int kBitsPerByteLog2 = 3;
 constexpr int kBitsPerSystemPointer = kSystemPointerSize * kBitsPerByte;
+constexpr int kBitsPerSystemPointerLog2 =
+    kSystemPointerSizeLog2 + kBitsPerByteLog2;
 constexpr int kBitsPerInt = kIntSize * kBitsPerByte;
 
 // IEEE 754 single precision floating point number bit layout.
@@ -628,7 +630,6 @@ class FullObjectSlot;
 class FullMaybeObjectSlot;
 class FullHeapObjectSlot;
 class OldSpace;
-class ParameterCount;
 class ReadOnlySpace;
 class RelocInfo;
 class Scope;

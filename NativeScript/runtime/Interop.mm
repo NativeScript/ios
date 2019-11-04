@@ -363,11 +363,11 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
     } else if (typeEncoding->type == BinaryTypeEncodingType::IncompleteArrayEncoding) {
         void* data = nullptr;
         if (arg->IsArrayBuffer()) {
-            v8::ArrayBuffer::Contents contents = arg.As<ArrayBuffer>()->GetContents();
-            data = contents.Data();
+            std::shared_ptr<BackingStore> backingStore = arg.As<ArrayBuffer>()->GetBackingStore();
+            data = backingStore->Data();
         } else if (arg->IsArrayBufferView()) {
-            v8::ArrayBuffer::Contents contents = arg.As<ArrayBufferView>()->Buffer()->GetContents();
-            data = contents.Data();
+            std::shared_ptr<BackingStore> backingStore = arg.As<ArrayBufferView>()->Buffer()->GetBackingStore();
+            data = backingStore->Data();
         } else {
             data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
         }

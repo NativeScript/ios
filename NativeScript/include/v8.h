@@ -3246,30 +3246,35 @@ class V8_EXPORT String : public Name {
 class V8_EXPORT Symbol : public Name {
  public:
   /**
-   * Returns the print name string of the symbol, or undefined if none.
+   * Returns the description string of the symbol, or undefined if none.
    */
-  Local<Value> Name() const;
+  Local<Value> Description() const;
+
+  V8_DEPRECATE_SOON("Use Symbol::Description()")
+  Local<Value> Name() const { return Description(); }
 
   /**
-   * Create a symbol. If name is not empty, it will be used as the description.
+   * Create a symbol. If description is not empty, it will be used as the
+   * description.
    */
   static Local<Symbol> New(Isolate* isolate,
-                           Local<String> name = Local<String>());
+                           Local<String> description = Local<String>());
 
   /**
    * Access global symbol registry.
    * Note that symbols created this way are never collected, so
    * they should only be used for statically fixed properties.
-   * Also, there is only one global name space for the names used as keys.
+   * Also, there is only one global name space for the descriptions used as
+   * keys.
    * To minimize the potential for clashes, use qualified names as keys.
    */
-  static Local<Symbol> For(Isolate *isolate, Local<String> name);
+  static Local<Symbol> For(Isolate* isolate, Local<String> description);
 
   /**
    * Retrieve a global symbol. Similar to |For|, but using a separate
    * registry that is not accessible by (and cannot clash with) JavaScript code.
    */
-  static Local<Symbol> ForApi(Isolate *isolate, Local<String> name);
+  static Local<Symbol> ForApi(Isolate* isolate, Local<String> description);
 
   // Well-known symbols
   static Local<Symbol> GetAsyncIterator(Isolate* isolate);
@@ -4846,6 +4851,7 @@ enum class ArrayBufferCreationMode { kInternalized, kExternalized };
 
 /**
  * A wrapper around the backing store (i.e. the raw memory) of an array buffer.
+ * See a document linked in http://crbug.com/v8/9908 for more information.
  *
  * The allocation and destruction of backing stores is generally managed by
  * V8. Clients should always use standard C++ memory ownership types (i.e.
@@ -4879,6 +4885,10 @@ class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
   bool IsShared() const;
 
  private:
+  /**
+   * See [Shared]ArrayBuffer::GetBackingStore and
+   * [Shared]ArrayBuffer::NewBackingStore.
+   */
   BackingStore();
 };
 
@@ -5021,6 +5031,9 @@ class V8_EXPORT ArrayBuffer : public Object {
    * |Allocator::Free| once all ArrayBuffers referencing it are collected by
    * the garbage collector.
    */
+  V8_DEPRECATE_SOON(
+      "Use the version that takes a BackingStore. "
+      "See http://crbug.com/v8/9908.")
   static Local<ArrayBuffer> New(
       Isolate* isolate, void* data, size_t byte_length,
       ArrayBufferCreationMode mode = ArrayBufferCreationMode::kExternalized);
@@ -5067,6 +5080,9 @@ class V8_EXPORT ArrayBuffer : public Object {
    * Returns true if ArrayBuffer is externalized, that is, does not
    * own its memory block.
    */
+  V8_DEPRECATE_SOON(
+      "With v8::BackingStore externalized ArrayBuffers are "
+      "the same as ordinary ArrayBuffers. See http://crbug.com/v8/9908.")
   bool IsExternal() const;
 
   /**
@@ -5092,6 +5108,8 @@ class V8_EXPORT ArrayBuffer : public Object {
    * deleter, which will call ArrayBuffer::Allocator::Free if the buffer
    * was allocated with ArrayBuffer::Allocator::Allocate.
    */
+  V8_DEPRECATE_SOON(
+      "Use GetBackingStore or Detach. See http://crbug.com/v8/9908.")
   Contents Externalize();
 
   /**
@@ -5101,6 +5119,7 @@ class V8_EXPORT ArrayBuffer : public Object {
    * With the new lifetime management of backing stores there is no need for
    * externalizing, so this function exists only to make the transition easier.
    */
+  V8_DEPRECATE_SOON("This will be removed together with IsExternal.")
   void Externalize(const std::shared_ptr<BackingStore>& backing_store);
 
   /**
@@ -5111,6 +5130,7 @@ class V8_EXPORT ArrayBuffer : public Object {
    * The embedder should make sure to hold a strong reference to the
    * ArrayBuffer while accessing this pointer.
    */
+  V8_DEPRECATE_SOON("Use GetBackingStore. See http://crbug.com/v8/9908.")
   Contents GetContents();
 
   /**
@@ -5494,6 +5514,9 @@ class V8_EXPORT SharedArrayBuffer : public Object {
    * specified. The memory block will not be reclaimed when a created
    * SharedArrayBuffer is garbage-collected.
    */
+  V8_DEPRECATE_SOON(
+      "Use the version that takes a BackingStore. "
+      "See http://crbug.com/v8/9908.")
   static Local<SharedArrayBuffer> New(
       Isolate* isolate, void* data, size_t byte_length,
       ArrayBufferCreationMode mode = ArrayBufferCreationMode::kExternalized);
@@ -5540,7 +5563,9 @@ class V8_EXPORT SharedArrayBuffer : public Object {
    * Create a new SharedArrayBuffer over an existing memory block. Propagate
    * flags to indicate whether the underlying buffer can be grown.
    */
-  V8_DEPRECATED("Use New method with data, and byte_length instead.")
+  V8_DEPRECATED(
+      "Use the version that takes a BackingStore. "
+      "See http://crbug.com/v8/9908.")
   static Local<SharedArrayBuffer> New(
       Isolate* isolate, const SharedArrayBuffer::Contents&,
       ArrayBufferCreationMode mode = ArrayBufferCreationMode::kExternalized);
@@ -5549,6 +5574,9 @@ class V8_EXPORT SharedArrayBuffer : public Object {
    * Returns true if SharedArrayBuffer is externalized, that is, does not
    * own its memory block.
    */
+  V8_DEPRECATE_SOON(
+      "With v8::BackingStore externalized SharedArrayBuffers are the same "
+      "as ordinary SharedArrayBuffers. See http://crbug.com/v8/9908.")
   bool IsExternal() const;
 
   /**
@@ -5563,6 +5591,8 @@ class V8_EXPORT SharedArrayBuffer : public Object {
    * v8::Isolate::CreateParams::array_buffer_allocator.
    *
    */
+  V8_DEPRECATE_SOON(
+      "Use GetBackingStore or Detach. See http://crbug.com/v8/9908.")
   Contents Externalize();
 
   /**
@@ -5572,6 +5602,7 @@ class V8_EXPORT SharedArrayBuffer : public Object {
    * With the new lifetime management of backing stores there is no need for
    * externalizing, so this function exists only to make the transition easier.
    */
+  V8_DEPRECATE_SOON("This will be removed together with IsExternal.")
   void Externalize(const std::shared_ptr<BackingStore>& backing_store);
 
   /**
@@ -5586,6 +5617,7 @@ class V8_EXPORT SharedArrayBuffer : public Object {
    * by the allocator specified in
    * v8::Isolate::CreateParams::array_buffer_allocator.
    */
+  V8_DEPRECATE_SOON("Use GetBackingStore. See http://crbug.com/v8/9908.")
   Contents GetContents();
 
   /**
@@ -9871,6 +9903,32 @@ class V8_EXPORT Context {
    * the global object can be reused to create a new context.
    */
   void DetachGlobal();
+
+  /**
+   * Reason for detaching a window.
+   */
+  enum DetachedWindowReason {
+    kWindowNotDetached = 0,
+    kDetachedWindowByNavigation,
+    kDetachedWindowByClosing,
+    kDetachedWindowByOtherReason
+  };
+
+  /**
+   * Sets a reason for detaching window, for reporting purposes.
+   *
+   * This API is experimental and may change or be deleted. Do not use!
+   *
+   * A window is a Blink concept. This API marks the context as backing
+   * a detached window. This doesn't necessarily mean that the context is
+   * detached.
+   *
+   * Every time a JS function is called within a context that has a non-zero
+   * DetachedWindowReason, Runtime::kReportDetachedWindowAccess is invoked,
+   * which will report this call to Blink via a callback, which in turn can
+   * report number of such calls via UKM metrics.
+   */
+  void SetDetachedWindowReason(DetachedWindowReason reason);
 
   /**
    * Creates a new context and returns a handle to the newly allocated

@@ -24,13 +24,13 @@ using namespace v8;
 - (void*)mutableBytes {
     Local<Object> obj = self->object_->Get(self->isolate_);
     if (obj->IsArrayBuffer()) {
-        void* data = obj.As<ArrayBuffer>()->GetContents().Data();
+        void* data = obj.As<ArrayBuffer>()->GetBackingStore()->Data();
         return data;
     }
 
     Local<ArrayBufferView> bufferView = obj.As<ArrayBufferView>();
     if (bufferView->HasBuffer()) {
-        void* data = bufferView->Buffer()->GetContents().Data();
+        void* data = bufferView->Buffer()->GetBackingStore()->Data();
         return data;
     }
 

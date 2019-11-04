@@ -91,7 +91,9 @@ public:
     void setCssGridColor(std::unique_ptr<protocol::DOM::RGBA> value) { m_cssGridColor = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<HighlightConfig> clone() const;
 
@@ -229,7 +231,9 @@ public:
     void setBackendNodeId(int value) { m_backendNodeId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<InspectNodeRequestedNotification> clone() const;
 
@@ -293,7 +297,9 @@ public:
     void setNodeId(int value) { m_nodeId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<NodeHighlightRequestedNotification> clone() const;
 
@@ -357,7 +363,9 @@ public:
     void setViewport(std::unique_ptr<protocol::Page::Viewport> value) { m_viewport = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScreenshotRequestedNotification> clone() const;
 

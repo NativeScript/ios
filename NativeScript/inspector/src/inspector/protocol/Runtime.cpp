@@ -141,7 +141,7 @@ std::unique_ptr<StringBuffer> RemoteObject::toJSONString() const
 
 void RemoteObject::writeBinary(std::vector<uint8_t>* out) const
 {
-    toValue()->writeBinary(out);
+    toValue()->AppendSerialized(out);
 }
 
 // static
@@ -854,7 +854,7 @@ std::unique_ptr<StringBuffer> StackTrace::toJSONString() const
 
 void StackTrace::writeBinary(std::vector<uint8_t>* out) const
 {
-    toValue()->writeBinary(out);
+    toValue()->AppendSerialized(out);
 }
 
 // static
@@ -925,7 +925,7 @@ std::unique_ptr<StringBuffer> StackTraceId::toJSONString() const
 
 void StackTraceId::writeBinary(std::vector<uint8_t>* out) const
 {
-    toValue()->writeBinary(out);
+    toValue()->AppendSerialized(out);
 }
 
 // static

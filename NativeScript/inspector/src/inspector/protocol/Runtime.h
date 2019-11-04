@@ -146,7 +146,9 @@ public:
     void setCustomPreview(std::unique_ptr<protocol::Runtime::CustomPreview> value) { m_customPreview = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<RemoteObject> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
@@ -271,7 +273,9 @@ public:
     void setBodyGetterId(const String& value) { m_bodyGetterId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CustomPreview> clone() const;
 
@@ -385,7 +389,9 @@ public:
     void setEntries(std::unique_ptr<protocol::Array<protocol::Runtime::EntryPreview>> value) { m_entries = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ObjectPreview> clone() const;
 
@@ -530,7 +536,9 @@ public:
     void setSubtype(const String& value) { m_subtype = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PropertyPreview> clone() const;
 
@@ -627,7 +635,9 @@ public:
     void setValue(std::unique_ptr<protocol::Runtime::ObjectPreview> value) { m_value = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<EntryPreview> clone() const;
 
@@ -731,7 +741,9 @@ public:
     void setSymbol(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_symbol = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PropertyDescriptor> clone() const;
 
@@ -867,7 +879,9 @@ public:
     void setValue(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_value = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<InternalPropertyDescriptor> clone() const;
 
@@ -940,7 +954,9 @@ public:
     void setValue(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_value = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PrivatePropertyDescriptor> clone() const;
 
@@ -1021,7 +1037,9 @@ public:
     void setObjectId(const String& value) { m_objectId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CallArgument> clone() const;
 
@@ -1106,7 +1124,9 @@ public:
     void setAuxData(std::unique_ptr<protocol::DictionaryValue> value) { m_auxData = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ExecutionContextDescription> clone() const;
 
@@ -1224,7 +1244,9 @@ public:
     void setExecutionContextId(int value) { m_executionContextId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ExceptionDetails> clone() const;
 
@@ -1364,7 +1386,9 @@ public:
     void setColumnNumber(int value) { m_columnNumber = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CallFrame> clone() const;
 
@@ -1477,7 +1501,9 @@ public:
     void setParentId(std::unique_ptr<protocol::Runtime::StackTraceId> value) { m_parentId = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<StackTrace> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
@@ -1567,7 +1593,9 @@ public:
     void setDebuggerId(const String& value) { m_debuggerId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<StackTraceId> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
@@ -1645,7 +1673,9 @@ public:
     void setExecutionContextId(int value) { m_executionContextId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<BindingCalledNotification> clone() const;
 
@@ -1765,7 +1795,9 @@ public:
     void setContext(const String& value) { m_context = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ConsoleAPICalledNotification> clone() const;
 
@@ -1874,7 +1906,9 @@ public:
     void setExceptionId(int value) { m_exceptionId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ExceptionRevokedNotification> clone() const;
 
@@ -1950,7 +1984,9 @@ public:
     void setExceptionDetails(std::unique_ptr<protocol::Runtime::ExceptionDetails> value) { m_exceptionDetails = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ExceptionThrownNotification> clone() const;
 
@@ -2023,7 +2059,9 @@ public:
     void setContext(std::unique_ptr<protocol::Runtime::ExecutionContextDescription> value) { m_context = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ExecutionContextCreatedNotification> clone() const;
 
@@ -2086,7 +2124,9 @@ public:
     void setExecutionContextId(int value) { m_executionContextId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ExecutionContextDestroyedNotification> clone() const;
 
@@ -2153,7 +2193,9 @@ public:
     void setHints(std::unique_ptr<protocol::DictionaryValue> value) { m_hints = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<InspectRequestedNotification> clone() const;
 

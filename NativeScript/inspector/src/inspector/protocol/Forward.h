@@ -98,7 +98,12 @@ namespace protocol {
 
 class  Serializable {
 public:
-    virtual std::vector<uint8_t> serializeToBinary() = 0;
+    virtual std::vector<uint8_t> TakeSerialized() && {
+      std::vector<uint8_t> out;
+      AppendSerialized(&out);
+      return out;
+    }
+    virtual void AppendSerialized(std::vector<uint8_t>* out) const = 0;
     virtual ~Serializable() = default;
 };
 
