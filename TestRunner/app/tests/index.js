@@ -19,6 +19,19 @@ global.__JUnitSaveResults = function (text) {
             console.log("TKUnit: " + line);
         });
     }
+
+    var reportUrl = NSProcessInfo.processInfo.environment.objectForKey("REPORT_BASEURL");
+    if (reportUrl) {
+        var urlRequest = NSMutableURLRequest.requestWithURL(NSURL.URLWithString(reportUrl));
+        urlRequest.HTTPMethod = "POST";
+        urlRequest.setValueForHTTPHeaderField("Content-Type", "application/xml");
+        urlRequest.HTTPBody = NSString.stringWithString(text).dataUsingEncoding(4);
+        var sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration;
+        var queue = NSOperationQueue.mainQueue;
+        var session = NSURLSession.sessionWithConfigurationDelegateDelegateQueue(sessionConfig, null, queue);
+        var dataTask = session.dataTaskWithRequestCompletionHandler(urlRequest, (data, response, error) => { });
+        dataTask.resume();
+    }
 };
 
 global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
