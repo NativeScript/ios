@@ -124,6 +124,7 @@ void JsV8InspectorClient::init() {
     }
 
     Isolate* isolate = runtime_->GetIsolate();
+    Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
     Local<Context> context = isolate->GetCurrentContext();
@@ -149,7 +150,8 @@ void JsV8InspectorClient::createInspectorSession() {
 
 void JsV8InspectorClient::disconnect() {
     Isolate* isolate = runtime_->GetIsolate();
-    HandleScope handleScope(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
 
     session_->resume();
     session_.reset();
@@ -251,13 +253,15 @@ inline Local<TypeName> JsV8InspectorClient::PersistentToLocal(Isolate* isolate, 
 
 void JsV8InspectorClient::scheduleBreak() {
     Isolate* isolate = runtime_->GetIsolate();
-    HandleScope scope(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
     this->session_->schedulePauseOnNextStatement(StringView(), StringView());
 }
 
 void JsV8InspectorClient::registerModules() {
     Isolate* isolate = runtime_->GetIsolate();
-    HandleScope scope(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
     Local<Object> inspectorObject = Object::New(isolate);

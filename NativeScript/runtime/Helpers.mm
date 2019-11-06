@@ -518,7 +518,8 @@ const std::string tns::BuildStacktraceFrameMessage(Isolate* isolate, Local<Stack
 }
 
 bool tns::LiveSync(Isolate* isolate) {
-    HandleScope scope(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
     Local<Value> value;

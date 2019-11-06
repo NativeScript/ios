@@ -648,6 +648,7 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
 
             FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                 PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                Isolate::Scope isolate_scope(context->isolate_);
                 HandleScope handle_scope(context->isolate_);
                 Local<v8::Function> getterFunc = context->callback_->Get(context->isolate_);
                 Local<Value> res;
@@ -675,6 +676,7 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
 
             FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                 PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                Isolate::Scope isolate_scope(context->isolate_);
                 HandleScope handle_scope(context->isolate_);
                 Local<v8::Function> setterFunc = context->callback_->Get(context->isolate_);
                 Local<Value> res;

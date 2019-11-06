@@ -64,7 +64,8 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
             break;
         }
 
-        HandleScope scope(this->workerIsolate_);
+        Isolate::Scope isolate_scope(this->workerIsolate_);
+        HandleScope handle_scope(this->workerIsolate_);
         Local<Context> context = this->workerIsolate_->GetCurrentContext();
         Local<Object> global = context->Global();
 
@@ -77,7 +78,8 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
     }
 
     {
-        HandleScope scope(this->workerIsolate_);
+        Isolate::Scope isolate_scope(this->workerIsolate_);
+        HandleScope handle_scope(this->workerIsolate_);
         Local<Context> context = this->workerIsolate_->GetCurrentContext();
         context->Exit();
         this->workerIsolate_->TerminateExecution();
@@ -161,6 +163,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
     }
 
     tns::ExecuteOnMainThread([this, message, src, stackTrace, lineNumber]() {
+        Isolate::Scope isolate_scope(this->mainIsolate_);
         HandleScope handle_scope(this->mainIsolate_);
         Local<Object> worker = this->poWorker_->Get(this->mainIsolate_).As<Object>();
         Local<Context> context = this->mainIsolate_->GetCurrentContext();

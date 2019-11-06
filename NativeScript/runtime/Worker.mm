@@ -77,7 +77,8 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
             TryCatch tc(workerIsolate);
             runtime->RunScript(workerPath, tc);
             if (tc.HasCaught()) {
-                HandleScope scope(workerIsolate);
+                Isolate::Scope isolate_scope(workerIsolate);
+                HandleScope handle_scope(workerIsolate);
                 worker->PassUncaughtExceptionFromWorkerToMain(workerIsolate, tc, false);
                 worker->Terminate();
             }
@@ -128,6 +129,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
 
         tns::ExecuteOnMainThread([state, message]() {
             Isolate* isolate = state->GetIsolate();
+            Isolate::Scope isolate_scope(isolate);
             HandleScope handle_scope(isolate);
             Local<Value> workerInstance = state->GetWorker()->Get(isolate);
             assert(!workerInstance.IsEmpty() && workerInstance->IsObject());

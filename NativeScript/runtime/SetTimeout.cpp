@@ -71,6 +71,7 @@ void SetTimeout::Elapsed(const uint32_t key) {
 
     Isolate* isolate = it->second.isolate_;
     Persistent<v8::Function>* poCallback = it->second.callback_;
+    Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
     Local<v8::Function> cb = poCallback->Get(isolate);

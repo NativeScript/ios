@@ -59,6 +59,7 @@ void Runtime::Init() {
     cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
     cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
 
+    Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     Local<FunctionTemplate> globalTemplateFunction = FunctionTemplate::New(isolate);
     globalTemplateFunction->SetClassName(tns::ToV8String(isolate, "NativeScriptGlobalObject"));
@@ -99,7 +100,8 @@ void Runtime::Init() {
 
 void Runtime::RunMainScript() {
     Isolate* isolate = this->GetIsolate();
-    HandleScope scope(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
     this->moduleInternal_.RunModule(isolate, "./");
 }
 

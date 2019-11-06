@@ -75,6 +75,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
         Isolate* isolate = data->isolate_;
 
+        Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
 
         Persistent<Value>* poCallback = data->callback_;

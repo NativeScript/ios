@@ -124,7 +124,8 @@ std::string NativeScriptException::GetErrorStackTrace(Isolate* isolate, const Lo
 
     std::stringstream ss;
 
-    HandleScope handleScope(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
 
     int frameCount = stackTrace->GetFrameCount();
 

@@ -759,6 +759,7 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
             Tasks::Register([](void* userData) {
                 TaskContext* context = static_cast<TaskContext*>(userData);
                 std::vector<Local<Value>> args;
+                Isolate::Scope isolate_scope(context->isolate_);
                 HandleScope handle_scope(context->isolate_);
                 for (int i = 0; i < context->args_.size(); i++) {
                     Local<Value> arg = context->args_[i]->Get(context->isolate_);
