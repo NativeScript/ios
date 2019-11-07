@@ -131,9 +131,9 @@ describe(module.id, function () {
     });
 
     it("CString as arg/return value", function () {
-        const ptr = interop.alloc(5 * interop.sizeof(interop.types.uint8));
-        var reference = new interop.Reference(interop.types.uint8, ptr);
         const str = "test";
+        const ptr = interop.alloc((str.length + 1) * interop.sizeof(interop.types.uint8));
+        var reference = new interop.Reference(interop.types.uint8, ptr);
         for (ii in str) {
             const i = parseInt(ii);
             reference[i] = str.charCodeAt(i);
@@ -142,9 +142,23 @@ describe(module.id, function () {
 
         const result = functionWithCharPtr(ptr);
 
-        expect(TNSGetOutput()).toBe('test');
-        // expect(interop.handleof(result).toNumber() == interop.handleof(ptr).toNumber());
-        expect(NSString.stringWithUTF8String(result).toString()).toBe('test');
+        expect(TNSGetOutput()).toBe(str);
+        expect(interop.handleof(result).toNumber() == interop.handleof(ptr).toNumber());
+        expect(NSString.stringWithUTF8String(result).toString()).toBe(str);
+    });
+
+    it("CString should be passed as its UTF8 encoding and returned as a reference to unsigned characters", function () {
+        const str = "test АБВГ";
+        const result = functionWithUCharPtr(str);
+
+        expect(TNSGetOutput()).toBe(str);
+
+        const strUtf8 = utf8.encode(str);
+        for (i in strUtf8) {
+            const actual = strUtf8.charCodeAt(i);
+            const expected = result[i];
+            expect(actual).toBe(expected, `Char code difference at index ${i} ("${actual}" vs "${expected}")`);
+        }
     });
 
     // TODO: Create array type and constructor
@@ -599,5 +613,21 @@ describe(module.id, function () {
         //     expect(reference).toEqual(jasmine.any(interop.Reference));
         //     expect(interop.handleof(reference.value)).toBe(interop.handleof(ref));
         // });
+
+        it("interop.Reference indexed property accessor", () => {
+            let stringToHash = "bla";
+
+            const bytesToAlloc = 32;
+            const result = interop.alloc(bytesToAlloc);
+            CC_SHA256(interop.handleof(NSString.stringWithString(stringToHash).UTF8String), stringToHash.length, result);
+            let buffer = new interop.Reference(interop.types.uint8, result);
+
+            let actual = "";
+            for (let i = 0; i < bytesToAlloc; i++) {
+                actual += buffer[i].toString(16).padStart(2, "0");
+            }
+
+            expect(actual).toBe("4df3c3f68fcc83b27e9d42c90431a72499f17875c81a599b566c9889b9696703");
+        });
     });
 });

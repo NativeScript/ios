@@ -3,6 +3,7 @@ console.log('Application Start!');
 
 require("./Infrastructure/timers");
 require("./Infrastructure/simulator");
+global.utf8 = require("./Infrastructure/utf8")
 
 global.UNUSED = function (param) {
 };

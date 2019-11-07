@@ -1,4 +1,5 @@
 #include "Reference.h"
+#include "Pointer.h"
 #include "Caches.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
@@ -15,6 +16,21 @@ void Reference::Register(Isolate* isolate, Local<Object> interop) {
     assert(success);
 }
 
+Local<Value> Reference::FromPointer(Isolate* isolate, Local<Value> type, void* handle) {
+    Local<Value> pointer = Pointer::NewInstance(isolate, handle);
+    ObjectManager::Register(isolate, pointer);
+
+    Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
+    Local<Value> args[2] = { type, pointer };
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> instance;
+    bool success = interopReferenceCtorFunc->NewInstance(context, 2, args).ToLocal(&instance);
+    assert(success);
+    ObjectManager::Register(isolate, instance);
+
+    return instance;
+}
+
 Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     auto cache = Caches::Get(isolate);
     Persistent<v8::Function>* interopReferenceCtor = cache->InteropReferenceCtorFunc;
@@ -25,7 +41,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, ReferenceConstructorCallback);
     ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "Reference"));
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-    ctorFuncTemplate->InstanceTemplate()->SetHandler(IndexedPropertyHandlerConfiguration(nullptr, IndexedPropertySetCallback));
+    ctorFuncTemplate->InstanceTemplate()->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetCallback, IndexedPropertySetCallback));
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
     Local<Context> context = isolate->GetCurrentContext();
     proto->SetAccessor(tns::ToV8String(isolate, "value"), GetValueCallback, SetValueCallback);
@@ -67,7 +83,48 @@ void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& 
     ObjectManager::Register(isolate, thiz);
 }
 
-void Reference::IndexedPropertySetCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info) {
+void Reference::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    Local<Object> thiz = info.This();
+
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
+    assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
+    ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
+
+    BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
+    if (typeWrapper == nullptr) {
+        // TODO: Missing type when creating the Reference instance
+        assert(false);
+    }
+
+    Local<Value> pointerObj = refWrapper->Value()->Get(isolate);
+    BaseDataWrapper* wrappedValue = tns::GetValue(isolate, pointerObj);
+    if (wrappedValue == nullptr || wrappedValue->Type() != WrapperType::Pointer) {
+        assert(false);
+    }
+
+    PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
+    void* data = pw->Data();
+
+    const TypeEncoding* typeEncoding = nullptr;
+    size_t size = 0;
+    if (typeWrapper->Type() == WrapperType::Primitive) {
+        PrimitiveDataWrapper* wrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
+        typeEncoding = wrapper->TypeEncoding();
+        size = wrapper->Size();
+    } else {
+        // TODO: Currently only PrimitiveDataWrappers are supported as type parameters
+        // Objective C class classes and structures should also be handled
+        assert(false);
+    }
+
+    void* ptr = (uint8_t*)data + index * size;
+    BaseCall call((uint8_t*)ptr);
+    Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, false);
+    info.GetReturnValue().Set(result);
+}
+
+void Reference::IndexedPropertySetCallback(uint32_t index, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     Local<Object> thiz = info.This();
 

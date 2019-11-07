@@ -3,6 +3,7 @@
 #include "Interop.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
+#include "Caches.h"
 #include "NativeScriptException.h"
 #include "FunctionReference.h"
 #include "Reference.h"
@@ -59,6 +60,17 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     assert(success);
 }
 
+Local<Object> Interop::GetInteropType(Isolate* isolate, std::string name) {
+    Caches* cache = Caches::Get(isolate);
+    auto it = cache->PrimitiveInteropTypes.find(name);
+    if (it == cache->PrimitiveInteropTypes.end()) {
+        // TODO: throw error for unknown primitive type
+        assert(false);
+    }
+
+    return it->second->Get(isolate);
+}
+
 void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::string name, PrimitiveDataWrapper* wrapper) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
@@ -76,10 +88,16 @@ void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::st
     }
     Local<Object> result = value.As<Object>();
 
-    ObjectManager::Register(isolate, result);
-
     tns::SetValue(isolate, result, wrapper);
     bool success = types->Set(context, tns::ToV8String(isolate, name), result).FromMaybe(false);
+
+    Caches* cache = Caches::Get(isolate);
+    auto it = cache->PrimitiveInteropTypes.find(name);
+    if (it == cache->PrimitiveInteropTypes.end()) {
+        Persistent<Object>* poResult = new Persistent<Object>(isolate, result);
+        cache->PrimitiveInteropTypes.emplace(name, poResult);
+    }
+
     assert(success);
 }
 
@@ -302,9 +320,6 @@ Local<Value> Interop::HandleOf(Isolate* isolate, Local<Value> value) {
             Local<ArrayBufferView> bufferView = value.As<ArrayBufferView>();
             std::shared_ptr<BackingStore> backingStore = bufferView->Buffer()->GetBackingStore();
             return Pointer::NewInstance(isolate, backingStore->Data());
-        } else if (tns::IsString(value)) {
-            v8::String::Utf8Value result(isolate, value);
-            return Pointer::NewInstance(isolate, *result);
         } else if (value->IsObject()) {
             Local<Object> obj = value.As<Object>();
             if (BaseDataWrapper* wrapper = tns::GetValue(isolate, obj)) {

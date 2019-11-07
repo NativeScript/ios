@@ -153,4 +153,11 @@ describe(module.id, function () {
         expect(interop.sizeof(TNSSimpleStruct)).toBeGreaterThan(0);
         expect(interop.sizeof(new TNSSimpleStruct())).toBeGreaterThan(0);
     });
+
+    it("HandleOf CStrings", () => {
+        let str = "test value";
+        let cStringHandle = interop.handleof(NSString.stringWithString(str).UTF8String);
+        let actual = NSString.stringWithCString(cStringHandle);
+        expect(actual).toBe(str);
+    });
 });

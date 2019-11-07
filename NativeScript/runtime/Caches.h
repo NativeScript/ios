@@ -57,6 +57,7 @@ public:
     std::map<id, v8::Persistent<v8::Value>*> Instances;
     std::unordered_map<const void*, v8::Persistent<v8::Object>*> PointerInstances;
     std::unordered_map<std::string, v8::Persistent<v8::Function>*> StructConstructorFunctions;
+    std::unordered_map<std::string, v8::Persistent<v8::Object>*> PrimitiveInteropTypes;
 
     std::function<v8::Local<v8::FunctionTemplate>(v8::Isolate* isolate, const BaseClassMeta*)> ObjectCtorInitializer;
     std::function<v8::Local<v8::Function>(v8::Isolate*, StructInfo)> StructCtorInitializer;

@@ -9,11 +9,13 @@ namespace tns {
 class Reference {
 public:
     static void Register(v8::Isolate* isolate, v8::Local<v8::Object> interop);
+    static v8::Local<v8::Value> FromPointer(v8::Isolate* isolate, v8::Local<v8::Value> type, void* handle);
     static v8::Local<v8::Function> GetInteropReferenceCtorFunc(v8::Isolate* isolate);
     static void* GetWrappedPointer(v8::Isolate* isolate, v8::Local<v8::Value> reference, const TypeEncoding* typeEncoding);
 private:
     static v8::Local<v8::Value> GetReferredValue(v8::Isolate* isolate, v8::Local<v8::Value> value);
     static void ReferenceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+    static void IndexedPropertyGetCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void IndexedPropertySetCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
 
     static void GetValueCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value>& info);

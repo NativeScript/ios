@@ -11,7 +11,7 @@ _Bool* functionWith_BoolPtr(_Bool* x) {
 }
 
 unsigned char* functionWithUCharPtr(unsigned char* x) {
-    TNSLog([NSString stringWithFormat:@"%s", x]);
+    TNSLog([NSString stringWithUTF8String:(char*)x]);
     return x;
 }
 
@@ -36,7 +36,7 @@ unsigned long long* functionWithULongLongPtr(unsigned long long* x) {
 }
 
 char* functionWithCharPtr(char* x) {
-    TNSLog([NSString stringWithFormat:@"%s", x]);
+    TNSLog([NSString stringWithUTF8String:x]);
 
     return x;
 }
@@ -115,8 +115,8 @@ void functionWithIntConstantArray2(int x[2][2]) {
 }
 
 char** functionWithDoubleCharPtr(char** x) {
-    TNSLog([NSString stringWithFormat:@"%s", x[0]]);
-    TNSLog([NSString stringWithFormat:@"%s", x[1]]);
+    TNSLog([NSString stringWithUTF8String:x[0]]);
+    TNSLog([NSString stringWithUTF8String:x[1]]);
 
     free(x[0]);
     x[0] = calloc(4, sizeof(char));

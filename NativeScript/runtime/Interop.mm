@@ -138,10 +138,32 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         NSString* selStr = [NSString stringWithUTF8String:str.c_str()];
         SEL selector = NSSelectorFromString(selStr);
         Interop::SetValue(dest, selector);
-    } else if (arg->IsString() && typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
-        v8::String::Utf8Value utf8Value(isolate, arg);
-        const char* strCopy = strdup(*utf8Value);
-        Interop::SetValue(dest, strCopy);
+    } else if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
+        if (arg->IsString()) {
+            v8::String::Utf8Value utf8Value(isolate, arg);
+            const char* strCopy = strdup(*utf8Value);
+            Interop::SetValue(dest, strCopy);
+        } else {
+            BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
+            assert(wrapper != nullptr);
+            if (wrapper->Type() == WrapperType::Pointer) {
+                PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
+                void* data = pw->Data();
+                Interop::SetValue(dest, data);
+            } else if (wrapper->Type() == WrapperType::Reference) {
+                ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
+                assert(refWrapper->Value() != nullptr);
+                Local<Value> value = refWrapper->Value()->Get(isolate);
+                wrapper = tns::GetValue(isolate, value);
+                assert(wrapper != nullptr && wrapper->Type() == WrapperType::Pointer);
+                PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
+                void* data = pw->Data();
+                Interop::SetValue(dest, data);
+            } else {
+                // Unsupported wrapprt type for CString
+                assert(false);
+            }
+        }
     } else if (arg->IsString() && typeEncoding->type == BinaryTypeEncodingType::UnicharEncoding) {
         v8::String::Utf8Value utf8Value(isolate, arg);
         std::vector<uint16_t> vector = tns::ToVector(*utf8Value);
@@ -960,12 +982,14 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
 Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call) {
     if (type == BinaryTypeEncodingType::CStringEncoding) {
-        char* result = call->GetResult<char*>();
+        unsigned char* result = call->GetResult<unsigned char*>();
         if (result == nullptr) {
             return Null(isolate);
         }
 
-        return tns::ToV8String(isolate, result);
+        Local<Value> uint8Type = GetInteropType(isolate, "uint8");
+        Local<Value> reference = Reference::FromPointer(isolate, uint8Type, result);
+        return reference;
     }
 
     if (type == BinaryTypeEncodingType::BoolEncoding) {

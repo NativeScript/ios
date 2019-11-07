@@ -15,6 +15,7 @@ typedef void (*FFIMethodCallback)(ffi_cif* cif, void* retValue, void** argValues
 class Interop {
 public:
     static void RegisterInteropTypes(v8::Isolate* isolate);
+    static v8::Local<v8::Object> GetInteropType(v8::Isolate* isolate, std::string name);
     static CFTypeRef CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static id CallInitializer(v8::Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args);
