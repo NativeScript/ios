@@ -48,10 +48,6 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
             }
         }
 
-        const GlobalTable<GlobalTableType::ByJsName>* globalTable = MetaFile::instance()->globalTableJs();
-        const InterfaceMeta* interfaceMeta = globalTable->findInterfaceMeta(baseClassName.c_str());
-        assert(interfaceMeta != nullptr);
-
         Local<Object> nativeSignature;
         std::string staticClassName;
         if (info.Length() > 1 && info[1]->IsObject()) {
