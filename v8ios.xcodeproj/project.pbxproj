@@ -354,6 +354,7 @@
 		C2A5E0F62328CC4200A91A76 /* zip_source_window.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E06B2328CA6F00A91A76 /* zip_source_window.c */; };
 		C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2A5F8682359AEB500074AFA /* ExtVector.cpp */; };
 		C2A5F86B2359AEB600074AFA /* ExtVector.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A5F8692359AEB600074AFA /* ExtVector.h */; };
+		C2A6EF3123745A0B00E8FBE7 /* MetadataInlines.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A6EF3023745A0B00E8FBE7 /* MetadataInlines.h */; };
 		C2C8EE7222CE323C001F8CEC /* ConcurrentMap.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7022CE323C001F8CEC /* ConcurrentMap.h */; };
 		C2C8EE7422CE3266001F8CEC /* ConcurrentQueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C8EE7322CE3266001F8CEC /* ConcurrentQueue.cpp */; };
 		C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
@@ -913,6 +914,7 @@
 		C2A5E0F52328CB3A00A91A76 /* config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
 		C2A5F8682359AEB500074AFA /* ExtVector.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ExtVector.cpp; sourceTree = "<group>"; };
 		C2A5F8692359AEB600074AFA /* ExtVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ExtVector.h; sourceTree = "<group>"; };
+		C2A6EF3023745A0B00E8FBE7 /* MetadataInlines.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MetadataInlines.h; sourceTree = "<group>"; };
 		C2C8EE7022CE323C001F8CEC /* ConcurrentMap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConcurrentMap.h; sourceTree = "<group>"; };
 		C2C8EE7322CE3266001F8CEC /* ConcurrentQueue.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ConcurrentQueue.cpp; sourceTree = "<group>"; };
 		C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SimpleAllocator.cpp; sourceTree = "<group>"; };
@@ -1790,6 +1792,7 @@
 				C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */,
 				C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */,
 				C2DDEB6E229EAC8200345BFE /* Metadata.h */,
+				C2A6EF3023745A0B00E8FBE7 /* MetadataInlines.h */,
 				C2DDEB70229EAC8200345BFE /* Metadata.mm */,
 				C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */,
 				C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */,
@@ -1882,6 +1885,7 @@
 				C247C16F22F82842001D2CA2 /* v8-util.h in Headers */,
 				C247C34222F828E3001D2CA2 /* v8-css-agent-impl.h in Headers */,
 				C2C8EE7222CE323C001F8CEC /* ConcurrentMap.h in Headers */,
+				C2A6EF3123745A0B00E8FBE7 /* MetadataInlines.h in Headers */,
 				C2F4D0AE232F85E20008A2EB /* SymbolIterator.h in Headers */,
 				C2DDEBAD229EAC8300345BFE /* Caches.h in Headers */,
 				C247C17022F82842001D2CA2 /* libffi.h in Headers */,

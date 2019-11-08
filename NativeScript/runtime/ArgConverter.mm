@@ -561,7 +561,7 @@ const Meta* ArgConverter::GetMeta(std::string name) {
         return meta;
     }
 
-    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+    const GlobalTable<GlobalTableType::ByJsName>* globalTable = MetaFile::instance()->globalTableJs();
     const Meta* result = globalTable->findMeta(name.c_str(), false /** onlyIfAvailable **/);
 
     Caches::Metadata.Insert(name, result);

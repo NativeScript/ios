@@ -48,7 +48,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
             }
         }
 
-        const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+        const GlobalTable<GlobalTableType::ByJsName>* globalTable = MetaFile::instance()->globalTableJs();
         const InterfaceMeta* interfaceMeta = globalTable->findInterfaceMeta(baseClassName.c_str());
         assert(interfaceMeta != nullptr);
 

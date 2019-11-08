@@ -3,17 +3,23 @@
 
 unsigned int binary::MetaFile::size()
 {
-    return this->_globalTableSymbols->size();
+    return this->_globalTableSymbolsJs->size();
 }
 
-void binary::MetaFile::registerInGlobalTable(const std::string& jsName, binary::MetaFileOffset offset)
+void binary::MetaFile::registerInGlobalTables(const ::Meta::Meta& meta, binary::MetaFileOffset offset)
 {
-    this->_globalTableSymbols->add(jsName, offset);
+    this->_globalTableSymbolsJs->add(meta.jsName, offset);
+
+    if (meta.type == ::Meta::MetaType::Protocol) {
+        this->_globalTableSymbolsNativeProtocols->add(meta.name, offset);
+    } else if (meta.type == ::Meta::MetaType::Interface) {
+        this->_globalTableSymbolsNativeInterfaces->add(meta.name, offset);
+    }
 }
 
 binary::MetaFileOffset binary::MetaFile::getFromGlobalTable(const std::string& jsName)
 {
-    return this->_globalTableSymbols->get(jsName);
+    return this->_globalTableSymbolsJs->get(jsName);
 }
 
 void binary::MetaFile::registerInTopLevelModulesTable(const std::string& moduleName, binary::MetaFileOffset offset)
@@ -48,9 +54,15 @@ void binary::MetaFile::save(std::shared_ptr<utils::Stream> stream)
 {
     // dump global table
     BinaryWriter globalTableStreamWriter = BinaryWriter(stream);
-    BinaryWriter heapWriter = this->heap_writer();							
-    std::vector<binary::MetaFileOffset> offsets = this->_globalTableSymbols->serialize(heapWriter);
-    globalTableStreamWriter.push_binaryArray(offsets);
+    BinaryWriter heapWriter = this->heap_writer();
+    std::vector<binary::MetaFileOffset> jsOffsets = this->_globalTableSymbolsJs->serialize(heapWriter);
+    globalTableStreamWriter.push_binaryArray(jsOffsets);
+
+    std::vector<binary::MetaFileOffset> nativeProtocolOffsets = this->_globalTableSymbolsNativeProtocols->serialize(heapWriter);
+    globalTableStreamWriter.push_binaryArray(nativeProtocolOffsets);
+
+    std::vector<binary::MetaFileOffset> nativeInterfaceOffsets = this->_globalTableSymbolsNativeInterfaces->serialize(heapWriter);
+    globalTableStreamWriter.push_binaryArray(nativeInterfaceOffsets);
 
     std::vector<MetaFileOffset> modulesOffsets;
     for (std::pair<std::string, MetaFileOffset> pair : this->_topLevelModules)

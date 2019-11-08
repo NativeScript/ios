@@ -547,7 +547,7 @@ void MetadataBuilder::RegisterStaticProtocols(Isolate* isolate, Local<v8::Functi
         MetadataBuilder::RegisterStaticProperties(isolate, ctorFunc, meta, className, names);
     }
 
-    const GlobalTable* globalTable = MetaFile::instance()->globalTable();
+    const GlobalTable<GlobalTableType::ByJsName>* globalTable = MetaFile::instance()->globalTableJs();
     for (auto itProto = meta->protocols->begin(); itProto != meta->protocols->end(); itProto++) {
         std::string protocolName = (*itProto).valuePtr();
         const ProtocolMeta* protoMeta = globalTable->findProtocol(protocolName.c_str());

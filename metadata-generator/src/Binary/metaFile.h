@@ -7,6 +7,8 @@
 #include <memory>
 #include <vector>
 
+#include "Meta/MetaEntities.h"
+
 using namespace std;
 
 namespace binary {
@@ -19,7 +21,13 @@ namespace binary {
      */
 class MetaFile {
 private:
-    std::unique_ptr<BinaryHashtable> _globalTableSymbols;
+    // Table with all global symbols indexed by JS name (JS names are deduplicated)
+    std::unique_ptr<BinaryHashtable> _globalTableSymbolsJs;
+    // Tables with all global Objective-C protocols/interfaces indexed by native name (in dedicated
+    // tables because it is allowed to have an interface and protocol with the same name)
+    std::unique_ptr<BinaryHashtable> _globalTableSymbolsNativeProtocols;
+    std::unique_ptr<BinaryHashtable> _globalTableSymbolsNativeInterfaces;
+
     std::map<std::string, MetaFileOffset> _topLevelModules;
     std::shared_ptr<utils::MemoryStream> _heap;
 
@@ -30,7 +38,9 @@ public:
          */
     MetaFile(int size)
     {
-        this->_globalTableSymbols = std::unique_ptr<BinaryHashtable>(new BinaryHashtable(size));
+        this->_globalTableSymbolsJs = std::unique_ptr<BinaryHashtable>(new BinaryHashtable(size));
+        this->_globalTableSymbolsNativeProtocols = std::unique_ptr<BinaryHashtable>(new BinaryHashtable(size/2));
+        this->_globalTableSymbolsNativeInterfaces = std::unique_ptr<BinaryHashtable>(new BinaryHashtable(size/2));
         this->_heap = std::shared_ptr<utils::MemoryStream>(new utils::MemoryStream());
         this->_heap->push_byte(0); // mark heap
     }
@@ -50,7 +60,7 @@ public:
          * \param jsName The jsName of the element
          * \param offset The offset in the heap
          */
-    void registerInGlobalTable(const std::string& jsName, MetaFileOffset offset);
+    void registerInGlobalTables(const ::Meta::Meta& meta, MetaFileOffset offset);
 
     /*
          * \brief Returns the offset to which the specified jsName is mapped in the global table.
