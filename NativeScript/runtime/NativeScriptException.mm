@@ -1,4 +1,5 @@
 #include "NativeScriptException.h"
+#include "Runtime.h"
 #include "Helpers.h"
 #include <sstream>
 
@@ -25,7 +26,11 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
     Local<Value> handler;
-    bool success = global->Get(context, tns::ToV8String(isolate, "__onUncaughtError")).ToLocal(&handler);
+    id value = Runtime::GetAppConfigValue("discardUncaughtJsExceptions");
+    bool isDiscarded = value ? [value boolValue] : false;
+
+    std::string cbName = isDiscarded ? "__onDiscardedError" : "__onUncaughtError";
+    bool success = global->Get(context, tns::ToV8String(isolate, cbName)).ToLocal(&handler);
 
     std::string stackTrace = GetErrorStackTrace(isolate, message->GetStackTrace());
     if (success && handler->IsFunction()) {
@@ -41,14 +46,18 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
         assert(success);
     }
 
-    Local<v8::String> messageV8String = message->Get();
-    std::string messageString = tns::ToString(isolate, messageV8String);
-    NSString* name = [NSString stringWithFormat:@"NativeScript encountered a fatal error: %s\n at \n%s", messageString.c_str(), stackTrace.c_str()];
-    NSException* objcException = [NSException exceptionWithName:name reason:nil userInfo:@{ @"sender": @"onUncaughtError" }];
+    if (!isDiscarded) {
+        Local<v8::String> messageV8String = message->Get();
+        std::string messageString = tns::ToString(isolate, messageV8String);
+        NSString* name = [NSString stringWithFormat:@"NativeScript encountered a fatal error: %s\n at \n%s", messageString.c_str(), stackTrace.c_str()];
+        NSException* objcException = [NSException exceptionWithName:name reason:nil userInfo:@{ @"sender": @"onUncaughtError" }];
 
-    NSLog(@"***** Fatal JavaScript exception - application has been terminated. *****\n");
-    NSLog(@"%@", [objcException description]);
-    @throw objcException;
+        NSLog(@"***** Fatal JavaScript exception - application has been terminated. *****\n");
+        NSLog(@"%@", [objcException description]);
+        @throw objcException;
+    } else {
+        NSLog(@"NativeScript discarding uncaught JS exception!");
+    }
 }
 
 void NativeScriptException::ReThrowToV8(Isolate* isolate) {

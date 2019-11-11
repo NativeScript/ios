@@ -31,6 +31,8 @@ public:
     static v8::Platform* GetPlatform() {
         return platform_;
     }
+
+    static id GetAppConfigValue(std::string key);
 private:
     static thread_local Runtime* currentRuntime_;
     static v8::Platform* platform_;

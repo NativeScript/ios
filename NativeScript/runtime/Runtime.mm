@@ -25,6 +25,7 @@ using namespace std;
 namespace tns {
 
 SimpleAllocator allocator_;
+NSDictionary* AppPackageJson = nil;
 
 void Runtime::Initialize() {
     MetaFile::setInstance(RuntimeConfig.MetadataPtr);
@@ -141,6 +142,21 @@ const int Runtime::WorkerId() {
 
 void Runtime::SetWorkerId(int workerId) {
     this->workerId_ = workerId;
+}
+
+id Runtime::GetAppConfigValue(std::string key) {
+    if (AppPackageJson == nil) {
+        NSString* packageJsonPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:@"package.json"];
+        NSData* data = [NSData dataWithContentsOfFile:packageJsonPath];
+        AppPackageJson = @{};
+        if (data) {
+            NSError* error = nil;
+            AppPackageJson = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&error];
+        }
+    }
+
+    id result = AppPackageJson[[NSString stringWithUTF8String:key.c_str()]];
+    return result;
 }
 
 void Runtime::DefineGlobalObject(Local<Context> context) {
