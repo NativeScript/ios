@@ -264,7 +264,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 
     ctorFuncTemplate = FunctionTemplate::New(isolate, ClassConstructorCallback, ext);
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-    ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, meta->jsName()));
+    ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, meta->name()));
+
     Local<v8::Function> baseCtorFunc;
 
     if (meta->type() == MetaType::Interface) {

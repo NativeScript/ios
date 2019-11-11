@@ -15,6 +15,7 @@
 		C2229978235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2229976235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp */; };
 		C22C092222CA3F370080D176 /* Worker.mm in Sources */ = {isa = PBXBuildFile; fileRef = C22C092022CA3F370080D176 /* Worker.mm */; };
 		C22C092322CA3F370080D176 /* Worker.h in Headers */ = {isa = PBXBuildFile; fileRef = C22C092122CA3F370080D176 /* Worker.h */; };
+		C22EF68B2379412100D67CBF /* TNSSwiftLike.m in Sources */ = {isa = PBXBuildFile; fileRef = C22EF68A2379412100D67CBF /* TNSSwiftLike.m */; };
 		C23992CA236C2D6E00D2F720 /* TestRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */; };
 		C23992F8236C364B00D2F720 /* Transport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DA236C364B00D2F720 /* Transport.swift */; };
 		C23992F9236C364B00D2F720 /* FileLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DB236C364B00D2F720 /* FileLogHandler.swift */; };
@@ -522,6 +523,8 @@
 		C2229976235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-ns-debugger-agent-impl.cpp"; sourceTree = "<group>"; };
 		C22C092022CA3F370080D176 /* Worker.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Worker.mm; sourceTree = "<group>"; };
 		C22C092122CA3F370080D176 /* Worker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Worker.h; sourceTree = "<group>"; };
+		C22EF68A2379412100D67CBF /* TNSSwiftLike.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TNSSwiftLike.m; sourceTree = "<group>"; };
+		C22EF68C2379414300D67CBF /* TNSSwiftLike.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSSwiftLike.h; sourceTree = "<group>"; };
 		C23992C7236C2D6E00D2F720 /* TestRunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TestRunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestRunnerTests.swift; sourceTree = "<group>"; };
 		C23992CB236C2D6E00D2F720 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -1522,6 +1525,8 @@
 				C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */,
 				C29374F3229FC1600075CB16 /* TNSClassWithPlaceholder.h */,
 				C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */,
+				C22EF68C2379414300D67CBF /* TNSSwiftLike.h */,
+				C22EF68A2379412100D67CBF /* TNSSwiftLike.m */,
 			);
 			path = Interfaces;
 			sourceTree = "<group>";
@@ -2337,6 +2342,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C22EF68B2379412100D67CBF /* TNSSwiftLike.m in Sources */,
 				C293751A229FC1600075CB16 /* TNSMethodCalls.m in Sources */,
 				C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */,
 				C2937524229FC1600075CB16 /* TNSAllocLog.m in Sources */,
