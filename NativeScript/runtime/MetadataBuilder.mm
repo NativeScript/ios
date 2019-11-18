@@ -250,11 +250,17 @@ std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Isolate* isolate, Loc
 }
 
 Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(Isolate* isolate, const BaseClassMeta* meta) {
+    std::unordered_map<std::string, uint8_t> instanceMembers;
+    std::unordered_map<std::string, uint8_t> staticMembers;
+    return MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(isolate, meta, instanceMembers, staticMembers);
+}
+
+Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(Isolate* isolate, const BaseClassMeta* meta, std::unordered_map<std::string, uint8_t>& instanceMembers, std::unordered_map<std::string, uint8_t>& staticMembers) {
     Local<FunctionTemplate> ctorFuncTemplate;
     auto cache = Caches::Get(isolate);
     auto it = cache->CtorFuncTemplates.find(meta);
     if (it != cache->CtorFuncTemplates.end()) {
-        ctorFuncTemplate = Local<FunctionTemplate>::New(isolate, *it->second);
+        ctorFuncTemplate = it->second->Get(isolate);
         return ctorFuncTemplate;
     }
 
@@ -287,11 +293,11 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 
                 const InterfaceMeta* baseMeta = static_cast<const InterfaceMeta*>(baseClassMeta);
                 if (baseMeta != nullptr) {
-                    Local<FunctionTemplate> baseCtorFuncTemplate = MetadataBuilder::GetOrCreateConstructorFunctionTemplate(isolate, baseMeta);
+                    Local<FunctionTemplate> baseCtorFuncTemplate = MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(isolate, baseMeta, instanceMembers, staticMembers);
                     ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
                     auto it = cache->CtorFuncs.find(baseMeta->name());
                     if (it != cache->CtorFuncs.end()) {
-                        baseCtorFunc = Local<v8::Function>::New(isolate, *it->second);
+                        baseCtorFunc = it->second->Get(isolate);
                     }
                 }
             }
@@ -299,7 +305,6 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         }
     }
 
-    std::vector<std::string> instanceMembers;
     MetadataBuilder::RegisterInstanceProperties(isolate, ctorFuncTemplate, meta, meta->name(), instanceMembers);
     MetadataBuilder::RegisterInstanceMethods(isolate, ctorFuncTemplate, meta, instanceMembers);
     MetadataBuilder::RegisterInstanceProtocols(isolate, ctorFuncTemplate, meta, meta->name(), instanceMembers);
@@ -329,7 +334,6 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
         }
     }
 
-    std::vector<std::string> staticMembers;
     if (meta->type() == MetaType::Interface) {
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
         MetadataBuilder::RegisterAllocMethod(isolate, ctorFunc, interfaceMeta);
@@ -409,7 +413,7 @@ void MetadataBuilder::RegisterAllocMethod(Isolate* isolate, Local<v8::Function> 
     assert(success);
 }
 
-void MetadataBuilder::RegisterInstanceMethods(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::vector<std::string>& names) {
+void MetadataBuilder::RegisterInstanceMethods(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::unordered_map<std::string, uint8_t>& names) {
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
     for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
@@ -418,18 +422,19 @@ void MetadataBuilder::RegisterInstanceMethods(Isolate* isolate, Local<FunctionTe
             continue;
         }
 
-        std::string name = methodMeta->jsName();
-        if (std::find(names.begin(), names.end(), name) == names.end()) {
+        std::string methodName = methodMeta->name();
+        auto methodsIt = names.find(methodName);
+        if (methodsIt == names.end()) {
             CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name());
             Local<External> ext = External::New(isolate, item);
             Local<FunctionTemplate> instanceMethodTemplate = FunctionTemplate::New(isolate, MethodCallback, ext);
-            proto->Set(tns::ToV8String(isolate, name), instanceMethodTemplate);
-            names.push_back(name);
+            proto->Set(tns::ToV8String(isolate, methodMeta->jsName()), instanceMethodTemplate);
+            names.emplace(methodName, 0);
         }
     }
 }
 
-void MetadataBuilder::RegisterInstanceProperties(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names) {
+void MetadataBuilder::RegisterInstanceProperties(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className, std::unordered_map<std::string, uint8_t>& names) {
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
     for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
@@ -438,30 +443,28 @@ void MetadataBuilder::RegisterInstanceProperties(Isolate* isolate, Local<Functio
             continue;
         }
 
-        std::string name = propMeta->jsName();
-        if (std::find(names.begin(), names.end(), name) == names.end()) {
-            FunctionCallback getter = nullptr;
-            FunctionCallback setter = nullptr;
-            if (propMeta->hasGetter()) {
-                getter = PropertyGetterCallback;
-            }
+        uint8_t accessors = 0;
+        if (propMeta->hasGetter()) {
+            accessors++;
+        }
+        if (propMeta->hasSetter()) {
+            accessors++;
+        }
 
-            if (propMeta->hasSetter()) {
-                setter = PropertySetterCallback;
-            }
-
-            if (getter || setter) {
-                CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className);
-                Local<External> ext = External::New(isolate, item);
-                Local<v8::String> propName = tns::ToV8String(isolate, name);
-                proto->SetAccessorProperty(propName, FunctionTemplate::New(isolate, getter, ext), FunctionTemplate::New(isolate, setter, ext), PropertyAttribute::DontDelete, AccessControl::DEFAULT);
-                names.push_back(name);
-            }
+        std::string propertyName = propMeta->name();
+        auto propertiesIt = names.find(propertyName);
+        if (accessors > 0 && (propertiesIt == names.end() || propertiesIt->second < accessors)) {
+            CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className);
+            Local<External> ext = External::New(isolate, item);
+            Local<FunctionTemplate> getter = FunctionTemplate::New(isolate, PropertyGetterCallback, ext);
+            Local<FunctionTemplate> setter = FunctionTemplate::New(isolate, PropertySetterCallback, ext);
+            proto->SetAccessorProperty(tns::ToV8String(isolate, propMeta->jsName()), getter, setter, PropertyAttribute::DontDelete, AccessControl::DEFAULT);
+            names.emplace(propertyName, accessors);
         }
     }
 }
 
-void MetadataBuilder::RegisterInstanceProtocols(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names) {
+void MetadataBuilder::RegisterInstanceProtocols(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className, std::unordered_map<std::string, uint8_t>& names) {
     if (meta->type() == MetaType::ProtocolType) {
         MetadataBuilder::RegisterInstanceMethods(isolate, ctorFuncTemplate, meta, names);
         MetadataBuilder::RegisterInstanceProperties(isolate, ctorFuncTemplate, meta, className, names);
@@ -477,7 +480,7 @@ void MetadataBuilder::RegisterInstanceProtocols(Isolate* isolate, Local<Function
     }
 }
 
-void MetadataBuilder::RegisterStaticMethods(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, std::vector<std::string>& names) {
+void MetadataBuilder::RegisterStaticMethods(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, std::unordered_map<std::string, uint8_t>& names) {
     Local<Context> context = isolate->GetCurrentContext();
     for (auto it = meta->staticMethods->begin(); it != meta->staticMethods->end(); it++) {
         const MethodMeta* methodMeta = (*it).valuePtr();
@@ -485,8 +488,9 @@ void MetadataBuilder::RegisterStaticMethods(Isolate* isolate, Local<v8::Function
             continue;
         }
 
-        std::string name = methodMeta->jsName();
-        if (std::find(names.begin(), names.end(), name) == names.end()) {
+        std::string methodName = methodMeta->name();
+        auto methodsIt = names.find(methodName);
+        if (methodsIt == names.end()) {
             CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name());
             Local<External> ext = External::New(isolate, item);
             Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate, MethodCallback, ext);
@@ -500,12 +504,12 @@ void MetadataBuilder::RegisterStaticMethods(Isolate* isolate, Local<v8::Function
             bool success = ctorFunc->Set(context, tns::ToV8String(isolate, methodMeta->jsName()), staticMethod).FromMaybe(false);
             assert(success);
 
-            names.push_back(name);
+            names.emplace(methodName, 0);
         }
     }
 }
 
-void MetadataBuilder::RegisterStaticProperties(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names) {
+void MetadataBuilder::RegisterStaticProperties(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::unordered_map<std::string, uint8_t>& names) {
     Local<Context> context = isolate->GetCurrentContext();
 
     for (auto it = meta->staticProps->begin(); it != meta->staticProps->end(); it++) {
@@ -514,35 +518,33 @@ void MetadataBuilder::RegisterStaticProperties(Isolate* isolate, Local<v8::Funct
             continue;
         }
 
-        std::string name = propMeta->jsName();
-        if (std::find(names.begin(), names.end(), name) == names.end()) {
-            AccessorNameGetterCallback getter = nullptr;
-            AccessorNameSetterCallback setter = nullptr;
-            if (propMeta->hasGetter()) {
-                getter = PropertyNameGetterCallback;
-            }
+        uint8_t accessors = 0;
+        if (propMeta->hasGetter()) {
+            accessors++;
+        }
 
-            if (propMeta->hasSetter()) {
-                setter = PropertyNameSetterCallback;
-            }
+        if (propMeta->hasSetter()) {
+            accessors++;
+        }
 
-            if (getter || setter) {
-                CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className);
-                Local<External> ext = External::New(isolate, item);
+        std::string propertyName = propMeta->name();
+        auto propertiesIt = names.find(propertyName);
+        if (accessors > 0 && (propertiesIt == names.end() || propertiesIt->second < accessors)) {
+            CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className);
+            Local<External> ext = External::New(isolate, item);
 
-                Local<v8::String> propName = tns::ToV8String(isolate, propMeta->jsName());
-                bool success;
-                Maybe<bool> maybeSuccess = ctorFunc->SetAccessor(context, propName, getter, setter, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
-                if (!maybeSuccess.To(&success) || !success) {
-                    assert(false);
-                }
-                names.push_back(name);
+            Local<v8::String> propName = tns::ToV8String(isolate, propMeta->jsName());
+            bool success;
+            Maybe<bool> maybeSuccess = ctorFunc->SetAccessor(context, propName, PropertyNameGetterCallback, PropertyNameSetterCallback, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
+            if (!maybeSuccess.To(&success) || !success) {
+                assert(false);
             }
+            names.emplace(propertyName, accessors);
         }
     }
 }
 
-void MetadataBuilder::RegisterStaticProtocols(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::vector<std::string>& names) {
+void MetadataBuilder::RegisterStaticProtocols(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::unordered_map<std::string, uint8_t>& names) {
     if (meta->type() == MetaType::ProtocolType) {
         MetadataBuilder::RegisterStaticMethods(isolate, ctorFunc, meta, names);
         MetadataBuilder::RegisterStaticProperties(isolate, ctorFunc, meta, className, names);
@@ -635,6 +637,11 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value> &
 
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+    if (!item->meta_->hasGetter()) {
+        Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Property is not readable."));
+        isolate->ThrowException(error);
+        return;
+    }
 
     Local<Value> result = InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->className_, true);
     if (!result.IsEmpty()) {
@@ -645,6 +652,12 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value> &
 void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value> &info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+    if (!item->meta_->hasSetter()) {
+        Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Attempted to assign to readonly property."));
+        isolate->ThrowException(error);
+        return;
+    }
+
     Local<Object> receiver = info.This();
     Local<Value> value = info[0];
     MetadataBuilder::InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->className_, true);
@@ -653,6 +666,12 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value> &
 void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const PropertyCallbackInfo<Value> &info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+    if (!item->meta_->hasGetter()) {
+        Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Property is not readable."));
+        isolate->ThrowException(error);
+        return;
+    }
+
     Local<Value> result = MetadataBuilder::InvokeMethod(isolate, item->meta_->getter(), Local<Object>(), { }, item->className_, false);
     if (!result.IsEmpty()) {
         info.GetReturnValue().Set(result);
@@ -662,6 +681,12 @@ void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const Propert
 void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<void> &info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+    if (!item->meta_->hasSetter()) {
+        Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Attempted to assign to readonly property."));
+        isolate->ThrowException(error);
+        return;
+    }
+
     MetadataBuilder::InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->className_, false);
 }
 

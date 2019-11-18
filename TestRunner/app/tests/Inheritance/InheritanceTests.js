@@ -4,75 +4,127 @@ describe(module.id, function () {
     });
 
     // Should be first
-    // it("StaticPropertyNames", function () {
-    //     expect('baseMethod' in TNSBaseInterface).toBe(true);
-    //     expect(TNSBaseInterface.hasOwnProperty('baseCategoryMethod')).toBe(true);
+    it("StaticPropertyNames", function () {
+        expect('baseMethod' in TNSBaseInterface).toBe(true);
+        expect(TNSBaseInterface.hasOwnProperty('baseCategoryMethod')).toBe(true);
 
-    //     expect(Object.getOwnPropertyNames(TNSBaseInterface).sort()).toEqual([
-    //         'baseCategoryMethod',
-    //         'baseCategoryProperty',
-    //         'baseCategoryProtocolMethod1',
-    //         'baseCategoryProtocolMethod1Optional',
-    //         'baseCategoryProtocolMethod2',
-    //         'baseCategoryProtocolMethod2Optional',
-    //         'baseCategoryProtocolProperty1',
-    //         'baseCategoryProtocolProperty1Optional',
-    //         'baseCategoryProtocolProperty2',
-    //         'baseCategoryProtocolProperty2Optional',
-    //         'baseMethod',
-    //         'baseProperty',
-    //         'baseProtocolMethod1',
-    //         'baseProtocolMethod1Optional',
-    //         'baseProtocolMethod2',
-    //         'baseProtocolMethod2Optional',
-    //         'baseProtocolProperty1',
-    //         'baseProtocolProperty1Optional',
-    //         'baseProtocolProperty2',
-    //         'baseProtocolProperty2Optional',
-    //         'name'
-    //     ]);
-    // });
+        expect(Object.getOwnPropertyNames(TNSBaseInterface).sort()).toEqual([
+            'alloc',
+            'arguments',
+            'baseCategoryMethod',
+            'baseCategoryProperty',
+            'baseCategoryProtocolMethod1',
+            'baseCategoryProtocolMethod1Optional',
+            'baseCategoryProtocolMethod2',
+            'baseCategoryProtocolMethod2Optional',
+            'baseCategoryProtocolProperty1',
+            'baseCategoryProtocolProperty1Optional',
+            'baseCategoryProtocolProperty2',
+            'baseCategoryProtocolProperty2Optional',
+            'baseMethod',
+            'baseProperty',
+            'baseProtocolMethod1',
+            'baseProtocolMethod1Optional',
+            'baseProtocolMethod2',
+            'baseProtocolMethod2Optional',
+            'baseProtocolProperty1',
+            'baseProtocolProperty1Optional',
+            'baseProtocolProperty2',
+            'baseProtocolProperty2Optional',
+            'caller',
+            'extend',
+            'length',
+            'name',
+            'prototype'
+        ]);
+    });
 
-    // it("InstancePropertyNames", function () {
-    //     expect('baseMethod' in TNSBaseInterface.prototype).toBe(true);
-    //     expect(TNSBaseInterface.prototype.hasOwnProperty('baseCategoryMethod')).toBe(true);
+    it("InstancePropertyNames", function () {
+        expect('baseMethod' in TNSBaseInterface.prototype).toBe(true);
+        expect(TNSBaseInterface.prototype.hasOwnProperty('baseCategoryMethod')).toBe(true);
 
-    //     expect(Object.getOwnPropertyNames(TNSBaseInterface.prototype).sort()).toEqual([
-    //         'baseCategoryMethod',
-    //         'baseCategoryProperty',
-    //         'baseCategoryProtocolMethod1',
-    //         'baseCategoryProtocolMethod1Optional',
-    //         'baseCategoryProtocolMethod2',
-    //         'baseCategoryProtocolMethod2Optional',
-    //         'baseCategoryProtocolProperty1',
-    //         'baseCategoryProtocolProperty1Optional',
-    //         'baseCategoryProtocolProperty2',
-    //         'baseCategoryProtocolProperty2Optional',
-    //         'baseMethod',
-    //         'baseProperty',
-    //         'baseProtocolMethod1',
-    //         'baseProtocolMethod1Optional',
-    //         'baseProtocolMethod2',
-    //         'baseProtocolMethod2Optional',
-    //         'baseProtocolProperty1',
-    //         'baseProtocolProperty1Optional',
-    //         'baseProtocolProperty2',
-    //         'baseProtocolProperty2Optional',
-    //         'callBaseMethod',
-    //         'constructor',
-    //         'initBaseCategoryMethod',
-    //         'initBaseCategoryProtocolMethod1',
-    //         'initBaseCategoryProtocolMethod1Optional',
-    //         'initBaseCategoryProtocolMethod2',
-    //         'initBaseCategoryProtocolMethod2Optional',
-    //         'initBaseMethod',
-    //         'initBaseProtocolMethod1',
-    //         'initBaseProtocolMethod1Optional',
-    //         'initBaseProtocolMethod2',
-    //         'initBaseProtocolMethod2Optional',
-    //         'methodWithParam'
-    //     ]);
-    // });
+        expect(Object.getOwnPropertyNames(TNSBaseInterface.prototype).sort()).toEqual([
+            'baseCategoryMethod',
+            'baseCategoryProperty',
+            'baseCategoryProtocolMethod1',
+            'baseCategoryProtocolMethod1Optional',
+            'baseCategoryProtocolMethod2',
+            'baseCategoryProtocolMethod2Optional',
+            'baseCategoryProtocolProperty1',
+            'baseCategoryProtocolProperty1Optional',
+            'baseCategoryProtocolProperty2',
+            'baseCategoryProtocolProperty2Optional',
+            'baseMethod',
+            'baseProperty',
+            'baseProtocolMethod1',
+            'baseProtocolMethod1Optional',
+            'baseProtocolMethod2',
+            'baseProtocolMethod2Optional',
+            'baseProtocolProperty1',
+            'baseProtocolProperty1Optional',
+            'baseProtocolProperty2',
+            'baseProtocolProperty2Optional',
+            'baseReadOnlyProperty',
+            'callBaseMethod',
+            'constructor',
+            'initBaseCategoryMethod',
+            'initBaseCategoryProtocolMethod1',
+            'initBaseCategoryProtocolMethod1Optional',
+            'initBaseCategoryProtocolMethod2',
+            'initBaseCategoryProtocolMethod2Optional',
+            'initBaseMethod',
+            'initBaseProtocolMethod1',
+            'initBaseProtocolMethod1Optional',
+            'initBaseProtocolMethod2',
+            'initBaseProtocolMethod2Optional',
+            'methodWithParam',
+            'toString'
+        ]);
+    });
+
+    it("InstancePropertyNames Derived", function () {
+        expect('derivedMethod' in TNSDerivedInterface.prototype).toBe(true);
+        expect(TNSDerivedInterface.prototype.hasOwnProperty('derivedCategoryMethod')).toBe(true);
+
+        expect(Object.getOwnPropertyNames(TNSDerivedInterface.prototype).sort()).toEqual([
+            'baseReadOnlyProperty', // exposed here as well because it has become read-write
+            'constructor',
+            'derivedCategoryMethod',
+            'derivedCategoryProperty',
+            'derivedCategoryProtocolMethod1',
+            'derivedCategoryProtocolMethod1Optional',
+            'derivedCategoryProtocolMethod2',
+            'derivedCategoryProtocolMethod2Optional',
+            'derivedCategoryProtocolProperty1',
+            'derivedCategoryProtocolProperty1Optional',
+            'derivedCategoryProtocolProperty2',
+            'derivedCategoryProtocolProperty2Optional',
+            'derivedMethod',
+            'derivedProperty',
+            'derivedPropertyReadOnly',
+            'derivedPropertyReadOnlyMadeWritable',
+            'derivedProtocolMethod1',
+            'derivedProtocolMethod1Optional',
+            'derivedProtocolMethod2',
+            'derivedProtocolMethod2Optional',
+            'derivedProtocolProperty1',
+            'derivedProtocolProperty1Optional',
+            'derivedProtocolProperty2',
+            'derivedProtocolProperty2Optional',
+            'initDerivedCategoryMethod',
+            'initDerivedCategoryProtocolMethod1',
+            'initDerivedCategoryProtocolMethod1Optional',
+            'initDerivedCategoryProtocolMethod2',
+            'initDerivedCategoryProtocolMethod2Optional',
+            'initDerivedMethod',
+            'initDerivedProtocolMethod1',
+            'initDerivedProtocolMethod1Optional',
+            'initDerivedProtocolMethod2',
+            'initDerivedProtocolMethod2Optional',
+            'methodWithParam', // exposed here as well because there's an overload in Derived (methodWith:Param:)
+            'toString'
+        ]);
+    });
 
     it("SimpleInheritance", function () {
         var JSObject = NSObject.extend({});
@@ -241,7 +293,60 @@ describe(module.id, function () {
         );
     });
 
-    it("PropertiesCalls", function () {
+    it("PropertiesCallsBase", function () {
+        "use strict";
+        var object = TNSBaseInterface.alloc().init();
+
+        object.baseProtocolProperty1 = 0;
+        UNUSED(object.baseProtocolProperty1);
+        object.baseProtocolProperty1Optional = 0;
+        UNUSED(object.baseProtocolProperty1Optional);
+        object.baseProtocolProperty2 = 0;
+        UNUSED(object.baseProtocolProperty2);
+        object.baseProtocolProperty2Optional = 0;
+        UNUSED(object.baseProtocolProperty2Optional);
+        object.baseProperty = 0;
+        UNUSED(object.baseProperty);
+        expect(() => object.baseReadOnlyProperty = 0).toThrowError("Attempted to assign to readonly property.");
+        UNUSED(object.baseReadOnlyProperty);
+        object.baseCategoryProtocolProperty1 = 0;
+        UNUSED(object.baseCategoryProtocolProperty1);
+        object.baseCategoryProtocolProperty1Optional = 0;
+        UNUSED(object.baseCategoryProtocolProperty1Optional);
+        object.baseCategoryProtocolProperty2 = 0;
+        UNUSED(object.baseCategoryProtocolProperty2);
+        object.baseCategoryProtocolProperty2Optional = 0;
+        UNUSED(object.baseCategoryProtocolProperty2Optional);
+        object.baseCategoryProperty = 0;
+        UNUSED(object.baseCategoryProperty);
+
+        var actual = TNSGetOutput();
+        expect(actual).toBe(
+            'instance setBaseProtocolProperty1: called' +
+            'instance baseProtocolProperty1 called' +
+            'instance setBaseProtocolProperty1Optional: called' +
+            'instance baseProtocolProperty1Optional called' +
+            'instance setBaseProtocolProperty2: called' +
+            'instance baseProtocolProperty2 called' +
+            'instance setBaseProtocolProperty2Optional: called' +
+            'instance baseProtocolProperty2Optional called' +
+            'instance setBaseProperty: called' +
+            'instance baseProperty called' +
+            'instance baseReadOnlyProperty called' +
+            'instance setBaseCategoryProtocolProperty1: called' +
+            'instance baseCategoryProtocolProperty1 called' +
+            'instance setBaseCategoryProtocolProperty1Optional: called' +
+            'instance baseCategoryProtocolProperty1Optional called' +
+            'instance setBaseCategoryProtocolProperty2: called' +
+            'instance baseCategoryProtocolProperty2 called' +
+            'instance setBaseCategoryProtocolProperty2Optional: called' +
+            'instance baseCategoryProtocolProperty2Optional called' +
+            'instance setBaseCategoryProperty: called' +
+            'instance baseCategoryProperty called'
+        );
+    });
+
+    it("PropertiesCallsDerived", function () {
         var JSDerivedInterface = TNSDerivedInterface.extend({});
         var object = JSDerivedInterface.alloc().init();
         object.baseProtocolProperty1 = 0;
@@ -254,6 +359,8 @@ describe(module.id, function () {
         UNUSED(object.baseProtocolProperty2Optional);
         object.baseProperty = 0;
         UNUSED(object.baseProperty);
+        object.baseReadOnlyProperty = 0;
+        UNUSED(object.baseReadOnlyProperty);
         object.baseCategoryProtocolProperty1 = 0;
         UNUSED(object.baseCategoryProtocolProperty1);
         object.baseCategoryProtocolProperty1Optional = 0;
@@ -297,6 +404,8 @@ describe(module.id, function () {
             'instance baseProtocolProperty2Optional called' +
             'instance setBaseProperty: called' +
             'instance baseProperty called' +
+            'instance setBaseReadOnlyProperty: called' +
+            'instance baseReadOnlyProperty called' +
             'instance setBaseCategoryProtocolProperty1: called' +
             'instance baseCategoryProtocolProperty1 called' +
             'instance setBaseCategoryProtocolProperty1Optional: called' +

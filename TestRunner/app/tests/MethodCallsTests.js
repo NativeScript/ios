@@ -997,15 +997,15 @@ describe(module.id, function () {
         var actual = TNSGetOutput();
         expect(actual).toBe('instance setDerivedProperty: calledinstance derivedProperty called');
     });
-    // it('Derived_DerivedPropertyReadOnly', function () {
-    //     "use strict";
-    //     var instance = TNSDerivedInterface.alloc().init();
-    //     expect(() => instance.derivedPropertyReadOnly = 1).toThrowError(/Attempted to assign to readonly property/);
-    //     UNUSED(instance.derivedPropertyReadOnly);
+    it('Derived_DerivedPropertyReadOnly', function () {
+        "use strict";
+        var instance = TNSDerivedInterface.alloc().init();
+        expect(() => instance.derivedPropertyReadOnly = 1).toThrowError(/Attempted to assign to readonly property/);
+        UNUSED(instance.derivedPropertyReadOnly);
 
-    //     var actual = TNSGetOutput();
-    //     expect(actual).toBe('instance derivedPropertyReadOnly called');
-    // });
+        var actual = TNSGetOutput();
+        expect(actual).toBe('instance derivedPropertyReadOnly called');
+    });
     it('Derived_DerivedProperty', function () {
         TNSDerivedInterface.derivedProperty = 1;
         UNUSED(TNSDerivedInterface.derivedProperty);
