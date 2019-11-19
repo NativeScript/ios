@@ -47,11 +47,6 @@ void Runtime::Init() {
         V8::SetFlagsFromString(flags.c_str(), flags.size());
     }
 
-    StartupData* snapshotBlobStartupData = new StartupData();
-    snapshotBlobStartupData->data = RuntimeConfig.SnapshotPtr;
-    snapshotBlobStartupData->raw_size = (int)RuntimeConfig.SnapshotSize;
-    V8::SetSnapshotDataBlob(snapshotBlobStartupData);
-
     Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = &allocator_;
     Isolate* isolate = Isolate::New(create_params);

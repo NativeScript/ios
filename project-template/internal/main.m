@@ -14,8 +14,6 @@
 #endif
 
 extern char startOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
-extern char startOfSnapshotSection __asm("section$start$__DATA$__TNSSnapshot");
-extern char endOfSnapshotSection __asm("section$end$__DATA$__TNSSnapshot");
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
@@ -42,10 +40,6 @@ int main(int argc, char *argv[]) {
 
         void* metadataPtr = &startOfMetadataSection;
 
-        const char* startSnapshotPtr = &startOfSnapshotSection;
-        const char* endSnapshotPtr = &endOfSnapshotSection;
-        size_t snapshotSize = endSnapshotPtr - startSnapshotPtr;
-
         bool isDebug =
 #ifdef DEBUG
             true;
@@ -57,8 +51,6 @@ int main(int argc, char *argv[]) {
         config.IsDebug = isDebug;
         config.LogToSystemConsole = isDebug;
         config.MetadataPtr = metadataPtr;
-        config.SnapshotPtr = startSnapshotPtr;
-        config.SnapshotSize = snapshotSize;
         config.BaseDir = baseDir;
         config.ArgumentsCount = argc;
         config.Arguments = argv;

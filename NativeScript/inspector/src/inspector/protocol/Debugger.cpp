@@ -1164,9 +1164,10 @@ void DispatcherImpl::getScriptSource(int callId, const String& method, const Pro
     }
     // Declare output parameters.
     String out_scriptSource;
+    Maybe<Binary> out_bytecode;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getScriptSource(in_scriptId, &out_scriptSource);
+    DispatchResponse response = m_backend->getScriptSource(in_scriptId, &out_scriptSource, &out_bytecode);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
@@ -1174,6 +1175,8 @@ void DispatcherImpl::getScriptSource(int callId, const String& method, const Pro
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("scriptSource", ValueConversions<String>::toValue(out_scriptSource));
+        if (out_bytecode.isJust())
+            result->setValue("bytecode", ValueConversions<Binary>::toValue(out_bytecode.fromJust()));
     }
     if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));

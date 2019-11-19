@@ -93,7 +93,7 @@ String ErrorSupport::errors()
 
 //#include "Values.h"
 
-#include "third_party/inspector_protocol/encoding/encoding.h"
+#include "third_party/inspector_protocol/crdtp/cbor.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -152,26 +152,26 @@ void escapeStringForJSONInternal(const Char* str, unsigned len,
 // to this constant.
 static constexpr int kStackLimitValues = 1000;
 
-using v8_inspector_protocol_encoding::Error;
-using v8_inspector_protocol_encoding::Status;
-using v8_inspector_protocol_encoding::span;
+using v8_crdtp::Error;
+using v8_crdtp::Status;
+using v8_crdtp::span;
 namespace cbor {
-using v8_inspector_protocol_encoding::cbor::CBORTokenTag;
-using v8_inspector_protocol_encoding::cbor::CBORTokenizer;
-using v8_inspector_protocol_encoding::cbor::EncodeBinary;
-using v8_inspector_protocol_encoding::cbor::EncodeDouble;
-using v8_inspector_protocol_encoding::cbor::EncodeFalse;
-using v8_inspector_protocol_encoding::cbor::EncodeFromLatin1;
-using v8_inspector_protocol_encoding::cbor::EncodeFromUTF16;
-using v8_inspector_protocol_encoding::cbor::EncodeIndefiniteLengthArrayStart;
-using v8_inspector_protocol_encoding::cbor::EncodeIndefiniteLengthMapStart;
-using v8_inspector_protocol_encoding::cbor::EncodeInt32;
-using v8_inspector_protocol_encoding::cbor::EncodeNull;
-using v8_inspector_protocol_encoding::cbor::EncodeStop;
-using v8_inspector_protocol_encoding::cbor::EncodeString8;
-using v8_inspector_protocol_encoding::cbor::EncodeTrue;
-using v8_inspector_protocol_encoding::cbor::EnvelopeEncoder;
-using v8_inspector_protocol_encoding::cbor::InitialByteForEnvelope;
+using v8_crdtp::cbor::CBORTokenTag;
+using v8_crdtp::cbor::CBORTokenizer;
+using v8_crdtp::cbor::EncodeBinary;
+using v8_crdtp::cbor::EncodeDouble;
+using v8_crdtp::cbor::EncodeFalse;
+using v8_crdtp::cbor::EncodeFromLatin1;
+using v8_crdtp::cbor::EncodeFromUTF16;
+using v8_crdtp::cbor::EncodeIndefiniteLengthArrayStart;
+using v8_crdtp::cbor::EncodeIndefiniteLengthMapStart;
+using v8_crdtp::cbor::EncodeInt32;
+using v8_crdtp::cbor::EncodeNull;
+using v8_crdtp::cbor::EncodeStop;
+using v8_crdtp::cbor::EncodeString8;
+using v8_crdtp::cbor::EncodeTrue;
+using v8_crdtp::cbor::EnvelopeEncoder;
+using v8_crdtp::cbor::InitialByteForEnvelope;
 }  // namespace cbor
 
 // Below are three parsing routines for CBOR, which cover enough
@@ -1147,10 +1147,10 @@ std::unique_ptr<Serializable> InternalResponse::createErrorResponse(int callId, 
 
 void InternalResponse::AppendSerialized(std::vector<uint8_t>* out) const
 {
-    using v8_inspector_protocol_encoding::cbor::NewCBOREncoder;
-    using v8_inspector_protocol_encoding::StreamingParserHandler;
-    using v8_inspector_protocol_encoding::Status;
-    using v8_inspector_protocol_encoding::SpanFrom;
+    using v8_crdtp::cbor::NewCBOREncoder;
+    using v8_crdtp::StreamingParserHandler;
+    using v8_crdtp::Status;
+    using v8_crdtp::SpanFrom;
 
     Status status;
     std::unique_ptr<StreamingParserHandler> encoder =
