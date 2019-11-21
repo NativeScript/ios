@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
+#include <sys/stat.h>
 #include <execinfo.h>
 #include <fstream>
 #include <codecvt>
@@ -100,6 +101,16 @@ std::vector<uint16_t> tns::ToVector(const std::string& value) {
     const uint16_t *end = reinterpret_cast<uint16_t const*>(value16.data() + value16.size());
     std::vector<uint16_t> vector(begin, end);
     return vector;
+}
+
+bool tns::Exists(const char* fullPath) {
+    struct stat statbuf;
+    mode_t mode = S_IFDIR | S_IFREG;
+    if (stat(fullPath, &statbuf) == 0) {
+        return (statbuf.st_mode & S_IFMT) & mode;
+    }
+
+    return false;
 }
 
 const char* tns::ReadText(const std::string& filePath, long& length, bool& isNew) {

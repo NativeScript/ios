@@ -22,6 +22,7 @@ double ToNumber(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
 bool ToBool(const v8::Local<v8::Value>& value);
 std::vector<uint16_t> ToVector(const std::string& value);
 
+bool Exists(const char* fullPath);
 const char* ReadText(const std::string& filePath, long& length, bool& isNew);
 std::string ReadText(const std::string& file);
 uint8_t* ReadBinary(const std::string path, long& length, bool& isNew);

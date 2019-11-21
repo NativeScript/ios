@@ -1,29 +1,26 @@
 #ifndef ConcurrentQueue_h
 #define ConcurrentQueue_h
 
-#include <condition_variable>
+#include <CoreFoundation/CoreFoundation.h>
+#include <vector>
 #include <string>
 #include <queue>
 #include <mutex>
 
 namespace tns {
 
-class ConcurrentQueue {
+struct ConcurrentQueue {
 public:
-    std::string Pop(bool& isTerminating);
-
-    void Push(const std::string& item);
-
+    void Initialize(CFRunLoopRef runLoop, void (*performWork)(void*), void* info);
+    void Push(std::string message);
+    std::vector<std::string> PopAll();
     void Terminate();
-
-    ConcurrentQueue() = default;
-    ConcurrentQueue(const ConcurrentQueue&) = delete;
-    ConcurrentQueue& operator=(const ConcurrentQueue&) = delete;
 private:
-    bool isTerminating_ = false;
-    std::queue<std::string> queue_;
+    std::queue<std::string> messagesQueue_;
+    CFRunLoopSourceRef runLoopTasksSource_ = nullptr;
+    CFRunLoopRef runLoop_ = nullptr;
     std::mutex mutex_;
-    std::condition_variable conditionVar_;
+    void SignalAndWakeUp();
 };
 
 }

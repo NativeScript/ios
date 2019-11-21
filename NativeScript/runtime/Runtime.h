@@ -28,6 +28,14 @@ public:
         return currentRuntime_;
     }
 
+    static bool IsWorker() {
+        if (currentRuntime_ == nullptr) {
+            return false;
+        }
+
+        return currentRuntime_->WorkerId() > 0;
+    }
+
     static v8::Platform* GetPlatform() {
         return platform_;
     }

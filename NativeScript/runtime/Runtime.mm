@@ -107,6 +107,13 @@ void Runtime::RunScript(string file, TryCatch& tc) {
     HandleScope handle_scope(isolate);
     Local<Context> context = isolate->GetCurrentContext();
     std::string filename = RuntimeConfig.ApplicationPath + "/" + file;
+
+    if (!tns::Exists(filename.c_str())) {
+        Local<Value> error = Exception::Error(tns::ToV8String(isolate, "The specified script does not exist: \"" + filename + "\""));
+        isolate->ThrowException(error);
+        return;
+    }
+
     string source = tns::ReadText(filename);
     Local<v8::String> script_source = v8::String::NewFromUtf8(isolate, source.c_str(), NewStringType::kNormal).ToLocalChecked();
 

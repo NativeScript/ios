@@ -2,31 +2,59 @@
 
 namespace tns {
 
-std::string ConcurrentQueue::Pop(bool& isTerminating) {
-    std::unique_lock<std::mutex> mlock(this->mutex_);
-    isTerminating = false;
-    while (this->queue_.empty()) {
-        this->conditionVar_.wait(mlock);
-        if (this->isTerminating_) {
-            isTerminating = true;
-            return "";
-        }
-    }
-    auto val = this->queue_.front();
-    this->queue_.pop();
-    return val;
+void ConcurrentQueue::Initialize(CFRunLoopRef runLoop, void (*performWork)(void*), void* info) {
+    this->runLoop_ = runLoop;
+    CFRunLoopSourceContext sourceContext = { 0, info, 0, 0, 0, 0, 0, 0, 0, performWork };
+    this->runLoopTasksSource_ = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &sourceContext);
+    CFRunLoopAddSource(this->runLoop_, this->runLoopTasksSource_, kCFRunLoopCommonModes);
 }
 
-void ConcurrentQueue::Push(const std::string& item) {
+void ConcurrentQueue::Push(std::string message) {
+    if (this->runLoopTasksSource_ != nullptr && !CFRunLoopSourceIsValid(this->runLoopTasksSource_)) {
+        return;
+    }
+
+    {
+        std::unique_lock<std::mutex> mlock(this->mutex_);
+        this->messagesQueue_.push(message);
+    }
+
+    this->SignalAndWakeUp();
+}
+
+std::vector<std::string> ConcurrentQueue::PopAll() {
     std::unique_lock<std::mutex> mlock(this->mutex_);
-    this->queue_.push(item);
-    mlock.unlock();
-    this->conditionVar_.notify_one();
+    std::vector<std::string> messages;
+
+    while (!this->messagesQueue_.empty()) {
+        std::string message = this->messagesQueue_.front();
+        this->messagesQueue_.pop();
+        messages.push_back(message);
+    }
+
+    return messages;
+}
+
+void ConcurrentQueue::SignalAndWakeUp() {
+    if (this->runLoopTasksSource_ != nullptr) {
+        assert(CFRunLoopSourceIsValid(this->runLoopTasksSource_));
+        CFRunLoopSourceSignal(this->runLoopTasksSource_);
+    }
+
+    if (this->runLoop_ != nullptr) {
+        CFRunLoopWakeUp(this->runLoop_);
+    }
 }
 
 void ConcurrentQueue::Terminate() {
-    this->isTerminating_ = true;
-    this->conditionVar_.notify_one();
+    if (this->runLoop_) {
+        CFRunLoopStop(this->runLoop_);
+    }
+
+    if (this->runLoopTasksSource_) {
+        CFRunLoopRemoveSource(this->runLoop_, this->runLoopTasksSource_, kCFRunLoopCommonModes);
+        CFRunLoopSourceInvalidate(this->runLoopTasksSource_);
+    }
 }
 
 }

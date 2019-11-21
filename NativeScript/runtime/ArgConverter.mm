@@ -7,6 +7,7 @@
 #include "Caches.h"
 #include "Interop.h"
 #include "Helpers.h"
+#include "Runtime.h"
 
 using namespace v8;
 using namespace std;
@@ -135,7 +136,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_);
     };
 
-    if ([NSThread isMainThread]) {
+    if ([NSThread isMainThread] || Runtime::IsWorker()) {
         cb();
     } else {
         dispatch_group_t group = dispatch_group_create();

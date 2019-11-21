@@ -498,6 +498,7 @@ private:
     int workerId_;
 
     void BackgroundLooper(std::function<v8::Isolate* ()> func);
+    void DrainPendingTasks();
     v8::Local<v8::Object> ConstructErrorObject(v8::Isolate* isolate, std::string message, std::string source, std::string stackTrace, int lineNumber);
 };
 

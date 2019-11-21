@@ -53,17 +53,9 @@ void WorkerWrapper::Start(Persistent<Value>* poWorker, std::function<Isolate* ()
     this->isRunning_ = true;
 }
 
-void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
-    this->workerIsolate_ = func();
-
-    while (!this->isTerminating_) {
-        bool isTerminating;
-        std::string message = this->queue_.Pop(isTerminating);
-
-        if (this->isTerminating_ || isTerminating) {
-            break;
-        }
-
+void WorkerWrapper::DrainPendingTasks() {
+    std::vector<std::string> messages = this->queue_.PopAll();
+    for (std::string message: messages) {
         Isolate::Scope isolate_scope(this->workerIsolate_);
         HandleScope handle_scope(this->workerIsolate_);
         Local<Context> context = this->workerIsolate_->GetCurrentContext();
@@ -76,6 +68,20 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
             this->CallOnErrorHandlers(tc);
         }
     }
+}
+
+void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
+    CFRunLoopRef runLoop = CFRunLoopGetCurrent();
+    this->queue_.Initialize(runLoop, [](void* info) {
+        WorkerWrapper* w = static_cast<WorkerWrapper*>(info);
+        w->DrainPendingTasks();
+    }, this);
+
+    this->workerIsolate_ = func();
+
+    this->DrainPendingTasks();
+
+    CFRunLoopRun();
 
     {
         Isolate::Scope isolate_scope(this->workerIsolate_);

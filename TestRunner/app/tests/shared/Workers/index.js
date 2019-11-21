@@ -34,15 +34,15 @@ describe("TNS Workers", () => {
         expect(() => new Worker()).toThrow();
     });
 
-    // if (global.NSObject) {
-    //     it("Should call worker.onerror when script does not exist", (done) => {
-    //         var worker = new Worker("./idonot-exist.js");
-    //         worker.onerror = (e) => {
-    //             expect(e).not.toEqual(null);
-    //             done();
-    //         }
-    //     });
-    // }
+    if (global.NSObject) {
+        it("Should call worker.onerror when script does not exist", (done) => {
+            var worker = new Worker("./idonot-exist.js");
+            worker.onerror = (e) => {
+                expect(e).not.toEqual(null);
+                done();
+            }
+        });
+    }
 
     it("Should throw exception when parameter is not a proper string", () => {
         // with object parameter
@@ -439,6 +439,38 @@ describe("TNS Workers", () => {
             done();
         }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
     });
+
+    if (global.NSObject) {
+        it("Worker has active CFRunLoop that can execute NSTimer events", done => {
+            var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
+
+            let messages = [];
+            worker.onmessage = msg => {
+                messages.push(msg.data);
+            };
+
+            worker.postMessage({ eval: `require("./tests/Infrastructure/timers");
+            (function func() {
+                postMessage("callback");
+                setTimeout(() => {
+                    postMessage("callback");
+                }, 500);
+            })();` });
+
+            for (var i = 0; i < 3; i++) {
+                worker.postMessage({ eval: `postMessage("${i}")` });
+            }
+
+            setTimeout(() => {
+                worker.postMessage({ eval: `postMessage("3")` });
+                setTimeout(() => {
+                    worker.terminate();
+                    expect(messages).toEqual([ "callback", "0", "1", "2", "callback", "3" ]);
+                    done();
+                }, 100);
+            }, 1000);
+        });
+    }
 
     function generateRandomString(strLen) {
         var chars = "abcAbc defgDEFG 1234567890 ";

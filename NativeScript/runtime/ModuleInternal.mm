@@ -10,16 +10,6 @@ using namespace v8;
 
 namespace tns {
 
-template <mode_t mode>
-static mode_t stat(NSString* path) {
-    struct stat statbuf;
-    if (stat(path.fileSystemRepresentation, &statbuf) == 0) {
-        return (statbuf.st_mode & S_IFMT) & mode;
-    }
-
-    return 0;
-}
-
 ModuleInternal::ModuleInternal()
     : requireFunction_(nullptr), requireFactoryFunction_(nullptr) {
 }
@@ -110,7 +100,11 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
             } else {
                 NSString* tnsModulesPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:@"tns_modules"];
                 fullPath = [tnsModulesPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
-                if (!stat<S_IFDIR | S_IFREG>(fullPath) && !stat<S_IFDIR | S_IFREG>([fullPath stringByAppendingPathExtension:@"js"])) {
+
+                const char* path1 = [fullPath fileSystemRepresentation];
+                const char* path2 = [[fullPath stringByAppendingPathExtension:@"js"] fileSystemRepresentation];
+
+                if (!tns::Exists(path1) && !tns::Exists(path2)) {
                     fullPath = [tnsModulesPath stringByAppendingPathComponent:@"tns-core-modules"];
                     fullPath = [fullPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
                 }
