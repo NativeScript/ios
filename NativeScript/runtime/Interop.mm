@@ -926,7 +926,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return v8::Boolean::New(isolate, [result boolValue]);
         }
 
-        if ([result isKindOfClass:[NSDate class]]) {
+        if (marshalToPrimitive && [result isKindOfClass:[NSDate class]]) {
             Local<Context> context = isolate->GetCurrentContext();
             double time = [result timeIntervalSince1970] * 1000.0;
             Local<Value> date;

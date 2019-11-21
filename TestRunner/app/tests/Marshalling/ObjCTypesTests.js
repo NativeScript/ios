@@ -114,6 +114,12 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('2001-09-09 01:46:40 +0000');
     });
 
+    it("Members of NSDate that return instancetype should not be marshalled to javascript dates", () => {
+        let actual = NSDate.date();
+        expect(actual).not.toEqual(null);
+        expect(typeof actual.timeIntervalSinceDate).toEqual("function");
+    });
+
     it('javascript functions round trip through the native as blocks preserving equality', function() {
         function f() {
             TNSLog('called');
