@@ -68,12 +68,16 @@ void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& 
     Persistent<Value>* val = nullptr;
     BaseDataWrapper* typeWrapper = nullptr;
     if (info.Length() == 1) {
-        val = new Persistent<Value>(isolate, info[0]);
+        if (!info[0]->IsNullOrUndefined()) {
+            val = new Persistent<Value>(isolate, info[0]);
+        }
     } else if (info.Length() > 1) {
-        Local<Value> typeValue = info[0];
-        typeWrapper = tns::GetValue(isolate, typeValue);
-        assert(typeWrapper != nullptr);
-        val = new Persistent<Value>(isolate, info[1]);
+        if (!info[0]->IsNullOrUndefined() && !info[1]->IsNullOrUndefined()) {
+            Local<Value> typeValue = info[0];
+            typeWrapper = tns::GetValue(isolate, typeValue);
+            assert(typeWrapper != nullptr);
+            val = new Persistent<Value>(isolate, info[1]);
+        }
     }
 
     ReferenceWrapper* wrapper = new ReferenceWrapper(typeWrapper, val);

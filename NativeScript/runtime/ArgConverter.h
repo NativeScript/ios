@@ -12,7 +12,12 @@ class ArgConverter;
 struct MethodCallbackWrapper {
 public:
     MethodCallbackWrapper(v8::Isolate* isolate, v8::Persistent<v8::Value>* callback, const uint8_t initialParamIndex, const uint8_t paramsCount, const TypeEncoding* typeEncoding)
-        : isolate_(isolate), callback_(callback), initialParamIndex_(initialParamIndex), paramsCount_(paramsCount), typeEncoding_(typeEncoding) {}
+        : isolate_(isolate),
+          callback_(callback),
+          initialParamIndex_(initialParamIndex),
+          paramsCount_(paramsCount),
+          typeEncoding_(typeEncoding) {
+    }
     v8::Isolate* isolate_;
     v8::Persistent<v8::Value>* callback_;
     const uint8_t initialParamIndex_;
@@ -43,6 +48,7 @@ private:
     static bool CanInvoke(v8::Isolate* isolate, const MethodMeta* candidate, const v8::FunctionCallbackInfo<v8::Value>& info);
     static void IndexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& args);
     static void IndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& args);
+    static bool IsErrorOutParameter(const TypeEncoding* typeEncoding);
 };
 
 }

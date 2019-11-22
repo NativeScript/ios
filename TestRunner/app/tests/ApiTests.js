@@ -251,59 +251,59 @@ describe(module.id, function () {
        expect(NSObject.isSubclassOfClass.length).toBe(1);
   });
 
-//    it("ArgumentsCount", function () {
-//        expect(function () {
-//            NSObject.alloc().init(3);
-//        }).toThrowError();
-//    });
+   it("ArgumentsCount", function () {
+       expect(function () {
+           NSObject.alloc().init(3);
+       }).toThrowError();
+   });
 
-//     it("NSError", function () {
-//         expect(function () {
-//             TNSApi.new().methodError(0);
-//         }).not.toThrow();
+    it("NSError", function () {
+        expect(function () {
+            TNSApi.new().methodError(0);
+        }).not.toThrow();
 
-//         var isThrown = false;
-//         try {
-//             TNSApi.new().methodError(1);
-//         } catch (e) {
-//             isThrown = true;
-//             expect(e instanceof interop.NSErrorWrapper).toBe(true);
-//             expect(e.stack).toEqual(jasmine.any(String));
-//         } finally {
-//             expect(isThrown).toBe(true);
-//         }
+        var isThrown = false;
+        try {
+            TNSApi.new().methodError(1);
+        } catch (e) {
+            isThrown = true;
+            // expect(e instanceof interop.NSErrorWrapper).toBe(true);
+            expect(e.stack).toEqual(jasmine.any(String));
+        } finally {
+            expect(isThrown).toBe(true);
+        }
 
-//         expect(function () {
-//             TNSApi.new().methodError(1, null);
-//         }).not.toThrow();
+        expect(function () {
+            TNSApi.new().methodError(1, null);
+        }).not.toThrow();
 
-//         expect(function () {
-//             TNSApi.new().methodError(1, 2, 3);
-//         }).toThrowError(/arguments count/);
+        expect(function () {
+            TNSApi.new().methodError(1, 2, 3);
+        }).toThrowError(/arguments count/);
 
-//         var errorRef = new interop.Reference();
-//         TNSApi.new().methodError(1, errorRef);
-//         expect(errorRef.value instanceof NSError).toBe(true);
-//     });
+        var errorRef = new interop.Reference();
+        TNSApi.new().methodError(1, errorRef);
+        expect(errorRef.value instanceof NSError).toBe(true);
+    });
 
-//     it("NSErrorOverride", function () {
-//         var JSApi = TNSApi.extend({
-//             methodError: function (x) {
-//                 TNSLog(x.toString());
+    it("NSErrorOverride", function () {
+        var JSApi = TNSApi.extend({
+            methodError: function (x) {
+                TNSLog(x.toString());
 
-//                 if (x !== 0) {
-//                     throw new Error("JS error");
-//                 }
-//             }
-//         });
+                if (x !== 0) {
+                    throw new Error("JS error");
+                }
+            }
+        });
 
-//         TNSTestNativeCallbacks.apiNSErrorOverride(JSApi.new());
-//         expect(TNSGetOutput()).toBe("011TNSErrorDomain");
+        TNSTestNativeCallbacks.apiNSErrorOverride(JSApi.new());
+        expect(TNSGetOutput()).toBe("011TNSErrorDomain");
 
-//         expect(function () {
-//             JSApi.new().methodError(1);
-//         }).toThrowError(/JS error/);
-//     });
+        expect(function () {
+            JSApi.new().methodError(1);
+        }).toThrowError(/JS error/);
+    });
 
 //     it("NSErrorExpose", function () {
 //         var JSApi = TNSApi.extend({

@@ -39,7 +39,6 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         callSuper = isMethodCallback && it != cache->ClassPrototypes.end();
     }
 
-    // TODO: Take into account an optional error out parameter when considering for method overloads - meta->hasErrorOutParameter()
     if (args.size() != meta->encodings()->count - 1) {
         // Arguments number mismatch -> search for a possible method overload in the class hierarchy
         std::string methodName = meta->jsName();
@@ -56,6 +55,15 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
                 }
             }
         }
+    }
+
+    int argsCount = meta->encodings()->count - 1;
+    if ((!meta->hasErrorOutParameter() && args.size() != argsCount) ||
+        (meta->hasErrorOutParameter() && args.size() != argsCount && args.size() != argsCount - 1)) {
+        std::ostringstream errorStream;
+        errorStream << "Actual arguments count: \"" << argsCount << ". Expected: \"" << args.size() << "\".";
+        std::string errorMessage = errorStream.str();
+        throw NativeScriptException(errorMessage);
     }
 
     return Interop::CallFunction(isolate, meta, target, klass, args, callSuper);
@@ -83,10 +91,18 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         ObjectWeakCallbackState* weakCallbackState = new ObjectWeakCallbackState(poCallback);
         poCallback->SetWeak(weakCallbackState, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
 
+        bool hasErrorOutParameter = false;
+
         std::vector<Local<Value>> v8Args;
         const TypeEncoding* typeEncoding = data->typeEncoding_;
         for (int i = 0; i < data->paramsCount_; i++) {
             typeEncoding = typeEncoding->next();
+            if (i == data->paramsCount_ - 1 && ArgConverter::IsErrorOutParameter(typeEncoding)) {
+                hasErrorOutParameter = true;
+                // No need to provide the NSError** parameter to the javascript callback
+                continue;
+            }
+
             int argIndex = i + data->initialParamIndex_;
 
             uint8_t* argBuffer = (uint8_t*)argValues[argIndex];
@@ -128,12 +144,32 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
         Local<Value> result;
         Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
+        TryCatch tc(isolate);
         if (!callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result)) {
+            if (hasErrorOutParameter && tc.HasCaught()) {
+                Local<Value> exception = tc.Exception();
+                std::string message = tns::ToString(isolate, exception);
+
+                int errorParamIndex = data->initialParamIndex_ + data->paramsCount_ - 1;
+                void* errorParam = argValues[errorParamIndex];
+                NSError*__strong** outPtr = static_cast<NSError*__strong**>(errorParam);
+                if (outPtr && *outPtr) {
+                    NSError* error = [NSError errorWithDomain:@"TNSErrorDomain" code:164 userInfo:@{ @"TNSJavaScriptError": [NSString stringWithUTF8String:message.c_str()] }];
+                    **static_cast<NSError*__strong**>(outPtr) = error;
+                }
+
+                tc.Reset();
+            }
+
             memset(retValue, 0, cif->rtype->size);
             return;
         }
 
         ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_);
+
+        if (tc.HasCaught()) {
+            tc.ReThrow();
+        }
     };
 
     if ([NSThread isMainThread] || Runtime::IsWorker()) {
@@ -720,6 +756,24 @@ void ArgConverter::FindMethodOverloads(Class klass, std::string methodName, Memb
         Class baseClass = objc_getClass(interfaceMeta->baseName());
         ArgConverter::FindMethodOverloads(baseClass, methodName, type, overloads);
     }
+}
+
+bool ArgConverter::IsErrorOutParameter(const TypeEncoding* typeEncoding) {
+    if (typeEncoding->type != BinaryTypeEncodingType::PointerEncoding) {
+        return false;
+    }
+
+    const TypeEncoding* innerTypeEncoding = typeEncoding->details.pointer.getInnerType();
+    if (innerTypeEncoding->type != BinaryTypeEncodingType::InterfaceDeclarationReference) {
+        return false;
+    }
+
+    const char* name = innerTypeEncoding->details.declarationReference.name.valuePtr();
+    if (name == nullptr) {
+        return false;
+    }
+
+    return strcmp(name, "NSError") == 0;
 }
 
 }

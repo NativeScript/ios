@@ -44,7 +44,7 @@ private:
     static v8::Local<v8::Value> StructToValue(v8::Isolate* isolate, void* result, StructInfo structInfo, bool copyStructs);
     static const TypeEncoding* CreateEncoding(BinaryTypeEncodingType type);
     static v8::Local<v8::Value> HandleOf(v8::Isolate* isolate, v8::Local<v8::Value> value);
-    static v8::Local<v8::Value> CallFunctionInternal(v8::Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<v8::Local<v8::Value>> args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType);
+    static v8::Local<v8::Value> CallFunctionInternal(v8::Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<v8::Local<v8::Value>> args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType, bool provideErrorOurParameter = false);
     static bool IsNumbericType(BinaryTypeEncodingType type);
 
     template <typename T>

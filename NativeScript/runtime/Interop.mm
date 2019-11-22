@@ -86,7 +86,9 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const MethodMeta* meta, id 
         functionPointer = (void*)objc_msgSend;
     }
 
-    return Interop::CallFunctionInternal(isolate, isPrimitiveFunction, functionPointer, typeEncoding, args, target, clazz, selector, callSuper, metaType);
+    bool provideErrorOutParameter = meta->hasErrorOutParameter() && args.size() < meta->encodings()->count - 1;
+
+    return Interop::CallFunctionInternal(isolate, isPrimitiveFunction, functionPointer, typeEncoding, args, target, clazz, selector, callSuper, metaType, provideErrorOutParameter);
 }
 
 id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, const std::vector<Local<Value>> args) {
@@ -1226,12 +1228,13 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
     return result.As<v8::Array>();
 }
 
-Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType) {
+Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType, bool provideErrorOurParameter) {
     int initialParameterIndex = isPrimitiveFunction ? 0 : 2;
 
     int argsCount = initialParameterIndex + (int)args.size();
+    int cifArgsCount = provideErrorOurParameter ? argsCount + 1 : argsCount;
 
-    ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, argsCount);
+    ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, cifArgsCount);
 
     FFICall call(cif);
 
@@ -1280,11 +1283,27 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
         Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
     }
 
+    void* errorRef = nullptr;
+    if (provideErrorOurParameter) {
+        void* dest = call.ArgumentBuffer(argsCount);
+        errorRef = malloc(ffi_type_pointer.size);
+        Interop::SetValue(dest, errorRef);
+    }
+
     @try {
         ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
     } @catch (NSException* e) {
         std::string message = [[e description] UTF8String];
         throw NativeScriptException(message);
+    }
+
+    if (errorRef != nullptr) {
+        NSError*__strong* errorPtr = (NSError*__strong*)errorRef;
+        NSError* error = errorPtr[0];
+        std::free(errorRef);
+        if (error) {
+            throw NativeScriptException([[error localizedDescription] UTF8String]);
+        }
     }
 
     @autoreleasepool {

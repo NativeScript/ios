@@ -162,7 +162,7 @@
 + (void)apiNSErrorOverride:(TNSApi*)object {
     {
         NSError* error = nil;
-        NSAssert([object method:0 error:&error] == true, NSStringFromSelector(_cmd));
+        NSAssert([object method:0 error:&error] == false, NSStringFromSelector(_cmd));
         NSAssert(error == nil, NSStringFromSelector(_cmd));
     }
 
