@@ -270,59 +270,68 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
     BinaryTypeEncodingType type = typeEncoding->type;
     switch (type) {
         case BinaryTypeEncodingType::VoidEncoding: {
-            return "v";
+            return @encode(void);
         }
         case BinaryTypeEncodingType::BoolEncoding: {
-            return "B";
+            return @encode(bool);
         }
         case BinaryTypeEncodingType::UnicharEncoding:
         case BinaryTypeEncodingType::UShortEncoding: {
-            return "S";
+            return @encode(ushort);
         }
         case BinaryTypeEncodingType::ShortEncoding: {
-            return "s";
+            return @encode(short);
         }
         case BinaryTypeEncodingType::UIntEncoding: {
-            return "I";
+            return @encode(uint);
         }
         case BinaryTypeEncodingType::IntEncoding: {
-            return "i";
+            return @encode(int);
         }
+#if defined(__LP64__)
         case BinaryTypeEncodingType::ULongEncoding: {
-            return "L";
+            return @encode(uint64_t);
         }
         case BinaryTypeEncodingType::LongEncoding: {
-            return "l";
+            return @encode(int64_t);
         }
+#else
+        case BinaryTypeEncodingType::ULongEncoding: {
+            return @encode(uint32_t);
+        }
+        case BinaryTypeEncodingType::LongEncoding: {
+            return @encode(int32_t);
+        }
+#endif
         case BinaryTypeEncodingType::ULongLongEncoding: {
-            return "Q";
+            return @encode(unsigned long long);
         }
         case BinaryTypeEncodingType::LongLongEncoding: {
-            return "q";
+            return @encode(long long);
         }
         case BinaryTypeEncodingType::UCharEncoding: {
-            return "C";
+            return @encode(unsigned char);
         }
         case BinaryTypeEncodingType::CharEncoding: {
-            return "c";
+            return @encode(char);
         }
         case BinaryTypeEncodingType::FloatEncoding: {
-            return "f";
+            return @encode(float);
         }
         case BinaryTypeEncodingType::DoubleEncoding: {
-            return "d";
+            return @encode(double);
         }
         case BinaryTypeEncodingType::CStringEncoding: {
-            return "*";
+            return @encode(char*);
         }
         case BinaryTypeEncodingType::ClassEncoding: {
-            return "#";
+            return @encode(Class);
         }
         case BinaryTypeEncodingType::SelectorEncoding: {
-            return ":";
+            return @encode(SEL);
         }
         case BinaryTypeEncodingType::BlockEncoding: {
-            return "@?";
+            return @encode(dispatch_block_t);
         }
         case BinaryTypeEncodingType::StructDeclarationReference: {
             const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
@@ -341,7 +350,26 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
             return ss.str();
         }
         case BinaryTypeEncodingType::PointerEncoding: {
-            return "^";
+            std::stringstream ss;
+            ss << "^";
+            const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
+            ss << GetTypeEncoding(innerType);
+            return ss.str();
+        }
+        case BinaryTypeEncodingType::ConstantArrayEncoding: {
+            const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
+            std::stringstream ss;
+            ss << "[";
+            ss << typeEncoding->details.constantArray.size << GetTypeEncoding(innerType);
+            ss << "]";
+            return ss.str();
+        }
+        case BinaryTypeEncodingType::IncompleteArrayEncoding: {
+            const TypeEncoding* innerType = typeEncoding->details.incompleteArray.getInnerType();
+            std::stringstream ss;
+            ss << "^";
+            ss << GetTypeEncoding(innerType);
+            return ss.str();
         }
         case BinaryTypeEncodingType::ProtocolEncoding:
         case BinaryTypeEncodingType::InterfaceDeclarationReference:
