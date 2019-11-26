@@ -144,9 +144,15 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
         Local<Value> result;
         Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
-        TryCatch tc(isolate);
-        if (!callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result)) {
-            if (hasErrorOutParameter && tc.HasCaught()) {
+
+        bool success = false;
+        if (hasErrorOutParameter) {
+            // We don't want the global error handler (NativeScriptException::OnUncaughtError) to be called for javascript exceptions occuring inside
+            // methods that have NSError* parameters. Those js errors will be marshalled to NSError* and sent
+            // directly to the calling native code. The v8::TryCatch statement prevents the global handler to be called.
+            TryCatch tc(isolate);
+            success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
+            if (!success && tc.HasCaught()) {
                 Local<Value> exception = tc.Exception();
                 std::string message = tns::ToString(isolate, exception);
 
@@ -157,19 +163,17 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
                     NSError* error = [NSError errorWithDomain:@"TNSErrorDomain" code:164 userInfo:@{ @"TNSJavaScriptError": [NSString stringWithUTF8String:message.c_str()] }];
                     **static_cast<NSError*__strong**>(outPtr) = error;
                 }
-
-                tc.Reset();
             }
+        } else {
+            success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
+        }
 
+        if (!success) {
             memset(retValue, 0, cif->rtype->size);
             return;
         }
 
         ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_);
-
-        if (tc.HasCaught()) {
-            tc.ReThrow();
-        }
     };
 
     if ([NSThread isMainThread] || Runtime::IsWorker()) {
