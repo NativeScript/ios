@@ -47,6 +47,14 @@ do
     OUTFOLDER=out.gn/$CURRENT_ARCH-release
     ar r $OUTFOLDER/obj/third_party/inspector_protocol/libinspector_protocol.a $OUTFOLDER/obj/third_party/inspector_protocol/crdtp/*.o
     cp "$OUTFOLDER/obj/third_party/inspector_protocol/libinspector_protocol.a" "$DIST/$CURRENT_ARCH"
+
+    ZLIB_INPUT="$OUTFOLDER/obj/third_party/zlib/zlib/*.o"
+    if [ $CURRENT_ARCH = "arm64" ]; then
+        ZLIB_INPUT="$ZLIB_INPUT $OUTFOLDER/obj/third_party/zlib/zlib_adler32_simd/*.o"
+    fi
+
+    ar r $OUTFOLDER/obj/third_party/zlib/libzip.a $ZLIB_INPUT
+    cp "$OUTFOLDER/obj/third_party/zlib/libzip.a" "$DIST/$CURRENT_ARCH"
 done
 
 popd

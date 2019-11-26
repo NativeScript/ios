@@ -1148,13 +1148,12 @@ std::unique_ptr<Serializable> InternalResponse::createErrorResponse(int callId, 
 void InternalResponse::AppendSerialized(std::vector<uint8_t>* out) const
 {
     using v8_crdtp::cbor::NewCBOREncoder;
-    using v8_crdtp::StreamingParserHandler;
+    using v8_crdtp::ParserHandler;
     using v8_crdtp::Status;
     using v8_crdtp::SpanFrom;
 
     Status status;
-    std::unique_ptr<StreamingParserHandler> encoder =
-        NewCBOREncoder(out, &status);
+    std::unique_ptr<ParserHandler> encoder = NewCBOREncoder(out, &status);
     encoder->HandleMapBegin();
     if (m_method) {
         encoder->HandleString8(SpanFrom("method"));
