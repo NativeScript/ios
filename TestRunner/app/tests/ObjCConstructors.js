@@ -62,6 +62,18 @@ describe("Constructing Objective-C classes with new operator", function () {
         expect(actual).toBe("initWithStringOptional:andString: s1 s2 calledinitWithStringOptional:andString: s3 s4 called");
     });
 
+    it("With constructor tokens", () => {
+        var obj = {
+            stringOptional: "s1",
+            andString: "s2"
+        };
+        var instance1 = new TNSCInterface(obj);
+        var instance2 = new (TNSCInterface.extend({}))(obj);
+
+        var actual = TNSGetOutput();
+        expect(actual).toBe("initWithStringOptional:andString: s1 s2 calledinitWithStringOptional:andString: s1 s2 called");
+    });
+
     it("initAWithIntNotImplemented:andInt:andInt and initZWithIntNotImplemented:andInt:andInt from protocol should be missing", function () {
         expect(() => new TNSCInterface(1, 2, 3)).toThrowError("No initializer found that matches constructor invocation.");
         expect(() => new (TNSCInterface.extend({}))(1, 2, 3)).toThrowError("No initializer found that matches constructor invocation.");

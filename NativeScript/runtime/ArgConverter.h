@@ -1,6 +1,7 @@
 #ifndef ArgConverter_h
 #define ArgConverter_h
 
+#include <vector>
 #include "libffi.h"
 #include "Common.h"
 #include "DataWrapper.h"
@@ -43,9 +44,10 @@ private:
     static v8::Local<v8::Function> CreateEmptyInstanceFunction(v8::Isolate* isolate, v8::GenericNamedPropertyGetterCallback propertyGetter = nullptr, v8::GenericNamedPropertySetterCallback propertySetter = nullptr);
     static v8::Local<v8::Object> CreateEmptyInstance(v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
     static void FindMethodOverloads(Class klass, std::string methodName, MemberType type, std::vector<const MethodMeta*>& overloads);
-    static const MethodMeta* FindInitializer(v8::Isolate* isolate, Class klass, const InterfaceMeta* interfaceMeta, const v8::FunctionCallbackInfo<v8::Value>& info);
+    static const MethodMeta* FindInitializer(v8::Isolate* isolate, Class klass, const InterfaceMeta* interfaceMeta, const v8::FunctionCallbackInfo<v8::Value>& info, std::vector<v8::Local<v8::Value>>& args);
     static bool CanInvoke(v8::Isolate* isolate, const TypeEncoding* typeEncoding, v8::Local<v8::Value> arg);
     static bool CanInvoke(v8::Isolate* isolate, const MethodMeta* candidate, const v8::FunctionCallbackInfo<v8::Value>& info);
+    static std::vector<v8::Local<v8::Value>> GetInitializerArgs(v8::Isolate* isolate, v8::Local<v8::Object> obj, std::string& constructorTokens);
     static void IndexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& args);
     static void IndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& args);
     static bool IsErrorOutParameter(const TypeEncoding* typeEncoding);

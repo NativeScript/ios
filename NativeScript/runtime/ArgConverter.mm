@@ -326,14 +326,13 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
     }
 
     if (result == nil && interfaceMeta != nullptr) {
-        const MethodMeta* initializer = ArgConverter::FindInitializer(isolate, klass, interfaceMeta, info);
+        std::vector<Local<Value>> args;
+        const MethodMeta* initializer = ArgConverter::FindInitializer(isolate, klass, interfaceMeta, info, args);
         if (initializer == nullptr) {
             return;
         }
 
         result = [klass alloc];
-
-        std::vector<Local<Value>> args = tns::ArgsToVector(info);
 
         result = Interop::CallInitializer(isolate, initializer, result, klass, args);
     }
@@ -358,12 +357,29 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
     }
 }
 
-const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, const InterfaceMeta* interfaceMeta, const FunctionCallbackInfo<Value>& info) {
+const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, const InterfaceMeta* interfaceMeta, const FunctionCallbackInfo<Value>& info, std::vector<Local<Value>>& args) {
     std::vector<const MethodMeta*> candidates;
+    args = tns::ArgsToVector(info);
+    std::vector<Local<Value>> initializerArgs;
+    std::string constructorTokens;
+    if (info.Length() == 1 && info[0]->IsObject() && tns::GetValue(isolate, info[0]) == nullptr) {
+        initializerArgs = GetInitializerArgs(isolate, info[0].As<Object>(), constructorTokens);
+    }
+
     do {
         KnownUnknownClassPair klasses(klass);
         std::vector<const MethodMeta*> initializers = interfaceMeta->initializersWithProtocols(klasses, ProtocolMetas());
         for (const MethodMeta* candidate: initializers) {
+            if (candidate->encodings()->count > 2) {
+                const char* expectedTokens = candidate->constructorTokens();
+                if (strcmp(expectedTokens, constructorTokens.c_str()) == 0) {
+                    candidates.clear();
+                    candidates.push_back(candidate);
+                    args = initializerArgs;
+                    break;
+                }
+            }
+
             if (ArgConverter::CanInvoke(isolate, candidate, info)) {
                 candidates.push_back(candidate);
             }
@@ -478,6 +494,30 @@ bool ArgConverter::CanInvoke(Isolate* isolate, const TypeEncoding* typeEncoding,
     }
 
     return false;
+}
+
+std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Isolate* isolate, Local<Object> obj, std::string& constructorTokens) {
+    std::vector<Local<Value>> args;
+    constructorTokens = "";
+    Local<Context> context = obj->CreationContext();
+    Local<v8::Array> properties;
+    if (obj->GetOwnPropertyNames(context).ToLocal(&properties)) {
+        std::stringstream ss;
+        for (uint32_t i = 0; i < properties->Length(); i++) {
+            Local<Value> propertyName;
+            if (properties->Get(context, i).ToLocal(&propertyName)) {
+                std::string name = tns::ToString(isolate, propertyName);
+                ss << name << ":";
+                Local<Value> propertyValue;
+                bool ok = obj->Get(context, propertyName).ToLocal(&propertyValue);
+                assert(ok);
+                args.push_back(propertyValue);
+            }
+        }
+        constructorTokens = ss.str();
+    }
+
+    return args;
 }
 
 Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver) {
