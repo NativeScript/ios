@@ -4673,29 +4673,6 @@ class V8_EXPORT WasmModuleObject : public Object {
   WasmModuleObject() = delete;
 
   /**
-   * An opaque, native heap object for transferring wasm modules. It
-   * supports move semantics, and does not support copy semantics.
-   */
-  using TransferrableModule V8_DEPRECATED("Use CompiledWasmModule directly") =
-      CompiledWasmModule;
-
-  /**
-   * Get an in-memory, non-persistable, and context-independent (meaning,
-   * suitable for transfer to another Isolate and Context) representation
-   * of this wasm compiled module.
-   */
-  V8_DEPRECATED("Use GetCompiledModule")
-  TransferrableModule GetTransferrableModule();
-
-  /**
-   * Efficiently re-create a WasmModuleObject, without recompiling, from
-   * a TransferrableModule.
-   */
-  V8_DEPRECATED("Use FromCompiledModule")
-  static MaybeLocal<WasmModuleObject> FromTransferrableModule(
-      Isolate* isolate, const TransferrableModule&);
-
-  /**
    * Efficiently re-create a WasmModuleObject, without recompiling, from
    * a CompiledWasmModule.
    */
@@ -6327,6 +6304,7 @@ class V8_EXPORT FunctionTemplate : public Template {
       SideEffectType side_effect_type = SideEffectType::kHasSideEffect);
 
   /** Get a template included in the snapshot by index. */
+  V8_DEPRECATED("Use v8::Isolate::GetDataFromSnapshotOnce instead")
   static MaybeLocal<FunctionTemplate> FromSnapshot(Isolate* isolate,
                                                    size_t index);
 
@@ -6618,6 +6596,7 @@ class V8_EXPORT ObjectTemplate : public Template {
       Local<FunctionTemplate> constructor = Local<FunctionTemplate>());
 
   /** Get a template included in the snapshot by index. */
+  V8_DEPRECATED("Use v8::Isolate::GetDataFromSnapshotOnce instead")
   static MaybeLocal<ObjectTemplate> FromSnapshot(Isolate* isolate,
                                                  size_t index);
 
@@ -8257,6 +8236,19 @@ class V8_EXPORT Isolate {
     kRegExpExecCalledOnSlowRegExp = 79,
     kRegExpReplaceCalledOnSlowRegExp = 80,
     kDisplayNames = 81,
+    // Temporary kCallInDetachedWindowBy* counters are for reporting function
+    // calls within contexts marked using |SetDetachedWindowReason|.
+    // TODO(bartekn,chromium:1018156): Remove once not needed.
+    kCallInDetachedWindowByNavigation = 82,
+    kCallInDetachedWindowByNavigationAfter10s = 83,
+    kCallInDetachedWindowByNavigationAfter1min = 84,
+    kCallInDetachedWindowByClosing = 85,
+    kCallInDetachedWindowByClosingAfter10s = 86,
+    kCallInDetachedWindowByClosingAfter1min = 87,
+    kCallInDetachedWindowByOtherReason = 88,
+    kCallInDetachedWindowByOtherReasonAfter10s = 89,
+    kCallInDetachedWindowByOtherReasonAfter1min = 90,
+    kSharedArrayBufferConstructed = 91,
 
     // If you add new values here, you'll also need to update Chromium's:
     // web_feature.mojom, use_counter_callback.cc, and enums.xml. V8 changes to
@@ -9596,6 +9588,7 @@ class V8_EXPORT SnapshotCreator {
    * Add a template to be included in the snapshot blob.
    * \returns the index of the template in the snapshot blob.
    */
+  V8_DEPRECATED("use AddData instead")
   size_t AddTemplate(Local<Template> template_obj);
 
   /**

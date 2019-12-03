@@ -94,7 +94,6 @@
 		C247C34822F828E3001D2CA2 /* custom-preview.cc in Sources */ = {isa = PBXBuildFile; fileRef = C247C2BD22F828E2001D2CA2 /* custom-preview.cc */; };
 		C247C34922F828E3001D2CA2 /* v8-string-conversions.cc in Sources */ = {isa = PBXBuildFile; fileRef = C247C2BE22F828E2001D2CA2 /* v8-string-conversions.cc */; };
 		C247C34A22F828E3001D2CA2 /* search-util.cc in Sources */ = {isa = PBXBuildFile; fileRef = C247C2BF22F828E2001D2CA2 /* search-util.cc */; };
-		C247C34B22F828E3001D2CA2 /* v8-inspector-protocol-encoding.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2C022F828E2001D2CA2 /* v8-inspector-protocol-encoding.h */; };
 		C247C34C22F828E3001D2CA2 /* v8-debugger-script.cc in Sources */ = {isa = PBXBuildFile; fileRef = C247C2C122F828E2001D2CA2 /* v8-debugger-script.cc */; };
 		C247C34D22F828E3001D2CA2 /* v8-debugger-agent-impl.cc in Sources */ = {isa = PBXBuildFile; fileRef = C247C2C222F828E2001D2CA2 /* v8-debugger-agent-impl.cc */; };
 		C247C34E22F828E3001D2CA2 /* inspected-context.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2C322F828E2001D2CA2 /* inspected-context.h */; };
@@ -153,7 +152,6 @@
 		C247C38322F828E3001D2CA2 /* v8-heap-profiler-agent-impl.cc in Sources */ = {isa = PBXBuildFile; fileRef = C247C2F922F828E2001D2CA2 /* v8-heap-profiler-agent-impl.cc */; };
 		C247C38422F828E3001D2CA2 /* v8-network-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2FA22F828E2001D2CA2 /* v8-network-agent-impl.h */; };
 		C247C38522F828E3001D2CA2 /* v8-dom-agent-impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C247C2FB22F828E2001D2CA2 /* v8-dom-agent-impl.cpp */; };
-		C247C38622F828E3001D2CA2 /* v8-inspector-protocol-encoding.cc in Sources */ = {isa = PBXBuildFile; fileRef = C247C2FC22F828E2001D2CA2 /* v8-inspector-protocol-encoding.cc */; };
 		C247C38722F828E3001D2CA2 /* string-16.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2FD22F828E2001D2CA2 /* string-16.h */; };
 		C247C38822F828E3001D2CA2 /* v8-overlay-agent-impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C247C2FE22F828E2001D2CA2 /* v8-overlay-agent-impl.cpp */; };
 		C247C38922F828E3001D2CA2 /* v8-debugger-script.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2FF22F828E2001D2CA2 /* v8-debugger-script.h */; };
@@ -612,7 +610,6 @@
 		C247C2BD22F828E2001D2CA2 /* custom-preview.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "custom-preview.cc"; sourceTree = "<group>"; };
 		C247C2BE22F828E2001D2CA2 /* v8-string-conversions.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-string-conversions.cc"; sourceTree = "<group>"; };
 		C247C2BF22F828E2001D2CA2 /* search-util.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "search-util.cc"; sourceTree = "<group>"; };
-		C247C2C022F828E2001D2CA2 /* v8-inspector-protocol-encoding.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-inspector-protocol-encoding.h"; sourceTree = "<group>"; };
 		C247C2C122F828E2001D2CA2 /* v8-debugger-script.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-debugger-script.cc"; sourceTree = "<group>"; };
 		C247C2C222F828E2001D2CA2 /* v8-debugger-agent-impl.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-debugger-agent-impl.cc"; sourceTree = "<group>"; };
 		C247C2C322F828E2001D2CA2 /* inspected-context.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "inspected-context.h"; sourceTree = "<group>"; };
@@ -671,7 +668,6 @@
 		C247C2F922F828E2001D2CA2 /* v8-heap-profiler-agent-impl.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-heap-profiler-agent-impl.cc"; sourceTree = "<group>"; };
 		C247C2FA22F828E2001D2CA2 /* v8-network-agent-impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-network-agent-impl.h"; sourceTree = "<group>"; };
 		C247C2FB22F828E2001D2CA2 /* v8-dom-agent-impl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-dom-agent-impl.cpp"; sourceTree = "<group>"; };
-		C247C2FC22F828E2001D2CA2 /* v8-inspector-protocol-encoding.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-inspector-protocol-encoding.cc"; sourceTree = "<group>"; };
 		C247C2FD22F828E2001D2CA2 /* string-16.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "string-16.h"; sourceTree = "<group>"; };
 		C247C2FE22F828E2001D2CA2 /* v8-overlay-agent-impl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-overlay-agent-impl.cpp"; sourceTree = "<group>"; };
 		C247C2FF22F828E2001D2CA2 /* v8-debugger-script.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-debugger-script.h"; sourceTree = "<group>"; };
@@ -1285,8 +1281,6 @@
 				C247C2F922F828E2001D2CA2 /* v8-heap-profiler-agent-impl.cc */,
 				C247C2C622F828E2001D2CA2 /* v8-inspector-impl.h */,
 				C247C2F822F828E2001D2CA2 /* v8-inspector-impl.cc */,
-				C247C2C022F828E2001D2CA2 /* v8-inspector-protocol-encoding.h */,
-				C247C2FC22F828E2001D2CA2 /* v8-inspector-protocol-encoding.cc */,
 				C247C2CD22F828E2001D2CA2 /* v8-inspector-session-impl.h */,
 				C247C30922F828E2001D2CA2 /* v8-inspector-session-impl.cc */,
 				C247C2B122F828E2001D2CA2 /* v8-log-agent-impl.h */,
@@ -2000,7 +1994,6 @@
 				C247C3A422F828E3001D2CA2 /* atomicops_internals_portable.h in Headers */,
 				C2B30FD9238418CA009D6A46 /* json_platform.h in Headers */,
 				C247C37B22F828E3001D2CA2 /* v8-profiler-agent-impl.h in Headers */,
-				C247C34B22F828E3001D2CA2 /* v8-inspector-protocol-encoding.h in Headers */,
 				C247C39722F828E3001D2CA2 /* allocation.h in Headers */,
 				C247C38B22F828E3001D2CA2 /* v8-string-conversions.h in Headers */,
 				C247C35C22F828E3001D2CA2 /* v8-dom-agent-impl.h in Headers */,
@@ -2582,7 +2575,6 @@
 				C247C35D22F828E3001D2CA2 /* CSS.cpp in Sources */,
 				C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */,
 				C247C36222F828E3001D2CA2 /* Page.cpp in Sources */,
-				C247C38622F828E3001D2CA2 /* v8-inspector-protocol-encoding.cc in Sources */,
 				C2229973235449B400C1DFD6 /* InspectorServer.mm in Sources */,
 				C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */,
 				C247C38122F828E3001D2CA2 /* v8-value-utils.cc in Sources */,

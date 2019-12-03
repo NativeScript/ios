@@ -45,7 +45,7 @@ for CURRENT_ARCH in ${ARCH_ARR[@]}
 do
     mkdir -p "$DIST/$CURRENT_ARCH"
     OUTFOLDER=out.gn/$CURRENT_ARCH-release
-    ar r $OUTFOLDER/obj/third_party/inspector_protocol/libinspector_protocol.a $OUTFOLDER/obj/third_party/inspector_protocol/crdtp/*.o
+    ar r $OUTFOLDER/obj/third_party/inspector_protocol/libinspector_protocol.a $OUTFOLDER/obj/third_party/inspector_protocol/crdtp/*.o $OUTFOLDER/obj/third_party/inspector_protocol/crdtp_platform/*.o
     cp "$OUTFOLDER/obj/third_party/inspector_protocol/libinspector_protocol.a" "$DIST/$CURRENT_ARCH"
 
     ZLIB_INPUT="$OUTFOLDER/obj/third_party/zlib/zlib/*.o"
