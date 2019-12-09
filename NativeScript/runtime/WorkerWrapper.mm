@@ -1,3 +1,4 @@
+#include <Foundation/Foundation.h>
 #include "DataWrapper.h"
 #include "Caches.h"
 #include "Helpers.h"
@@ -7,13 +8,20 @@ using namespace v8;
 
 namespace tns {
 
+static NSOperationQueue* workers_ = nil;
+
+__attribute__((constructor))
+void staticInitMethod() {
+    workers_ = [[NSOperationQueue alloc] init];
+    workers_.maxConcurrentOperationCount = 10;
+}
+
 WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage)
     : mainIsolate_(mainIsolate),
       workerIsolate_(nullptr),
       isRunning_(false),
       isClosing_(false),
       isTerminating_(false),
-      thread_{},
       onMessage_(onMessage) {
 }
 
@@ -48,7 +56,9 @@ void WorkerWrapper::Start(Persistent<Value>* poWorker, std::function<Isolate* ()
     nextId_++;
     this->workerId_ = nextId_;
 
-    this->thread_ = std::thread(&WorkerWrapper::BackgroundLooper, this, func);
+    [workers_ addOperationWithBlock:^{
+        this->BackgroundLooper(func);
+    }];
 
     this->isRunning_ = true;
 }
@@ -187,7 +197,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
             bool success = onErrorFunc->Call(context, v8::Undefined(this->mainIsolate_), 1, args).ToLocal(&result);
             if (!success && tc.HasCaught()) {
                 Local<Value> error = tc.Exception();
-                Log("%s", tns::ToString(this->mainIsolate_, error).c_str());
+                Log(@"%s", tns::ToString(this->mainIsolate_, error).c_str());
                 this->mainIsolate_->ThrowException(error);
             }
         }

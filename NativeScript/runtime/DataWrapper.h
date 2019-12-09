@@ -490,7 +490,6 @@ private:
     bool isRunning_;
     bool isClosing_;
     bool isTerminating_;
-    std::thread thread_;
     std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
     v8::Persistent<v8::Value>* poWorker_;
     ConcurrentQueue queue_;

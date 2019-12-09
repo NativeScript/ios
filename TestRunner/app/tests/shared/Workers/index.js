@@ -211,7 +211,7 @@ describe("TNS Workers", () => {
 
     if (global.NSObject) {
         it("Should create many worker instances without throwing error", (done) => {
-            var workersCount = 10;
+            var workersCount = 50;
             var messagesCount = 100;
             var allWorkersResponseCounter = 0;
 
