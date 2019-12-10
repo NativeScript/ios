@@ -24,7 +24,7 @@ public:
          */
     BinaryHashtable(int size)
     {
-        this->elements = std::vector<std::vector<std::tuple<std::string, MetaFileOffset> > >((unsigned long)((size * 1.25) + .5));
+        this->elements = std::vector<std::vector<std::tuple<std::string, MetaFileOffset>>>(size);
     }
 
     /*

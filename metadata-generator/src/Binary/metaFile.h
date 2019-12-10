@@ -38,9 +38,10 @@ public:
          */
     MetaFile(int size)
     {
+         size = std::max(size, 100);
         this->_globalTableSymbolsJs = std::unique_ptr<BinaryHashtable>(new BinaryHashtable(size));
-        this->_globalTableSymbolsNativeProtocols = std::unique_ptr<BinaryHashtable>(new BinaryHashtable(size/2));
-        this->_globalTableSymbolsNativeInterfaces = std::unique_ptr<BinaryHashtable>(new BinaryHashtable(size/2));
+        this->_globalTableSymbolsNativeProtocols = std::unique_ptr<BinaryHashtable>(new BinaryHashtable(size/10));
+        this->_globalTableSymbolsNativeInterfaces = std::unique_ptr<BinaryHashtable>(new BinaryHashtable(size/10));
         this->_heap = std::shared_ptr<utils::MemoryStream>(new utils::MemoryStream());
         this->_heap->push_byte(0); // mark heap
     }

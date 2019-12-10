@@ -92,7 +92,7 @@ public:
 
         // Serialize Meta objects to binary metadata
         if (!cla_outputBinFile.empty()) {
-            binary::MetaFile file(metasByModules.size());
+            binary::MetaFile file(metaContainer.size() / 10); // Average number of hash collisions: 10 per bucket
             binary::BinarySerializer serializer(&file);
             serializer.serializeContainer(metasByModules);
             file.save(cla_outputBinFile);
@@ -137,7 +137,7 @@ public:
         // (even though the 'suppressIncludeNotFound' setting is false)
         // here we set this explicitly in order to keep the same behavior
         Compiler.getPreprocessor().SetSuppressIncludeNotFoundError(!cla_strictIncludes);
-        
+
         return std::unique_ptr<clang::ASTConsumer>(new MetaGenerationConsumer(Compiler.getASTContext().getSourceManager(), Compiler.getPreprocessor().getHeaderSearchInfo()));
     }
 };
@@ -197,15 +197,15 @@ int main(int argc, const char** argv)
     }
     std::vector<std::string> includePaths;
     std::string umbrellaContent = CreateUmbrellaHeader(clangArgs, includePaths);
-    
+
     if (!cla_inputUmbrellaHeaderFile.empty()) {
         std::ifstream fs(cla_inputUmbrellaHeaderFile);
         umbrellaContent = std::string((std::istreambuf_iterator<char>(fs)),
                                       std::istreambuf_iterator<char>());
     }
-    
+
     clangArgs.insert(clangArgs.end(), includePaths.begin(), includePaths.end());
-    
+
     // Save the umbrella file
     if (!cla_outputUmbrellaHeaderFile.empty()) {
         std::error_code errorCode;
@@ -218,7 +218,7 @@ int main(int argc, const char** argv)
 
     // generate metadata for the intermediate sdk header
     clang::tooling::runToolOnCodeWithArgs(new MetaGenerationFrontendAction(), umbrellaContent, clangArgs, "umbrella.h", "objc-metadata-generator");
-    
+
     std::clock_t end = clock();
     double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
     std::cout << "Done! Running time: " << elapsed_secs << " sec " << std::endl;
