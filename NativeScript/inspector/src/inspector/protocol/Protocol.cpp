@@ -901,11 +901,11 @@ DispatcherBase::WeakPtr::~WeakPtr()
         m_dispatcher->m_weakPtrs.erase(this);
 }
 
-DispatcherBase::Callback::Callback(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, const ProtocolMessage& message)
+DispatcherBase::Callback::Callback(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message)
     : m_backendImpl(std::move(backendImpl))
     , m_callId(callId)
     , m_method(method)
-    , m_message(message) { }
+    , m_message(message.begin(), message.end()) { }
 
 DispatcherBase::Callback::~Callback() = default;
 
@@ -926,7 +926,7 @@ void DispatcherBase::Callback::fallThroughIfActive()
 {
     if (!m_backendImpl || !m_backendImpl->get())
         return;
-    m_backendImpl->get()->channel()->fallThrough(m_callId, m_method, m_message);
+    m_backendImpl->get()->channel()->fallThrough(m_callId, m_method, v8_crdtp::SpanFrom(m_message));
     m_backendImpl = nullptr;
 }
 
@@ -1110,7 +1110,7 @@ bool UberDispatcher::canDispatch(const String& in_method)
     return !!findDispatcher(method);
 }
 
-void UberDispatcher::dispatch(int callId, const String& in_method, std::unique_ptr<Value> parsedMessage, const ProtocolMessage& rawMessage)
+void UberDispatcher::dispatch(int callId, const String& in_method, std::unique_ptr<Value> parsedMessage, v8_crdtp::span<uint8_t> rawMessage)
 {
     String method = in_method;
     auto redirectIt = m_redirects.find(method);

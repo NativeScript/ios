@@ -112,16 +112,16 @@ public:
     }
     ~DispatcherImpl() override { }
     bool canDispatch(const String& method) override;
-    void dispatch(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+    void dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
     std::unordered_map<String, String>& redirects() { return m_redirects; }
 
 protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
     using DispatchMap = std::unordered_map<String, CallHandler>;
     DispatchMap m_dispatchMap;
     std::unordered_map<String, String> m_redirects;
 
-    void getDomains(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void getDomains(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
     Backend* m_backend;
 };
@@ -130,7 +130,7 @@ bool DispatcherImpl::canDispatch(const String& method) {
     return m_dispatchMap.find(method) != m_dispatchMap.end();
 }
 
-void DispatcherImpl::dispatch(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<protocol::DictionaryValue> messageObject)
+void DispatcherImpl::dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject)
 {
     std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     DCHECK(it != m_dispatchMap.end());
@@ -139,7 +139,7 @@ void DispatcherImpl::dispatch(int callId, const String& method, const ProtocolMe
 }
 
 
-void DispatcherImpl::getDomains(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::getDomains(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Schema::Domain>> out_domains;

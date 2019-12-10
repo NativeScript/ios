@@ -950,8 +950,17 @@ public:
     String getName() { return m_name; }
     void setName(const String& value) { m_name = value; }
 
-    protocol::Runtime::RemoteObject* getValue() { return m_value.get(); }
+    bool hasValue() { return m_value.isJust(); }
+    protocol::Runtime::RemoteObject* getValue(protocol::Runtime::RemoteObject* defaultValue) { return m_value.isJust() ? m_value.fromJust() : defaultValue; }
     void setValue(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_value = std::move(value); }
+
+    bool hasGet() { return m_get.isJust(); }
+    protocol::Runtime::RemoteObject* getGet(protocol::Runtime::RemoteObject* defaultValue) { return m_get.isJust() ? m_get.fromJust() : defaultValue; }
+    void setGet(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_get = std::move(value); }
+
+    bool hasSet() { return m_set.isJust(); }
+    protocol::Runtime::RemoteObject* getSet(protocol::Runtime::RemoteObject* defaultValue) { return m_set.isJust() ? m_set.fromJust() : defaultValue; }
+    void setSet(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_set = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override {
@@ -966,8 +975,7 @@ public:
         enum {
             NoFieldsSet = 0,
             NameSet = 1 << 1,
-            ValueSet = 1 << 2,
-            AllFieldsSet = (NameSet | ValueSet | 0)};
+            AllFieldsSet = (NameSet | 0)};
 
 
         PrivatePropertyDescriptorBuilder<STATE | NameSet>& setName(const String& value)
@@ -977,11 +985,22 @@ public:
             return castState<NameSet>();
         }
 
-        PrivatePropertyDescriptorBuilder<STATE | ValueSet>& setValue(std::unique_ptr<protocol::Runtime::RemoteObject> value)
+        PrivatePropertyDescriptorBuilder<STATE>& setValue(std::unique_ptr<protocol::Runtime::RemoteObject> value)
         {
-            static_assert(!(STATE & ValueSet), "property value should not be set yet");
             m_result->setValue(std::move(value));
-            return castState<ValueSet>();
+            return *this;
+        }
+
+        PrivatePropertyDescriptorBuilder<STATE>& setGet(std::unique_ptr<protocol::Runtime::RemoteObject> value)
+        {
+            m_result->setGet(std::move(value));
+            return *this;
+        }
+
+        PrivatePropertyDescriptorBuilder<STATE>& setSet(std::unique_ptr<protocol::Runtime::RemoteObject> value)
+        {
+            m_result->setSet(std::move(value));
+            return *this;
         }
 
         std::unique_ptr<PrivatePropertyDescriptor> build()
@@ -1013,7 +1032,9 @@ private:
     }
 
     String m_name;
-    std::unique_ptr<protocol::Runtime::RemoteObject> m_value;
+    Maybe<protocol::Runtime::RemoteObject> m_value;
+    Maybe<protocol::Runtime::RemoteObject> m_get;
+    Maybe<protocol::Runtime::RemoteObject> m_set;
 };
 
 

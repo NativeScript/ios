@@ -548,8 +548,20 @@ std::unique_ptr<PrivatePropertyDescriptor> PrivatePropertyDescriptor::fromValue(
     errors->setName("name");
     result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     protocol::Value* valueValue = object->get("value");
-    errors->setName("value");
-    result->m_value = ValueConversions<protocol::Runtime::RemoteObject>::fromValue(valueValue, errors);
+    if (valueValue) {
+        errors->setName("value");
+        result->m_value = ValueConversions<protocol::Runtime::RemoteObject>::fromValue(valueValue, errors);
+    }
+    protocol::Value* getValue = object->get("get");
+    if (getValue) {
+        errors->setName("get");
+        result->m_get = ValueConversions<protocol::Runtime::RemoteObject>::fromValue(getValue, errors);
+    }
+    protocol::Value* setValue = object->get("set");
+    if (setValue) {
+        errors->setName("set");
+        result->m_set = ValueConversions<protocol::Runtime::RemoteObject>::fromValue(setValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
@@ -560,7 +572,12 @@ std::unique_ptr<protocol::DictionaryValue> PrivatePropertyDescriptor::toValue() 
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("name", ValueConversions<String>::toValue(m_name));
-    result->setValue("value", ValueConversions<protocol::Runtime::RemoteObject>::toValue(m_value.get()));
+    if (m_value.isJust())
+        result->setValue("value", ValueConversions<protocol::Runtime::RemoteObject>::toValue(m_value.fromJust()));
+    if (m_get.isJust())
+        result->setValue("get", ValueConversions<protocol::Runtime::RemoteObject>::toValue(m_get.fromJust()));
+    if (m_set.isJust())
+        result->setValue("set", ValueConversions<protocol::Runtime::RemoteObject>::toValue(m_set.fromJust()));
     return result;
 }
 
@@ -1397,36 +1414,36 @@ public:
     }
     ~DispatcherImpl() override { }
     bool canDispatch(const String& method) override;
-    void dispatch(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+    void dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
     std::unordered_map<String, String>& redirects() { return m_redirects; }
 
 protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
     using DispatchMap = std::unordered_map<String, CallHandler>;
     DispatchMap m_dispatchMap;
     std::unordered_map<String, String> m_redirects;
 
-    void awaitPromise(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void callFunctionOn(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void compileScript(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void discardConsoleEntries(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void enable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void evaluate(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getIsolateId(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getHeapUsage(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getProperties(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void globalLexicalScopeNames(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void queryObjects(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void releaseObject(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void releaseObjectGroup(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void runIfWaitingForDebugger(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void runScript(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setCustomObjectFormatterEnabled(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setMaxCallStackSizeToCapture(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void terminateExecution(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void addBinding(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void removeBinding(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void awaitPromise(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void callFunctionOn(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void compileScript(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void discardConsoleEntries(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void evaluate(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void getIsolateId(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void getHeapUsage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void getProperties(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void globalLexicalScopeNames(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void queryObjects(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void releaseObject(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void releaseObjectGroup(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void runIfWaitingForDebugger(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void runScript(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void setCustomObjectFormatterEnabled(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void setMaxCallStackSizeToCapture(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void terminateExecution(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void addBinding(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void removeBinding(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
     Backend* m_backend;
 };
@@ -1435,7 +1452,7 @@ bool DispatcherImpl::canDispatch(const String& method) {
     return m_dispatchMap.find(method) != m_dispatchMap.end();
 }
 
-void DispatcherImpl::dispatch(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<protocol::DictionaryValue> messageObject)
+void DispatcherImpl::dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject)
 {
     std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     DCHECK(it != m_dispatchMap.end());
@@ -1446,7 +1463,7 @@ void DispatcherImpl::dispatch(int callId, const String& method, const ProtocolMe
 
 class AwaitPromiseCallbackImpl : public Backend::AwaitPromiseCallback, public DispatcherBase::Callback {
 public:
-    AwaitPromiseCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, const ProtocolMessage& message)
+    AwaitPromiseCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message)
         : DispatcherBase::Callback(std::move(backendImpl), callId, method, message) { }
 
     void sendSuccess(std::unique_ptr<protocol::Runtime::RemoteObject> result, Maybe<protocol::Runtime::ExceptionDetails> exceptionDetails) override
@@ -1470,7 +1487,7 @@ public:
     }
 };
 
-void DispatcherImpl::awaitPromise(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::awaitPromise(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -1503,7 +1520,7 @@ void DispatcherImpl::awaitPromise(int callId, const String& method, const Protoc
 
 class CallFunctionOnCallbackImpl : public Backend::CallFunctionOnCallback, public DispatcherBase::Callback {
 public:
-    CallFunctionOnCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, const ProtocolMessage& message)
+    CallFunctionOnCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message)
         : DispatcherBase::Callback(std::move(backendImpl), callId, method, message) { }
 
     void sendSuccess(std::unique_ptr<protocol::Runtime::RemoteObject> result, Maybe<protocol::Runtime::ExceptionDetails> exceptionDetails) override
@@ -1527,7 +1544,7 @@ public:
     }
 };
 
-void DispatcherImpl::callFunctionOn(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::callFunctionOn(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -1600,7 +1617,7 @@ void DispatcherImpl::callFunctionOn(int callId, const String& method, const Prot
     return;
 }
 
-void DispatcherImpl::compileScript(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::compileScript(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -1647,7 +1664,7 @@ void DispatcherImpl::compileScript(int callId, const String& method, const Proto
     return;
 }
 
-void DispatcherImpl::disable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
@@ -1661,7 +1678,7 @@ void DispatcherImpl::disable(int callId, const String& method, const ProtocolMes
     return;
 }
 
-void DispatcherImpl::discardConsoleEntries(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::discardConsoleEntries(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
@@ -1675,7 +1692,7 @@ void DispatcherImpl::discardConsoleEntries(int callId, const String& method, con
     return;
 }
 
-void DispatcherImpl::enable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
@@ -1691,7 +1708,7 @@ void DispatcherImpl::enable(int callId, const String& method, const ProtocolMess
 
 class EvaluateCallbackImpl : public Backend::EvaluateCallback, public DispatcherBase::Callback {
 public:
-    EvaluateCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, const ProtocolMessage& message)
+    EvaluateCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message)
         : DispatcherBase::Callback(std::move(backendImpl), callId, method, message) { }
 
     void sendSuccess(std::unique_ptr<protocol::Runtime::RemoteObject> result, Maybe<protocol::Runtime::ExceptionDetails> exceptionDetails) override
@@ -1715,7 +1732,7 @@ public:
     }
 };
 
-void DispatcherImpl::evaluate(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::evaluate(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -1806,7 +1823,7 @@ void DispatcherImpl::evaluate(int callId, const String& method, const ProtocolMe
     return;
 }
 
-void DispatcherImpl::getIsolateId(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::getIsolateId(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Declare output parameters.
     String out_id;
@@ -1826,7 +1843,7 @@ void DispatcherImpl::getIsolateId(int callId, const String& method, const Protoc
     return;
 }
 
-void DispatcherImpl::getHeapUsage(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::getHeapUsage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Declare output parameters.
     double out_usedSize;
@@ -1848,7 +1865,7 @@ void DispatcherImpl::getHeapUsage(int callId, const String& method, const Protoc
     return;
 }
 
-void DispatcherImpl::getProperties(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::getProperties(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -1906,7 +1923,7 @@ void DispatcherImpl::getProperties(int callId, const String& method, const Proto
     return;
 }
 
-void DispatcherImpl::globalLexicalScopeNames(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::globalLexicalScopeNames(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -1940,7 +1957,7 @@ void DispatcherImpl::globalLexicalScopeNames(int callId, const String& method, c
     return;
 }
 
-void DispatcherImpl::queryObjects(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::queryObjects(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -1977,7 +1994,7 @@ void DispatcherImpl::queryObjects(int callId, const String& method, const Protoc
     return;
 }
 
-void DispatcherImpl::releaseObject(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::releaseObject(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -2002,7 +2019,7 @@ void DispatcherImpl::releaseObject(int callId, const String& method, const Proto
     return;
 }
 
-void DispatcherImpl::releaseObjectGroup(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::releaseObjectGroup(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -2027,7 +2044,7 @@ void DispatcherImpl::releaseObjectGroup(int callId, const String& method, const 
     return;
 }
 
-void DispatcherImpl::runIfWaitingForDebugger(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::runIfWaitingForDebugger(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
@@ -2043,7 +2060,7 @@ void DispatcherImpl::runIfWaitingForDebugger(int callId, const String& method, c
 
 class RunScriptCallbackImpl : public Backend::RunScriptCallback, public DispatcherBase::Callback {
 public:
-    RunScriptCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, const ProtocolMessage& message)
+    RunScriptCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message)
         : DispatcherBase::Callback(std::move(backendImpl), callId, method, message) { }
 
     void sendSuccess(std::unique_ptr<protocol::Runtime::RemoteObject> result, Maybe<protocol::Runtime::ExceptionDetails> exceptionDetails) override
@@ -2067,7 +2084,7 @@ public:
     }
 };
 
-void DispatcherImpl::runScript(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::runScript(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -2128,7 +2145,7 @@ void DispatcherImpl::runScript(int callId, const String& method, const ProtocolM
     return;
 }
 
-void DispatcherImpl::setCustomObjectFormatterEnabled(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::setCustomObjectFormatterEnabled(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -2153,7 +2170,7 @@ void DispatcherImpl::setCustomObjectFormatterEnabled(int callId, const String& m
     return;
 }
 
-void DispatcherImpl::setMaxCallStackSizeToCapture(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::setMaxCallStackSizeToCapture(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -2180,7 +2197,7 @@ void DispatcherImpl::setMaxCallStackSizeToCapture(int callId, const String& meth
 
 class TerminateExecutionCallbackImpl : public Backend::TerminateExecutionCallback, public DispatcherBase::Callback {
 public:
-    TerminateExecutionCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, const ProtocolMessage& message)
+    TerminateExecutionCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message)
         : DispatcherBase::Callback(std::move(backendImpl), callId, method, message) { }
 
     void sendSuccess() override
@@ -2201,7 +2218,7 @@ public:
     }
 };
 
-void DispatcherImpl::terminateExecution(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::terminateExecution(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
 
     std::unique_ptr<TerminateExecutionCallbackImpl> callback(new TerminateExecutionCallbackImpl(weakPtr(), callId, method, message));
@@ -2209,7 +2226,7 @@ void DispatcherImpl::terminateExecution(int callId, const String& method, const 
     return;
 }
 
-void DispatcherImpl::addBinding(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::addBinding(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
@@ -2240,7 +2257,7 @@ void DispatcherImpl::addBinding(int callId, const String& method, const Protocol
     return;
 }
 
-void DispatcherImpl::removeBinding(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DispatcherImpl::removeBinding(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));

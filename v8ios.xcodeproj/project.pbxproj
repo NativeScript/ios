@@ -16,6 +16,7 @@
 		C22C092222CA3F370080D176 /* Worker.mm in Sources */ = {isa = PBXBuildFile; fileRef = C22C092022CA3F370080D176 /* Worker.mm */; };
 		C22C092322CA3F370080D176 /* Worker.h in Headers */ = {isa = PBXBuildFile; fileRef = C22C092122CA3F370080D176 /* Worker.h */; };
 		C22EF68B2379412100D67CBF /* TNSSwiftLike.m in Sources */ = {isa = PBXBuildFile; fileRef = C22EF68A2379412100D67CBF /* TNSSwiftLike.m */; };
+		C23011AB239FF975003CFE86 /* serializable.h in Headers */ = {isa = PBXBuildFile; fileRef = C23011AA239FF975003CFE86 /* serializable.h */; };
 		C23992CA236C2D6E00D2F720 /* TestRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */; };
 		C23992F8236C364B00D2F720 /* Transport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DA236C364B00D2F720 /* Transport.swift */; };
 		C23992F9236C364B00D2F720 /* FileLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DB236C364B00D2F720 /* FileLogHandler.swift */; };
@@ -529,6 +530,7 @@
 		C22C092122CA3F370080D176 /* Worker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Worker.h; sourceTree = "<group>"; };
 		C22EF68A2379412100D67CBF /* TNSSwiftLike.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TNSSwiftLike.m; sourceTree = "<group>"; };
 		C22EF68C2379414300D67CBF /* TNSSwiftLike.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSSwiftLike.h; sourceTree = "<group>"; };
+		C23011AA239FF975003CFE86 /* serializable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = serializable.h; sourceTree = "<group>"; };
 		C23992C7236C2D6E00D2F720 /* TestRunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TestRunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestRunnerTests.swift; sourceTree = "<group>"; };
 		C23992CB236C2D6E00D2F720 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -1725,6 +1727,7 @@
 		C2B30FD0238418CA009D6A46 /* crdtp */ = {
 			isa = PBXGroup;
 			children = (
+				C23011AA239FF975003CFE86 /* serializable.h */,
 				C2B30FD1238418CA009D6A46 /* json_platform.h */,
 				C2B30FD2238418CA009D6A46 /* export.h */,
 				C2B30FD3238418CA009D6A46 /* status.h */,
@@ -1903,6 +1906,7 @@
 				C247C33F22F828E3001D2CA2 /* custom-preview.h in Headers */,
 				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
 				C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */,
+				C23011AB239FF975003CFE86 /* serializable.h in Headers */,
 				C266569F22B282BA00EE15CC /* FunctionReference.h in Headers */,
 				C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */,
 				C247C38722F828E3001D2CA2 /* string-16.h in Headers */,

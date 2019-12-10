@@ -637,6 +637,8 @@ struct ValueConversions<ListValue> {
 //#include "ErrorSupport.h"
 //#include "Values.h"
 
+#include "third_party/inspector_protocol/crdtp/span.h"
+
 namespace v8_inspector {
 namespace protocol {
 
@@ -696,7 +698,7 @@ public:
 
     class  Callback {
     public:
-        Callback(std::unique_ptr<WeakPtr> backendImpl, int callId, const String& method, const ProtocolMessage& message);
+        Callback(std::unique_ptr<WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message);
         virtual ~Callback();
         void dispose();
 
@@ -708,14 +710,14 @@ public:
         std::unique_ptr<WeakPtr> m_backendImpl;
         int m_callId;
         String m_method;
-        ProtocolMessage m_message;
+        std::vector<uint8_t> m_message;
     };
 
     explicit DispatcherBase(FrontendChannel*);
     virtual ~DispatcherBase();
 
     virtual bool canDispatch(const String& method) = 0;
-    virtual void dispatch(int callId, const String& method, const ProtocolMessage& rawMessage, std::unique_ptr<protocol::DictionaryValue> messageObject) = 0;
+    virtual void dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> rawMessage, std::unique_ptr<protocol::DictionaryValue> messageObject) = 0;
     FrontendChannel* channel() { return m_frontendChannel; }
 
     void sendResponse(int callId, const DispatchResponse&, std::unique_ptr<protocol::DictionaryValue> result);
@@ -739,7 +741,7 @@ public:
     void setupRedirects(const std::unordered_map<String, String>&);
     bool parseCommand(Value* message, int* callId, String* method);
     bool canDispatch(const String& method);
-    void dispatch(int callId, const String& method, std::unique_ptr<Value> message, const ProtocolMessage& rawMessage);
+    void dispatch(int callId, const String& method, std::unique_ptr<Value> message, v8_crdtp::span<uint8_t> rawMessage);
     FrontendChannel* channel() { return m_frontendChannel; }
     virtual ~UberDispatcher();
 

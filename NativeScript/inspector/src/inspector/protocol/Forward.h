@@ -93,26 +93,21 @@ using Maybe = typename detail::MaybeTypedef<T>::type;
 #ifndef v8_inspector_protocol_FrontendChannel_h
 #define v8_inspector_protocol_FrontendChannel_h
 
+#include "third_party/inspector_protocol/crdtp/serializable.h"
+#include "third_party/inspector_protocol/crdtp/span.h"
+
 namespace v8_inspector {
 namespace protocol {
 
-class  Serializable {
-public:
-    virtual std::vector<uint8_t> TakeSerialized() && {
-      std::vector<uint8_t> out;
-      AppendSerialized(&out);
-      return out;
-    }
-    virtual void AppendSerialized(std::vector<uint8_t>* out) const = 0;
-    virtual ~Serializable() = default;
-};
+using v8_crdtp::Serializable;
 
 class  FrontendChannel {
 public:
     virtual ~FrontendChannel() { }
     virtual void sendProtocolResponse(int callId, std::unique_ptr<Serializable> message) = 0;
     virtual void sendProtocolNotification(std::unique_ptr<Serializable> message) = 0;
-    virtual void fallThrough(int callId, const String& method, const ProtocolMessage& message) = 0;
+
+    virtual void fallThrough(int callId, const String& method, v8_crdtp::span<uint8_t> message) = 0;
     virtual void flushProtocolNotifications() = 0;
 };
 
