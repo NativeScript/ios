@@ -35,6 +35,26 @@ Runtime::Runtime() {
     currentRuntime_ = this;
 }
 
+Runtime::~Runtime() {
+    {
+        Isolate::Scope isolate_scope(this->isolate_);
+        HandleScope handle_scope(this->isolate_);
+        Local<Context> context = this->isolate_->GetCurrentContext();
+        context->Exit();
+        this->isolate_->TerminateExecution();
+    }
+
+    Caches::WorkerState* state = nullptr;
+    Caches::Workers.Remove(this->workerId_, state);
+    if (state != nullptr) {
+        delete state;
+        state = nullptr;
+    }
+
+    this->isolate_->Dispose();
+    Caches::Remove(this->isolate_);
+}
+
 void Runtime::Init() {
     if (!mainThreadInitialized_) {
         Runtime::platform_ = RuntimeConfig.IsDebug

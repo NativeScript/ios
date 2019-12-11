@@ -1,6 +1,5 @@
 #include <Foundation/Foundation.h>
 #include "DataWrapper.h"
-#include "Caches.h"
 #include "Helpers.h"
 #include "Runtime.h"
 
@@ -92,24 +91,6 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
     this->DrainPendingTasks();
 
     CFRunLoopRun();
-
-    {
-        Isolate::Scope isolate_scope(this->workerIsolate_);
-        HandleScope handle_scope(this->workerIsolate_);
-        Local<Context> context = this->workerIsolate_->GetCurrentContext();
-        context->Exit();
-        this->workerIsolate_->TerminateExecution();
-    }
-
-    Caches::WorkerState* state = nullptr;
-    Caches::Workers.Remove(this->workerId_, state);
-    if (state != nullptr) {
-        delete state;
-        state = nullptr;
-    }
-
-    this->workerIsolate_->Dispose();
-    Caches::Remove(this->workerIsolate_);
 
     Runtime* runtime = Runtime::GetCurrentRuntime();
     delete runtime;

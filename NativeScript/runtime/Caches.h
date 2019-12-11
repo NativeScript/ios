@@ -43,6 +43,8 @@ public:
         void* userData_;
     };
 
+    ~Caches();
+
     static ConcurrentMap<std::string, const Meta*> Metadata;
     static ConcurrentMap<int, WorkerState*> Workers;
 
@@ -58,22 +60,23 @@ public:
     std::unordered_map<const void*, v8::Persistent<v8::Object>*> PointerInstances;
     std::unordered_map<std::string, v8::Persistent<v8::Function>*> StructConstructorFunctions;
     std::unordered_map<std::string, v8::Persistent<v8::Object>*> PrimitiveInteropTypes;
+    std::unordered_map<std::string, v8::Persistent<v8::Function>*> CFunctions;
 
     std::function<v8::Local<v8::FunctionTemplate>(v8::Isolate* isolate, const BaseClassMeta*)> ObjectCtorInitializer;
     std::function<v8::Local<v8::Function>(v8::Isolate*, StructInfo)> StructCtorInitializer;
-    v8::Persistent<v8::Function>* ToStringFunc;
+    v8::Persistent<v8::Function>* ToStringFunc = nullptr;
 
-    v8::Persistent<v8::Function>* EmptyObjCtorFunc;
-    v8::Persistent<v8::Function>* EmptyStructCtorFunc;
-    v8::Persistent<v8::Function>* SliceFunc;
-    v8::Persistent<v8::Function>* OriginalExtendsFunc;
-    v8::Persistent<v8::Function>* WeakRefGetterFunc;
-    v8::Persistent<v8::Function>* WeakRefClearFunc;
-    std::unordered_map<std::string, v8::Persistent<v8::Function>*> CFunctions;
+    v8::Persistent<v8::Function>* EmptyObjCtorFunc = nullptr;
+    v8::Persistent<v8::Function>* EmptyStructCtorFunc = nullptr;
+    v8::Persistent<v8::Function>* SliceFunc = nullptr;
+    v8::Persistent<v8::Function>* OriginalExtendsFunc = nullptr;
+    v8::Persistent<v8::Function>* WeakRefGetterFunc = nullptr;
+    v8::Persistent<v8::Function>* WeakRefClearFunc = nullptr;
+    v8::Persistent<v8::Function>* SmartJSONStringifyFunc = nullptr;
 
-    v8::Persistent<v8::Function>* InteropReferenceCtorFunc;
-    v8::Persistent<v8::Function>* PointerCtorFunc;
-    v8::Persistent<v8::Function>* FunctionReferenceCtorFunc;
+    v8::Persistent<v8::Function>* InteropReferenceCtorFunc = nullptr;
+    v8::Persistent<v8::Function>* PointerCtorFunc = nullptr;
+    v8::Persistent<v8::Function>* FunctionReferenceCtorFunc = nullptr;
 
     std::unordered_map<std::pair<void*, std::string>, v8::Persistent<v8::Value>*, pair_hash> StructInstances;
 

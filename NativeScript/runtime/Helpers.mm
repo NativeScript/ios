@@ -11,6 +11,7 @@
 #include <cxxabi.h>
 #include "RuntimeConfig.h"
 #include "Helpers.h"
+#include "Caches.h"
 
 using namespace v8;
 
@@ -19,8 +20,6 @@ namespace {
     char* Buffer = new char[BUFFER_SIZE];
     uint8_t* BinBuffer = new uint8_t[BUFFER_SIZE];
 }
-
-static std::map<Isolate*, Persistent<v8::Function>*> isolateToPersistentSmartJSONStringify = std::map<Isolate*, Persistent<v8::Function>*>();
 
 Local<String> tns::ToV8String(Isolate* isolate, std::string value) {
     return v8::String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal, (int)value.length()).ToLocalChecked();
@@ -364,11 +363,9 @@ Local<v8::String> tns::JsonStringifyObject(Isolate* isolate, Local<Value> value,
 }
 
 Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
-    auto it = isolateToPersistentSmartJSONStringify.find(isolate);
-    if (it != isolateToPersistentSmartJSONStringify.end()) {
-        auto smartStringifyPersistentFunction = it->second;
-
-        return smartStringifyPersistentFunction->Get(isolate);
+    Caches* caches = Caches::Get(isolate);
+    if (caches->SmartJSONStringifyFunc != nullptr) {
+        return caches->SmartJSONStringifyFunc->Get(isolate);
     }
 
     std::string smartStringifyFunctionScript =
@@ -413,11 +410,9 @@ Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
 
     Local<v8::Function> smartStringifyFunction = result.As<v8::Function>();
 
-    Persistent<v8::Function>* smartStringifyPersistentFunction = new Persistent<v8::Function>(isolate, smartStringifyFunction);
+    caches->SmartJSONStringifyFunc = new Persistent<v8::Function>(isolate, smartStringifyFunction);
 
-    isolateToPersistentSmartJSONStringify.insert(std::make_pair(isolate, smartStringifyPersistentFunction));
-
-    return smartStringifyPersistentFunction->Get(isolate);
+    return smartStringifyFunction;
 }
 
 std::string tns::ReplaceAll(const std::string source, std::string find, std::string replacement) {

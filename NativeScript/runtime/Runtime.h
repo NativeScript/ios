@@ -11,6 +11,7 @@ namespace tns {
 class Runtime {
 public:
     Runtime();
+    ~Runtime();
     void Init();
     void RunMainScript();
     void RunScript(std::string file, v8::TryCatch& tc);
