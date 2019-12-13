@@ -8,13 +8,15 @@ namespace tns {
 class ObjectManager;
 
 struct ObjectWeakCallbackState {
-    ObjectWeakCallbackState(v8::Persistent<v8::Value>* target) : target_(target) { }
-    v8::Persistent<v8::Value>* target_;
+    ObjectWeakCallbackState(std::shared_ptr<v8::Persistent<v8::Value>> target) : target_(target) {
+    }
+
+    std::shared_ptr<v8::Persistent<v8::Value>> target_;
 };
 
 class ObjectManager {
 public:
-    static v8::Persistent<v8::Value>* Register(v8::Isolate* isolate, const v8::Local<v8::Value> obj);
+    static std::shared_ptr<v8::Persistent<v8::Value>> Register(v8::Isolate* isolate, const v8::Local<v8::Value> obj);
     static void FinalizerCallback(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
 private:
     static bool DisposeValue(v8::Isolate* isolate, v8::Local<v8::Value> value);

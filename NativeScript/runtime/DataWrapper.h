@@ -263,9 +263,11 @@ private:
 
 class StructWrapper: public StructTypeWrapper {
 public:
-    StructWrapper(struct StructInfo structInfo, void* data)
+    StructWrapper(struct StructInfo structInfo, void* data, std::shared_ptr<v8::Persistent<v8::Value>> parent)
         : StructTypeWrapper(structInfo),
-          data_(data) {
+          data_(data),
+          childCount_(0),
+          parent_(parent) {
     }
 
     const WrapperType Type() {
@@ -275,8 +277,26 @@ public:
     void* Data() const {
         return this->data_;
     }
+
+    std::shared_ptr<v8::Persistent<v8::Value>> Parent() {
+        return this->parent_;
+    }
+
+    void IncrementChildren() {
+        this->childCount_++;
+    }
+
+    void DecrementChildren() {
+        this->childCount_--;
+    }
+
+    int ChildCount() {
+        return this->childCount_;
+    }
 private:
     void* data_;
+    int childCount_;
+    std::shared_ptr<v8::Persistent<v8::Value>> parent_;
 };
 
 class ObjCDataWrapper: public BaseDataWrapper {
@@ -414,7 +434,7 @@ public:
 
 class FunctionReferenceWrapper: public BaseDataWrapper {
 public:
-    FunctionReferenceWrapper(v8::Persistent<v8::Value>* function)
+    FunctionReferenceWrapper(std::shared_ptr<v8::Persistent<v8::Value>> function)
         : function_(function),
           data_(nullptr) {
     }
@@ -423,7 +443,7 @@ public:
         return WrapperType::FunctionReference;
     }
 
-    v8::Persistent<v8::Value>* Function() {
+    std::shared_ptr<v8::Persistent<v8::Value>> Function() {
         return this->function_;
     }
 
@@ -435,7 +455,7 @@ public:
         this->data_ = data;
     }
 private:
-    v8::Persistent<v8::Value>* function_;
+    std::shared_ptr<v8::Persistent<v8::Value>> function_;
     void* data_;
 };
 
@@ -472,7 +492,7 @@ class WorkerWrapper: public BaseDataWrapper {
 public:
     WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage);
 
-    void Start(v8::Persistent<v8::Value>* poWorker, std::function<v8::Isolate* ()> func);
+    void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker, std::function<v8::Isolate* ()> func);
     void CallOnErrorHandlers(v8::TryCatch& tc);
     void PassUncaughtExceptionFromWorkerToMain(v8::Isolate* workerIsolate, v8::TryCatch& tc, bool async = true);
     void PostMessage(std::string message);
@@ -491,7 +511,7 @@ private:
     bool isClosing_;
     bool isTerminating_;
     std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
-    v8::Persistent<v8::Value>* poWorker_;
+    std::shared_ptr<v8::Persistent<v8::Value>> poWorker_;
     ConcurrentQueue queue_;
     static int nextId_;
     int workerId_;

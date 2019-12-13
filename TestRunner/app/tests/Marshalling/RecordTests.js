@@ -1,6 +1,7 @@
 describe(module.id, function () {
     afterEach(function () {
         TNSClearOutput();
+        gc();
     });
 
     it("SimpleRecord", function () {
@@ -39,6 +40,29 @@ describe(module.id, function () {
         var record = new TNSNestedStruct({a: {x: 1, y: 2}, b: {x: 3, y: 4}});
         TNSTestNativeCallbacks.recordsNestedStruct(record);
         expect(TNSGetOutput()).toBe('1 2 3 4');
+    });
+
+    it("NestedRecordSetter", function () {
+        var rect = getRectStruct();
+        rect.origin.y = 25;
+        rect.size.height = 45;
+        expect(rect.origin.x).toBe(10);
+        expect(rect.origin.y).toBe(25);
+        expect(rect.size.width).toBe(30);
+        expect(rect.size.height).toBe(45);
+    });
+
+    it("NestedRecordGCRoot", function () {
+        var size = null;
+        (() => {
+            var rect = getRectStruct();
+            size = rect.size;
+        })();
+        gc();
+        gc();
+
+        expect(size.width).toBe(30);
+        expect(size.height).toBe(40);
     });
 
     it("RecordConstructorPointer", function () {

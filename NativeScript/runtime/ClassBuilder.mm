@@ -67,8 +67,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         }
 
         auto cache = Caches::Get(isolate);
-        Persistent<v8::Function>* poBaseCtorFunc = cache->CtorFuncs.find(item->meta_->name())->second;
-        Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
+        Local<v8::Function> baseCtorFunc = cache->CtorFuncs.find(item->meta_->name())->second->Get(isolate);
 
         CacheItem* cacheItem = new CacheItem(nullptr, extendedClass);
         Local<External> ext = External::New(isolate, cacheItem);
@@ -108,8 +107,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass, true);
         tns::SetValue(isolate, extendClassCtorFunc, wrapper);
 
-        cache->CtorFuncs.emplace(std::make_pair(extendedClassName, new Persistent<v8::Function>(isolate, extendClassCtorFunc)));
-        cache->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendFuncPrototype)));
+        cache->CtorFuncs.emplace(extendedClassName, std::make_unique<Persistent<v8::Function>>(isolate, extendClassCtorFunc));
+        cache->ClassPrototypes.emplace(extendedClassName, std::make_unique<Persistent<Object>>(isolate, extendFuncPrototype));
 
         info.GetReturnValue().Set(extendClassCtorFunc);
     } catch (NativeScriptException& ex) {
@@ -132,7 +131,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 
 void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
     auto cache = Caches::Get(isolate);
-    if (cache->OriginalExtendsFunc != nullptr) {
+    if (cache->OriginalExtendsFunc.get() != nullptr) {
         return;
     }
 
@@ -157,7 +156,7 @@ void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
     Local<Value> extendsFunc;
     assert(script->Run(context).ToLocal(&extendsFunc) && extendsFunc->IsFunction());
 
-    cache->OriginalExtendsFunc = new Persistent<v8::Function>(isolate, extendsFunc.As<v8::Function>());
+    cache->OriginalExtendsFunc = std::make_unique<Persistent<v8::Function>>(isolate, extendsFunc.As<v8::Function>());
 }
 
 void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
@@ -173,7 +172,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info[1].As<Object>());
         if (!wrapper) {
             // We are not extending a native object -> call the base __extends function
-            Persistent<v8::Function>* poExtendsFunc = cache->OriginalExtendsFunc;
+            Persistent<v8::Function>* poExtendsFunc = cache->OriginalExtendsFunc.get();
             assert(poExtendsFunc != nullptr);
             Local<v8::Function> originalExtendsFunc = poExtendsFunc->Get(isolate);
             Local<Value> args[] = { info[0], info[1] };
@@ -195,9 +194,8 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
 
         const Meta* baseMeta = ArgConverter::FindMeta(baseClass);
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
-        Persistent<v8::Function>* poBaseCtorFunc = cache->CtorFuncs.find(interfaceMeta->name())->second;
+        Local<v8::Function> baseCtorFunc = cache->CtorFuncs.find(interfaceMeta->name())->second->Get(isolate);
 
-        Local<v8::Function> baseCtorFunc = poBaseCtorFunc->Get(isolate);
         assert(extendedClassCtorFunc->SetPrototype(context, baseCtorFunc).ToChecked());
 
         Local<v8::String> prototypeProp = tns::ToV8String(isolate, "prototype");
@@ -214,11 +212,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         success = extendedClassCtorFuncPrototype->SetPrototype(context, prototypePropValue.As<Object>()).FromMaybe(false);
         assert(success);
 
-        cache->ClassPrototypes.emplace(std::make_pair(extendedClassName, new Persistent<Object>(isolate, extendedClassCtorFuncPrototype)));
+        cache->ClassPrototypes.emplace(extendedClassName, std::make_unique<Persistent<Object>>(isolate, extendedClassCtorFuncPrototype));
 
         Persistent<v8::Function>* poExtendedClassCtorFunc = new Persistent<v8::Function>(isolate, extendedClassCtorFunc);
 
-        cache->CtorFuncs.emplace(std::make_pair(extendedClassName, poExtendedClassCtorFunc));
+        cache->CtorFuncs.emplace(extendedClassName, poExtendedClassCtorFunc);
 
         IMP newInitialize = imp_implementationWithBlock(^(id self) {
             Local<Context> context = isolate->GetCurrentContext();
@@ -502,7 +500,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
                 }
             }
 
-            Persistent<Value>* poCallback = new Persistent<Value>(isolate, method);
+            std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, method);
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
             IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
             std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);
@@ -583,7 +581,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
 
         for (int j = 0; j < methodMetas.size(); j++) {
             const MethodMeta* methodMeta = methodMetas[j];
-            Persistent<Value>* poCallback = new Persistent<Value>(isolate, method);
+            std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, method);
             const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
             uint8_t argsCount = methodMeta->encodings()->count - 1;
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
@@ -666,9 +664,17 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
         const PropertyMeta* propertyMeta = propertyMetas[j];
         std::string propertyName = propertyMeta->name();
 
-        if (!getter.IsEmpty() && getter->IsFunction() && propertyMeta->hasGetter()) {
-            Persistent<v8::Function>* poGetterFunc = new Persistent<v8::Function>(isolate, getter.As<v8::Function>());
-            PropertyCallbackContext* userData = new PropertyCallbackContext(isolate, poGetterFunc, new Persistent<Object>(isolate, implementationObject), propertyMeta);
+        bool hasGetter = !getter.IsEmpty() && getter->IsFunction() && propertyMeta->hasGetter();
+        bool hasSetter = !setter.IsEmpty() && setter->IsFunction() && propertyMeta->hasSetter();
+
+        std::shared_ptr<Persistent<Object>> poImplementationObject;
+        if (hasGetter || hasSetter) {
+            poImplementationObject = std::make_shared<Persistent<Object>>(isolate, implementationObject);
+        }
+
+        if (hasGetter) {
+            std::shared_ptr<Persistent<v8::Function>> poGetterFunc = std::make_shared<Persistent<v8::Function>>(isolate, getter.As<v8::Function>());
+            PropertyCallbackContext* userData = new PropertyCallbackContext(isolate, poGetterFunc, poImplementationObject, propertyMeta);
 
             FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                 PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
@@ -694,9 +700,9 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
             class_addMethod(extendedClass, propertyMeta->getter()->selector(), impGetter, "@@:");
         }
 
-        if (!setter.IsEmpty() && setter->IsFunction() && propertyMeta->hasSetter()) {
-            Persistent<v8::Function>* poSetterFunc = new Persistent<v8::Function>(isolate, setter.As<v8::Function>());
-            PropertyCallbackContext* userData = new PropertyCallbackContext(isolate, poSetterFunc, new Persistent<Object>(isolate, implementationObject), propertyMeta);
+        if (hasSetter) {
+            std::shared_ptr<Persistent<v8::Function>> poSetterFunc = std::make_shared<Persistent<v8::Function>>(isolate, setter.As<v8::Function>());
+            PropertyCallbackContext* userData = new PropertyCallbackContext(isolate, poSetterFunc, poImplementationObject, propertyMeta);
 
             FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                 PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
@@ -734,7 +740,8 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<Name> property, const Prope
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> thiz = info.This();
 
-    Local<Object> superValue = ArgConverter::CreateEmptyObject(context);
+    std::shared_ptr<Persistent<Value>> poValue = ArgConverter::CreateEmptyObject(context);
+    Local<Object> superValue = poValue->Get(isolate).As<Object>();
 
     superValue->SetPrototype(context, thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype()).ToChecked();
     superValue->SetInternalField(0, thiz->GetInternalField(0));

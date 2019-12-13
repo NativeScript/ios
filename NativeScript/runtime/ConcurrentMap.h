@@ -37,13 +37,9 @@ public:
         return it != this->container_.end();
     }
 
-    void Remove(TKey& key, TValue& removedElement) {
+    void Remove(TKey& key) {
         std::lock_guard<std::mutex> writerLock(this->containerMutex_);
-        auto it = this->container_.find(key);
-        if (it != this->container_.end()) {
-            removedElement = it->second;
-            this->container_.erase(it);
-        }
+        this->container_.erase(key);
     }
 
     ConcurrentMap() = default;

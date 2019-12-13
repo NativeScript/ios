@@ -16,7 +16,7 @@ void FunctionReference::Register(Isolate* isolate, Local<Object> interop) {
 
 Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* isolate) {
     auto cache = Caches::Get(isolate);
-    Persistent<v8::Function>* poFunctionReferenceCtor = cache->FunctionReferenceCtorFunc;
+    Persistent<v8::Function>* poFunctionReferenceCtor = cache->FunctionReferenceCtorFunc.get();
     if (poFunctionReferenceCtor != nullptr) {
         return poFunctionReferenceCtor->Get(isolate);
     }
@@ -34,7 +34,7 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* iso
 
     tns::SetValue(isolate, ctorFunc, new FunctionReferenceTypeWrapper());
 
-    cache->FunctionReferenceCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
+    cache->FunctionReferenceCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
 
     return ctorFunc;
 }
@@ -46,7 +46,7 @@ void FunctionReference::FunctionReferenceConstructorCallback(const FunctionCallb
     Isolate* isolate = info.GetIsolate();
 
     Local<v8::Function> arg = info[0].As<v8::Function>();
-    Persistent<v8::Value>* poArg = ObjectManager::Register(isolate, arg);
+    std::shared_ptr<Persistent<v8::Value>> poArg = ObjectManager::Register(isolate, arg);
     FunctionReferenceWrapper* wrapper = new FunctionReferenceWrapper(poArg);
     tns::SetValue(isolate, arg, wrapper);
     info.GetReturnValue().Set(arg);

@@ -8,8 +8,8 @@ using namespace std;
 
 namespace tns {
 
-Persistent<Value>* ObjectManager::Register(Isolate* isolate, const Local<Value> obj) {
-    Persistent<Value>* objectHandle = new Persistent<Value>(isolate, obj);
+std::shared_ptr<Persistent<Value>> ObjectManager::Register(Isolate* isolate, const Local<Value> obj) {
+    std::shared_ptr<Persistent<Value>> objectHandle = std::make_shared<Persistent<Value>>(isolate, obj);
     ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
     objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
     return objectHandle;
@@ -23,9 +23,9 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
 
     if (disposed) {
         state->target_->Reset();
-        delete state->target_;
         delete state;
     } else {
+        state->target_->ClearWeak();
         state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
     }
 }
@@ -50,13 +50,28 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         return true;
     }
 
-    Caches* cache = Caches::Get(isolate);
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
     switch (wrapper->Type()) {
         case WrapperType::Struct: {
             StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
             void* data = structWrapper->Data();
-            if (data) {
-                std::free(data);
+
+            std::shared_ptr<Persistent<Value>> poParentStruct = structWrapper->Parent();
+            if (poParentStruct != nullptr) {
+                Local<Value> parentStruct = poParentStruct->Get(isolate);
+                BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parentStruct);
+                if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
+                    StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
+                    parentStructWrapper->DecrementChildren();
+                }
+            } else {
+                if (structWrapper->ChildCount() == 0) {
+                    std::pair<void*, std::string> key = std::make_pair(data, structWrapper->StructInfo().Name());
+                    cache->StructInstances.erase(key);
+                    std::free(data);
+                } else {
+                    return false;
+                }
             }
             break;
         }
@@ -64,10 +79,16 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
             id target = objCObjectWrapper->Data();
             if (target != nil) {
-                auto it = cache->Instances.find(target);
-                if (it != cache->Instances.end()) {
-                    cache->Instances.erase(it);
+                long retainCount = 0;
+                if (![target isKindOfClass:[NSTimer class]]) { // The retainCount method of NSTimer instances might sometimes hang indefinitely
+                    retainCount = [target retainCount];
                 }
+
+                if (retainCount > 4) {
+                    return false;
+                }
+
+                cache->Instances.erase(target);
             }
             break;
         }
@@ -78,12 +99,6 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         }
         case WrapperType::Reference: {
             ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
-//            if (referenceWrapper->Value() != nullptr) {
-//                Local<Value> value = referenceWrapper->Value()->Get(isolate);
-//                ObjectManager::DisposeValue(isolate, value);
-//                referenceWrapper->Value()->Reset();
-//            }
-
             if (referenceWrapper->Data() != nullptr) {
                 if (referenceWrapper->ShouldDisposeData()) {
                     std::free(referenceWrapper->Data());
@@ -97,11 +112,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         case WrapperType::Pointer: {
             PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
             if (pointerWrapper->Data() != nullptr) {
-                auto it = cache->PointerInstances.find(pointerWrapper->Data());
-                if (it != cache->PointerInstances.end()) {
-                    delete it->second;
-                    cache->PointerInstances.erase(it);
-                }
+                cache->PointerInstances.erase(pointerWrapper->Data());
 
                 if (pointerWrapper->IsAdopted()) {
                     std::free(pointerWrapper->Data());
@@ -112,8 +123,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         }
         case WrapperType::FunctionReference: {
             FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
-            if (funcWrapper->Function() != nullptr) {
-                funcWrapper->Function()->Reset();
+            std::shared_ptr<Persistent<Value>> func = funcWrapper->Function();
+            if (func != nullptr) {
+                func->Reset();
             }
             break;
         }

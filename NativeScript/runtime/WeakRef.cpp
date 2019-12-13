@@ -27,7 +27,9 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         Local<Object> target = info[0].As<Object>();
         Local<Context> context = isolate->GetCurrentContext();
 
-        Local<Object> weakRef = ArgConverter::CreateEmptyObject(context);
+        std::shared_ptr<Persistent<Value>> poValue = ArgConverter::CreateEmptyObject(context);
+        Local<Object> weakRef = poValue->Get(isolate).As<Object>();
+        poValue->Reset();
 
         Persistent<Object>* poTarget = new Persistent<Object>(isolate, target);
         Persistent<Object>* poHolder = new Persistent<Object>(isolate, weakRef);
@@ -92,27 +94,27 @@ void WeakRef::WeakHolderCallback(const WeakCallbackInfo<CallbackState>& data) {
 
 Local<v8::Function> WeakRef::GetGetterFunction(Isolate* isolate) {
     auto cache = Caches::Get(isolate);
-    Persistent<v8::Function>* poGetter = cache->WeakRefGetterFunc;
+    Persistent<v8::Function>* poGetter = cache->WeakRefGetterFunc.get();
     if (poGetter != nullptr) {
         return poGetter->Get(isolate);
     }
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> getterFunc = FunctionTemplate::New(isolate, GetCallback)->GetFunction(context).ToLocalChecked();
-    cache->WeakRefGetterFunc = new Persistent<v8::Function>(isolate, getterFunc);
+    cache->WeakRefGetterFunc = std::make_unique<Persistent<v8::Function>>(isolate, getterFunc);
     return getterFunc;
 }
 
 Local<v8::Function> WeakRef::GetClearFunction(Isolate* isolate) {
     auto cache = Caches::Get(isolate);
-    Persistent<v8::Function>* poClear = cache->WeakRefClearFunc;
+    Persistent<v8::Function>* poClear = cache->WeakRefClearFunc.get();
     if (poClear != nullptr) {
         return poClear->Get(isolate);
     }
 
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction(context).ToLocalChecked();
-    cache->WeakRefClearFunc = new Persistent<v8::Function>(isolate, clearFunc);
+    cache->WeakRefClearFunc = std::make_unique<Persistent<v8::Function>>(isolate, clearFunc);
     return clearFunc;
 }
 

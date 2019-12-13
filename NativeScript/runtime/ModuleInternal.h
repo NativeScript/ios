@@ -8,8 +8,7 @@ namespace tns {
 
 class ModuleInternal {
 public:
-    ModuleInternal();
-    void Init(v8::Isolate* isolate);
+    ModuleInternal(v8::Isolate* isolate);
     bool RunModule(v8::Isolate* isolate, std::string path);
 private:
     static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -25,16 +24,16 @@ private:
     void SaveScriptCache(const v8::Local<v8::Script> script, const std::string& path);
     std::string GetCacheFileName(const std::string& path);
 
-    v8::Persistent<v8::Function>* requireFunction_;
-    v8::Persistent<v8::Function>* requireFactoryFunction_;
-    std::unordered_map<std::string, v8::Persistent<v8::Object>*> loadedModules_;
+    std::unique_ptr<v8::Persistent<v8::Function>> requireFunction_;
+    std::unique_ptr<v8::Persistent<v8::Function>> requireFactoryFunction_;
+    std::unordered_map<std::string, std::shared_ptr<v8::Persistent<v8::Object>>> loadedModules_;
 
-    class TempModule {
+    struct TempModule {
     public:
-        TempModule(ModuleInternal* module, std::string modulePath, std::string cacheKey, v8::Persistent<v8::Object>* poModuleObj)
+        TempModule(ModuleInternal* module, std::string modulePath, std::string cacheKey, std::shared_ptr<v8::Persistent<v8::Object>> poModuleObj)
             : module_(module), dispose_(true), modulePath_(modulePath), cacheKey_(cacheKey) {
-            module->loadedModules_.insert(std::make_pair(modulePath, poModuleObj));
-            module->loadedModules_.insert(std::make_pair(cacheKey, poModuleObj));
+            module->loadedModules_.emplace(modulePath, poModuleObj);
+            module->loadedModules_.emplace(cacheKey, poModuleObj);
         }
 
         ~TempModule() {

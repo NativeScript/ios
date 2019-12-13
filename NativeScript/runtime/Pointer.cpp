@@ -29,7 +29,7 @@ Local<Value> Pointer::NewInstance(Isolate* isolate, void* handle) {
 
 Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
     auto cache = Caches::Get(isolate);
-    Persistent<v8::Function>* pointerCtorFunc = cache->PointerCtorFunc;
+    Persistent<v8::Function>* pointerCtorFunc = cache->PointerCtorFunc.get();
     if (pointerCtorFunc != nullptr) {
         return pointerCtorFunc->Get(isolate);
     }
@@ -58,7 +58,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
     Pointer::RegisterToDecimalStringMethod(isolate, prototype);
     Pointer::RegisterToNumberMethod(isolate, prototype);
 
-    cache->PointerCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
+    cache->PointerCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
 
     return ctorFunc;
 }
@@ -106,7 +106,7 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
 
         ObjectManager::Register(isolate, info.This());
 
-        cache->PointerInstances.insert(std::make_pair(ptr, new Persistent<Object>(isolate, info.This())));
+        cache->PointerInstances.emplace(ptr, std::make_shared<Persistent<Object>>(isolate, info.This()));
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8(isolate);
     }

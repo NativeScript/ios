@@ -16,8 +16,8 @@ namespace tns {
 
 void ArgConverter::Init(Isolate* isolate, GenericNamedPropertyGetterCallback structPropertyGetter, GenericNamedPropertySetterCallback structPropertySetter) {
     auto cache = Caches::Get(isolate);
-    cache->EmptyObjCtorFunc = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate));
-    cache->EmptyStructCtorFunc = new Persistent<v8::Function>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter));
+    cache->EmptyObjCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate));
+    cache->EmptyStructCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter));
 }
 
 Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const MethodMeta* meta, bool isMethodCallback) {
@@ -87,7 +87,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
 
-        Persistent<Value>* poCallback = data->callback_;
+        std::shared_ptr<Persistent<Value>> poCallback = data->callback_;
         ObjectWeakCallbackState* weakCallbackState = new ObjectWeakCallbackState(poCallback);
         poCallback->SetWeak(weakCallbackState, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
 
@@ -137,8 +137,8 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
                 //TODO: We are creating a persistent object here that will never be GCed
                 // We need to determine the lifetime of this object
-                Persistent<Value>* poObj = new Persistent<Value>(data->isolate_, thiz);
-                cache->Instances.insert(std::make_pair(self_, poObj));
+                std::shared_ptr<Persistent<Value>> poSelf = std::make_shared<Persistent<Value>>(data->isolate_, thiz);
+                cache->Instances.emplace(self_, poSelf);
             }
         }
 
@@ -345,12 +345,12 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
     Local<Object> thiz = info.This();
     ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
 
-    Persistent<Value>* poThiz = ObjectManager::Register(isolate, thiz);
 
     auto cache = Caches::Get(isolate);
     auto it = cache->Instances.find(result);
     if (it == cache->Instances.end()) {
-        cache->Instances.insert(std::make_pair(result, poThiz));
+        std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(isolate, thiz);
+        cache->Instances.emplace(result, poThiz);
     } else {
         Local<Value> obj = it->second->Get(isolate);
         info.GetReturnValue().Set(obj);
@@ -529,7 +529,8 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
 
     if (wrapper->Type() == WrapperType::Struct) {
         if (receiver.IsEmpty()) {
-            receiver = CreateEmptyStruct(context);
+            std::shared_ptr<Persistent<Value>> poStruct = CreateEmptyStruct(context);
+            receiver = poStruct->Get(isolate).As<Object>();
         }
 
         StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
@@ -566,8 +567,9 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
        if (it != cache->Instances.end()) {
            receiver = it->second->Get(isolate).As<Object>();
        } else {
-           receiver = CreateEmptyObject(context);
-           cache->Instances.insert(std::make_pair(target, new Persistent<Value>(isolate, receiver)));
+           std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context);
+           receiver = poValue->Get(isolate).As<Object>();
+           cache->Instances.emplace(target, poValue);
        }
     }
 
@@ -683,21 +685,21 @@ const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
     return protocolMeta;
 }
 
-Local<Object> ArgConverter::CreateEmptyObject(Local<Context> context) {
+std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context) {
     Isolate* isolate = context->GetIsolate();
-    Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyObjCtorFunc;
+    Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyObjCtorFunc.get();
     assert(ctorFunc != nullptr);
     return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
 
-Local<Object> ArgConverter::CreateEmptyStruct(Local<Context> context) {
+std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyStruct(Local<Context> context) {
     Isolate* isolate = context->GetIsolate();
-    Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyStructCtorFunc;
+    Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyStructCtorFunc.get();
     assert(ctorFunc != nullptr);
     return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
 
-Local<Object> ArgConverter::CreateEmptyInstance(Local<Context> context, Persistent<v8::Function>* ctorFunc) {
+std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(Local<Context> context, Persistent<v8::Function>* ctorFunc) {
     Isolate* isolate = context->GetIsolate();
     Local<v8::Function> emptyCtorFunc = ctorFunc->Get(isolate);
     Local<Value> value;
@@ -706,9 +708,9 @@ Local<Object> ArgConverter::CreateEmptyInstance(Local<Context> context, Persiste
     }
     Local<Object> result = value.As<Object>();
 
-    ObjectManager::Register(isolate, result);
+    std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, result);
 
-    return result;
+    return poValue;
 }
 
 Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, GenericNamedPropertyGetterCallback propertyGetter, GenericNamedPropertySetterCallback propertySetter) {

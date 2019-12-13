@@ -37,14 +37,14 @@ public:
         return currentRuntime_->WorkerId() > 0;
     }
 
-    static v8::Platform* GetPlatform() {
-        return platform_;
+    static std::unique_ptr<v8::Platform> GetPlatform() {
+        return std::move(platform_);
     }
 
     static id GetAppConfigValue(std::string key);
 private:
     static thread_local Runtime* currentRuntime_;
-    static v8::Platform* platform_;
+    static std::unique_ptr<v8::Platform> platform_;
     static bool mainThreadInitialized_;
 
     void DefineGlobalObject(v8::Local<v8::Context> context);
@@ -54,7 +54,7 @@ private:
     void DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     static void PerformanceNowCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     v8::Isolate* isolate_;
-    ModuleInternal moduleInternal_;
+    std::unique_ptr<ModuleInternal> moduleInternal_;
     int workerId_;
 };
 

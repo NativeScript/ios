@@ -363,7 +363,7 @@ Local<v8::String> tns::JsonStringifyObject(Isolate* isolate, Local<Value> value,
 }
 
 Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
-    Caches* caches = Caches::Get(isolate);
+    std::shared_ptr<Caches> caches = Caches::Get(isolate);
     if (caches->SmartJSONStringifyFunc != nullptr) {
         return caches->SmartJSONStringifyFunc->Get(isolate);
     }
@@ -410,7 +410,7 @@ Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
 
     Local<v8::Function> smartStringifyFunction = result.As<v8::Function>();
 
-    caches->SmartJSONStringifyFunc = new Persistent<v8::Function>(isolate, smartStringifyFunction);
+    caches->SmartJSONStringifyFunc = std::make_unique<Persistent<v8::Function>>(isolate, smartStringifyFunction);
 
     return smartStringifyFunction;
 }

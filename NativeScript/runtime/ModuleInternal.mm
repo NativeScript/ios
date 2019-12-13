@@ -10,11 +10,7 @@ using namespace v8;
 
 namespace tns {
 
-ModuleInternal::ModuleInternal()
-    : requireFunction_(nullptr), requireFactoryFunction_(nullptr) {
-}
-
-void ModuleInternal::Init(Isolate* isolate) {
+ModuleInternal::ModuleInternal(Isolate* isolate) {
     std::string requireFactoryScript =
         "(function() { "
         "    function require_factory(requireInternal, dirName) { "
@@ -42,10 +38,10 @@ void ModuleInternal::Init(Isolate* isolate) {
     }
     assert(!result.IsEmpty() && result->IsFunction());
 
-    requireFactoryFunction_ = new Persistent<v8::Function>(isolate, result.As<v8::Function>());
+    this->requireFactoryFunction_ = std::make_unique<Persistent<v8::Function>>(isolate, result.As<v8::Function>());
 
     Local<FunctionTemplate> requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
-    requireFunction_ = new Persistent<v8::Function>(isolate, requireFuncTemplate->GetFunction(context).ToLocalChecked());
+    this->requireFunction_ = std::make_unique<Persistent<v8::Function>>(isolate, requireFuncTemplate->GetFunction(context).ToLocalChecked());
 
     Local<v8::Function> globalRequire = GetRequireFunction(isolate, RuntimeConfig.ApplicationPath);
     bool success = global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
@@ -68,7 +64,7 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
 Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const std::string& dirName) {
     Local<v8::Function> requireFuncFactory = requireFactoryFunction_->Get(isolate);
     Local<Context> context = isolate->GetCurrentContext();
-    Local<v8::Function> requireInternalFunc = requireFunction_->Get(isolate);
+    Local<v8::Function> requireInternalFunc = this->requireFunction_->Get(isolate);
     Local<Value> args[2] {
         requireInternalFunc, tns::ToV8String(isolate, dirName.c_str())
     };
@@ -190,7 +186,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     success = moduleObj->DefineOwnProperty(context, tns::ToV8String(isolate, "id"), fileName, readOnlyFlags).FromMaybe(false);
     assert(success);
 
-    Persistent<Object>* poModuleObj = new Persistent<Object>(isolate, moduleObj);
+    std::shared_ptr<Persistent<Object>> poModuleObj = std::make_shared<Persistent<Object>>(isolate, moduleObj);
     TempModule tempModule(this, modulePath, cacheKey, poModuleObj);
 
     Local<Script> script = LoadScript(isolate, modulePath);
@@ -250,8 +246,7 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
 
     json = value.As<Object>();
 
-    Persistent<Object>* poJson = new Persistent<Object>(isolate, json);
-    this->loadedModules_.insert(std::make_pair(modulePath, poJson));
+    this->loadedModules_.emplace(modulePath, std::make_shared<Persistent<Object>>(isolate, json));
 
     return json;
 }
