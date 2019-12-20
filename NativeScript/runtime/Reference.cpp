@@ -33,7 +33,7 @@ Local<Value> Reference::FromPointer(Isolate* isolate, Local<Value> type, void* h
 
 Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     auto cache = Caches::Get(isolate);
-    Persistent<v8::Function>* interopReferenceCtor = cache->InteropReferenceCtorFunc;
+    Persistent<v8::Function>* interopReferenceCtor = cache->InteropReferenceCtorFunc.get();
     if (interopReferenceCtor != nullptr) {
         return interopReferenceCtor->Get(isolate);
     }
@@ -58,7 +58,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     Local<Object> prototype = prototypeValue.As<Object>();
     Reference::RegisterToStringMethod(isolate, prototype);
 
-    cache->InteropReferenceCtorFunc = new Persistent<v8::Function>(isolate, ctorFunc);
+    cache->InteropReferenceCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
 
     return ctorFunc;
 }

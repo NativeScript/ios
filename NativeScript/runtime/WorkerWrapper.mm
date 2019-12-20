@@ -50,7 +50,7 @@ void WorkerWrapper::PostMessage(std::string message) {
     }
 }
 
-void WorkerWrapper::Start(Persistent<Value>* poWorker, std::function<Isolate* ()> func) {
+void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker, std::function<Isolate* ()> func) {
     this->poWorker_ = poWorker;
     nextId_++;
     this->workerId_ = nextId_;

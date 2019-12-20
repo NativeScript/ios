@@ -94,8 +94,8 @@ public:
         DefaultPlatform::CallDelayedOnWorkerThread(move(task), 0);
     }
 
-    static Platform* CreateDefaultPlatform() {
-        return NewDefaultPlatform().release();
+    static std::unique_ptr<Platform> CreateDefaultPlatform() {
+        return NewDefaultPlatform();
     }
 private:
     static unique_ptr<Platform> NewDefaultPlatform() {

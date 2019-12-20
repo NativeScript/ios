@@ -174,7 +174,7 @@ void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
         label = tns::ToString(isolate, labelString);
     }
 
-    Caches* cache = Caches::Get(isolate);
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
     auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
     double timeStamp = nano.time_since_epoch().count();
@@ -196,7 +196,7 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
         label = tns::ToString(isolate, labelString);
     }
 
-    Caches* cache = Caches::Get(isolate);
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto itTimersMap = cache->Timers.find(label);
     if (itTimersMap == cache->Timers.end()) {
         std::string warning = std::string("No such label '" + label + "' for console.timeEnd()");

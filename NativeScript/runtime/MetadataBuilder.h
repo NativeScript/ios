@@ -17,7 +17,7 @@ public:
     static v8::Local<v8::Function> GetOrCreateStructCtorFunction(v8::Isolate* isolate, StructInfo structInfo);
     static void StructPropertyGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void StructPropertySetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
-    static v8::Persistent<v8::Function>* CreateToStringFunction(v8::Isolate* isolate);
+    static void CreateToStringFunction(v8::Isolate* isolate);
 private:
     static v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplateInternal(v8::Isolate* isolate, const BaseClassMeta* meta, std::unordered_map<std::string, uint8_t>& instanceMembers, std::unordered_map<std::string, uint8_t>& staticMembers);
     static void GlobalPropertyGetter(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);

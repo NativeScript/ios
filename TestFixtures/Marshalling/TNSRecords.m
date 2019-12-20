@@ -23,6 +23,11 @@ NestedSimpleStruct getNestedStruct() {
     return simpleStruct;
 }
 
+CGRect getRectStruct() {
+    CGRect result = { .origin = { .x = 10, .y = 20 }, .size = { .width = 30, .height = 40 } };
+    return result;
+}
+
 TNSComplexStruct getComplexStruct() {
     TNSComplexStruct result = { .x1 = 100, .y1 = { { .x2 = 10, .y2 = { .x3 = { 1, 2 } } }, { .x2 = 20, .y2 = { .x3 = { 3, 4 } } } }, .x4 = 123456 };
 

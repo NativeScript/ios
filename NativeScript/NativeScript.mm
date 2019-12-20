@@ -19,7 +19,7 @@ using namespace tns;
 
 @implementation NativeScript
 
-static Runtime* runtime_ = nullptr;
+static std::shared_ptr<Runtime> runtime_;
 
 + (void)start:(Config*)config {
     RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
@@ -29,7 +29,7 @@ static Runtime* runtime_ = nullptr;
     RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
 
     Runtime::Initialize();
-    runtime_ = new Runtime();
+    runtime_ = std::make_shared<Runtime>();
 
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     runtime_->Init();
@@ -38,7 +38,7 @@ static Runtime* runtime_ = nullptr;
     printf("Runtime initialization took %llims\n", duration);
 
     if (config.IsDebug) {
-        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(runtime_);
+        v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(runtime_.get());
         inspectorClient->init();
         inspectorClient->registerModules();
         inspectorClient->connect([config ArgumentsCount], [config Arguments]);
@@ -47,6 +47,8 @@ static Runtime* runtime_ = nullptr;
     runtime_->RunMainScript();
 
     tns::Tasks::Drain();
+
+    runtime_.reset();
 }
 
 + (bool)liveSync {

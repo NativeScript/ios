@@ -41,15 +41,15 @@ private:
 
     struct PropertyCallbackContext {
     public:
-        PropertyCallbackContext(v8::Isolate* isolate, v8::Persistent<v8::Function>* callback, v8::Persistent<v8::Object>* implementationObject, const PropertyMeta* meta)
+        PropertyCallbackContext(v8::Isolate* isolate, std::shared_ptr<v8::Persistent<v8::Function>> callback, std::shared_ptr<v8::Persistent<v8::Object>> implementationObject, const PropertyMeta* meta)
             : isolate_(isolate),
               callback_(callback),
               implementationObject_(implementationObject),
               meta_(meta) {
             }
         v8::Isolate* isolate_;
-        v8::Persistent<v8::Function>* callback_;
-        v8::Persistent<v8::Object>* implementationObject_;
+        std::shared_ptr<v8::Persistent<v8::Function>> callback_;
+        std::shared_ptr<v8::Persistent<v8::Object>> implementationObject_;
         const PropertyMeta* meta_;
     };
 };

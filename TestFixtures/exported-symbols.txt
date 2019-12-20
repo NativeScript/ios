@@ -190,6 +190,7 @@ _doubleMatrixDouble2x4
 _doubleMatrixDouble2x3
 _doubleMatrixDouble2x2
 _getNestedStruct
+_getRectStruct
 _getFloat2
 _getFloat3
 _getFloat4

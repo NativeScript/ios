@@ -66,7 +66,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
         WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
         tns::SetValue(isolate, thiz, worker);
-        Persistent<Value>* poWorker = ObjectManager::Register(isolate, thiz);
+        std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(isolate, thiz);
 
         std::function<Isolate* ()> func([worker, workerPath]() {
             tns::Runtime* runtime = new tns::Runtime();
@@ -88,7 +88,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
         worker->Start(poWorker, func);
 
-        Caches::WorkerState* state = new Caches::WorkerState(isolate, poWorker, worker);
+        std::shared_ptr<Caches::WorkerState> state = std::make_shared<Caches::WorkerState>(isolate, poWorker, worker);
         int workerId = worker->Id();
         Caches::Workers.Insert(workerId, state);
     } catch (NativeScriptException& ex) {
@@ -111,7 +111,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
 
         Runtime* runtime = Runtime::GetCurrentRuntime();
         int workerId = runtime->WorkerId();
-        Caches::WorkerState* state = Caches::Workers.Get(workerId);
+        std::shared_ptr<Caches::WorkerState> state = Caches::Workers.Get(workerId);
         assert(state != nullptr);
         WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
         if (!worker->IsRunning()) {
@@ -201,7 +201,7 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::str
 void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
     Runtime* runtime = Runtime::GetCurrentRuntime();
     int workerId = runtime->WorkerId();
-    Caches::WorkerState* state = Caches::Workers.Get(workerId);
+    std::shared_ptr<Caches::WorkerState> state = Caches::Workers.Get(workerId);
     assert(state != nullptr);
     WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
 

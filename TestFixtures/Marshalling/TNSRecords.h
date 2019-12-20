@@ -133,6 +133,7 @@ typedef struct StructWithVectorAndDouble {
 } StructWithVectorAndDouble;
 
 TNSVerySimpleStruct getSimpleStruct();
+CGRect getRectStruct();
 TNSComplexStruct getComplexStruct();
 matrix_float2x2 getMatrixFloat2x2();
 matrix_float2x3 getMatrixFloat2x3();

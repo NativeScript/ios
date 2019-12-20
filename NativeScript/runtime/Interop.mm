@@ -293,7 +293,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             Local<Value> callbackValue = funcWrapper->Function()->Get(isolate);
             assert(callbackValue->IsFunction());
             Local<v8::Function> callback = callbackValue.As<v8::Function>();
-            Persistent<Value>* poCallback = new Persistent<Value>(isolate, callback);
+            std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, callback);
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 0, argsCount, functionTypeEncoding);
 
             void* functionPointer = (void*)Interop::CreateMethod(0, argsCount, functionTypeEncoding, ArgConverter::MethodCallback, userData);
@@ -308,7 +308,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
         int argsCount = typeEncoding->details.block.signature.count - 1;
 
-        Persistent<Value>* poCallback = new Persistent<Value>(isolate, arg);
+        std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, arg);
         MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
         CFTypeRef blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
 
@@ -436,13 +436,15 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 }
                 Local<v8::Array> array = Interop::ToArray(isolate, obj);
                 ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
-                Caches::Get(isolate)->Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
+                std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
+                Caches::Get(isolate)->Instances.emplace(adapter, poValue);
                 Interop::SetValue(dest, adapter);
                 return;
             } else if ((klass == [NSData class] || klass == [NSMutableData class]) && (arg->IsArrayBuffer() || arg->IsArrayBufferView())) {
                 Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
                 NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
-                Caches::Get(isolate)->Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
+                std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
+                Caches::Get(isolate)->Instances.emplace(adapter, poValue);
                 Interop::SetValue(dest, adapter);
                 return;
             } else if (klass == [NSDictionary class]) {
@@ -455,7 +457,8 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                     }
                 }
                 DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
-                Caches::Get(isolate)->Instances.emplace(std::make_pair(adapter, new Persistent<Value>(isolate, obj)));
+                std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
+                Caches::Get(isolate)->Instances.emplace(adapter, poValue);
                 Interop::SetValue(dest, adapter);
                 return;
             }
@@ -551,19 +554,25 @@ id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
     assert(false);
 }
 
-Local<Value> Interop::StructToValue(Isolate* isolate, void* result, StructInfo structInfo, bool copyStructs) {
+Local<Value> Interop::StructToValue(Isolate* isolate, void* result, StructInfo structInfo, std::shared_ptr<Persistent<Value>> parentStruct) {
     StructWrapper* wrapper = nullptr;
-    if (copyStructs) {
+    if (parentStruct == nullptr) {
         ffi_type* ffiType = structInfo.FFIType();
         void* dest = malloc(ffiType->size);
         memcpy(dest, result, ffiType->size);
 
-        wrapper = new StructWrapper(structInfo, dest);
+        wrapper = new StructWrapper(structInfo, dest, nullptr);
     } else {
-        wrapper = new StructWrapper(structInfo, result);
+        Local<Value> parent = parentStruct->Get(isolate);
+        BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parent);
+        if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
+            StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
+            parentStructWrapper->IncrementChildren();
+        }
+        wrapper = new StructWrapper(structInfo, result, parentStruct);
     }
 
-    Caches* cache = Caches::Get(isolate);
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
     std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
     auto it = cache->StructInstances.find(key);
     if (it != cache->StructInstances.end()) {
@@ -571,9 +580,9 @@ Local<Value> Interop::StructToValue(Isolate* isolate, void* result, StructInfo s
     }
 
     Local<Value> res = ArgConverter::ConvertArgument(isolate, wrapper);
-    Persistent<Value>* poResult = new Persistent<Value>(isolate, res);
-    if (copyStructs) {
-        cache->StructInstances.insert(std::make_pair(key, poResult));
+    if (parentStruct == nullptr) {
+        std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(isolate, res);
+        cache->StructInstances.emplace(key, poResult);
     }
     return res;
 }
@@ -683,7 +692,7 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
 }
 
-Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, bool copyStructs, bool isStructMember) {
+Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember) {
     if (typeEncoding->type == BinaryTypeEncodingType::ExtVectorEncoding) {
         ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, isStructMember);
         const TypeEncoding* innerTypeEncoding = typeEncoding->details.extVector.getInnerType();
@@ -703,7 +712,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
         StructInfo structInfo = FFICall::GetStructInfo(structMeta, structName);
-        Local<Value> value = Interop::StructToValue(isolate, result, structInfo, copyStructs);
+        Local<Value> value = Interop::StructToValue(isolate, result, structInfo, parentStruct);
         return value;
     }
 
@@ -713,7 +722,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
         StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
         void* result = call->ResultBuffer();
-        Local<Value> value = Interop::StructToValue(isolate, result, structInfo, copyStructs);
+        Local<Value> value = Interop::StructToValue(isolate, result, structInfo, parentStruct);
         return value;
     }
 
@@ -774,7 +783,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return Null(isolate);
         }
 
-        Caches* cache = Caches::Get(isolate);
+        std::shared_ptr<Caches> cache = Caches::Get(isolate);
         while (true) {
             const char* name = class_getName(result);
 
@@ -838,7 +847,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
             ffi_call(cif, FFI_FN(block->invoke), call.ResultBuffer(), call.ArgsArray());
 
-            Local<Value> result = Interop::GetResult(isolate, enc, &call, true, true);
+            Local<Value> result = Interop::GetResult(isolate, enc, &call, true, nullptr);
 
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&callback);
@@ -1195,7 +1204,7 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
 
     Local<v8::Function> sliceFunc;
     auto cache = Caches::Get(isolate);
-    Persistent<v8::Function>* poSliceFunc = cache->SliceFunc;
+    Persistent<v8::Function>* poSliceFunc = cache->SliceFunc.get();
 
     if (poSliceFunc != nullptr) {
         sliceFunc = poSliceFunc->Get(isolate);
@@ -1215,7 +1224,7 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
 
         assert(tempSliceFunc->IsFunction());
         sliceFunc = tempSliceFunc.As<v8::Function>();
-        cache->SliceFunc = new Persistent<v8::Function>(isolate, sliceFunc);
+        cache->SliceFunc = std::make_unique<Persistent<v8::Function>>(isolate, sliceFunc);
     }
 
     Local<Value> sliceArgs[1] { object };
@@ -1307,7 +1316,7 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
     }
 
     @autoreleasepool {
-        Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, marshalToPrimitive, true);
+        Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, marshalToPrimitive, nullptr);
 
         return result;
     }

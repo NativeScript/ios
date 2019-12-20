@@ -61,7 +61,7 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
 }
 
 Local<Object> Interop::GetInteropType(Isolate* isolate, std::string name) {
-    Caches* cache = Caches::Get(isolate);
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto it = cache->PrimitiveInteropTypes.find(name);
     if (it == cache->PrimitiveInteropTypes.end()) {
         // TODO: throw error for unknown primitive type
@@ -91,11 +91,10 @@ void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::st
     tns::SetValue(isolate, result, wrapper);
     bool success = types->Set(context, tns::ToV8String(isolate, name), result).FromMaybe(false);
 
-    Caches* cache = Caches::Get(isolate);
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto it = cache->PrimitiveInteropTypes.find(name);
     if (it == cache->PrimitiveInteropTypes.end()) {
-        Persistent<Object>* poResult = new Persistent<Object>(isolate, result);
-        cache->PrimitiveInteropTypes.emplace(name, poResult);
+        cache->PrimitiveInteropTypes.emplace(name, std::make_unique<Persistent<Object>>(isolate, result));
     }
 
     assert(success);
