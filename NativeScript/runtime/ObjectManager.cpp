@@ -8,6 +8,8 @@ using namespace std;
 
 namespace tns {
 
+static Class NSTimerClass = objc_getClass("NSTimer");
+
 std::shared_ptr<Persistent<Value>> ObjectManager::Register(Isolate* isolate, const Local<Value> obj) {
     std::shared_ptr<Persistent<Value>> objectHandle = std::make_shared<Persistent<Value>>(isolate, obj);
     ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
@@ -80,8 +82,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             id target = objCObjectWrapper->Data();
             if (target != nil) {
                 long retainCount = 0;
-                if (![target isKindOfClass:[NSTimer class]]) { // The retainCount method of NSTimer instances might sometimes hang indefinitely
-                    retainCount = [target retainCount];
+
+                if (!tns::IsInstanceOf(target, NSTimerClass)) { // The CFGetRetainCount method of uninitialized NSTimer instances (NSTimer.alloc()) hangs indefinitely
+                    retainCount = CFGetRetainCount(target);
                 }
 
                 if (retainCount > 4) {

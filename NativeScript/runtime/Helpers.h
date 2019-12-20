@@ -61,6 +61,8 @@ const std::string GetCurrentScriptUrl(v8::Isolate* isolate);
 
 bool LiveSync(v8::Isolate* isolate);
 
+bool IsInstanceOf(id obj, Class clazz);
+
 }
 
 #endif /* Helpers_h */
