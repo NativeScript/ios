@@ -366,6 +366,7 @@ const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, c
         initializerArgs = GetInitializerArgs(isolate, info[0].As<Object>(), constructorTokens);
     }
 
+    bool found = false;
     do {
         KnownUnknownClassPair klasses(klass);
         std::vector<const MethodMeta*> initializers = interfaceMeta->initializersWithProtocols(klasses, ProtocolMetas());
@@ -376,6 +377,7 @@ const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, c
                     candidates.clear();
                     candidates.push_back(candidate);
                     args = initializerArgs;
+                    found = true;
                     break;
                 }
             }
@@ -384,6 +386,11 @@ const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, c
                 candidates.push_back(candidate);
             }
         }
+
+        if (found) {
+            break;
+        }
+
         interfaceMeta = interfaceMeta->baseMeta();
     } while (interfaceMeta);
 
