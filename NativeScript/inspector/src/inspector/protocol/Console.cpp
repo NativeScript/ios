@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace Console {
@@ -91,6 +94,20 @@ std::unique_ptr<protocol::DictionaryValue> ConsoleMessage::toValue() const
     return result;
 }
 
+void ConsoleMessage::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("source"), m_source, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("level"), m_level, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("line"), m_line, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("column"), m_column, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ConsoleMessage> ConsoleMessage::clone() const
 {
     ErrorSupport errors;
@@ -121,6 +138,15 @@ std::unique_ptr<protocol::DictionaryValue> MessageAddedNotification::toValue() c
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("message", ValueConversions<protocol::Console::ConsoleMessage>::toValue(m_message.get()));
     return result;
+}
+
+void MessageAddedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("message"), m_message, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<MessageAddedNotification> MessageAddedNotification::clone() const

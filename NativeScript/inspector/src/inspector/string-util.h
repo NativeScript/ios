@@ -93,6 +93,10 @@ class Binary {
  public:
   Binary() = default;
 
+  void AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EncodeBinary(v8_crdtp::span<uint8_t>(data(), size()), out);
+  }
+
   const uint8_t* data() const { return bytes_->data(); }
   size_t size() const { return bytes_->size(); }
   String toBase64() const { UNIMPLEMENTED(); }

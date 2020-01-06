@@ -69,7 +69,7 @@ DispatchResponse V8OverlayAgentImpl::hideHighlight() {
 }
 
 DispatchResponse V8OverlayAgentImpl::getHighlightObjectForTest(int in_nodeId,
-                                                               std::unique_ptr<protocol::DictionaryValue>* out_highlight) {
+                                                               Maybe<bool> in_includeDistance, Maybe<bool> in_includeStyle, std::unique_ptr<protocol::DictionaryValue>* out_highlight) {
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
 
@@ -105,7 +105,7 @@ DispatchResponse V8OverlayAgentImpl::setShowViewportSizeOnResize(bool in_show) {
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
 
-DispatchResponse V8OverlayAgentImpl::setSuspended(bool in_suspended) {
+DispatchResponse V8OverlayAgentImpl::setShowLayoutShiftRegions(bool in_result) {
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
     

@@ -239,7 +239,7 @@ DispatchResponse V8DOMAgentImpl::getFlattenedDocument(Maybe<int> in_depth, Maybe
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
 
-DispatchResponse V8DOMAgentImpl::getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, int* out_backendNodeId, Maybe<int>* out_nodeId) {
+DispatchResponse V8DOMAgentImpl::getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, Maybe<bool> in_ignorePointerEventsNone, int* out_backendNodeId, String* out_frameId, Maybe<int>* out_nodeId) {
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
 
@@ -316,6 +316,14 @@ DispatchResponse V8DOMAgentImpl::undo() {
 }
 
 DispatchResponse V8DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_backendNodeId, Maybe<int>* out_nodeId) {
+    return protocol::DispatchResponse::Error("Protocol command not supported.");
+}
+
+DispatchResponse V8DOMAgentImpl::setNodeStackTracesEnabled(bool in_enable) {
+    return protocol::DispatchResponse::Error("Protocol command not supported.");
+}
+
+DispatchResponse V8DOMAgentImpl::getNodeStackTraces(int in_nodeId, Maybe<protocol::Runtime::StackTrace>* out_creation) {
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
 

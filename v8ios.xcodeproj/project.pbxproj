@@ -353,6 +353,7 @@
 		C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2A5F8682359AEB500074AFA /* ExtVector.cpp */; };
 		C2A5F86B2359AEB600074AFA /* ExtVector.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A5F8692359AEB600074AFA /* ExtVector.h */; };
 		C2A6EF3123745A0B00E8FBE7 /* MetadataInlines.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A6EF3023745A0B00E8FBE7 /* MetadataInlines.h */; };
+		C2B07AFA23C38FDA00E245BE /* serializer_traits.h in Headers */ = {isa = PBXBuildFile; fileRef = C2B07AF923C38FDA00E245BE /* serializer_traits.h */; };
 		C2B30FD9238418CA009D6A46 /* json_platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C2B30FD1238418CA009D6A46 /* json_platform.h */; };
 		C2B30FDA238418CA009D6A46 /* export.h in Headers */ = {isa = PBXBuildFile; fileRef = C2B30FD2238418CA009D6A46 /* export.h */; };
 		C2B30FDB238418CA009D6A46 /* status.h in Headers */ = {isa = PBXBuildFile; fileRef = C2B30FD3238418CA009D6A46 /* status.h */; };
@@ -920,6 +921,7 @@
 		C2A5F8682359AEB500074AFA /* ExtVector.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ExtVector.cpp; sourceTree = "<group>"; };
 		C2A5F8692359AEB600074AFA /* ExtVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ExtVector.h; sourceTree = "<group>"; };
 		C2A6EF3023745A0B00E8FBE7 /* MetadataInlines.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MetadataInlines.h; sourceTree = "<group>"; };
+		C2B07AF923C38FDA00E245BE /* serializer_traits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = serializer_traits.h; sourceTree = "<group>"; };
 		C2B30FD1238418CA009D6A46 /* json_platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = json_platform.h; sourceTree = "<group>"; };
 		C2B30FD2238418CA009D6A46 /* export.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = export.h; sourceTree = "<group>"; };
 		C2B30FD3238418CA009D6A46 /* status.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = status.h; sourceTree = "<group>"; };
@@ -1727,6 +1729,7 @@
 		C2B30FD0238418CA009D6A46 /* crdtp */ = {
 			isa = PBXGroup;
 			children = (
+				C2B07AF923C38FDA00E245BE /* serializer_traits.h */,
 				C23011AA239FF975003CFE86 /* serializable.h */,
 				C2B30FD1238418CA009D6A46 /* json_platform.h */,
 				C2B30FD2238418CA009D6A46 /* export.h */,
@@ -1937,6 +1940,7 @@
 				C247C16622F82842001D2CA2 /* v8-version.h in Headers */,
 				C247C3A022F828E3001D2CA2 /* semaphore.h in Headers */,
 				C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */,
+				C2B07AFA23C38FDA00E245BE /* serializer_traits.h in Headers */,
 				C247C38022F828E3001D2CA2 /* v8-schema-agent-impl.h in Headers */,
 				C247C39A22F828E3001D2CA2 /* globals.h in Headers */,
 				C247C33722F828E3001D2CA2 /* trace_event_common.h in Headers */,

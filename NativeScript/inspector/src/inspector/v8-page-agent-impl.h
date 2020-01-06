@@ -47,6 +47,9 @@ public:
     DispatchResponse clearCompilationCache() override;
     DispatchResponse generateTestReport(const String& in_message, Maybe<String> in_group) override;
     DispatchResponse waitForDebugger() override;
+    DispatchResponse setInterceptFileChooserDialog(bool in_enabled) override;
+    DispatchResponse getInstallabilityErrors(std::unique_ptr<protocol::Array<String>>* out_errors) override;
+    DispatchResponse getManifestIcons(Maybe<protocol::Binary>* out_primaryIcon) override;
 
     void restore();
     void reset();

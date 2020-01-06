@@ -220,6 +220,18 @@ DispatchResponse V8PageAgentImpl::waitForDebugger() {
     return protocol::DispatchResponse::Error("Protocol command not supported.");
 }
 
+DispatchResponse V8PageAgentImpl::setInterceptFileChooserDialog(bool in_enabled) {
+    return protocol::DispatchResponse::Error("Protocol command not supported.");
+}
+
+DispatchResponse V8PageAgentImpl::getInstallabilityErrors(std::unique_ptr<protocol::Array<String>>* out_errors) {
+    return protocol::DispatchResponse::Error("Protocol command not supported.");
+}
+
+DispatchResponse V8PageAgentImpl::getManifestIcons(Maybe<protocol::Binary>* out_primaryIcon) {
+    return protocol::DispatchResponse::Error("Protocol command not supported.");
+}
+
 void V8PageAgentImpl::ReadEntries(std::string baseDir, std::vector<V8PageAgentImpl::PageEntry>& entries) {
     DIR* dir = opendir(baseDir.c_str());
     if (dir == nullptr) {

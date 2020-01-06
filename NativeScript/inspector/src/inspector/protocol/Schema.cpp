@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace Schema {
@@ -48,6 +51,16 @@ std::unique_ptr<protocol::DictionaryValue> Domain::toValue() const
     return result;
 }
 
+void Domain::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("version"), m_version, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Domain> Domain::clone() const
 {
     ErrorSupport errors;
@@ -62,7 +75,7 @@ std::unique_ptr<StringBuffer> Domain::toJSONString() const
 
 void Domain::writeBinary(std::vector<uint8_t>* out) const
 {
-    toValue()->AppendSerialized(out);
+    AppendSerialized(out);
 }
 
 // static

@@ -29,6 +29,7 @@ using MonotonicTime = double;
 using Headers = Object;
 using ConnectionType = String;
 using CookieSameSite = String;
+using CookiePriority = String;
 class ResourceTiming;
 using ResourcePriority = String;
 class Request;
@@ -42,6 +43,10 @@ class WebSocketResponse;
 class WebSocketFrame;
 class Initiator;
 class Cookie;
+using SetCookieBlockedReason = String;
+using CookieBlockedReason = String;
+class BlockedSetCookieWithReason;
+class BlockedCookieWithReason;
 class AuthChallenge;
 class SignedExchangeSignature;
 class SignedExchangeHeader;
@@ -65,6 +70,8 @@ class WebSocketFrameReceivedNotification;
 class WebSocketFrameSentNotification;
 class WebSocketHandshakeResponseReceivedNotification;
 class WebSocketWillSendHandshakeRequestNotification;
+class RequestWillBeSentExtraInfoNotification;
+class ResponseReceivedExtraInfoNotification;
 
 namespace ResourceTypeEnum {
  extern const char Document[];
@@ -117,7 +124,14 @@ namespace ConnectionTypeEnum {
 namespace CookieSameSiteEnum {
  extern const char Strict[];
  extern const char Lax[];
+ extern const char None[];
 } // namespace CookieSameSiteEnum
+
+namespace CookiePriorityEnum {
+ extern const char Low[];
+ extern const char Medium[];
+ extern const char High[];
+} // namespace CookiePriorityEnum
 
 namespace ResourcePriorityEnum {
  extern const char VeryLow[];
@@ -143,6 +157,33 @@ namespace BlockedReasonEnum {
  extern const char ContentType[];
  extern const char CollapsedByClient[];
 } // namespace BlockedReasonEnum
+
+namespace SetCookieBlockedReasonEnum {
+ extern const char SecureOnly[];
+ extern const char SameSiteStrict[];
+ extern const char SameSiteLax[];
+ extern const char SameSiteUnspecifiedTreatedAsLax[];
+ extern const char SameSiteNoneInsecure[];
+ extern const char UserPreferences[];
+ extern const char SyntaxError[];
+ extern const char SchemeNotSupported[];
+ extern const char OverwriteSecure[];
+ extern const char InvalidDomain[];
+ extern const char InvalidPrefix[];
+ extern const char UnknownError[];
+} // namespace SetCookieBlockedReasonEnum
+
+namespace CookieBlockedReasonEnum {
+ extern const char SecureOnly[];
+ extern const char NotOnPath[];
+ extern const char DomainMismatch[];
+ extern const char SameSiteStrict[];
+ extern const char SameSiteLax[];
+ extern const char SameSiteUnspecifiedTreatedAsLax[];
+ extern const char SameSiteNoneInsecure[];
+ extern const char UserPreferences[];
+ extern const char UnknownError[];
+} // namespace CookieBlockedReasonEnum
 
 namespace SignedExchangeErrorFieldEnum {
  extern const char SignatureSig[];
@@ -211,9 +252,7 @@ public:
     void setReceiveHeadersEnd(double value) { m_receiveHeadersEnd = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ResourceTiming> clone() const;
 
@@ -470,9 +509,7 @@ public:
     void setIsLinkPreload(bool value) { m_isLinkPreload = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Request> clone() const;
 
@@ -627,9 +664,7 @@ public:
     void setSignatureData(const String& value) { m_signatureData = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SignedCertificateTimestamp> clone() const;
 
@@ -794,9 +829,7 @@ public:
     void setCertificateTransparencyCompliance(const String& value) { m_certificateTransparencyCompliance = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SecurityDetails> clone() const;
 
@@ -1011,6 +1044,10 @@ public:
     bool getFromServiceWorker(bool defaultValue) { return m_fromServiceWorker.isJust() ? m_fromServiceWorker.fromJust() : defaultValue; }
     void setFromServiceWorker(bool value) { m_fromServiceWorker = value; }
 
+    bool hasFromPrefetchCache() { return m_fromPrefetchCache.isJust(); }
+    bool getFromPrefetchCache(bool defaultValue) { return m_fromPrefetchCache.isJust() ? m_fromPrefetchCache.fromJust() : defaultValue; }
+    void setFromPrefetchCache(bool value) { m_fromPrefetchCache = value; }
+
     double getEncodedDataLength() { return m_encodedDataLength; }
     void setEncodedDataLength(double value) { m_encodedDataLength = value; }
 
@@ -1030,9 +1067,7 @@ public:
     void setSecurityDetails(std::unique_ptr<protocol::Network::SecurityDetails> value) { m_securityDetails = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Response> clone() const;
 
@@ -1144,6 +1179,12 @@ public:
             return *this;
         }
 
+        ResponseBuilder<STATE>& setFromPrefetchCache(bool value)
+        {
+            m_result->setFromPrefetchCache(value);
+            return *this;
+        }
+
         ResponseBuilder<STATE | EncodedDataLengthSet>& setEncodedDataLength(double value)
         {
             static_assert(!(STATE & EncodedDataLengthSet), "property encodedDataLength should not be set yet");
@@ -1222,6 +1263,7 @@ private:
     Maybe<int> m_remotePort;
     Maybe<bool> m_fromDiskCache;
     Maybe<bool> m_fromServiceWorker;
+    Maybe<bool> m_fromPrefetchCache;
     double m_encodedDataLength;
     Maybe<protocol::Network::ResourceTiming> m_timing;
     Maybe<String> m_protocol;
@@ -1241,9 +1283,7 @@ public:
     void setHeaders(std::unique_ptr<protocol::Network::Headers> value) { m_headers = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketRequest> clone() const;
 
@@ -1324,9 +1364,7 @@ public:
     void setRequestHeadersText(const String& value) { m_requestHeadersText = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketResponse> clone() const;
 
@@ -1435,9 +1473,7 @@ public:
     void setPayloadData(const String& value) { m_payloadData = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketFrame> clone() const;
 
@@ -1540,9 +1576,7 @@ public:
     void setLineNumber(double value) { m_lineNumber = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Initiator> clone() const;
 
@@ -1653,10 +1687,11 @@ public:
     String getSameSite(const String& defaultValue) { return m_sameSite.isJust() ? m_sameSite.fromJust() : defaultValue; }
     void setSameSite(const String& value) { m_sameSite = value; }
 
+    String getPriority() { return m_priority; }
+    void setPriority(const String& value) { m_priority = value; }
+
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Cookie> clone() const;
 
@@ -1674,7 +1709,8 @@ public:
             HttpOnlySet = 1 << 7,
             SecureSet = 1 << 8,
             SessionSet = 1 << 9,
-            AllFieldsSet = (NameSet | ValueSet | DomainSet | PathSet | ExpiresSet | SizeSet | HttpOnlySet | SecureSet | SessionSet | 0)};
+            PrioritySet = 1 << 10,
+            AllFieldsSet = (NameSet | ValueSet | DomainSet | PathSet | ExpiresSet | SizeSet | HttpOnlySet | SecureSet | SessionSet | PrioritySet | 0)};
 
 
         CookieBuilder<STATE | NameSet>& setName(const String& value)
@@ -1746,6 +1782,13 @@ public:
             return *this;
         }
 
+        CookieBuilder<STATE | PrioritySet>& setPriority(const String& value)
+        {
+            static_assert(!(STATE & PrioritySet), "property priority should not be set yet");
+            m_result->setPriority(value);
+            return castState<PrioritySet>();
+        }
+
         std::unique_ptr<Cookie> build()
         {
             static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
@@ -1789,6 +1832,168 @@ private:
     bool m_secure;
     bool m_session;
     Maybe<String> m_sameSite;
+    String m_priority;
+};
+
+
+class  BlockedSetCookieWithReason : public Serializable{
+    PROTOCOL_DISALLOW_COPY(BlockedSetCookieWithReason);
+public:
+    static std::unique_ptr<BlockedSetCookieWithReason> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~BlockedSetCookieWithReason() override { }
+
+    protocol::Array<String>* getBlockedReasons() { return m_blockedReasons.get(); }
+    void setBlockedReasons(std::unique_ptr<protocol::Array<String>> value) { m_blockedReasons = std::move(value); }
+
+    String getCookieLine() { return m_cookieLine; }
+    void setCookieLine(const String& value) { m_cookieLine = value; }
+
+    bool hasCookie() { return m_cookie.isJust(); }
+    protocol::Network::Cookie* getCookie(protocol::Network::Cookie* defaultValue) { return m_cookie.isJust() ? m_cookie.fromJust() : defaultValue; }
+    void setCookie(std::unique_ptr<protocol::Network::Cookie> value) { m_cookie = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<BlockedSetCookieWithReason> clone() const;
+
+    template<int STATE>
+    class BlockedSetCookieWithReasonBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            BlockedReasonsSet = 1 << 1,
+            CookieLineSet = 1 << 2,
+            AllFieldsSet = (BlockedReasonsSet | CookieLineSet | 0)};
+
+
+        BlockedSetCookieWithReasonBuilder<STATE | BlockedReasonsSet>& setBlockedReasons(std::unique_ptr<protocol::Array<String>> value)
+        {
+            static_assert(!(STATE & BlockedReasonsSet), "property blockedReasons should not be set yet");
+            m_result->setBlockedReasons(std::move(value));
+            return castState<BlockedReasonsSet>();
+        }
+
+        BlockedSetCookieWithReasonBuilder<STATE | CookieLineSet>& setCookieLine(const String& value)
+        {
+            static_assert(!(STATE & CookieLineSet), "property cookieLine should not be set yet");
+            m_result->setCookieLine(value);
+            return castState<CookieLineSet>();
+        }
+
+        BlockedSetCookieWithReasonBuilder<STATE>& setCookie(std::unique_ptr<protocol::Network::Cookie> value)
+        {
+            m_result->setCookie(std::move(value));
+            return *this;
+        }
+
+        std::unique_ptr<BlockedSetCookieWithReason> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class BlockedSetCookieWithReason;
+        BlockedSetCookieWithReasonBuilder() : m_result(new BlockedSetCookieWithReason()) { }
+
+        template<int STEP> BlockedSetCookieWithReasonBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<BlockedSetCookieWithReasonBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::BlockedSetCookieWithReason> m_result;
+    };
+
+    static BlockedSetCookieWithReasonBuilder<0> create()
+    {
+        return BlockedSetCookieWithReasonBuilder<0>();
+    }
+
+private:
+    BlockedSetCookieWithReason()
+    {
+    }
+
+    std::unique_ptr<protocol::Array<String>> m_blockedReasons;
+    String m_cookieLine;
+    Maybe<protocol::Network::Cookie> m_cookie;
+};
+
+
+class  BlockedCookieWithReason : public Serializable{
+    PROTOCOL_DISALLOW_COPY(BlockedCookieWithReason);
+public:
+    static std::unique_ptr<BlockedCookieWithReason> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~BlockedCookieWithReason() override { }
+
+    protocol::Array<String>* getBlockedReasons() { return m_blockedReasons.get(); }
+    void setBlockedReasons(std::unique_ptr<protocol::Array<String>> value) { m_blockedReasons = std::move(value); }
+
+    protocol::Network::Cookie* getCookie() { return m_cookie.get(); }
+    void setCookie(std::unique_ptr<protocol::Network::Cookie> value) { m_cookie = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<BlockedCookieWithReason> clone() const;
+
+    template<int STATE>
+    class BlockedCookieWithReasonBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            BlockedReasonsSet = 1 << 1,
+            CookieSet = 1 << 2,
+            AllFieldsSet = (BlockedReasonsSet | CookieSet | 0)};
+
+
+        BlockedCookieWithReasonBuilder<STATE | BlockedReasonsSet>& setBlockedReasons(std::unique_ptr<protocol::Array<String>> value)
+        {
+            static_assert(!(STATE & BlockedReasonsSet), "property blockedReasons should not be set yet");
+            m_result->setBlockedReasons(std::move(value));
+            return castState<BlockedReasonsSet>();
+        }
+
+        BlockedCookieWithReasonBuilder<STATE | CookieSet>& setCookie(std::unique_ptr<protocol::Network::Cookie> value)
+        {
+            static_assert(!(STATE & CookieSet), "property cookie should not be set yet");
+            m_result->setCookie(std::move(value));
+            return castState<CookieSet>();
+        }
+
+        std::unique_ptr<BlockedCookieWithReason> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class BlockedCookieWithReason;
+        BlockedCookieWithReasonBuilder() : m_result(new BlockedCookieWithReason()) { }
+
+        template<int STEP> BlockedCookieWithReasonBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<BlockedCookieWithReasonBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::BlockedCookieWithReason> m_result;
+    };
+
+    static BlockedCookieWithReasonBuilder<0> create()
+    {
+        return BlockedCookieWithReasonBuilder<0>();
+    }
+
+private:
+    BlockedCookieWithReason()
+    {
+    }
+
+    std::unique_ptr<protocol::Array<String>> m_blockedReasons;
+    std::unique_ptr<protocol::Network::Cookie> m_cookie;
 };
 
 
@@ -1818,9 +2023,7 @@ public:
     void setRealm(const String& value) { m_realm = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<AuthChallenge> clone() const;
 
@@ -1935,9 +2138,7 @@ public:
     void setCertificates(std::unique_ptr<protocol::Array<String>> value) { m_certificates = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SignedExchangeSignature> clone() const;
 
@@ -2076,10 +2277,11 @@ public:
     protocol::Array<protocol::Network::SignedExchangeSignature>* getSignatures() { return m_signatures.get(); }
     void setSignatures(std::unique_ptr<protocol::Array<protocol::Network::SignedExchangeSignature>> value) { m_signatures = std::move(value); }
 
+    String getHeaderIntegrity() { return m_headerIntegrity; }
+    void setHeaderIntegrity(const String& value) { m_headerIntegrity = value; }
+
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SignedExchangeHeader> clone() const;
 
@@ -2092,7 +2294,8 @@ public:
             ResponseCodeSet = 1 << 2,
             ResponseHeadersSet = 1 << 3,
             SignaturesSet = 1 << 4,
-            AllFieldsSet = (RequestUrlSet | ResponseCodeSet | ResponseHeadersSet | SignaturesSet | 0)};
+            HeaderIntegritySet = 1 << 5,
+            AllFieldsSet = (RequestUrlSet | ResponseCodeSet | ResponseHeadersSet | SignaturesSet | HeaderIntegritySet | 0)};
 
 
         SignedExchangeHeaderBuilder<STATE | RequestUrlSet>& setRequestUrl(const String& value)
@@ -2121,6 +2324,13 @@ public:
             static_assert(!(STATE & SignaturesSet), "property signatures should not be set yet");
             m_result->setSignatures(std::move(value));
             return castState<SignaturesSet>();
+        }
+
+        SignedExchangeHeaderBuilder<STATE | HeaderIntegritySet>& setHeaderIntegrity(const String& value)
+        {
+            static_assert(!(STATE & HeaderIntegritySet), "property headerIntegrity should not be set yet");
+            m_result->setHeaderIntegrity(value);
+            return castState<HeaderIntegritySet>();
         }
 
         std::unique_ptr<SignedExchangeHeader> build()
@@ -2156,6 +2366,7 @@ private:
     int m_responseCode;
     std::unique_ptr<protocol::Network::Headers> m_responseHeaders;
     std::unique_ptr<protocol::Array<protocol::Network::SignedExchangeSignature>> m_signatures;
+    String m_headerIntegrity;
 };
 
 
@@ -2178,9 +2389,7 @@ public:
     void setErrorField(const String& value) { m_errorField = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SignedExchangeError> clone() const;
 
@@ -2269,9 +2478,7 @@ public:
     void setErrors(std::unique_ptr<protocol::Array<protocol::Network::SignedExchangeError>> value) { m_errors = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SignedExchangeInfo> clone() const;
 
@@ -2364,9 +2571,7 @@ public:
     void setEncodedDataLength(int value) { m_encodedDataLength = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<DataReceivedNotification> clone() const;
 
@@ -2471,9 +2676,7 @@ public:
     void setData(const String& value) { m_data = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<EventSourceMessageReceivedNotification> clone() const;
 
@@ -2590,9 +2793,7 @@ public:
     void setBlockedReason(const String& value) { m_blockedReason = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LoadingFailedNotification> clone() const;
 
@@ -2707,9 +2908,7 @@ public:
     void setShouldReportCorbBlocking(bool value) { m_shouldReportCorbBlocking = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LoadingFinishedNotification> clone() const;
 
@@ -2834,10 +3033,12 @@ public:
     protocol::Network::Headers* getResponseHeaders(protocol::Network::Headers* defaultValue) { return m_responseHeaders.isJust() ? m_responseHeaders.fromJust() : defaultValue; }
     void setResponseHeaders(std::unique_ptr<protocol::Network::Headers> value) { m_responseHeaders = std::move(value); }
 
+    bool hasRequestId() { return m_requestId.isJust(); }
+    String getRequestId(const String& defaultValue) { return m_requestId.isJust() ? m_requestId.fromJust() : defaultValue; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<RequestInterceptedNotification> clone() const;
 
@@ -2925,6 +3126,12 @@ public:
             return *this;
         }
 
+        RequestInterceptedNotificationBuilder<STATE>& setRequestId(const String& value)
+        {
+            m_result->setRequestId(value);
+            return *this;
+        }
+
         std::unique_ptr<RequestInterceptedNotification> build()
         {
             static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
@@ -2965,6 +3172,7 @@ private:
     Maybe<String> m_responseErrorReason;
     Maybe<int> m_responseStatusCode;
     Maybe<protocol::Network::Headers> m_responseHeaders;
+    Maybe<String> m_requestId;
 };
 
 
@@ -2979,9 +3187,7 @@ public:
     void setRequestId(const String& value) { m_requestId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<RequestServedFromCacheNotification> clone() const;
 
@@ -3078,9 +3284,7 @@ public:
     void setHasUserGesture(bool value) { m_hasUserGesture = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<RequestWillBeSentNotification> clone() const;
 
@@ -3233,9 +3437,7 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ResourceChangedPriorityNotification> clone() const;
 
@@ -3320,9 +3522,7 @@ public:
     void setInfo(std::unique_ptr<protocol::Network::SignedExchangeInfo> value) { m_info = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SignedExchangeReceivedNotification> clone() const;
 
@@ -3410,9 +3610,7 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ResponseReceivedNotification> clone() const;
 
@@ -3522,9 +3720,7 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketClosedNotification> clone() const;
 
@@ -3604,9 +3800,7 @@ public:
     void setInitiator(std::unique_ptr<protocol::Network::Initiator> value) { m_initiator = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketCreatedNotification> clone() const;
 
@@ -3691,9 +3885,7 @@ public:
     void setErrorMessage(const String& value) { m_errorMessage = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketFrameErrorNotification> clone() const;
 
@@ -3781,9 +3973,7 @@ public:
     void setResponse(std::unique_ptr<protocol::Network::WebSocketFrame> value) { m_response = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketFrameReceivedNotification> clone() const;
 
@@ -3871,9 +4061,7 @@ public:
     void setResponse(std::unique_ptr<protocol::Network::WebSocketFrame> value) { m_response = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketFrameSentNotification> clone() const;
 
@@ -3961,9 +4149,7 @@ public:
     void setResponse(std::unique_ptr<protocol::Network::WebSocketResponse> value) { m_response = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> clone() const;
 
@@ -4054,9 +4240,7 @@ public:
     void setRequest(std::unique_ptr<protocol::Network::WebSocketRequest> value) { m_request = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> clone() const;
 
@@ -4137,6 +4321,191 @@ private:
 };
 
 
+class  RequestWillBeSentExtraInfoNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(RequestWillBeSentExtraInfoNotification);
+public:
+    static std::unique_ptr<RequestWillBeSentExtraInfoNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~RequestWillBeSentExtraInfoNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    protocol::Array<protocol::Network::BlockedCookieWithReason>* getBlockedCookies() { return m_blockedCookies.get(); }
+    void setBlockedCookies(std::unique_ptr<protocol::Array<protocol::Network::BlockedCookieWithReason>> value) { m_blockedCookies = std::move(value); }
+
+    protocol::Network::Headers* getHeaders() { return m_headers.get(); }
+    void setHeaders(std::unique_ptr<protocol::Network::Headers> value) { m_headers = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<RequestWillBeSentExtraInfoNotification> clone() const;
+
+    template<int STATE>
+    class RequestWillBeSentExtraInfoNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            BlockedCookiesSet = 1 << 2,
+            HeadersSet = 1 << 3,
+            AllFieldsSet = (RequestIdSet | BlockedCookiesSet | HeadersSet | 0)};
+
+
+        RequestWillBeSentExtraInfoNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        RequestWillBeSentExtraInfoNotificationBuilder<STATE | BlockedCookiesSet>& setBlockedCookies(std::unique_ptr<protocol::Array<protocol::Network::BlockedCookieWithReason>> value)
+        {
+            static_assert(!(STATE & BlockedCookiesSet), "property blockedCookies should not be set yet");
+            m_result->setBlockedCookies(std::move(value));
+            return castState<BlockedCookiesSet>();
+        }
+
+        RequestWillBeSentExtraInfoNotificationBuilder<STATE | HeadersSet>& setHeaders(std::unique_ptr<protocol::Network::Headers> value)
+        {
+            static_assert(!(STATE & HeadersSet), "property headers should not be set yet");
+            m_result->setHeaders(std::move(value));
+            return castState<HeadersSet>();
+        }
+
+        std::unique_ptr<RequestWillBeSentExtraInfoNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class RequestWillBeSentExtraInfoNotification;
+        RequestWillBeSentExtraInfoNotificationBuilder() : m_result(new RequestWillBeSentExtraInfoNotification()) { }
+
+        template<int STEP> RequestWillBeSentExtraInfoNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<RequestWillBeSentExtraInfoNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::RequestWillBeSentExtraInfoNotification> m_result;
+    };
+
+    static RequestWillBeSentExtraInfoNotificationBuilder<0> create()
+    {
+        return RequestWillBeSentExtraInfoNotificationBuilder<0>();
+    }
+
+private:
+    RequestWillBeSentExtraInfoNotification()
+    {
+    }
+
+    String m_requestId;
+    std::unique_ptr<protocol::Array<protocol::Network::BlockedCookieWithReason>> m_blockedCookies;
+    std::unique_ptr<protocol::Network::Headers> m_headers;
+};
+
+
+class  ResponseReceivedExtraInfoNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(ResponseReceivedExtraInfoNotification);
+public:
+    static std::unique_ptr<ResponseReceivedExtraInfoNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~ResponseReceivedExtraInfoNotification() override { }
+
+    String getRequestId() { return m_requestId; }
+    void setRequestId(const String& value) { m_requestId = value; }
+
+    protocol::Array<protocol::Network::BlockedSetCookieWithReason>* getBlockedCookies() { return m_blockedCookies.get(); }
+    void setBlockedCookies(std::unique_ptr<protocol::Array<protocol::Network::BlockedSetCookieWithReason>> value) { m_blockedCookies = std::move(value); }
+
+    protocol::Network::Headers* getHeaders() { return m_headers.get(); }
+    void setHeaders(std::unique_ptr<protocol::Network::Headers> value) { m_headers = std::move(value); }
+
+    bool hasHeadersText() { return m_headersText.isJust(); }
+    String getHeadersText(const String& defaultValue) { return m_headersText.isJust() ? m_headersText.fromJust() : defaultValue; }
+    void setHeadersText(const String& value) { m_headersText = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<ResponseReceivedExtraInfoNotification> clone() const;
+
+    template<int STATE>
+    class ResponseReceivedExtraInfoNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            RequestIdSet = 1 << 1,
+            BlockedCookiesSet = 1 << 2,
+            HeadersSet = 1 << 3,
+            AllFieldsSet = (RequestIdSet | BlockedCookiesSet | HeadersSet | 0)};
+
+
+        ResponseReceivedExtraInfoNotificationBuilder<STATE | RequestIdSet>& setRequestId(const String& value)
+        {
+            static_assert(!(STATE & RequestIdSet), "property requestId should not be set yet");
+            m_result->setRequestId(value);
+            return castState<RequestIdSet>();
+        }
+
+        ResponseReceivedExtraInfoNotificationBuilder<STATE | BlockedCookiesSet>& setBlockedCookies(std::unique_ptr<protocol::Array<protocol::Network::BlockedSetCookieWithReason>> value)
+        {
+            static_assert(!(STATE & BlockedCookiesSet), "property blockedCookies should not be set yet");
+            m_result->setBlockedCookies(std::move(value));
+            return castState<BlockedCookiesSet>();
+        }
+
+        ResponseReceivedExtraInfoNotificationBuilder<STATE | HeadersSet>& setHeaders(std::unique_ptr<protocol::Network::Headers> value)
+        {
+            static_assert(!(STATE & HeadersSet), "property headers should not be set yet");
+            m_result->setHeaders(std::move(value));
+            return castState<HeadersSet>();
+        }
+
+        ResponseReceivedExtraInfoNotificationBuilder<STATE>& setHeadersText(const String& value)
+        {
+            m_result->setHeadersText(value);
+            return *this;
+        }
+
+        std::unique_ptr<ResponseReceivedExtraInfoNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class ResponseReceivedExtraInfoNotification;
+        ResponseReceivedExtraInfoNotificationBuilder() : m_result(new ResponseReceivedExtraInfoNotification()) { }
+
+        template<int STEP> ResponseReceivedExtraInfoNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<ResponseReceivedExtraInfoNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Network::ResponseReceivedExtraInfoNotification> m_result;
+    };
+
+    static ResponseReceivedExtraInfoNotificationBuilder<0> create()
+    {
+        return ResponseReceivedExtraInfoNotificationBuilder<0>();
+    }
+
+private:
+    ResponseReceivedExtraInfoNotification()
+    {
+    }
+
+    String m_requestId;
+    std::unique_ptr<protocol::Array<protocol::Network::BlockedSetCookieWithReason>> m_blockedCookies;
+    std::unique_ptr<protocol::Network::Headers> m_headers;
+    Maybe<String> m_headersText;
+};
+
+
 // ------------- Backend interface.
 
 class  Backend {
@@ -4184,7 +4553,7 @@ public:
     void eventSourceMessageReceived(const String& requestId, double timestamp, const String& eventName, const String& eventId, const String& data);
     void loadingFailed(const String& requestId, double timestamp, const String& type, const String& errorText, Maybe<bool> canceled = Maybe<bool>(), Maybe<String> blockedReason = Maybe<String>());
     void loadingFinished(const String& requestId, double timestamp, double encodedDataLength, Maybe<bool> shouldReportCorbBlocking = Maybe<bool>());
-    void requestIntercepted(const String& interceptionId, std::unique_ptr<protocol::Network::Request> request, const String& frameId, const String& resourceType, bool isNavigationRequest, Maybe<bool> isDownload = Maybe<bool>(), Maybe<String> redirectUrl = Maybe<String>(), Maybe<protocol::Network::AuthChallenge> authChallenge = Maybe<protocol::Network::AuthChallenge>(), Maybe<String> responseErrorReason = Maybe<String>(), Maybe<int> responseStatusCode = Maybe<int>(), Maybe<protocol::Network::Headers> responseHeaders = Maybe<protocol::Network::Headers>());
+    void requestIntercepted(const String& interceptionId, std::unique_ptr<protocol::Network::Request> request, const String& frameId, const String& resourceType, bool isNavigationRequest, Maybe<bool> isDownload = Maybe<bool>(), Maybe<String> redirectUrl = Maybe<String>(), Maybe<protocol::Network::AuthChallenge> authChallenge = Maybe<protocol::Network::AuthChallenge>(), Maybe<String> responseErrorReason = Maybe<String>(), Maybe<int> responseStatusCode = Maybe<int>(), Maybe<protocol::Network::Headers> responseHeaders = Maybe<protocol::Network::Headers>(), Maybe<String> requestId = Maybe<String>());
     void requestServedFromCache(const String& requestId);
     void requestWillBeSent(const String& requestId, const String& loaderId, const String& documentURL, std::unique_ptr<protocol::Network::Request> request, double timestamp, double wallTime, std::unique_ptr<protocol::Network::Initiator> initiator, Maybe<protocol::Network::Response> redirectResponse = Maybe<protocol::Network::Response>(), Maybe<String> type = Maybe<String>(), Maybe<String> frameId = Maybe<String>(), Maybe<bool> hasUserGesture = Maybe<bool>());
     void resourceChangedPriority(const String& requestId, const String& newPriority, double timestamp);
@@ -4197,6 +4566,8 @@ public:
     void webSocketFrameSent(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketFrame> response);
     void webSocketHandshakeResponseReceived(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketResponse> response);
     void webSocketWillSendHandshakeRequest(const String& requestId, double timestamp, double wallTime, std::unique_ptr<protocol::Network::WebSocketRequest> request);
+    void requestWillBeSentExtraInfo(const String& requestId, std::unique_ptr<protocol::Array<protocol::Network::BlockedCookieWithReason>> blockedCookies, std::unique_ptr<protocol::Network::Headers> headers);
+    void responseReceivedExtraInfo(const String& requestId, std::unique_ptr<protocol::Array<protocol::Network::BlockedSetCookieWithReason>> blockedCookies, std::unique_ptr<protocol::Network::Headers> headers, Maybe<String> headersText = Maybe<String>());
 
     void flush();
     void sendRawCBORNotification(std::vector<uint8_t>);

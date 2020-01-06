@@ -91,9 +91,7 @@ public:
     void setArgs(std::unique_ptr<protocol::Array<protocol::Runtime::RemoteObject>> value) { m_args = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LogEntry> clone() const;
 
@@ -239,9 +237,7 @@ public:
     void setThreshold(double value) { m_threshold = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ViolationSetting> clone() const;
 
@@ -314,9 +310,7 @@ public:
     void setEntry(std::unique_ptr<protocol::Log::LogEntry> value) { m_entry = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<EntryAddedNotification> clone() const;
 

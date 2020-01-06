@@ -30,6 +30,7 @@ namespace InspectModeEnum {
  extern const char SearchForNode[];
  extern const char SearchForUAShadowDOM[];
  extern const char CaptureAreaScreenshot[];
+ extern const char ShowDistances[];
  extern const char None[];
 } // namespace InspectModeEnum
 
@@ -91,9 +92,7 @@ public:
     void setCssGridColor(std::unique_ptr<protocol::DOM::RGBA> value) { m_cssGridColor = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<HighlightConfig> clone() const;
 
@@ -231,9 +230,7 @@ public:
     void setBackendNodeId(int value) { m_backendNodeId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<InspectNodeRequestedNotification> clone() const;
 
@@ -297,9 +294,7 @@ public:
     void setNodeId(int value) { m_nodeId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<NodeHighlightRequestedNotification> clone() const;
 
@@ -363,9 +358,7 @@ public:
     void setViewport(std::unique_ptr<protocol::Page::Viewport> value) { m_viewport = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScreenshotRequestedNotification> clone() const;
 
@@ -425,7 +418,7 @@ public:
 
     virtual DispatchResponse disable() = 0;
     virtual DispatchResponse enable() = 0;
-    virtual DispatchResponse getHighlightObjectForTest(int in_nodeId, std::unique_ptr<protocol::DictionaryValue>* out_highlight) = 0;
+    virtual DispatchResponse getHighlightObjectForTest(int in_nodeId, Maybe<bool> in_includeDistance, Maybe<bool> in_includeStyle, std::unique_ptr<protocol::DictionaryValue>* out_highlight) = 0;
     virtual DispatchResponse hideHighlight() = 0;
     virtual DispatchResponse highlightFrame(const String& in_frameId, Maybe<protocol::DOM::RGBA> in_contentColor, Maybe<protocol::DOM::RGBA> in_contentOutlineColor) = 0;
     virtual DispatchResponse highlightNode(std::unique_ptr<protocol::Overlay::HighlightConfig> in_highlightConfig, Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, Maybe<String> in_selector) = 0;
@@ -437,10 +430,10 @@ public:
     virtual DispatchResponse setShowDebugBorders(bool in_show) = 0;
     virtual DispatchResponse setShowFPSCounter(bool in_show) = 0;
     virtual DispatchResponse setShowPaintRects(bool in_result) = 0;
+    virtual DispatchResponse setShowLayoutShiftRegions(bool in_result) = 0;
     virtual DispatchResponse setShowScrollBottleneckRects(bool in_show) = 0;
     virtual DispatchResponse setShowHitTestBorders(bool in_show) = 0;
     virtual DispatchResponse setShowViewportSizeOnResize(bool in_show) = 0;
-    virtual DispatchResponse setSuspended(bool in_suspended) = 0;
 
 };
 

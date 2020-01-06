@@ -337,14 +337,19 @@ void escapeWideStringForJSON(const uint16_t* str, unsigned len, StringBuilder* d
 //#include "Forward.h"
 //#include "Values.h"
 
+#include "third_party/inspector_protocol/crdtp/serializable.h"
+
 namespace v8_inspector {
 namespace protocol {
 
-class  Object {
+class  Object : public v8_crdtp::Serializable {
 public:
     static std::unique_ptr<Object> fromValue(protocol::Value*, ErrorSupport*);
     explicit Object(std::unique_ptr<protocol::DictionaryValue>);
     ~Object();
+
+    // Implements Serializable.
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     std::unique_ptr<Object> clone() const;

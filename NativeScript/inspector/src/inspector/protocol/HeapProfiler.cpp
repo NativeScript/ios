@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace HeapProfiler {
@@ -56,6 +59,18 @@ std::unique_ptr<protocol::DictionaryValue> SamplingHeapProfileNode::toValue() co
     return result;
 }
 
+void SamplingHeapProfileNode::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("callFrame"), m_callFrame, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("selfSize"), m_selfSize, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("id"), m_id, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("children"), m_children, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<SamplingHeapProfileNode> SamplingHeapProfileNode::clone() const
 {
     ErrorSupport errors;
@@ -96,6 +111,17 @@ std::unique_ptr<protocol::DictionaryValue> SamplingHeapProfileSample::toValue() 
     return result;
 }
 
+void SamplingHeapProfileSample::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("size"), m_size, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("ordinal"), m_ordinal, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<SamplingHeapProfileSample> SamplingHeapProfileSample::clone() const
 {
     ErrorSupport errors;
@@ -132,6 +158,16 @@ std::unique_ptr<protocol::DictionaryValue> SamplingHeapProfile::toValue() const
     return result;
 }
 
+void SamplingHeapProfile::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("head"), m_head, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("samples"), m_samples, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<SamplingHeapProfile> SamplingHeapProfile::clone() const
 {
     ErrorSupport errors;
@@ -164,6 +200,15 @@ std::unique_ptr<protocol::DictionaryValue> AddHeapSnapshotChunkNotification::toV
     return result;
 }
 
+void AddHeapSnapshotChunkNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("chunk"), m_chunk, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<AddHeapSnapshotChunkNotification> AddHeapSnapshotChunkNotification::clone() const
 {
     ErrorSupport errors;
@@ -194,6 +239,15 @@ std::unique_ptr<protocol::DictionaryValue> HeapStatsUpdateNotification::toValue(
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("statsUpdate", ValueConversions<protocol::Array<int>>::toValue(m_statsUpdate.get()));
     return result;
+}
+
+void HeapStatsUpdateNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("statsUpdate"), m_statsUpdate, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<HeapStatsUpdateNotification> HeapStatsUpdateNotification::clone() const
@@ -230,6 +284,16 @@ std::unique_ptr<protocol::DictionaryValue> LastSeenObjectIdNotification::toValue
     result->setValue("lastSeenObjectId", ValueConversions<int>::toValue(m_lastSeenObjectId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
     return result;
+}
+
+void LastSeenObjectIdNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lastSeenObjectId"), m_lastSeenObjectId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<LastSeenObjectIdNotification> LastSeenObjectIdNotification::clone() const
@@ -273,6 +337,17 @@ std::unique_ptr<protocol::DictionaryValue> ReportHeapSnapshotProgressNotificatio
     if (m_finished.isJust())
         result->setValue("finished", ValueConversions<bool>::toValue(m_finished.fromJust()));
     return result;
+}
+
+void ReportHeapSnapshotProgressNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("done"), m_done, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("total"), m_total, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("finished"), m_finished, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ReportHeapSnapshotProgressNotification> ReportHeapSnapshotProgressNotification::clone() const
@@ -649,6 +724,12 @@ void DispatcherImpl::stopTrackingHeapObjects(int callId, const String& method, v
         errors->setName("reportProgress");
         in_reportProgress = ValueConversions<bool>::fromValue(reportProgressValue, errors);
     }
+    protocol::Value* treatGlobalObjectsAsRootsValue = object ? object->get("treatGlobalObjectsAsRoots") : nullptr;
+    Maybe<bool> in_treatGlobalObjectsAsRoots;
+    if (treatGlobalObjectsAsRootsValue) {
+        errors->setName("treatGlobalObjectsAsRoots");
+        in_treatGlobalObjectsAsRoots = ValueConversions<bool>::fromValue(treatGlobalObjectsAsRootsValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -656,7 +737,7 @@ void DispatcherImpl::stopTrackingHeapObjects(int callId, const String& method, v
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->stopTrackingHeapObjects(std::move(in_reportProgress));
+    DispatchResponse response = m_backend->stopTrackingHeapObjects(std::move(in_reportProgress), std::move(in_treatGlobalObjectsAsRoots));
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
@@ -677,6 +758,12 @@ void DispatcherImpl::takeHeapSnapshot(int callId, const String& method, v8_crdtp
         errors->setName("reportProgress");
         in_reportProgress = ValueConversions<bool>::fromValue(reportProgressValue, errors);
     }
+    protocol::Value* treatGlobalObjectsAsRootsValue = object ? object->get("treatGlobalObjectsAsRoots") : nullptr;
+    Maybe<bool> in_treatGlobalObjectsAsRoots;
+    if (treatGlobalObjectsAsRootsValue) {
+        errors->setName("treatGlobalObjectsAsRoots");
+        in_treatGlobalObjectsAsRoots = ValueConversions<bool>::fromValue(treatGlobalObjectsAsRootsValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -684,7 +771,7 @@ void DispatcherImpl::takeHeapSnapshot(int callId, const String& method, v8_crdtp
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->takeHeapSnapshot(std::move(in_reportProgress));
+    DispatchResponse response = m_backend->takeHeapSnapshot(std::move(in_reportProgress), std::move(in_treatGlobalObjectsAsRoots));
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;

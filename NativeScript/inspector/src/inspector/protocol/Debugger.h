@@ -90,9 +90,7 @@ public:
     void setColumnNumber(int value) { m_columnNumber = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Location> clone() const;
 
@@ -175,9 +173,7 @@ public:
     void setColumnNumber(int value) { m_columnNumber = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScriptPosition> clone() const;
 
@@ -274,9 +270,7 @@ public:
     void setReturnValue(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_returnValue = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CallFrame> clone() const;
 
@@ -425,9 +419,7 @@ public:
     void setEndLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_endLocation = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Scope> clone() const;
 
@@ -523,9 +515,7 @@ public:
     void setLineContent(const String& value) { m_lineContent = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SearchMatch> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
@@ -617,9 +607,7 @@ public:
     void setType(const String& value) { m_type = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<BreakLocation> clone() const;
 
@@ -709,9 +697,7 @@ public:
     void setLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_location = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<BreakpointResolvedNotification> clone() const;
 
@@ -820,9 +806,7 @@ public:
     void setAsyncCallStackTraceId(std::unique_ptr<protocol::Runtime::StackTraceId> value) { m_asyncCallStackTraceId = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PausedNotification> clone() const;
 
@@ -974,9 +958,7 @@ public:
     void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScriptFailedToParseNotification> clone() const;
 
@@ -1198,9 +1180,7 @@ public:
     void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScriptParsedNotification> clone() const;
 

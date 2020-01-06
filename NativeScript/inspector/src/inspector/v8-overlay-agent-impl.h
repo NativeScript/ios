@@ -36,7 +36,7 @@ public:
     DispatchResponse hideHighlight() override;
     
     DispatchResponse getHighlightObjectForTest(int in_nodeId,
-                                               std::unique_ptr<protocol::DictionaryValue> *out_highlight) override;
+                                               Maybe<bool> in_includeDistance, Maybe<bool> in_includeStyle, std::unique_ptr<protocol::DictionaryValue>* out_highlight) override;
     
     DispatchResponse highlightQuad(std::unique_ptr<protocol::Array<double>> in_quad,
                                    Maybe<protocol::DOM::RGBA> in_color,
@@ -54,7 +54,7 @@ public:
     DispatchResponse setShowScrollBottleneckRects(bool in_show) override;
     DispatchResponse setShowHitTestBorders(bool in_show) override;
     DispatchResponse setShowViewportSizeOnResize(bool in_show) override;
-    DispatchResponse setSuspended(bool in_suspended) override;
+    DispatchResponse setShowLayoutShiftRegions(bool in_result) override;
     
 private:
     protocol::Overlay::Frontend m_frontend;

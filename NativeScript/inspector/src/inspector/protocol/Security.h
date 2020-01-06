@@ -19,9 +19,14 @@ namespace Security {
 using CertificateId = int;
 using MixedContentType = String;
 using SecurityState = String;
+class CertificateSecurityState;
+using SafetyTipStatus = String;
+class SafetyTipInfo;
+class VisibleSecurityState;
 class SecurityStateExplanation;
 class InsecureContentStatus;
 class CertificateErrorNotification;
+class VisibleSecurityStateChangedNotification;
 class SecurityStateChangedNotification;
 
 namespace MixedContentTypeEnum {
@@ -36,9 +41,459 @@ namespace SecurityStateEnum {
  extern const char Insecure[];
  extern const char Secure[];
  extern const char Info[];
+ extern const char InsecureBroken[];
 } // namespace SecurityStateEnum
 
+namespace SafetyTipStatusEnum {
+ extern const char BadReputation[];
+ extern const char Lookalike[];
+} // namespace SafetyTipStatusEnum
+
 // ------------- Type and builder declarations.
+
+class  CertificateSecurityState : public Serializable{
+    PROTOCOL_DISALLOW_COPY(CertificateSecurityState);
+public:
+    static std::unique_ptr<CertificateSecurityState> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~CertificateSecurityState() override { }
+
+    String getProtocol() { return m_protocol; }
+    void setProtocol(const String& value) { m_protocol = value; }
+
+    String getKeyExchange() { return m_keyExchange; }
+    void setKeyExchange(const String& value) { m_keyExchange = value; }
+
+    bool hasKeyExchangeGroup() { return m_keyExchangeGroup.isJust(); }
+    String getKeyExchangeGroup(const String& defaultValue) { return m_keyExchangeGroup.isJust() ? m_keyExchangeGroup.fromJust() : defaultValue; }
+    void setKeyExchangeGroup(const String& value) { m_keyExchangeGroup = value; }
+
+    String getCipher() { return m_cipher; }
+    void setCipher(const String& value) { m_cipher = value; }
+
+    bool hasMac() { return m_mac.isJust(); }
+    String getMac(const String& defaultValue) { return m_mac.isJust() ? m_mac.fromJust() : defaultValue; }
+    void setMac(const String& value) { m_mac = value; }
+
+    protocol::Array<String>* getCertificate() { return m_certificate.get(); }
+    void setCertificate(std::unique_ptr<protocol::Array<String>> value) { m_certificate = std::move(value); }
+
+    String getSubjectName() { return m_subjectName; }
+    void setSubjectName(const String& value) { m_subjectName = value; }
+
+    String getIssuer() { return m_issuer; }
+    void setIssuer(const String& value) { m_issuer = value; }
+
+    double getValidFrom() { return m_validFrom; }
+    void setValidFrom(double value) { m_validFrom = value; }
+
+    double getValidTo() { return m_validTo; }
+    void setValidTo(double value) { m_validTo = value; }
+
+    bool hasCertificateNetworkError() { return m_certificateNetworkError.isJust(); }
+    String getCertificateNetworkError(const String& defaultValue) { return m_certificateNetworkError.isJust() ? m_certificateNetworkError.fromJust() : defaultValue; }
+    void setCertificateNetworkError(const String& value) { m_certificateNetworkError = value; }
+
+    bool getCertificateHasWeakSignature() { return m_certificateHasWeakSignature; }
+    void setCertificateHasWeakSignature(bool value) { m_certificateHasWeakSignature = value; }
+
+    bool getCertificateHasSha1Signature() { return m_certificateHasSha1Signature; }
+    void setCertificateHasSha1Signature(bool value) { m_certificateHasSha1Signature = value; }
+
+    bool getModernSSL() { return m_modernSSL; }
+    void setModernSSL(bool value) { m_modernSSL = value; }
+
+    bool getObsoleteSslProtocol() { return m_obsoleteSslProtocol; }
+    void setObsoleteSslProtocol(bool value) { m_obsoleteSslProtocol = value; }
+
+    bool getObsoleteSslKeyExchange() { return m_obsoleteSslKeyExchange; }
+    void setObsoleteSslKeyExchange(bool value) { m_obsoleteSslKeyExchange = value; }
+
+    bool getObsoleteSslCipher() { return m_obsoleteSslCipher; }
+    void setObsoleteSslCipher(bool value) { m_obsoleteSslCipher = value; }
+
+    bool getObsoleteSslSignature() { return m_obsoleteSslSignature; }
+    void setObsoleteSslSignature(bool value) { m_obsoleteSslSignature = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<CertificateSecurityState> clone() const;
+
+    template<int STATE>
+    class CertificateSecurityStateBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            ProtocolSet = 1 << 1,
+            KeyExchangeSet = 1 << 2,
+            CipherSet = 1 << 3,
+            CertificateSet = 1 << 4,
+            SubjectNameSet = 1 << 5,
+            IssuerSet = 1 << 6,
+            ValidFromSet = 1 << 7,
+            ValidToSet = 1 << 8,
+            CertificateHasWeakSignatureSet = 1 << 9,
+            CertificateHasSha1SignatureSet = 1 << 10,
+            ModernSSLSet = 1 << 11,
+            ObsoleteSslProtocolSet = 1 << 12,
+            ObsoleteSslKeyExchangeSet = 1 << 13,
+            ObsoleteSslCipherSet = 1 << 14,
+            ObsoleteSslSignatureSet = 1 << 15,
+            AllFieldsSet = (ProtocolSet | KeyExchangeSet | CipherSet | CertificateSet | SubjectNameSet | IssuerSet | ValidFromSet | ValidToSet | CertificateHasWeakSignatureSet | CertificateHasSha1SignatureSet | ModernSSLSet | ObsoleteSslProtocolSet | ObsoleteSslKeyExchangeSet | ObsoleteSslCipherSet | ObsoleteSslSignatureSet | 0)};
+
+
+        CertificateSecurityStateBuilder<STATE | ProtocolSet>& setProtocol(const String& value)
+        {
+            static_assert(!(STATE & ProtocolSet), "property protocol should not be set yet");
+            m_result->setProtocol(value);
+            return castState<ProtocolSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | KeyExchangeSet>& setKeyExchange(const String& value)
+        {
+            static_assert(!(STATE & KeyExchangeSet), "property keyExchange should not be set yet");
+            m_result->setKeyExchange(value);
+            return castState<KeyExchangeSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE>& setKeyExchangeGroup(const String& value)
+        {
+            m_result->setKeyExchangeGroup(value);
+            return *this;
+        }
+
+        CertificateSecurityStateBuilder<STATE | CipherSet>& setCipher(const String& value)
+        {
+            static_assert(!(STATE & CipherSet), "property cipher should not be set yet");
+            m_result->setCipher(value);
+            return castState<CipherSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE>& setMac(const String& value)
+        {
+            m_result->setMac(value);
+            return *this;
+        }
+
+        CertificateSecurityStateBuilder<STATE | CertificateSet>& setCertificate(std::unique_ptr<protocol::Array<String>> value)
+        {
+            static_assert(!(STATE & CertificateSet), "property certificate should not be set yet");
+            m_result->setCertificate(std::move(value));
+            return castState<CertificateSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | SubjectNameSet>& setSubjectName(const String& value)
+        {
+            static_assert(!(STATE & SubjectNameSet), "property subjectName should not be set yet");
+            m_result->setSubjectName(value);
+            return castState<SubjectNameSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | IssuerSet>& setIssuer(const String& value)
+        {
+            static_assert(!(STATE & IssuerSet), "property issuer should not be set yet");
+            m_result->setIssuer(value);
+            return castState<IssuerSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | ValidFromSet>& setValidFrom(double value)
+        {
+            static_assert(!(STATE & ValidFromSet), "property validFrom should not be set yet");
+            m_result->setValidFrom(value);
+            return castState<ValidFromSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | ValidToSet>& setValidTo(double value)
+        {
+            static_assert(!(STATE & ValidToSet), "property validTo should not be set yet");
+            m_result->setValidTo(value);
+            return castState<ValidToSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE>& setCertificateNetworkError(const String& value)
+        {
+            m_result->setCertificateNetworkError(value);
+            return *this;
+        }
+
+        CertificateSecurityStateBuilder<STATE | CertificateHasWeakSignatureSet>& setCertificateHasWeakSignature(bool value)
+        {
+            static_assert(!(STATE & CertificateHasWeakSignatureSet), "property certificateHasWeakSignature should not be set yet");
+            m_result->setCertificateHasWeakSignature(value);
+            return castState<CertificateHasWeakSignatureSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | CertificateHasSha1SignatureSet>& setCertificateHasSha1Signature(bool value)
+        {
+            static_assert(!(STATE & CertificateHasSha1SignatureSet), "property certificateHasSha1Signature should not be set yet");
+            m_result->setCertificateHasSha1Signature(value);
+            return castState<CertificateHasSha1SignatureSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | ModernSSLSet>& setModernSSL(bool value)
+        {
+            static_assert(!(STATE & ModernSSLSet), "property modernSSL should not be set yet");
+            m_result->setModernSSL(value);
+            return castState<ModernSSLSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | ObsoleteSslProtocolSet>& setObsoleteSslProtocol(bool value)
+        {
+            static_assert(!(STATE & ObsoleteSslProtocolSet), "property obsoleteSslProtocol should not be set yet");
+            m_result->setObsoleteSslProtocol(value);
+            return castState<ObsoleteSslProtocolSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | ObsoleteSslKeyExchangeSet>& setObsoleteSslKeyExchange(bool value)
+        {
+            static_assert(!(STATE & ObsoleteSslKeyExchangeSet), "property obsoleteSslKeyExchange should not be set yet");
+            m_result->setObsoleteSslKeyExchange(value);
+            return castState<ObsoleteSslKeyExchangeSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | ObsoleteSslCipherSet>& setObsoleteSslCipher(bool value)
+        {
+            static_assert(!(STATE & ObsoleteSslCipherSet), "property obsoleteSslCipher should not be set yet");
+            m_result->setObsoleteSslCipher(value);
+            return castState<ObsoleteSslCipherSet>();
+        }
+
+        CertificateSecurityStateBuilder<STATE | ObsoleteSslSignatureSet>& setObsoleteSslSignature(bool value)
+        {
+            static_assert(!(STATE & ObsoleteSslSignatureSet), "property obsoleteSslSignature should not be set yet");
+            m_result->setObsoleteSslSignature(value);
+            return castState<ObsoleteSslSignatureSet>();
+        }
+
+        std::unique_ptr<CertificateSecurityState> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class CertificateSecurityState;
+        CertificateSecurityStateBuilder() : m_result(new CertificateSecurityState()) { }
+
+        template<int STEP> CertificateSecurityStateBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<CertificateSecurityStateBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Security::CertificateSecurityState> m_result;
+    };
+
+    static CertificateSecurityStateBuilder<0> create()
+    {
+        return CertificateSecurityStateBuilder<0>();
+    }
+
+private:
+    CertificateSecurityState()
+    {
+          m_validFrom = 0;
+          m_validTo = 0;
+          m_certificateHasWeakSignature = false;
+          m_certificateHasSha1Signature = false;
+          m_modernSSL = false;
+          m_obsoleteSslProtocol = false;
+          m_obsoleteSslKeyExchange = false;
+          m_obsoleteSslCipher = false;
+          m_obsoleteSslSignature = false;
+    }
+
+    String m_protocol;
+    String m_keyExchange;
+    Maybe<String> m_keyExchangeGroup;
+    String m_cipher;
+    Maybe<String> m_mac;
+    std::unique_ptr<protocol::Array<String>> m_certificate;
+    String m_subjectName;
+    String m_issuer;
+    double m_validFrom;
+    double m_validTo;
+    Maybe<String> m_certificateNetworkError;
+    bool m_certificateHasWeakSignature;
+    bool m_certificateHasSha1Signature;
+    bool m_modernSSL;
+    bool m_obsoleteSslProtocol;
+    bool m_obsoleteSslKeyExchange;
+    bool m_obsoleteSslCipher;
+    bool m_obsoleteSslSignature;
+};
+
+
+class  SafetyTipInfo : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SafetyTipInfo);
+public:
+    static std::unique_ptr<SafetyTipInfo> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~SafetyTipInfo() override { }
+
+    String getSafetyTipStatus() { return m_safetyTipStatus; }
+    void setSafetyTipStatus(const String& value) { m_safetyTipStatus = value; }
+
+    bool hasSafeUrl() { return m_safeUrl.isJust(); }
+    String getSafeUrl(const String& defaultValue) { return m_safeUrl.isJust() ? m_safeUrl.fromJust() : defaultValue; }
+    void setSafeUrl(const String& value) { m_safeUrl = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<SafetyTipInfo> clone() const;
+
+    template<int STATE>
+    class SafetyTipInfoBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            SafetyTipStatusSet = 1 << 1,
+            AllFieldsSet = (SafetyTipStatusSet | 0)};
+
+
+        SafetyTipInfoBuilder<STATE | SafetyTipStatusSet>& setSafetyTipStatus(const String& value)
+        {
+            static_assert(!(STATE & SafetyTipStatusSet), "property safetyTipStatus should not be set yet");
+            m_result->setSafetyTipStatus(value);
+            return castState<SafetyTipStatusSet>();
+        }
+
+        SafetyTipInfoBuilder<STATE>& setSafeUrl(const String& value)
+        {
+            m_result->setSafeUrl(value);
+            return *this;
+        }
+
+        std::unique_ptr<SafetyTipInfo> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class SafetyTipInfo;
+        SafetyTipInfoBuilder() : m_result(new SafetyTipInfo()) { }
+
+        template<int STEP> SafetyTipInfoBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<SafetyTipInfoBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Security::SafetyTipInfo> m_result;
+    };
+
+    static SafetyTipInfoBuilder<0> create()
+    {
+        return SafetyTipInfoBuilder<0>();
+    }
+
+private:
+    SafetyTipInfo()
+    {
+    }
+
+    String m_safetyTipStatus;
+    Maybe<String> m_safeUrl;
+};
+
+
+class  VisibleSecurityState : public Serializable{
+    PROTOCOL_DISALLOW_COPY(VisibleSecurityState);
+public:
+    static std::unique_ptr<VisibleSecurityState> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~VisibleSecurityState() override { }
+
+    String getSecurityState() { return m_securityState; }
+    void setSecurityState(const String& value) { m_securityState = value; }
+
+    bool hasCertificateSecurityState() { return m_certificateSecurityState.isJust(); }
+    protocol::Security::CertificateSecurityState* getCertificateSecurityState(protocol::Security::CertificateSecurityState* defaultValue) { return m_certificateSecurityState.isJust() ? m_certificateSecurityState.fromJust() : defaultValue; }
+    void setCertificateSecurityState(std::unique_ptr<protocol::Security::CertificateSecurityState> value) { m_certificateSecurityState = std::move(value); }
+
+    bool hasSafetyTipInfo() { return m_safetyTipInfo.isJust(); }
+    protocol::Security::SafetyTipInfo* getSafetyTipInfo(protocol::Security::SafetyTipInfo* defaultValue) { return m_safetyTipInfo.isJust() ? m_safetyTipInfo.fromJust() : defaultValue; }
+    void setSafetyTipInfo(std::unique_ptr<protocol::Security::SafetyTipInfo> value) { m_safetyTipInfo = std::move(value); }
+
+    protocol::Array<String>* getSecurityStateIssueIds() { return m_securityStateIssueIds.get(); }
+    void setSecurityStateIssueIds(std::unique_ptr<protocol::Array<String>> value) { m_securityStateIssueIds = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<VisibleSecurityState> clone() const;
+
+    template<int STATE>
+    class VisibleSecurityStateBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            SecurityStateSet = 1 << 1,
+            SecurityStateIssueIdsSet = 1 << 2,
+            AllFieldsSet = (SecurityStateSet | SecurityStateIssueIdsSet | 0)};
+
+
+        VisibleSecurityStateBuilder<STATE | SecurityStateSet>& setSecurityState(const String& value)
+        {
+            static_assert(!(STATE & SecurityStateSet), "property securityState should not be set yet");
+            m_result->setSecurityState(value);
+            return castState<SecurityStateSet>();
+        }
+
+        VisibleSecurityStateBuilder<STATE>& setCertificateSecurityState(std::unique_ptr<protocol::Security::CertificateSecurityState> value)
+        {
+            m_result->setCertificateSecurityState(std::move(value));
+            return *this;
+        }
+
+        VisibleSecurityStateBuilder<STATE>& setSafetyTipInfo(std::unique_ptr<protocol::Security::SafetyTipInfo> value)
+        {
+            m_result->setSafetyTipInfo(std::move(value));
+            return *this;
+        }
+
+        VisibleSecurityStateBuilder<STATE | SecurityStateIssueIdsSet>& setSecurityStateIssueIds(std::unique_ptr<protocol::Array<String>> value)
+        {
+            static_assert(!(STATE & SecurityStateIssueIdsSet), "property securityStateIssueIds should not be set yet");
+            m_result->setSecurityStateIssueIds(std::move(value));
+            return castState<SecurityStateIssueIdsSet>();
+        }
+
+        std::unique_ptr<VisibleSecurityState> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class VisibleSecurityState;
+        VisibleSecurityStateBuilder() : m_result(new VisibleSecurityState()) { }
+
+        template<int STEP> VisibleSecurityStateBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<VisibleSecurityStateBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Security::VisibleSecurityState> m_result;
+    };
+
+    static VisibleSecurityStateBuilder<0> create()
+    {
+        return VisibleSecurityStateBuilder<0>();
+    }
+
+private:
+    VisibleSecurityState()
+    {
+    }
+
+    String m_securityState;
+    Maybe<protocol::Security::CertificateSecurityState> m_certificateSecurityState;
+    Maybe<protocol::Security::SafetyTipInfo> m_safetyTipInfo;
+    std::unique_ptr<protocol::Array<String>> m_securityStateIssueIds;
+};
+
 
 class  SecurityStateExplanation : public Serializable{
     PROTOCOL_DISALLOW_COPY(SecurityStateExplanation);
@@ -70,9 +525,7 @@ public:
     void setRecommendations(std::unique_ptr<protocol::Array<String>> value) { m_recommendations = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SecurityStateExplanation> clone() const;
 
@@ -205,9 +658,7 @@ public:
     void setDisplayedInsecureContentStyle(const String& value) { m_displayedInsecureContentStyle = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<InsecureContentStatus> clone() const;
 
@@ -335,9 +786,7 @@ public:
     void setRequestURL(const String& value) { m_requestURL = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CertificateErrorNotification> clone() const;
 
@@ -408,6 +857,69 @@ private:
 };
 
 
+class  VisibleSecurityStateChangedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(VisibleSecurityStateChangedNotification);
+public:
+    static std::unique_ptr<VisibleSecurityStateChangedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~VisibleSecurityStateChangedNotification() override { }
+
+    protocol::Security::VisibleSecurityState* getVisibleSecurityState() { return m_visibleSecurityState.get(); }
+    void setVisibleSecurityState(std::unique_ptr<protocol::Security::VisibleSecurityState> value) { m_visibleSecurityState = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<VisibleSecurityStateChangedNotification> clone() const;
+
+    template<int STATE>
+    class VisibleSecurityStateChangedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            VisibleSecurityStateSet = 1 << 1,
+            AllFieldsSet = (VisibleSecurityStateSet | 0)};
+
+
+        VisibleSecurityStateChangedNotificationBuilder<STATE | VisibleSecurityStateSet>& setVisibleSecurityState(std::unique_ptr<protocol::Security::VisibleSecurityState> value)
+        {
+            static_assert(!(STATE & VisibleSecurityStateSet), "property visibleSecurityState should not be set yet");
+            m_result->setVisibleSecurityState(std::move(value));
+            return castState<VisibleSecurityStateSet>();
+        }
+
+        std::unique_ptr<VisibleSecurityStateChangedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class VisibleSecurityStateChangedNotification;
+        VisibleSecurityStateChangedNotificationBuilder() : m_result(new VisibleSecurityStateChangedNotification()) { }
+
+        template<int STEP> VisibleSecurityStateChangedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<VisibleSecurityStateChangedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Security::VisibleSecurityStateChangedNotification> m_result;
+    };
+
+    static VisibleSecurityStateChangedNotificationBuilder<0> create()
+    {
+        return VisibleSecurityStateChangedNotificationBuilder<0>();
+    }
+
+private:
+    VisibleSecurityStateChangedNotification()
+    {
+    }
+
+    std::unique_ptr<protocol::Security::VisibleSecurityState> m_visibleSecurityState;
+};
+
+
 class  SecurityStateChangedNotification : public Serializable{
     PROTOCOL_DISALLOW_COPY(SecurityStateChangedNotification);
 public:
@@ -432,9 +944,7 @@ public:
     void setSummary(const String& value) { m_summary = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SecurityStateChangedNotification> clone() const;
 
@@ -540,6 +1050,7 @@ class  Frontend {
 public:
     explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
     void certificateError(int eventId, const String& errorType, const String& requestURL);
+    void visibleSecurityStateChanged(std::unique_ptr<protocol::Security::VisibleSecurityState> visibleSecurityState);
     void securityStateChanged(const String& securityState, bool schemeIsCryptographic, std::unique_ptr<protocol::Array<protocol::Security::SecurityStateExplanation>> explanations, std::unique_ptr<protocol::Security::InsecureContentStatus> insecureContentStatus, Maybe<String> summary = Maybe<String>());
 
     void flush();

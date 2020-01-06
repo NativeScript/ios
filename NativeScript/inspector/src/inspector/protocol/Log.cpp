@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace Log {
@@ -117,6 +120,24 @@ std::unique_ptr<protocol::DictionaryValue> LogEntry::toValue() const
     return result;
 }
 
+void LogEntry::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("source"), m_source, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("level"), m_level, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lineNumber"), m_lineNumber, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("stackTrace"), m_stackTrace, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("networkRequestId"), m_networkRequestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("workerId"), m_workerId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("args"), m_args, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<LogEntry> LogEntry::clone() const
 {
     ErrorSupport errors;
@@ -161,6 +182,16 @@ std::unique_ptr<protocol::DictionaryValue> ViolationSetting::toValue() const
     return result;
 }
 
+void ViolationSetting::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("threshold"), m_threshold, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ViolationSetting> ViolationSetting::clone() const
 {
     ErrorSupport errors;
@@ -191,6 +222,15 @@ std::unique_ptr<protocol::DictionaryValue> EntryAddedNotification::toValue() con
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("entry", ValueConversions<protocol::Log::LogEntry>::toValue(m_entry.get()));
     return result;
+}
+
+void EntryAddedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("entry"), m_entry, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<EntryAddedNotification> EntryAddedNotification::clone() const

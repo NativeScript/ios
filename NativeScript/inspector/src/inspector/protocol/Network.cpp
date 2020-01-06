@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace Network {
@@ -69,7 +72,14 @@ const char Other[] = "other";
 namespace CookieSameSiteEnum {
 const char Strict[] = "Strict";
 const char Lax[] = "Lax";
+const char None[] = "None";
 } // namespace CookieSameSiteEnum
+
+namespace CookiePriorityEnum {
+const char Low[] = "Low";
+const char Medium[] = "Medium";
+const char High[] = "High";
+} // namespace CookiePriorityEnum
 
 std::unique_ptr<ResourceTiming> ResourceTiming::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
@@ -155,6 +165,30 @@ std::unique_ptr<protocol::DictionaryValue> ResourceTiming::toValue() const
     result->setValue("pushEnd", ValueConversions<double>::toValue(m_pushEnd));
     result->setValue("receiveHeadersEnd", ValueConversions<double>::toValue(m_receiveHeadersEnd));
     return result;
+}
+
+void ResourceTiming::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestTime"), m_requestTime, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("proxyStart"), m_proxyStart, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("proxyEnd"), m_proxyEnd, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("dnsStart"), m_dnsStart, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("dnsEnd"), m_dnsEnd, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("connectStart"), m_connectStart, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("connectEnd"), m_connectEnd, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sslStart"), m_sslStart, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sslEnd"), m_sslEnd, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("workerStart"), m_workerStart, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("workerReady"), m_workerReady, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sendStart"), m_sendStart, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sendEnd"), m_sendEnd, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pushStart"), m_pushStart, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pushEnd"), m_pushEnd, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("receiveHeadersEnd"), m_receiveHeadersEnd, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ResourceTiming> ResourceTiming::clone() const
@@ -257,6 +291,24 @@ std::unique_ptr<protocol::DictionaryValue> Request::toValue() const
     return result;
 }
 
+void Request::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("urlFragment"), m_urlFragment, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("method"), m_method, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headers"), m_headers, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("postData"), m_postData, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hasPostData"), m_hasPostData, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("mixedContentType"), m_mixedContentType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("initialPriority"), m_initialPriority, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("referrerPolicy"), m_referrerPolicy, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isLinkPreload"), m_isLinkPreload, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Request> Request::clone() const
 {
     ErrorSupport errors;
@@ -315,6 +367,22 @@ std::unique_ptr<protocol::DictionaryValue> SignedCertificateTimestamp::toValue()
     result->setValue("signatureAlgorithm", ValueConversions<String>::toValue(m_signatureAlgorithm));
     result->setValue("signatureData", ValueConversions<String>::toValue(m_signatureData));
     return result;
+}
+
+void SignedCertificateTimestamp::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("status"), m_status, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("origin"), m_origin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("logDescription"), m_logDescription, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("logId"), m_logId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hashAlgorithm"), m_hashAlgorithm, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("signatureAlgorithm"), m_signatureAlgorithm, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("signatureData"), m_signatureData, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<SignedCertificateTimestamp> SignedCertificateTimestamp::clone() const
@@ -401,6 +469,27 @@ std::unique_ptr<protocol::DictionaryValue> SecurityDetails::toValue() const
     result->setValue("signedCertificateTimestampList", ValueConversions<protocol::Array<protocol::Network::SignedCertificateTimestamp>>::toValue(m_signedCertificateTimestampList.get()));
     result->setValue("certificateTransparencyCompliance", ValueConversions<String>::toValue(m_certificateTransparencyCompliance));
     return result;
+}
+
+void SecurityDetails::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("protocol"), m_protocol, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("keyExchange"), m_keyExchange, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("keyExchangeGroup"), m_keyExchangeGroup, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cipher"), m_cipher, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("mac"), m_mac, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("certificateId"), m_certificateId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("subjectName"), m_subjectName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sanList"), m_sanList, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("issuer"), m_issuer, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("validFrom"), m_validFrom, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("validTo"), m_validTo, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("signedCertificateTimestampList"), m_signedCertificateTimestampList, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("certificateTransparencyCompliance"), m_certificateTransparencyCompliance, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<SecurityDetails> SecurityDetails::clone() const
@@ -492,6 +581,11 @@ std::unique_ptr<Response> Response::fromValue(protocol::Value* value, ErrorSuppo
         errors->setName("fromServiceWorker");
         result->m_fromServiceWorker = ValueConversions<bool>::fromValue(fromServiceWorkerValue, errors);
     }
+    protocol::Value* fromPrefetchCacheValue = object->get("fromPrefetchCache");
+    if (fromPrefetchCacheValue) {
+        errors->setName("fromPrefetchCache");
+        result->m_fromPrefetchCache = ValueConversions<bool>::fromValue(fromPrefetchCacheValue, errors);
+    }
     protocol::Value* encodedDataLengthValue = object->get("encodedDataLength");
     errors->setName("encodedDataLength");
     result->m_encodedDataLength = ValueConversions<double>::fromValue(encodedDataLengthValue, errors);
@@ -543,6 +637,8 @@ std::unique_ptr<protocol::DictionaryValue> Response::toValue() const
         result->setValue("fromDiskCache", ValueConversions<bool>::toValue(m_fromDiskCache.fromJust()));
     if (m_fromServiceWorker.isJust())
         result->setValue("fromServiceWorker", ValueConversions<bool>::toValue(m_fromServiceWorker.fromJust()));
+    if (m_fromPrefetchCache.isJust())
+        result->setValue("fromPrefetchCache", ValueConversions<bool>::toValue(m_fromPrefetchCache.fromJust()));
     result->setValue("encodedDataLength", ValueConversions<double>::toValue(m_encodedDataLength));
     if (m_timing.isJust())
         result->setValue("timing", ValueConversions<protocol::Network::ResourceTiming>::toValue(m_timing.fromJust()));
@@ -552,6 +648,34 @@ std::unique_ptr<protocol::DictionaryValue> Response::toValue() const
     if (m_securityDetails.isJust())
         result->setValue("securityDetails", ValueConversions<protocol::Network::SecurityDetails>::toValue(m_securityDetails.fromJust()));
     return result;
+}
+
+void Response::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("status"), m_status, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("statusText"), m_statusText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headers"), m_headers, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headersText"), m_headersText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("mimeType"), m_mimeType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestHeaders"), m_requestHeaders, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestHeadersText"), m_requestHeadersText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("connectionReused"), m_connectionReused, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("connectionId"), m_connectionId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("remoteIPAddress"), m_remoteIPAddress, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("remotePort"), m_remotePort, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fromDiskCache"), m_fromDiskCache, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fromServiceWorker"), m_fromServiceWorker, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fromPrefetchCache"), m_fromPrefetchCache, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("encodedDataLength"), m_encodedDataLength, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timing"), m_timing, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("protocol"), m_protocol, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("securityState"), m_securityState, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("securityDetails"), m_securityDetails, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<Response> Response::clone() const
@@ -584,6 +708,15 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketRequest::toValue() const
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("headers", ValueConversions<protocol::Network::Headers>::toValue(m_headers.get()));
     return result;
+}
+
+void WebSocketRequest::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headers"), m_headers, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<WebSocketRequest> WebSocketRequest::clone() const
@@ -647,6 +780,20 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketResponse::toValue() const
     return result;
 }
 
+void WebSocketResponse::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("status"), m_status, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("statusText"), m_statusText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headers"), m_headers, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headersText"), m_headersText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestHeaders"), m_requestHeaders, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestHeadersText"), m_requestHeadersText, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<WebSocketResponse> WebSocketResponse::clone() const
 {
     ErrorSupport errors;
@@ -685,6 +832,17 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketFrame::toValue() const
     result->setValue("mask", ValueConversions<bool>::toValue(m_mask));
     result->setValue("payloadData", ValueConversions<String>::toValue(m_payloadData));
     return result;
+}
+
+void WebSocketFrame::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("opcode"), m_opcode, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("mask"), m_mask, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("payloadData"), m_payloadData, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<WebSocketFrame> WebSocketFrame::clone() const
@@ -746,6 +904,18 @@ std::unique_ptr<protocol::DictionaryValue> Initiator::toValue() const
     return result;
 }
 
+void Initiator::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("type"), m_type, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("stack"), m_stack, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lineNumber"), m_lineNumber, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Initiator> Initiator::clone() const
 {
     ErrorSupport errors;
@@ -794,6 +964,9 @@ std::unique_ptr<Cookie> Cookie::fromValue(protocol::Value* value, ErrorSupport* 
         errors->setName("sameSite");
         result->m_sameSite = ValueConversions<String>::fromValue(sameSiteValue, errors);
     }
+    protocol::Value* priorityValue = object->get("priority");
+    errors->setName("priority");
+    result->m_priority = ValueConversions<String>::fromValue(priorityValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
@@ -814,10 +987,157 @@ std::unique_ptr<protocol::DictionaryValue> Cookie::toValue() const
     result->setValue("session", ValueConversions<bool>::toValue(m_session));
     if (m_sameSite.isJust())
         result->setValue("sameSite", ValueConversions<String>::toValue(m_sameSite.fromJust()));
+    result->setValue("priority", ValueConversions<String>::toValue(m_priority));
     return result;
 }
 
+void Cookie::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("domain"), m_domain, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("path"), m_path, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("expires"), m_expires, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("size"), m_size, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("httpOnly"), m_httpOnly, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("secure"), m_secure, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("session"), m_session, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sameSite"), m_sameSite, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("priority"), m_priority, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Cookie> Cookie::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+namespace SetCookieBlockedReasonEnum {
+const char SecureOnly[] = "SecureOnly";
+const char SameSiteStrict[] = "SameSiteStrict";
+const char SameSiteLax[] = "SameSiteLax";
+const char SameSiteUnspecifiedTreatedAsLax[] = "SameSiteUnspecifiedTreatedAsLax";
+const char SameSiteNoneInsecure[] = "SameSiteNoneInsecure";
+const char UserPreferences[] = "UserPreferences";
+const char SyntaxError[] = "SyntaxError";
+const char SchemeNotSupported[] = "SchemeNotSupported";
+const char OverwriteSecure[] = "OverwriteSecure";
+const char InvalidDomain[] = "InvalidDomain";
+const char InvalidPrefix[] = "InvalidPrefix";
+const char UnknownError[] = "UnknownError";
+} // namespace SetCookieBlockedReasonEnum
+
+namespace CookieBlockedReasonEnum {
+const char SecureOnly[] = "SecureOnly";
+const char NotOnPath[] = "NotOnPath";
+const char DomainMismatch[] = "DomainMismatch";
+const char SameSiteStrict[] = "SameSiteStrict";
+const char SameSiteLax[] = "SameSiteLax";
+const char SameSiteUnspecifiedTreatedAsLax[] = "SameSiteUnspecifiedTreatedAsLax";
+const char SameSiteNoneInsecure[] = "SameSiteNoneInsecure";
+const char UserPreferences[] = "UserPreferences";
+const char UnknownError[] = "UnknownError";
+} // namespace CookieBlockedReasonEnum
+
+std::unique_ptr<BlockedSetCookieWithReason> BlockedSetCookieWithReason::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<BlockedSetCookieWithReason> result(new BlockedSetCookieWithReason());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* blockedReasonsValue = object->get("blockedReasons");
+    errors->setName("blockedReasons");
+    result->m_blockedReasons = ValueConversions<protocol::Array<String>>::fromValue(blockedReasonsValue, errors);
+    protocol::Value* cookieLineValue = object->get("cookieLine");
+    errors->setName("cookieLine");
+    result->m_cookieLine = ValueConversions<String>::fromValue(cookieLineValue, errors);
+    protocol::Value* cookieValue = object->get("cookie");
+    if (cookieValue) {
+        errors->setName("cookie");
+        result->m_cookie = ValueConversions<protocol::Network::Cookie>::fromValue(cookieValue, errors);
+    }
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> BlockedSetCookieWithReason::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("blockedReasons", ValueConversions<protocol::Array<String>>::toValue(m_blockedReasons.get()));
+    result->setValue("cookieLine", ValueConversions<String>::toValue(m_cookieLine));
+    if (m_cookie.isJust())
+        result->setValue("cookie", ValueConversions<protocol::Network::Cookie>::toValue(m_cookie.fromJust()));
+    return result;
+}
+
+void BlockedSetCookieWithReason::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("blockedReasons"), m_blockedReasons, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cookieLine"), m_cookieLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cookie"), m_cookie, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<BlockedSetCookieWithReason> BlockedSetCookieWithReason::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<BlockedCookieWithReason> BlockedCookieWithReason::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<BlockedCookieWithReason> result(new BlockedCookieWithReason());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* blockedReasonsValue = object->get("blockedReasons");
+    errors->setName("blockedReasons");
+    result->m_blockedReasons = ValueConversions<protocol::Array<String>>::fromValue(blockedReasonsValue, errors);
+    protocol::Value* cookieValue = object->get("cookie");
+    errors->setName("cookie");
+    result->m_cookie = ValueConversions<protocol::Network::Cookie>::fromValue(cookieValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> BlockedCookieWithReason::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("blockedReasons", ValueConversions<protocol::Array<String>>::toValue(m_blockedReasons.get()));
+    result->setValue("cookie", ValueConversions<protocol::Network::Cookie>::toValue(m_cookie.get()));
+    return result;
+}
+
+void BlockedCookieWithReason::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("blockedReasons"), m_blockedReasons, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cookie"), m_cookie, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<BlockedCookieWithReason> BlockedCookieWithReason::clone() const
 {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
@@ -865,6 +1185,18 @@ std::unique_ptr<protocol::DictionaryValue> AuthChallenge::toValue() const
     result->setValue("scheme", ValueConversions<String>::toValue(m_scheme));
     result->setValue("realm", ValueConversions<String>::toValue(m_realm));
     return result;
+}
+
+void AuthChallenge::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("source"), m_source, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("origin"), m_origin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scheme"), m_scheme, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("realm"), m_realm, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<AuthChallenge> AuthChallenge::clone() const
@@ -940,6 +1272,23 @@ std::unique_ptr<protocol::DictionaryValue> SignedExchangeSignature::toValue() co
     return result;
 }
 
+void SignedExchangeSignature::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("label"), m_label, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("signature"), m_signature, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("integrity"), m_integrity, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("certUrl"), m_certUrl, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("certSha256"), m_certSha256, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("validityUrl"), m_validityUrl, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("date"), m_date, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("expires"), m_expires, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("certificates"), m_certificates, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<SignedExchangeSignature> SignedExchangeSignature::clone() const
 {
     ErrorSupport errors;
@@ -968,6 +1317,9 @@ std::unique_ptr<SignedExchangeHeader> SignedExchangeHeader::fromValue(protocol::
     protocol::Value* signaturesValue = object->get("signatures");
     errors->setName("signatures");
     result->m_signatures = ValueConversions<protocol::Array<protocol::Network::SignedExchangeSignature>>::fromValue(signaturesValue, errors);
+    protocol::Value* headerIntegrityValue = object->get("headerIntegrity");
+    errors->setName("headerIntegrity");
+    result->m_headerIntegrity = ValueConversions<String>::fromValue(headerIntegrityValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
@@ -981,7 +1333,21 @@ std::unique_ptr<protocol::DictionaryValue> SignedExchangeHeader::toValue() const
     result->setValue("responseCode", ValueConversions<int>::toValue(m_responseCode));
     result->setValue("responseHeaders", ValueConversions<protocol::Network::Headers>::toValue(m_responseHeaders.get()));
     result->setValue("signatures", ValueConversions<protocol::Array<protocol::Network::SignedExchangeSignature>>::toValue(m_signatures.get()));
+    result->setValue("headerIntegrity", ValueConversions<String>::toValue(m_headerIntegrity));
     return result;
+}
+
+void SignedExchangeHeader::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestUrl"), m_requestUrl, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("responseCode"), m_responseCode, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("responseHeaders"), m_responseHeaders, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("signatures"), m_signatures, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headerIntegrity"), m_headerIntegrity, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<SignedExchangeHeader> SignedExchangeHeader::clone() const
@@ -1039,6 +1405,17 @@ std::unique_ptr<protocol::DictionaryValue> SignedExchangeError::toValue() const
     return result;
 }
 
+void SignedExchangeError::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("message"), m_message, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("signatureIndex"), m_signatureIndex, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("errorField"), m_errorField, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<SignedExchangeError> SignedExchangeError::clone() const
 {
     ErrorSupport errors;
@@ -1092,6 +1469,18 @@ std::unique_ptr<protocol::DictionaryValue> SignedExchangeInfo::toValue() const
     return result;
 }
 
+void SignedExchangeInfo::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("outerResponse"), m_outerResponse, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("header"), m_header, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("securityDetails"), m_securityDetails, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("errors"), m_errors, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<SignedExchangeInfo> SignedExchangeInfo::clone() const
 {
     ErrorSupport errors;
@@ -1134,6 +1523,18 @@ std::unique_ptr<protocol::DictionaryValue> DataReceivedNotification::toValue() c
     result->setValue("dataLength", ValueConversions<int>::toValue(m_dataLength));
     result->setValue("encodedDataLength", ValueConversions<int>::toValue(m_encodedDataLength));
     return result;
+}
+
+void DataReceivedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("dataLength"), m_dataLength, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("encodedDataLength"), m_encodedDataLength, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<DataReceivedNotification> DataReceivedNotification::clone() const
@@ -1182,6 +1583,19 @@ std::unique_ptr<protocol::DictionaryValue> EventSourceMessageReceivedNotificatio
     result->setValue("eventId", ValueConversions<String>::toValue(m_eventId));
     result->setValue("data", ValueConversions<String>::toValue(m_data));
     return result;
+}
+
+void EventSourceMessageReceivedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("eventName"), m_eventName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("eventId"), m_eventId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("data"), m_data, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<EventSourceMessageReceivedNotification> EventSourceMessageReceivedNotification::clone() const
@@ -1242,6 +1656,20 @@ std::unique_ptr<protocol::DictionaryValue> LoadingFailedNotification::toValue() 
     return result;
 }
 
+void LoadingFailedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("type"), m_type, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("errorText"), m_errorText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("canceled"), m_canceled, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("blockedReason"), m_blockedReason, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<LoadingFailedNotification> LoadingFailedNotification::clone() const
 {
     ErrorSupport errors;
@@ -1287,6 +1715,18 @@ std::unique_ptr<protocol::DictionaryValue> LoadingFinishedNotification::toValue(
     if (m_shouldReportCorbBlocking.isJust())
         result->setValue("shouldReportCorbBlocking", ValueConversions<bool>::toValue(m_shouldReportCorbBlocking.fromJust()));
     return result;
+}
+
+void LoadingFinishedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("encodedDataLength"), m_encodedDataLength, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shouldReportCorbBlocking"), m_shouldReportCorbBlocking, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<LoadingFinishedNotification> LoadingFinishedNotification::clone() const
@@ -1350,6 +1790,11 @@ std::unique_ptr<RequestInterceptedNotification> RequestInterceptedNotification::
         errors->setName("responseHeaders");
         result->m_responseHeaders = ValueConversions<protocol::Network::Headers>::fromValue(responseHeadersValue, errors);
     }
+    protocol::Value* requestIdValue = object->get("requestId");
+    if (requestIdValue) {
+        errors->setName("requestId");
+        result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
@@ -1376,7 +1821,29 @@ std::unique_ptr<protocol::DictionaryValue> RequestInterceptedNotification::toVal
         result->setValue("responseStatusCode", ValueConversions<int>::toValue(m_responseStatusCode.fromJust()));
     if (m_responseHeaders.isJust())
         result->setValue("responseHeaders", ValueConversions<protocol::Network::Headers>::toValue(m_responseHeaders.fromJust()));
+    if (m_requestId.isJust())
+        result->setValue("requestId", ValueConversions<String>::toValue(m_requestId.fromJust()));
     return result;
+}
+
+void RequestInterceptedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("interceptionId"), m_interceptionId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("request"), m_request, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("resourceType"), m_resourceType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isNavigationRequest"), m_isNavigationRequest, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isDownload"), m_isDownload, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("redirectUrl"), m_redirectUrl, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("authChallenge"), m_authChallenge, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("responseErrorReason"), m_responseErrorReason, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("responseStatusCode"), m_responseStatusCode, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("responseHeaders"), m_responseHeaders, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<RequestInterceptedNotification> RequestInterceptedNotification::clone() const
@@ -1409,6 +1876,15 @@ std::unique_ptr<protocol::DictionaryValue> RequestServedFromCacheNotification::t
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     return result;
+}
+
+void RequestServedFromCacheNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<RequestServedFromCacheNotification> RequestServedFromCacheNotification::clone() const
@@ -1495,6 +1971,25 @@ std::unique_ptr<protocol::DictionaryValue> RequestWillBeSentNotification::toValu
     return result;
 }
 
+void RequestWillBeSentNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("loaderId"), m_loaderId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("documentURL"), m_documentURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("request"), m_request, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("wallTime"), m_wallTime, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("initiator"), m_initiator, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("redirectResponse"), m_redirectResponse, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("type"), m_type, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hasUserGesture"), m_hasUserGesture, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<RequestWillBeSentNotification> RequestWillBeSentNotification::clone() const
 {
     ErrorSupport errors;
@@ -1535,6 +2030,17 @@ std::unique_ptr<protocol::DictionaryValue> ResourceChangedPriorityNotification::
     return result;
 }
 
+void ResourceChangedPriorityNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("newPriority"), m_newPriority, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ResourceChangedPriorityNotification> ResourceChangedPriorityNotification::clone() const
 {
     ErrorSupport errors;
@@ -1569,6 +2075,16 @@ std::unique_ptr<protocol::DictionaryValue> SignedExchangeReceivedNotification::t
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("info", ValueConversions<protocol::Network::SignedExchangeInfo>::toValue(m_info.get()));
     return result;
+}
+
+void SignedExchangeReceivedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("info"), m_info, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<SignedExchangeReceivedNotification> SignedExchangeReceivedNotification::clone() const
@@ -1626,6 +2142,20 @@ std::unique_ptr<protocol::DictionaryValue> ResponseReceivedNotification::toValue
     return result;
 }
 
+void ResponseReceivedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("loaderId"), m_loaderId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("type"), m_type, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("response"), m_response, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ResponseReceivedNotification> ResponseReceivedNotification::clone() const
 {
     ErrorSupport errors;
@@ -1660,6 +2190,16 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketClosedNotification::toValue(
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
     return result;
+}
+
+void WebSocketClosedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<WebSocketClosedNotification> WebSocketClosedNotification::clone() const
@@ -1705,6 +2245,17 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketCreatedNotification::toValue
     return result;
 }
 
+void WebSocketCreatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("initiator"), m_initiator, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<WebSocketCreatedNotification> WebSocketCreatedNotification::clone() const
 {
     ErrorSupport errors;
@@ -1743,6 +2294,17 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketFrameErrorNotification::toVa
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
     result->setValue("errorMessage", ValueConversions<String>::toValue(m_errorMessage));
     return result;
+}
+
+void WebSocketFrameErrorNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("errorMessage"), m_errorMessage, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<WebSocketFrameErrorNotification> WebSocketFrameErrorNotification::clone() const
@@ -1785,6 +2347,17 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketFrameReceivedNotification::t
     return result;
 }
 
+void WebSocketFrameReceivedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("response"), m_response, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<WebSocketFrameReceivedNotification> WebSocketFrameReceivedNotification::clone() const
 {
     ErrorSupport errors;
@@ -1825,6 +2398,17 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketFrameSentNotification::toVal
     return result;
 }
 
+void WebSocketFrameSentNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("response"), m_response, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<WebSocketFrameSentNotification> WebSocketFrameSentNotification::clone() const
 {
     ErrorSupport errors;
@@ -1863,6 +2447,17 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketHandshakeResponseReceivedNot
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
     result->setValue("response", ValueConversions<protocol::Network::WebSocketResponse>::toValue(m_response.get()));
     return result;
+}
+
+void WebSocketHandshakeResponseReceivedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("response"), m_response, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> WebSocketHandshakeResponseReceivedNotification::clone() const
@@ -1909,7 +2504,129 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketWillSendHandshakeRequestNoti
     return result;
 }
 
+void WebSocketWillSendHandshakeRequestNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("wallTime"), m_wallTime, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("request"), m_request, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> WebSocketWillSendHandshakeRequestNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<RequestWillBeSentExtraInfoNotification> RequestWillBeSentExtraInfoNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<RequestWillBeSentExtraInfoNotification> result(new RequestWillBeSentExtraInfoNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* requestIdValue = object->get("requestId");
+    errors->setName("requestId");
+    result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
+    protocol::Value* blockedCookiesValue = object->get("blockedCookies");
+    errors->setName("blockedCookies");
+    result->m_blockedCookies = ValueConversions<protocol::Array<protocol::Network::BlockedCookieWithReason>>::fromValue(blockedCookiesValue, errors);
+    protocol::Value* headersValue = object->get("headers");
+    errors->setName("headers");
+    result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> RequestWillBeSentExtraInfoNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
+    result->setValue("blockedCookies", ValueConversions<protocol::Array<protocol::Network::BlockedCookieWithReason>>::toValue(m_blockedCookies.get()));
+    result->setValue("headers", ValueConversions<protocol::Network::Headers>::toValue(m_headers.get()));
+    return result;
+}
+
+void RequestWillBeSentExtraInfoNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("blockedCookies"), m_blockedCookies, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headers"), m_headers, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<RequestWillBeSentExtraInfoNotification> RequestWillBeSentExtraInfoNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<ResponseReceivedExtraInfoNotification> ResponseReceivedExtraInfoNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<ResponseReceivedExtraInfoNotification> result(new ResponseReceivedExtraInfoNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* requestIdValue = object->get("requestId");
+    errors->setName("requestId");
+    result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
+    protocol::Value* blockedCookiesValue = object->get("blockedCookies");
+    errors->setName("blockedCookies");
+    result->m_blockedCookies = ValueConversions<protocol::Array<protocol::Network::BlockedSetCookieWithReason>>::fromValue(blockedCookiesValue, errors);
+    protocol::Value* headersValue = object->get("headers");
+    errors->setName("headers");
+    result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
+    protocol::Value* headersTextValue = object->get("headersText");
+    if (headersTextValue) {
+        errors->setName("headersText");
+        result->m_headersText = ValueConversions<String>::fromValue(headersTextValue, errors);
+    }
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> ResponseReceivedExtraInfoNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
+    result->setValue("blockedCookies", ValueConversions<protocol::Array<protocol::Network::BlockedSetCookieWithReason>>::toValue(m_blockedCookies.get()));
+    result->setValue("headers", ValueConversions<protocol::Network::Headers>::toValue(m_headers.get()));
+    if (m_headersText.isJust())
+        result->setValue("headersText", ValueConversions<String>::toValue(m_headersText.fromJust()));
+    return result;
+}
+
+void ResponseReceivedExtraInfoNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("requestId"), m_requestId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("blockedCookies"), m_blockedCookies, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headers"), m_headers, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("headersText"), m_headersText, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<ResponseReceivedExtraInfoNotification> ResponseReceivedExtraInfoNotification::clone() const
 {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
@@ -1978,7 +2695,7 @@ void Frontend::loadingFinished(const String& requestId, double timestamp, double
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.loadingFinished", std::move(messageData)));
 }
 
-void Frontend::requestIntercepted(const String& interceptionId, std::unique_ptr<protocol::Network::Request> request, const String& frameId, const String& resourceType, bool isNavigationRequest, Maybe<bool> isDownload, Maybe<String> redirectUrl, Maybe<protocol::Network::AuthChallenge> authChallenge, Maybe<String> responseErrorReason, Maybe<int> responseStatusCode, Maybe<protocol::Network::Headers> responseHeaders)
+void Frontend::requestIntercepted(const String& interceptionId, std::unique_ptr<protocol::Network::Request> request, const String& frameId, const String& resourceType, bool isNavigationRequest, Maybe<bool> isDownload, Maybe<String> redirectUrl, Maybe<protocol::Network::AuthChallenge> authChallenge, Maybe<String> responseErrorReason, Maybe<int> responseStatusCode, Maybe<protocol::Network::Headers> responseHeaders, Maybe<String> requestId)
 {
     if (!m_frontendChannel)
         return;
@@ -2001,6 +2718,8 @@ void Frontend::requestIntercepted(const String& interceptionId, std::unique_ptr<
         messageData->setResponseStatusCode(std::move(responseStatusCode).takeJust());
     if (responseHeaders.isJust())
         messageData->setResponseHeaders(std::move(responseHeaders).takeJust());
+    if (requestId.isJust())
+        messageData->setRequestId(std::move(requestId).takeJust());
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.requestIntercepted", std::move(messageData)));
 }
 
@@ -2160,6 +2879,32 @@ void Frontend::webSocketWillSendHandshakeRequest(const String& requestId, double
         .setRequest(std::move(request))
         .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketWillSendHandshakeRequest", std::move(messageData)));
+}
+
+void Frontend::requestWillBeSentExtraInfo(const String& requestId, std::unique_ptr<protocol::Array<protocol::Network::BlockedCookieWithReason>> blockedCookies, std::unique_ptr<protocol::Network::Headers> headers)
+{
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<RequestWillBeSentExtraInfoNotification> messageData = RequestWillBeSentExtraInfoNotification::create()
+        .setRequestId(requestId)
+        .setBlockedCookies(std::move(blockedCookies))
+        .setHeaders(std::move(headers))
+        .build();
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.requestWillBeSentExtraInfo", std::move(messageData)));
+}
+
+void Frontend::responseReceivedExtraInfo(const String& requestId, std::unique_ptr<protocol::Array<protocol::Network::BlockedSetCookieWithReason>> blockedCookies, std::unique_ptr<protocol::Network::Headers> headers, Maybe<String> headersText)
+{
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<ResponseReceivedExtraInfoNotification> messageData = ResponseReceivedExtraInfoNotification::create()
+        .setRequestId(requestId)
+        .setBlockedCookies(std::move(blockedCookies))
+        .setHeaders(std::move(headers))
+        .build();
+    if (headersText.isJust())
+        messageData->setHeadersText(std::move(headersText).takeJust());
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.responseReceivedExtraInfo", std::move(messageData)));
 }
 
 void Frontend::flush()

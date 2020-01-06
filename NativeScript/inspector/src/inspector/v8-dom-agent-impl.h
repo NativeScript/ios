@@ -40,7 +40,7 @@ public:
     DispatchResponse getAttributes(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_attributes) override;
     DispatchResponse getBoxModel(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::DOM::BoxModel>* out_model) override;
     DispatchResponse getFlattenedDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::Array<protocol::DOM::Node>>* out_nodes) override;
-    DispatchResponse getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, int* out_backendNodeId, Maybe<int>* out_nodeId) override;
+    DispatchResponse getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, Maybe<bool> in_ignorePointerEventsNone, int* out_backendNodeId, String* out_frameId, Maybe<int>* out_nodeId) override;
     DispatchResponse getOuterHTML(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, String* out_outerHTML) override;
     DispatchResponse getRelayoutBoundary(int in_nodeId, int* out_nodeId) override;
     DispatchResponse markUndoableState() override;
@@ -60,6 +60,9 @@ public:
     DispatchResponse setOuterHTML(int in_nodeId, const String& in_outerHTML) override;
     DispatchResponse undo() override;
     DispatchResponse getFrameOwner(const String& in_frameId, int* out_backendNodeId, Maybe<int>* out_nodeId) override;
+    DispatchResponse setNodeStackTracesEnabled(bool in_enable) override;
+    DispatchResponse getNodeStackTraces(int in_nodeId, Maybe<protocol::Runtime::StackTrace>* out_creation) override;
+
 
     const bool enabled() {
         return m_enabled;

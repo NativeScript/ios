@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace Overlay {
@@ -124,6 +127,26 @@ std::unique_ptr<protocol::DictionaryValue> HighlightConfig::toValue() const
     return result;
 }
 
+void HighlightConfig::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("showInfo"), m_showInfo, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("showStyles"), m_showStyles, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("showRulers"), m_showRulers, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("showExtensionLines"), m_showExtensionLines, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("contentColor"), m_contentColor, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("paddingColor"), m_paddingColor, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("borderColor"), m_borderColor, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("marginColor"), m_marginColor, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("eventTargetColor"), m_eventTargetColor, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shapeColor"), m_shapeColor, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shapeMarginColor"), m_shapeMarginColor, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cssGridColor"), m_cssGridColor, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<HighlightConfig> HighlightConfig::clone() const
 {
     ErrorSupport errors;
@@ -134,6 +157,7 @@ namespace InspectModeEnum {
 const char SearchForNode[] = "searchForNode";
 const char SearchForUAShadowDOM[] = "searchForUAShadowDOM";
 const char CaptureAreaScreenshot[] = "captureAreaScreenshot";
+const char ShowDistances[] = "showDistances";
 const char None[] = "none";
 } // namespace InspectModeEnum
 
@@ -161,6 +185,15 @@ std::unique_ptr<protocol::DictionaryValue> InspectNodeRequestedNotification::toV
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("backendNodeId", ValueConversions<int>::toValue(m_backendNodeId));
     return result;
+}
+
+void InspectNodeRequestedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), m_backendNodeId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<InspectNodeRequestedNotification> InspectNodeRequestedNotification::clone() const
@@ -195,6 +228,15 @@ std::unique_ptr<protocol::DictionaryValue> NodeHighlightRequestedNotification::t
     return result;
 }
 
+void NodeHighlightRequestedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<NodeHighlightRequestedNotification> NodeHighlightRequestedNotification::clone() const
 {
     ErrorSupport errors;
@@ -225,6 +267,15 @@ std::unique_ptr<protocol::DictionaryValue> ScreenshotRequestedNotification::toVa
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("viewport", ValueConversions<protocol::Page::Viewport>::toValue(m_viewport.get()));
     return result;
+}
+
+void ScreenshotRequestedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("viewport"), m_viewport, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ScreenshotRequestedNotification> ScreenshotRequestedNotification::clone() const
@@ -306,10 +357,10 @@ public:
         m_dispatchMap["Overlay.setShowDebugBorders"] = &DispatcherImpl::setShowDebugBorders;
         m_dispatchMap["Overlay.setShowFPSCounter"] = &DispatcherImpl::setShowFPSCounter;
         m_dispatchMap["Overlay.setShowPaintRects"] = &DispatcherImpl::setShowPaintRects;
+        m_dispatchMap["Overlay.setShowLayoutShiftRegions"] = &DispatcherImpl::setShowLayoutShiftRegions;
         m_dispatchMap["Overlay.setShowScrollBottleneckRects"] = &DispatcherImpl::setShowScrollBottleneckRects;
         m_dispatchMap["Overlay.setShowHitTestBorders"] = &DispatcherImpl::setShowHitTestBorders;
         m_dispatchMap["Overlay.setShowViewportSizeOnResize"] = &DispatcherImpl::setShowViewportSizeOnResize;
-        m_dispatchMap["Overlay.setSuspended"] = &DispatcherImpl::setSuspended;
     }
     ~DispatcherImpl() override { }
     bool canDispatch(const String& method) override;
@@ -336,10 +387,10 @@ protected:
     void setShowDebugBorders(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setShowFPSCounter(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setShowPaintRects(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void setShowLayoutShiftRegions(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setShowScrollBottleneckRects(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setShowHitTestBorders(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setShowViewportSizeOnResize(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setSuspended(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
     Backend* m_backend;
 };
@@ -393,6 +444,18 @@ void DispatcherImpl::getHighlightObjectForTest(int callId, const String& method,
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     errors->setName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    protocol::Value* includeDistanceValue = object ? object->get("includeDistance") : nullptr;
+    Maybe<bool> in_includeDistance;
+    if (includeDistanceValue) {
+        errors->setName("includeDistance");
+        in_includeDistance = ValueConversions<bool>::fromValue(includeDistanceValue, errors);
+    }
+    protocol::Value* includeStyleValue = object ? object->get("includeStyle") : nullptr;
+    Maybe<bool> in_includeStyle;
+    if (includeStyleValue) {
+        errors->setName("includeStyle");
+        in_includeStyle = ValueConversions<bool>::fromValue(includeStyleValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -402,7 +465,7 @@ void DispatcherImpl::getHighlightObjectForTest(int callId, const String& method,
     std::unique_ptr<protocol::DictionaryValue> out_highlight;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getHighlightObjectForTest(in_nodeId, &out_highlight);
+    DispatchResponse response = m_backend->getHighlightObjectForTest(in_nodeId, std::move(in_includeDistance), std::move(in_includeStyle), &out_highlight);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
@@ -758,6 +821,31 @@ void DispatcherImpl::setShowPaintRects(int callId, const String& method, v8_crdt
     return;
 }
 
+void DispatcherImpl::setShowLayoutShiftRegions(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* resultValue = object ? object->get("result") : nullptr;
+    errors->setName("result");
+    bool in_result = ValueConversions<bool>::fromValue(resultValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return;
+    }
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->setShowLayoutShiftRegions(in_result);
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response);
+    return;
+}
+
 void DispatcherImpl::setShowScrollBottleneckRects(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
@@ -824,31 +912,6 @@ void DispatcherImpl::setShowViewportSizeOnResize(int callId, const String& metho
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setShowViewportSizeOnResize(in_show);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
-        return;
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response);
-    return;
-}
-
-void DispatcherImpl::setSuspended(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* suspendedValue = object ? object->get("suspended") : nullptr;
-    errors->setName("suspended");
-    bool in_suspended = ValueConversions<bool>::fromValue(suspendedValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setSuspended(in_suspended);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;

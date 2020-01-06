@@ -35,9 +35,7 @@ public:
     void setVersion(const String& value) { m_version = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Domain> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;

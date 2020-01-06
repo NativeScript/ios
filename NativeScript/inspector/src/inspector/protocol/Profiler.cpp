@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace Profiler {
@@ -76,6 +79,20 @@ std::unique_ptr<protocol::DictionaryValue> ProfileNode::toValue() const
     return result;
 }
 
+void ProfileNode::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("id"), m_id, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("callFrame"), m_callFrame, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hitCount"), m_hitCount, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("children"), m_children, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("deoptReason"), m_deoptReason, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("positionTicks"), m_positionTicks, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ProfileNode> ProfileNode::clone() const
 {
     ErrorSupport errors;
@@ -130,6 +147,19 @@ std::unique_ptr<protocol::DictionaryValue> Profile::toValue() const
     return result;
 }
 
+void Profile::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodes"), m_nodes, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startTime"), m_startTime, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endTime"), m_endTime, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("samples"), m_samples, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timeDeltas"), m_timeDeltas, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Profile> Profile::clone() const
 {
     ErrorSupport errors;
@@ -164,6 +194,16 @@ std::unique_ptr<protocol::DictionaryValue> PositionTickInfo::toValue() const
     result->setValue("line", ValueConversions<int>::toValue(m_line));
     result->setValue("ticks", ValueConversions<int>::toValue(m_ticks));
     return result;
+}
+
+void PositionTickInfo::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("line"), m_line, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("ticks"), m_ticks, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<PositionTickInfo> PositionTickInfo::clone() const
@@ -206,6 +246,17 @@ std::unique_ptr<protocol::DictionaryValue> CoverageRange::toValue() const
     return result;
 }
 
+void CoverageRange::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startOffset"), m_startOffset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endOffset"), m_endOffset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("count"), m_count, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<CoverageRange> CoverageRange::clone() const
 {
     ErrorSupport errors;
@@ -244,6 +295,17 @@ std::unique_ptr<protocol::DictionaryValue> FunctionCoverage::toValue() const
     result->setValue("ranges", ValueConversions<protocol::Array<protocol::Profiler::CoverageRange>>::toValue(m_ranges.get()));
     result->setValue("isBlockCoverage", ValueConversions<bool>::toValue(m_isBlockCoverage));
     return result;
+}
+
+void FunctionCoverage::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("functionName"), m_functionName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("ranges"), m_ranges, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isBlockCoverage"), m_isBlockCoverage, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<FunctionCoverage> FunctionCoverage::clone() const
@@ -286,6 +348,17 @@ std::unique_ptr<protocol::DictionaryValue> ScriptCoverage::toValue() const
     return result;
 }
 
+void ScriptCoverage::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scriptId"), m_scriptId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("functions"), m_functions, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ScriptCoverage> ScriptCoverage::clone() const
 {
     ErrorSupport errors;
@@ -316,6 +389,15 @@ std::unique_ptr<protocol::DictionaryValue> TypeObject::toValue() const
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("name", ValueConversions<String>::toValue(m_name));
     return result;
+}
+
+void TypeObject::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<TypeObject> TypeObject::clone() const
@@ -352,6 +434,16 @@ std::unique_ptr<protocol::DictionaryValue> TypeProfileEntry::toValue() const
     result->setValue("offset", ValueConversions<int>::toValue(m_offset));
     result->setValue("types", ValueConversions<protocol::Array<protocol::Profiler::TypeObject>>::toValue(m_types.get()));
     return result;
+}
+
+void TypeProfileEntry::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("offset"), m_offset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("types"), m_types, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<TypeProfileEntry> TypeProfileEntry::clone() const
@@ -394,6 +486,17 @@ std::unique_ptr<protocol::DictionaryValue> ScriptTypeProfile::toValue() const
     return result;
 }
 
+void ScriptTypeProfile::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scriptId"), m_scriptId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("entries"), m_entries, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ScriptTypeProfile> ScriptTypeProfile::clone() const
 {
     ErrorSupport errors;
@@ -428,6 +531,16 @@ std::unique_ptr<protocol::DictionaryValue> CounterInfo::toValue() const
     result->setValue("name", ValueConversions<String>::toValue(m_name));
     result->setValue("value", ValueConversions<int>::toValue(m_value));
     return result;
+}
+
+void CounterInfo::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<CounterInfo> CounterInfo::clone() const
@@ -477,6 +590,18 @@ std::unique_ptr<protocol::DictionaryValue> ConsoleProfileFinishedNotification::t
     return result;
 }
 
+void ConsoleProfileFinishedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("id"), m_id, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("location"), m_location, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("profile"), m_profile, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("title"), m_title, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ConsoleProfileFinishedNotification> ConsoleProfileFinishedNotification::clone() const
 {
     ErrorSupport errors;
@@ -518,6 +643,17 @@ std::unique_ptr<protocol::DictionaryValue> ConsoleProfileStartedNotification::to
     if (m_title.isJust())
         result->setValue("title", ValueConversions<String>::toValue(m_title.fromJust()));
     return result;
+}
+
+void ConsoleProfileStartedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("id"), m_id, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("location"), m_location, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("title"), m_title, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ConsoleProfileStartedNotification> ConsoleProfileStartedNotification::clone() const

@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace Page {
@@ -47,6 +50,11 @@ std::unique_ptr<Frame> Frame::fromValue(protocol::Value* value, ErrorSupport* er
     protocol::Value* urlValue = object->get("url");
     errors->setName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
+    protocol::Value* urlFragmentValue = object->get("urlFragment");
+    if (urlFragmentValue) {
+        errors->setName("urlFragment");
+        result->m_urlFragment = ValueConversions<String>::fromValue(urlFragmentValue, errors);
+    }
     protocol::Value* securityOriginValue = object->get("securityOrigin");
     errors->setName("securityOrigin");
     result->m_securityOrigin = ValueConversions<String>::fromValue(securityOriginValue, errors);
@@ -74,11 +82,30 @@ std::unique_ptr<protocol::DictionaryValue> Frame::toValue() const
     if (m_name.isJust())
         result->setValue("name", ValueConversions<String>::toValue(m_name.fromJust()));
     result->setValue("url", ValueConversions<String>::toValue(m_url));
+    if (m_urlFragment.isJust())
+        result->setValue("urlFragment", ValueConversions<String>::toValue(m_urlFragment.fromJust()));
     result->setValue("securityOrigin", ValueConversions<String>::toValue(m_securityOrigin));
     result->setValue("mimeType", ValueConversions<String>::toValue(m_mimeType));
     if (m_unreachableUrl.isJust())
         result->setValue("unreachableUrl", ValueConversions<String>::toValue(m_unreachableUrl.fromJust()));
     return result;
+}
+
+void Frame::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("id"), m_id, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentId"), m_parentId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("loaderId"), m_loaderId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("urlFragment"), m_urlFragment, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("securityOrigin"), m_securityOrigin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("mimeType"), m_mimeType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("unreachableUrl"), m_unreachableUrl, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<Frame> Frame::clone() const
@@ -149,6 +176,21 @@ std::unique_ptr<protocol::DictionaryValue> FrameResource::toValue() const
     return result;
 }
 
+void FrameResource::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("type"), m_type, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("mimeType"), m_mimeType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lastModified"), m_lastModified, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("contentSize"), m_contentSize, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("failed"), m_failed, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("canceled"), m_canceled, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FrameResource> FrameResource::clone() const
 {
     ErrorSupport errors;
@@ -192,6 +234,17 @@ std::unique_ptr<protocol::DictionaryValue> FrameResourceTree::toValue() const
     return result;
 }
 
+void FrameResourceTree::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frame"), m_frame, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("childFrames"), m_childFrames, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("resources"), m_resources, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FrameResourceTree> FrameResourceTree::clone() const
 {
     ErrorSupport errors;
@@ -229,6 +282,16 @@ std::unique_ptr<protocol::DictionaryValue> FrameTree::toValue() const
     if (m_childFrames.isJust())
         result->setValue("childFrames", ValueConversions<protocol::Array<protocol::Page::FrameTree>>::toValue(m_childFrames.fromJust()));
     return result;
+}
+
+void FrameTree::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frame"), m_frame, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("childFrames"), m_childFrames, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<FrameTree> FrameTree::clone() const
@@ -273,6 +336,18 @@ std::unique_ptr<protocol::DictionaryValue> LayoutViewport::toValue() const
     result->setValue("clientWidth", ValueConversions<int>::toValue(m_clientWidth));
     result->setValue("clientHeight", ValueConversions<int>::toValue(m_clientHeight));
     return result;
+}
+
+void LayoutViewport::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pageX"), m_pageX, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pageY"), m_pageY, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("clientWidth"), m_clientWidth, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("clientHeight"), m_clientHeight, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<LayoutViewport> LayoutViewport::clone() const
@@ -338,6 +413,22 @@ std::unique_ptr<protocol::DictionaryValue> VisualViewport::toValue() const
     return result;
 }
 
+void VisualViewport::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("offsetX"), m_offsetX, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("offsetY"), m_offsetY, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pageX"), m_pageX, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pageY"), m_pageY, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("clientWidth"), m_clientWidth, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("clientHeight"), m_clientHeight, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scale"), m_scale, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("zoom"), m_zoom, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<VisualViewport> VisualViewport::clone() const
 {
     ErrorSupport errors;
@@ -384,6 +475,19 @@ std::unique_ptr<protocol::DictionaryValue> Viewport::toValue() const
     result->setValue("height", ValueConversions<double>::toValue(m_height));
     result->setValue("scale", ValueConversions<double>::toValue(m_scale));
     return result;
+}
+
+void Viewport::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("x"), m_x, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("y"), m_y, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("width"), m_width, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("height"), m_height, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scale"), m_scale, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<Viewport> Viewport::clone() const
@@ -463,6 +567,21 @@ std::unique_ptr<protocol::DictionaryValue> FontFamilies::toValue() const
     return result;
 }
 
+void FontFamilies::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("standard"), m_standard, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fixed"), m_fixed, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("serif"), m_serif, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sansSerif"), m_sansSerif, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cursive"), m_cursive, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fantasy"), m_fantasy, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pictograph"), m_pictograph, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FontFamilies> FontFamilies::clone() const
 {
     ErrorSupport errors;
@@ -505,11 +624,31 @@ std::unique_ptr<protocol::DictionaryValue> FontSizes::toValue() const
     return result;
 }
 
+void FontSizes::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("standard"), m_standard, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fixed"), m_fixed, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FontSizes> FontSizes::clone() const
 {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
+
+namespace ClientNavigationReasonEnum {
+const char FormSubmissionGet[] = "formSubmissionGet";
+const char FormSubmissionPost[] = "formSubmissionPost";
+const char HttpHeaderRefresh[] = "httpHeaderRefresh";
+const char ScriptInitiated[] = "scriptInitiated";
+const char MetaTagRefresh[] = "metaTagRefresh";
+const char PageBlockInterstitial[] = "pageBlockInterstitial";
+const char Reload[] = "reload";
+} // namespace ClientNavigationReasonEnum
 
 std::unique_ptr<DomContentEventFiredNotification> DomContentEventFiredNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
@@ -537,7 +676,70 @@ std::unique_ptr<protocol::DictionaryValue> DomContentEventFiredNotification::toV
     return result;
 }
 
+void DomContentEventFiredNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<DomContentEventFiredNotification> DomContentEventFiredNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+const char* FileChooserOpenedNotification::ModeEnum::SelectSingle = "selectSingle";
+const char* FileChooserOpenedNotification::ModeEnum::SelectMultiple = "selectMultiple";
+
+std::unique_ptr<FileChooserOpenedNotification> FileChooserOpenedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<FileChooserOpenedNotification> result(new FileChooserOpenedNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* frameIdValue = object->get("frameId");
+    errors->setName("frameId");
+    result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
+    protocol::Value* backendNodeIdValue = object->get("backendNodeId");
+    errors->setName("backendNodeId");
+    result->m_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
+    protocol::Value* modeValue = object->get("mode");
+    errors->setName("mode");
+    result->m_mode = ValueConversions<String>::fromValue(modeValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> FileChooserOpenedNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
+    result->setValue("backendNodeId", ValueConversions<int>::toValue(m_backendNodeId));
+    result->setValue("mode", ValueConversions<String>::toValue(m_mode));
+    return result;
+}
+
+void FileChooserOpenedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), m_backendNodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("mode"), m_mode, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<FileChooserOpenedNotification> FileChooserOpenedNotification::clone() const
 {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
@@ -580,6 +782,17 @@ std::unique_ptr<protocol::DictionaryValue> FrameAttachedNotification::toValue() 
     return result;
 }
 
+void FrameAttachedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentFrameId"), m_parentFrameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("stack"), m_stack, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FrameAttachedNotification> FrameAttachedNotification::clone() const
 {
     ErrorSupport errors;
@@ -610,6 +823,15 @@ std::unique_ptr<protocol::DictionaryValue> FrameClearedScheduledNavigationNotifi
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
     return result;
+}
+
+void FrameClearedScheduledNavigationNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<FrameClearedScheduledNavigationNotification> FrameClearedScheduledNavigationNotification::clone() const
@@ -644,6 +866,15 @@ std::unique_ptr<protocol::DictionaryValue> FrameDetachedNotification::toValue() 
     return result;
 }
 
+void FrameDetachedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FrameDetachedNotification> FrameDetachedNotification::clone() const
 {
     ErrorSupport errors;
@@ -676,7 +907,67 @@ std::unique_ptr<protocol::DictionaryValue> FrameNavigatedNotification::toValue()
     return result;
 }
 
+void FrameNavigatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frame"), m_frame, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FrameNavigatedNotification> FrameNavigatedNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<FrameRequestedNavigationNotification> FrameRequestedNavigationNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<FrameRequestedNavigationNotification> result(new FrameRequestedNavigationNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* frameIdValue = object->get("frameId");
+    errors->setName("frameId");
+    result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
+    protocol::Value* reasonValue = object->get("reason");
+    errors->setName("reason");
+    result->m_reason = ValueConversions<String>::fromValue(reasonValue, errors);
+    protocol::Value* urlValue = object->get("url");
+    errors->setName("url");
+    result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> FrameRequestedNavigationNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
+    result->setValue("reason", ValueConversions<String>::toValue(m_reason));
+    result->setValue("url", ValueConversions<String>::toValue(m_url));
+    return result;
+}
+
+void FrameRequestedNavigationNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("reason"), m_reason, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<FrameRequestedNavigationNotification> FrameRequestedNavigationNotification::clone() const
 {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
@@ -728,6 +1019,18 @@ std::unique_ptr<protocol::DictionaryValue> FrameScheduledNavigationNotification:
     return result;
 }
 
+void FrameScheduledNavigationNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("delay"), m_delay, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("reason"), m_reason, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FrameScheduledNavigationNotification> FrameScheduledNavigationNotification::clone() const
 {
     ErrorSupport errors;
@@ -758,6 +1061,15 @@ std::unique_ptr<protocol::DictionaryValue> FrameStartedLoadingNotification::toVa
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
     return result;
+}
+
+void FrameStartedLoadingNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<FrameStartedLoadingNotification> FrameStartedLoadingNotification::clone() const
@@ -792,7 +1104,62 @@ std::unique_ptr<protocol::DictionaryValue> FrameStoppedLoadingNotification::toVa
     return result;
 }
 
+void FrameStoppedLoadingNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FrameStoppedLoadingNotification> FrameStoppedLoadingNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<DownloadWillBeginNotification> DownloadWillBeginNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<DownloadWillBeginNotification> result(new DownloadWillBeginNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* frameIdValue = object->get("frameId");
+    errors->setName("frameId");
+    result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
+    protocol::Value* urlValue = object->get("url");
+    errors->setName("url");
+    result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> DownloadWillBeginNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
+    result->setValue("url", ValueConversions<String>::toValue(m_url));
+    return result;
+}
+
+void DownloadWillBeginNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<DownloadWillBeginNotification> DownloadWillBeginNotification::clone() const
 {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
@@ -836,6 +1203,18 @@ std::unique_ptr<protocol::DictionaryValue> LifecycleEventNotification::toValue()
     return result;
 }
 
+void LifecycleEventNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("loaderId"), m_loaderId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<LifecycleEventNotification> LifecycleEventNotification::clone() const
 {
     ErrorSupport errors;
@@ -866,6 +1245,15 @@ std::unique_ptr<protocol::DictionaryValue> LoadEventFiredNotification::toValue()
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
     return result;
+}
+
+void LoadEventFiredNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<LoadEventFiredNotification> LoadEventFiredNotification::clone() const
@@ -902,6 +1290,16 @@ std::unique_ptr<protocol::DictionaryValue> NavigatedWithinDocumentNotification::
     result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
     result->setValue("url", ValueConversions<String>::toValue(m_url));
     return result;
+}
+
+void NavigatedWithinDocumentNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<NavigatedWithinDocumentNotification> NavigatedWithinDocumentNotification::clone() const
@@ -948,6 +1346,18 @@ std::unique_ptr<protocol::DictionaryValue> WindowOpenNotification::toValue() con
     return result;
 }
 
+void WindowOpenNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("windowName"), m_windowName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("windowFeatures"), m_windowFeatures, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("userGesture"), m_userGesture, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<WindowOpenNotification> WindowOpenNotification::clone() const
 {
     ErrorSupport errors;
@@ -984,6 +1394,16 @@ std::unique_ptr<protocol::DictionaryValue> CompilationCacheProducedNotification:
     return result;
 }
 
+void CompilationCacheProducedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("data"), m_data, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<CompilationCacheProducedNotification> CompilationCacheProducedNotification::clone() const
 {
     ErrorSupport errors;
@@ -1005,6 +1425,13 @@ namespace FormatEnum {
 const char* Mhtml = "mhtml";
 } // namespace FormatEnum
 } // namespace CaptureSnapshot
+
+namespace PrintToPDF {
+namespace TransferModeEnum {
+const char* ReturnAsBase64 = "ReturnAsBase64";
+const char* ReturnAsStream = "ReturnAsStream";
+} // namespace TransferModeEnum
+} // namespace PrintToPDF
 
 namespace SetDownloadBehavior {
 namespace BehaviorEnum {
@@ -1035,6 +1462,13 @@ const char* Active = "active";
 } // namespace StateEnum
 } // namespace SetWebLifecycleState
 
+namespace FileChooserOpened {
+namespace ModeEnum {
+const char* SelectSingle = "selectSingle";
+const char* SelectMultiple = "selectMultiple";
+} // namespace ModeEnum
+} // namespace FileChooserOpened
+
 namespace FrameScheduledNavigation {
 namespace ReasonEnum {
 const char* FormSubmissionGet = "formSubmissionGet";
@@ -1057,6 +1491,18 @@ void Frontend::domContentEventFired(double timestamp)
         .setTimestamp(timestamp)
         .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Page.domContentEventFired", std::move(messageData)));
+}
+
+void Frontend::fileChooserOpened(const String& frameId, int backendNodeId, const String& mode)
+{
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<FileChooserOpenedNotification> messageData = FileChooserOpenedNotification::create()
+        .setFrameId(frameId)
+        .setBackendNodeId(backendNodeId)
+        .setMode(mode)
+        .build();
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Page.fileChooserOpened", std::move(messageData)));
 }
 
 void Frontend::frameAttached(const String& frameId, const String& parentFrameId, Maybe<protocol::Runtime::StackTrace> stack)
@@ -1109,6 +1555,18 @@ void Frontend::frameResized()
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Page.frameResized"));
 }
 
+void Frontend::frameRequestedNavigation(const String& frameId, const String& reason, const String& url)
+{
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<FrameRequestedNavigationNotification> messageData = FrameRequestedNavigationNotification::create()
+        .setFrameId(frameId)
+        .setReason(reason)
+        .setUrl(url)
+        .build();
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Page.frameRequestedNavigation", std::move(messageData)));
+}
+
 void Frontend::frameScheduledNavigation(const String& frameId, double delay, const String& reason, const String& url)
 {
     if (!m_frontendChannel)
@@ -1140,6 +1598,17 @@ void Frontend::frameStoppedLoading(const String& frameId)
         .setFrameId(frameId)
         .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Page.frameStoppedLoading", std::move(messageData)));
+}
+
+void Frontend::downloadWillBegin(const String& frameId, const String& url)
+{
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<DownloadWillBeginNotification> messageData = DownloadWillBeginNotification::create()
+        .setFrameId(frameId)
+        .setUrl(url)
+        .build();
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Page.downloadWillBegin", std::move(messageData)));
 }
 
 void Frontend::lifecycleEvent(const String& frameId, const String& loaderId, const String& name, double timestamp)
@@ -1226,6 +1695,8 @@ public:
       m_redirects["Page.deleteCookie"] = "Network.deleteCookie";
         m_dispatchMap["Page.disable"] = &DispatcherImpl::disable;
         m_dispatchMap["Page.enable"] = &DispatcherImpl::enable;
+        m_dispatchMap["Page.getInstallabilityErrors"] = &DispatcherImpl::getInstallabilityErrors;
+        m_dispatchMap["Page.getManifestIcons"] = &DispatcherImpl::getManifestIcons;
       m_redirects["Page.getCookies"] = "Network.getCookies";
         m_dispatchMap["Page.getFrameTree"] = &DispatcherImpl::getFrameTree;
         m_dispatchMap["Page.getLayoutMetrics"] = &DispatcherImpl::getLayoutMetrics;
@@ -1253,6 +1724,7 @@ public:
         m_dispatchMap["Page.clearCompilationCache"] = &DispatcherImpl::clearCompilationCache;
         m_dispatchMap["Page.generateTestReport"] = &DispatcherImpl::generateTestReport;
         m_dispatchMap["Page.waitForDebugger"] = &DispatcherImpl::waitForDebugger;
+        m_dispatchMap["Page.setInterceptFileChooserDialog"] = &DispatcherImpl::setInterceptFileChooserDialog;
     }
     ~DispatcherImpl() override { }
     bool canDispatch(const String& method) override;
@@ -1270,6 +1742,8 @@ protected:
     void createIsolatedWorld(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void getInstallabilityErrors(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void getManifestIcons(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void getFrameTree(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void getLayoutMetrics(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void getResourceContent(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -1292,6 +1766,7 @@ protected:
     void clearCompilationCache(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void generateTestReport(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void waitForDebugger(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void setInterceptFileChooserDialog(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
     Backend* m_backend;
 };
@@ -1445,6 +1920,47 @@ void DispatcherImpl::enable(int callId, const String& method, v8_crdtp::span<uin
     }
     if (weak->get())
         weak->get()->sendResponse(callId, response);
+    return;
+}
+
+void DispatcherImpl::getInstallabilityErrors(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+    // Declare output parameters.
+    std::unique_ptr<protocol::Array<String>> out_errors;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->getInstallabilityErrors(&out_errors);
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        result->setValue("errors", ValueConversions<protocol::Array<String>>::toValue(out_errors.get()));
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response, std::move(result));
+    return;
+}
+
+void DispatcherImpl::getManifestIcons(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+    // Declare output parameters.
+    Maybe<Binary> out_primaryIcon;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->getManifestIcons(&out_primaryIcon);
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        if (out_primaryIcon.isJust())
+            result->setValue("primaryIcon", ValueConversions<Binary>::toValue(out_primaryIcon.fromJust()));
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response, std::move(result));
     return;
 }
 
@@ -2040,6 +2556,31 @@ void DispatcherImpl::waitForDebugger(int callId, const String& method, v8_crdtp:
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->waitForDebugger();
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response);
+    return;
+}
+
+void DispatcherImpl::setInterceptFileChooserDialog(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* enabledValue = object ? object->get("enabled") : nullptr;
+    errors->setName("enabled");
+    bool in_enabled = ValueConversions<bool>::fromValue(enabledValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return;
+    }
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->setInterceptFileChooserDialog(in_enabled);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;

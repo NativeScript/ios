@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace CSS {
@@ -55,6 +58,16 @@ std::unique_ptr<protocol::DictionaryValue> PseudoElementMatches::toValue() const
     return result;
 }
 
+void PseudoElementMatches::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoType"), m_pseudoType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("matches"), m_matches, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<PseudoElementMatches> PseudoElementMatches::clone() const
 {
     ErrorSupport errors;
@@ -94,6 +107,16 @@ std::unique_ptr<protocol::DictionaryValue> InheritedStyleEntry::toValue() const
     return result;
 }
 
+void InheritedStyleEntry::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("inlineStyle"), m_inlineStyle, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("matchedCSSRules"), m_matchedCSSRules, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<InheritedStyleEntry> InheritedStyleEntry::clone() const
 {
     ErrorSupport errors;
@@ -128,6 +151,16 @@ std::unique_ptr<protocol::DictionaryValue> RuleMatch::toValue() const
     result->setValue("rule", ValueConversions<protocol::CSS::CSSRule>::toValue(m_rule.get()));
     result->setValue("matchingSelectors", ValueConversions<protocol::Array<int>>::toValue(m_matchingSelectors.get()));
     return result;
+}
+
+void RuleMatch::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("rule"), m_rule, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("matchingSelectors"), m_matchingSelectors, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<RuleMatch> RuleMatch::clone() const
@@ -169,6 +202,16 @@ std::unique_ptr<protocol::DictionaryValue> Value::toValue() const
     return result;
 }
 
+void Value::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Value> Value::clone() const
 {
     ErrorSupport errors;
@@ -203,6 +246,16 @@ std::unique_ptr<protocol::DictionaryValue> SelectorList::toValue() const
     result->setValue("selectors", ValueConversions<protocol::Array<protocol::CSS::Value>>::toValue(m_selectors.get()));
     result->setValue("text", ValueConversions<String>::toValue(m_text));
     return result;
+}
+
+void SelectorList::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("selectors"), m_selectors, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<SelectorList> SelectorList::clone() const
@@ -266,6 +319,12 @@ std::unique_ptr<CSSStyleSheetHeader> CSSStyleSheetHeader::fromValue(protocol::Va
     protocol::Value* lengthValue = object->get("length");
     errors->setName("length");
     result->m_length = ValueConversions<double>::fromValue(lengthValue, errors);
+    protocol::Value* endLineValue = object->get("endLine");
+    errors->setName("endLine");
+    result->m_endLine = ValueConversions<double>::fromValue(endLineValue, errors);
+    protocol::Value* endColumnValue = object->get("endColumn");
+    errors->setName("endColumn");
+    result->m_endColumn = ValueConversions<double>::fromValue(endColumnValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
@@ -291,7 +350,32 @@ std::unique_ptr<protocol::DictionaryValue> CSSStyleSheetHeader::toValue() const
     result->setValue("startLine", ValueConversions<double>::toValue(m_startLine));
     result->setValue("startColumn", ValueConversions<double>::toValue(m_startColumn));
     result->setValue("length", ValueConversions<double>::toValue(m_length));
+    result->setValue("endLine", ValueConversions<double>::toValue(m_endLine));
+    result->setValue("endColumn", ValueConversions<double>::toValue(m_endColumn));
     return result;
+}
+
+void CSSStyleSheetHeader::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceURL"), m_sourceURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceMapURL"), m_sourceMapURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("origin"), m_origin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("title"), m_title, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("ownerNode"), m_ownerNode, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("disabled"), m_disabled, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hasSourceURL"), m_hasSourceURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isInline"), m_isInline, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startLine"), m_startLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startColumn"), m_startColumn, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("length"), m_length, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endLine"), m_endLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endColumn"), m_endColumn, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<CSSStyleSheetHeader> CSSStyleSheetHeader::clone() const
@@ -348,6 +432,19 @@ std::unique_ptr<protocol::DictionaryValue> CSSRule::toValue() const
     return result;
 }
 
+void CSSRule::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("selectorList"), m_selectorList, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("origin"), m_origin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("style"), m_style, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("media"), m_media, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<CSSRule> CSSRule::clone() const
 {
     ErrorSupport errors;
@@ -390,6 +487,18 @@ std::unique_ptr<protocol::DictionaryValue> RuleUsage::toValue() const
     result->setValue("endOffset", ValueConversions<double>::toValue(m_endOffset));
     result->setValue("used", ValueConversions<bool>::toValue(m_used));
     return result;
+}
+
+void RuleUsage::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startOffset"), m_startOffset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endOffset"), m_endOffset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("used"), m_used, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<RuleUsage> RuleUsage::clone() const
@@ -436,6 +545,18 @@ std::unique_ptr<protocol::DictionaryValue> SourceRange::toValue() const
     return result;
 }
 
+void SourceRange::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startLine"), m_startLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startColumn"), m_startColumn, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endLine"), m_endLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endColumn"), m_endColumn, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<SourceRange> SourceRange::clone() const
 {
     ErrorSupport errors;
@@ -479,6 +600,17 @@ std::unique_ptr<protocol::DictionaryValue> ShorthandEntry::toValue() const
     return result;
 }
 
+void ShorthandEntry::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("important"), m_important, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ShorthandEntry> ShorthandEntry::clone() const
 {
     ErrorSupport errors;
@@ -513,6 +645,16 @@ std::unique_ptr<protocol::DictionaryValue> CSSComputedStyleProperty::toValue() c
     result->setValue("name", ValueConversions<String>::toValue(m_name));
     result->setValue("value", ValueConversions<String>::toValue(m_value));
     return result;
+}
+
+void CSSComputedStyleProperty::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<CSSComputedStyleProperty> CSSComputedStyleProperty::clone() const
@@ -570,6 +712,19 @@ std::unique_ptr<protocol::DictionaryValue> CSSStyle::toValue() const
     if (m_range.isJust())
         result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.fromJust()));
     return result;
+}
+
+void CSSStyle::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cssProperties"), m_cssProperties, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shorthandEntries"), m_shorthandEntries, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cssText"), m_cssText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<CSSStyle> CSSStyle::clone() const
@@ -650,6 +805,22 @@ std::unique_ptr<protocol::DictionaryValue> CSSProperty::toValue() const
     return result;
 }
 
+void CSSProperty::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("important"), m_important, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("implicit"), m_implicit, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parsedOk"), m_parsedOk, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("disabled"), m_disabled, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<CSSProperty> CSSProperty::clone() const
 {
     ErrorSupport errors;
@@ -719,6 +890,20 @@ std::unique_ptr<protocol::DictionaryValue> CSSMedia::toValue() const
     return result;
 }
 
+void CSSMedia::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("source"), m_source, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceURL"), m_sourceURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("mediaList"), m_mediaList, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<CSSMedia> CSSMedia::clone() const
 {
     ErrorSupport errors;
@@ -753,6 +938,16 @@ std::unique_ptr<protocol::DictionaryValue> MediaQuery::toValue() const
     result->setValue("expressions", ValueConversions<protocol::Array<protocol::CSS::MediaQueryExpression>>::toValue(m_expressions.get()));
     result->setValue("active", ValueConversions<bool>::toValue(m_active));
     return result;
+}
+
+void MediaQuery::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("expressions"), m_expressions, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("active"), m_active, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<MediaQuery> MediaQuery::clone() const
@@ -809,6 +1004,19 @@ std::unique_ptr<protocol::DictionaryValue> MediaQueryExpression::toValue() const
     return result;
 }
 
+void MediaQueryExpression::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("unit"), m_unit, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("feature"), m_feature, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("valueRange"), m_valueRange, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("computedLength"), m_computedLength, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<MediaQueryExpression> MediaQueryExpression::clone() const
 {
     ErrorSupport errors;
@@ -847,6 +1055,17 @@ std::unique_ptr<protocol::DictionaryValue> PlatformFontUsage::toValue() const
     result->setValue("isCustomFont", ValueConversions<bool>::toValue(m_isCustomFont));
     result->setValue("glyphCount", ValueConversions<double>::toValue(m_glyphCount));
     return result;
+}
+
+void PlatformFontUsage::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("familyName"), m_familyName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isCustomFont"), m_isCustomFont, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("glyphCount"), m_glyphCount, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<PlatformFontUsage> PlatformFontUsage::clone() const
@@ -909,6 +1128,22 @@ std::unique_ptr<protocol::DictionaryValue> FontFace::toValue() const
     return result;
 }
 
+void FontFace::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontFamily"), m_fontFamily, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontStyle"), m_fontStyle, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontVariant"), m_fontVariant, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontWeight"), m_fontWeight, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fontStretch"), m_fontStretch, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("unicodeRange"), m_unicodeRange, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("src"), m_src, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("platformFontFamily"), m_platformFontFamily, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FontFace> FontFace::clone() const
 {
     ErrorSupport errors;
@@ -943,6 +1178,16 @@ std::unique_ptr<protocol::DictionaryValue> CSSKeyframesRule::toValue() const
     result->setValue("animationName", ValueConversions<protocol::CSS::Value>::toValue(m_animationName.get()));
     result->setValue("keyframes", ValueConversions<protocol::Array<protocol::CSS::CSSKeyframeRule>>::toValue(m_keyframes.get()));
     return result;
+}
+
+void CSSKeyframesRule::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("animationName"), m_animationName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("keyframes"), m_keyframes, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<CSSKeyframesRule> CSSKeyframesRule::clone() const
@@ -992,6 +1237,18 @@ std::unique_ptr<protocol::DictionaryValue> CSSKeyframeRule::toValue() const
     return result;
 }
 
+void CSSKeyframeRule::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("origin"), m_origin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("keyText"), m_keyText, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("style"), m_style, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<CSSKeyframeRule> CSSKeyframeRule::clone() const
 {
     ErrorSupport errors;
@@ -1032,6 +1289,17 @@ std::unique_ptr<protocol::DictionaryValue> StyleDeclarationEdit::toValue() const
     return result;
 }
 
+void StyleDeclarationEdit::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("range"), m_range, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), m_text, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<StyleDeclarationEdit> StyleDeclarationEdit::clone() const
 {
     ErrorSupport errors;
@@ -1067,6 +1335,15 @@ std::unique_ptr<protocol::DictionaryValue> FontsUpdatedNotification::toValue() c
     return result;
 }
 
+void FontsUpdatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("font"), m_font, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<FontsUpdatedNotification> FontsUpdatedNotification::clone() const
 {
     ErrorSupport errors;
@@ -1097,6 +1374,15 @@ std::unique_ptr<protocol::DictionaryValue> StyleSheetAddedNotification::toValue(
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("header", ValueConversions<protocol::CSS::CSSStyleSheetHeader>::toValue(m_header.get()));
     return result;
+}
+
+void StyleSheetAddedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("header"), m_header, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<StyleSheetAddedNotification> StyleSheetAddedNotification::clone() const
@@ -1131,6 +1417,15 @@ std::unique_ptr<protocol::DictionaryValue> StyleSheetChangedNotification::toValu
     return result;
 }
 
+void StyleSheetChangedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<StyleSheetChangedNotification> StyleSheetChangedNotification::clone() const
 {
     ErrorSupport errors;
@@ -1161,6 +1456,15 @@ std::unique_ptr<protocol::DictionaryValue> StyleSheetRemovedNotification::toValu
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
     return result;
+}
+
+void StyleSheetRemovedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), m_styleSheetId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<StyleSheetRemovedNotification> StyleSheetRemovedNotification::clone() const

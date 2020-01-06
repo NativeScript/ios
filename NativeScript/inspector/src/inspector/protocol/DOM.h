@@ -47,6 +47,7 @@ namespace PseudoTypeEnum {
  extern const char FirstLetter[];
  extern const char Before[];
  extern const char After[];
+ extern const char Marker[];
  extern const char Backdrop[];
  extern const char Selection[];
  extern const char FirstLineInherited[];
@@ -85,9 +86,7 @@ public:
     void setBackendNodeId(int value) { m_backendNodeId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<BackendNode> clone() const;
 
@@ -273,9 +272,7 @@ public:
     void setIsSVG(bool value) { m_isSVG = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Node> clone() const;
 
@@ -550,9 +547,7 @@ public:
     void setA(double value) { m_a = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<RGBA> clone() const;
 
@@ -662,9 +657,7 @@ public:
     void setShapeOutside(std::unique_ptr<protocol::DOM::ShapeOutsideInfo> value) { m_shapeOutside = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<BoxModel> clone() const;
 
@@ -787,9 +780,7 @@ public:
     void setMarginShape(std::unique_ptr<protocol::Array<protocol::Value>> value) { m_marginShape = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ShapeOutsideInfo> clone() const;
 
@@ -879,9 +870,7 @@ public:
     void setHeight(double value) { m_height = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Rect> clone() const;
 
@@ -981,9 +970,7 @@ public:
     void setValue(const String& value) { m_value = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<AttributeModifiedNotification> clone() const;
 
@@ -1068,9 +1055,7 @@ public:
     void setName(const String& value) { m_name = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<AttributeRemovedNotification> clone() const;
 
@@ -1146,9 +1131,7 @@ public:
     void setCharacterData(const String& value) { m_characterData = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CharacterDataModifiedNotification> clone() const;
 
@@ -1224,9 +1207,7 @@ public:
     void setChildNodeCount(int value) { m_childNodeCount = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ChildNodeCountUpdatedNotification> clone() const;
 
@@ -1306,9 +1287,7 @@ public:
     void setNode(std::unique_ptr<protocol::DOM::Node> value) { m_node = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ChildNodeInsertedNotification> clone() const;
 
@@ -1394,9 +1373,7 @@ public:
     void setNodeId(int value) { m_nodeId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ChildNodeRemovedNotification> clone() const;
 
@@ -1473,9 +1450,7 @@ public:
     void setDistributedNodes(std::unique_ptr<protocol::Array<protocol::DOM::BackendNode>> value) { m_distributedNodes = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<DistributedNodesUpdatedNotification> clone() const;
 
@@ -1548,9 +1523,7 @@ public:
     void setNodeIds(std::unique_ptr<protocol::Array<int>> value) { m_nodeIds = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<InlineStyleInvalidatedNotification> clone() const;
 
@@ -1616,9 +1589,7 @@ public:
     void setPseudoElement(std::unique_ptr<protocol::DOM::Node> value) { m_pseudoElement = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PseudoElementAddedNotification> clone() const;
 
@@ -1694,9 +1665,7 @@ public:
     void setPseudoElementId(int value) { m_pseudoElementId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PseudoElementRemovedNotification> clone() const;
 
@@ -1773,9 +1742,7 @@ public:
     void setNodes(std::unique_ptr<protocol::Array<protocol::DOM::Node>> value) { m_nodes = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SetChildNodesNotification> clone() const;
 
@@ -1851,9 +1818,7 @@ public:
     void setRootId(int value) { m_rootId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ShadowRootPoppedNotification> clone() const;
 
@@ -1930,9 +1895,7 @@ public:
     void setRoot(std::unique_ptr<protocol::DOM::Node> value) { m_root = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ShadowRootPushedNotification> clone() const;
 
@@ -2012,7 +1975,7 @@ public:
     virtual DispatchResponse getContentQuads(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::Array<protocol::Array<double>>>* out_quads) = 0;
     virtual DispatchResponse getDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_root) = 0;
     virtual DispatchResponse getFlattenedDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::Array<protocol::DOM::Node>>* out_nodes) = 0;
-    virtual DispatchResponse getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, int* out_backendNodeId, Maybe<int>* out_nodeId) = 0;
+    virtual DispatchResponse getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, Maybe<bool> in_ignorePointerEventsNone, int* out_backendNodeId, String* out_frameId, Maybe<int>* out_nodeId) = 0;
     virtual DispatchResponse getOuterHTML(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, String* out_outerHTML) = 0;
     virtual DispatchResponse getRelayoutBoundary(int in_nodeId, int* out_nodeId) = 0;
     virtual DispatchResponse getSearchResults(const String& in_searchId, int in_fromIndex, int in_toIndex, std::unique_ptr<protocol::Array<int>>* out_nodeIds) = 0;
@@ -2032,6 +1995,8 @@ public:
     virtual DispatchResponse setAttributeValue(int in_nodeId, const String& in_name, const String& in_value) = 0;
     virtual DispatchResponse setAttributesAsText(int in_nodeId, const String& in_text, Maybe<String> in_name) = 0;
     virtual DispatchResponse setFileInputFiles(std::unique_ptr<protocol::Array<String>> in_files, Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) = 0;
+    virtual DispatchResponse setNodeStackTracesEnabled(bool in_enable) = 0;
+    virtual DispatchResponse getNodeStackTraces(int in_nodeId, Maybe<protocol::Runtime::StackTrace>* out_creation) = 0;
     virtual DispatchResponse getFileInfo(const String& in_objectId, String* out_path) = 0;
     virtual DispatchResponse setInspectedNode(int in_nodeId) = 0;
     virtual DispatchResponse setNodeName(int in_nodeId, const String& in_name, int* out_nodeId) = 0;

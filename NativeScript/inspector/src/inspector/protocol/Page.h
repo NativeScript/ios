@@ -31,20 +31,34 @@ class VisualViewport;
 class Viewport;
 class FontFamilies;
 class FontSizes;
+using ClientNavigationReason = String;
 class DomContentEventFiredNotification;
+class FileChooserOpenedNotification;
 class FrameAttachedNotification;
 class FrameClearedScheduledNavigationNotification;
 class FrameDetachedNotification;
 class FrameNavigatedNotification;
 using FrameResizedNotification = Object;
+class FrameRequestedNavigationNotification;
 class FrameScheduledNavigationNotification;
 class FrameStartedLoadingNotification;
 class FrameStoppedLoadingNotification;
+class DownloadWillBeginNotification;
 class LifecycleEventNotification;
 class LoadEventFiredNotification;
 class NavigatedWithinDocumentNotification;
 class WindowOpenNotification;
 class CompilationCacheProducedNotification;
+
+namespace ClientNavigationReasonEnum {
+ extern const char FormSubmissionGet[];
+ extern const char FormSubmissionPost[];
+ extern const char HttpHeaderRefresh[];
+ extern const char ScriptInitiated[];
+ extern const char MetaTagRefresh[];
+ extern const char PageBlockInterstitial[];
+ extern const char Reload[];
+} // namespace ClientNavigationReasonEnum
 
 namespace CaptureScreenshot {
 namespace FormatEnum {
@@ -58,6 +72,13 @@ namespace FormatEnum {
  extern const char* Mhtml;
 } // FormatEnum
 } // CaptureSnapshot
+
+namespace PrintToPDF {
+namespace TransferModeEnum {
+ extern const char* ReturnAsBase64;
+ extern const char* ReturnAsStream;
+} // TransferModeEnum
+} // PrintToPDF
 
 namespace SetDownloadBehavior {
 namespace BehaviorEnum {
@@ -87,6 +108,13 @@ namespace StateEnum {
  extern const char* Active;
 } // StateEnum
 } // SetWebLifecycleState
+
+namespace FileChooserOpened {
+namespace ModeEnum {
+ extern const char* SelectSingle;
+ extern const char* SelectMultiple;
+} // ModeEnum
+} // FileChooserOpened
 
 namespace FrameScheduledNavigation {
 namespace ReasonEnum {
@@ -126,6 +154,10 @@ public:
     String getUrl() { return m_url; }
     void setUrl(const String& value) { m_url = value; }
 
+    bool hasUrlFragment() { return m_urlFragment.isJust(); }
+    String getUrlFragment(const String& defaultValue) { return m_urlFragment.isJust() ? m_urlFragment.fromJust() : defaultValue; }
+    void setUrlFragment(const String& value) { m_urlFragment = value; }
+
     String getSecurityOrigin() { return m_securityOrigin; }
     void setSecurityOrigin(const String& value) { m_securityOrigin = value; }
 
@@ -137,9 +169,7 @@ public:
     void setUnreachableUrl(const String& value) { m_unreachableUrl = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Frame> clone() const;
 
@@ -187,6 +217,12 @@ public:
             static_assert(!(STATE & UrlSet), "property url should not be set yet");
             m_result->setUrl(value);
             return castState<UrlSet>();
+        }
+
+        FrameBuilder<STATE>& setUrlFragment(const String& value)
+        {
+            m_result->setUrlFragment(value);
+            return *this;
         }
 
         FrameBuilder<STATE | SecurityOriginSet>& setSecurityOrigin(const String& value)
@@ -242,6 +278,7 @@ private:
     String m_loaderId;
     Maybe<String> m_name;
     String m_url;
+    Maybe<String> m_urlFragment;
     String m_securityOrigin;
     String m_mimeType;
     Maybe<String> m_unreachableUrl;
@@ -281,9 +318,7 @@ public:
     void setCanceled(bool value) { m_canceled = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameResource> clone() const;
 
@@ -399,9 +434,7 @@ public:
     void setResources(std::unique_ptr<protocol::Array<protocol::Page::FrameResource>> value) { m_resources = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameResourceTree> clone() const;
 
@@ -484,9 +517,7 @@ public:
     void setChildFrames(std::unique_ptr<protocol::Array<protocol::Page::FrameTree>> value) { m_childFrames = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameTree> clone() const;
 
@@ -565,9 +596,7 @@ public:
     void setClientHeight(int value) { m_clientHeight = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LayoutViewport> clone() const;
 
@@ -683,9 +712,7 @@ public:
     void setZoom(double value) { m_zoom = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<VisualViewport> clone() const;
 
@@ -828,9 +855,7 @@ public:
     void setScale(double value) { m_scale = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Viewport> clone() const;
 
@@ -959,9 +984,7 @@ public:
     void setPictograph(const String& value) { m_pictograph = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FontFamilies> clone() const;
 
@@ -1069,9 +1092,7 @@ public:
     void setFixed(int value) { m_fixed = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FontSizes> clone() const;
 
@@ -1139,9 +1160,7 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<DomContentEventFiredNotification> clone() const;
 
@@ -1194,6 +1213,99 @@ private:
 };
 
 
+class  FileChooserOpenedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(FileChooserOpenedNotification);
+public:
+    static std::unique_ptr<FileChooserOpenedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~FileChooserOpenedNotification() override { }
+
+    String getFrameId() { return m_frameId; }
+    void setFrameId(const String& value) { m_frameId = value; }
+
+    int getBackendNodeId() { return m_backendNodeId; }
+    void setBackendNodeId(int value) { m_backendNodeId = value; }
+
+    struct  ModeEnum {
+        static const char* SelectSingle;
+        static const char* SelectMultiple;
+    }; // ModeEnum
+
+    String getMode() { return m_mode; }
+    void setMode(const String& value) { m_mode = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<FileChooserOpenedNotification> clone() const;
+
+    template<int STATE>
+    class FileChooserOpenedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            FrameIdSet = 1 << 1,
+            BackendNodeIdSet = 1 << 2,
+            ModeSet = 1 << 3,
+            AllFieldsSet = (FrameIdSet | BackendNodeIdSet | ModeSet | 0)};
+
+
+        FileChooserOpenedNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
+        {
+            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
+            m_result->setFrameId(value);
+            return castState<FrameIdSet>();
+        }
+
+        FileChooserOpenedNotificationBuilder<STATE | BackendNodeIdSet>& setBackendNodeId(int value)
+        {
+            static_assert(!(STATE & BackendNodeIdSet), "property backendNodeId should not be set yet");
+            m_result->setBackendNodeId(value);
+            return castState<BackendNodeIdSet>();
+        }
+
+        FileChooserOpenedNotificationBuilder<STATE | ModeSet>& setMode(const String& value)
+        {
+            static_assert(!(STATE & ModeSet), "property mode should not be set yet");
+            m_result->setMode(value);
+            return castState<ModeSet>();
+        }
+
+        std::unique_ptr<FileChooserOpenedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class FileChooserOpenedNotification;
+        FileChooserOpenedNotificationBuilder() : m_result(new FileChooserOpenedNotification()) { }
+
+        template<int STEP> FileChooserOpenedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<FileChooserOpenedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Page::FileChooserOpenedNotification> m_result;
+    };
+
+    static FileChooserOpenedNotificationBuilder<0> create()
+    {
+        return FileChooserOpenedNotificationBuilder<0>();
+    }
+
+private:
+    FileChooserOpenedNotification()
+    {
+          m_backendNodeId = 0;
+    }
+
+    String m_frameId;
+    int m_backendNodeId;
+    String m_mode;
+};
+
+
 class  FrameAttachedNotification : public Serializable{
     PROTOCOL_DISALLOW_COPY(FrameAttachedNotification);
 public:
@@ -1212,9 +1324,7 @@ public:
     void setStack(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stack = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameAttachedNotification> clone() const;
 
@@ -1293,9 +1403,7 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameClearedScheduledNavigationNotification> clone() const;
 
@@ -1358,9 +1466,7 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameDetachedNotification> clone() const;
 
@@ -1423,9 +1529,7 @@ public:
     void setFrame(std::unique_ptr<protocol::Page::Frame> value) { m_frame = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameNavigatedNotification> clone() const;
 
@@ -1477,6 +1581,93 @@ private:
 };
 
 
+class  FrameRequestedNavigationNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(FrameRequestedNavigationNotification);
+public:
+    static std::unique_ptr<FrameRequestedNavigationNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~FrameRequestedNavigationNotification() override { }
+
+    String getFrameId() { return m_frameId; }
+    void setFrameId(const String& value) { m_frameId = value; }
+
+    String getReason() { return m_reason; }
+    void setReason(const String& value) { m_reason = value; }
+
+    String getUrl() { return m_url; }
+    void setUrl(const String& value) { m_url = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<FrameRequestedNavigationNotification> clone() const;
+
+    template<int STATE>
+    class FrameRequestedNavigationNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            FrameIdSet = 1 << 1,
+            ReasonSet = 1 << 2,
+            UrlSet = 1 << 3,
+            AllFieldsSet = (FrameIdSet | ReasonSet | UrlSet | 0)};
+
+
+        FrameRequestedNavigationNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
+        {
+            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
+            m_result->setFrameId(value);
+            return castState<FrameIdSet>();
+        }
+
+        FrameRequestedNavigationNotificationBuilder<STATE | ReasonSet>& setReason(const String& value)
+        {
+            static_assert(!(STATE & ReasonSet), "property reason should not be set yet");
+            m_result->setReason(value);
+            return castState<ReasonSet>();
+        }
+
+        FrameRequestedNavigationNotificationBuilder<STATE | UrlSet>& setUrl(const String& value)
+        {
+            static_assert(!(STATE & UrlSet), "property url should not be set yet");
+            m_result->setUrl(value);
+            return castState<UrlSet>();
+        }
+
+        std::unique_ptr<FrameRequestedNavigationNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class FrameRequestedNavigationNotification;
+        FrameRequestedNavigationNotificationBuilder() : m_result(new FrameRequestedNavigationNotification()) { }
+
+        template<int STEP> FrameRequestedNavigationNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<FrameRequestedNavigationNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Page::FrameRequestedNavigationNotification> m_result;
+    };
+
+    static FrameRequestedNavigationNotificationBuilder<0> create()
+    {
+        return FrameRequestedNavigationNotificationBuilder<0>();
+    }
+
+private:
+    FrameRequestedNavigationNotification()
+    {
+    }
+
+    String m_frameId;
+    String m_reason;
+    String m_url;
+};
+
+
 class  FrameScheduledNavigationNotification : public Serializable{
     PROTOCOL_DISALLOW_COPY(FrameScheduledNavigationNotification);
 public:
@@ -1507,9 +1698,7 @@ public:
     void setUrl(const String& value) { m_url = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameScheduledNavigationNotification> clone() const;
 
@@ -1600,9 +1789,7 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameStartedLoadingNotification> clone() const;
 
@@ -1665,9 +1852,7 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<FrameStoppedLoadingNotification> clone() const;
 
@@ -1719,6 +1904,81 @@ private:
 };
 
 
+class  DownloadWillBeginNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(DownloadWillBeginNotification);
+public:
+    static std::unique_ptr<DownloadWillBeginNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~DownloadWillBeginNotification() override { }
+
+    String getFrameId() { return m_frameId; }
+    void setFrameId(const String& value) { m_frameId = value; }
+
+    String getUrl() { return m_url; }
+    void setUrl(const String& value) { m_url = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<DownloadWillBeginNotification> clone() const;
+
+    template<int STATE>
+    class DownloadWillBeginNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            FrameIdSet = 1 << 1,
+            UrlSet = 1 << 2,
+            AllFieldsSet = (FrameIdSet | UrlSet | 0)};
+
+
+        DownloadWillBeginNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value)
+        {
+            static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
+            m_result->setFrameId(value);
+            return castState<FrameIdSet>();
+        }
+
+        DownloadWillBeginNotificationBuilder<STATE | UrlSet>& setUrl(const String& value)
+        {
+            static_assert(!(STATE & UrlSet), "property url should not be set yet");
+            m_result->setUrl(value);
+            return castState<UrlSet>();
+        }
+
+        std::unique_ptr<DownloadWillBeginNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class DownloadWillBeginNotification;
+        DownloadWillBeginNotificationBuilder() : m_result(new DownloadWillBeginNotification()) { }
+
+        template<int STEP> DownloadWillBeginNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<DownloadWillBeginNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Page::DownloadWillBeginNotification> m_result;
+    };
+
+    static DownloadWillBeginNotificationBuilder<0> create()
+    {
+        return DownloadWillBeginNotificationBuilder<0>();
+    }
+
+private:
+    DownloadWillBeginNotification()
+    {
+    }
+
+    String m_frameId;
+    String m_url;
+};
+
+
 class  LifecycleEventNotification : public Serializable{
     PROTOCOL_DISALLOW_COPY(LifecycleEventNotification);
 public:
@@ -1739,9 +1999,7 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LifecycleEventNotification> clone() const;
 
@@ -1832,9 +2090,7 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LoadEventFiredNotification> clone() const;
 
@@ -1901,9 +2157,7 @@ public:
     void setUrl(const String& value) { m_url = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<NavigatedWithinDocumentNotification> clone() const;
 
@@ -1984,9 +2238,7 @@ public:
     void setUserGesture(bool value) { m_userGesture = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<WindowOpenNotification> clone() const;
 
@@ -2080,9 +2332,7 @@ public:
     void setData(const Binary& value) { m_data = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CompilationCacheProducedNotification> clone() const;
 
@@ -2154,6 +2404,8 @@ public:
     virtual DispatchResponse createIsolatedWorld(const String& in_frameId, Maybe<String> in_worldName, Maybe<bool> in_grantUniveralAccess, int* out_executionContextId) = 0;
     virtual DispatchResponse disable() = 0;
     virtual DispatchResponse enable() = 0;
+    virtual DispatchResponse getInstallabilityErrors(std::unique_ptr<protocol::Array<String>>* out_errors) = 0;
+    virtual DispatchResponse getManifestIcons(Maybe<Binary>* out_primaryIcon) = 0;
     virtual DispatchResponse getFrameTree(std::unique_ptr<protocol::Page::FrameTree>* out_frameTree) = 0;
     virtual DispatchResponse getLayoutMetrics(std::unique_ptr<protocol::Page::LayoutViewport>* out_layoutViewport, std::unique_ptr<protocol::Page::VisualViewport>* out_visualViewport, std::unique_ptr<protocol::DOM::Rect>* out_contentSize) = 0;
     class  GetResourceContentCallback {
@@ -2190,6 +2442,7 @@ public:
     virtual DispatchResponse clearCompilationCache() = 0;
     virtual DispatchResponse generateTestReport(const String& in_message, Maybe<String> in_group) = 0;
     virtual DispatchResponse waitForDebugger() = 0;
+    virtual DispatchResponse setInterceptFileChooserDialog(bool in_enabled) = 0;
 
 };
 
@@ -2199,14 +2452,17 @@ class  Frontend {
 public:
     explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
     void domContentEventFired(double timestamp);
+    void fileChooserOpened(const String& frameId, int backendNodeId, const String& mode);
     void frameAttached(const String& frameId, const String& parentFrameId, Maybe<protocol::Runtime::StackTrace> stack = Maybe<protocol::Runtime::StackTrace>());
     void frameClearedScheduledNavigation(const String& frameId);
     void frameDetached(const String& frameId);
     void frameNavigated(std::unique_ptr<protocol::Page::Frame> frame);
     void frameResized();
+    void frameRequestedNavigation(const String& frameId, const String& reason, const String& url);
     void frameScheduledNavigation(const String& frameId, double delay, const String& reason, const String& url);
     void frameStartedLoading(const String& frameId);
     void frameStoppedLoading(const String& frameId);
+    void downloadWillBegin(const String& frameId, const String& url);
     void lifecycleEvent(const String& frameId, const String& loaderId, const String& name, double timestamp);
     void loadEventFired(double timestamp);
     void navigatedWithinDocument(const String& frameId, const String& url);

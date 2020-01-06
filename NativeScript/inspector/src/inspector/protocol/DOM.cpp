@@ -8,6 +8,9 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace DOM {
@@ -52,6 +55,17 @@ std::unique_ptr<protocol::DictionaryValue> BackendNode::toValue() const
     return result;
 }
 
+void BackendNode::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeType"), m_nodeType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeName"), m_nodeName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), m_backendNodeId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<BackendNode> BackendNode::clone() const
 {
     ErrorSupport errors;
@@ -63,6 +77,7 @@ const char FirstLine[] = "first-line";
 const char FirstLetter[] = "first-letter";
 const char Before[] = "before";
 const char After[] = "after";
+const char Marker[] = "marker";
 const char Backdrop[] = "backdrop";
 const char Selection[] = "selection";
 const char FirstLineInherited[] = "first-line-inherited";
@@ -282,6 +297,42 @@ std::unique_ptr<protocol::DictionaryValue> Node::toValue() const
     return result;
 }
 
+void Node::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentId"), m_parentId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), m_backendNodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeType"), m_nodeType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeName"), m_nodeName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("localName"), m_localName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeValue"), m_nodeValue, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("childNodeCount"), m_childNodeCount, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("children"), m_children, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("attributes"), m_attributes, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("documentURL"), m_documentURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("baseURL"), m_baseURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("publicId"), m_publicId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("systemId"), m_systemId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("internalSubset"), m_internalSubset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("xmlVersion"), m_xmlVersion, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoType"), m_pseudoType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shadowRootType"), m_shadowRootType, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), m_frameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("contentDocument"), m_contentDocument, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shadowRoots"), m_shadowRoots, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("templateContent"), m_templateContent, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoElements"), m_pseudoElements, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("importedDocument"), m_importedDocument, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("distributedNodes"), m_distributedNodes, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isSVG"), m_isSVG, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Node> Node::clone() const
 {
     ErrorSupport errors;
@@ -327,6 +378,18 @@ std::unique_ptr<protocol::DictionaryValue> RGBA::toValue() const
     if (m_a.isJust())
         result->setValue("a", ValueConversions<double>::toValue(m_a.fromJust()));
     return result;
+}
+
+void RGBA::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("r"), m_r, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("g"), m_g, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("b"), m_b, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("a"), m_a, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<RGBA> RGBA::clone() const
@@ -388,6 +451,21 @@ std::unique_ptr<protocol::DictionaryValue> BoxModel::toValue() const
     return result;
 }
 
+void BoxModel::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("content"), m_content, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("padding"), m_padding, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("border"), m_border, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("margin"), m_margin, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("width"), m_width, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("height"), m_height, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shapeOutside"), m_shapeOutside, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<BoxModel> BoxModel::clone() const
 {
     ErrorSupport errors;
@@ -426,6 +504,17 @@ std::unique_ptr<protocol::DictionaryValue> ShapeOutsideInfo::toValue() const
     result->setValue("shape", ValueConversions<protocol::Array<protocol::Value>>::toValue(m_shape.get()));
     result->setValue("marginShape", ValueConversions<protocol::Array<protocol::Value>>::toValue(m_marginShape.get()));
     return result;
+}
+
+void ShapeOutsideInfo::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("bounds"), m_bounds, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("shape"), m_shape, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("marginShape"), m_marginShape, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ShapeOutsideInfo> ShapeOutsideInfo::clone() const
@@ -472,6 +561,18 @@ std::unique_ptr<protocol::DictionaryValue> Rect::toValue() const
     return result;
 }
 
+void Rect::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("x"), m_x, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("y"), m_y, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("width"), m_width, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("height"), m_height, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Rect> Rect::clone() const
 {
     ErrorSupport errors;
@@ -512,6 +613,17 @@ std::unique_ptr<protocol::DictionaryValue> AttributeModifiedNotification::toValu
     return result;
 }
 
+void AttributeModifiedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("value"), m_value, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::clone() const
 {
     ErrorSupport errors;
@@ -546,6 +658,16 @@ std::unique_ptr<protocol::DictionaryValue> AttributeRemovedNotification::toValue
     result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
     result->setValue("name", ValueConversions<String>::toValue(m_name));
     return result;
+}
+
+void AttributeRemovedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::clone() const
@@ -584,6 +706,16 @@ std::unique_ptr<protocol::DictionaryValue> CharacterDataModifiedNotification::to
     return result;
 }
 
+void CharacterDataModifiedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("characterData"), m_characterData, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotification::clone() const
 {
     ErrorSupport errors;
@@ -618,6 +750,16 @@ std::unique_ptr<protocol::DictionaryValue> ChildNodeCountUpdatedNotification::to
     result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
     result->setValue("childNodeCount", ValueConversions<int>::toValue(m_childNodeCount));
     return result;
+}
+
+void ChildNodeCountUpdatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("childNodeCount"), m_childNodeCount, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotification::clone() const
@@ -660,6 +802,17 @@ std::unique_ptr<protocol::DictionaryValue> ChildNodeInsertedNotification::toValu
     return result;
 }
 
+void ChildNodeInsertedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentNodeId"), m_parentNodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("previousNodeId"), m_previousNodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("node"), m_node, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::clone() const
 {
     ErrorSupport errors;
@@ -694,6 +847,16 @@ std::unique_ptr<protocol::DictionaryValue> ChildNodeRemovedNotification::toValue
     result->setValue("parentNodeId", ValueConversions<int>::toValue(m_parentNodeId));
     result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
     return result;
+}
+
+void ChildNodeRemovedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentNodeId"), m_parentNodeId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), m_nodeId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::clone() const
@@ -732,6 +895,16 @@ std::unique_ptr<protocol::DictionaryValue> DistributedNodesUpdatedNotification::
     return result;
 }
 
+void DistributedNodesUpdatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("insertionPointId"), m_insertionPointId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("distributedNodes"), m_distributedNodes, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<DistributedNodesUpdatedNotification> DistributedNodesUpdatedNotification::clone() const
 {
     ErrorSupport errors;
@@ -762,6 +935,15 @@ std::unique_ptr<protocol::DictionaryValue> InlineStyleInvalidatedNotification::t
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("nodeIds", ValueConversions<protocol::Array<int>>::toValue(m_nodeIds.get()));
     return result;
+}
+
+void InlineStyleInvalidatedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeIds"), m_nodeIds, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotification::clone() const
@@ -800,6 +982,16 @@ std::unique_ptr<protocol::DictionaryValue> PseudoElementAddedNotification::toVal
     return result;
 }
 
+void PseudoElementAddedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentId"), m_parentId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoElement"), m_pseudoElement, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::clone() const
 {
     ErrorSupport errors;
@@ -834,6 +1026,16 @@ std::unique_ptr<protocol::DictionaryValue> PseudoElementRemovedNotification::toV
     result->setValue("parentId", ValueConversions<int>::toValue(m_parentId));
     result->setValue("pseudoElementId", ValueConversions<int>::toValue(m_pseudoElementId));
     return result;
+}
+
+void PseudoElementRemovedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentId"), m_parentId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoElementId"), m_pseudoElementId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotification::clone() const
@@ -872,6 +1074,16 @@ std::unique_ptr<protocol::DictionaryValue> SetChildNodesNotification::toValue() 
     return result;
 }
 
+void SetChildNodesNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("parentId"), m_parentId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodes"), m_nodes, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::clone() const
 {
     ErrorSupport errors;
@@ -908,6 +1120,16 @@ std::unique_ptr<protocol::DictionaryValue> ShadowRootPoppedNotification::toValue
     return result;
 }
 
+void ShadowRootPoppedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hostId"), m_hostId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("rootId"), m_rootId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::clone() const
 {
     ErrorSupport errors;
@@ -942,6 +1164,16 @@ std::unique_ptr<protocol::DictionaryValue> ShadowRootPushedNotification::toValue
     result->setValue("hostId", ValueConversions<int>::toValue(m_hostId));
     result->setValue("root", ValueConversions<protocol::DOM::Node>::toValue(m_root.get()));
     return result;
+}
+
+void ShadowRootPushedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hostId"), m_hostId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("root"), m_root, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::clone() const
@@ -1158,6 +1390,8 @@ public:
         m_dispatchMap["DOM.setAttributeValue"] = &DispatcherImpl::setAttributeValue;
         m_dispatchMap["DOM.setAttributesAsText"] = &DispatcherImpl::setAttributesAsText;
         m_dispatchMap["DOM.setFileInputFiles"] = &DispatcherImpl::setFileInputFiles;
+        m_dispatchMap["DOM.setNodeStackTracesEnabled"] = &DispatcherImpl::setNodeStackTracesEnabled;
+        m_dispatchMap["DOM.getNodeStackTraces"] = &DispatcherImpl::getNodeStackTraces;
         m_dispatchMap["DOM.getFileInfo"] = &DispatcherImpl::getFileInfo;
         m_dispatchMap["DOM.setInspectedNode"] = &DispatcherImpl::setInspectedNode;
         m_dispatchMap["DOM.setNodeName"] = &DispatcherImpl::setNodeName;
@@ -1209,6 +1443,8 @@ protected:
     void setAttributeValue(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setAttributesAsText(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setFileInputFiles(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void setNodeStackTracesEnabled(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void getNodeStackTraces(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void getFileInfo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setInspectedNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setNodeName(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -1675,6 +1911,12 @@ void DispatcherImpl::getNodeForLocation(int callId, const String& method, v8_crd
         errors->setName("includeUserAgentShadowDOM");
         in_includeUserAgentShadowDOM = ValueConversions<bool>::fromValue(includeUserAgentShadowDOMValue, errors);
     }
+    protocol::Value* ignorePointerEventsNoneValue = object ? object->get("ignorePointerEventsNone") : nullptr;
+    Maybe<bool> in_ignorePointerEventsNone;
+    if (ignorePointerEventsNoneValue) {
+        errors->setName("ignorePointerEventsNone");
+        in_ignorePointerEventsNone = ValueConversions<bool>::fromValue(ignorePointerEventsNoneValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -1682,10 +1924,11 @@ void DispatcherImpl::getNodeForLocation(int callId, const String& method, v8_crd
     }
     // Declare output parameters.
     int out_backendNodeId;
+    String out_frameId;
     Maybe<int> out_nodeId;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getNodeForLocation(in_x, in_y, std::move(in_includeUserAgentShadowDOM), &out_backendNodeId, &out_nodeId);
+    DispatchResponse response = m_backend->getNodeForLocation(in_x, in_y, std::move(in_includeUserAgentShadowDOM), std::move(in_ignorePointerEventsNone), &out_backendNodeId, &out_frameId, &out_nodeId);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
@@ -1693,6 +1936,7 @@ void DispatcherImpl::getNodeForLocation(int callId, const String& method, v8_crd
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("backendNodeId", ValueConversions<int>::toValue(out_backendNodeId));
+        result->setValue("frameId", ValueConversions<String>::toValue(out_frameId));
         if (out_nodeId.isJust())
             result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId.fromJust()));
     }
@@ -2330,6 +2574,63 @@ void DispatcherImpl::setFileInputFiles(int callId, const String& method, v8_crdt
     }
     if (weak->get())
         weak->get()->sendResponse(callId, response);
+    return;
+}
+
+void DispatcherImpl::setNodeStackTracesEnabled(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* enableValue = object ? object->get("enable") : nullptr;
+    errors->setName("enable");
+    bool in_enable = ValueConversions<bool>::fromValue(enableValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return;
+    }
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->setNodeStackTracesEnabled(in_enable);
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response);
+    return;
+}
+
+void DispatcherImpl::getNodeStackTraces(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    errors->setName("nodeId");
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return;
+    }
+    // Declare output parameters.
+    Maybe<protocol::Runtime::StackTrace> out_creation;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->getNodeStackTraces(in_nodeId, &out_creation);
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        if (out_creation.isJust())
+            result->setValue("creation", ValueConversions<protocol::Runtime::StackTrace>::toValue(out_creation.fromJust()));
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response, std::move(result));
     return;
 }
 

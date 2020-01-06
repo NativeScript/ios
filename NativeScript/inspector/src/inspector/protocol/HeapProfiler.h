@@ -49,9 +49,7 @@ public:
     void setChildren(std::unique_ptr<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileNode>> value) { m_children = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SamplingHeapProfileNode> clone() const;
 
@@ -149,9 +147,7 @@ public:
     void setOrdinal(double value) { m_ordinal = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SamplingHeapProfileSample> clone() const;
 
@@ -238,9 +234,7 @@ public:
     void setSamples(std::unique_ptr<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileSample>> value) { m_samples = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SamplingHeapProfile> clone() const;
 
@@ -312,9 +306,7 @@ public:
     void setChunk(const String& value) { m_chunk = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<AddHeapSnapshotChunkNotification> clone() const;
 
@@ -377,9 +369,7 @@ public:
     void setStatsUpdate(std::unique_ptr<protocol::Array<int>> value) { m_statsUpdate = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<HeapStatsUpdateNotification> clone() const;
 
@@ -445,9 +435,7 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LastSeenObjectIdNotification> clone() const;
 
@@ -528,9 +516,7 @@ public:
     void setFinished(bool value) { m_finished = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ReportHeapSnapshotProgressNotification> clone() const;
 
@@ -616,8 +602,8 @@ public:
     virtual DispatchResponse startSampling(Maybe<double> in_samplingInterval) = 0;
     virtual DispatchResponse startTrackingHeapObjects(Maybe<bool> in_trackAllocations) = 0;
     virtual DispatchResponse stopSampling(std::unique_ptr<protocol::HeapProfiler::SamplingHeapProfile>* out_profile) = 0;
-    virtual DispatchResponse stopTrackingHeapObjects(Maybe<bool> in_reportProgress) = 0;
-    virtual DispatchResponse takeHeapSnapshot(Maybe<bool> in_reportProgress) = 0;
+    virtual DispatchResponse stopTrackingHeapObjects(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots) = 0;
+    virtual DispatchResponse takeHeapSnapshot(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots) = 0;
 
 };
 
