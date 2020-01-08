@@ -37,14 +37,14 @@ public:
         return currentRuntime_->WorkerId() > 0;
     }
 
-    static std::unique_ptr<v8::Platform> GetPlatform() {
-        return std::move(platform_);
+    static std::shared_ptr<v8::Platform> GetPlatform() {
+        return platform_;
     }
 
     static id GetAppConfigValue(std::string key);
 private:
     static thread_local Runtime* currentRuntime_;
-    static std::unique_ptr<v8::Platform> platform_;
+    static std::shared_ptr<v8::Platform> platform_;
     static bool mainThreadInitialized_;
 
     void DefineGlobalObject(v8::Local<v8::Context> context);

@@ -235,7 +235,7 @@ void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplat
     globalTemplate->Set(ToV8String(isolate, "__time"), timeFunctionTemplate);
 }
 
-std::unique_ptr<Platform> Runtime::platform_;
+std::shared_ptr<Platform> Runtime::platform_;
 bool Runtime::mainThreadInitialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;
 
