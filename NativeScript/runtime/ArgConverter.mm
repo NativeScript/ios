@@ -4,7 +4,6 @@
 #include "NativeScriptException.h"
 #include "DictionaryAdapter.h"
 #include "ObjectManager.h"
-#include "Caches.h"
 #include "Interop.h"
 #include "Helpers.h"
 #include "Runtime.h"
@@ -325,13 +324,9 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
         }
     }
 
-    if (result == nil && interfaceMeta != nullptr) {
+    if (result == nil && interfaceMeta != nullptr && info.Length() > 0) {
         std::vector<Local<Value>> args;
         const MethodMeta* initializer = ArgConverter::FindInitializer(isolate, klass, interfaceMeta, info, args);
-        if (initializer == nullptr) {
-            return;
-        }
-
         result = [klass alloc];
 
         result = Interop::CallInitializer(isolate, initializer, result, klass, args);
@@ -344,7 +339,6 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
     Local<Object> thiz = info.This();
     ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
-
 
     auto cache = Caches::Get(isolate);
     auto it = cache->Instances.find(result);
@@ -366,10 +360,10 @@ const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, c
         initializerArgs = GetInitializerArgs(isolate, info[0].As<Object>(), constructorTokens);
     }
 
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
     bool found = false;
     do {
-        KnownUnknownClassPair klasses(klass);
-        std::vector<const MethodMeta*> initializers = interfaceMeta->initializersWithProtocols(klasses, ProtocolMetas());
+        std::vector<const MethodMeta*> initializers = ArgConverter::GetInitializers(cache.get(), klass, interfaceMeta);
         for (const MethodMeta* candidate: initializers) {
             if (candidate->encodings()->count > 2) {
                 const char* expectedTokens = candidate->constructorTokens();
@@ -827,6 +821,20 @@ bool ArgConverter::IsErrorOutParameter(const TypeEncoding* typeEncoding) {
     }
 
     return strcmp(name, "NSError") == 0;
+}
+
+std::vector<const MethodMeta*> ArgConverter::GetInitializers(Caches* cache, Class klass, const InterfaceMeta* interfaceMeta) {
+    auto it = cache->Initializers.find(interfaceMeta);
+    if (it != cache->Initializers.end()) {
+        return it->second;
+    }
+
+    KnownUnknownClassPair klasses(klass);
+    std::vector<const MethodMeta*> initializers = interfaceMeta->initializersWithProtocols(klasses, ProtocolMetas());
+
+    cache->Initializers.emplace(interfaceMeta, initializers);
+
+    return initializers;
 }
 
 }

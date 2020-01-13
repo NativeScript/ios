@@ -10,8 +10,7 @@ namespace tns {
 
 struct StructInfo;
 
-struct pair_hash
-{
+struct pair_hash {
     template <class T1, class T2>
     std::size_t operator() (const std::pair<T1, T2> &pair) const {
         return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
@@ -69,6 +68,7 @@ public:
     std::function<v8::Local<v8::FunctionTemplate>(v8::Isolate* isolate, const BaseClassMeta*)> ObjectCtorInitializer;
     std::function<v8::Local<v8::Function>(v8::Isolate*, StructInfo)> StructCtorInitializer;
     std::unordered_map<std::string, double> Timers;
+    std::unordered_map<const InterfaceMeta*, std::vector<const MethodMeta*>> Initializers;
 
     std::unique_ptr<v8::Persistent<v8::Function>> ToStringFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
     std::unique_ptr<v8::Persistent<v8::Function>> EmptyObjCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);

@@ -4,6 +4,7 @@
 #include <vector>
 #include "libffi.h"
 #include "Common.h"
+#include "Caches.h"
 #include "DataWrapper.h"
 
 namespace tns {
@@ -51,6 +52,7 @@ private:
     static void IndexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& args);
     static void IndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& args);
     static bool IsErrorOutParameter(const TypeEncoding* typeEncoding);
+    static std::vector<const MethodMeta*> GetInitializers(Caches* cache, Class klass, const InterfaceMeta* interfaceMeta);
 };
 
 }
