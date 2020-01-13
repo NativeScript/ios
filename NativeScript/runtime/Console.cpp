@@ -313,9 +313,14 @@ const Local<v8::String> Console::BuildStringFromArg(Isolate* isolate, const Loca
 
 const Local<v8::String> Console::TransformJSObject(Isolate* isolate, Local<Object> object) {
     Local<Context> context = isolate->GetCurrentContext();
-    Local<v8::String> objToString = object->ToString(context).ToLocalChecked();
-    Local<v8::String> resultString;
+    Local<Value> value;
+    bool success = object->ToString(context).ToLocal(&value);
+    if (!success) {
+        return tns::ToV8String(isolate, "");
+    }
+    Local<v8::String> objToString = value.As<v8::String>();
 
+    Local<v8::String> resultString;
     bool hasCustomToStringImplementation = tns::ToString(isolate, objToString).find("[object Object]") == std::string::npos;
 
     if (hasCustomToStringImplementation) {
