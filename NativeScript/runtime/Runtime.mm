@@ -8,6 +8,7 @@
 #include "NativeScriptException.h"
 #include "InlineFunctions.h"
 #include "SimpleAllocator.h"
+#include "ObjectManager.h"
 #include "RuntimeConfig.h"
 #include "Helpers.h"
 #include "TSHelpers.h"
@@ -81,6 +82,7 @@ void Runtime::Init() {
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
     WeakRef::Init(isolate, globalTemplate);
+    ObjectManager::Init(isolate, globalTemplate);
 
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);

@@ -403,7 +403,7 @@
 		C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB83229EAC8300345BFE /* ObjectManager.h */; };
 		C2DDEBAD229EAC8300345BFE /* Caches.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB84229EAC8300345BFE /* Caches.h */; };
 		C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */; };
-		C2DDEBAF229EAC8300345BFE /* ObjectManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB86229EAC8300345BFE /* ObjectManager.cpp */; };
+		C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB86229EAC8300345BFE /* ObjectManager.mm */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB87229EAC8300345BFE /* StringHasher.h */; };
 		C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB88229EAC8300345BFE /* Caches.cpp */; };
 		C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB89229EAC8300345BFE /* ModuleInternal.h */; };
@@ -974,7 +974,7 @@
 		C2DDEB83229EAC8300345BFE /* ObjectManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ObjectManager.h; sourceTree = "<group>"; };
 		C2DDEB84229EAC8300345BFE /* Caches.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Caches.h; sourceTree = "<group>"; };
 		C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DictionaryAdapter.h; sourceTree = "<group>"; };
-		C2DDEB86229EAC8300345BFE /* ObjectManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ObjectManager.cpp; sourceTree = "<group>"; };
+		C2DDEB86229EAC8300345BFE /* ObjectManager.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ObjectManager.mm; sourceTree = "<group>"; };
 		C2DDEB87229EAC8300345BFE /* StringHasher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
 		C2DDEB88229EAC8300345BFE /* Caches.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Caches.cpp; sourceTree = "<group>"; };
 		C2DDEB89229EAC8300345BFE /* ModuleInternal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ModuleInternal.h; sourceTree = "<group>"; };
@@ -1818,7 +1818,7 @@
 				C266567A22AA630F00EE15CC /* NSDataAdapter.h */,
 				C266567922AA630F00EE15CC /* NSDataAdapter.mm */,
 				C2DDEB83229EAC8300345BFE /* ObjectManager.h */,
-				C2DDEB86229EAC8300345BFE /* ObjectManager.cpp */,
+				C2DDEB86229EAC8300345BFE /* ObjectManager.mm */,
 				C266569222AFFF7E00EE15CC /* Pointer.h */,
 				C266569122AFFF7E00EE15CC /* Pointer.cpp */,
 				C266569622AFFFB000EE15CC /* Reference.h */,
@@ -2521,7 +2521,7 @@
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				C247C33E22F828E3001D2CA2 /* v8-debugger.cc in Sources */,
 				C247C37F22F828E3001D2CA2 /* v8-css-agent-impl.cpp in Sources */,
-				C2DDEBAF229EAC8300345BFE /* ObjectManager.cpp in Sources */,
+				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
 				C247C35722F828E3001D2CA2 /* v8-console-agent-impl.cc in Sources */,
 				C247C35422F828E3001D2CA2 /* v8-console-message.cc in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,

@@ -549,7 +549,3 @@ bool tns::LiveSync(Isolate* isolate) {
 
     return true;
 }
-
-bool tns::IsInstanceOf(id obj, Class clazz) {
-    return [obj isKindOfClass:clazz];
-}

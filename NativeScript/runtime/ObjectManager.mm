@@ -1,3 +1,5 @@
+#include <CoreFoundation/CoreFoundation.h>
+#include <sstream>
 #include "ObjectManager.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
@@ -9,6 +11,10 @@ using namespace std;
 namespace tns {
 
 static Class NSTimerClass = objc_getClass("NSTimer");
+
+void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+    globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"), FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
+}
 
 std::shared_ptr<Persistent<Value>> ObjectManager::Register(Isolate* isolate, const Local<Value> obj) {
     std::shared_ptr<Persistent<Value>> objectHandle = std::make_shared<Persistent<Value>>(isolate, obj);
@@ -81,17 +87,16 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
             id target = objCObjectWrapper->Data();
             if (target != nil) {
-                long retainCount = 0;
-
-                if (!tns::IsInstanceOf(target, NSTimerClass)) { // The CFGetRetainCount method of uninitialized NSTimer instances (NSTimer.alloc()) hangs indefinitely
-                    retainCount = CFGetRetainCount(target);
-                }
-
-                if (retainCount > 4) {
+                long retainCount = ObjectManager::GetRetainCount(target);
+                if (retainCount > 2) {
                     return false;
                 }
 
                 cache->Instances.erase(target);
+
+                for (int i = 0; i < retainCount - 1; i++) {
+                    [target release];
+                }
             }
             break;
         }
@@ -159,6 +164,80 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
     wrapper = nullptr;
     tns::SetValue(isolate, obj, nullptr);
     return true;
+}
+
+void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+
+    if (info.Length() != 1) {
+        std::ostringstream errorStream;
+        errorStream << "Actual arguments count: \"" << info.Length() << "\". Expected: \"1\".";
+        std::string errorMessage = errorStream.str();
+        Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
+        isolate->ThrowException(error);
+        return;
+    }
+
+    Local<Value> value = info[0];
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+
+    if (wrapper == nullptr) {
+        std::string arg0 = tns::ToString(isolate, info[0]);
+        std::ostringstream errorStream;
+        errorStream << arg0 << " is an object which is not a native wrapper.";
+        std::string errorMessage = errorStream.str();
+        Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
+        isolate->ThrowException(error);
+        return;
+    }
+
+    if (wrapper->Type() != WrapperType::ObjCObject) {
+        return;
+    }
+
+    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+    id data = objcWrapper->Data();
+    if (data != nil) {
+        std::shared_ptr<Caches> cache = Caches::Get(isolate);
+        auto it = cache->Instances.find(data);
+        if (it != cache->Instances.end()) {
+            ObjectWeakCallbackState* state = it->second->ClearWeak<ObjectWeakCallbackState>();
+            if (state != nullptr) {
+                delete state;
+            }
+            cache->Instances.erase(it);
+        }
+
+        long retainCount = ObjectManager::GetRetainCount(data);
+        for (int i = 0; i < retainCount - 1; i++) {
+            [data release];
+        }
+
+        delete wrapper;
+        tns::SetValue(isolate, value.As<Object>(), nullptr);
+    }
+}
+
+void ObjectManager::Release(id obj) {
+    if (obj != nil) {
+        [obj release];
+    }
+}
+
+bool ObjectManager::IsInstanceOf(id obj, Class clazz) {
+    return [obj isKindOfClass:clazz];
+}
+
+long ObjectManager::GetRetainCount(id obj) {
+    if (!obj) {
+        return 0;
+    }
+
+    if (ObjectManager::IsInstanceOf(obj, NSTimerClass)) {
+        return 0;
+    }
+
+    return CFGetRetainCount(obj);
 }
 
 }

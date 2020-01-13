@@ -453,81 +453,75 @@ describe(module.id, function () {
         expect(str.normalize()).toBe(str);
     });
 
-//     describe("__releaseNativeCounterpart", function () {
-//         it("deallocates js derived instances created with alloc().init()", function () {
-//             var P = TNSAllocLog.extend({
-//                 dealloc: function () {
-//                     TNSAllocLog.dealloc.apply(this);
-//                 }
-//             });
+    describe("__releaseNativeCounterpart", function () {
+        it("deallocates js derived instances created with alloc().init()", function () {
+            var P = TNSAllocLog.extend({});
 
-//             var p = P.alloc().init();
+            var p = P.alloc().init();
 
-//             __releaseNativeCounterpart(p);
+            __releaseNativeCounterpart(p);
 
-//             const output = TNSGetOutput();
-//             expect(output).toBe("TNSAllocLog initTNSAllocLog dealloc");
-//         });
+            const output = TNSGetOutput();
+            expect(output).toBe("TNSAllocLog initTNSAllocLog dealloc");
+        });
 
-//         it("deallocates js derived instances created with new", function () {
-//             var P = TNSAllocLog.extend({
-//                 dealloc: function () {
-//                     TNSAllocLog.dealloc.apply(this);
-//                 }
-//             });
+        it("deallocates js derived instances created with new", function () {
+            var P = TNSAllocLog.extend({});
 
-//             var p = new P();
+            var p = new P();
 
-//             __releaseNativeCounterpart(p);
+            __releaseNativeCounterpart(p);
 
-//             const output = TNSGetOutput();
-//             expect(output).toBe("TNSAllocLog initTNSAllocLog dealloc");
-//         });
+            const output = TNSGetOutput();
+            expect(output).toBe("TNSAllocLog initTNSAllocLog dealloc");
+        });
 
-//         it("deallocates native instances created with alloc().init()", function () {
-//             var p = TNSAllocLog.alloc().init();
+        it("deallocates native instances created with alloc().init()", function () {
+            var p = TNSAllocLog.alloc().init();
 
-//             __releaseNativeCounterpart(p);
+            __releaseNativeCounterpart(p);
 
-//             const output = TNSGetOutput();
-//             expect(output).toBe("TNSAllocLog initTNSAllocLog dealloc");
-//         });
+            const output = TNSGetOutput();
+            expect(output).toBe("TNSAllocLog initTNSAllocLog dealloc");
+        });
 
-//         it("deallocates native instances created with new", function () {
-//             var p = new TNSAllocLog();
+        it("deallocates native instances created with new", function () {
+            var p = new TNSAllocLog();
 
-//             __releaseNativeCounterpart(p);
+            __releaseNativeCounterpart(p);
 
-//             const output = TNSGetOutput();
-//             expect(output).toBe("TNSAllocLog initTNSAllocLog dealloc");
-//         });
+            const output = TNSGetOutput();
+            expect(output).toBe("TNSAllocLog initTNSAllocLog dealloc");
+        });
 
-//         it("throws when object is not a native wrapper", function () {
-//             const expectedError = /argument.*not a native wrapper/i;
-//             expect(() => __releaseNativeCounterpart(0)).toThrowError(expectedError);
-//             expect(() => __releaseNativeCounterpart("")).toThrowError(expectedError);
-//             expect(() => __releaseNativeCounterpart([])).toThrowError(expectedError);
-//             expect(() => __releaseNativeCounterpart({})).toThrowError(expectedError);
-//             expect(() => __releaseNativeCounterpart(null)).toThrowError(expectedError);
-//             expect(() => __releaseNativeCounterpart(undefined)).toThrowError(expectedError);
-//         });
+        it("throws when object is not a native wrapper", function () {
+            expect(() => __releaseNativeCounterpart(1, 2, 3)).toThrowError(/Actual arguments count: "3". Expected: "1"./);
+            const getNotANativeWrapperRegex = obj => new RegExp(`${obj} is an object which is not a native wrapper.`);
 
-//         it("sets object to nil", function () {
-//             var arr = NSArray.arrayWithArray([1,2,3]);
-//             expect(arr.count).toBe(3);
-//             __releaseNativeCounterpart(arr);
+            expect(() => __releaseNativeCounterpart(0)).toThrowError(getNotANativeWrapperRegex(0));
+            expect(() => __releaseNativeCounterpart("")).toThrowError(getNotANativeWrapperRegex(""));
+            expect(() => __releaseNativeCounterpart([])).toThrowError(getNotANativeWrapperRegex(""));
+            expect(() => __releaseNativeCounterpart({})).toThrowError(getNotANativeWrapperRegex("\\[object Object\\]"));
+            expect(() => __releaseNativeCounterpart(null)).toThrowError(getNotANativeWrapperRegex(null));
+            expect(() => __releaseNativeCounterpart(undefined)).toThrowError(getNotANativeWrapperRegex(undefined));
+        });
 
-//             expect(arr.toString()).toBe(null);
-//             expect(typeof arr).toBe(typeof {});
+        // it("sets object to nil", function () {
+        //     var arr = NSArray.arrayWithArray([1,2,3]);
+        //     expect(arr.count).toBe(3);
+        //     __releaseNativeCounterpart(arr);
 
-//             // Extract from [Working with nil](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ProgrammingWithObjectiveC/WorkingwithObjects/WorkingwithObjects.html#//apple_ref/doc/uid/TP40011210-CH4-SW22):
-//             // If you expect a return value from a message sent to nil, the return value will be
-//             // nil for object return types, 0 for numeric types, and NO for BOOL types. Returned
-//             // structures have all members initialized to zero.
-//             expect(arr.count).toBe(0);
-//         });
+        //     expect(arr.toString()).toBe(null);
+        //     expect(typeof arr).toBe(typeof {});
 
-//     });
+        //     // Extract from [Working with nil](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ProgrammingWithObjectiveC/WorkingwithObjects/WorkingwithObjects.html#//apple_ref/doc/uid/TP40011210-CH4-SW22):
+        //     // If you expect a return value from a message sent to nil, the return value will be
+        //     // nil for object return types, 0 for numeric types, and NO for BOOL types. Returned
+        //     // structures have all members initialized to zero.
+        //     expect(arr.count).toBe(0);
+        // });
+
+    });
 //     describe("async", function () {
 //         it("should work", function (done) {
 //             var str = NSString.alloc();
