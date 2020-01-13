@@ -381,20 +381,16 @@ void MetadataBuilder::CreateToStringFunction(Isolate* isolate) {
 }
 
 void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
     Local<Object> thiz = info.This();
-    if (thiz->InternalFieldCount() < 1) {
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
+
+    if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
         info.GetReturnValue().Set(thiz);
         return;
     }
 
-    Local<External> ext = thiz->GetInternalField(0).As<External>();
-    BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-    if (wrapper->Type() != WrapperType::ObjCObject) {
-        info.GetReturnValue().Set(thiz);
-        return;
-    }
-
-    ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+    ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
     id target = dataWrapper->Data();
     if (target == nil) {
         info.GetReturnValue().Set(thiz);
