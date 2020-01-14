@@ -1,3 +1,14 @@
+6.4.0-beta.1-v8 (2020-01-14)
+====
+
+### Features
+
+- SIMD support
+- `NSError**` output parameters support
+- Global js error handler
+
+### Bug Fixes
+
 6.2.0-alpha.2-v8 (2019-09-18)
 =====
 
