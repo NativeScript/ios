@@ -524,6 +524,16 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toMatch(/^<TNSIBaseInterface: 0x\w+>$/);
     });
 
+    it("CArray return type marshalling", () => {
+        var color = UIColor.alloc().initWithRedGreenBlueAlpha(0.1, 0.2, 0.3, 0.7);
+        var components = CGColorGetComponents(color.CGColor);
+        expect(components instanceof interop.Reference).toBe(true);
+        expect(components[0]).toBe(0.1);
+        expect(components[1]).toBe(0.2);
+        expect(components[2]).toBe(0.3);
+        expect(components[3]).toBe(0.7);
+    });
+
     it("Marshal returned javascript object as NSDictionaries", () => {
         var TSObject = NSObject.extend({
             getData: function () {

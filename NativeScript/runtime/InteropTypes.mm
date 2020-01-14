@@ -60,15 +60,14 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     assert(success);
 }
 
-Local<Object> Interop::GetInteropType(Isolate* isolate, std::string name) {
+Local<Object> Interop::GetInteropType(Isolate* isolate, BinaryTypeEncodingType type) {
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
-    auto it = cache->PrimitiveInteropTypes.find(name);
-    if (it == cache->PrimitiveInteropTypes.end()) {
-        // TODO: throw error for unknown primitive type
-        assert(false);
+    auto it = cache->PrimitiveInteropTypes.find(type);
+    if (it != cache->PrimitiveInteropTypes.end()) {
+        return it->second->Get(isolate);
     }
 
-    return it->second->Get(isolate);
+    return Local<Object>();
 }
 
 void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::string name, PrimitiveDataWrapper* wrapper) {
@@ -91,10 +90,11 @@ void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::st
     tns::SetValue(isolate, result, wrapper);
     bool success = types->Set(context, tns::ToV8String(isolate, name), result).FromMaybe(false);
 
+    BinaryTypeEncodingType type = wrapper->TypeEncoding()->type;
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
-    auto it = cache->PrimitiveInteropTypes.find(name);
+    auto it = cache->PrimitiveInteropTypes.find(type);
     if (it == cache->PrimitiveInteropTypes.end()) {
-        cache->PrimitiveInteropTypes.emplace(name, std::make_unique<Persistent<Object>>(isolate, result));
+        cache->PrimitiveInteropTypes.emplace(type, std::make_unique<Persistent<Object>>(isolate, result));
     }
 
     assert(success);

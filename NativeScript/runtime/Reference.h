@@ -13,6 +13,15 @@ public:
     static v8::Local<v8::Function> GetInteropReferenceCtorFunc(v8::Isolate* isolate);
     static void* GetWrappedPointer(v8::Isolate* isolate, v8::Local<v8::Value> reference, const TypeEncoding* typeEncoding);
 private:
+    struct DataPair {
+        DataPair(const TypeEncoding* typeEncoding, void* data, size_t size): typeEncoding_(typeEncoding), data_(data), size_(size) {
+        }
+
+        const TypeEncoding* typeEncoding_;
+        void* data_;
+        size_t size_;
+    };
+
     static v8::Local<v8::Value> GetReferredValue(v8::Isolate* isolate, v8::Local<v8::Value> value);
     static void ReferenceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void IndexedPropertyGetCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info);
@@ -21,6 +30,7 @@ private:
     static void GetValueCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void SetValueCallback(v8::Local<v8::Name> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
     static void RegisterToStringMethod(v8::Isolate* isolate, v8::Local<v8::Object> prototype);
+    static DataPair GetTypeEncodingDataPair(v8::Isolate* isolate, v8::Local<v8::Object> obj);
 };
 
 }

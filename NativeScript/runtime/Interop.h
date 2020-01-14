@@ -15,7 +15,6 @@ typedef void (*FFIMethodCallback)(ffi_cif* cif, void* retValue, void** argValues
 class Interop {
 public:
     static void RegisterInteropTypes(v8::Isolate* isolate);
-    static v8::Local<v8::Object> GetInteropType(v8::Isolate* isolate, std::string name);
     static CFTypeRef CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static id CallInitializer(v8::Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args);
@@ -46,6 +45,7 @@ private:
     static v8::Local<v8::Value> HandleOf(v8::Isolate* isolate, v8::Local<v8::Value> value);
     static v8::Local<v8::Value> CallFunctionInternal(v8::Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<v8::Local<v8::Value>> args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType, bool provideErrorOurParameter = false);
     static bool IsNumbericType(BinaryTypeEncodingType type);
+    static v8::Local<v8::Object> GetInteropType(v8::Isolate* isolate, BinaryTypeEncodingType type);
 
     template <typename T>
     static inline void SetValue(void* dest, T value) {

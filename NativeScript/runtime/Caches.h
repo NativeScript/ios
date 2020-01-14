@@ -58,7 +58,7 @@ public:
     std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> CtorFuncs;
     std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> ProtocolCtorFuncs;
     std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> StructConstructorFunctions;
-    std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Object>>> PrimitiveInteropTypes;
+    std::unordered_map<BinaryTypeEncodingType, std::unique_ptr<v8::Persistent<v8::Object>>> PrimitiveInteropTypes;
     std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> CFunctions;
 
     std::map<id, std::shared_ptr<v8::Persistent<v8::Value>>> Instances;

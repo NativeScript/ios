@@ -907,14 +907,26 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         BaseCall c(result);
         Local<Value> value = Interop::GetResult(isolate, innerType, &c, true);
+        Local<Value> type = Interop::GetInteropType(isolate, innerType->type);
 
-        Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
-        Local<Value> args[1] = { value };
+        std::vector<Local<Value>> args;
+        args.push_back(value);
+        if (!type.IsEmpty()) {
+            args.insert(args.begin(), type);
+        }
+
         Local<Context> context = isolate->GetCurrentContext();
         Local<Object> instance;
-        bool success = interopReferenceCtorFunc->NewInstance(context, 1, args).ToLocal(&instance);
-        ObjectManager::Register(isolate, instance);
+        Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
+        bool success = interopReferenceCtorFunc->NewInstance(context, (int)args.size(), args.data()).ToLocal(&instance);
         assert(success);
+
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, instance);
+        if (wrapper != nullptr && wrapper->Type() == WrapperType::Reference) {
+            ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
+            refWrapper->SetData(result);
+            refWrapper->SetEncoding(innerType);
+        }
 
         return instance;
     }
@@ -998,7 +1010,7 @@ Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodin
             return Null(isolate);
         }
 
-        Local<Value> uint8Type = GetInteropType(isolate, "uint8");
+        Local<Value> uint8Type = Interop::GetInteropType(isolate, BinaryTypeEncodingType::UCharEncoding);
         Local<Value> reference = Reference::FromPointer(isolate, uint8Type, result);
         return reference;
     }
