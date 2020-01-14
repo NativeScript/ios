@@ -19,7 +19,6 @@ public:
     static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     static std::shared_ptr<v8::Persistent<v8::Value>> Register(v8::Isolate* isolate, const v8::Local<v8::Value> obj);
     static void FinalizerCallback(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
-    static void Release(id obj);
 private:
     static bool DisposeValue(v8::Isolate* isolate, v8::Local<v8::Value> value);
     static void ReleaseNativeCounterpartCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

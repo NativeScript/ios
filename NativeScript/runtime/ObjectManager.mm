@@ -88,15 +88,11 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             id target = objCObjectWrapper->Data();
             if (target != nil) {
                 long retainCount = ObjectManager::GetRetainCount(target);
-                if (retainCount > 2) {
+                if (retainCount > 4) {
                     return false;
                 }
 
                 cache->Instances.erase(target);
-
-                for (int i = 0; i < retainCount - 1; i++) {
-                    [target release];
-                }
             }
             break;
         }
@@ -215,12 +211,6 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
 
         delete wrapper;
         tns::SetValue(isolate, value.As<Object>(), nullptr);
-    }
-}
-
-void ObjectManager::Release(id obj) {
-    if (obj != nil) {
-        [obj release];
     }
 }
 

@@ -63,18 +63,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const FunctionMeta* meta, c
     }
 
     const TypeEncoding* typeEncoding = meta->encodings()->first();
-    Local<Value> result = Interop::CallFunction(isolate, functionPointer, typeEncoding, args);
-
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, result);
-    if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-        ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-        id obj = objcWrapper->Data();
-        if (obj != nil && meta->ownsReturnedCocoaObject()) {
-            ObjectManager::Release(obj);
-        }
-    }
-
-    return result;
+    return Interop::CallFunction(isolate, functionPointer, typeEncoding, args);
 }
 
 Local<Value> Interop::CallFunction(Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args) {
@@ -99,18 +88,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const MethodMeta* meta, id 
 
     bool provideErrorOutParameter = meta->hasErrorOutParameter() && args.size() < meta->encodings()->count - 1;
 
-    Local<Value> result = Interop::CallFunctionInternal(isolate, isPrimitiveFunction, functionPointer, typeEncoding, args, target, clazz, selector, callSuper, metaType, provideErrorOutParameter);
-
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, result);
-    if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-        ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-        id obj = objcWrapper->Data();
-        if (obj != nil && (meta->ownsReturnedCocoaObject() || meta->isInitializer())) {
-            ObjectManager::Release(obj);
-        }
-    }
-
-    return result;
+    return Interop::CallFunctionInternal(isolate, isPrimitiveFunction, functionPointer, typeEncoding, args, target, clazz, selector, callSuper, metaType, provideErrorOutParameter);
 }
 
 id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, const std::vector<Local<Value>> args) {
@@ -131,8 +109,6 @@ id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id t
     ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
     id result = call.GetResult<id>();
-
-    ObjectManager::Release(result);
 
     return result;
 }
