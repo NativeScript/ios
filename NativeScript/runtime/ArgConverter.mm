@@ -753,6 +753,14 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index, const PropertyC
     }
 
     id obj = [array objectAtIndex:index];
+
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    auto it = cache->Instances.find(obj);
+    if (it != cache->Instances.end()) {
+        args.GetReturnValue().Set(it->second->Get(isolate));
+        return;
+    }
+
     Local<Value> result = ArgConverter::ConvertArgument(isolate, new ObjCDataWrapper(obj));
     args.GetReturnValue().Set(result);
 }
