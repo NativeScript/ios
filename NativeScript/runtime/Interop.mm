@@ -418,87 +418,62 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         Local<Object> obj = arg.As<Object>();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
 
-        if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-            const char* name = typeEncoding->details.declarationReference.name.valuePtr();
-            Class klass = objc_getClass(name);
-            if (!klass) {
+        if (wrapper != nullptr) {
+            if (wrapper->Type() == WrapperType::Enum) {
+                EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
+                Local<Context> context = isolate->GetCurrentContext();
+                std::string jsCode = enumWrapper->JSCode();
+                Local<Script> script;
+                if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
+                    assert(false);
+                }
+                assert(!script.IsEmpty());
+
+                Local<Value> result;
+                if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
+                    assert(false);
+                }
+
+                assert(result->IsNumber());
+
+                double value = result.As<Number>()->Value();
+                SetValue(dest, value);
+            } else if (wrapper->Type() == WrapperType::Pointer) {
+                PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+                void* data = pointerWrapper->Data();
+                Interop::SetValue(dest, data);
+            } else if (wrapper->Type() == WrapperType::ObjCObject) {
+                ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                id data = objCDataWrapper->Data();
+                Interop::SetValue(dest, data);
+            } else if (wrapper->Type() == WrapperType::ObjCClass) {
+                ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
+                id data = classWrapper->Klass();
+                Interop::SetValue(dest, data);
+            } else {
                 assert(false);
             }
 
-            if (klass == [NSArray class]) {
-                if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    id target = objcWrapper->Data();
-                    if ([target isKindOfClass:[NSArray class]]) {
-                        Interop::SetValue(dest, target);
-                        return;
-                    }
-                }
-                Local<v8::Array> array = Interop::ToArray(isolate, obj);
-                ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
-                std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
-                Caches::Get(isolate)->Instances.emplace(adapter, poValue);
-                Interop::SetValue(dest, adapter);
-                return;
-            } else if ((klass == [NSData class] || klass == [NSMutableData class]) && (arg->IsArrayBuffer() || arg->IsArrayBufferView())) {
-                Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
-                NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
-                std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
-                Caches::Get(isolate)->Instances.emplace(adapter, poValue);
-                Interop::SetValue(dest, adapter);
-                return;
-            } else if (klass == [NSDictionary class]) {
-                if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    id target = objcWrapper->Data();
-                    if ([target isKindOfClass:[NSDictionary class]]) {
-                        Interop::SetValue(dest, target);
-                        return;
-                    }
-                }
-                DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
-                std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
-                Caches::Get(isolate)->Instances.emplace(adapter, poValue);
-                Interop::SetValue(dest, adapter);
-                return;
-            }
+            return;
         }
 
-        assert(wrapper != nullptr);
-
-        if (wrapper->Type() == WrapperType::Enum) {
-            EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
-            Local<Context> context = isolate->GetCurrentContext();
-            std::string jsCode = enumWrapper->JSCode();
-            Local<Script> script;
-            if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
-                assert(false);
-            }
-            assert(!script.IsEmpty());
-
-            Local<Value> result;
-            if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
-                assert(false);
-            }
-
-            assert(result->IsNumber());
-
-            double value = result.As<Number>()->Value();
-            SetValue(dest, value);
-        } else if (wrapper->Type() == WrapperType::Pointer) {
-            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
-            void* data = pointerWrapper->Data();
-            Interop::SetValue(dest, data);
-        } else if (wrapper->Type() == WrapperType::ObjCObject) {
-            ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-            id data = objCDataWrapper->Data();
-            Interop::SetValue(dest, data);
-        } else if (wrapper->Type() == WrapperType::ObjCClass) {
-            ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
-            id data = classWrapper->Klass();
-            Interop::SetValue(dest, data);
+        if (obj->IsArrayBuffer() || obj->IsArrayBufferView()) {
+            Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
+            NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
+            std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
+            Caches::Get(isolate)->Instances.emplace(adapter, poValue);
+            Interop::SetValue(dest, adapter);
+        } else if (tns::IsArrayOrArrayLike(isolate, obj)) {
+            Local<v8::Array> array = Interop::ToArray(isolate, obj);
+            ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
+            std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
+            Caches::Get(isolate)->Instances.emplace(adapter, poValue);
+            Interop::SetValue(dest, adapter);
         } else {
-            assert(false);
+            DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
+            std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
+            Caches::Get(isolate)->Instances.emplace(adapter, poValue);
+            Interop::SetValue(dest, adapter);
         }
     } else {
         assert(false);

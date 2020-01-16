@@ -38,6 +38,7 @@ std::vector<v8::Local<v8::Value>> ArgsToVector(const v8::FunctionCallbackInfo<v8
 bool IsString(v8::Local<v8::Value> value);
 bool IsNumber(v8::Local<v8::Value> value);
 bool IsBool(v8::Local<v8::Value> value);
+bool IsArrayOrArrayLike(v8::Isolate* isolate, v8::Local<v8::Value> value);
 
 void ExecuteOnMainThread(std::function<void ()> func, bool async = true);
 

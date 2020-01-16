@@ -284,6 +284,20 @@ bool tns::IsBool(Local<Value> value) {
     return !value.IsEmpty() && (value->IsBoolean() || value->IsBooleanObject());
 }
 
+bool tns::IsArrayOrArrayLike(Isolate* isolate, Local<Value> value) {
+    if (value->IsArray()) {
+        return true;
+    }
+
+    if (!value->IsObject()) {
+        return false;
+    }
+
+    Local<Object> obj = value.As<Object>();
+    Local<Context> context = obj->CreationContext();
+    return obj->Has(context, ToV8String(isolate, "length")).FromMaybe(false);
+}
+
 void tns::ExecuteOnMainThread(std::function<void ()> func, bool async) {
     if (async) {
         dispatch_async(dispatch_get_main_queue(), ^(void) {
