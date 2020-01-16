@@ -54,10 +54,6 @@ public:
     void CallOnWorkerThread(std::unique_ptr<Task> task) override;
     void CallDelayedOnWorkerThread(std::unique_ptr<Task> task,
                                    double delay_in_seconds) override;
-    void CallOnForegroundThread(v8::Isolate* isolate, Task* task) override;
-    void CallDelayedOnForegroundThread(Isolate* isolate, Task* task,
-                                       double delay_in_seconds) override;
-    void CallIdleOnForegroundThread(Isolate* isolate, IdleTask* task) override;
     bool IdleTasksEnabled(Isolate* isolate) override;
     double MonotonicallyIncreasingTime() override;
     double CurrentClockTimeMillis() override;

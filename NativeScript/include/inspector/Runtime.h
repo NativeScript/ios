@@ -36,19 +36,16 @@ namespace API {
 
 class V8_EXPORT RemoteObject : public Exported {
 public:
-    static std::unique_ptr<protocol::Runtime::API::RemoteObject> fromJSONString(const StringView& json);
     static std::unique_ptr<protocol::Runtime::API::RemoteObject> fromBinary(const uint8_t* data, size_t length);
 };
 
 class V8_EXPORT StackTrace : public Exported {
 public:
-    static std::unique_ptr<protocol::Runtime::API::StackTrace> fromJSONString(const StringView& json);
     static std::unique_ptr<protocol::Runtime::API::StackTrace> fromBinary(const uint8_t* data, size_t length);
 };
 
 class V8_EXPORT StackTraceId : public Exported {
 public:
-    static std::unique_ptr<protocol::Runtime::API::StackTraceId> fromJSONString(const StringView& json);
     static std::unique_ptr<protocol::Runtime::API::StackTraceId> fromBinary(const uint8_t* data, size_t length);
 };
 

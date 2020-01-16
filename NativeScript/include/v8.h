@@ -1048,6 +1048,11 @@ class TracedGlobal : public TracedReferenceBase<T> {
  * to ensure that the handle is not accessed once the V8 object has been
  * reclaimed. This can happen when the handle is not passed through the
  * EmbedderHeapTracer. For more details see TracedReferenceBase.
+ *
+ * The reference assumes the embedder has precise knowledge about references at
+ * all times. In case V8 needs to separately handle on-stack references, the
+ * embedder is required to set the stack start through
+ * |EmbedderHeapTracer::SetStackStart|.
  */
 template <typename T>
 class TracedReference : public TracedReferenceBase<T> {
@@ -1161,7 +1166,7 @@ class TracedReference : public TracedReferenceBase<T> {
    * involving V8 needs to be done, a second callback can be scheduled using
    * WeakCallbackInfo<void>::SetSecondPassCallback.
    */
-  V8_DEPRECATE_SOON("Use TracedGlobal<> if callbacks are required.")
+  V8_DEPRECATED("Use TracedGlobal<> if callbacks are required.")
   V8_INLINE void SetFinalizationCallback(
       void* parameter, WeakCallbackInfo<void>::Callback callback);
 };
@@ -7871,6 +7876,17 @@ class V8_EXPORT EmbedderHeapTracer {
   void IterateTracedGlobalHandles(TracedGlobalHandleVisitor* visitor);
 
   /**
+   * Called by the embedder to set the start of the stack which is e.g. used by
+   * V8 to determine whether handles are used from stack or heap.
+   */
+  void SetStackStart(void* stack_start);
+
+  /**
+   * Called by the embedder to notify V8 of an empty execution stack.
+   */
+  void NotifyEmptyEmbedderStack();
+
+  /**
    * Called by v8 to register internal fields of found wrappers.
    *
    * The embedder is expected to store them somewhere and trace reachable
@@ -7879,8 +7895,6 @@ class V8_EXPORT EmbedderHeapTracer {
   virtual void RegisterV8References(
       const std::vector<std::pair<void*, void*> >& embedder_fields) = 0;
 
-  V8_DEPRECATED("Use version taking TracedReferenceBase<v8::Data> argument")
-  void RegisterEmbedderReference(const TracedReferenceBase<v8::Value>& ref);
   void RegisterEmbedderReference(const TracedReferenceBase<v8::Data>& ref);
 
   /**
@@ -7964,9 +7978,6 @@ class V8_EXPORT EmbedderHeapTracer {
    */
   virtual void ResetHandleInNonTracingGC(
       const v8::TracedReference<v8::Value>& handle);
-  V8_DEPRECATED("Use TracedReference version when not requiring destructors.")
-  virtual void ResetHandleInNonTracingGC(
-      const v8::TracedGlobal<v8::Value>& handle);
 
   /*
    * Called by the embedder to immediately perform a full garbage collection.
@@ -9203,6 +9214,9 @@ class V8_EXPORT Isolate {
    * Set the callback to invoke to check if code generation from
    * strings should be allowed.
    */
+  V8_DEPRECATED(
+      "Use Isolate::SetModifyCodeGenerationFromStringsCallback instead. "
+      "See http://crbug.com/v8/10096.")
   void SetAllowCodeGenerationFromStringsCallback(
       AllowCodeGenerationFromStringsCallback callback);
   void SetModifyCodeGenerationFromStringsCallback(
@@ -9927,8 +9941,16 @@ class V8_EXPORT TryCatch {
   Local<Value> Exception() const;
 
   /**
-   * Returns the .stack property of the thrown object.  If no .stack
+   * Returns the .stack property of an object.  If no .stack
    * property is present an empty handle is returned.
+   */
+  V8_WARN_UNUSED_RESULT static MaybeLocal<Value> StackTrace(
+      Local<Context> context, Local<Value> exception);
+
+  /**
+   * Returns the .stack property of the thrown object.  If no .stack property is
+   * present or if this try/catch block has not caught an exception, an empty
+   * handle is returned.
    */
   V8_WARN_UNUSED_RESULT MaybeLocal<Value> StackTrace(
       Local<Context> context) const;

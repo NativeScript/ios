@@ -79,16 +79,6 @@ void Domain::writeBinary(std::vector<uint8_t>* out) const
 }
 
 // static
-std::unique_ptr<API::Domain> API::Domain::fromJSONString(const StringView& json)
-{
-    ErrorSupport errors;
-    std::unique_ptr<Value> value = StringUtil::parseJSON(json);
-    if (!value)
-        return nullptr;
-    return protocol::Schema::Domain::fromValue(value.get(), &errors);
-}
-
-// static
 std::unique_ptr<API::Domain> API::Domain::fromBinary(const uint8_t* data, size_t length)
 {
     ErrorSupport errors;

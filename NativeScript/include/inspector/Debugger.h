@@ -52,7 +52,6 @@ V8_EXPORT extern const char* XHR;
 
 class V8_EXPORT SearchMatch : public Exported {
 public:
-    static std::unique_ptr<protocol::Debugger::API::SearchMatch> fromJSONString(const StringView& json);
     static std::unique_ptr<protocol::Debugger::API::SearchMatch> fromBinary(const uint8_t* data, size_t length);
 };
 

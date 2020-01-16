@@ -165,16 +165,6 @@ void RemoteObject::writeBinary(std::vector<uint8_t>* out) const
 }
 
 // static
-std::unique_ptr<API::RemoteObject> API::RemoteObject::fromJSONString(const StringView& json)
-{
-    ErrorSupport errors;
-    std::unique_ptr<Value> value = StringUtil::parseJSON(json);
-    if (!value)
-        return nullptr;
-    return protocol::Runtime::RemoteObject::fromValue(value.get(), &errors);
-}
-
-// static
 std::unique_ptr<API::RemoteObject> API::RemoteObject::fromBinary(const uint8_t* data, size_t length)
 {
     ErrorSupport errors;
@@ -1047,16 +1037,6 @@ void StackTrace::writeBinary(std::vector<uint8_t>* out) const
 }
 
 // static
-std::unique_ptr<API::StackTrace> API::StackTrace::fromJSONString(const StringView& json)
-{
-    ErrorSupport errors;
-    std::unique_ptr<Value> value = StringUtil::parseJSON(json);
-    if (!value)
-        return nullptr;
-    return protocol::Runtime::StackTrace::fromValue(value.get(), &errors);
-}
-
-// static
 std::unique_ptr<API::StackTrace> API::StackTrace::fromBinary(const uint8_t* data, size_t length)
 {
     ErrorSupport errors;
@@ -1125,16 +1105,6 @@ std::unique_ptr<StringBuffer> StackTraceId::toJSONString() const
 void StackTraceId::writeBinary(std::vector<uint8_t>* out) const
 {
     AppendSerialized(out);
-}
-
-// static
-std::unique_ptr<API::StackTraceId> API::StackTraceId::fromJSONString(const StringView& json)
-{
-    ErrorSupport errors;
-    std::unique_ptr<Value> value = StringUtil::parseJSON(json);
-    if (!value)
-        return nullptr;
-    return protocol::Runtime::StackTraceId::fromValue(value.get(), &errors);
 }
 
 // static

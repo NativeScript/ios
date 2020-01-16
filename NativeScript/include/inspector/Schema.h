@@ -36,7 +36,6 @@ namespace API {
 
 class V8_EXPORT Domain : public Exported {
 public:
-    static std::unique_ptr<protocol::Schema::API::Domain> fromJSONString(const StringView& json);
     static std::unique_ptr<protocol::Schema::API::Domain> fromBinary(const uint8_t* data, size_t length);
 };
 

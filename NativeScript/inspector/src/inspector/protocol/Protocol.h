@@ -77,7 +77,6 @@ public:
         TypeBinary,
         TypeObject,
         TypeArray,
-        TypeSerialized,
         TypeImported
     };
 
@@ -183,32 +182,6 @@ private:
     explicit BinaryValue(const Binary& value) : Value(TypeBinary), m_binaryValue(value) { }
 
     Binary m_binaryValue;
-};
-
-class  SerializedValue : public Value {
-public:
-    static std::unique_ptr<SerializedValue> fromJSON(const String& value)
-    {
-        return std::unique_ptr<SerializedValue>(new SerializedValue(value));
-    }
-
-    static std::unique_ptr<SerializedValue> fromBinary(std::vector<uint8_t> value)
-    {
-        return std::unique_ptr<SerializedValue>(new SerializedValue(std::move(value)));
-    }
-
-    void writeJSON(StringBuilder* output) const override;
-    std::vector<uint8_t> TakeSerialized() && override;
-    void AppendSerialized(std::vector<uint8_t>* bytes) const override;
-    std::unique_ptr<Value> clone() const override;
-
-private:
-    explicit SerializedValue(const String& json) : Value(TypeSerialized), m_serializedJSON(json) { }
-    explicit SerializedValue(std::vector<uint8_t> binary) : Value(TypeSerialized), m_serializedBinary(std::move(binary)) { }
-    SerializedValue(const String& json, const std::vector<uint8_t>& binary)
-        : Value(TypeSerialized), m_serializedJSON(json), m_serializedBinary(binary) { }
-    String m_serializedJSON;
-    std::vector<uint8_t> m_serializedBinary;
 };
 
 class  DictionaryValue : public Value {

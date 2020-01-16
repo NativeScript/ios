@@ -341,16 +341,6 @@ void SearchMatch::writeBinary(std::vector<uint8_t>* out) const
 }
 
 // static
-std::unique_ptr<API::SearchMatch> API::SearchMatch::fromJSONString(const StringView& json)
-{
-    ErrorSupport errors;
-    std::unique_ptr<Value> value = StringUtil::parseJSON(json);
-    if (!value)
-        return nullptr;
-    return protocol::Debugger::SearchMatch::fromValue(value.get(), &errors);
-}
-
-// static
 std::unique_ptr<API::SearchMatch> API::SearchMatch::fromBinary(const uint8_t* data, size_t length)
 {
     ErrorSupport errors;

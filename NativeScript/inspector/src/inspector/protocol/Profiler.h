@@ -1103,12 +1103,12 @@ public:
     virtual DispatchResponse getBestEffortCoverage(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>* out_result) = 0;
     virtual DispatchResponse setSamplingInterval(int in_interval) = 0;
     virtual DispatchResponse start() = 0;
-    virtual DispatchResponse startPreciseCoverage(Maybe<bool> in_callCount, Maybe<bool> in_detailed) = 0;
+    virtual DispatchResponse startPreciseCoverage(Maybe<bool> in_callCount, Maybe<bool> in_detailed, double* out_timestamp) = 0;
     virtual DispatchResponse startTypeProfile() = 0;
     virtual DispatchResponse stop(std::unique_ptr<protocol::Profiler::Profile>* out_profile) = 0;
     virtual DispatchResponse stopPreciseCoverage() = 0;
     virtual DispatchResponse stopTypeProfile() = 0;
-    virtual DispatchResponse takePreciseCoverage(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>* out_result) = 0;
+    virtual DispatchResponse takePreciseCoverage(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>* out_result, double* out_timestamp) = 0;
     virtual DispatchResponse takeTypeProfile(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptTypeProfile>>* out_result) = 0;
     virtual DispatchResponse enableRuntimeCallStats() = 0;
     virtual DispatchResponse disableRuntimeCallStats() = 0;

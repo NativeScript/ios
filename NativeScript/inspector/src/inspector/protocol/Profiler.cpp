@@ -879,15 +879,21 @@ void DispatcherImpl::startPreciseCoverage(int callId, const String& method, v8_c
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
+    // Declare output parameters.
+    double out_timestamp;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->startPreciseCoverage(std::move(in_callCount), std::move(in_detailed));
+    DispatchResponse response = m_backend->startPreciseCoverage(std::move(in_callCount), std::move(in_detailed), &out_timestamp);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
     }
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        result->setValue("timestamp", ValueConversions<double>::toValue(out_timestamp));
+    }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(callId, response, std::move(result));
     return;
 }
 
@@ -957,9 +963,10 @@ void DispatcherImpl::takePreciseCoverage(int callId, const String& method, v8_cr
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> out_result;
+    double out_timestamp;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->takePreciseCoverage(&out_result);
+    DispatchResponse response = m_backend->takePreciseCoverage(&out_result, &out_timestamp);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
@@ -967,6 +974,7 @@ void DispatcherImpl::takePreciseCoverage(int callId, const String& method, v8_cr
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("result", ValueConversions<protocol::Array<protocol::Profiler::ScriptCoverage>>::toValue(out_result.get()));
+        result->setValue("timestamp", ValueConversions<double>::toValue(out_timestamp));
     }
     if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));

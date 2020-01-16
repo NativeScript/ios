@@ -110,7 +110,6 @@
 		C247C35822F828E3001D2CA2 /* v8-inspector-session-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2CD22F828E2001D2CA2 /* v8-inspector-session-impl.h */; };
 		C247C35922F828E3001D2CA2 /* value-mirror.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2CE22F828E2001D2CA2 /* value-mirror.h */; };
 		C247C35A22F828E3001D2CA2 /* injected-script.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2CF22F828E2001D2CA2 /* injected-script.h */; };
-		C247C35B22F828E3001D2CA2 /* wasm-translation.cc in Sources */ = {isa = PBXBuildFile; fileRef = C247C2D022F828E2001D2CA2 /* wasm-translation.cc */; };
 		C247C35C22F828E3001D2CA2 /* v8-dom-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2D122F828E2001D2CA2 /* v8-dom-agent-impl.h */; };
 		C247C35D22F828E3001D2CA2 /* CSS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C247C2D322F828E2001D2CA2 /* CSS.cpp */; };
 		C247C35E22F828E3001D2CA2 /* Protocol.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2D422F828E2001D2CA2 /* Protocol.h */; };
@@ -141,7 +140,6 @@
 		C247C37722F828E3001D2CA2 /* Profiler.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2ED22F828E2001D2CA2 /* Profiler.h */; };
 		C247C37822F828E3001D2CA2 /* Forward.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2EE22F828E2001D2CA2 /* Forward.h */; };
 		C247C37922F828E3001D2CA2 /* v8-value-utils.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2EF22F828E2001D2CA2 /* v8-value-utils.h */; };
-		C247C37A22F828E3001D2CA2 /* wasm-translation.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2F022F828E2001D2CA2 /* wasm-translation.h */; };
 		C247C37B22F828E3001D2CA2 /* v8-profiler-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2F122F828E2001D2CA2 /* v8-profiler-agent-impl.h */; };
 		C247C37C22F828E3001D2CA2 /* string-util.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2F222F828E2001D2CA2 /* string-util.h */; };
 		C247C37D22F828E3001D2CA2 /* v8-schema-agent-impl.cc in Sources */ = {isa = PBXBuildFile; fileRef = C247C2F322F828E2001D2CA2 /* v8-schema-agent-impl.cc */; };
@@ -196,6 +194,8 @@
 		C247C3AF22F828E3001D2CA2 /* atomicops_internals_atomicword_compat.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C32922F828E3001D2CA2 /* atomicops_internals_atomicword_compat.h */; };
 		C247C3B022F828E3001D2CA2 /* interface-types.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C32B22F828E3001D2CA2 /* interface-types.h */; };
 		C247C3B122F828E3001D2CA2 /* debug-interface.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C32C22F828E3001D2CA2 /* debug-interface.h */; };
+		C263B4CC23D0A87E00D5B872 /* bits.h in Headers */ = {isa = PBXBuildFile; fileRef = C263B4CB23D0A87E00D5B872 /* bits.h */; };
+		C263B4D023D0AF0900D5B872 /* v8-time.h in Headers */ = {isa = PBXBuildFile; fileRef = C263B4CF23D0AF0900D5B872 /* v8-time.h */; };
 		C266567822AA405100EE15CC /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C266567722AA405100EE15CC /* Default-568h@2x.png */; };
 		C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C266567922AA630F00EE15CC /* NSDataAdapter.mm */; };
 		C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C266567A22AA630F00EE15CC /* NSDataAdapter.h */; };
@@ -628,7 +628,6 @@
 		C247C2CD22F828E2001D2CA2 /* v8-inspector-session-impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-inspector-session-impl.h"; sourceTree = "<group>"; };
 		C247C2CE22F828E2001D2CA2 /* value-mirror.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "value-mirror.h"; sourceTree = "<group>"; };
 		C247C2CF22F828E2001D2CA2 /* injected-script.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "injected-script.h"; sourceTree = "<group>"; };
-		C247C2D022F828E2001D2CA2 /* wasm-translation.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "wasm-translation.cc"; sourceTree = "<group>"; };
 		C247C2D122F828E2001D2CA2 /* v8-dom-agent-impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-dom-agent-impl.h"; sourceTree = "<group>"; };
 		C247C2D322F828E2001D2CA2 /* CSS.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CSS.cpp; sourceTree = "<group>"; };
 		C247C2D422F828E2001D2CA2 /* Protocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Protocol.h; sourceTree = "<group>"; };
@@ -659,7 +658,6 @@
 		C247C2ED22F828E2001D2CA2 /* Profiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Profiler.h; sourceTree = "<group>"; };
 		C247C2EE22F828E2001D2CA2 /* Forward.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Forward.h; sourceTree = "<group>"; };
 		C247C2EF22F828E2001D2CA2 /* v8-value-utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-value-utils.h"; sourceTree = "<group>"; };
-		C247C2F022F828E2001D2CA2 /* wasm-translation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "wasm-translation.h"; sourceTree = "<group>"; };
 		C247C2F122F828E2001D2CA2 /* v8-profiler-agent-impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-profiler-agent-impl.h"; sourceTree = "<group>"; };
 		C247C2F222F828E2001D2CA2 /* string-util.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "string-util.h"; sourceTree = "<group>"; };
 		C247C2F322F828E2001D2CA2 /* v8-schema-agent-impl.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-schema-agent-impl.cc"; sourceTree = "<group>"; };
@@ -715,6 +713,8 @@
 		C247C32B22F828E3001D2CA2 /* interface-types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "interface-types.h"; sourceTree = "<group>"; };
 		C247C32C22F828E3001D2CA2 /* debug-interface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "debug-interface.h"; sourceTree = "<group>"; };
 		C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "exported-symbols.txt"; sourceTree = "<group>"; };
+		C263B4CB23D0A87E00D5B872 /* bits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = bits.h; sourceTree = "<group>"; };
+		C263B4CF23D0AF0900D5B872 /* v8-time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-time.h"; sourceTree = "<group>"; };
 		C266567722AA405100EE15CC /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		C266567922AA630F00EE15CC /* NSDataAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NSDataAdapter.mm; sourceTree = "<group>"; };
 		C266567A22AA630F00EE15CC /* NSDataAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NSDataAdapter.h; sourceTree = "<group>"; };
@@ -1313,8 +1313,6 @@
 				C247C2F722F828E2001D2CA2 /* v8-value-utils.cc */,
 				C247C2CE22F828E2001D2CA2 /* value-mirror.h */,
 				C247C30C22F828E2001D2CA2 /* value-mirror.cc */,
-				C247C2F022F828E2001D2CA2 /* wasm-translation.h */,
-				C247C2D022F828E2001D2CA2 /* wasm-translation.cc */,
 			);
 			path = inspector;
 			sourceTree = "<group>";
@@ -1375,6 +1373,7 @@
 		C247C31322F828E3001D2CA2 /* base */ = {
 			isa = PBXGroup;
 			children = (
+				C263B4CB23D0A87E00D5B872 /* bits.h */,
 				C247C31422F828E3001D2CA2 /* address-region.h */,
 				C247C31522F828E3001D2CA2 /* build_config.h */,
 				C247C31622F828E3001D2CA2 /* template-utils.h */,
@@ -1401,6 +1400,7 @@
 		C247C31922F828E3001D2CA2 /* platform */ = {
 			isa = PBXGroup;
 			children = (
+				C263B4CF23D0AF0900D5B872 /* v8-time.h */,
 				C247C31A22F828E3001D2CA2 /* semaphore.h */,
 				C247C31B22F828E3001D2CA2 /* mutex.h */,
 				C247C31C22F828E3001D2CA2 /* platform.h */,
@@ -1888,6 +1888,7 @@
 				C247C35222F828E3001D2CA2 /* v8-stack-trace-impl.h in Headers */,
 				C247C17622F82842001D2CA2 /* ffitarget.h in Headers */,
 				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
+				C263B4CC23D0A87E00D5B872 /* bits.h in Headers */,
 				C247C39E22F828E3001D2CA2 /* base-export.h in Headers */,
 				C247C33122F828E3001D2CA2 /* JsV8InspectorClient.h in Headers */,
 				C2B30FDA238418CA009D6A46 /* export.h in Headers */,
@@ -1966,7 +1967,6 @@
 				C2DDEBAB229EAC8300345BFE /* WeakRef.h in Headers */,
 				C247C36A22F828E3001D2CA2 /* Overlay.h in Headers */,
 				C247C36B22F828E3001D2CA2 /* DOM.h in Headers */,
-				C247C37A22F828E3001D2CA2 /* wasm-translation.h in Headers */,
 				C2DDEBA8229EAC8300345BFE /* SymbolLoader.h in Headers */,
 				C247C17322F82842001D2CA2 /* v8-internal.h in Headers */,
 				C266569822AFFFB000EE15CC /* Reference.h in Headers */,
@@ -2021,6 +2021,7 @@
 				C247C3A522F828E3001D2CA2 /* safe_conversions.h in Headers */,
 				C266569422AFFF7E00EE15CC /* Pointer.h in Headers */,
 				C247C17222F82842001D2CA2 /* v8-inspector.h in Headers */,
+				C263B4D023D0AF0900D5B872 /* v8-time.h in Headers */,
 				C247C3A322F828E3001D2CA2 /* v8-fallthrough.h in Headers */,
 				C2B30FDC238418CA009D6A46 /* cbor.h in Headers */,
 				C2B30FDD238418CA009D6A46 /* glue.h in Headers */,
@@ -2589,7 +2590,6 @@
 				C247C34622F828E3001D2CA2 /* v8-console.cc in Sources */,
 				C27E5D8522F2FDDB00498ED0 /* KnownUnknownClassPair.cpp in Sources */,
 				C247C37D22F828E3001D2CA2 /* v8-schema-agent-impl.cc in Sources */,
-				C247C35B22F828E3001D2CA2 /* wasm-translation.cc in Sources */,
 				C2DDEBB5229EAC8300345BFE /* Tasks.cpp in Sources */,
 				C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */,
 				2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */,
