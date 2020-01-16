@@ -588,7 +588,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             SEL selector = methodMeta->selector();
             IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
             std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);
-            assert(class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str()));
+            class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str());
         }
     }
 }
