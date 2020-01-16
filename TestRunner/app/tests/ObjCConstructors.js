@@ -62,7 +62,18 @@ describe("Constructing Objective-C classes with new operator", function () {
         expect(actual).toBe("initWithStringOptional:andString: s1 s2 calledinitWithStringOptional:andString: s3 s4 called");
     });
 
-    it("With constructor tokens", () => {
+    it("With single constructor token", () => {
+        var obj = {
+            string: "abc"
+        };
+        var instance1 = new TNSCInterface(obj);
+        var instance2 = new (TNSCInterface.extend({}))(obj);
+
+        var actual = TNSGetOutput();
+        expect(actual).toBe("initWithString:abc calledinitWithString:abc called");
+    });
+
+    it("With multiple constructor tokens", () => {
         var obj = {
             stringOptional: "s1",
             andString: "s2"

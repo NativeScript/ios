@@ -365,7 +365,7 @@ const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, c
     do {
         std::vector<const MethodMeta*> initializers = ArgConverter::GetInitializers(cache.get(), klass, interfaceMeta);
         for (const MethodMeta* candidate: initializers) {
-            if (candidate->encodings()->count > 2) {
+            if (constructorTokens != "") {
                 const char* expectedTokens = candidate->constructorTokens();
                 if (strcmp(expectedTokens, constructorTokens.c_str()) == 0) {
                     candidates.clear();
