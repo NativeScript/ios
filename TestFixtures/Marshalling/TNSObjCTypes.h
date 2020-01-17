@@ -28,6 +28,7 @@ typedef int (^NumberReturner)(int, int, int);
 - (NSDate*)methodWithNSDate:(NSDate*)date;
 - (void (^)(void))methodWithBlock:(void (^)(void))block;
 - (NSArray*)methodWithNSArray:(NSArray*)array;
+- (id)methodWithNSArrayWrappingDictionary:(id)array;
 - (NSDictionary*)methodWithNSDictionary:(NSDictionary*)dictionary;
 - (NSData*)methodWithNSData:(NSData*)data;
 - (NSDecimalNumber*)methodWithNSDecimalNumber:(NSDecimalNumber*)number;

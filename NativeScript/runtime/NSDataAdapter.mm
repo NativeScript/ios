@@ -1,17 +1,24 @@
 #include "NSDataAdapter.h"
+#include "ObjectManager.h"
+#include "Helpers.h"
+#include "Caches.h"
 
+using namespace tns;
 using namespace v8;
 
 @implementation NSDataAdapter {
     Isolate* isolate_;
-    Persistent<Object>* object_;
+    std::shared_ptr<Persistent<Value>> object_;
 }
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
     if (self) {
         assert(jsObject->IsArrayBuffer() || jsObject->IsArrayBufferView());
         self->isolate_ = isolate;
-        self->object_ = new Persistent<Object>(isolate, jsObject);
+        self->object_ = ObjectManager::Register(isolate, jsObject);
+        std::shared_ptr<Caches> cache = Caches::Get(isolate);
+        cache->Instances.emplace(self, self->object_);
+        tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
     }
 
     return self;
@@ -22,7 +29,7 @@ using namespace v8;
 }
 
 - (void*)mutableBytes {
-    Local<Object> obj = self->object_->Get(self->isolate_);
+    Local<Object> obj = self->object_->Get(self->isolate_).As<Object>();
     if (obj->IsArrayBuffer()) {
         void* data = obj.As<ArrayBuffer>()->GetBackingStore()->Data();
         return data;
@@ -42,7 +49,7 @@ using namespace v8;
 }
 
 - (NSUInteger)length {
-    Local<Object> obj = self->object_->Get(self->isolate_);
+    Local<Object> obj = self->object_->Get(self->isolate_).As<Object>();
     if (obj->IsArrayBuffer()) {
         return obj.As<ArrayBuffer>()->ByteLength();
     }

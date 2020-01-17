@@ -1,29 +1,31 @@
 #import <Foundation/NSString.h>
 #include "DictionaryAdapter.h"
-#include "Interop.h"
+#include "ObjectManager.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
+#include "Interop.h"
+#include "Caches.h"
 
 using namespace v8;
 using namespace tns;
 
 @interface DictionaryAdapterMapKeysEnumerator : NSEnumerator
 
-- (instancetype)initWithMap:(Local<Map>)properties isolate:(Isolate*)isolate;
+- (instancetype)initWithMap:(std::shared_ptr<Persistent<Value>>)map isolate:(Isolate*)isolate;
 
 @end
 
 @implementation DictionaryAdapterMapKeysEnumerator {
     Isolate* isolate_;
     uint32_t index_;
-    Persistent<v8::Array>* array_;
+    std::shared_ptr<Persistent<Value>> map_;
 }
 
-- (instancetype)initWithMap:(Local<Map>)map isolate:(Isolate*)isolate {
+- (instancetype)initWithMap:(std::shared_ptr<Persistent<Value>>)map isolate:(Isolate*)isolate {
     if (self) {
         self->isolate_ = isolate;
         self->index_ = 0;
-        self->array_ = new Persistent<v8::Array>(isolate, map->AsArray());
+        self->map_ = map;
     }
 
     return self;
@@ -32,7 +34,7 @@ using namespace tns;
 - (id)nextObject {
     Isolate* isolate = self->isolate_;
     Local<Context> context = isolate->GetCurrentContext();
-    Local<v8::Array> array = self->array_->Get(isolate);
+    Local<v8::Array> array = self->map_->Get(isolate).As<Map>()->AsArray();
 
     if (self->index_ < array->Length() - 1) {
         Local<Value> key;
@@ -48,37 +50,45 @@ using namespace tns;
 }
 
 - (void)dealloc {
-    self->array_->Reset();
 }
 
 @end
 
 @interface DictionaryAdapterObjectKeysEnumerator : NSEnumerator
 
-- (instancetype)initWithProperties:(Local<v8::Array>)properties isolate:(Isolate*)isolate;
+- (instancetype)initWithProperties:(std::shared_ptr<Persistent<Value>>)dictionary isolate:(Isolate*)isolate;
+- (Local<v8::Array>)getProperties;
 
 @end
 
 @implementation DictionaryAdapterObjectKeysEnumerator {
     Isolate* isolate_;
-    Persistent<v8::Array>* properties_;
+    std::shared_ptr<Persistent<Value>> dictionary_;
     NSUInteger index_;
 }
 
-- (instancetype)initWithProperties:(Local<v8::Array>)properties isolate:(Isolate*)isolate {
+- (instancetype)initWithProperties:(std::shared_ptr<Persistent<Value>>)dictionary isolate:(Isolate*)isolate {
     if (self) {
         self->isolate_ = isolate;
-        self->properties_ = new Persistent<v8::Array>(isolate, properties);
+        self->dictionary_ = dictionary;
         self->index_ = 0;
     }
 
     return self;
 }
 
+- (Local<v8::Array>)getProperties {
+    Local<Context> context = self->isolate_->GetCurrentContext();
+    Local<v8::Array> properties;
+    Local<Object> dictionary = self->dictionary_->Get(self->isolate_).As<Object>();
+    assert(dictionary->GetOwnPropertyNames(context).ToLocal(&properties));
+    return properties;
+}
+
 - (id)nextObject {
     Isolate* isolate = self->isolate_;
     Local<Context> context = isolate->GetCurrentContext();
-    Local<v8::Array> properties = self->properties_->Get(self->isolate_);
+    Local<v8::Array> properties = [self getProperties];
     if (self->index_ < properties->Length()) {
         Local<Value> value;
         bool success = properties->Get(context, (uint)self->index_).ToLocal(&value);
@@ -95,7 +105,7 @@ using namespace tns;
     Isolate* isolate = self->isolate_;
     Local<Context> context = isolate->GetCurrentContext();
     NSMutableArray* array = [NSMutableArray array];
-    Local<v8::Array> properties = self->properties_->Get(self->isolate_);
+    Local<v8::Array> properties = [self getProperties];
     for (int i = 0; i < properties->Length(); i++) {
         Local<Value> value;
         bool success = properties->Get(context, i).ToLocal(&value);
@@ -108,27 +118,29 @@ using namespace tns;
 }
 
 - (void)dealloc {
-    self->properties_->Reset();
 }
 
 @end
 
 @implementation DictionaryAdapter {
     Isolate* isolate_;
-    Persistent<Object>* object_;
+    std::shared_ptr<Persistent<Value>> object_;
 }
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
     if (self) {
         self->isolate_ = isolate;
-        self->object_ = new Persistent<Object>(isolate, jsObject);
+        self->object_ = ObjectManager::Register(isolate, jsObject);
+        std::shared_ptr<Caches> cache = Caches::Get(isolate);
+        cache->Instances.emplace(self, self->object_);
+        tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
     }
 
     return self;
 }
 
 - (NSUInteger)count {
-    Local<Object> obj = self->object_->Get(self->isolate_);
+    Local<Object> obj = self->object_->Get(self->isolate_).As<Object>();
 
     if (obj->IsMap()) {
         return obj.As<Map>()->Size();
@@ -146,7 +158,7 @@ using namespace tns;
 - (id)objectForKey:(id)aKey {
     Isolate* isolate = self->isolate_;
     Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> obj = self->object_->Get(self->isolate_);
+    Local<Object> obj = self->object_->Get(self->isolate_).As<Object>();
 
     Local<Value> value;
     if ([aKey isKindOfClass:[NSNumber class]]) {
@@ -177,17 +189,13 @@ using namespace tns;
 }
 
 - (NSEnumerator*)keyEnumerator {
-    Local<Object> obj = self->object_->Get(self->isolate_);
+    Local<Value> obj = self->object_->Get(self->isolate_);
 
     if (obj->IsMap()) {
-        return [[DictionaryAdapterMapKeysEnumerator alloc] initWithMap:obj.As<Map>() isolate:self->isolate_];
+        return [[DictionaryAdapterMapKeysEnumerator alloc] initWithMap:self->object_ isolate:self->isolate_];
     }
 
-    Local<Context> context = self->isolate_->GetCurrentContext();
-    Local<v8::Array> properties;
-    assert(obj->GetOwnPropertyNames(context).ToLocal(&properties));
-
-    return [[DictionaryAdapterObjectKeysEnumerator alloc] initWithProperties:properties isolate:self->isolate_];
+    return [[DictionaryAdapterObjectKeysEnumerator alloc] initWithProperties:self->object_ isolate:self->isolate_];
 }
 
 - (void)dealloc {

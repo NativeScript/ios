@@ -1,28 +1,32 @@
-#import <Foundation/NSString.h>
 #include "ArrayAdapter.h"
-#include "Interop.h"
+#include "ObjectManager.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
+#include "Interop.h"
+#include "Caches.h"
 
 using namespace tns;
 using namespace v8;
 
 @implementation ArrayAdapter {
     Isolate* isolate_;
-    Persistent<Object>* object_;
+    std::shared_ptr<Persistent<Value>> object_;
 }
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
     if (self) {
         self->isolate_ = isolate;
-        self->object_ = new Persistent<Object>(isolate, jsObject);
+        self->object_ = ObjectManager::Register(isolate, jsObject);
+        std::shared_ptr<Caches> cache = Caches::Get(isolate);
+        cache->Instances.emplace(self, self->object_);
+        tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
     }
 
     return self;
 }
 
 - (NSUInteger)count {
-    Local<Object> object = self->object_->Get(self->isolate_);
+    Local<Object> object = self->object_->Get(self->isolate_).As<Object>();
     if (object->IsArray()) {
         uint32_t length = object.As<v8::Array>()->Length();
         return length;
@@ -41,7 +45,7 @@ using namespace v8;
         assert(false);
     }
 
-    Local<Object> object = self->object_->Get(self->isolate_);
+    Local<Object> object = self->object_->Get(self->isolate_).As<Object>();
     Local<Context> context = self->isolate_->GetCurrentContext();
     Local<Value> item;
     bool success = object->Get(context, (uint)index).ToLocal(&item);

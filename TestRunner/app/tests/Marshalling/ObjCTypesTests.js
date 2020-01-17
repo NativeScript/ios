@@ -170,6 +170,19 @@ describe(module.id, function () {
         TNSClearOutput();
     });
 
+    it("MethodWithNSArrayWrappingNSDictionary", () => {
+        let obj = {
+            id: 1,
+            param: "abc"
+        };
+
+        var result = TNSObjCTypes.alloc().init().methodWithNSArrayWrappingDictionary([obj]);
+
+        expect(result).toBe(obj);
+        expect(result.id).toEqual(1);
+        expect(result.param).toEqual("abc");
+    });
+
     it("MethodWithNSDictionaryObject", function () {
         var dictionary = { a: 3, b: { "-1": [4, 5] }, d: 6 };
         var result = TNSObjCTypes.alloc().init().methodWithNSDictionary(dictionary);

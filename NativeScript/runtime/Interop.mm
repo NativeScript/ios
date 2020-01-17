@@ -460,19 +460,13 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         if (obj->IsArrayBuffer() || obj->IsArrayBufferView()) {
             Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
             NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
-            std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
-            Caches::Get(isolate)->Instances.emplace(adapter, poValue);
             Interop::SetValue(dest, adapter);
         } else if (tns::IsArrayOrArrayLike(isolate, obj)) {
             Local<v8::Array> array = Interop::ToArray(isolate, obj);
             ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
-            std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
-            Caches::Get(isolate)->Instances.emplace(adapter, poValue);
             Interop::SetValue(dest, adapter);
         } else {
             DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
-            std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, obj);
-            Caches::Get(isolate)->Instances.emplace(adapter, poValue);
             Interop::SetValue(dest, adapter);
         }
     } else {
@@ -494,7 +488,8 @@ id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
         bool value = tns::ToBool(arg);
         return @(value);
     } else if (arg->IsArray()) {
-        ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:arg.As<v8::Array>() isolate:isolate];
+        Local<Object> obj = arg.As<Object>();
+        ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:obj isolate:isolate];
         return adapter;
     } else if (arg->IsObject()) {
         if (BaseDataWrapper* wrapper = tns::GetValue(isolate, arg)) {
@@ -520,7 +515,8 @@ id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
                     break;
             }
         } else {
-            DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:arg.As<Object>() isolate:isolate];
+            Local<Object> obj = arg.As<Object>();
+            DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
             return adapter;
         }
     }

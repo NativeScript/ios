@@ -1,5 +1,8 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <sstream>
+#include "DictionaryAdapter.h"
+#include "NSDataAdapter.h"
+#include "ArrayAdapter.h"
 #include "ObjectManager.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
@@ -89,6 +92,14 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             if (target != nil) {
                 long retainCount = ObjectManager::GetRetainCount(target);
                 if (retainCount > 4) {
+                    return false;
+                }
+
+                bool isAdapter =
+                    [target isKindOfClass:[DictionaryAdapter class]] ||
+                    [target isKindOfClass:[ArrayAdapter class]] ||
+                    [target isKindOfClass:[NSDataAdapter class]];
+                if (isAdapter && retainCount > 2) {
                     return false;
                 }
 

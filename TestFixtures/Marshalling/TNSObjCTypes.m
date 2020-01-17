@@ -85,6 +85,12 @@ CFTypeRef TNSFunctionWithCreateCFTypeRefReturn() {
     return array;
 }
 
+- (id)methodWithNSArrayWrappingDictionary:(id)array {
+    NSArray* arr = (NSArray*)array;
+    id result = [arr objectAtIndex:0];
+    return result;
+}
+
 - (NSDictionary*)methodWithNSDictionary:(NSDictionary*)dictionary {
     for (id x in dictionary) {
         TNSLog([NSString stringWithFormat:@"%@ %@", x, dictionary[x]]);
