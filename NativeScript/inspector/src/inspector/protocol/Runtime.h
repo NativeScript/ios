@@ -150,7 +150,6 @@ public:
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<RemoteObject> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
-    void writeBinary(std::vector<uint8_t>* out) const override;
 
     template<int STATE>
     class RemoteObjectBuilder {
@@ -1502,7 +1501,6 @@ public:
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<StackTrace> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
-    void writeBinary(std::vector<uint8_t>* out) const override;
 
     template<int STATE>
     class StackTraceBuilder {
@@ -1592,7 +1590,6 @@ public:
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<StackTraceId> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
-    void writeBinary(std::vector<uint8_t>* out) const override;
 
     template<int STATE>
     class StackTraceIdBuilder {

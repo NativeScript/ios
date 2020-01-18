@@ -73,11 +73,6 @@ std::unique_ptr<StringBuffer> Domain::toJSONString() const
     return StringBufferImpl::adopt(json);
 }
 
-void Domain::writeBinary(std::vector<uint8_t>* out) const
-{
-    AppendSerialized(out);
-}
-
 // static
 std::unique_ptr<API::Domain> API::Domain::fromBinary(const uint8_t* data, size_t length)
 {

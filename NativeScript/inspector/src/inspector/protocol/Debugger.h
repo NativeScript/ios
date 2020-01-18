@@ -519,7 +519,6 @@ public:
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SearchMatch> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
-    void writeBinary(std::vector<uint8_t>* out) const override;
 
     template<int STATE>
     class SearchMatchBuilder {

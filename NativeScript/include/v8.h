@@ -8340,18 +8340,6 @@ class V8_EXPORT Isolate {
     kRegExpReplaceCalledOnSlowRegExp = 80,
     kDisplayNames = 81,
     kSharedArrayBufferConstructed = 82,
-    // Temporary kCallInDetachedWindowBy* counters are for reporting function
-    // calls within contexts marked using |SetDetachedWindowReason|.
-    // TODO(bartekn,chromium:1018156): Remove once not needed.
-    kCallInDetachedWindowByNavigation = 83,
-    kCallInDetachedWindowByNavigationAfter10s = 84,
-    kCallInDetachedWindowByNavigationAfter1min = 85,
-    kCallInDetachedWindowByClosing = 86,
-    kCallInDetachedWindowByClosingAfter10s = 87,
-    kCallInDetachedWindowByClosingAfter1min = 88,
-    kCallInDetachedWindowByOtherReason = 89,
-    kCallInDetachedWindowByOtherReasonAfter10s = 90,
-    kCallInDetachedWindowByOtherReasonAfter1min = 91,
 
     // If you add new values here, you'll also need to update Chromium's:
     // web_feature.mojom, use_counter_callback.cc, and enums.xml. V8 changes to
@@ -10089,32 +10077,6 @@ class V8_EXPORT Context {
   void DetachGlobal();
 
   /**
-   * Reason for detaching a window.
-   */
-  enum DetachedWindowReason {
-    kWindowNotDetached = 0,
-    kDetachedWindowByNavigation,
-    kDetachedWindowByClosing,
-    kDetachedWindowByOtherReason
-  };
-
-  /**
-   * Sets a reason for detaching window, for reporting purposes.
-   *
-   * This API is experimental and may change or be deleted. Do not use!
-   *
-   * A window is a Blink concept. This API marks the context as backing
-   * a detached window. This doesn't necessarily mean that the context is
-   * detached.
-   *
-   * Every time a JS function is called within a context that has a non-zero
-   * DetachedWindowReason, Runtime::kReportDetachedWindowAccess is invoked,
-   * which will report this call to Blink via a callback, which in turn can
-   * report number of such calls via UKM metrics.
-   */
-  void SetDetachedWindowReason(DetachedWindowReason reason);
-
-  /**
    * Creates a new context and returns a handle to the newly allocated
    * context.
    *
@@ -10804,14 +10766,9 @@ TracedGlobal<T>& TracedGlobal<T>::operator=(const TracedGlobal<S>& rhs) {
 template <class T>
 TracedGlobal<T>& TracedGlobal<T>::operator=(TracedGlobal&& rhs) {
   if (this != &rhs) {
-    this->Reset();
-    if (rhs.val_ != nullptr) {
-      this->val_ = rhs.val_;
       V8::MoveTracedGlobalReference(
           reinterpret_cast<internal::Address**>(&rhs.val_),
           reinterpret_cast<internal::Address**>(&this->val_));
-      rhs.val_ = nullptr;
-    }
   }
   return *this;
 }
@@ -10859,14 +10816,9 @@ TracedReference<T>& TracedReference<T>::operator=(
 template <class T>
 TracedReference<T>& TracedReference<T>::operator=(TracedReference&& rhs) {
   if (this != &rhs) {
-    this->Reset();
-    if (rhs.val_ != nullptr) {
-      this->val_ = rhs.val_;
-      V8::MoveTracedGlobalReference(
-          reinterpret_cast<internal::Address**>(&rhs.val_),
-          reinterpret_cast<internal::Address**>(&this->val_));
-      rhs.val_ = nullptr;
-    }
+    V8::MoveTracedGlobalReference(
+        reinterpret_cast<internal::Address**>(&rhs.val_),
+        reinterpret_cast<internal::Address**>(&this->val_));
   }
   return *this;
 }

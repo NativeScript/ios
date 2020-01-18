@@ -335,11 +335,6 @@ std::unique_ptr<StringBuffer> SearchMatch::toJSONString() const
     return StringBufferImpl::adopt(json);
 }
 
-void SearchMatch::writeBinary(std::vector<uint8_t>* out) const
-{
-    AppendSerialized(out);
-}
-
 // static
 std::unique_ptr<API::SearchMatch> API::SearchMatch::fromBinary(const uint8_t* data, size_t length)
 {

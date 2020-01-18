@@ -18,9 +18,6 @@ class V8_EXPORT Exported {
 public:
     virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
 
-    V8_DEPRECATE_SOON("Use AppendSerialized instead.")
-    virtual void writeBinary(std::vector<uint8_t>* out) const = 0;
-
     virtual void AppendSerialized(std::vector<uint8_t>* out) const = 0;
 
     virtual ~Exported() { }

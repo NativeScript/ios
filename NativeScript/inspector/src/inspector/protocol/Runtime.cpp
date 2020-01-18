@@ -159,11 +159,6 @@ std::unique_ptr<StringBuffer> RemoteObject::toJSONString() const
     return StringBufferImpl::adopt(json);
 }
 
-void RemoteObject::writeBinary(std::vector<uint8_t>* out) const
-{
-    AppendSerialized(out);
-}
-
 // static
 std::unique_ptr<API::RemoteObject> API::RemoteObject::fromBinary(const uint8_t* data, size_t length)
 {
@@ -1031,11 +1026,6 @@ std::unique_ptr<StringBuffer> StackTrace::toJSONString() const
     return StringBufferImpl::adopt(json);
 }
 
-void StackTrace::writeBinary(std::vector<uint8_t>* out) const
-{
-    AppendSerialized(out);
-}
-
 // static
 std::unique_ptr<API::StackTrace> API::StackTrace::fromBinary(const uint8_t* data, size_t length)
 {
@@ -1100,11 +1090,6 @@ std::unique_ptr<StringBuffer> StackTraceId::toJSONString() const
 {
     String json = toValue()->toJSONString();
     return StringBufferImpl::adopt(json);
-}
-
-void StackTraceId::writeBinary(std::vector<uint8_t>* out) const
-{
-    AppendSerialized(out);
 }
 
 // static
