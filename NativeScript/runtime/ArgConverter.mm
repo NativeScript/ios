@@ -761,6 +761,45 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index, const PropertyC
         return;
     }
 
+    if (obj == nil || obj == [NSNull null]) {
+        args.GetReturnValue().Set(Null(isolate));
+        return;
+    }
+
+    if ([obj isKindOfClass:[@YES class]]) {
+        args.GetReturnValue().Set(v8::Boolean::New(isolate, [obj boolValue]));
+        return;
+    }
+
+    if ([obj isKindOfClass:[NSDate class]]) {
+        Local<Context> context = isolate->GetCurrentContext();
+        double time = [obj timeIntervalSince1970] * 1000.0;
+        Local<Value> date;
+        if (Date::New(context, time).ToLocal(&date)) {
+            args.GetReturnValue().Set(date);
+            return;
+        }
+
+        std::ostringstream errorStream;
+        errorStream << "Unable to convert " << [obj description] << " to a Date object";
+        std::string errorMessage = errorStream.str();
+        Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
+        isolate->ThrowException(error);
+        return;
+    }
+
+    if ([obj isKindOfClass:[NSString class]]) {
+        const char* str = [obj UTF8String];
+        args.GetReturnValue().Set(tns::ToV8String(isolate, str));
+        return;
+    }
+
+    if ([obj isKindOfClass:[NSNumber class]] && ![obj isKindOfClass:[NSDecimalNumber class]]) {
+        double value = [obj doubleValue];
+        args.GetReturnValue().Set(Number::New(isolate, value));
+        return;
+    }
+
     Local<Value> result = ArgConverter::ConvertArgument(isolate, new ObjCDataWrapper(obj));
     args.GetReturnValue().Set(result);
 }

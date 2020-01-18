@@ -227,6 +227,27 @@ describe(module.id, function () {
         //expect(interop.handleof(buffer)).toBe(data.bytes);
     });
 
+    it("NSArray with boolean", () => {
+        let actual = NSArray.arrayWithArray([true]);
+        expect(actual[0]).toEqual(true);
+    });
+
+    it("NSArray with number", () => {
+        let actual = NSArray.arrayWithArray([5]);
+        expect(actual[0]).toEqual(5);
+    });
+
+    it("NSArray with date", () => {
+        let date = new Date();
+        let actual = NSArray.arrayWithArray([date]);
+        expect(actual[0]).toEqual(date);
+    });
+
+    it("NSArray with string", () => {
+        let actual = NSArray.arrayWithArray(["abc"]);
+        expect(actual[0]).toEqual("abc");
+    });
+
     it("MethodWithNSDecimalNumber", function () {
         expect(NSDecimalNumber.maximumDecimalNumber instanceof NSDecimalNumber).toBe(true);
 

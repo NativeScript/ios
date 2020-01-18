@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include <objc/message.h>
+#include <sstream>
 #include "Interop.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
@@ -484,6 +485,11 @@ id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
     } else if (tns::IsNumber(arg)) {
         double value = tns::ToNumber(isolate, arg);
         return @(value);
+    } else if (arg->IsDate()) {
+        Local<Date> date = arg.As<Date>();
+        double time = date->ValueOf();
+        NSDate* nsDate = [NSDate dateWithTimeIntervalSince1970:(time / 1000)];
+        return nsDate;
     } else if (tns::IsBool(arg)) {
         bool value = tns::ToBool(arg);
         return @(value);
@@ -928,8 +934,12 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
                 return date;
             }
 
-            // TODO: invalid date
-            assert(false);
+            std::ostringstream errorStream;
+            errorStream << "Unable to convert " << [result description] << " to a Date object";
+            std::string errorMessage = errorStream.str();
+            Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
+            isolate->ThrowException(error);
+            return Local<Value>();
         }
 
         if (marshalToPrimitive && [result isKindOfClass:[NSString class]]) {
