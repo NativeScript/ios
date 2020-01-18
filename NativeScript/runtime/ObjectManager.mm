@@ -99,7 +99,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
                     [target isKindOfClass:[DictionaryAdapter class]] ||
                     [target isKindOfClass:[ArrayAdapter class]] ||
                     [target isKindOfClass:[NSDataAdapter class]];
-                if (isAdapter && retainCount > 2) {
+                if (isAdapter /**&& retainCount > 2**/) {
                     return false;
                 }
 
