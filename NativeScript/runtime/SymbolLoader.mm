@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include "SymbolLoader.h"
+#include "Helpers.h"
 #include <dlfcn.h>
 
 namespace tns {
@@ -30,7 +31,7 @@ public:
         CFErrorRef error = nullptr;
         bool loaded = CFBundleLoadExecutableAndReturnError(this->_bundle, &error);
         if (error) {
-            assert(false);
+            tns::Assert(false);
         }
 
         return loaded;

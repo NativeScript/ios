@@ -32,7 +32,7 @@ IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCou
     ffi_closure* closure = static_cast<ffi_closure*>(ffi_closure_alloc(sizeof(ffi_closure), &functionPointer));
     ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParamIndex, initialParamIndex + argsCount);
     ffi_status status = ffi_prep_closure_loc(closure, cif, callback, userData, functionPointer);
-    assert(status == FFI_OK);
+    tns::Assert(status == FFI_OK);
 
     return (IMP)functionPointer;
 }
@@ -60,7 +60,7 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const FunctionMeta* meta, c
     void* functionPointer = SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
     if (!functionPointer) {
         Log(@"Unable to load \"%s\" function", meta->name());
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     const TypeEncoding* typeEncoding = meta->encodings()->first();
@@ -148,23 +148,23 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             Interop::SetValue(dest, strCopy);
         } else {
             BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
-            assert(wrapper != nullptr);
+            tns::Assert(wrapper != nullptr, isolate);
             if (wrapper->Type() == WrapperType::Pointer) {
                 PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
                 void* data = pw->Data();
                 Interop::SetValue(dest, data);
             } else if (wrapper->Type() == WrapperType::Reference) {
                 ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
-                assert(refWrapper->Value() != nullptr);
+                tns::Assert(refWrapper->Value() != nullptr, isolate);
                 Local<Value> value = refWrapper->Value()->Get(isolate);
                 wrapper = tns::GetValue(isolate, value);
-                assert(wrapper != nullptr && wrapper->Type() == WrapperType::Pointer);
+                tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Pointer, isolate);
                 PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
                 void* data = pw->Data();
                 Interop::SetValue(dest, data);
             } else {
                 // Unsupported wrapprt type for CString
-                assert(false);
+                tns::Assert(false, isolate);
             }
         }
     } else if (arg->IsString() && typeEncoding->type == BinaryTypeEncodingType::UnicharEncoding) {
@@ -211,11 +211,11 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         } else if (typeEncoding->type == BinaryTypeEncodingType::CharEncoding) {
             Interop::SetNumericValue<char>(dest, value);
         } else {
-            assert(false);
+            tns::Assert(false, isolate);
         }
     } else if (typeEncoding->type == BinaryTypeEncodingType::ExtVectorEncoding) {
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
-        assert(wrapper != nullptr && wrapper->Type() == WrapperType::ExtVector);
+        tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::ExtVector, isolate);
         ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
         void* data = extVectorWrapper->Data();
         size_t size = extVectorWrapper->FFIType()->size;
@@ -224,7 +224,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
         if (innerType->type == BinaryTypeEncodingType::VoidEncoding) {
-            assert(wrapper != nullptr);
+            tns::Assert(wrapper != nullptr, isolate);
 
             if (wrapper->Type() == WrapperType::Pointer) {
                 PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
@@ -235,20 +235,20 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 Interop::SetValue(dest, data);
             } else {
                 // TODO:
-                assert(false);
+                tns::Assert(false, isolate);
             }
         } else {
             void* data = nullptr;
 
             if (wrapper == nullptr && innerType->type == BinaryTypeEncodingType::StructDeclarationReference) {
                 const Meta* meta = ArgConverter::GetMeta(innerType->details.declarationReference.name.valuePtr());
-                assert(meta != nullptr && meta->type() == MetaType::Struct);
+                tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
                 const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
                 StructInfo structInfo = FFICall::GetStructInfo(structMeta);
                 data = calloc(structInfo.FFIType()->size, 1);
                 Interop::InitializeStruct(isolate, data, structInfo.Fields(), arg);
             } else {
-                assert(wrapper != nullptr);
+                tns::Assert(wrapper != nullptr, isolate);
 
                 if (wrapper->Type() == WrapperType::Pointer) {
                     PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
@@ -268,7 +268,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                     StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
                     data = structWrapper->Data();
                 } else {
-                    assert(false);
+                    tns::Assert(false, isolate);
                 }
             }
 
@@ -276,7 +276,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         }
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::FunctionPointerEncoding) {
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg.As<Object>());
-        assert(wrapper != nullptr);
+        tns::Assert(wrapper != nullptr, isolate);
         if (wrapper->Type() == WrapperType::Pointer) {
             PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
             void* data = pointerWrapper->Data();
@@ -286,13 +286,13 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             void* data = functionWrapper->Data();
             Interop::SetValue(dest, data);
         } else if (wrapper->Type() == WrapperType::FunctionReference) {
-            assert(wrapper != nullptr && wrapper->Type() == WrapperType::FunctionReference);
+            tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::FunctionReference, isolate);
             FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
             const TypeEncoding* functionTypeEncoding = typeEncoding->details.functionPointer.signature.first();
             int argsCount = typeEncoding->details.functionPointer.signature.count - 1;
 
             Local<Value> callbackValue = funcWrapper->Function()->Get(isolate);
-            assert(callbackValue->IsFunction());
+            tns::Assert(callbackValue->IsFunction(), isolate);
             Local<v8::Function> callback = callbackValue.As<v8::Function>();
             std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, callback);
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 0, argsCount, functionTypeEncoding);
@@ -303,7 +303,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
 
             Interop::SetValue(dest, functionPointer);
         } else {
-            assert(false);
+            tns::Assert(false, isolate);
         }
     } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
         const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
@@ -328,18 +328,18 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 memcpy(dest, buffer, size);
             } else if (wrapper->Type() == WrapperType::Reference) {
                 void* data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
-                assert(data != nullptr);
+                tns::Assert(data != nullptr, isolate);
                 ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
                 size_t size = ffiType->size;
                 memcpy(dest, data, size);
             } else {
-                assert(false);
+                tns::Assert(false, isolate);
             }
         } else {
             // Create the structure using the struct initializer syntax
             const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
             const Meta* meta = ArgConverter::GetMeta(structName);
-            assert(meta != nullptr && meta->type() == MetaType::Struct);
+            tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
             StructInfo structInfo = FFICall::GetStructInfo(structMeta);
             Interop::InitializeStruct(isolate, dest, structInfo.Fields(), obj);
@@ -359,7 +359,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             memcpy(dest, data, size);
         } else {
             // Anonymous structs can only be initialized with plain javascript objects
-            assert(wrapper == nullptr);
+            tns::Assert(wrapper == nullptr, isolate);
             size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
             const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
             const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
@@ -369,14 +369,14 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
     } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
         Local<Object> obj = arg.As<Object>();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
-        assert(wrapper != nullptr && wrapper->Type() == WrapperType::ObjCProtocol);
+        tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::ObjCProtocol, isolate);
         ObjCProtocolWrapper* protoWrapper = static_cast<ObjCProtocolWrapper*>(wrapper);
         Protocol* proto = protoWrapper->Proto();
         Interop::SetValue(dest, proto);
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::ClassEncoding) {
         Local<Object> obj = arg.As<Object>();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
-        assert(wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass);
+        tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass, isolate);
         ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
         Class clazz = classWrapper->Klass();
         Interop::SetValue(dest, clazz);
@@ -407,7 +407,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             for (uint32_t i = 0; i < length; i++) {
                 Local<Value> element;
                 bool success = array->Get(context, i).ToLocal(&element);
-                assert(success);
+                tns::Assert(success, isolate);
                 void* ptr = (uint8_t*)dest + i * ffiType->size;
                 Interop::WriteValue(isolate, innerType, ptr, element);
             }
@@ -426,16 +426,16 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 std::string jsCode = enumWrapper->JSCode();
                 Local<Script> script;
                 if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
-                    assert(false);
+                    tns::Assert(false, isolate);
                 }
-                assert(!script.IsEmpty());
+                tns::Assert(!script.IsEmpty(), isolate);
 
                 Local<Value> result;
                 if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
-                    assert(false);
+                    tns::Assert(false, isolate);
                 }
 
-                assert(result->IsNumber());
+                tns::Assert(result->IsNumber(), isolate);
 
                 double value = result.As<Number>()->Value();
                 SetValue(dest, value);
@@ -452,7 +452,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 id data = classWrapper->Klass();
                 Interop::SetValue(dest, data);
             } else {
-                assert(false);
+                tns::Assert(false, isolate);
             }
 
             return;
@@ -471,7 +471,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             Interop::SetValue(dest, adapter);
         }
     } else {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 }
 
@@ -517,7 +517,7 @@ id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
                 }
                 default:
                     // TODO: Unsupported object type
-                    assert(false);
+                    tns::Assert(false, isolate);
                     break;
             }
         } else {
@@ -528,7 +528,8 @@ id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
     }
 
     // TODO: Handle other possible types
-    assert(false);
+    tns::Assert(false, isolate);
+    return nil;
 }
 
 Local<Value> Interop::StructToValue(Isolate* isolate, void* result, StructInfo structInfo, std::shared_ptr<Persistent<Value>> parentStruct) {
@@ -577,14 +578,14 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
         Local<Value> value;
         if (!inititalizer.IsEmpty() && !inititalizer->IsNullOrUndefined() && inititalizer->IsObject()) {
             bool success = inititalizer.As<Object>()->Get(context, tns::ToV8String(isolate, field.Name())).ToLocal(&value);
-            assert(success);
+            tns::Assert(success, isolate);
         }
 
         BinaryTypeEncodingType type = field.Encoding()->type;
 
         if (type == BinaryTypeEncodingType::StructDeclarationReference) {
             const Meta* meta = ArgConverter::GetMeta(field.Encoding()->details.declarationReference.name.valuePtr());
-            assert(meta != nullptr && meta->type() == MetaType::Struct);
+            tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
             StructInfo nestedStructInfo = FFICall::GetStructInfo(structMeta);
             Interop::InitializeStruct(isolate, destBuffer, nestedStructInfo.Fields(), value, position);
@@ -612,7 +613,7 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
                 for (uint32_t index = 0; index < min; index++) {
                     Local<Value> element;
                     bool success = array->Get(context, index).ToLocal(&element);
-                    assert(success);
+                    tns::Assert(success, isolate);
                     uint8_t* dst = (uint8_t*)destBuffer + offset;
                     Interop::WriteValue(isolate, innerType, dst, element);
                     offset += ffiType->size;
@@ -656,7 +657,7 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
                 Interop::SetStructValue<double>(value, destBuffer, offset);
             } else {
                 // TODO: Unsupported struct field encoding
-                assert(false);
+                tns::Assert(false, isolate);
             }
         }
     }
@@ -683,7 +684,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
     if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
         const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
         const Meta* meta = ArgConverter::GetMeta(structName);
-        assert(meta != nullptr && meta->type() == MetaType::Struct);
+        tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
 
         void* result = call->ResultBuffer();
 
@@ -715,7 +716,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             BaseCall bc((uint8_t*)call->ResultBuffer(), offset);
             Local<Value> element = Interop::GetResult(isolate, innerType, &bc, false);
             bool success = array->Set(context, i, element).FromMaybe(false);
-            assert(success);
+            tns::Assert(success, isolate);
         }
         return array;
     }
@@ -740,7 +741,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         const ProtocolMeta* protocolMeta = ArgConverter::FindProtocolMeta(protocol);
         if (protocolMeta == nullptr) {
             // Unable to find protocol metadata
-            assert(false);
+            tns::Assert(false, isolate);
         }
 
         auto cache = Caches::Get(isolate);
@@ -751,7 +752,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return it->second->Get(isolate);
         }
 
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::ClassEncoding) {
@@ -781,7 +782,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             }
         }
 
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
@@ -828,7 +829,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&callback);
-        assert(success);
+        tns::Assert(success, isolate);
 
         tns::SetValue(isolate, callback, blockWrapper);
 
@@ -851,7 +852,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
             Isolate* isolate = info.GetIsolate();
             AnonymousFunctionWrapper* wrapper = static_cast<AnonymousFunctionWrapper*>(info.Data().As<External>()->Value());
-            assert(wrapper != nullptr);
+            tns::Assert(wrapper != nullptr, isolate);
 
             const std::vector<Local<Value>> args = tns::ArgsToVector(info);
             void* functionPointer = wrapper->Data();
@@ -861,7 +862,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&func);
-        assert(success);
+        tns::Assert(success, isolate);
 
         tns::SetValue(isolate, func, wrapper);
         ObjectManager::Register(isolate, func);
@@ -896,7 +897,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         Local<Object> instance;
         Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
         bool success = interopReferenceCtorFunc->NewInstance(context, (int)args.size(), args.data()).ToLocal(&instance);
-        assert(success);
+        tns::Assert(success, isolate);
 
         BaseDataWrapper* wrapper = tns::GetValue(isolate, instance);
         if (wrapper != nullptr && wrapper->Type() == WrapperType::Reference) {
@@ -1077,7 +1078,7 @@ Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodin
     }
 
     if (type != BinaryTypeEncodingType::VoidEncoding) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     // TODO: Handle all the possible return types https://nshipster.com/type-encodings/
@@ -1127,7 +1128,7 @@ void Interop::SetStructPropertyValue(Isolate* isolate, StructWrapper* wrapper, S
         }
         case BinaryTypeEncodingType::PointerEncoding: {
             BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-            assert(wrapper != nullptr && wrapper->Type() == WrapperType::Struct);
+            tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Struct, isolate);
             StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
             void* data = structWrapper->Data();
             Interop::SetValue(destBuffer, data);
@@ -1185,7 +1186,7 @@ void Interop::SetStructPropertyValue(Isolate* isolate, StructWrapper* wrapper, S
         }
         default: {
             // TODO: Handle all possible cases
-            assert(false);
+            tns::Assert(false, isolate);
         }
     }
 }
@@ -1206,16 +1207,16 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
         Local<Context> context = isolate->GetCurrentContext();
         Local<Script> script;
         if (!Script::Compile(context, tns::ToV8String(isolate, source)).ToLocal(&script)) {
-            assert(false);
+            tns::Assert(false, isolate);
         }
-        assert(!script.IsEmpty());
+        tns::Assert(!script.IsEmpty(), isolate);
 
         Local<Value> tempSliceFunc;
         if (!script->Run(context).ToLocal(&tempSliceFunc)) {
-            assert(false);
+            tns::Assert(false, isolate);
         }
 
-        assert(tempSliceFunc->IsFunction());
+        tns::Assert(tempSliceFunc->IsFunction(), isolate);
         sliceFunc = tempSliceFunc.As<v8::Function>();
         cache->SliceFunc = std::make_unique<Persistent<v8::Function>>(isolate, sliceFunc);
     }
@@ -1225,7 +1226,7 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<Value> result;
     bool success = sliceFunc->Call(context, object, 1, sliceArgs).ToLocal(&result);
-    assert(success);
+    tns::Assert(success, isolate);
 
     return result.As<v8::Array>();
 }

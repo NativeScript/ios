@@ -17,8 +17,8 @@ void WeakRef::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
 }
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
-    assert(info.IsConstructCall());
     Isolate* isolate = info.GetIsolate();
+    tns::Assert(info.IsConstructCall(), isolate);
     try {
         if (info.Length() < 1 || !info[0]->IsObject()) {
             throw NativeScriptException("Argument must be an object.");
@@ -39,10 +39,10 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kFinalizer);
 
         bool success = weakRef->Set(context, tns::ToV8String(isolate, "get"), GetGetterFunction(isolate)).FromMaybe(false);
-        assert(success);
+        tns::Assert(success, isolate);
 
         success = weakRef->Set(context, tns::ToV8String(isolate, "clear"), GetClearFunction(isolate)).FromMaybe(false);
-        assert(success);
+        tns::Assert(success, isolate);
 
         tns::SetPrivateValue(weakRef, tns::ToV8String(isolate, "target"), External::New(isolate, poTarget));
 

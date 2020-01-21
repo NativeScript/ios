@@ -132,14 +132,14 @@ void TSHelpers::Init(Isolate* isolate) {
     TryCatch tc(isolate);
     if (!Script::Compile(context, tns::ToV8String(isolate, source.c_str())).ToLocal(&script) && tc.HasCaught()) {
         tns::LogError(isolate, tc);
-        assert(false);
+        tns::Assert(false, isolate);
     }
-    assert(!script.IsEmpty());
+    tns::Assert(!script.IsEmpty(), isolate);
 
     Local<Value> result;
     if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
         tns::LogError(isolate, tc);
-        assert(false);
+        tns::Assert(false, isolate);
     }
 }
 

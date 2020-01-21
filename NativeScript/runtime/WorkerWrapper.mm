@@ -114,7 +114,8 @@ void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
 
     Local<Value> onErrorVal;
     bool success = global->Get(context, tns::ToV8String(this->workerIsolate_, "onerror")).ToLocal(&onErrorVal);
-    assert(success);
+    Isolate* isolate = context->GetIsolate();
+    tns::Assert(success, isolate);
 
     if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
         Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
@@ -141,12 +142,13 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
     Local<Context> context = workerIsolate->GetCurrentContext();
     int lineNumber;
     bool success = tc.Message()->GetLineNumber(context).To(&lineNumber);
-    assert(success);
+    Isolate* isolate = context->GetIsolate();
+    tns::Assert(success, isolate);
 
     std::string message = tns::ToString(workerIsolate, tc.Message()->Get());
     Local<Value> source;
     success = tc.Message()->GetScriptResourceName()->ToString(context).ToLocal(&source);
-    assert(success);
+    tns::Assert(success, isolate);
     std::string src = tns::ToString(workerIsolate, source);
 
     std::string stackTrace = "";
@@ -167,7 +169,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
 
         Local<Value> onErrorVal;
         bool success = worker->Get(context, tns::ToV8String(this->mainIsolate_, "onerror")).ToLocal(&onErrorVal);
-        assert(success);
+        tns::Assert(success, this->mainIsolate_);
 
         if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
             Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
@@ -190,12 +192,12 @@ Local<Object> WorkerWrapper::ConstructErrorObject(Isolate* isolate, std::string 
     Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
     Local<Object> obj;
     bool success = objTemplate->NewInstance(context).ToLocal(&obj);
-    assert(success);
+    tns::Assert(success, isolate);
 
-    assert(obj->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, message)).FromMaybe(false));
-    assert(obj->Set(context, tns::ToV8String(isolate, "filename"), tns::ToV8String(isolate, source)).FromMaybe(false));
-    assert(obj->Set(context, tns::ToV8String(isolate, "stackTrace"), tns::ToV8String(isolate, stackTrace)).FromMaybe(false));
-    assert(obj->Set(context, tns::ToV8String(isolate, "lineno"), Number::New(isolate, lineNumber)).FromMaybe(false));
+    tns::Assert(obj->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, message)).FromMaybe(false), isolate);
+    tns::Assert(obj->Set(context, tns::ToV8String(isolate, "filename"), tns::ToV8String(isolate, source)).FromMaybe(false), isolate);
+    tns::Assert(obj->Set(context, tns::ToV8String(isolate, "stackTrace"), tns::ToV8String(isolate, stackTrace)).FromMaybe(false), isolate);
+    tns::Assert(obj->Set(context, tns::ToV8String(isolate, "lineno"), Number::New(isolate, lineNumber)).FromMaybe(false), isolate);
 
     return obj;
 }

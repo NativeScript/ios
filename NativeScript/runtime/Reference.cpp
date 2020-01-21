@@ -13,7 +13,7 @@ void Reference::Register(Isolate* isolate, Local<Object> interop) {
     Local<v8::Function> ctorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
     Local<Context> context = isolate->GetCurrentContext();
     bool success = interop->Set(context, tns::ToV8String(isolate, "Reference"), ctorFunc).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 Local<Value> Reference::FromPointer(Isolate* isolate, Local<Value> type, void* handle) {
@@ -25,7 +25,7 @@ Local<Value> Reference::FromPointer(Isolate* isolate, Local<Value> type, void* h
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> instance;
     bool success = interopReferenceCtorFunc->NewInstance(context, 2, args).ToLocal(&instance);
-    assert(success);
+    tns::Assert(success, isolate);
     ObjectManager::Register(isolate, instance);
 
     return instance;
@@ -48,13 +48,13 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
 
     Local<v8::Function> ctorFunc;
     if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     tns::SetValue(isolate, ctorFunc, new ReferenceTypeWrapper());
     Local<Value> prototypeValue;
     bool success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
-    assert(success && prototypeValue->IsObject());
+    tns::Assert(success && prototypeValue->IsObject(), isolate);
     Local<Object> prototype = prototypeValue.As<Object>();
     Reference::RegisterToStringMethod(isolate, prototype);
 
@@ -75,7 +75,7 @@ void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& 
         if (!info[0]->IsNullOrUndefined() && !info[1]->IsNullOrUndefined()) {
             Local<Value> typeValue = info[0];
             typeWrapper = tns::GetValue(isolate, typeValue);
-            assert(typeWrapper != nullptr);
+            tns::Assert(typeWrapper != nullptr, isolate);
             val = new Persistent<Value>(isolate, info[1]);
         }
     }
@@ -128,7 +128,7 @@ void Reference::GetValueCallback(Local<Name> name, const PropertyCallbackInfo<Va
 void Reference::SetValueCallback(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<void>& info) {
     Isolate* isolate = info.GetIsolate();
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, info.This());
-    assert(baseWrapper->Type() == WrapperType::Reference);
+    tns::Assert(baseWrapper->Type() == WrapperType::Reference, isolate);
     ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
     Persistent<Value>* poValue = new Persistent<Value>(isolate, value);
 
@@ -183,7 +183,7 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, con
     }
 
     BaseDataWrapper* wrapper = tns::GetValue(isolate, reference);
-    assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
+    tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
     ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
     if (refWrapper->Data() != nullptr) {
         return refWrapper->Data();
@@ -267,7 +267,7 @@ void Reference::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-        assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
+        tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
         ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
         Persistent<Value>* value = refWrapper->Value();
 
@@ -283,28 +283,28 @@ void Reference::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype
     });
 
     Local<v8::Function> func;
-    assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func));
+    tns::Assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func), isolate);
 
     Local<Context> context = isolate->GetCurrentContext();
     bool success = prototype->Set(context, tns::ToV8String(isolate, "toString"), func).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 Reference::DataPair Reference::GetTypeEncodingDataPair(Isolate* isolate, Local<Object> obj) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
-    assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference);
+    tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
     ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
 
     BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
     if (typeWrapper == nullptr) {
         // TODO: Missing type when creating the Reference instance
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     if (typeWrapper->Type() != WrapperType::Primitive) {
         // TODO: Currently only PrimitiveDataWrappers are supported as type parameters
         // Objective C class classes and structures should also be handled
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     PrimitiveDataWrapper* primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
@@ -325,7 +325,8 @@ Reference::DataPair Reference::GetTypeEncodingDataPair(Isolate* isolate, Local<O
         return pair;
     }
 
-    assert(false);
+    tns::Assert(false, isolate);
+    return DataPair(nullptr, nullptr, 0);
 }
 
 }

@@ -13,7 +13,7 @@ using namespace v8;
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
     if (self) {
-        assert(jsObject->IsArrayBuffer() || jsObject->IsArrayBufferView());
+        tns::Assert(jsObject->IsArrayBuffer() || jsObject->IsArrayBufferView(), isolate);
         self->isolate_ = isolate;
         self->object_ = ObjectManager::Register(isolate, jsObject);
         std::shared_ptr<Caches> cache = Caches::Get(isolate);

@@ -1,4 +1,5 @@
 #include "ConcurrentQueue.h"
+#include "Helpers.h"
 
 namespace tns {
 
@@ -37,7 +38,7 @@ std::vector<std::string> ConcurrentQueue::PopAll() {
 
 void ConcurrentQueue::SignalAndWakeUp() {
     if (this->runLoopTasksSource_ != nullptr) {
-        assert(CFRunLoopSourceIsValid(this->runLoopTasksSource_));
+        tns::Assert(CFRunLoopSourceIsValid(this->runLoopTasksSource_));
         CFRunLoopSourceSignal(this->runLoopTasksSource_);
     }
 

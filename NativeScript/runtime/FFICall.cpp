@@ -1,5 +1,6 @@
 #include "FFICall.h"
 #include "ArgConverter.h"
+#include "Helpers.h"
 #include <sstream>
 
 namespace tns {
@@ -101,7 +102,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
         case BinaryTypeEncodingType::StructDeclarationReference: {
             const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
             const Meta* meta = ArgConverter::GetMeta(structName);
-            assert(meta->type() == MetaType::Struct);
+            tns::Assert(meta->type() == MetaType::Struct);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
 
             StructInfo structInfo = FFICall::GetStructInfo(structMeta, structName);
@@ -136,7 +137,8 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
     }
 
     // TODO: implement all the possible encoding types
-    assert(false);
+    tns::Assert(false);
+    return nullptr;
 }
 
 StructInfo FFICall::GetStructInfo(const StructMeta* structMeta, std::string structName) {
@@ -263,7 +265,7 @@ ffi_cif* FFICall::GetCif(const TypeEncoding* typeEncoding, const int initialPara
 
         cif = new ffi_cif();
         ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
-        assert(status == FFI_OK);
+        tns::Assert(status == FFI_OK);
 
         cifCache_.insert(std::make_pair(typeEncoding, cif));
     }

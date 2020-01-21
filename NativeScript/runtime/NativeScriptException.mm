@@ -35,7 +35,7 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
     std::string stackTrace = GetErrorStackTrace(isolate, message->GetStackTrace());
     if (success && handler->IsFunction()) {
         if (error->IsObject()) {
-            assert(error.As<Object>()->Set(context, tns::ToV8String(isolate, "stackTrace"), tns::ToV8String(isolate, stackTrace)).FromMaybe(false));
+            tns::Assert(error.As<Object>()->Set(context, tns::ToV8String(isolate, "stackTrace"), tns::ToV8String(isolate, stackTrace)).FromMaybe(false), isolate);
         }
 
         Local<v8::Function> errorHandlerFunc = handler.As<v8::Function>();
@@ -43,7 +43,7 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
         Local<Value> args[] = { error };
         Local<Value> result;
         success = errorHandlerFunc->Call(context, thiz, 1, args).ToLocal(&result);
-        assert(success);
+        tns::Assert(success, isolate);
     }
 
     if (!isDiscarded) {
@@ -72,9 +72,9 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
         errObj = this->javascriptException_->Get(isolate);
         if (errObj->IsObject()) {
             if (!this->fullMessage_.empty()) {
-                assert(errObj.As<Object>()->Set(context, tns::ToV8String(isolate, "fullMessage"), tns::ToV8String(isolate, this->fullMessage_)).FromMaybe(false));
+                tns::Assert(errObj.As<Object>()->Set(context, tns::ToV8String(isolate, "fullMessage"), tns::ToV8String(isolate, this->fullMessage_)).FromMaybe(false), isolate);
             } else if (!this->message_.empty()) {
-                assert(errObj.As<Object>()->Set(context, tns::ToV8String(isolate, "fullMessage"), tns::ToV8String(isolate, this->message_)).FromMaybe(false));
+                tns::Assert(errObj.As<Object>()->Set(context, tns::ToV8String(isolate, "fullMessage"), tns::ToV8String(isolate, this->message_)).FromMaybe(false), isolate);
             }
         }
     } else if (!this->fullMessage_.empty()) {
@@ -105,7 +105,7 @@ std::string NativeScriptException::GetErrorMessage(Isolate* isolate, Local<Value
         hasFullErrorMessage = true;
         Local<Value> errMsgVal;
         bool success = error.As<Object>()->Get(context, v8FullMessage).ToLocal(&errMsgVal);
-        assert(success);
+        tns::Assert(success, isolate);
         if (!errMsgVal.IsEmpty()) {
             errMessage = tns::ToString(isolate, errMsgVal.As<v8::String>());
         } else {

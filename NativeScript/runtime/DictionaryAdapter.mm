@@ -39,7 +39,7 @@ using namespace tns;
     if (self->index_ < array->Length() - 1) {
         Local<Value> key;
         bool success = array->Get(context, self->index_).ToLocal(&key);
-        assert(success);
+        tns::Assert(success, isolate);
         self->index_ += 2;
         std::string keyStr = tns::ToString(self->isolate_, key);
         NSString* result = [NSString stringWithUTF8String:keyStr.c_str()];
@@ -81,7 +81,7 @@ using namespace tns;
     Local<Context> context = self->isolate_->GetCurrentContext();
     Local<v8::Array> properties;
     Local<Object> dictionary = self->dictionary_->Get(self->isolate_).As<Object>();
-    assert(dictionary->GetOwnPropertyNames(context).ToLocal(&properties));
+    tns::Assert(dictionary->GetOwnPropertyNames(context).ToLocal(&properties), self->isolate_);
     return properties;
 }
 
@@ -92,7 +92,7 @@ using namespace tns;
     if (self->index_ < properties->Length()) {
         Local<Value> value;
         bool success = properties->Get(context, (uint)self->index_).ToLocal(&value);
-        assert(success);
+        tns::Assert(success, isolate);
         self->index_++;
         std::string result = tns::ToString(self->isolate_, value);
         return [NSString stringWithUTF8String:result.c_str()];
@@ -109,7 +109,7 @@ using namespace tns;
     for (int i = 0; i < properties->Length(); i++) {
         Local<Value> value;
         bool success = properties->Get(context, i).ToLocal(&value);
-        assert(success);
+        tns::Assert(success, isolate);
         std::string result = tns::ToString(self->isolate_, value);
         [array addObject:[NSString stringWithUTF8String:result.c_str()]];
     }
@@ -148,7 +148,7 @@ using namespace tns;
 
     Local<Context> context = self->isolate_->GetCurrentContext();
     Local<v8::Array> properties;
-    assert(obj->GetOwnPropertyNames(context).ToLocal(&properties));
+    tns::Assert(obj->GetOwnPropertyNames(context).ToLocal(&properties), self->isolate_);
 
     uint32_t length = properties->Length();
 
@@ -164,7 +164,7 @@ using namespace tns;
     if ([aKey isKindOfClass:[NSNumber class]]) {
         unsigned int key = [aKey unsignedIntValue];
         bool success = obj->Get(context, key).ToLocal(&value);
-        assert(success);
+        tns::Assert(success, isolate);
     } else if ([aKey isKindOfClass:[NSString class]]) {
         const char* key = [aKey UTF8String];
         Local<v8::String> keyV8Str = tns::ToV8String(isolate, key);
@@ -173,14 +173,14 @@ using namespace tns;
             Local<Context> context = isolate->GetCurrentContext();
             Local<Map> map = obj.As<Map>();
             bool success = map->Get(context, keyV8Str).ToLocal(&value);
-            assert(success);
+            tns::Assert(success, isolate);
         } else {
             bool success = obj->Get(context, keyV8Str).ToLocal(&value);
-            assert(success);
+            tns::Assert(success, isolate);
         }
     } else {
         // TODO: unsupported key type
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     id result = Interop::ToObject(self->isolate_, value);

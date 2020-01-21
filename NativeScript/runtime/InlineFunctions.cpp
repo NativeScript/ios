@@ -131,13 +131,13 @@ void InlineFunctions::Init(Isolate* isolate) {
 
     Local<Script> script;
     if (!Script::Compile(context, tns::ToV8String(isolate, inlineFunctionsSource)).ToLocal(&script)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
-    assert(!script.IsEmpty());
+    tns::Assert(!script.IsEmpty(), isolate);
 
     Local<Value> result;
     if (!script->Run(context).ToLocal(&result)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 }
 

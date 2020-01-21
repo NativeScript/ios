@@ -80,7 +80,7 @@ void MetadataBuilder::GlobalPropertyGetter(Local<Name> property, const PropertyC
         Local<External> ext = External::New(isolate, item);
         Local<v8::Function> func;
         bool success = v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func);
-        assert(success);
+        tns::Assert(success, isolate);
 
         tns::SetValue(isolate, func, new FunctionWrapper(funcMeta));
         MetadataBuilder::DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
@@ -106,13 +106,13 @@ void MetadataBuilder::GlobalPropertyGetter(Local<Name> property, const PropertyC
         Local<Context> context = isolate->GetCurrentContext();
         Local<Script> script;
         if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
-            assert(false);
+            tns::Assert(false, isolate);
         }
-        assert(!script.IsEmpty());
+        tns::Assert(!script.IsEmpty(), isolate);
 
         Local<Value> result;
         if (!script->Run(context).ToLocal(&result)) {
-            assert(false);
+            tns::Assert(false, isolate);
         }
         info.GetReturnValue().Set(result);
     } else if (meta->type() == MetaType::Struct) {
@@ -136,16 +136,16 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Isolate* isol
     Local<External> ext = External::New(isolate, wrapper);
     Local<v8::Function> structCtorFunc;
     bool success = v8::Function::New(context, StructConstructorCallback, ext).ToLocal(&structCtorFunc);
-    assert(success);
+    tns::Assert(success, isolate);
 
     tns::SetValue(isolate, structCtorFunc, wrapper);
 
     Local<v8::Function> equalsFunc;
     success = v8::Function::New(context, StructEqualsCallback).ToLocal(&equalsFunc);
-    assert(success);
+    tns::Assert(success, isolate);
 
     success = structCtorFunc->Set(context, tns::ToV8String(isolate, "equals"), equalsFunc).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     cache->StructConstructorFunctions.emplace(structInfo.Name(), std::make_unique<Persistent<v8::Function>>(isolate, structCtorFunc));
 
@@ -193,7 +193,8 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
 }
 
 void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& info) {
-    assert(info.Length() == 2);
+    Isolate* isolate = info.GetIsolate();
+    tns::Assert(info.Length() == 2, isolate);
 
     Local<Object> arg1 = info[0].As<Object>();
     Local<Object> arg2 = info[1].As<Object>();
@@ -204,7 +205,6 @@ void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& in
         return;
     }
 
-    Isolate* isolate = info.GetIsolate();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
     if (wrapper == nullptr || wrapper->Type() != WrapperType::StructType) {
         info.GetReturnValue().Set(false);
@@ -319,7 +319,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> ctorFunc;
     bool success = ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc);
-    assert(success);
+    tns::Assert(success, isolate);
 
     if (meta->type() == MetaType::ProtocolType) {
         const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
@@ -332,12 +332,12 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
     Local<Object> global = context->Global();
     success = global->Set(context, tns::ToV8String(isolate, meta->jsName()), ctorFunc).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     if (!baseCtorFunc.IsEmpty()) {
         bool success;
         if (!ctorFunc->SetPrototype(context, baseCtorFunc).To(&success) || !success) {
-            assert(false);
+            tns::Assert(false, isolate);
         }
     }
 
@@ -347,7 +347,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
         Local<v8::Function> extendFunc = ClassBuilder::GetExtendFunction(context, interfaceMeta);
         bool success = ctorFunc->Set(context, tns::ToV8String(isolate, "extend"), extendFunc).FromMaybe(false);
-        assert(success);
+        tns::Assert(success, isolate);
     }
 
     MetadataBuilder::RegisterStaticMethods(isolate, ctorFunc, meta, staticMembers);
@@ -358,11 +358,11 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
     Local<Value> prototypeValue;
     success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
-    assert(success);
+    tns::Assert(success, isolate);
     Local<Object> prototype = prototypeValue.As<Object>();
 
     success = prototype->Set(context, tns::ToV8String(isolate, "toString"), cache->ToStringFunc->Get(isolate)).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
     cache->Prototypes.insert(std::make_pair(meta, poPrototype));
@@ -374,7 +374,7 @@ void MetadataBuilder::CreateToStringFunction(Isolate* isolate) {
     Local<FunctionTemplate> toStringFuncTemplate = FunctionTemplate::New(isolate, MetadataBuilder::ToStringFunctionCallback);
 
     Local<v8::Function> toStringFunc;
-    assert(toStringFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&toStringFunc));
+    tns::Assert(toStringFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&toStringFunc), isolate);
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     cache->ToStringFunc = std::make_unique<Persistent<v8::Function>>(isolate, toStringFunc);
@@ -410,11 +410,11 @@ void MetadataBuilder::RegisterAllocMethod(Isolate* isolate, Local<v8::Function> 
     Local<FunctionTemplate> allocFuncTemplate = FunctionTemplate::New(isolate, AllocCallback, ext);
     Local<v8::Function> allocFunc;
     if (!allocFuncTemplate->GetFunction(context).ToLocal(&allocFunc)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     bool success = ctorFunc->Set(context, tns::ToV8String(isolate, "alloc"), allocFunc).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 void MetadataBuilder::RegisterInstanceMethods(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::unordered_map<std::string, uint8_t>& names) {
@@ -500,13 +500,13 @@ void MetadataBuilder::RegisterStaticMethods(Isolate* isolate, Local<v8::Function
             Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate, MethodCallback, ext);
             Local<v8::Function> staticMethod;
             if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
-                assert(false);
+                tns::Assert(false, isolate);
             }
 
             DefineFunctionLengthProperty(context, methodMeta->encodings(), staticMethod);
 
             bool success = ctorFunc->Set(context, tns::ToV8String(isolate, methodMeta->jsName()), staticMethod).FromMaybe(false);
-            assert(success);
+            tns::Assert(success, isolate);
 
             names.emplace(methodName, 0);
         }
@@ -541,7 +541,7 @@ void MetadataBuilder::RegisterStaticProperties(Isolate* isolate, Local<v8::Funct
             bool success;
             Maybe<bool> maybeSuccess = ctorFunc->SetAccessor(context, propName, PropertyNameGetterCallback, PropertyNameSetterCallback, ext, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
             if (!maybeSuccess.To(&success) || !success) {
-                assert(false);
+                tns::Assert(false, isolate);
             }
             names.emplace(propertyName, accessors);
         }
@@ -565,8 +565,8 @@ void MetadataBuilder::RegisterStaticProtocols(Isolate* isolate, Local<v8::Functi
 }
 
 void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
-    assert(info.IsConstructCall());
     Isolate* isolate = info.GetIsolate();
+    tns::Assert(info.IsConstructCall(), isolate);
     try {
         CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
         Class klass = objc_getClass(item->meta_->name());
@@ -579,8 +579,8 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
 }
 
 void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
-    assert(info.Length() == 0);
     Isolate* isolate = info.GetIsolate();
+    tns::Assert(info.Length() == 0, isolate);
 
     try {
         Local<Object> thiz = info.This();
@@ -706,7 +706,7 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<Name> property, const P
     }
 
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, thiz);
-    assert(baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Struct);
+    tns::Assert(baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Struct, isolate);
     StructWrapper* wrapper = static_cast<StructWrapper*>(baseWrapper);
 
     StructInfo structInfo = wrapper->StructInfo();
@@ -768,7 +768,7 @@ void MetadataBuilder::DefineFunctionLengthProperty(Local<Context> context, const
     const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     int paramsCount = std::max(0, encodings->count - 1);
     bool success = func->DefineOwnProperty(context, tns::ToV8String(isolate, "length"), Number::New(isolate, paramsCount), readOnlyFlags).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass, bool isMethodCallback) {

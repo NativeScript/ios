@@ -15,7 +15,7 @@ void Console::Init(Isolate* isolate) {
     Context::Scope context_scope(context);
     Local<Object> console = Object::New(isolate);
     bool success = console->SetPrototype(context, Object::New(isolate)).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     Console::AttachLogFunction(isolate, console, "log");
     Console::AttachLogFunction(isolate, console, "info");
@@ -30,7 +30,7 @@ void Console::Init(Isolate* isolate) {
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     if (!global->DefineOwnProperty(context, tns::ToV8String(isolate, "console"), console, readOnlyFlags).FromMaybe(false)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 }
 
@@ -113,7 +113,7 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
 
             Local<v8::Array> propNames;
             bool success = argObject->GetPropertyNames(context).ToLocal(&propNames);
-            assert(success);
+            tns::Assert(success, isolate);
             uint32_t propertiesLength = propNames->Length();
             for (uint32_t i = 0; i < propertiesLength; i++) {
                 Local<Value> propertyName = propNames->Get(context, i).ToLocalChecked();
@@ -228,13 +228,13 @@ void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const s
 
     Local<v8::Function> func;
     if (!Function::New(context, callback, tns::ToV8String(isolate, name), 0, ConstructorBehavior::kThrow).ToLocal(&func)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     Local<v8::String> logFuncName = tns::ToV8String(isolate, name);
     func->SetName(logFuncName);
     if (!console->CreateDataProperty(context, logFuncName, func).FromMaybe(false)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 }
 
@@ -268,7 +268,7 @@ const Local<v8::String> Console::BuildStringFromArg(Isolate* isolate, const Loca
     Local<v8::String> argString;
     if (val->IsFunction()) {
         bool success = val->ToDetailString(context).ToLocal(&argString);
-        assert(success);
+        tns::Assert(success, isolate);
     } else if (val->IsArray()) {
         Local<Value> cachedSelf = val;
         Local<Object> array = val->ToObject(context).ToLocalChecked();
@@ -305,7 +305,7 @@ const Local<v8::String> Console::BuildStringFromArg(Isolate* isolate, const Loca
         argString = TransformJSObject(isolate, obj);
     } else {
         bool success = val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
-        assert(success);
+        tns::Assert(success, isolate);
     }
 
     return argString;

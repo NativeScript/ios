@@ -15,17 +15,17 @@ void SetTimeout::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
 }
 
 void SetTimeout::SetTimeoutCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
     if (!args[0]->IsFunction()) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
-    Isolate* isolate = args.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
 
     double timeout = 0.0;
     if (args.Length() > 1 && args[1]->IsNumber()) {
         if (!args[1]->NumberValue(context).To(&timeout)) {
-            assert(false);
+            tns::Assert(false, isolate);
         }
     }
 
@@ -43,15 +43,15 @@ void SetTimeout::SetTimeoutCallback(const FunctionCallbackInfo<Value>& args) {
 }
 
 void SetTimeout::ClearTimeoutCallback(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
     if (!args[0]->IsNumber()) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
-    Isolate* isolate = args.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     double value;
     if (!args[0]->NumberValue(context).To(&value)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     uint32_t key = value;
@@ -79,7 +79,7 @@ void SetTimeout::Elapsed(const uint32_t key) {
     Local<Object> global = context->Global();
     Local<Value> result;
     if (!cb->Call(context, global, 0, nullptr).ToLocal(&result)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     RemoveKey(key);

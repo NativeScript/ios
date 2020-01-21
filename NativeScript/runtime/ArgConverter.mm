@@ -24,7 +24,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
     bool instanceMethod = !receiver.IsEmpty();
     bool callSuper = false;
     if (instanceMethod) {
-        assert(receiver->InternalFieldCount() > 0);
+        tns::Assert(receiver->InternalFieldCount() > 0, isolate);
 
         Local<External> ext = receiver->GetInternalField(0).As<External>();
         // TODO: Check the actual type of the DataWrapper
@@ -186,7 +186,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         });
 
         if (dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC)) != 0) {
-            assert(false);
+            tns::Assert(false);
         }
     }
 }
@@ -285,7 +285,7 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
             if (baseWrapper == nullptr) {
                 const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
                 const Meta* meta = ArgConverter::GetMeta(structName);
-                assert(meta != nullptr && meta->type() == MetaType::Struct);
+                tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
                 const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
                 StructInfo structInfo = FFICall::GetStructInfo(structMeta);
                 Interop::InitializeStruct(isolate, retValue, structInfo.Fields(), value);
@@ -301,11 +301,11 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
     }
 
     // TODO: Handle other return types, i.e. assign the retValue parameter from the v8 result
-    assert(false);
+    tns::Assert(false, isolate);
 }
 
 void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<Value>& info, Class klass, const InterfaceMeta* interfaceMeta) {
-    assert(klass != nullptr);
+    tns::Assert(klass != nullptr, isolate);
 
     id result = nil;
 
@@ -511,7 +511,7 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Isolate* isolate, Loc
                 ss << name << ":";
                 Local<Value> propertyValue;
                 bool ok = obj->Get(context, propertyName).ToLocal(&propertyValue);
-                assert(ok);
+                tns::Assert(ok, isolate);
                 args.push_back(propertyValue);
             }
         }
@@ -540,11 +540,11 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
         Local<v8::Function> structCtorFunc = cache->StructCtorInitializer(isolate, structInfo);
         Local<Value> proto;
         bool success = structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto);
-        assert(success);
+        tns::Assert(success, isolate);
 
         if (!proto.IsEmpty()) {
             bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
-            assert(success);
+            tns::Assert(success, isolate);
         }
 
         tns::SetValue(isolate, receiver, structWrapper);
@@ -583,7 +583,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
             Local<Value> prototype = it->second->Get(isolate);
             bool success;
             if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
-                assert(false);
+                tns::Assert(false, isolate);
             }
         } else {
             cache->ObjectCtorInitializer(isolate, static_cast<const BaseClassMeta*>(meta));
@@ -592,7 +592,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
                 Local<Value> prototype = it->second->Get(isolate);
                 bool success;
                 if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
-                    assert(false);
+                    tns::Assert(false, isolate);
                 }
             }
         }
@@ -681,7 +681,7 @@ const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
         return nullptr;
     }
 
-    assert(meta->type() == MetaType::ProtocolType);
+    tns::Assert(meta->type() == MetaType::ProtocolType);
     const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(meta);
     return protocolMeta;
 }
@@ -689,14 +689,14 @@ const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context) {
     Isolate* isolate = context->GetIsolate();
     Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyObjCtorFunc.get();
-    assert(ctorFunc != nullptr);
+    tns::Assert(ctorFunc != nullptr, isolate);
     return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
 
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyStruct(Local<Context> context) {
     Isolate* isolate = context->GetIsolate();
     Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyStructCtorFunc.get();
-    assert(ctorFunc != nullptr);
+    tns::Assert(ctorFunc != nullptr, isolate);
     return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
 
@@ -705,7 +705,7 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(Local<Conte
     Local<v8::Function> emptyCtorFunc = ctorFunc->Get(isolate);
     Local<Value> value;
     if (!emptyCtorFunc->CallAsConstructor(context, 0, nullptr).ToLocal(&value) || value.IsEmpty() || !value->IsObject()) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
     Local<Object> result = value.As<Object>();
 
@@ -728,7 +728,7 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, 
 
     Local<v8::Function> emptyInstanceCtorFunc;
     if (!emptyInstanceCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyInstanceCtorFunc)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
     return emptyInstanceCtorFunc;
 }

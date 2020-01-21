@@ -10,6 +10,7 @@
 #include <dlfcn.h>
 #include <cxxabi.h>
 #include "RuntimeConfig.h"
+#include "Runtime.h"
 #include "Helpers.h"
 #include "Caches.h"
 
@@ -115,7 +116,7 @@ bool tns::Exists(const char* fullPath) {
 const char* tns::ReadText(const std::string& filePath, long& length, bool& isNew) {
     FILE* file = fopen(filePath.c_str(), "rb");
     if (file == nullptr) {
-        assert(false);
+        tns::Assert(false);
     }
 
     fseek(file, 0, SEEK_END);
@@ -202,7 +203,7 @@ void tns::SetPrivateValue(const Local<Object>& obj, const Local<v8::String>& pro
     Local<Private> privateKey = Private::ForApi(isolate, propName);
     bool success;
     if (!obj->SetPrivate(context, privateKey, value).To(&success) || !success) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 }
 
@@ -213,7 +214,7 @@ Local<Value> tns::GetPrivateValue(const Local<Object>& obj, const Local<v8::Stri
 
     Maybe<bool> hasPrivate = obj->HasPrivate(context, privateKey);
 
-    assert(!hasPrivate.IsNothing());
+    tns::Assert(!hasPrivate.IsNothing(), isolate);
 
     if (!hasPrivate.FromMaybe(false)) {
         return Local<Value>();
@@ -221,7 +222,7 @@ Local<Value> tns::GetPrivateValue(const Local<Object>& obj, const Local<v8::Stri
 
     Local<Value> result;
     if (!obj->GetPrivate(context, privateKey).ToLocal(&result)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     return result;
@@ -408,7 +409,7 @@ Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
 
     Local<Script> script;
     bool success = Script::Compile(context, source).ToLocal(&script);
-    assert(success);
+    tns::Assert(success, isolate);
 
     if (script.IsEmpty()) {
         return Local<v8::Function>();
@@ -416,7 +417,7 @@ Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
 
     Local<Value> result;
     success = script->Run(context).ToLocal(&result);
-    assert(success);
+    tns::Assert(success, isolate);
 
     if (result.IsEmpty() && !result->IsFunction()) {
         return Local<v8::Function>();
@@ -562,4 +563,39 @@ bool tns::LiveSync(Isolate* isolate) {
     }
 
     return true;
+}
+
+void tns::Assert(bool condition, Isolate* isolate) {
+    if (!RuntimeConfig.IsDebug) {
+        assert(condition);
+        return;
+    }
+
+    if (condition) {
+        return;
+    }
+
+    if (isolate == nullptr) {
+        Runtime* runtime = Runtime::GetCurrentRuntime();
+        if (runtime != nullptr) {
+            isolate = runtime->GetIsolate();
+        }
+    }
+
+    if (isolate == nullptr) {
+        Log(@"====== Assertion failed ======");
+        Log(@"Native stack trace:");
+        LogBacktrace();
+        assert(false);
+        return;
+    }
+
+    Log(@"====== Assertion failed ======");
+    Log(@"Native stack trace:");
+    LogBacktrace();
+
+    Log(@"JavaScript stack trace:");
+    std::string stack = tns::GetStackTrace(isolate);
+    Log(@"%s", stack.c_str());
+    assert(false);
 }

@@ -11,7 +11,7 @@ void FunctionReference::Register(Isolate* isolate, Local<Object> interop) {
     Local<v8::Function> ctorFunc = FunctionReference::GetFunctionReferenceCtorFunc(isolate);
     Local<Context> context = isolate->GetCurrentContext();
     bool success = interop->Set(context, tns::ToV8String(isolate, "FunctionReference"), ctorFunc).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* isolate) {
@@ -29,7 +29,7 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* iso
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> ctorFunc;
     if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     tns::SetValue(isolate, ctorFunc, new FunctionReferenceTypeWrapper());
@@ -40,10 +40,10 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* iso
 }
 
 void FunctionReference::FunctionReferenceConstructorCallback(const FunctionCallbackInfo<Value>& info) {
-    assert(info.Length() == 1);
-    assert(info[0]->IsFunction());
-
     Isolate* isolate = info.GetIsolate();
+
+    tns::Assert(info.Length() == 1, isolate);
+    tns::Assert(info[0]->IsFunction(), isolate);
 
     Local<v8::Function> arg = info[0].As<v8::Function>();
     std::shared_ptr<Persistent<v8::Value>> poArg = ObjectManager::Register(isolate, arg);

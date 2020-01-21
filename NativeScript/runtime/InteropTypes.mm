@@ -54,10 +54,10 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::SelectorEncoding)));
 
     bool success = interop->Set(context, tns::ToV8String(isolate, "types"), types).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     success = global->Set(context, tns::ToV8String(isolate, "interop"), interop).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 Local<Object> Interop::GetInteropType(Isolate* isolate, BinaryTypeEncodingType type) {
@@ -78,12 +78,12 @@ void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::st
 
     Local<v8::Function> ctorFunc;
     if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     Local<Value> value;
     if (!ctorFunc->CallAsConstructor(context, 0, nullptr).ToLocal(&value) || value.IsEmpty() || !value->IsObject()) {
-        assert(false);
+        tns::Assert(false, isolate);
     }
     Local<Object> result = value.As<Object>();
 
@@ -97,24 +97,24 @@ void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::st
         cache->PrimitiveInteropTypes.emplace(type, std::make_unique<Persistent<Object>>(isolate, result));
     }
 
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 void Interop::RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
-        assert(info.Length() == 1 && info[0]->IsObject());
+        Isolate* isolate = info.GetIsolate();
+        tns::Assert(info.Length() == 1 && info[0]->IsObject(), isolate);
         Local<Object> arg = info[0].As<Object>();
-        assert(arg->InternalFieldCount() > 0 && arg->GetInternalField(0)->IsExternal());
+        tns::Assert(arg->InternalFieldCount() > 0 && arg->GetInternalField(0)->IsExternal(), isolate);
 
         Local<External> ext = arg->GetInternalField(0).As<External>();
         ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
 
         id obj = wrapper->Data();
-        assert([obj isKindOfClass:[NSData class]]);
+        tns::Assert([obj isKindOfClass:[NSData class]], isolate);
 
-        Isolate* isolate = info.GetIsolate();
         size_t length = [obj length];
         void* data = const_cast<void*>([obj bytes]);
 
@@ -123,18 +123,18 @@ void Interop::RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8:
         Local<ArrayBuffer> result = ArrayBuffer::New(isolate, std::move(backingStore));
         info.GetReturnValue().Set(result);
     }).ToLocal(&func);
-    assert(success);
+    tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "bufferFromData"), func).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
-        assert(info.Length() == 1);
         Isolate* isolate = info.GetIsolate();
+        tns::Assert(info.Length() == 1, isolate);
         try {
             Local<Value> arg = info[0];
 
@@ -148,24 +148,24 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
             ex.ReThrowToV8(isolate);
         }
     }).ToLocal(&func);
-    assert(success);
+    tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "handleof"), func).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 void Interop::RegisterAllocFunction(Isolate* isolate, Local<Object> interop) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
-        assert(info.Length() == 1);
-        assert(tns::IsNumber(info[0]));
-
         Isolate* isolate = info.GetIsolate();
+        tns::Assert(info.Length() == 1, isolate);
+        tns::Assert(tns::IsNumber(info[0]), isolate);
+
         Local<Context> context = isolate->GetCurrentContext();
         Local<Number> arg = info[0].As<Number>();
         int32_t value;
-        assert(arg->Int32Value(context).To(&value));
+        tns::Assert(arg->Int32Value(context).To(&value), isolate);
 
         size_t size = static_cast<size_t>(value);
 
@@ -176,23 +176,22 @@ void Interop::RegisterAllocFunction(Isolate* isolate, Local<Object> interop) {
         wrapper->SetAdopted(true);
         info.GetReturnValue().Set(pointerInstance);
     }).ToLocal(&func);
-    assert(success);
+    tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "alloc"), func).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 void Interop::RegisterFreeFunction(Isolate* isolate, Local<Object> interop) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
-        assert(info.Length() == 1);
+        Isolate* isolate = info.GetIsolate();
+        tns::Assert(info.Length() == 1, isolate);
         Local<Value> arg = info[0];
 
-        Isolate* isolate = info.GetIsolate();
-
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
-        assert(wrapper->Type() == WrapperType::Pointer);
+        tns::Assert(wrapper->Type() == WrapperType::Pointer, isolate);
 
         PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
         if (pw->IsAdopted()) {
@@ -206,41 +205,40 @@ void Interop::RegisterFreeFunction(Isolate* isolate, Local<Object> interop) {
 
         info.GetReturnValue().Set(v8::Undefined(isolate));
     }).ToLocal(&func);
-    assert(success);
+    tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "free"), func).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 void Interop::RegisterAdoptFunction(Isolate* isolate, Local<Object> interop) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
-        assert(info.Length() == 1);
+        Isolate* isolate = info.GetIsolate();
+        tns::Assert(info.Length() == 1, isolate);
         Local<Value> arg = info[0];
 
-        Isolate* isolate = info.GetIsolate();
-
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
-        assert(wrapper->Type() == WrapperType::Pointer);
+        tns::Assert(wrapper->Type() == WrapperType::Pointer, isolate);
 
         PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
         pw->SetAdopted(true);
 
         info.GetReturnValue().Set(arg);
     }).ToLocal(&func);
-    assert(success);
+    tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "adopt"), func).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
-        assert(info.Length() == 1);
         Isolate* isolate = info.GetIsolate();
+        tns::Assert(info.Length() == 1, isolate);
         try {
             Local<Value> arg = info[0];
             size_t size = 0;
@@ -296,10 +294,10 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
             ex.ReThrowToV8(isolate);
         }
     }).ToLocal(&func);
-    assert(success);
+    tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "sizeof"), func).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 const TypeEncoding* Interop::CreateEncoding(BinaryTypeEncodingType type) {

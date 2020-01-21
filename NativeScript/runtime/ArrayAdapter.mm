@@ -35,21 +35,21 @@ using namespace v8;
     Local<Context> context = self->isolate_->GetCurrentContext();
     Local<v8::Array> propertyNames;
     bool success = object->GetPropertyNames(context).ToLocal(&propertyNames);
-    assert(success);
+    tns::Assert(success, self->isolate_);
     uint32_t length = propertyNames->Length();
     return length;
 }
 
 - (id)objectAtIndex:(NSUInteger)index {
     if (!(index < [self count])) {
-        assert(false);
+        tns::Assert(false, self->isolate_);
     }
 
     Local<Object> object = self->object_->Get(self->isolate_).As<Object>();
     Local<Context> context = self->isolate_->GetCurrentContext();
     Local<Value> item;
     bool success = object->Get(context, (uint)index).ToLocal(&item);
-    assert(success);
+    tns::Assert(success, self->isolate_);
 
     if (item->IsNullOrUndefined()) {
         return nil;

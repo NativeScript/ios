@@ -19,7 +19,7 @@ Local<Value> ExtVector::NewInstance(Isolate* isolate, void* data, ffi_type* ffiT
     Local<Context> context = isolate->GetCurrentContext();
     Local<Value> result;
     bool success = ctorFuncTemplate->InstanceTemplate()->NewInstance(context).ToLocal(&result);
-    assert(success);
+    tns::Assert(success, isolate);
 
     // TODO: Validate that the inner type is supported (float, double)
     ExtVectorWrapper* wrapper = new ExtVectorWrapper(data, ffiType, innerTypeEncoding);
@@ -31,7 +31,7 @@ Local<Value> ExtVector::NewInstance(Isolate* isolate, void* data, ffi_type* ffiT
 void ExtVector::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-    assert(wrapper != nullptr && wrapper->Type() == WrapperType::ExtVector);
+    tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::ExtVector, isolate);
     ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
     const TypeEncoding* innerTypeEncoding = extVectorWrapper->InnerTypeEncoding();
     ffi_type* innerFFIType = FFICall::GetArgumentType(innerTypeEncoding);
@@ -53,7 +53,7 @@ void ExtVector::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbac
 void ExtVector::IndexedPropertySetCallback(uint32_t index, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-    assert(wrapper != nullptr && wrapper->Type() == WrapperType::ExtVector);
+    tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::ExtVector, isolate);
     ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
     const TypeEncoding* innerTypeEncoding = extVectorWrapper->InnerTypeEncoding();
     ffi_type* innerFFIType = FFICall::GetArgumentType(innerTypeEncoding);

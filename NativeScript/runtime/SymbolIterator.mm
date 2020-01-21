@@ -17,11 +17,11 @@ void SymbolIterator::Set(Isolate* isolate, Local<Value> object) {
         Local<Object> result = CreateIteratorObject(isolate, object);
         args.GetReturnValue().Set(result);
     }, object).ToLocal(&iterator);
-    assert(success);
+    tns::Assert(success, isolate);
 
     Local<Value> symbolIteratorKey = Symbol::GetIterator(isolate);
     success = object.As<Object>()->Set(context, symbolIteratorKey, iterator).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 Local<Object> SymbolIterator::CreateIteratorObject(Isolate* isolate, Local<Value> object) {
@@ -30,7 +30,7 @@ Local<Object> SymbolIterator::CreateIteratorObject(Isolate* isolate, Local<Value
     objectTemplate->SetInternalFieldCount(2);
     Local<Object> result;
     bool success = objectTemplate->NewInstance(context).ToLocal(&result);
-    assert(success);
+    tns::Assert(success, isolate);
 
     int index = 0;
     result->SetInternalField(0, object);
@@ -38,9 +38,9 @@ Local<Object> SymbolIterator::CreateIteratorObject(Isolate* isolate, Local<Value
 
     Local<v8::Function> next;
     success = v8::Function::New(context, NextCallback).ToLocal(&next);
-    assert(success);
+    tns::Assert(success, isolate);
     success = result->Set(context, tns::ToV8String(isolate, "next"), next).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     return result;
 }
@@ -68,9 +68,9 @@ void SymbolIterator::NextCallback(const v8::FunctionCallbackInfo<v8::Value>& arg
 
     if (index >= [target count]) {
         bool success = obj->Set(context, tns::ToV8String(isolate, "done"), v8::Boolean::New(isolate, true)).FromMaybe(false);
-        assert(success);
+        tns::Assert(success, isolate);
         success = obj->Set(context, tns::ToV8String(isolate, "value"), v8::Undefined(isolate)).FromMaybe(false);
-        assert(success);
+        tns::Assert(success, isolate);
     } else {
         id item = [target objectAtIndex:index];
         Local<Value> val;
@@ -83,9 +83,9 @@ void SymbolIterator::NextCallback(const v8::FunctionCallbackInfo<v8::Value>& arg
         }
 
         bool success = obj->Set(context, tns::ToV8String(isolate, "done"), v8::Boolean::New(isolate, false)).FromMaybe(false);
-        assert(success);
+        tns::Assert(success, isolate);
         success = obj->Set(context, tns::ToV8String(isolate, "value"), val).FromMaybe(false);
-        assert(success);
+        tns::Assert(success, isolate);
 
         index++;
         thiz->SetAlignedPointerInInternalField(1, reinterpret_cast<void*>(index << 1));

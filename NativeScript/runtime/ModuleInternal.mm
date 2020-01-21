@@ -27,16 +27,16 @@ ModuleInternal::ModuleInternal(Isolate* isolate) {
     TryCatch tc(isolate);
     if (!Script::Compile(context, tns::ToV8String(isolate, requireFactoryScript.c_str())).ToLocal(&script) && tc.HasCaught()) {
         tns::LogError(isolate, tc);
-        assert(false);
+        tns::Assert(false, isolate);
     }
-    assert(!script.IsEmpty());
+    tns::Assert(!script.IsEmpty(), isolate);
 
     Local<Value> result;
     if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
         tns::LogError(isolate, tc);
-        assert(false);
+        tns::Assert(false, isolate);
     }
-    assert(!result.IsEmpty() && result->IsFunction());
+    tns::Assert(!result.IsEmpty() && result->IsFunction(), isolate);
 
     this->requireFactoryFunction_ = std::make_unique<Persistent<v8::Function>>(isolate, result.As<v8::Function>());
 
@@ -45,7 +45,7 @@ ModuleInternal::ModuleInternal(Isolate* isolate) {
 
     Local<v8::Function> globalRequire = GetRequireFunction(isolate, RuntimeConfig.ApplicationPath);
     bool success = global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 }
 
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
@@ -53,7 +53,7 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
     Local<Object> globalObject = context->Global();
     Local<Value> requireObj;
     bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
-    assert(success && requireObj->IsFunction());
+    tns::Assert(success && requireObj->IsFunction(), isolate);
     Local<v8::Function> requireFunc = requireObj.As<v8::Function>();
     Local<Value> args[] = { ToV8String(isolate, path) };
     Local<Value> result;
@@ -72,7 +72,7 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const s
     Local<Value> result;
     Local<Object> thiz = Object::New(isolate);
     bool success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
-    assert(success && !result.IsEmpty() && result->IsFunction());
+    tns::Assert(success && !result.IsEmpty() && result->IsFunction(), isolate);
 
     return result.As<v8::Function>();
 }
@@ -119,13 +119,13 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
         }
 
         if (isData) {
-            assert(!moduleObj.IsEmpty());
+            tns::Assert(!moduleObj.IsEmpty(), isolate);
             info.GetReturnValue().Set(moduleObj);
         } else {
             Local<Context> context = isolate->GetCurrentContext();
             Local<Value> exportsObj;
             bool success = moduleObj->Get(context, tns::ToV8String(isolate, "exports")).ToLocal(&exportsObj);
-            assert(success);
+            tns::Assert(success, isolate);
             info.GetReturnValue().Set(exportsObj);
         }
     } catch (NativeScriptException& ex) {
@@ -167,7 +167,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
         moduleObj = this->LoadData(isolate, path);
     } else {
         // TODO: throw an error for unsupported file extension
-        assert(false);
+        tns::Assert(false, isolate);
     }
 
     return moduleObj;
@@ -178,13 +178,13 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     Local<Object> exportsObj = Object::New(isolate);
     Local<Context> context = isolate->GetCurrentContext();
     bool success = moduleObj->Set(context, tns::ToV8String(isolate, "exports"), exportsObj).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
 
     Local<v8::String> fileName = tns::ToV8String(isolate, modulePath);
     success = moduleObj->DefineOwnProperty(context, tns::ToV8String(isolate, "id"), fileName, readOnlyFlags).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     std::shared_ptr<Persistent<Object>> poModuleObj = std::make_shared<Persistent<Object>>(isolate, moduleObj);
     TempModule tempModule(this, modulePath, cacheKey, poModuleObj);
@@ -207,7 +207,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     };
 
     success = moduleObj->Set(context, tns::ToV8String(isolate, "require"), require).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     {
         TryCatch tc(isolate);

@@ -24,10 +24,10 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
             Local<Context> context = isolate->GetCurrentContext();
             Local<v8::Function> iteratorFunc = poIteratorFunc->Get(isolate);
             if (!iteratorFunc->Call(context, context->Global(), 0, {}).ToLocal(&iteratorRes)) {
-                assert(false);
+                tns::Assert(false, isolate);
             }
 
-            assert(!iteratorRes.IsEmpty() && iteratorRes->IsObject());
+            tns::Assert(!iteratorRes.IsEmpty() && iteratorRes->IsObject(), isolate);
             Local<Object> iteratorObj = iteratorRes.As<Object>();
 
             void* selfPtr = (__bridge void*)self;
@@ -45,7 +45,7 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
         Local<Context> context = isolate->GetCurrentContext();
         Local<Value> next;
         bool success = iteratorObj->Get(context, tns::ToV8String(isolate, "next")).ToLocal(&next);
-        assert(success && !next.IsEmpty() && next->IsFunction());
+        tns::Assert(success && !next.IsEmpty() && next->IsFunction(), isolate);
 
         state->itemsPtr = buffer;
         while (count < length) {
@@ -53,7 +53,7 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
             Local<Context> context = isolate->GetCurrentContext();
             Local<Value> nextResult;
             if (!nextFunc->Call(context, iteratorObj, 0, {}).ToLocal(&nextResult)) {
-                assert(false);
+                tns::Assert(false, isolate);
             }
 
             if (nextResult.IsEmpty() || !nextResult->IsObject()) {
@@ -62,7 +62,7 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
 
             Local<Value> done;
             bool success = nextResult.As<Object>()->Get(context, tns::ToV8String(isolate, "done")).ToLocal(&done);
-            assert(success && tns::IsBool(done));
+            tns::Assert(success && tns::IsBool(done), isolate);
 
             if (tns::ToBool(done)) {
                 poIteratorObj->Reset();
@@ -73,7 +73,7 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
 
             Local<Value> value;
             success = nextResult.As<Object>()->Get(context, tns::ToV8String(isolate, "value")).ToLocal(&value);
-            assert(success && !value.IsEmpty());
+            tns::Assert(success && !value.IsEmpty(), isolate);
 
             id result = Interop::ToObject(isolate, value);
             *buffer++ = result;

@@ -112,7 +112,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
         Runtime* runtime = Runtime::GetCurrentRuntime();
         int workerId = runtime->WorkerId();
         std::shared_ptr<Caches::WorkerState> state = Caches::Workers.Get(workerId);
-        assert(state != nullptr);
+        tns::Assert(state != nullptr, isolate);
         WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
         if (!worker->IsRunning()) {
             return;
@@ -132,7 +132,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
             Isolate::Scope isolate_scope(isolate);
             HandleScope handle_scope(isolate);
             Local<Value> workerInstance = state->GetWorker()->Get(isolate);
-            assert(!workerInstance.IsEmpty() && workerInstance->IsObject());
+            tns::Assert(!workerInstance.IsEmpty() && workerInstance->IsObject(), isolate);
             Worker::OnMessageCallback(isolate, workerInstance, message);
         });
     } catch (NativeScriptException& ex) {
@@ -155,7 +155,7 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
         }
 
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-        assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker);
+        tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker, isolate);
 
         WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
         if (!worker->IsRunning() || worker->IsClosing()) {
@@ -180,7 +180,7 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::str
     Local<Context> context = isolate->GetCurrentContext();
     Local<Value> onMessageValue;
     bool success = receiver.As<Object>()->Get(context, tns::ToV8String(isolate, "onmessage")).ToLocal(&onMessageValue);
-    assert(success);
+    tns::Assert(success, isolate);
 
     if (!onMessageValue->IsFunction()) {
         return;
@@ -192,7 +192,7 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::str
     Local<v8::String> messageStr = tns::ToV8String(isolate, message);
     Local<Value> arg;
     success = v8::JSON::Parse(context, messageStr).ToLocal(&arg);
-    assert(success);
+    tns::Assert(success, isolate);
 
     Local<Value> args[1] { arg };
     success = onMessageFunc->Call(context, receiver, 1, args).ToLocal(&result);
@@ -202,7 +202,8 @@ void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
     Runtime* runtime = Runtime::GetCurrentRuntime();
     int workerId = runtime->WorkerId();
     std::shared_ptr<Caches::WorkerState> state = Caches::Workers.Get(workerId);
-    assert(state != nullptr);
+    Isolate* isolate = info.GetIsolate();
+    tns::Assert(state != nullptr, isolate);
     WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
 
     if (!worker->IsRunning() || worker->IsClosing()) {
@@ -211,12 +212,11 @@ void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
 
     worker->Close();
 
-    Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
     Local<Value> onCloseVal;
     bool success = global->Get(context, tns::ToV8String(isolate, "onclose")).ToLocal(&onCloseVal);
-    assert(success);
+    tns::Assert(success, isolate);
     if (!onCloseVal.IsEmpty() && onCloseVal->IsFunction()) {
         Local<v8::Function> onCloseFunc = onCloseVal.As<v8::Function>();
         Local<Value> args[0] { };
@@ -232,7 +232,7 @@ void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
 void Worker::TerminateCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-    assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker);
+    tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker, isolate);
 
     WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
     worker->Terminate();
@@ -244,10 +244,10 @@ Local<v8::String> Worker::Serialize(Isolate* isolate, Local<Value> value, Local<
 
     Local<Object> obj;
     bool success = objTemplate->NewInstance(context).ToLocal(&obj);
-    assert(success);
+    tns::Assert(success, isolate);
 
     success = obj->Set(context, tns::ToV8String(isolate, "data"), value).FromMaybe(false);
-    assert(success);
+    tns::Assert(success, isolate);
 
     Local<Value> result;
     TryCatch tc(isolate);
@@ -257,7 +257,7 @@ Local<v8::String> Worker::Serialize(Isolate* isolate, Local<Value> value, Local<
         return Local<v8::String>();
     }
 
-    assert(success);
+    tns::Assert(success, isolate);
 
     return result.As<v8::String>();
 }
