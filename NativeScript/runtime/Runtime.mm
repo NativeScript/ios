@@ -58,7 +58,9 @@ void Runtime::Init() {
 
         V8::InitializePlatform(Runtime::platform_.get());
         V8::Initialize();
-        std::string flags = "--expose_gc --jitless --no-lazy";
+        std::string flags = RuntimeConfig.IsDebug
+            ? "--expose_gc --jitless"
+            : "--expose_gc --jitless --no-lazy";
         V8::SetFlagsFromString(flags.c_str(), flags.size());
     }
 
