@@ -9,7 +9,7 @@
  * This set of documents provides reference material generated from the
  * V8 header file, include/v8.h.
  *
- * For other documentation see http://code.google.com/apis/v8/
+ * For other documentation see https://v8.dev/.
  */
 
 #ifndef INCLUDE_V8_H_
@@ -4780,9 +4780,13 @@ class V8_EXPORT WasmModuleObject : public Object {
    * If possible, deserialize the module, otherwise compile it from the provided
    * uncompiled bytes.
    */
+  V8_DEPRECATED(
+      "Use WasmStreaming for deserialization from cache or the "
+      "CompiledWasmModule to transfer between isolates")
   static MaybeLocal<WasmModuleObject> DeserializeOrCompile(
       Isolate* isolate, MemorySpan<const uint8_t> serialized_module,
       MemorySpan<const uint8_t> wire_bytes);
+
   V8_INLINE static WasmModuleObject* Cast(Value* obj);
 
  private:
@@ -8044,7 +8048,65 @@ struct DeserializeInternalFieldsCallback {
 };
 typedef DeserializeInternalFieldsCallback DeserializeEmbedderFieldsCallback;
 
+/**
+ * Controls how the default MeasureMemoryDelegate reports the result of
+ * the memory measurement to JS. With kSummary only the total size is reported.
+ * With kDetailed the result includes the size of each native context.
+ */
 enum class MeasureMemoryMode { kSummary, kDetailed };
+
+/**
+ * Controls how promptly a memory measurement request is executed.
+ * By default the measurement is folded with the next scheduled GC which may
+ * happen after a while. The kEager starts increment GC right away and
+ * is useful for testing.
+ */
+enum class MeasureMemoryExecution { kDefault, kEager };
+
+/**
+ * The delegate is used in Isolate::MeasureMemory API.
+ *
+ * It specifies the contexts that need to be measured and gets called when
+ * the measurement is completed to report the results.
+ */
+class V8_EXPORT MeasureMemoryDelegate {
+ public:
+  virtual ~MeasureMemoryDelegate() = default;
+
+  /**
+   * Returns true if the size of the given context needs to be measured.
+   */
+  virtual bool ShouldMeasure(Local<Context> context) = 0;
+
+  /**
+   * This function is called when memory measurement finishes.
+   *
+   * \param context_sizes_in_bytes a vector of (context, size) pairs that
+   *   includes each context for which ShouldMeasure returned true and that
+   *   was not garbage collected while the memory measurement was in progress.
+   *
+   * \param unattributed_size_in_bytes total size of objects that were not
+   *   attributed to any context (i.e. are likely shared objects).
+   */
+  virtual void MeasurementComplete(
+      const std::vector<std::pair<Local<Context>, size_t>>&
+          context_sizes_in_bytes,
+      size_t unattributed_size_in_bytes) = 0;
+
+  /**
+   * Returns a default delegate that resolves the given promise when
+   * the memory measurement completes.
+   *
+   * \param isolate the current isolate
+   * \param context the current context
+   * \param promise_resolver the promise resolver that is given the
+   *   result of the memory measurement.
+   * \param mode the detail level of the result.
+   */
+  static std::unique_ptr<MeasureMemoryDelegate> Default(
+      Isolate* isolate, Local<Context> context,
+      Local<Promise::Resolver> promise_resolver, MeasureMemoryMode mode);
+};
 
 /**
  * Isolate represents an isolated instance of the V8 engine.  V8 isolates have
@@ -8578,15 +8640,24 @@ class V8_EXPORT Isolate {
   bool GetHeapCodeAndMetadataStatistics(HeapCodeStatistics* object_statistics);
 
   /**
-   * Enqueues a memory measurement request for the given context and mode.
    * This API is experimental and may change significantly.
    *
-   * \param mode Indicates whether the result should include per-context
-   *   memory usage or just the total memory usage.
-   * \returns a promise that will be resolved with memory usage estimate.
+   * Enqueues a memory measurement request and invokes the delegate with the
+   * results.
+   *
+   * \param delegate the delegate that defines which contexts to measure and
+   *   reports the results.
+   *
+   * \param execution promptness executing the memory measurement.
+   *   The kEager value is expected to be used only in tests.
    */
-  v8::MaybeLocal<v8::Promise> MeasureMemory(v8::Local<v8::Context> context,
-                                            MeasureMemoryMode mode);
+  bool MeasureMemory(
+      std::unique_ptr<MeasureMemoryDelegate> delegate,
+      MeasureMemoryExecution execution = MeasureMemoryExecution::kDefault);
+
+  V8_DEPRECATE_SOON("Use the version with a delegate")
+  MaybeLocal<Promise> MeasureMemory(Local<Context> context,
+                                    MeasureMemoryMode mode);
 
   /**
    * Get a call stack sample from the isolate.

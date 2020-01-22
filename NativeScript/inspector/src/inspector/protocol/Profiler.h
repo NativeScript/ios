@@ -30,6 +30,7 @@ class ScriptTypeProfile;
 class CounterInfo;
 class ConsoleProfileFinishedNotification;
 class ConsoleProfileStartedNotification;
+class PreciseCoverageDeltaUpdateNotification;
 
 // ------------- Type and builder declarations.
 
@@ -1092,6 +1093,94 @@ private:
 };
 
 
+class  PreciseCoverageDeltaUpdateNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(PreciseCoverageDeltaUpdateNotification);
+public:
+    static std::unique_ptr<PreciseCoverageDeltaUpdateNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~PreciseCoverageDeltaUpdateNotification() override { }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    String getOccassion() { return m_occassion; }
+    void setOccassion(const String& value) { m_occassion = value; }
+
+    protocol::Array<protocol::Profiler::ScriptCoverage>* getResult() { return m_result.get(); }
+    void setResult(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> value) { m_result = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<PreciseCoverageDeltaUpdateNotification> clone() const;
+
+    template<int STATE>
+    class PreciseCoverageDeltaUpdateNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            TimestampSet = 1 << 1,
+            OccassionSet = 1 << 2,
+            ResultSet = 1 << 3,
+            AllFieldsSet = (TimestampSet | OccassionSet | ResultSet | 0)};
+
+
+        PreciseCoverageDeltaUpdateNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        PreciseCoverageDeltaUpdateNotificationBuilder<STATE | OccassionSet>& setOccassion(const String& value)
+        {
+            static_assert(!(STATE & OccassionSet), "property occassion should not be set yet");
+            m_result->setOccassion(value);
+            return castState<OccassionSet>();
+        }
+
+        PreciseCoverageDeltaUpdateNotificationBuilder<STATE | ResultSet>& setResult(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> value)
+        {
+            static_assert(!(STATE & ResultSet), "property result should not be set yet");
+            m_result->setResult(std::move(value));
+            return castState<ResultSet>();
+        }
+
+        std::unique_ptr<PreciseCoverageDeltaUpdateNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class PreciseCoverageDeltaUpdateNotification;
+        PreciseCoverageDeltaUpdateNotificationBuilder() : m_result(new PreciseCoverageDeltaUpdateNotification()) { }
+
+        template<int STEP> PreciseCoverageDeltaUpdateNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<PreciseCoverageDeltaUpdateNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Profiler::PreciseCoverageDeltaUpdateNotification> m_result;
+    };
+
+    static PreciseCoverageDeltaUpdateNotificationBuilder<0> create()
+    {
+        return PreciseCoverageDeltaUpdateNotificationBuilder<0>();
+    }
+
+private:
+    PreciseCoverageDeltaUpdateNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    double m_timestamp;
+    String m_occassion;
+    std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> m_result;
+};
+
+
 // ------------- Backend interface.
 
 class  Backend {
@@ -1123,6 +1212,7 @@ public:
     explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
     void consoleProfileFinished(const String& id, std::unique_ptr<protocol::Debugger::Location> location, std::unique_ptr<protocol::Profiler::Profile> profile, Maybe<String> title = Maybe<String>());
     void consoleProfileStarted(const String& id, std::unique_ptr<protocol::Debugger::Location> location, Maybe<String> title = Maybe<String>());
+    void preciseCoverageDeltaUpdate(double timestamp, const String& occassion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result);
 
     void flush();
     void sendRawCBORNotification(std::vector<uint8_t>);

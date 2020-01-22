@@ -662,6 +662,57 @@ std::unique_ptr<ConsoleProfileStartedNotification> ConsoleProfileStartedNotifica
     return fromValue(toValue().get(), &errors);
 }
 
+std::unique_ptr<PreciseCoverageDeltaUpdateNotification> PreciseCoverageDeltaUpdateNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<PreciseCoverageDeltaUpdateNotification> result(new PreciseCoverageDeltaUpdateNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* timestampValue = object->get("timestamp");
+    errors->setName("timestamp");
+    result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
+    protocol::Value* occassionValue = object->get("occassion");
+    errors->setName("occassion");
+    result->m_occassion = ValueConversions<String>::fromValue(occassionValue, errors);
+    protocol::Value* resultValue = object->get("result");
+    errors->setName("result");
+    result->m_result = ValueConversions<protocol::Array<protocol::Profiler::ScriptCoverage>>::fromValue(resultValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> PreciseCoverageDeltaUpdateNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
+    result->setValue("occassion", ValueConversions<String>::toValue(m_occassion));
+    result->setValue("result", ValueConversions<protocol::Array<protocol::Profiler::ScriptCoverage>>::toValue(m_result.get()));
+    return result;
+}
+
+void PreciseCoverageDeltaUpdateNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), m_timestamp, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("occassion"), m_occassion, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), m_result, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
+std::unique_ptr<PreciseCoverageDeltaUpdateNotification> PreciseCoverageDeltaUpdateNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
 // ------------- Enum values from params.
 
 
@@ -692,6 +743,18 @@ void Frontend::consoleProfileStarted(const String& id, std::unique_ptr<protocol:
     if (title.isJust())
         messageData->setTitle(std::move(title).takeJust());
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Profiler.consoleProfileStarted", std::move(messageData)));
+}
+
+void Frontend::preciseCoverageDeltaUpdate(double timestamp, const String& occassion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result)
+{
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<PreciseCoverageDeltaUpdateNotification> messageData = PreciseCoverageDeltaUpdateNotification::create()
+        .setTimestamp(timestamp)
+        .setOccassion(occassion)
+        .setResult(std::move(result))
+        .build();
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Profiler.preciseCoverageDeltaUpdate", std::move(messageData)));
 }
 
 void Frontend::flush()
