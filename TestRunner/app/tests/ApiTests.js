@@ -718,6 +718,15 @@ describe(module.id, function () {
         }
     });
 
+    it("Dynamically load modules", () => {
+        // The CMMotionActivityManager interface is defined inside the CoreMotion system framework which is not
+        // statically loaded and the runtime must dynamically resolve it at runtime.
+        let activityManager = CMMotionActivityManager.new();
+        expect(activityManager).not.toBeUndefined();
+        expect(activityManager).not.toBeNull();
+        expect(activityManager instanceof CMMotionActivityManager).toBe(true);
+    });
+
 //     if (TNSIsConfigurationDebug) {
 //         it("ApiIterator", function () {
 //             var counter = 0;

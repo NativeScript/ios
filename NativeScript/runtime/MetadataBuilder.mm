@@ -326,7 +326,12 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
         tns::SetValue(isolate, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name()), protoMeta));
         cache->ProtocolCtorFuncs.insert(std::make_pair(meta->name(), new Persistent<v8::Function>(isolate, ctorFunc)));
     } else {
-        tns::SetValue(isolate, ctorFunc, new ObjCClassWrapper(objc_getClass(meta->name())));
+        Class klass = objc_getClass(meta->name());
+        if (klass == nil) {
+            SymbolLoader::instance().ensureModule(meta->topLevelModule());
+            klass = objc_getClass(meta->name());
+        }
+        tns::SetValue(isolate, ctorFunc, new ObjCClassWrapper(klass));
         cache->CtorFuncs.emplace(meta->name(), std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc));
     }
 
