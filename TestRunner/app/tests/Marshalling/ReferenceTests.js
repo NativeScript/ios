@@ -113,6 +113,186 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe('179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000');
     });
 
+    it("functionWithUInt8ArrayBufferView", function () {
+        let array = Uint8Array.from([ 97, 98, 99 ]);
+        let actual = functionWithUCharPtr(array);
+        expect(actual[0]).toBe(97);
+        expect(actual[1]).toBe(98);
+        expect(actual[2]).toBe(99);
+        expect(TNSGetOutput()).toBe("abc");
+    });
+
+    it("functionWithUInt8ArrayBuffer", function () {
+        let array = Uint8Array.from([ 97, 98, 99 ]).buffer;
+        let actual = functionWithUCharPtr(array);
+        expect(actual[0]).toBe(97);
+        expect(actual[1]).toBe(98);
+        expect(actual[2]).toBe(99);
+        expect(TNSGetOutput()).toBe("abc");
+    });
+
+    it("functionWithInt8ArrayBufferView", function () {
+        let array = Int8Array.from([ 97, 98, 99 ]);
+        let actual = functionWithCharPtr(array);
+        expect(actual[0]).toBe(97);
+        expect(actual[1]).toBe(98);
+        expect(actual[2]).toBe(99);
+        expect(TNSGetOutput()).toBe("abc");
+    });
+
+    it("functionWithInt8ArrayBuffer", function () {
+        let array = Int8Array.from([ 97, 98, 99 ]).buffer;
+        let actual = functionWithCharPtr(array);
+        expect(actual[0]).toBe(97);
+        expect(actual[1]).toBe(98);
+        expect(actual[2]).toBe(99);
+        expect(TNSGetOutput()).toBe("abc");
+    });
+
+    it("functionWithUInt16ArrayBufferView", function () {
+        let array = Uint16Array.from([ 65535, 1, 2 ]);
+        let actual = functionWithUShortPtr(array);
+        expect(actual[0]).toBe(65535);
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("65535");
+    });
+
+    it("functionWithUInt16ArrayBuffer", function () {
+        let array = Uint16Array.from([ 65535, 1, 2 ]).buffer;
+        let actual = functionWithUShortPtr(array);
+        expect(actual[0]).toBe(65535);
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("65535");
+    });
+
+    it("functionWithInt16ArrayBufferView", function () {
+        let array = Int16Array.from([ 32767, 1, 2 ]);
+        let actual = functionWithShortPtr(array);
+        expect(actual[0]).toBe(32767);
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("32767");
+    });
+
+    it("functionWithInt16ArrayBuffer", function () {
+        let array = Int16Array.from([ 32767, 1, 2 ]).buffer;
+        let actual = functionWithShortPtr(array);
+        expect(actual[0]).toBe(32767);
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("32767");
+    });
+
+    it("functionWithUInt32ArrayBufferView", function () {
+        let array = Uint32Array.from([ 4294967295, 1, 2 ]);
+        let actual = functionWithUIntPtr(array);
+        expect(actual[0]).toBe(4294967295);
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("4294967295");
+    });
+
+    it("functionWithUInt32ArrayBuffer", function () {
+        let array = Uint32Array.from([ 4294967295, 1, 2 ]).buffer;
+        let actual = functionWithUIntPtr(array);
+        expect(actual[0]).toBe(4294967295);
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("4294967295");
+    });
+
+    it("functionWithInt32ArrayBufferView", function () {
+        let array = Int32Array.from([ 2147483647, 1, 2 ]);
+        let actual = functionWithIntPtr(array);
+        expect(actual[0]).toBe(2147483647);
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("2147483647");
+    });
+
+    it("functionWithInt32ArrayBuffer", function () {
+        let array = Int32Array.from([ 2147483647, 1, 2 ]);
+        let actual = functionWithIntPtr(array);
+        expect(actual[0]).toBe(2147483647);
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("2147483647");
+    });
+
+    it("functionWithUInt64ArrayBufferView", function () {
+        let array = BigUint64Array.from([ BigInt("18446744073709551615"), BigInt("1"), BigInt("2") ]);
+        let actual = functionWithULongLongPtr(array);
+        expect(actual[0]).toBe(BigInt("18446744073709551615"));
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("18446744073709551615");
+    });
+
+    it("functionWithUInt64ArrayBuffer", function () {
+        let array = BigUint64Array.from([ BigInt("18446744073709551615"), BigInt("1"), BigInt("2") ]).buffer;
+        let actual = functionWithULongLongPtr(array);
+        expect(actual[0]).toBe(BigInt("18446744073709551615"));
+        expect(actual[1]).toBe(1);
+        expect(actual[2]).toBe(2);
+        expect(TNSGetOutput()).toBe("18446744073709551615");
+    });
+
+    it("functionWithInt64ArrayBufferView", function () {
+        let array = BigInt64Array.from([ BigInt("9223372036854775807"), BigInt("-9223372036854775808"), BigInt("3") ]);
+        let actual = functionWithLongLongPtr(array);
+        expect(actual[0]).toBe(BigInt("9223372036854775807"));
+        expect(actual[1]).toBe(BigInt("-9223372036854775808"));
+        expect(actual[2]).toBe(3);
+        expect(TNSGetOutput()).toBe("9223372036854775807");
+    });
+
+    it("functionWithInt64ArrayBuffer", function () {
+        let array = BigInt64Array.from([ BigInt("9223372036854775807"), BigInt("-9223372036854775808"), BigInt("3") ]).buffer;
+        let actual = functionWithLongLongPtr(array);
+        expect(actual[0]).toBe(BigInt("9223372036854775807"));
+        expect(actual[1]).toBe(BigInt("-9223372036854775808"));
+        expect(actual[2]).toBe(3);
+        expect(TNSGetOutput()).toBe("9223372036854775807");
+    });
+
+    it("functionWithFloat32ArrayBufferView", function () {
+        let array = Float32Array.from([ -3.4028234663852886e+38, 3.4028234663852886e+38, 1.1 ]);
+        let actual = functionWithFloatPtr(array);
+        expect(actual[0]).toBe(-3.4028234663852886e+38);
+        expect(actual[1]).toBe(3.4028234663852886e+38);
+        expect(actual[2]).toBeCloseTo(1.1, 5);
+        expect(TNSGetOutput()).toBe("-340282346638528859811704183484516925440.000000000000000000000000000000000000000000000");
+    });
+
+    it("functionWithFloat32ArrayBuffer", function () {
+        let array = Float32Array.from([ -3.4028234663852886e+38, 3.4028234663852886e+38, 1.1 ]).buffer;
+        let actual = functionWithFloatPtr(array);
+        expect(actual[0]).toBe(-3.4028234663852886e+38);
+        expect(actual[1]).toBe(3.4028234663852886e+38);
+        expect(actual[2]).toBeCloseTo(1.1, 5);
+        expect(TNSGetOutput()).toBe("-340282346638528859811704183484516925440.000000000000000000000000000000000000000000000");
+    });
+
+    it("functionWithFloat64ArrayBufferView", function () {
+        let array = Float64Array.from([ -Number.MAX_VALUE, Number.MAX_VALUE, 1.1 ]);
+        let actual = functionWithDoublePtr(array);
+        expect(actual[0]).toBe(-Number.MAX_VALUE);
+        expect(actual[1]).toBe(Number.MAX_VALUE);
+        expect(actual[2]).toBeCloseTo(1.1, 5);
+        expect(TNSGetOutput()).toBe("-179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    });
+
+    it("functionWithFloat64ArrayBuffer", function () {
+        let array = Float64Array.from([ -Number.MAX_VALUE, Number.MAX_VALUE, 1.1 ]).buffer;
+        let actual = functionWithDoublePtr(array);
+        expect(actual[0]).toBe(-Number.MAX_VALUE);
+        expect(actual[1]).toBe(Number.MAX_VALUE);
+        expect(actual[2]).toBeCloseTo(1.1, 5);
+        expect(TNSGetOutput()).toBe("-179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    });
+
     it("functionWithStructPtr", function () {
         var struct = new TNSNestedStruct({a: {x: 1, y: 2}, b: {x: 3, y: 4}});
         expect(TNSNestedStruct.equals(functionWithStructPtr(new interop.Reference(struct)).value, struct)).toBe(true);

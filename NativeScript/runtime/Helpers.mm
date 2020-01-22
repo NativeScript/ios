@@ -299,6 +299,30 @@ bool tns::IsArrayOrArrayLike(Isolate* isolate, Local<Value> value) {
     return obj->Has(context, ToV8String(isolate, "length")).FromMaybe(false);
 }
 
+void* tns::TryGetBufferFromArrayBuffer(v8::Local<v8::Value> value, bool& isArrayBuffer) {
+    isArrayBuffer = false;
+
+    if (value.IsEmpty() || (!value->IsArrayBuffer() && !value->IsArrayBufferView())) {
+        return nullptr;
+    }
+
+    Local<ArrayBuffer> buffer;
+    if (value->IsArrayBufferView()) {
+        isArrayBuffer = true;
+        buffer = value.As<ArrayBufferView>()->Buffer();
+    } else if (value->IsArrayBuffer()) {
+        isArrayBuffer = true;
+        buffer = value.As<ArrayBuffer>();
+    }
+
+    if (buffer.IsEmpty()) {
+        return nullptr;
+    }
+
+    void* data = buffer->GetBackingStore()->Data();
+    return data;
+}
+
 void tns::ExecuteOnMainThread(std::function<void ()> func, bool async) {
     if (async) {
         dispatch_async(dispatch_get_main_queue(), ^(void) {

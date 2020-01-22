@@ -20,6 +20,10 @@ using namespace v8;
 
 namespace tns {
 
+static constexpr uint64_t kUint64AllBitsSet = static_cast<uint64_t>(int64_t{-1});
+static constexpr int64_t kMinSafeInteger = static_cast<int64_t>(kUint64AllBitsSet << 53) + 1; // -9007199254740991 (-(2^53-1))
+static constexpr int64_t kMaxSafeInteger = -kMinSafeInteger; // 9007199254740991 (2^53-1)
+
 Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .reserved = 0,
     .size = sizeof(JSBlock),
@@ -148,6 +152,15 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             Interop::SetValue(dest, strCopy);
         } else {
             BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
+            if (wrapper == nullptr) {
+                bool isArrayBuffer = false;
+                void* data = tns::TryGetBufferFromArrayBuffer(arg, isArrayBuffer);
+                if (isArrayBuffer) {
+                    Interop::SetValue(dest, data);
+                    return;
+                }
+            }
+
             tns::Assert(wrapper != nullptr, isolate);
             if (wrapper->Type() == WrapperType::Pointer) {
                 PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
@@ -248,6 +261,15 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 data = calloc(structInfo.FFIType()->size, 1);
                 Interop::InitializeStruct(isolate, data, structInfo.Fields(), arg);
             } else {
+                if (wrapper == nullptr) {
+                    bool isArrayBuffer = false;
+                    void* data = tns::TryGetBufferFromArrayBuffer(arg, isArrayBuffer);
+                    if (isArrayBuffer) {
+                        Interop::SetValue(dest, data);
+                        return;
+                    }
+                }
+
                 tns::Assert(wrapper != nullptr, isolate);
 
                 if (wrapper->Type() == WrapperType::Pointer) {
@@ -1034,11 +1056,19 @@ Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodin
 
     if (type == BinaryTypeEncodingType::ULongLongEncoding) {
         unsigned long long result = call->GetResult<unsigned long long>();
+        if (result > kMaxSafeInteger) {
+            return BigInt::NewFromUnsigned(isolate, result);
+        }
+
         return Number::New(isolate, result);
     }
 
     if (type == BinaryTypeEncodingType::LongLongEncoding) {
         long long result = call->GetResult<long long>();
+        if (result < kMinSafeInteger || result > kMaxSafeInteger) {
+            return BigInt::New(isolate, result);
+        }
+
         return Number::New(isolate, result);
     }
 

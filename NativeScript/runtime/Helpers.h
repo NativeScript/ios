@@ -39,6 +39,7 @@ bool IsString(v8::Local<v8::Value> value);
 bool IsNumber(v8::Local<v8::Value> value);
 bool IsBool(v8::Local<v8::Value> value);
 bool IsArrayOrArrayLike(v8::Isolate* isolate, v8::Local<v8::Value> value);
+void* TryGetBufferFromArrayBuffer(v8::Local<v8::Value> value, bool& isArrayBuffer);
 
 void ExecuteOnMainThread(std::function<void ()> func, bool async = true);
 
