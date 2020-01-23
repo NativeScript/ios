@@ -75,3 +75,11 @@ void functionThrowsException() {
 @implementation TNSPropertyMethodConflictClass
 
 @end
+
+@implementation RectClass
+
+- (CGRect)getRect {
+    return CGRectMake(1, 2, 3, 4);
+}
+
+@end

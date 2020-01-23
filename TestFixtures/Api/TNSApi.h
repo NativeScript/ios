@@ -64,3 +64,11 @@ typedef UIColor NIKColor;
 @protocol TNSUnusedProtocol
 - (void)someMethod:(int)a;
 @end
+
+@protocol RectProtocol
+@optional
+- (CGRect)getRect;
+@end
+
+@interface RectClass : NSObject<RectProtocol>
+@end

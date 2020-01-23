@@ -1271,13 +1271,13 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
 
     FFICall call(cif);
 
-    std::unique_ptr<objc_super> sup = std::unique_ptr<objc_super>(new objc_super());
+    std::unique_ptr<objc_super> sup = std::make_unique<objc_super>();
 
     bool isInstanceMethod = (target && target != nil);
 
     if (initialParameterIndex > 1) {
 #if defined(__x86_64__)
-        if (metaType == MetaType::Undefined || metaType == MetaType::Union) {
+        if (metaType == MetaType::Undefined || metaType == MetaType::Union || metaType == MetaType::Struct) {
             const unsigned UNIX64_FLAG_RET_IN_MEM = (1 << 10);
 
             ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);

@@ -727,6 +727,15 @@ describe(module.id, function () {
         expect(activityManager instanceof CMMotionActivityManager).toBe(true);
     });
 
+    it("Optional method returning a structure should use objc_msgSend_stret on x86_64", () => {
+        let obj = RectClass.new();
+        let actual = obj.getRect();
+        expect(actual.origin.x).toBe(1);
+        expect(actual.origin.y).toBe(2);
+        expect(actual.size.width).toBe(3);
+        expect(actual.size.height).toBe(4);
+    });
+
 //     if (TNSIsConfigurationDebug) {
 //         it("ApiIterator", function () {
 //             var counter = 0;
