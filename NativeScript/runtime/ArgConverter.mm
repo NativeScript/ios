@@ -68,12 +68,12 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
     return Interop::CallFunction(isolate, meta, target, klass, args, callSuper);
 }
 
-Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, BaseDataWrapper* wrapper) {
+Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, BaseDataWrapper* wrapper, bool skipGCRegistration) {
     if (wrapper == nullptr) {
         return Null(isolate);
     }
 
-    Local<Value> result = CreateJsWrapper(isolate, wrapper, Local<Object>());
+    Local<Value> result = CreateJsWrapper(isolate, wrapper, Local<Object>(), skipGCRegistration);
     return result;
 }
 
@@ -117,27 +117,15 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
         Local<Context> context = isolate->GetCurrentContext();
         Local<Object> thiz = context->Global();
-        if (data->initialParamIndex_ > 0) {
+        if (data->initialParamIndex_ > 1) {
             id self_ = *static_cast<const id*>(argValues[0]);
             auto cache = Caches::Get(isolate);
             auto it = cache->Instances.find(self_);
             if (it != cache->Instances.end()) {
                 thiz = it->second->Get(data->isolate_).As<Object>();
             } else {
-                std::string className = object_getClassName(self_);
                 ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
-                thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>()).As<Object>();
-
-                auto it = cache->ClassPrototypes.find(className);
-                if (it != cache->ClassPrototypes.end()) {
-                    Local<Context> context = isolate->GetCurrentContext();
-                    thiz->SetPrototype(context, it->second->Get(isolate)).ToChecked();
-                }
-
-                //TODO: We are creating a persistent object here that will never be GCed
-                // We need to determine the lifetime of this object
-                std::shared_ptr<Persistent<Value>> poSelf = std::make_shared<Persistent<Value>>(data->isolate_, thiz);
-                cache->Instances.emplace(self_, poSelf);
+                thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>(), true).As<Object>();
             }
         }
 
@@ -336,18 +324,17 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
         result = [[klass alloc] init];
     }
 
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
-    Local<Object> thiz = info.This();
-    ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
-
     auto cache = Caches::Get(isolate);
     auto it = cache->Instances.find(result);
-    if (it == cache->Instances.end()) {
-        std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(isolate, thiz);
-        cache->Instances.emplace(result, poThiz);
-    } else {
+    if (it != cache->Instances.end()) {
         Local<Value> obj = it->second->Get(isolate);
         info.GetReturnValue().Set(obj);
+    } else {
+        ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
+        Local<Object> thiz = info.This();
+        ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
+        std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(isolate, thiz);
+        cache->Instances.emplace(result, poThiz);
     }
 }
 
@@ -521,7 +508,7 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Isolate* isolate, Loc
     return args;
 }
 
-Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver) {
+Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver, bool skipGCRegistration) {
     Local<Context> context = isolate->GetCurrentContext();
 
     if (wrapper == nullptr) {
@@ -564,14 +551,14 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
 
     auto cache = Caches::Get(isolate);
     if (receiver.IsEmpty()) {
-       auto it = cache->Instances.find(target);
-       if (it != cache->Instances.end()) {
-           receiver = it->second->Get(isolate).As<Object>();
-       } else {
-           std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context);
-           receiver = poValue->Get(isolate).As<Object>();
-           cache->Instances.emplace(target, poValue);
-       }
+        auto it = cache->Instances.find(target);
+        if (it != cache->Instances.end()) {
+            receiver = it->second->Get(isolate).As<Object>();
+        } else {
+            std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, skipGCRegistration);
+            receiver = poValue->Get(isolate).As<Object>();
+            cache->Instances.emplace(target, poValue);
+        }
     }
 
     Class klass = [target class];
@@ -686,11 +673,11 @@ const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
     return protocolMeta;
 }
 
-std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context) {
+std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context, bool skipGCRegistration) {
     Isolate* isolate = context->GetIsolate();
     Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyObjCtorFunc.get();
     tns::Assert(ctorFunc != nullptr, isolate);
-    return ArgConverter::CreateEmptyInstance(context, ctorFunc);
+    return ArgConverter::CreateEmptyInstance(context, ctorFunc, skipGCRegistration);
 }
 
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyStruct(Local<Context> context) {
@@ -700,7 +687,7 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyStruct(Local<Context
     return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
 
-std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(Local<Context> context, Persistent<v8::Function>* ctorFunc) {
+std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(Local<Context> context, Persistent<v8::Function>* ctorFunc, bool skipGCRegistration) {
     Isolate* isolate = context->GetIsolate();
     Local<v8::Function> emptyCtorFunc = ctorFunc->Get(isolate);
     Local<Value> value;
@@ -709,7 +696,12 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(Local<Conte
     }
     Local<Object> result = value.As<Object>();
 
-    std::shared_ptr<Persistent<Value>> poValue = ObjectManager::Register(isolate, result);
+    std::shared_ptr<Persistent<Value>> poValue;
+    if (!skipGCRegistration) {
+        poValue = ObjectManager::Register(isolate, result);
+    } else {
+        poValue = std::make_shared<Persistent<Value>>(isolate, result);
+    }
 
     return poValue;
 }
