@@ -176,7 +176,7 @@ void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
-    auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+    auto nano = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
     double timeStamp = nano.time_since_epoch().count();
 
     cache->Timers.insert(std::make_pair(label, timeStamp));
@@ -204,16 +204,17 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
         return;
     }
 
-    auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+    auto nano = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
     double endTimeStamp = nano.time_since_epoch().count();
     double startTimeStamp = itTimersMap->second;
 
     cache->Timers.erase(label);
 
-    auto diff = endTimeStamp - startTimeStamp;
+    double diffMicroseconds = endTimeStamp - startTimeStamp;
+    double diffMilliseconds = diffMicroseconds / 1000.0;
 
     std::stringstream ss;
-    ss << label << ": " << std::fixed << std::setprecision(2) << diff << "ms" ;
+    ss << label << ": " << std::fixed << std::setprecision(2) << diffMilliseconds << "ms" ;
 
     Local<v8::String> data = args.Data().As<v8::String>();
     std::string verbosityLevel = tns::ToString(isolate, data);
