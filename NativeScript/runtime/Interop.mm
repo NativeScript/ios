@@ -60,11 +60,11 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
     return blockPointer;
 }
 
-Local<Value> Interop::CallFunction(Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args) {
+Local<Value> Interop::CallFunction(Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, V8Args& args) {
     return Interop::CallFunctionInternal(isolate, true, functionPointer, typeEncoding, args, nil, nil, nil, false, MetaType::Undefined);
 }
 
-Local<Value> Interop::CallFunction(Isolate* isolate, const MethodMeta* meta, id target, Class clazz, const std::vector<Local<Value>> args, bool callSuper) {
+Local<Value> Interop::CallFunction(Isolate* isolate, const MethodMeta* meta, id target, Class clazz, V8Args& args, bool callSuper) {
     SEL selector = nil;
     void* functionPointer = nullptr;
     const TypeEncoding* typeEncoding = nullptr;
@@ -80,18 +80,18 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const MethodMeta* meta, id 
         functionPointer = (void*)objc_msgSend;
     }
 
-    bool provideErrorOutParameter = meta->hasErrorOutParameter() && args.size() < meta->encodings()->count - 1;
+    bool provideErrorOutParameter = meta->hasErrorOutParameter() && args.Length() < meta->encodings()->count - 1;
 
     return Interop::CallFunctionInternal(isolate, isPrimitiveFunction, functionPointer, typeEncoding, args, target, clazz, selector, callSuper, metaType, provideErrorOutParameter);
 }
 
-id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, const std::vector<Local<Value>> args) {
+id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, V8Args& args) {
     const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
     SEL selector = methodMeta->selector();
     void* functionPointer = (void*)objc_msgSend;
 
     int initialParameterIndex = 2;
-    int argsCount = initialParameterIndex + (int)args.size();
+    int argsCount = initialParameterIndex + (int)args.Length();
 
     ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, argsCount);
     FFICall call(cif);
@@ -107,7 +107,7 @@ id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id t
     return result;
 }
 
-void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, const std::vector<Local<Value>> args) {
+void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, V8Args& args) {
     const TypeEncoding* enc = typeEncoding;
     for (int i = initialParameterIndex; i < argsCount; i++) {
         enc = enc->next();
@@ -829,7 +829,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             ffi_cif* cif = FFICall::GetCif(enc, 1, argsCount);
             FFICall call(cif);
 
-            std::vector<Local<Value>> args = tns::ArgsToVector(info);
+            V8FunctionCallbackArgs args(info);
             Isolate* isolate = info.GetIsolate();
             Interop::SetValue(call.ArgumentBuffer(0), block);
             Interop::SetFFIParams(isolate, enc, &call, argsCount, 1, args);
@@ -865,7 +865,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             AnonymousFunctionWrapper* wrapper = static_cast<AnonymousFunctionWrapper*>(info.Data().As<External>()->Value());
             tns::Assert(wrapper != nullptr, isolate);
 
-            const std::vector<Local<Value>> args = tns::ArgsToVector(info);
+            V8FunctionCallbackArgs args(info);
             void* functionPointer = wrapper->Data();
             const TypeEncoding* typeEncoding = wrapper->ParametersEncoding();
 
@@ -1250,10 +1250,10 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
     return result.As<v8::Array>();
 }
 
-Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType, bool provideErrorOurParameter) {
+Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, V8Args& args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType, bool provideErrorOurParameter) {
     int initialParameterIndex = isPrimitiveFunction ? 0 : 2;
 
-    int argsCount = initialParameterIndex + (int)args.size();
+    int argsCount = initialParameterIndex + (int)args.Length();
     int cifArgsCount = provideErrorOurParameter ? argsCount + 1 : argsCount;
 
     ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, cifArgsCount);

@@ -34,6 +34,74 @@ enum class WrapperType {
     Worker,
 };
 
+struct V8Args {
+public:
+    virtual v8::Local<v8::Value> operator[](int i) const = 0;
+    virtual size_t Length() = 0;
+};
+
+struct V8FunctionCallbackArgs: public V8Args {
+public:
+    V8FunctionCallbackArgs(const v8::FunctionCallbackInfo<v8::Value>& info)
+        : info_(info) {
+    }
+
+    v8::Local<v8::Value> operator[](int i) const override {
+        return this->info_[i];
+    }
+
+    size_t Length() override {
+        return this->info_.Length();
+    }
+private:
+    const v8::FunctionCallbackInfo<v8::Value>& info_;
+};
+
+struct V8VectorArgs: public V8Args {
+public:
+    V8VectorArgs(const std::vector<v8::Local<v8::Value>>& args)
+        : args_(args) {
+    }
+
+    v8::Local<v8::Value> operator[](int i) const override {
+        return this->args_[i];
+    }
+
+    size_t Length() override {
+        return this->args_.size();
+    }
+private:
+    const std::vector<v8::Local<v8::Value>>& args_;
+};
+
+struct V8SimpleValueArgs: public V8Args {
+public:
+    V8SimpleValueArgs(v8::Local<v8::Value>& value)
+        : value_(value) {
+    }
+
+    v8::Local<v8::Value> operator[](int i) const override {
+        return this->value_;
+    }
+
+    size_t Length() override {
+        return 1;
+    }
+private:
+    v8::Local<v8::Value>& value_;
+};
+
+struct V8EmptyValueArgs: public V8Args {
+public:
+    v8::Local<v8::Value> operator[](int i) const override {
+        return v8::Local<v8::Value>();
+    }
+
+    size_t Length() override {
+        return 0;
+    }
+};
+
 struct StructField {
 public:
     StructField(ptrdiff_t offset, ffi_type* ffiType, std::string name, const TypeEncoding* encoding)

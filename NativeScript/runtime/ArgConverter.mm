@@ -19,7 +19,7 @@ void ArgConverter::Init(Isolate* isolate, GenericNamedPropertyGetterCallback str
     cache->EmptyStructCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter));
 }
 
-Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, const std::vector<Local<Value>> args, const MethodMeta* meta, bool isMethodCallback) {
+Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, V8Args& args, const MethodMeta* meta, bool isMethodCallback) {
     id target = nil;
     bool instanceMethod = !receiver.IsEmpty();
     bool callSuper = false;
@@ -38,7 +38,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         callSuper = isMethodCallback && it != cache->ClassPrototypes.end();
     }
 
-    if (args.size() != meta->encodings()->count - 1) {
+    if (args.Length() != meta->encodings()->count - 1) {
         // Arguments number mismatch -> search for a possible method overload in the class hierarchy
         std::string methodName = meta->jsName();
         std::string className = class_getName(klass);
@@ -48,7 +48,7 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         if (overloads.size() > 0) {
             for (auto it = overloads.begin(); it != overloads.end(); it++) {
                 const MethodMeta* methodMeta = (*it);
-                if (args.size() == methodMeta->encodings()->count - 1) {
+                if (args.Length() == methodMeta->encodings()->count - 1) {
                     meta = methodMeta;
                     break;
                 }
@@ -57,10 +57,10 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
     }
 
     int argsCount = meta->encodings()->count - 1;
-    if ((!meta->hasErrorOutParameter() && args.size() != argsCount) ||
-        (meta->hasErrorOutParameter() && args.size() != argsCount && args.size() != argsCount - 1)) {
+    if ((!meta->hasErrorOutParameter() && args.Length() != argsCount) ||
+        (meta->hasErrorOutParameter() && args.Length() != argsCount && args.Length() != argsCount - 1)) {
         std::ostringstream errorStream;
-        errorStream << "Actual arguments count: \"" << argsCount << ". Expected: \"" << args.size() << "\".";
+        errorStream << "Actual arguments count: \"" << argsCount << ". Expected: \"" << args.Length() << "\".";
         std::string errorMessage = errorStream.str();
         throw NativeScriptException(errorMessage);
     }
@@ -317,7 +317,8 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
         const MethodMeta* initializer = ArgConverter::FindInitializer(isolate, klass, interfaceMeta, info, args);
         result = [klass alloc];
 
-        result = Interop::CallInitializer(isolate, initializer, result, klass, args);
+        V8VectorArgs vectorArgs(args);
+        result = Interop::CallInitializer(isolate, initializer, result, klass, vectorArgs);
     }
 
     if (result == nil) {

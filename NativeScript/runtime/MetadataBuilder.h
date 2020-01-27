@@ -34,7 +34,7 @@ private:
     static void ToStringFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static std::pair<ffi_type*, void*> GetStructData(v8::Isolate* isolate, v8::Local<v8::Object> initializer, StructInfo structInfo);
 
-    static v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, const std::vector<v8::Local<v8::Value>> args, std::string containingClass, bool isMethodCallback);
+    static v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, V8Args& args, std::string containingClass, bool isMethodCallback);
     static void RegisterAllocMethod(v8::Isolate* isolate, v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
     static void RegisterInstanceMethods(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::unordered_map<std::string, uint8_t>& names);
     static void RegisterInstanceProperties(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, std::unordered_map<std::string, uint8_t>& names);

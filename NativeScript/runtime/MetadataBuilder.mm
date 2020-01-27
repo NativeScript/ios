@@ -622,7 +622,7 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
     CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(info.Data().As<External>()->Value());
 
     bool instanceMethod = info.This()->InternalFieldCount() > 0;
-    std::vector<Local<Value>> args = tns::ArgsToVector(info);
+    V8FunctionCallbackArgs args(info);
 
     std::string className = item->className_;
 
@@ -658,7 +658,8 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value> &
         return;
     }
 
-    Local<Value> result = InvokeMethod(isolate, item->meta_->getter(), receiver, { }, item->className_, true);
+    V8EmptyValueArgs args;
+    Local<Value> result = MetadataBuilder::InvokeMethod(isolate, item->meta_->getter(), receiver, args, item->className_, true);
     if (!result.IsEmpty()) {
         info.GetReturnValue().Set(result);
     }
@@ -675,7 +676,8 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value> &
 
     Local<Object> receiver = info.This();
     Local<Value> value = info[0];
-    MetadataBuilder::InvokeMethod(isolate, item->meta_->setter(), receiver, { value }, item->className_, true);
+    V8SimpleValueArgs args(value);
+    MetadataBuilder::InvokeMethod(isolate, item->meta_->setter(), receiver, args, item->className_, true);
 }
 
 void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const PropertyCallbackInfo<Value> &info) {
@@ -687,7 +689,8 @@ void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const Propert
         return;
     }
 
-    Local<Value> result = MetadataBuilder::InvokeMethod(isolate, item->meta_->getter(), Local<Object>(), { }, item->className_, false);
+    V8EmptyValueArgs args;
+    Local<Value> result = MetadataBuilder::InvokeMethod(isolate, item->meta_->getter(), Local<Object>(), args, item->className_, false);
     if (!result.IsEmpty()) {
         info.GetReturnValue().Set(result);
     }
@@ -702,7 +705,8 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
         return;
     }
 
-    MetadataBuilder::InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), { value }, item->className_, false);
+    V8SimpleValueArgs args(value);
+    MetadataBuilder::InvokeMethod(isolate, item->meta_->setter(), Local<Object>(), args, item->className_, false);
 }
 
 void MetadataBuilder::StructPropertyGetterCallback(Local<Name> property, const PropertyCallbackInfo<Value>& info) {
@@ -782,7 +786,7 @@ void MetadataBuilder::DefineFunctionLengthProperty(Local<Context> context, const
     tns::Assert(success, isolate);
 }
 
-Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, const std::vector<Local<Value>> args, std::string containingClass, bool isMethodCallback) {
+Local<Value> MetadataBuilder::InvokeMethod(Isolate* isolate, const MethodMeta* meta, Local<Object> receiver, V8Args& args, std::string containingClass, bool isMethodCallback) {
     Class klass = objc_getClass(containingClass.c_str());
     // TODO: Find out if the isMethodCallback property can be determined based on a UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
 
@@ -814,13 +818,14 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
                     localArgs.push_back(arg);
                 }
                 const TypeEncoding* typeEncoding = item->meta_->encodings()->first();
-                Interop::CallFunction(isolate, item->userData_, typeEncoding, localArgs);
+                V8VectorArgs vectorArgs(localArgs);
+                Interop::CallFunction(isolate, item->userData_, typeEncoding, vectorArgs);
             });
 
             return;
         }
 
-        std::vector<Local<Value>> args = tns::ArgsToVector(info);
+        V8FunctionCallbackArgs args(info);
         const TypeEncoding* typeEncoding = item->meta_->encodings()->first();
         Local<Value> result = Interop::CallFunction(isolate, item->userData_, typeEncoding, args);
 
