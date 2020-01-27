@@ -170,6 +170,7 @@ StructInfo FFICall::GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldE
     }
 
     std::vector<StructField> fields;
+    fields.reserve(fieldsCount);
     ffi_type* ffiType = new ffi_type({ .size = 0, .alignment = 0, .type = FFI_TYPE_STRUCT });
 
     ffiType->elements = new ffi_type*[fieldsCount + 1];

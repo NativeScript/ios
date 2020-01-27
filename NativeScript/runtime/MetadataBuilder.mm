@@ -813,6 +813,7 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
                 Isolate::Scope isolate_scope(isolate);
                 HandleScope handle_scope(isolate);
                 std::vector<Local<Value>> localArgs;
+                localArgs.reserve(args.size());
                 for (int i = 0; i < args.size(); i++) {
                     Local<Value> arg = args[i]->Get(isolate);
                     localArgs.push_back(arg);

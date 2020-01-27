@@ -93,6 +93,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         bool hasErrorOutParameter = false;
 
         std::vector<Local<Value>> v8Args;
+        v8Args.reserve(data->paramsCount_);
         const TypeEncoding* typeEncoding = data->typeEncoding_;
         for (int i = 0; i < data->paramsCount_; i++) {
             typeEncoding = typeEncoding->next();

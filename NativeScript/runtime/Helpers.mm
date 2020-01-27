@@ -267,6 +267,7 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
 
 std::vector<Local<Value>> tns::ArgsToVector(const FunctionCallbackInfo<Value>& info) {
     std::vector<Local<Value>> args;
+    args.reserve(info.Length());
     for (int i = 0; i < info.Length(); i++) {
         args.push_back(info[i]);
     }

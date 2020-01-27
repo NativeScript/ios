@@ -44,6 +44,7 @@ public:
         stackSize += malloc_good_size(std::max(cif->rtype->size, sizeof(ffi_arg)));
 
         std::vector<size_t> argValueOffsets;
+        argValueOffsets.reserve(argsCount);
         for (size_t i = 0; i < argsCount; i++) {
             argValueOffsets.push_back(stackSize);
             ffi_type* argType = cif->arg_types[i];
