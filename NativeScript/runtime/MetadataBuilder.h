@@ -52,21 +52,15 @@ private:
 
     template<class T>
     struct CacheItem {
-        CacheItem(const T* meta, const std::string className)
+        CacheItem(const T* meta, const std::string className, void* userData = nullptr)
         : meta_(meta),
-          className_(className) {
+          className_(className),
+          userData_(userData) {
             static_assert(std::is_base_of<Meta, T>::value, "Derived not derived from Meta");
         }
         const T* meta_;
         const std::string className_;
-    };
-
-    struct TaskContext {
-    public:
-        TaskContext(v8::Isolate* isolate, const FunctionMeta* meta, std::vector<v8::Persistent<v8::Value>*> args): isolate_(isolate), meta_(meta), args_(args) {}
-        v8::Isolate* isolate_;
-        const FunctionMeta* meta_;
-        std::vector<v8::Persistent<v8::Value>*> args_;
+        void* userData_;
     };
 };
 

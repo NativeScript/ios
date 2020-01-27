@@ -60,17 +60,6 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
     return blockPointer;
 }
 
-Local<Value> Interop::CallFunction(Isolate* isolate, const FunctionMeta* meta, const std::vector<Local<Value>> args) {
-    void* functionPointer = SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
-    if (!functionPointer) {
-        Log(@"Unable to load \"%s\" function", meta->name());
-        tns::Assert(false, isolate);
-    }
-
-    const TypeEncoding* typeEncoding = meta->encodings()->first();
-    return Interop::CallFunction(isolate, functionPointer, typeEncoding, args);
-}
-
 Local<Value> Interop::CallFunction(Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<Local<Value>> args) {
     return Interop::CallFunctionInternal(isolate, true, functionPointer, typeEncoding, args, nil, nil, nil, false, MetaType::Undefined);
 }

@@ -2,21 +2,20 @@
 
 namespace tns {
 
-void Tasks::Register(TaskCallback task, void* userData) {
-    TaskContext* context = new TaskContext(task, userData);
-    tasks_.push_back(context);
+void Tasks::Register(std::function<void()> task) {
+    tasks_.push_back(task);
 }
 
 void Tasks::Drain() {
     auto i = std::begin(tasks_);
     while (i != std::end(tasks_)) {
-        TaskContext* context = *i;
-        context->task_(context->userData_);
+        std::function<void()> task = *i;
+        task();
         i = tasks_.erase(i);
         ++i;
     }
 }
 
-std::vector<Tasks::TaskContext*> Tasks::tasks_;
+std::vector<std::function<void()>> Tasks::tasks_;
 
 }

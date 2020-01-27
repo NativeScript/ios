@@ -74,9 +74,15 @@ void MetadataBuilder::GlobalPropertyGetter(Local<Name> property, const PropertyC
         }
 
         const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
+        void* functionPointer = SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
+        if (functionPointer == nullptr) {
+            Log(@"Unable to load \"%s\" function", meta->name());
+            tns::Assert(false, isolate);
+        }
+
         Local<Context> context = isolate->GetCurrentContext();
 
-        CacheItem<FunctionMeta>* item = new CacheItem<FunctionMeta>(funcMeta, std::string());
+        CacheItem<FunctionMeta>* item = new CacheItem<FunctionMeta>(funcMeta, std::string(), functionPointer);
         Local<External> ext = External::New(isolate, item);
         Local<v8::Function> func;
         bool success = v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func);
@@ -794,29 +800,31 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
         CacheItem<FunctionMeta>* item = static_cast<CacheItem<FunctionMeta>*>(info.Data().As<External>()->Value());
 
         if (strcmp(item->meta_->jsName(), "UIApplicationMain") == 0) {
-            std::vector<Persistent<Value>*> args;
+            std::vector<std::shared_ptr<Persistent<Value>>> args;
             for (int i = 0; i < info.Length(); i++) {
-                args.push_back(new Persistent<Value>(isolate, info[i]));
+                args.push_back(std::make_shared<Persistent<Value>>(isolate, info[i]));
             }
 
-            void* userData = new TaskContext(isolate, item->meta_, args);
-            Tasks::Register([](void* userData) {
-                TaskContext* context = static_cast<TaskContext*>(userData);
-                std::vector<Local<Value>> args;
-                Isolate::Scope isolate_scope(context->isolate_);
-                HandleScope handle_scope(context->isolate_);
-                for (int i = 0; i < context->args_.size(); i++) {
-                    Local<Value> arg = context->args_[i]->Get(context->isolate_);
-                    args.push_back(arg);
+            Tasks::Register([isolate, item, args]() {
+                Isolate::Scope isolate_scope(isolate);
+                HandleScope handle_scope(isolate);
+                std::vector<Local<Value>> localArgs;
+                for (int i = 0; i < args.size(); i++) {
+                    Local<Value> arg = args[i]->Get(isolate);
+                    localArgs.push_back(arg);
                 }
-                Interop::CallFunction(context->isolate_, context->meta_, args);
-            }, userData);
+                const TypeEncoding* typeEncoding = item->meta_->encodings()->first();
+                Interop::CallFunction(isolate, item->userData_, typeEncoding, localArgs);
+            });
+
             return;
         }
 
         std::vector<Local<Value>> args = tns::ArgsToVector(info);
-        Local<Value> result = Interop::CallFunction(isolate, item->meta_, args);
-        if (item->meta_->encodings()->first()->type != BinaryTypeEncodingType::VoidEncoding) {
+        const TypeEncoding* typeEncoding = item->meta_->encodings()->first();
+        Local<Value> result = Interop::CallFunction(isolate, item->userData_, typeEncoding, args);
+
+        if (typeEncoding->type != BinaryTypeEncodingType::VoidEncoding) {
             info.GetReturnValue().Set(result);
         }
     } catch (NativeScriptException& ex) {

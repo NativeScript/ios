@@ -19,7 +19,6 @@ public:
     static IMP CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static id CallInitializer(v8::Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args);
     static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const MethodMeta* meta, id target, Class clazz, const std::vector<v8::Local<v8::Value>> args, bool callSuper);
-    static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, const FunctionMeta* meta, const std::vector<v8::Local<v8::Value>> args);
     static v8::Local<v8::Value> CallFunction(v8::Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, const std::vector<v8::Local<v8::Value>> args);
     static v8::Local<v8::Value> GetResult(v8::Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<v8::Persistent<v8::Value>> parentStruct = nullptr, bool isStructMember = false);
     static void SetStructPropertyValue(v8::Isolate* isolate, StructWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
