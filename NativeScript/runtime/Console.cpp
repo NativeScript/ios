@@ -214,7 +214,7 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
     double diffMilliseconds = diffMicroseconds / 1000.0;
 
     std::stringstream ss;
-    ss << label << ": " << std::fixed << std::setprecision(2) << diffMilliseconds << "ms" ;
+    ss << "CONSOLE INFO " << label << ": " << std::fixed << std::setprecision(3) << diffMilliseconds << "ms" ;
 
     Local<v8::String> data = args.Data().As<v8::String>();
     std::string verbosityLevel = tns::ToString(isolate, data);
