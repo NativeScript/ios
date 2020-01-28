@@ -34,8 +34,8 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
 IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData) {
     void* functionPointer;
     ffi_closure* closure = static_cast<ffi_closure*>(ffi_closure_alloc(sizeof(ffi_closure), &functionPointer));
-    ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParamIndex, initialParamIndex + argsCount);
-    ffi_status status = ffi_prep_closure_loc(closure, cif, callback, userData, functionPointer);
+    ParametrizedCall* call = ParametrizedCall::Get(typeEncoding, initialParamIndex, initialParamIndex + argsCount);
+    ffi_status status = ffi_prep_closure_loc(closure, call->Cif, callback, userData, functionPointer);
     tns::Assert(status == FFI_OK);
 
     return (IMP)functionPointer;
@@ -93,14 +93,14 @@ id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id t
     int initialParameterIndex = 2;
     int argsCount = initialParameterIndex + (int)args.Length();
 
-    ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, argsCount);
-    FFICall call(cif);
+    ParametrizedCall* parametrizedCall = ParametrizedCall::Get(typeEncoding, initialParameterIndex, argsCount);
+    FFICall call(parametrizedCall);
 
     Interop::SetValue(call.ArgumentBuffer(0), target);
     Interop::SetValue(call.ArgumentBuffer(1), selector);
     Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
 
-    ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+    ffi_call(parametrizedCall->Cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
     id result = call.GetResult<id>();
 
@@ -826,15 +826,15 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             int argsCount = typeEncoding->details.block.signature.count;
             const TypeEncoding* enc = typeEncoding->details.block.signature.first();
 
-            ffi_cif* cif = FFICall::GetCif(enc, 1, argsCount);
-            FFICall call(cif);
+            ParametrizedCall* parametrizedCall = ParametrizedCall::Get(enc, 1, argsCount);
+            FFICall call(parametrizedCall);
 
             V8FunctionCallbackArgs args(info);
             Isolate* isolate = info.GetIsolate();
             Interop::SetValue(call.ArgumentBuffer(0), block);
             Interop::SetFFIParams(isolate, enc, &call, argsCount, 1, args);
 
-            ffi_call(cif, FFI_FN(block->invoke), call.ResultBuffer(), call.ArgsArray());
+            ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(), call.ArgsArray());
 
             Local<Value> result = Interop::GetResult(isolate, enc, &call, true, nullptr);
 
@@ -1256,9 +1256,9 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
     int argsCount = initialParameterIndex + (int)args.Length();
     int cifArgsCount = provideErrorOurParameter ? argsCount + 1 : argsCount;
 
-    ffi_cif* cif = FFICall::GetCif(typeEncoding, initialParameterIndex, cifArgsCount);
+    ParametrizedCall* parametrizedCall = ParametrizedCall::Get(typeEncoding, initialParameterIndex, cifArgsCount);
 
-    FFICall call(cif);
+    FFICall call(parametrizedCall);
 
     std::unique_ptr<objc_super> sup = std::make_unique<objc_super>();
 
@@ -1273,7 +1273,7 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
 
             if (returnType->type == FFI_TYPE_LONGDOUBLE) {
                 functionPointer = (void*)objc_msgSend_fpret;
-            } else if (returnType->type == FFI_TYPE_STRUCT && (cif->flags & UNIX64_FLAG_RET_IN_MEM)) {
+            } else if (returnType->type == FFI_TYPE_STRUCT && (parametrizedCall->Cif->flags & UNIX64_FLAG_RET_IN_MEM)) {
                 if (callSuper) {
                     functionPointer = (void*)objc_msgSendSuper_stret;
                 } else {
@@ -1313,7 +1313,7 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
     }
 
     @try {
-        ffi_call(cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+        ffi_call(parametrizedCall->Cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
     } @catch (NSException* e) {
         std::string message = [[e description] UTF8String];
         throw NativeScriptException(message);

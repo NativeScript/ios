@@ -245,36 +245,36 @@ StructInfo FFICall::GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldE
     return structInfo;
 }
 
-ffi_cif* FFICall::GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) {
-    ffi_cif* cif = nullptr;
-    auto it = cifCache_.find(typeEncoding);
-    if (it != cifCache_.end()) {
-        cif = it->second;
-    } else {
-        const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount]();
-        ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
-
-        for (int i = 0; i < initialParameterIndex; i++) {
-            parameterTypesFFITypes[i] = &ffi_type_pointer;
-        }
-
-        const TypeEncoding* enc = typeEncoding;
-        for (int i = initialParameterIndex; i < argsCount; i++) {
-            enc = enc->next();
-            parameterTypesFFITypes[i] = FFICall::GetArgumentType(enc);
-        }
-
-        cif = new ffi_cif();
-        ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
-        tns::Assert(status == FFI_OK);
-
-        cifCache_.insert(std::make_pair(typeEncoding, cif));
+ParametrizedCall* ParametrizedCall::Get(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) {
+    auto it = callsCache_.find(typeEncoding);
+    if (it != callsCache_.end()) {
+        return it->second;
     }
 
-    return cif;
+    const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount]();
+    ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
+
+    for (int i = 0; i < initialParameterIndex; i++) {
+        parameterTypesFFITypes[i] = &ffi_type_pointer;
+    }
+
+    const TypeEncoding* enc = typeEncoding;
+    for (int i = initialParameterIndex; i < argsCount; i++) {
+        enc = enc->next();
+        parameterTypesFFITypes[i] = FFICall::GetArgumentType(enc);
+    }
+
+    ffi_cif* cif = new ffi_cif();
+    ffi_status status = ffi_prep_cif(cif, FFI_DEFAULT_ABI, argsCount, returnType, const_cast<ffi_type**>(parameterTypesFFITypes));
+    tns::Assert(status == FFI_OK);
+
+    ParametrizedCall* call = new ParametrizedCall(cif);
+    callsCache_.emplace(typeEncoding, call);
+
+    return call;
 }
 
-std::unordered_map<const TypeEncoding*, ffi_cif*> FFICall::cifCache_;
+std::unordered_map<const TypeEncoding*, ParametrizedCall*> ParametrizedCall::callsCache_;
 std::unordered_map<std::string, StructInfo> FFICall::structInfosCache_;
 
 }

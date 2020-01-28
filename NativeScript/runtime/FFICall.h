@@ -11,7 +11,10 @@ namespace tns {
 
 class BaseCall {
 public:
-    BaseCall(uint8_t* buffer, size_t returnOffset = 0): buffer_(buffer), returnOffset_(returnOffset) { }
+    BaseCall(uint8_t* buffer, size_t returnOffset = 0)
+        : buffer_(buffer),
+          returnOffset_(returnOffset) {
+    }
 
     ~BaseCall() {
     }
@@ -29,33 +32,50 @@ protected:
     size_t returnOffset_;
 };
 
-class FFICall: public BaseCall {
+class ParametrizedCall {
 public:
-    FFICall(ffi_cif* cif): BaseCall(nullptr) {
+    ParametrizedCall(ffi_cif* cif)
+        : Cif(cif),
+          ReturnOffset(0),
+          StackSize(0) {
         unsigned int argsCount = cif->nargs;
-        size_t stackSize = 0;
+        this->StackSize = 0;
 
         if (argsCount > 0) {
-            stackSize = malloc_good_size(sizeof(void* [argsCount]));
+            this->StackSize = malloc_good_size(sizeof(void* [argsCount]));
         }
 
-        this->returnOffset_ = stackSize;
+        this->ReturnOffset = this->StackSize;
 
-        stackSize += malloc_good_size(std::max(cif->rtype->size, sizeof(ffi_arg)));
+        this->StackSize += malloc_good_size(std::max(cif->rtype->size, sizeof(ffi_arg)));
 
-        std::vector<size_t> argValueOffsets;
-        argValueOffsets.reserve(argsCount);
+        this->ArgValueOffsets.reserve(argsCount);
         for (size_t i = 0; i < argsCount; i++) {
-            argValueOffsets.push_back(stackSize);
+            this->ArgValueOffsets.push_back(this->StackSize);
             ffi_type* argType = cif->arg_types[i];
-            stackSize += malloc_good_size(std::max(argType->size, sizeof(ffi_arg)));
+            this->StackSize += malloc_good_size(std::max(argType->size, sizeof(ffi_arg)));
         }
+    }
 
-        this->buffer_ = reinterpret_cast<uint8_t*>(calloc(1, stackSize));
+    static ParametrizedCall* Get(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
+
+    ffi_cif* Cif;
+    size_t ReturnOffset;
+    size_t StackSize;
+    std::vector<size_t> ArgValueOffsets;
+private:
+    static std::unordered_map<const TypeEncoding*, ParametrizedCall*> callsCache_;
+};
+
+class FFICall: public BaseCall {
+public:
+    FFICall(ParametrizedCall* parametrizedCall): BaseCall(nullptr) {
+        this->returnOffset_ = parametrizedCall->ReturnOffset;
+        this->buffer_ = reinterpret_cast<uint8_t*>(calloc(1, parametrizedCall->StackSize));
 
         this->argsArray_ = reinterpret_cast<void**>(this->buffer_);
-        for (size_t i = 0; i < argsCount; i++) {
-            this->argsArray_[i] = this->buffer_ + argValueOffsets[i];
+        for (size_t i = 0; i < parametrizedCall->Cif->nargs; i++) {
+            this->argsArray_[i] = this->buffer_ + parametrizedCall->ArgValueOffsets[i];
         }
     }
 
@@ -66,7 +86,6 @@ public:
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding, bool isStructMember = false);
     static StructInfo GetStructInfo(const StructMeta* structMeta, std::string structName = "");
     static StructInfo GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldEncoding, const String* fieldNames, std::string structName = "");
-    static ffi_cif* GetCif(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount);
 
     void* ArgumentBuffer(unsigned index) {
         return this->argsArray_[index];
@@ -76,7 +95,6 @@ public:
         return this->argsArray_;
     }
 private:
-    static std::unordered_map<const TypeEncoding*, ffi_cif*> cifCache_;
     static std::unordered_map<std::string, StructInfo> structInfosCache_;
     void** argsArray_;
 };
