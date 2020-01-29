@@ -3,6 +3,7 @@
 
 #include <string>
 #include "ConcurrentMap.h"
+#include "robin_hood.h"
 #include "Common.h"
 #include "Metadata.h"
 
@@ -52,23 +53,23 @@ public:
     static std::shared_ptr<Caches> Get(v8::Isolate* isolate);
     static void Remove(v8::Isolate* isolate);
 
-    std::unordered_map<const Meta*, std::unique_ptr<v8::Persistent<v8::Value>>> Prototypes;
-    std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Object>>> ClassPrototypes;
-    std::unordered_map<const BaseClassMeta*, std::unique_ptr<v8::Persistent<v8::FunctionTemplate>>> CtorFuncTemplates;
-    std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> CtorFuncs;
-    std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> ProtocolCtorFuncs;
-    std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> StructConstructorFunctions;
-    std::unordered_map<BinaryTypeEncodingType, std::unique_ptr<v8::Persistent<v8::Object>>> PrimitiveInteropTypes;
-    std::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> CFunctions;
+    robin_hood::unordered_map<const Meta*, std::unique_ptr<v8::Persistent<v8::Value>>> Prototypes;
+    robin_hood::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Object>>> ClassPrototypes;
+    robin_hood::unordered_map<const BaseClassMeta*, std::unique_ptr<v8::Persistent<v8::FunctionTemplate>>> CtorFuncTemplates;
+    robin_hood::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> CtorFuncs;
+    robin_hood::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> ProtocolCtorFuncs;
+    robin_hood::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> StructConstructorFunctions;
+    robin_hood::unordered_map<BinaryTypeEncodingType, std::unique_ptr<v8::Persistent<v8::Object>>> PrimitiveInteropTypes;
+    robin_hood::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Function>>> CFunctions;
 
-    std::map<id, std::shared_ptr<v8::Persistent<v8::Value>>> Instances;
-    std::unordered_map<std::pair<void*, std::string>, std::shared_ptr<v8::Persistent<v8::Value>>, pair_hash> StructInstances;
-    std::unordered_map<const void*, std::shared_ptr<v8::Persistent<v8::Object>>> PointerInstances;
+    robin_hood::unordered_map<id, std::shared_ptr<v8::Persistent<v8::Value>>> Instances;
+    robin_hood::unordered_map<std::pair<void*, std::string>, std::shared_ptr<v8::Persistent<v8::Value>>, pair_hash> StructInstances;
+    robin_hood::unordered_map<const void*, std::shared_ptr<v8::Persistent<v8::Object>>> PointerInstances;
 
     std::function<v8::Local<v8::FunctionTemplate>(v8::Isolate* isolate, const BaseClassMeta*)> ObjectCtorInitializer;
     std::function<v8::Local<v8::Function>(v8::Isolate*, StructInfo)> StructCtorInitializer;
-    std::unordered_map<std::string, double> Timers;
-    std::unordered_map<const InterfaceMeta*, std::vector<const MethodMeta*>> Initializers;
+    robin_hood::unordered_map<std::string, double> Timers;
+    robin_hood::unordered_map<const InterfaceMeta*, std::vector<const MethodMeta*>> Initializers;
 
     std::unique_ptr<v8::Persistent<v8::Function>> ToStringFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
     std::unique_ptr<v8::Persistent<v8::Function>> EmptyObjCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);

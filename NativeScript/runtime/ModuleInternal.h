@@ -2,7 +2,7 @@
 #define ModuleInternal_h
 
 #include "Common.h"
-#include <unordered_map>
+#include "robin_hood.h"
 
 namespace tns {
 
@@ -26,7 +26,7 @@ private:
 
     std::unique_ptr<v8::Persistent<v8::Function>> requireFunction_;
     std::unique_ptr<v8::Persistent<v8::Function>> requireFactoryFunction_;
-    std::unordered_map<std::string, std::shared_ptr<v8::Persistent<v8::Object>>> loadedModules_;
+    robin_hood::unordered_map<std::string, std::shared_ptr<v8::Persistent<v8::Object>>> loadedModules_;
 
     struct TempModule {
     public:

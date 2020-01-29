@@ -179,7 +179,7 @@ void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
     auto nano = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now());
     double timeStamp = nano.time_since_epoch().count();
 
-    cache->Timers.insert(std::make_pair(label, timeStamp));
+    cache->Timers.emplace(label, timeStamp);
 }
 
 void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {

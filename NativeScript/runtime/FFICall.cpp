@@ -240,7 +240,7 @@ StructInfo FFICall::GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldE
 
     StructInfo structInfo(structName, ffiType, fields);
 
-    structInfosCache_.insert(std::make_pair(structName, structInfo));
+    structInfosCache_.emplace(structName, structInfo);
 
     return structInfo;
 }
@@ -274,7 +274,7 @@ ParametrizedCall* ParametrizedCall::Get(const TypeEncoding* typeEncoding, const 
     return call;
 }
 
-std::unordered_map<const TypeEncoding*, ParametrizedCall*> ParametrizedCall::callsCache_;
-std::unordered_map<std::string, StructInfo> FFICall::structInfosCache_;
+robin_hood::unordered_map<const TypeEncoding*, ParametrizedCall*> ParametrizedCall::callsCache_;
+robin_hood::unordered_map<std::string, StructInfo> FFICall::structInfosCache_;
 
 }

@@ -2,7 +2,7 @@
 #define ConcurrentMap_h
 
 #include <shared_mutex>
-#include <unordered_map>
+#include "robin_hood.h"
 
 namespace tns {
 
@@ -47,7 +47,7 @@ public:
     ConcurrentMap& operator=(const ConcurrentMap&) = delete;
 private:
     std::mutex containerMutex_;
-    std::unordered_map<TKey, TValue> container_;
+    robin_hood::unordered_map<TKey, TValue> container_;
 };
 
 }

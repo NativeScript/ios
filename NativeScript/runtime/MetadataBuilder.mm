@@ -263,12 +263,12 @@ std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Isolate* isolate, Loc
 }
 
 Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(Isolate* isolate, const BaseClassMeta* meta) {
-    std::unordered_map<std::string, uint8_t> instanceMembers;
-    std::unordered_map<std::string, uint8_t> staticMembers;
+    robin_hood::unordered_map<std::string, uint8_t> instanceMembers;
+    robin_hood::unordered_map<std::string, uint8_t> staticMembers;
     return MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(isolate, meta, instanceMembers, staticMembers);
 }
 
-Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(Isolate* isolate, const BaseClassMeta* meta, std::unordered_map<std::string, uint8_t>& instanceMembers, std::unordered_map<std::string, uint8_t>& staticMembers) {
+Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(Isolate* isolate, const BaseClassMeta* meta, robin_hood::unordered_map<std::string, uint8_t>& instanceMembers, robin_hood::unordered_map<std::string, uint8_t>& staticMembers) {
     Local<FunctionTemplate> ctorFuncTemplate;
     auto cache = Caches::Get(isolate);
     auto it = cache->CtorFuncTemplates.find(meta);
@@ -330,7 +330,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     if (meta->type() == MetaType::ProtocolType) {
         const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
         tns::SetValue(isolate, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name()), protoMeta));
-        cache->ProtocolCtorFuncs.insert(std::make_pair(meta->name(), new Persistent<v8::Function>(isolate, ctorFunc)));
+        cache->ProtocolCtorFuncs.emplace(meta->name(), new Persistent<v8::Function>(isolate, ctorFunc));
     } else {
         Class klass = objc_getClass(meta->name());
         if (klass == nil) {
@@ -376,7 +376,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     tns::Assert(success, isolate);
 
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
-    cache->Prototypes.insert(std::make_pair(meta, poPrototype));
+    cache->Prototypes.emplace(meta, poPrototype);
 
     return ctorFuncTemplate;
 }
@@ -428,7 +428,7 @@ void MetadataBuilder::RegisterAllocMethod(Isolate* isolate, Local<v8::Function> 
     tns::Assert(success, isolate);
 }
 
-void MetadataBuilder::RegisterInstanceMethods(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::unordered_map<std::string, uint8_t>& names) {
+void MetadataBuilder::RegisterInstanceMethods(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, robin_hood::unordered_map<std::string, uint8_t>& names) {
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
     for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
@@ -449,7 +449,7 @@ void MetadataBuilder::RegisterInstanceMethods(Isolate* isolate, Local<FunctionTe
     }
 }
 
-void MetadataBuilder::RegisterInstanceProperties(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className, std::unordered_map<std::string, uint8_t>& names) {
+void MetadataBuilder::RegisterInstanceProperties(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className, robin_hood::unordered_map<std::string, uint8_t>& names) {
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
     for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
@@ -479,7 +479,7 @@ void MetadataBuilder::RegisterInstanceProperties(Isolate* isolate, Local<Functio
     }
 }
 
-void MetadataBuilder::RegisterInstanceProtocols(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className, std::unordered_map<std::string, uint8_t>& names) {
+void MetadataBuilder::RegisterInstanceProtocols(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, const std::string className, robin_hood::unordered_map<std::string, uint8_t>& names) {
     if (meta->type() == MetaType::ProtocolType) {
         MetadataBuilder::RegisterInstanceMethods(isolate, ctorFuncTemplate, meta, names);
         MetadataBuilder::RegisterInstanceProperties(isolate, ctorFuncTemplate, meta, className, names);
@@ -495,7 +495,7 @@ void MetadataBuilder::RegisterInstanceProtocols(Isolate* isolate, Local<Function
     }
 }
 
-void MetadataBuilder::RegisterStaticMethods(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, std::unordered_map<std::string, uint8_t>& names) {
+void MetadataBuilder::RegisterStaticMethods(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, robin_hood::unordered_map<std::string, uint8_t>& names) {
     Local<Context> context = isolate->GetCurrentContext();
     for (auto it = meta->staticMethods->begin(); it != meta->staticMethods->end(); it++) {
         const MethodMeta* methodMeta = (*it).valuePtr();
@@ -524,7 +524,7 @@ void MetadataBuilder::RegisterStaticMethods(Isolate* isolate, Local<v8::Function
     }
 }
 
-void MetadataBuilder::RegisterStaticProperties(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::unordered_map<std::string, uint8_t>& names) {
+void MetadataBuilder::RegisterStaticProperties(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, robin_hood::unordered_map<std::string, uint8_t>& names) {
     Local<Context> context = isolate->GetCurrentContext();
 
     for (auto it = meta->staticProps->begin(); it != meta->staticProps->end(); it++) {
@@ -559,7 +559,7 @@ void MetadataBuilder::RegisterStaticProperties(Isolate* isolate, Local<v8::Funct
     }
 }
 
-void MetadataBuilder::RegisterStaticProtocols(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, std::unordered_map<std::string, uint8_t>& names) {
+void MetadataBuilder::RegisterStaticProtocols(Isolate* isolate, Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, robin_hood::unordered_map<std::string, uint8_t>& names) {
     if (meta->type() == MetaType::ProtocolType) {
         MetadataBuilder::RegisterStaticMethods(isolate, ctorFunc, meta, names);
         MetadataBuilder::RegisterStaticProperties(isolate, ctorFunc, meta, className, names);

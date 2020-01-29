@@ -33,8 +33,8 @@ static UInt8 getSystemVersion() {
 
     return iosVersion = encodeVersion(majorVersion, minorVersion);
 }
-std::unordered_map<std::string, MembersCollection> getMetasByJSNames(MembersCollection members) {
-    std::unordered_map<std::string, MembersCollection> result;
+robin_hood::unordered_map<std::string, MembersCollection> getMetasByJSNames(MembersCollection members) {
+    robin_hood::unordered_map<std::string, MembersCollection> result;
     for (auto member : members) {
         result[member->jsName()].insert(member);
     }
@@ -72,11 +72,11 @@ bool MethodMeta::isImplementedInClass(Class klass, bool isStatic) const {
         //      E.g. [NSAttributedString alloc] returns a NSConcreteAttributedString*
         //   2. The message is forwarded to another object. E.g. `UITextField` forwards
         //      `autocapitalizationType` to an instance of `UITextInputTraits`
-        static std::unordered_map<Class, id> sampleInstances;
+        static robin_hood::unordered_map<Class, id> sampleInstances;
 
         auto it = sampleInstances.find(klass);
         if (it == sampleInstances.end()) {
-            it = sampleInstances.insert(std::make_pair(klass, [klass alloc])).first;
+            it = sampleInstances.emplace(klass, [klass alloc]).first;
         }
         id sampleInstance = it->second;
         return [sampleInstance respondsToSelector:this->selector()];

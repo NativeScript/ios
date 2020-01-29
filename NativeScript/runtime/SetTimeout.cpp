@@ -34,7 +34,7 @@ void SetTimeout::SetTimeoutCallback(const FunctionCallbackInfo<Value>& args) {
     Local<v8::Function> callback = args[0].As<v8::Function>();
     dispatch_block_t block = dispatch_block_create(DISPATCH_BLOCK_INHERIT_QOS_CLASS, ^{ Elapsed(key); });
     CacheEntry entry(isolate, new Persistent<v8::Function>(isolate, callback));
-    cache_.insert(std::make_pair(key, entry));
+    cache_.emplace(key, entry);
 
     dispatch_time_t time = dispatch_time(DISPATCH_TIME_NOW, timeout * NSEC_PER_MSEC);
     dispatch_after(time, dispatch_get_main_queue(), block);
@@ -97,7 +97,7 @@ void SetTimeout::RemoveKey(const uint32_t key) {
     cache_.erase(it);
 }
 
-std::unordered_map<uint32_t, SetTimeout::CacheEntry> SetTimeout::cache_;
+robin_hood::unordered_map<uint32_t, SetTimeout::CacheEntry> SetTimeout::cache_;
 uint32_t SetTimeout::count_ = 0;
 
 }

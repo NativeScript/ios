@@ -3,6 +3,7 @@
 
 #include <malloc/malloc.h>
 #include <map>
+#include "robin_hood.h"
 #include "Metadata.h"
 #include "DataWrapper.h"
 #include "libffi.h"
@@ -64,7 +65,7 @@ public:
     size_t StackSize;
     std::vector<size_t> ArgValueOffsets;
 private:
-    static std::unordered_map<const TypeEncoding*, ParametrizedCall*> callsCache_;
+    static robin_hood::unordered_map<const TypeEncoding*, ParametrizedCall*> callsCache_;
 };
 
 class FFICall: public BaseCall {
@@ -95,7 +96,7 @@ public:
         return this->argsArray_;
     }
 private:
-    static std::unordered_map<std::string, StructInfo> structInfosCache_;
+    static robin_hood::unordered_map<std::string, StructInfo> structInfosCache_;
     void** argsArray_;
 };
 

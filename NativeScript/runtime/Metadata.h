@@ -4,7 +4,7 @@
 #include <stack>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
+#include "robin_hood.h"
 #include <map>
 #include <set>
 #include <vector>
@@ -726,7 +726,7 @@ public:
 
 typedef std::set<const MemberMeta*> MembersCollection;
 
-std::unordered_map<std::string, MembersCollection> getMetasByJSNames(MembersCollection methods);
+robin_hood::unordered_map<std::string, MembersCollection> getMetasByJSNames(MembersCollection methods);
 
 struct PropertyMeta : MemberMeta {
     PtrTo<MethodMeta> method1;
