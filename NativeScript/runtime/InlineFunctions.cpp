@@ -1,25 +1,9 @@
-#include <string>
 #include "InlineFunctions.h"
 #include "Helpers.h"
 
 using namespace v8;
 
 namespace tns {
-
-std::vector<std::string> InlineFunctions::GlobalFunctions = {
-    "CGPointMake",
-    "CGRectMake",
-    "CGSizeMake",
-    "UIEdgeInsetsMake",
-    "NSMakeRange",
-    "__decorate",
-    "__param",
-    "ObjCClass",
-    "ObjCMethod",
-    "ObjC",
-    "ObjCParam",
-    "__tsEnum",
-};
 
 void InlineFunctions::Init(Isolate* isolate) {
 
@@ -139,6 +123,22 @@ void InlineFunctions::Init(Isolate* isolate) {
     if (!script->Run(context).ToLocal(&result)) {
         tns::Assert(false, isolate);
     }
+}
+
+bool InlineFunctions::IsGlobalFunction(std::string name) {
+    return
+        name == "CGPointMake" ||
+        name == "CGRectMake" ||
+        name == "CGSizeMake" ||
+        name == "UIEdgeInsetsMake" ||
+        name == "NSMakeRange" ||
+        name == "__decorate" ||
+        name == "__param" ||
+        name == "ObjCClass" ||
+        name == "ObjCMethod" ||
+        name == "ObjC" ||
+        name == "ObjCParam" ||
+        name == "__tsEnum";
 }
 
 }

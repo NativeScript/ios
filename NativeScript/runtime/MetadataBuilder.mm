@@ -1,5 +1,4 @@
 #include <Foundation/Foundation.h>
-#include <map>
 #include "MetadataBuilder.h"
 #include "NativeScriptException.h"
 #include "ArgConverter.h"
@@ -34,7 +33,7 @@ void MetadataBuilder::GlobalPropertyGetter(Local<Name> property, const PropertyC
         return;
     }
 
-    if (std::find(InlineFunctions::GlobalFunctions.begin(), InlineFunctions::GlobalFunctions.end(), propName) != InlineFunctions::GlobalFunctions.end()) {
+    if (InlineFunctions::IsGlobalFunction(propName)) {
         return;
     }
 
