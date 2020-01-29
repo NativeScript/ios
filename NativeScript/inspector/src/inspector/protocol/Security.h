@@ -117,7 +117,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CertificateSecurityState> clone() const;
 
     template<int STATE>
@@ -340,7 +339,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SafetyTipInfo> clone() const;
 
     template<int STATE>
@@ -421,7 +419,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<VisibleSecurityState> clone() const;
 
     template<int STATE>
@@ -526,7 +523,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SecurityStateExplanation> clone() const;
 
     template<int STATE>
@@ -659,7 +655,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<InsecureContentStatus> clone() const;
 
     template<int STATE>
@@ -787,7 +782,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CertificateErrorNotification> clone() const;
 
     template<int STATE>
@@ -869,7 +863,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<VisibleSecurityStateChangedNotification> clone() const;
 
     template<int STATE>
@@ -945,7 +938,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SecurityStateChangedNotification> clone() const;
 
     template<int STATE>

@@ -67,12 +67,6 @@ std::unique_ptr<Domain> Domain::clone() const
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<StringBuffer> Domain::toJSONString() const
-{
-    String json = toValue()->toJSONString();
-    return StringBufferImpl::adopt(json);
-}
-
 // static
 std::unique_ptr<API::Domain> API::Domain::fromBinary(const uint8_t* data, size_t length)
 {

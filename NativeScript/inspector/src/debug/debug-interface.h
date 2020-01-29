@@ -174,6 +174,9 @@ class WasmScript : public Script {
   int GetContainingFunction(int byte_offset) const;
 
   uint32_t GetFunctionHash(int function_index);
+
+  int CodeOffset() const;
+  int CodeLength() const;
 };
 
 V8_EXPORT_PRIVATE void GetLoadedScripts(
@@ -208,6 +211,8 @@ class DebugDelegate {
 
 V8_EXPORT_PRIVATE void SetDebugDelegate(Isolate* isolate,
                                         DebugDelegate* listener);
+
+V8_EXPORT_PRIVATE void TierDownAllModulesPerIsolate(Isolate* isolate);
 
 class AsyncEventDelegate {
  public:

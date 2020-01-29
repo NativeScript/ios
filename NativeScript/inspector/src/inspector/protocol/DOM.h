@@ -87,7 +87,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<BackendNode> clone() const;
 
     template<int STATE>
@@ -273,7 +272,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Node> clone() const;
 
     template<int STATE>
@@ -548,7 +546,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<RGBA> clone() const;
 
     template<int STATE>
@@ -658,7 +655,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<BoxModel> clone() const;
 
     template<int STATE>
@@ -781,7 +777,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ShapeOutsideInfo> clone() const;
 
     template<int STATE>
@@ -871,7 +866,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Rect> clone() const;
 
     template<int STATE>
@@ -971,7 +965,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<AttributeModifiedNotification> clone() const;
 
     template<int STATE>
@@ -1056,7 +1049,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<AttributeRemovedNotification> clone() const;
 
     template<int STATE>
@@ -1132,7 +1124,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CharacterDataModifiedNotification> clone() const;
 
     template<int STATE>
@@ -1208,7 +1199,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ChildNodeCountUpdatedNotification> clone() const;
 
     template<int STATE>
@@ -1288,7 +1278,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ChildNodeInsertedNotification> clone() const;
 
     template<int STATE>
@@ -1374,7 +1363,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ChildNodeRemovedNotification> clone() const;
 
     template<int STATE>
@@ -1451,7 +1439,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<DistributedNodesUpdatedNotification> clone() const;
 
     template<int STATE>
@@ -1524,7 +1511,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<InlineStyleInvalidatedNotification> clone() const;
 
     template<int STATE>
@@ -1590,7 +1576,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PseudoElementAddedNotification> clone() const;
 
     template<int STATE>
@@ -1666,7 +1651,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PseudoElementRemovedNotification> clone() const;
 
     template<int STATE>
@@ -1743,7 +1727,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SetChildNodesNotification> clone() const;
 
     template<int STATE>
@@ -1819,7 +1802,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ShadowRootPoppedNotification> clone() const;
 
     template<int STATE>
@@ -1896,7 +1878,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ShadowRootPushedNotification> clone() const;
 
     template<int STATE>

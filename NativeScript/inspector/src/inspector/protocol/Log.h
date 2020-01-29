@@ -92,7 +92,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LogEntry> clone() const;
 
     template<int STATE>
@@ -238,7 +237,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ViolationSetting> clone() const;
 
     template<int STATE>
@@ -311,7 +309,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<EntryAddedNotification> clone() const;
 
     template<int STATE>

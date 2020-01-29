@@ -50,7 +50,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SamplingHeapProfileNode> clone() const;
 
     template<int STATE>
@@ -148,7 +147,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SamplingHeapProfileSample> clone() const;
 
     template<int STATE>
@@ -235,7 +233,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SamplingHeapProfile> clone() const;
 
     template<int STATE>
@@ -307,7 +304,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<AddHeapSnapshotChunkNotification> clone() const;
 
     template<int STATE>
@@ -370,7 +366,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<HeapStatsUpdateNotification> clone() const;
 
     template<int STATE>
@@ -436,7 +431,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LastSeenObjectIdNotification> clone() const;
 
     template<int STATE>
@@ -517,7 +511,6 @@ public:
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
-    String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ReportHeapSnapshotProgressNotification> clone() const;
 
     template<int STATE>

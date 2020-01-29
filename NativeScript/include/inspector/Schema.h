@@ -16,8 +16,6 @@ namespace protocol {
 #define v8_inspector_protocol_exported_api_h
 class V8_EXPORT Exported {
 public:
-    virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
-
     virtual void AppendSerialized(std::vector<uint8_t>* out) const = 0;
 
     virtual ~Exported() { }

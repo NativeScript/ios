@@ -329,12 +329,6 @@ std::unique_ptr<SearchMatch> SearchMatch::clone() const
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<StringBuffer> SearchMatch::toJSONString() const
-{
-    String json = toValue()->toJSONString();
-    return StringBufferImpl::adopt(json);
-}
-
 // static
 std::unique_ptr<API::SearchMatch> API::SearchMatch::fromBinary(const uint8_t* data, size_t length)
 {

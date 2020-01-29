@@ -90,10 +90,8 @@ public:
     virtual bool asString(String* output) const;
     virtual bool asBinary(Binary* output) const;
 
-    virtual void writeJSON(StringBuilder* output) const;
     virtual void AppendSerialized(std::vector<uint8_t>* bytes) const override;
     virtual std::unique_ptr<Value> clone() const;
-    String toJSONString() const;
 
 protected:
     Value() : m_type(TypeNull) { }
@@ -126,7 +124,6 @@ public:
     bool asBoolean(bool* output) const override;
     bool asDouble(double* output) const override;
     bool asInteger(int* output) const override;
-    void writeJSON(StringBuilder* output) const override;
     void AppendSerialized(std::vector<uint8_t>* bytes) const override;
     std::unique_ptr<Value> clone() const override;
 
@@ -155,7 +152,6 @@ public:
     }
 
     bool asString(String* output) const override;
-    void writeJSON(StringBuilder* output) const override;
     void AppendSerialized(std::vector<uint8_t>* bytes) const override;
     std::unique_ptr<Value> clone() const override;
 
@@ -174,7 +170,6 @@ public:
     }
 
     bool asBinary(Binary* output) const override;
-    void writeJSON(StringBuilder* output) const override;
     void AppendSerialized(std::vector<uint8_t>* bytes) const override;
     std::unique_ptr<Value> clone() const override;
 
@@ -204,7 +199,6 @@ public:
         return std::unique_ptr<DictionaryValue>(DictionaryValue::cast(value.release()));
     }
 
-    void writeJSON(StringBuilder* output) const override;
     void AppendSerialized(std::vector<uint8_t>* bytes) const override;
     std::unique_ptr<Value> clone() const override;
 
@@ -273,7 +267,6 @@ public:
 
     ~ListValue() override;
 
-    void writeJSON(StringBuilder* output) const override;
     void AppendSerialized(std::vector<uint8_t>* bytes) const override;
     std::unique_ptr<Value> clone() const override;
 
@@ -287,9 +280,6 @@ private:
     ListValue();
     std::vector<std::unique_ptr<Value>> m_data;
 };
-
-void escapeLatinStringForJSON(const uint8_t* str, unsigned len, StringBuilder* dst);
-void escapeWideStringForJSON(const uint16_t* str, unsigned len, StringBuilder* dst);
 
 } // namespace v8_inspector
 } // namespace protocol

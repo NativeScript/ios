@@ -153,12 +153,6 @@ std::unique_ptr<RemoteObject> RemoteObject::clone() const
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<StringBuffer> RemoteObject::toJSONString() const
-{
-    String json = toValue()->toJSONString();
-    return StringBufferImpl::adopt(json);
-}
-
 // static
 std::unique_ptr<API::RemoteObject> API::RemoteObject::fromBinary(const uint8_t* data, size_t length)
 {
@@ -1020,12 +1014,6 @@ std::unique_ptr<StackTrace> StackTrace::clone() const
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<StringBuffer> StackTrace::toJSONString() const
-{
-    String json = toValue()->toJSONString();
-    return StringBufferImpl::adopt(json);
-}
-
 // static
 std::unique_ptr<API::StackTrace> API::StackTrace::fromBinary(const uint8_t* data, size_t length)
 {
@@ -1084,12 +1072,6 @@ std::unique_ptr<StackTraceId> StackTraceId::clone() const
 {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<StringBuffer> StackTraceId::toJSONString() const
-{
-    String json = toValue()->toJSONString();
-    return StringBufferImpl::adopt(json);
 }
 
 // static

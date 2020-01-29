@@ -2467,7 +2467,10 @@ class V8_EXPORT ValueDeserializer {
   /**
    * Expect inline wasm in the data stream (rather than in-memory transfer)
    */
-  void SetExpectInlineWasm(bool allow_inline_wasm);
+  V8_DEPRECATED(
+      "Wasm module serialization is only supported via explicit methods, e.g. "
+      "CompiledWasmModule::Serialize()")
+  void SetExpectInlineWasm(bool allow_inline_wasm) {}
 
   /**
    * Reads the underlying wire format version. Likely mostly to be useful to
@@ -2795,7 +2798,6 @@ class V8_EXPORT Value : public Data {
 
   /**
    * Returns true if this value is a SharedArrayBuffer.
-   * This is an experimental feature.
    */
   bool IsSharedArrayBuffer() const;
 
@@ -2804,6 +2806,12 @@ class V8_EXPORT Value : public Data {
    */
   bool IsProxy() const;
 
+  /**
+   * Returns true if this value is a WasmModuleObject.
+   */
+  bool IsWasmModuleObject() const;
+
+  V8_DEPRECATED("Use IsWasmModuleObject")
   bool IsWebAssemblyCompiledModule() const;
 
   /**
@@ -5306,7 +5314,7 @@ class V8_EXPORT TypedArray : public ArrayBufferView {
    */
   static constexpr size_t kMaxLength = internal::kApiSystemPointerSize == 4
                                            ? internal::kSmiMaxValue
-                                           : 0x7FFFFFFF;  // kMaxInt32
+                                           : 0xFFFFFFFF;
 
   /**
    * Number of elements in this typed array
@@ -5525,7 +5533,6 @@ class V8_EXPORT DataView : public ArrayBufferView {
 
 /**
  * An instance of the built-in SharedArrayBuffer constructor.
- * This API is experimental and may change significantly.
  */
 class V8_EXPORT SharedArrayBuffer : public Object {
  public:
@@ -5537,8 +5544,6 @@ class V8_EXPORT SharedArrayBuffer : public Object {
    * The Data pointer of ArrayBuffer::Contents must be freed using the provided
    * deleter, which will call ArrayBuffer::Allocator::Free if the buffer
    * was allocated with ArraryBuffer::Allocator::Allocate.
-   *
-   * This API is experimental and may change significantly.
    */
   class V8_EXPORT Contents {  // NOLINT
    public:
