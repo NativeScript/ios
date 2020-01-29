@@ -1260,7 +1260,7 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
 
     FFICall call(parametrizedCall);
 
-    std::unique_ptr<objc_super> sup = std::make_unique<objc_super>();
+    objc_super sup;
 
     bool isInstanceMethod = (target && target != nil);
 
@@ -1285,9 +1285,9 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
 
         if (isInstanceMethod) {
             if (callSuper) {
-                sup->receiver = target;
-                sup->super_class = class_getSuperclass(object_getClass(target));
-                Interop::SetValue(call.ArgumentBuffer(0), sup.get());
+                sup.receiver = target;
+                sup.super_class = class_getSuperclass(object_getClass(target));
+                Interop::SetValue(call.ArgumentBuffer(0), &sup);
             } else {
                 Interop::SetValue(call.ArgumentBuffer(0), target);
             }
