@@ -98,8 +98,4 @@ private:
 
 }
 
-//#ifdef __OBJC__
-//#include "Interop_impl.h"
-//#endif
-
 #endif /* Interop_h */

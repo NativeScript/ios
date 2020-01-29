@@ -487,7 +487,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
             std::string methodNameStr = tns::ToString(isolate, methodName);
             SEL selector = sel_registerName(methodNameStr.c_str());
 
-            TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc(argsCount + 1, sizeof(TypeEncoding)));
+            TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(malloc((argsCount + 1) * sizeof(TypeEncoding)));
             typeEncoding->type = returnType;
 
             if (!paramsVal.IsEmpty() && paramsVal->IsArray()) {

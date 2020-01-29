@@ -71,7 +71,7 @@ class FFICall: public BaseCall {
 public:
     FFICall(ParametrizedCall* parametrizedCall): BaseCall(nullptr) {
         this->returnOffset_ = parametrizedCall->ReturnOffset;
-        this->buffer_ = reinterpret_cast<uint8_t*>(calloc(1, parametrizedCall->StackSize));
+        this->buffer_ = reinterpret_cast<uint8_t*>(malloc(parametrizedCall->StackSize));
 
         this->argsArray_ = reinterpret_cast<void**>(this->buffer_);
         for (size_t i = 0; i < parametrizedCall->Cif->nargs; i++) {

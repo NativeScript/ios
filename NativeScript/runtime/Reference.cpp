@@ -224,7 +224,7 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, con
 
     if (wrappedValue->Type() == WrapperType::ObjCClass) {
         ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrappedValue);
-        void* handle = calloc(sizeof(Class*), 1);
+        void* handle = malloc(sizeof(Class*));
         Class clazz = classWrapper->Klass();
         *static_cast<Class*>(handle) = clazz;
         refWrapper->SetData(handle, true);
@@ -234,7 +234,7 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, con
     if (wrappedValue->Type() == WrapperType::ObjCProtocol) {
         ObjCProtocolWrapper* protoWrapper = static_cast<ObjCProtocolWrapper*>(wrappedValue);
         Protocol* proto = protoWrapper->Proto();
-        void* handle = calloc(sizeof(Protocol**), 1);
+        void* handle = malloc(sizeof(Protocol**));
         *static_cast<Protocol**>(handle) = proto;
         refWrapper->SetData(handle, true);
         return (Protocol**)handle;
@@ -243,7 +243,7 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, con
     if (wrappedValue->Type() == WrapperType::ObjCObject) {
         ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrappedValue);
         id target = dataWrapper->Data();
-        void* handle = calloc(sizeof(id), 1);
+        void* handle = malloc(sizeof(id));
         *static_cast<id*>(handle) = target;
         refWrapper->SetData(handle, true);
         return (id)handle;

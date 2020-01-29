@@ -389,7 +389,7 @@
 		C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB74229EAC8200345BFE /* SetTimeout.h */; };
 		C2DDEB9E229EAC8300345BFE /* SymbolLoader.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB75229EAC8200345BFE /* SymbolLoader.mm */; };
 		C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB76229EAC8200345BFE /* Tasks.h */; };
-		C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB77229EAC8200345BFE /* Interop.mm */; };
+		C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB77229EAC8200345BFE /* Interop.mm */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2DDEBA1229EAC8300345BFE /* FFICall.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB78229EAC8200345BFE /* FFICall.h */; };
 		C2DDEBA2229EAC8300345BFE /* Console.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB79229EAC8200345BFE /* Console.h */; };
 		C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB7A229EAC8200345BFE /* ArrayAdapter.mm */; };

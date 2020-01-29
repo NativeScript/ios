@@ -91,7 +91,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             id target = objCObjectWrapper->Data();
             if (target != nil) {
                 long retainCount = ObjectManager::GetRetainCount(target);
-                if (retainCount > 4) {
+                if (retainCount > 2) {
                     return false;
                 }
 

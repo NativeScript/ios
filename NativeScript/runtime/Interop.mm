@@ -42,7 +42,7 @@ IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCou
 }
 
 CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData) {
-    JSBlock* blockPointer = reinterpret_cast<JSBlock*>(calloc(1, sizeof(JSBlock)));
+    JSBlock* blockPointer = reinterpret_cast<JSBlock*>(malloc(sizeof(JSBlock)));
     void* functionPointer = (void*)CreateMethod(initialParamIndex, argsCount, typeEncoding, callback, userData);
 
     *blockPointer = {
@@ -247,7 +247,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
                 const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
                 StructInfo structInfo = FFICall::GetStructInfo(structMeta);
-                data = calloc(structInfo.FFIType()->size, 1);
+                data = malloc(structInfo.FFIType()->size);
                 Interop::InitializeStruct(isolate, data, structInfo.Fields(), arg);
             } else {
                 if (wrapper == nullptr) {
@@ -268,7 +268,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                     ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
                     Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
                     ffi_type* ffiType = FFICall::GetArgumentType(innerType);
-                    data = calloc(ffiType->size, 1);
+                    data = malloc(ffiType->size);
                     referenceWrapper->SetData(data);
                     referenceWrapper->SetEncoding(innerType);
                     // Initialize the ref/out parameter value before passing it to the function call
@@ -1301,9 +1301,7 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
     bool isInstanceReturnType = typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding;
     bool marshalToPrimitive = isPrimitiveFunction || !isInstanceReturnType;
 
-    @autoreleasepool {
-        Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
-    }
+    Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
 
     void* errorRef = nullptr;
     if (provideErrorOurParameter) {
@@ -1328,11 +1326,9 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
         }
     }
 
-    @autoreleasepool {
-        Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, marshalToPrimitive, nullptr);
+    Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, marshalToPrimitive, nullptr);
 
-        return result;
-    }
+    return result;
 }
 
 }

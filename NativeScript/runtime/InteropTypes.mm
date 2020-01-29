@@ -169,7 +169,7 @@ void Interop::RegisterAllocFunction(Isolate* isolate, Local<Object> interop) {
 
         size_t size = static_cast<size_t>(value);
 
-        void* data = calloc(size, 1);
+        void* data = calloc(1, size);
 
         Local<Value> pointerInstance = Pointer::NewInstance(isolate, data);
         PointerWrapper* wrapper = static_cast<PointerWrapper*>(pointerInstance.As<Object>()->GetInternalField(0).As<External>()->Value());
@@ -301,7 +301,7 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
 }
 
 const TypeEncoding* Interop::CreateEncoding(BinaryTypeEncodingType type) {
-    TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc(1, sizeof(TypeEncoding)));
+    TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(malloc(sizeof(TypeEncoding)));
     typeEncoding->type = type;
 
     return typeEncoding;
