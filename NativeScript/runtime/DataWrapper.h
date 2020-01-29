@@ -37,7 +37,7 @@ enum class WrapperType {
 struct V8Args {
 public:
     virtual v8::Local<v8::Value> operator[](int i) const = 0;
-    virtual size_t Length() = 0;
+    virtual size_t Length() const = 0;
 };
 
 struct V8FunctionCallbackArgs: public V8Args {
@@ -50,7 +50,7 @@ public:
         return this->info_[i];
     }
 
-    size_t Length() override {
+    size_t Length() const override {
         return this->info_.Length();
     }
 private:
@@ -67,7 +67,7 @@ public:
         return this->args_[i];
     }
 
-    size_t Length() override {
+    size_t Length() const override {
         return this->args_.size();
     }
 private:
@@ -84,7 +84,7 @@ public:
         return this->value_;
     }
 
-    size_t Length() override {
+    size_t Length() const override {
         return 1;
     }
 private:
@@ -97,7 +97,7 @@ public:
         return v8::Local<v8::Value>();
     }
 
-    size_t Length() override {
+    size_t Length() const override {
         return 0;
     }
 };
