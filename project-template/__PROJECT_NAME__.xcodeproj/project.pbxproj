@@ -26,8 +26,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		391174B321F1CBD300BA2583 /* TNSDebugging.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TNSDebugging.h; path = internal/TNSDebugging.h; sourceTree = SOURCE_ROOT; };
-		391174B421F1CBD300BA2583 /* TNSExceptionHandler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TNSExceptionHandler.h; path = internal/TNSExceptionHandler.h; sourceTree = SOURCE_ROOT; };
 		391174B521F1D7BF00BA2583 /* nativescript-build.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = "nativescript-build.xcconfig"; path = "internal/nativescript-build.xcconfig"; sourceTree = SOURCE_ROOT; };
 		391174B721F1D99900BA2583 /* plugins-release.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "plugins-release.xcconfig"; sourceTree = SOURCE_ROOT; };
 		391174B821F1D99900BA2583 /* plugins-debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "plugins-debug.xcconfig"; sourceTree = SOURCE_ROOT; };
@@ -113,8 +111,6 @@
 				42C751E1232B767700186695 /* Build Scripts */,
 				391174B821F1D99900BA2583 /* plugins-debug.xcconfig */,
 				391174B721F1D99900BA2583 /* plugins-release.xcconfig */,
-				391174B321F1CBD300BA2583 /* TNSDebugging.h */,
-				391174B421F1CBD300BA2583 /* TNSExceptionHandler.h */,
 				CDF4743E1BA4855C0087EA85 /* build.xcconfig */,
 				CDD59A261BB43B5D00EC2671 /* build-debug.xcconfig */,
 				CDD59A271BB43B5D00EC2671 /* build-release.xcconfig */,
