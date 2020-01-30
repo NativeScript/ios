@@ -27,8 +27,15 @@ static constexpr int64_t kMaxSafeInteger = -kMinSafeInteger; // 9007199254740991
 Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .reserved = 0,
     .size = sizeof(JSBlock),
-    .copy = &copyBlock,
-    .dispose = &disposeBlock
+    .copy = [](JSBlock* dst, const JSBlock* src) {
+    },
+    .dispose = [](JSBlock* block) {
+        if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
+            MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
+            wrapper->callback_->Reset();
+            delete wrapper;
+        }
+    }
 };
 
 IMP Interop::CreateMethod(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData) {
@@ -323,6 +330,8 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
         std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, arg);
         MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
         CFTypeRef blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
+
+        [(id)blockPtr autorelease];
 
         BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding);
         tns::SetValue(isolate, arg.As<Object>(), wrapper);

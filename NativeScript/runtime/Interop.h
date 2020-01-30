@@ -87,12 +87,6 @@ private:
         void* userData;
 
         static JSBlockDescriptor kJSBlockDescriptor;
-
-        static void copyBlock(JSBlock* dst, const JSBlock* src) {
-        }
-
-        static void disposeBlock(JSBlock* block) {
-        }
     } JSBlock;
 };
 
