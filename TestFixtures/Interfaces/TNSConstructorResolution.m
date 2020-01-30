@@ -42,3 +42,12 @@
 }
 
 @end
+
+@implementation TNSTestObject
+
+- (id)initWithURL:(NSURL*)x {
+    TNSLog([NSString stringWithFormat:@"%@%@ called", NSStringFromSelector(_cmd), x]);
+    return [super init];
+}
+
+@end

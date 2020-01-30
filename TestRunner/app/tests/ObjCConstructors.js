@@ -46,6 +46,14 @@ describe("Constructing Objective-C classes with new operator", function () {
         expect(actual).toBe("initWithString:str calledinitWithString:str called");
     });
 
+    it("WithObject", function () {
+        var instance1 = new TNSTestObject(NSURL.fileURLWithPath("/path"));
+        var instance2 = new (TNSTestObject.extend({}))(NSURL.fileURLWithPath("/path"));
+
+        var actual = TNSGetOutput();
+        expect(actual).toBe("initWithURL:file:///path calledinitWithURL:file:///path called");
+    });
+
     it("WithInt:andInt from protocol", function () {
         var instance1 = new TNSCInterface(5, 10);
         var instance2 = new (TNSCInterface.extend({}))(100, 500);
@@ -129,26 +137,26 @@ describe("Constructing Objective-C classes with new operator", function () {
             // expect(obj.retainCount()).toBe(1);
         });
 
-        // it("should support parameters", () => {
-        //     let arr = new NSArray({
-        //         array: [1, 2, 3]
-        //     });
-        //     expect(arr).toEqual(jasmine.any(NSArray));
-        //     expect(arr.count).toEqual(3);
-        // });
+        it("should support parameters", () => {
+            let arr = new NSArray({
+                array: [1, 2, 3]
+            });
+            expect(arr).toEqual(jasmine.any(NSArray));
+            expect(arr.count).toEqual(3);
+        });
 
-        // it("should support even more complex parameters", () => {
-        //     let alertView = new UIAlertView({
-        //         title: "About",
-        //         message: "NativeScript Team",
-        //         delegate: null,
-        //         cancelButtonTitle: "OK",
-        //         otherButtonTitles: null
-        //     });
-        //     expect(alertView.title).toEqual("About");
-        //     expect(alertView.message).toEqual("NativeScript Team");
-        //     expect(alertView.buttonTitleAtIndex(0)).toEqual("OK");
-        // });
+        it("should support even more complex parameters", () => {
+            let alertView = new UIAlertView({
+                title: "About",
+                message: "NativeScript Team",
+                delegate: null,
+                cancelButtonTitle: "OK",
+                otherButtonTitles: null
+            });
+            expect(alertView.title).toEqual("About");
+            expect(alertView.message).toEqual("NativeScript Team");
+            expect(alertView.buttonTitleAtIndex(0)).toEqual("OK");
+        });
 
         // it("should support void initializers", () => {
         //     let object = new TNSCInterface({
@@ -165,11 +173,11 @@ describe("Constructing Objective-C classes with new operator", function () {
         //     })).toThrowError(/TNSErrorDomain error 1/);
         // });
 
-        // it("should resolve initializers that only begin with 'init'", () => {
-        //     let url = new NSURL({
-        //         fileURLWithPath: "/foo"
-        //     });
-        //     expect(url).toEqual(jasmine.any(NSURL));
-        // });
+        it("should resolve initializers that only begin with 'init'", () => {
+            let url = new NSURL({
+                fileURLWithPath: "/foo"
+            });
+            expect(url).toEqual(jasmine.any(NSURL));
+        });
     });
 });

@@ -440,6 +440,16 @@ bool ArgConverter::CanInvoke(Isolate* isolate, const TypeEncoding* typeEncoding,
         if (strcmp(name, "NSArray") == 0 && arg->IsArray()) {
             return true;
         }
+
+        if (BaseDataWrapper* wrapper = tns::GetValue(isolate, arg)) {
+            if (wrapper->Type() == WrapperType::ObjCObject) {
+                ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                Class candidateClass = objc_getClass(name);
+                if (candidateClass != nil && [objcWrapper->Data() isKindOfClass:candidateClass]) {
+                    return true;
+                }
+            }
+        }
     }
 
     if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {

@@ -24,3 +24,7 @@ typedef struct TNSCStructure {
 - (id)initWithString:(NSString*)x;
 - (id)initWithParameter1:(NSString*)x parameter2:(NSString*)y error:(NSError**)error;
 @end
+
+@interface TNSTestObject : NSObject
+- (id)initWithURL:(NSURL*)x;
+@end
