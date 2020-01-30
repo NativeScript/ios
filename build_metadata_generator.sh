@@ -2,7 +2,7 @@
 set -e
 
 pushd "metadata-generator"
-cmake .
+cmake -DCMAKE_BUILD_TYPE=Release .
 make clean
 make
 cp build-step-metadata-generator.py bin

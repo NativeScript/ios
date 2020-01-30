@@ -127,7 +127,7 @@ void binary::BinarySerializer::serializeMember(::Meta::Meta* meta, binary::Membe
 {
     this->serializeBase(meta, binaryMetaStruct);
     binaryMetaStruct._flags &= 0b11111000; // this clears the type information written in the lower 3 bits
-    
+
     if (meta->getFlags(::Meta::MetaFlags::MemberIsOptional))
         binaryMetaStruct._flags |= BinaryFlags::MemberIsOptional;
 
@@ -136,7 +136,7 @@ void binary::BinarySerializer::serializeMember(::Meta::Meta* meta, binary::Membe
 void binary::BinarySerializer::serializeMethod(::Meta::MethodMeta* meta, binary::MethodMeta& binaryMetaStruct)
 {
     this->serializeMember(meta, binaryMetaStruct);
-    
+
     if (meta->getFlags(::Meta::MetaFlags::MethodIsVariadic))
         binaryMetaStruct._flags |= BinaryFlags::MethodIsVariadic;
     if (meta->getFlags(::Meta::MetaFlags::MethodIsNullTerminatedVariadic))
@@ -206,7 +206,7 @@ static llvm::ErrorOr<llvm::SmallString<128>> getFrameworkLib(clang::Module* fram
         path::append(path, framework->Directory->getName());
     }
     path::append(path, library);
-    
+
     if (!fs::exists(path)) {
         path.append(".tbd");
         if (fs::exists(path)) {
@@ -215,10 +215,10 @@ static llvm::ErrorOr<llvm::SmallString<128>> getFrameworkLib(clang::Module* fram
             // that come with Xcode by linking to DYLIB libraries instead of storing the actual, larger DYLIB libraries.
             return path;
         }
-        
+
         return errc::no_such_file_or_directory;
     }
-    
+
     return path;
 }
 
@@ -229,12 +229,12 @@ static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
     using namespace llvm::sys;
 
     llvm::ErrorOr<SmallString<128>> path = getFrameworkLib(framework, framework->Name);
-    
+
     if(path.getError()) {
         if (framework->LinkLibraries.size() == 0) {
             return errc::no_such_file_or_directory;
         }
-        
+
         path = getFrameworkLib(framework, framework->LinkLibraries[0].Library);
     }
 
@@ -248,7 +248,12 @@ static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
         uint32_t filetype = (machObjectFile->is64Bit() ? machObjectFile->getHeader64().filetype : machObjectFile->getHeader().filetype);
         return (filetype == MachO::MH_DYLIB || filetype == MachO::MH_DYLIB_STUB || filetype == MachO::MH_DYLINKER);
     };
-    
+
+    auto isObjFile = [](MachOObjectFile* machObjectFile) -> bool {
+        uint32_t filetype = (machObjectFile->is64Bit() ? machObjectFile->getHeader64().filetype : machObjectFile->getHeader().filetype);
+        return (filetype == MachO::MH_OBJECT);
+    };
+
     if (Expected<OwningBinary<Binary> > binaryOrErr = createBinary(path.get())) {
         Binary& binary = *binaryOrErr.get().getBinary();
 
@@ -258,6 +263,8 @@ static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
                     if (MachOObjectFile* machObjectFile = dyn_cast<MachOObjectFile>(objectFile.get().get())) {
                         if (isDylib(machObjectFile)) {
                             return false;
+                        } else if (isObjFile(machObjectFile)) {
+                            return true;
                         }
                     }
                 } else if (Expected<std::unique_ptr<Archive> > archive = object.getAsArchive()) {
