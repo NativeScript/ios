@@ -73,12 +73,14 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
             runtime->Init();
             runtime->SetWorkerId(worker->WorkerId());
             Isolate* workerIsolate = runtime->GetIsolate();
+            int workerId = worker->WorkerId();
+            Worker::SetWorkerId(workerIsolate, workerId);
 
+            Isolate::Scope isolate_scope(workerIsolate);
+            HandleScope handle_scope(workerIsolate);
             TryCatch tc(workerIsolate);
-            runtime->RunScript(workerPath, tc);
+            runtime->RunModule(workerPath);
             if (tc.HasCaught()) {
-                Isolate::Scope isolate_scope(workerIsolate);
-                HandleScope handle_scope(workerIsolate);
                 worker->PassUncaughtExceptionFromWorkerToMain(workerIsolate, tc, false);
                 worker->Terminate();
             }
@@ -109,8 +111,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
             throw NativeScriptException("Too many arguments passed.");
         }
 
-        Runtime* runtime = Runtime::GetCurrentRuntime();
-        int workerId = runtime->WorkerId();
+        int workerId = Worker::GetWorkerId(isolate, info.This());
         std::shared_ptr<Caches::WorkerState> state = Caches::Workers.Get(workerId);
         tns::Assert(state != nullptr, isolate);
         WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
@@ -199,10 +200,9 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::str
 }
 
 void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
-    Runtime* runtime = Runtime::GetCurrentRuntime();
-    int workerId = runtime->WorkerId();
-    std::shared_ptr<Caches::WorkerState> state = Caches::Workers.Get(workerId);
     Isolate* isolate = info.GetIsolate();
+    int workerId = Worker::GetWorkerId(isolate, info.This());
+    std::shared_ptr<Caches::WorkerState> state = Caches::Workers.Get(workerId);
     tns::Assert(state != nullptr, isolate);
     WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
 
@@ -260,6 +260,24 @@ Local<v8::String> Worker::Serialize(Isolate* isolate, Local<Value> value, Local<
     tns::Assert(success, isolate);
 
     return result.As<v8::String>();
+}
+
+void Worker::SetWorkerId(Isolate* isolate, int workerId) {
+    HandleScope scope(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> global = context->Global();
+    global->SetPrivate(context, Private::ForApi(isolate, tns::ToV8String(isolate, "workerId")), Number::New(isolate, workerId));
+}
+
+int Worker::GetWorkerId(Isolate* isolate, Local<Object> global) {
+    Local<Value> value;
+
+    Local<Context> context = isolate->GetCurrentContext();
+    bool success = global->GetPrivate(context, Private::ForApi(isolate, tns::ToV8String(isolate, "workerId"))).ToLocal(&value);
+    tns::Assert(success && value->IsNumber(), isolate);
+
+    Local<Number> number = value.As<Number>();
+    return number->Value();
 }
 
 }

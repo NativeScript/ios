@@ -48,6 +48,7 @@ Runtime::~Runtime() {
     Caches::Workers.Remove(this->workerId_);
     Caches::Remove(this->isolate_);
     this->isolate_->Dispose();
+    currentRuntime_ = nullptr;
 }
 
 void Runtime::Init() {

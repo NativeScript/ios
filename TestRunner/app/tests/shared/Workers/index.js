@@ -449,7 +449,7 @@ describe("TNS Workers", () => {
                 messages.push(msg.data);
             };
 
-            worker.postMessage({ eval: `require("./tests/Infrastructure/timers");
+            worker.postMessage({ eval: `require("../../Infrastructure/timers");
             (function func() {
                 postMessage("callback");
                 setTimeout(() => {

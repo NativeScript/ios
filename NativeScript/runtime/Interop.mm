@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include <objc/message.h>
 #include <sstream>
+#include "Runtime.h"
 #include "Interop.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
@@ -32,7 +33,10 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .dispose = [](JSBlock* block) {
         if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
-            wrapper->callback_->Reset();
+            Runtime* runtime = Runtime::GetCurrentRuntime();
+            if (runtime != nullptr) {
+                wrapper->callback_->Reset();
+            }
             delete wrapper;
         }
     }
