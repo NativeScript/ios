@@ -117,18 +117,22 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
             uint32_t propertiesLength = propNames->Length();
             for (uint32_t i = 0; i < propertiesLength; i++) {
                 Local<Value> propertyName = propNames->Get(context, i).ToLocalChecked();
-                Local<Value> propertyValue = argObject->Get(context, propertyName).ToLocalChecked();
+                Local<Value> propertyValue;
+                bool success = argObject->Get(context, propertyName).ToLocal(&propertyValue);
+                if (!success || propertyValue.IsEmpty() || propertyValue->IsUndefined()) {
+                    continue;
+                }
 
                 bool propIsFunction = propertyValue->IsFunction();
 
-                ss << tns::ToString(isolate, propertyName->ToString(context).ToLocalChecked());
+                ss << tns::ToString(isolate, propertyName->ToString(context).ToLocalChecked()) << ": ";
 
                 if (propIsFunction) {
                     ss << "()";
                 } else if (propertyValue->IsArray()) {
                     Local<v8::String> stringResult = BuildStringFromArg(isolate, propertyValue);
                     std::string jsonStringifiedArray = tns::ToString(isolate, stringResult);
-                    ss << ": " << jsonStringifiedArray;
+                    ss << jsonStringifiedArray;
                 } else if (propertyValue->IsObject()) {
                     Local<Object> obj = propertyValue->ToObject(context).ToLocalChecked();
                     Local<v8::String> objString = TransformJSObject(isolate, obj);
@@ -137,9 +141,9 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
                     if (jsonStringifiedObject.find("circular structure") != std::string::npos) {
                         jsonStringifiedObject = "#CR";
                     }
-                    ss << ": " << jsonStringifiedObject;
+                    ss << jsonStringifiedObject;
                 } else {
-                    ss << ": \"" << tns::ToString(isolate, propertyValue->ToDetailString(context).ToLocalChecked()) << "\"";
+                    ss << "\"" << tns::ToString(isolate, propertyValue->ToDetailString(context).ToLocalChecked()) << "\"";
                 }
 
                 ss << std::endl;

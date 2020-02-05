@@ -23,7 +23,9 @@ Local<Value> Pointer::NewInstance(Isolate* isolate, void* handle) {
     Local<Value> result;
     Local<v8::Function> ctorFunc = Pointer::GetPointerCtorFunc(isolate);
     bool success = ctorFunc->NewInstance(isolate->GetCurrentContext(), 1, args).ToLocal(&result);
-    tns::Assert(success, isolate);
+    if (!success) {
+        return v8::Undefined(isolate);
+    }
     return result;
 }
 
