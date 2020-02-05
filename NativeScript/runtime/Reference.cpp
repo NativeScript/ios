@@ -174,6 +174,16 @@ Local<Value> Reference::GetReferredValue(Isolate* isolate, Local<Value> value) {
         }
     }
 
+    BaseDataWrapper* typeWrapper = wrapper->TypeWrapper();
+    if (typeWrapper != nullptr && typeWrapper->Type() == WrapperType::Primitive && baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Pointer) {
+        Reference::DataPair pair = GetTypeEncodingDataPair(isolate, value.As<Object>());
+        if (pair.data_ != nullptr && pair.typeEncoding_ != nullptr) {
+            BaseCall call((uint8_t*)pair.data_);
+            Local<Value> result = Interop::GetResult(isolate, pair.typeEncoding_, &call, false);
+            return result;
+        }
+    }
+
     return innerValue;
 }
 
