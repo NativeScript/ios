@@ -470,6 +470,32 @@ describe("TNS Workers", () => {
                 }, 100);
             }, 1000);
         });
+
+        it("Worker should marshal callbacks on the worker thread even if the native callback was invoked on a different thread", done => {
+            let  worker = new Worker("./tests/shared/Workers/EvalWorker.js");
+
+            worker.onmessage = msg => {
+                expect(msg.data.callingThreadHash).toEqual(msg.data.callbackThreadHash);
+                expect(msg.data.callingThreadHash).not.toEqual(NSThread.currentThread.hash);
+                done();
+            };
+
+            worker.postMessage({ eval:`
+                let sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration;
+                let queue = NSOperationQueue.mainQueue;
+                let session = NSURLSession.sessionWithConfigurationDelegateDelegateQueue(sessionConfig, null, queue);
+                let request = NSMutableURLRequest.requestWithURL(NSURL.URLWithString("https://google.com"));
+                request.HTTPMethod = "GET";
+                let callingThreadHash = NSThread.currentThread.hash;
+                let task = session.dataTaskWithRequestCompletionHandler(request, function (data, response, error) {
+                    self.postMessage({
+                        callingThreadHash: callingThreadHash,
+                        callbackThreadHash: NSThread.currentThread.hash
+                    });
+                });
+                task.resume();
+            ` });
+        });
     }
 
     function generateRandomString(strLen) {

@@ -18,13 +18,15 @@ public:
           callback_(callback),
           initialParamIndex_(initialParamIndex),
           paramsCount_(paramsCount),
-          typeEncoding_(typeEncoding) {
+          typeEncoding_(typeEncoding),
+          runLoop_(CFRunLoopGetCurrent()) {
     }
     v8::Isolate* isolate_;
     std::shared_ptr<v8::Persistent<v8::Value>> callback_;
     const uint8_t initialParamIndex_;
     const uint8_t paramsCount_;
     const TypeEncoding* typeEncoding_;
+    const CFRunLoopRef runLoop_;
 };
 
 class ArgConverter {
@@ -53,6 +55,7 @@ private:
     static void IndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& args);
     static bool IsErrorOutParameter(const TypeEncoding* typeEncoding);
     static std::vector<const MethodMeta*> GetInitializers(Caches* cache, Class klass, const InterfaceMeta* interfaceMeta);
+    static void MethodCallbackInternal(ffi_cif* cif, void* retValue, void** argValues, void* userData);
 };
 
 }

@@ -78,104 +78,113 @@ Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, BaseDataWrapper* wr
 }
 
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
-    void (^cb)() = ^{
-        MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
+    MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
 
-        Isolate* isolate = data->isolate_;
+    if (data->runLoop_ == CFRunLoopGetCurrent()) {
+        ArgConverter::MethodCallbackInternal(cif, retValue, argValues, userData);
+        return;
+    }
 
-        Isolate::Scope isolate_scope(isolate);
-        HandleScope handle_scope(isolate);
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+    CFRunLoopPerformBlock(data->runLoop_, kCFRunLoopCommonModes, ^{
+        ArgConverter::MethodCallbackInternal(cif, retValue, argValues, userData);
+        dispatch_semaphore_signal(semaphore);
+    });
 
-        std::shared_ptr<Persistent<Value>> poCallback = data->callback_;
+    NSTimeInterval interval = 15; // seconds
+    NSDate* end = [[NSDate date] dateByAddingTimeInterval:interval];
 
-        bool hasErrorOutParameter = false;
-
-        std::vector<Local<Value>> v8Args;
-        v8Args.reserve(data->paramsCount_);
-        const TypeEncoding* typeEncoding = data->typeEncoding_;
-        for (int i = 0; i < data->paramsCount_; i++) {
-            typeEncoding = typeEncoding->next();
-            if (i == data->paramsCount_ - 1 && ArgConverter::IsErrorOutParameter(typeEncoding)) {
-                hasErrorOutParameter = true;
-                // No need to provide the NSError** parameter to the javascript callback
-                continue;
-            }
-
-            int argIndex = i + data->initialParamIndex_;
-
-            uint8_t* argBuffer = (uint8_t*)argValues[argIndex];
-            BaseCall call(argBuffer);
-            Local<Value> jsWrapper = Interop::GetResult(isolate, typeEncoding, &call, true);
-
-            if (!jsWrapper.IsEmpty()) {
-                v8Args.push_back(jsWrapper);
-            } else {
-                v8Args.push_back(v8::Undefined(isolate));
-            }
-        }
-
-        Local<Context> context = isolate->GetCurrentContext();
-        Local<Object> thiz = context->Global();
-        if (data->initialParamIndex_ > 1) {
-            id self_ = *static_cast<const id*>(argValues[0]);
-            auto cache = Caches::Get(isolate);
-            auto it = cache->Instances.find(self_);
-            if (it != cache->Instances.end()) {
-                thiz = it->second->Get(data->isolate_).As<Object>();
-            } else {
-                ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
-                thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>(), true).As<Object>();
-            }
-        }
-
-        Local<Value> result;
-        Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
-
-        bool success = false;
-        if (hasErrorOutParameter) {
-            // We don't want the global error handler (NativeScriptException::OnUncaughtError) to be called for javascript exceptions occuring inside
-            // methods that have NSError* parameters. Those js errors will be marshalled to NSError* and sent
-            // directly to the calling native code. The v8::TryCatch statement prevents the global handler to be called.
-            TryCatch tc(isolate);
-            success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
-            if (!success && tc.HasCaught()) {
-                Local<Value> exception = tc.Exception();
-                std::string message = tns::ToString(isolate, exception);
-
-                int errorParamIndex = data->initialParamIndex_ + data->paramsCount_ - 1;
-                void* errorParam = argValues[errorParamIndex];
-                NSError*__strong** outPtr = static_cast<NSError*__strong**>(errorParam);
-                if (outPtr && *outPtr) {
-                    NSError* error = [NSError errorWithDomain:@"TNSErrorDomain" code:164 userInfo:@{ @"TNSJavaScriptError": [NSString stringWithUTF8String:message.c_str()] }];
-                    **static_cast<NSError*__strong**>(outPtr) = error;
-                }
-            }
-        } else {
-            success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
-        }
-
-        if (!success) {
-            memset(retValue, 0, cif->rtype->size);
-            return;
-        }
-
-        ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_);
-    };
-
-    if ([NSThread isMainThread] || Runtime::IsWorker()) {
-        cb();
-    } else {
-        dispatch_group_t group = dispatch_group_create();
-        dispatch_group_enter(group);
-        tns::ExecuteOnMainThread([cb, group]() {
-            cb();
-            dispatch_group_leave(group);
-        });
-
-        if (dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC)) != 0) {
+    CFRunLoopWakeUp(data->runLoop_);
+    while (dispatch_semaphore_wait(semaphore, DISPATCH_TIME_NOW)) {
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, false);
+        if ([end timeIntervalSinceNow] <= 0) {
             tns::Assert(false);
         }
     }
+}
+
+void ArgConverter::MethodCallbackInternal(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
+    MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
+
+    Isolate* isolate = data->isolate_;
+
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+
+    std::shared_ptr<Persistent<Value>> poCallback = data->callback_;
+
+    bool hasErrorOutParameter = false;
+
+    std::vector<Local<Value>> v8Args;
+    v8Args.reserve(data->paramsCount_);
+    const TypeEncoding* typeEncoding = data->typeEncoding_;
+    for (int i = 0; i < data->paramsCount_; i++) {
+        typeEncoding = typeEncoding->next();
+        if (i == data->paramsCount_ - 1 && ArgConverter::IsErrorOutParameter(typeEncoding)) {
+            hasErrorOutParameter = true;
+            // No need to provide the NSError** parameter to the javascript callback
+            continue;
+        }
+
+        int argIndex = i + data->initialParamIndex_;
+
+        uint8_t* argBuffer = (uint8_t*)argValues[argIndex];
+        BaseCall call(argBuffer);
+        Local<Value> jsWrapper = Interop::GetResult(isolate, typeEncoding, &call, true);
+
+        if (!jsWrapper.IsEmpty()) {
+            v8Args.push_back(jsWrapper);
+        } else {
+            v8Args.push_back(v8::Undefined(isolate));
+        }
+    }
+
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> thiz = context->Global();
+    if (data->initialParamIndex_ > 1) {
+        id self_ = *static_cast<const id*>(argValues[0]);
+        auto cache = Caches::Get(isolate);
+        auto it = cache->Instances.find(self_);
+        if (it != cache->Instances.end()) {
+            thiz = it->second->Get(data->isolate_).As<Object>();
+        } else {
+            ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
+            thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>(), true).As<Object>();
+        }
+    }
+
+    Local<Value> result;
+    Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
+
+    bool success = false;
+    if (hasErrorOutParameter) {
+        // We don't want the global error handler (NativeScriptException::OnUncaughtError) to be called for javascript exceptions occuring inside
+        // methods that have NSError* parameters. Those js errors will be marshalled to NSError* and sent
+        // directly to the calling native code. The v8::TryCatch statement prevents the global handler to be called.
+        TryCatch tc(isolate);
+        success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
+        if (!success && tc.HasCaught()) {
+            Local<Value> exception = tc.Exception();
+            std::string message = tns::ToString(isolate, exception);
+
+            int errorParamIndex = data->initialParamIndex_ + data->paramsCount_ - 1;
+            void* errorParam = argValues[errorParamIndex];
+            NSError*__strong** outPtr = static_cast<NSError*__strong**>(errorParam);
+            if (outPtr && *outPtr) {
+                NSError* error = [NSError errorWithDomain:@"TNSErrorDomain" code:164 userInfo:@{ @"TNSJavaScriptError": [NSString stringWithUTF8String:message.c_str()] }];
+                **static_cast<NSError*__strong**>(outPtr) = error;
+            }
+        }
+    } else {
+        success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
+    }
+
+    if (!success) {
+        memset(retValue, 0, cif->rtype->size);
+        return;
+    }
+
+    ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_);
 }
 
 void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value, const TypeEncoding* typeEncoding) {
@@ -537,10 +546,9 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
         Local<v8::Function> structCtorFunc = cache->StructCtorInitializer(isolate, structInfo);
         Local<Value> proto;
         bool success = structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto);
-        tns::Assert(success, isolate);
 
-        if (!proto.IsEmpty()) {
-            bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
+        if (success && !proto.IsEmpty()) {
+            success = receiver->SetPrototype(context, proto).FromMaybe(false);
             tns::Assert(success, isolate);
         }
 
