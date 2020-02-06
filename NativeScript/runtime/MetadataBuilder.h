@@ -12,14 +12,14 @@ namespace tns {
 
 class MetadataBuilder {
 public:
-    static void RegisterConstantsOnGlobalObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> global, bool isWorkerThread);
-    static v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(v8::Isolate* isolate, const BaseClassMeta* meta);
-    static v8::Local<v8::Function> GetOrCreateStructCtorFunction(v8::Isolate* isolate, StructInfo structInfo);
+    static void RegisterConstantsOnGlobalObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate, bool isWorkerThread);
+    static v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplate(v8::Local<v8::Context> context, const BaseClassMeta* meta);
+    static v8::Local<v8::Function> GetOrCreateStructCtorFunction(v8::Local<v8::Context> context, StructInfo structInfo);
     static void StructPropertyGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void StructPropertySetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
-    static void CreateToStringFunction(v8::Isolate* isolate);
+    static void CreateToStringFunction(v8::Local<v8::Context> context);
 private:
-    static v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplateInternal(v8::Isolate* isolate, const BaseClassMeta* meta, robin_hood::unordered_map<std::string, uint8_t>& instanceMembers, robin_hood::unordered_map<std::string, uint8_t>& staticMembers);
+    static v8::Local<v8::FunctionTemplate> GetOrCreateConstructorFunctionTemplateInternal(v8::Local<v8::Context> context, const BaseClassMeta* meta, robin_hood::unordered_map<std::string, uint8_t>& instanceMembers, robin_hood::unordered_map<std::string, uint8_t>& staticMembers);
     static void GlobalPropertyGetter(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -32,16 +32,16 @@ private:
     static void StructConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void StructEqualsCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void ToStringFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
-    static std::pair<ffi_type*, void*> GetStructData(v8::Isolate* isolate, v8::Local<v8::Object> initializer, StructInfo structInfo);
+    static std::pair<ffi_type*, void*> GetStructData(v8::Local<v8::Context> context, v8::Local<v8::Object> initializer, StructInfo structInfo);
 
-    static v8::Local<v8::Value> InvokeMethod(v8::Isolate* isolate, const MethodMeta* meta, v8::Local<v8::Object> receiver, V8Args& args, std::string containingClass, bool isMethodCallback);
-    static void RegisterAllocMethod(v8::Isolate* isolate, v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
-    static void RegisterInstanceMethods(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, robin_hood::unordered_map<std::string, uint8_t>& names);
-    static void RegisterInstanceProperties(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, robin_hood::unordered_map<std::string, uint8_t>& names);
-    static void RegisterInstanceProtocols(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, robin_hood::unordered_map<std::string, uint8_t>& names);
-    static void RegisterStaticMethods(v8::Isolate* isolate, v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, robin_hood::unordered_map<std::string, uint8_t>& names);
-    static void RegisterStaticProperties(v8::Isolate* isolate, v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, robin_hood::unordered_map<std::string, uint8_t>& names);
-    static void RegisterStaticProtocols(v8::Isolate* isolate, v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, robin_hood::unordered_map<std::string, uint8_t>& names);
+    static v8::Local<v8::Value> InvokeMethod(v8::Local<v8::Context> context, const MethodMeta* meta, v8::Local<v8::Object> receiver, V8Args& args, std::string containingClass, bool isMethodCallback);
+    static void RegisterAllocMethod(v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta);
+    static void RegisterInstanceMethods(v8::Local<v8::Context> context, v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, robin_hood::unordered_map<std::string, uint8_t>& names);
+    static void RegisterInstanceProperties(v8::Local<v8::Context> context, v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, robin_hood::unordered_map<std::string, uint8_t>& names);
+    static void RegisterInstanceProtocols(v8::Local<v8::Context> context, v8::Local<v8::FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, std::string className, robin_hood::unordered_map<std::string, uint8_t>& names);
+    static void RegisterStaticMethods(v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, robin_hood::unordered_map<std::string, uint8_t>& names);
+    static void RegisterStaticProperties(v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, robin_hood::unordered_map<std::string, uint8_t>& names);
+    static void RegisterStaticProtocols(v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc, const BaseClassMeta* meta, const std::string className, robin_hood::unordered_map<std::string, uint8_t>& names);
     static void DefineFunctionLengthProperty(v8::Local<v8::Context> context, const TypeEncodingsList<ArrayCount>* encodings, v8::Local<v8::Function> func);
 
     struct GlobalHandlerContext {

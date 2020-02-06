@@ -2,6 +2,7 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Runtime.h"
+#include "Caches.h"
 
 using namespace v8;
 
@@ -64,12 +65,13 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker, std::func
 
 void WorkerWrapper::DrainPendingTasks() {
     std::vector<std::string> messages = this->queue_.PopAll();
-    for (std::string message: messages) {
-        Isolate::Scope isolate_scope(this->workerIsolate_);
-        HandleScope handle_scope(this->workerIsolate_);
-        Local<Context> context = this->workerIsolate_->GetCurrentContext();
-        Local<Object> global = context->Global();
+    v8::Locker locker(this->workerIsolate_);
+    Isolate::Scope isolate_scope(this->workerIsolate_);
+    HandleScope handle_scope(this->workerIsolate_);
+    Local<Context> context = Caches::Get(this->workerIsolate_)->GetContext();
+    Local<Object> global = context->Global();
 
+    for (std::string message: messages) {
         TryCatch tc(this->workerIsolate_);
         this->onMessage_(this->workerIsolate_, global, message);
 
@@ -109,7 +111,7 @@ void WorkerWrapper::Terminate() {
 }
 
 void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
-    Local<Context> context = this->workerIsolate_->GetCurrentContext();
+    Local<Context> context = Caches::Get(this->workerIsolate_)->GetContext();
     Local<Object> global = context->Global();
 
     Local<Value> onErrorVal;
@@ -131,15 +133,15 @@ void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
         }
 
         if (!success && innerTc.HasCaught()) {
-            this->PassUncaughtExceptionFromWorkerToMain(this->workerIsolate_, innerTc);
+            this->PassUncaughtExceptionFromWorkerToMain(context, innerTc);
         }
 
-        this->PassUncaughtExceptionFromWorkerToMain(this->workerIsolate_, tc);
+        this->PassUncaughtExceptionFromWorkerToMain(context, tc);
     }
 }
 
-void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate, TryCatch& tc, bool async) {
-    Local<Context> context = workerIsolate->GetCurrentContext();
+void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context, TryCatch& tc, bool async) {
+    Isolate* workerIsolate = context->GetIsolate();
     int lineNumber;
     bool success = tc.Message()->GetLineNumber(context).To(&lineNumber);
     Isolate* isolate = context->GetIsolate();
@@ -162,10 +164,11 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
     }
 
     tns::ExecuteOnMainThread([this, message, src, stackTrace, lineNumber]() {
+        v8::Locker locker(this->mainIsolate_);
         Isolate::Scope isolate_scope(this->mainIsolate_);
         HandleScope handle_scope(this->mainIsolate_);
         Local<Object> worker = this->poWorker_->Get(this->mainIsolate_).As<Object>();
-        Local<Context> context = this->mainIsolate_->GetCurrentContext();
+        Local<Context> context = Caches::Get(this->mainIsolate_)->GetContext();
 
         Local<Value> onErrorVal;
         bool success = worker->Get(context, tns::ToV8String(this->mainIsolate_, "onerror")).ToLocal(&onErrorVal);
@@ -173,7 +176,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
 
         if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
             Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
-            Local<Object> arg = this->ConstructErrorObject(this->mainIsolate_, message, src, stackTrace, lineNumber);
+            Local<Object> arg = this->ConstructErrorObject(context, message, src, stackTrace, lineNumber);
             Local<Value> args[1] = { arg };
             Local<Value> result;
             TryCatch tc(this->mainIsolate_);
@@ -187,8 +190,8 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Isolate* workerIsolate
     }, async);
 }
 
-Local<Object> WorkerWrapper::ConstructErrorObject(Isolate* isolate, std::string message, std::string source, std::string stackTrace, int lineNumber) {
-    Local<Context> context = isolate->GetCurrentContext();
+Local<Object> WorkerWrapper::ConstructErrorObject(Local<Context> context, std::string message, std::string source, std::string stackTrace, int lineNumber) {
+    Isolate* isolate = context->GetIsolate();
     Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
     Local<Object> obj;
     bool success = objTemplate->NewInstance(context).ToLocal(&obj);

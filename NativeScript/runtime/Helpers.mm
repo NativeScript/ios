@@ -364,12 +364,12 @@ void tns::LogError(Isolate* isolate, TryCatch& tc) {
     Log(@"%s", stackTraceStr.c_str());
 }
 
-Local<v8::String> tns::JsonStringifyObject(Isolate* isolate, Local<Value> value, bool handleCircularReferences) {
+Local<v8::String> tns::JsonStringifyObject(Local<Context> context, Local<Value> value, bool handleCircularReferences) {
+    Isolate* isolate = context->GetIsolate();
     if (value.IsEmpty()) {
         return v8::String::Empty(isolate);
     }
 
-    Local<Context> context = isolate->GetCurrentContext();
     if (handleCircularReferences) {
         Local<v8::Function> smartJSONStringifyFunction = tns::GetSmartJSONStringifyFunction(isolate);
 
@@ -564,9 +564,11 @@ const std::string tns::BuildStacktraceFrameMessage(Isolate* isolate, Local<Stack
 }
 
 bool tns::LiveSync(Isolate* isolate) {
+    v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    Local<Context> context = cache->GetContext();
     Local<Object> global = context->Global();
     Local<Value> value;
     bool success = global->Get(context, tns::ToV8String(isolate, "__onLiveSync")).ToLocal(&value);

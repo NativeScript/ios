@@ -41,12 +41,13 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* iso
 
 void FunctionReference::FunctionReferenceConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
 
     tns::Assert(info.Length() == 1, isolate);
     tns::Assert(info[0]->IsFunction(), isolate);
 
     Local<v8::Function> arg = info[0].As<v8::Function>();
-    std::shared_ptr<Persistent<v8::Value>> poArg = ObjectManager::Register(isolate, arg);
+    std::shared_ptr<Persistent<v8::Value>> poArg = ObjectManager::Register(context, arg);
     FunctionReferenceWrapper* wrapper = new FunctionReferenceWrapper(poArg);
     tns::SetValue(isolate, arg, wrapper);
     info.GetReturnValue().Set(arg);

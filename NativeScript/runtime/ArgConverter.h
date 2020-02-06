@@ -31,26 +31,26 @@ public:
 
 class ArgConverter {
 public:
-    static void Init(v8::Isolate* isolate, v8::GenericNamedPropertyGetterCallback structPropertyGetter, v8::GenericNamedPropertySetterCallback structPropertySetter);
-    static v8::Local<v8::Value> Invoke(v8::Isolate* isolate, Class klass, v8::Local<v8::Object> receiver, V8Args& args, const MethodMeta* meta, bool isMethodCallback);
-    static v8::Local<v8::Value> ConvertArgument(v8::Isolate* isolate, BaseDataWrapper* wrapper, bool skipGCRegistration = false);
-    static v8::Local<v8::Value> CreateJsWrapper(v8::Isolate* isolate, BaseDataWrapper* wrapper, v8::Local<v8::Object> receiver, bool skipGCRegistration = false);
+    static void Init(v8::Local<v8::Context> context, v8::GenericNamedPropertyGetterCallback structPropertyGetter, v8::GenericNamedPropertySetterCallback structPropertySetter);
+    static v8::Local<v8::Value> Invoke(v8::Local<v8::Context> context, Class klass, v8::Local<v8::Object> receiver, V8Args& args, const MethodMeta* meta, bool isMethodCallback);
+    static v8::Local<v8::Value> ConvertArgument(v8::Local<v8::Context> context, BaseDataWrapper* wrapper, bool skipGCRegistration = false);
+    static v8::Local<v8::Value> CreateJsWrapper(v8::Local<v8::Context> context, BaseDataWrapper* wrapper, v8::Local<v8::Object> receiver, bool skipGCRegistration = false);
     static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyObject(v8::Local<v8::Context> context, bool skipGCRegistration = false);
     static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyStruct(v8::Local<v8::Context> context);
     static const Meta* FindMeta(Class klass);
     static const Meta* GetMeta(std::string name);
     static const ProtocolMeta* FindProtocolMeta(Protocol* protocol);
     static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData);
-    static void SetValue(v8::Isolate* isolate, void* retValue, v8::Local<v8::Value> value, const TypeEncoding* typeEncoding);
-    static void ConstructObject(v8::Isolate* isolate, const v8::FunctionCallbackInfo<v8::Value>& info, Class klass, const InterfaceMeta* interfaceMeta = nullptr);
+    static void SetValue(v8::Local<v8::Context> context, void* retValue, v8::Local<v8::Value> value, const TypeEncoding* typeEncoding);
+    static void ConstructObject(v8::Local<v8::Context> context, const v8::FunctionCallbackInfo<v8::Value>& info, Class klass, const InterfaceMeta* interfaceMeta = nullptr);
 private:
-    static v8::Local<v8::Function> CreateEmptyInstanceFunction(v8::Isolate* isolate, v8::GenericNamedPropertyGetterCallback propertyGetter = nullptr, v8::GenericNamedPropertySetterCallback propertySetter = nullptr);
+    static v8::Local<v8::Function> CreateEmptyInstanceFunction(v8::Local<v8::Context> context, v8::GenericNamedPropertyGetterCallback propertyGetter = nullptr, v8::GenericNamedPropertySetterCallback propertySetter = nullptr);
     static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyInstance(v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc, bool skipGCRegistration = false);
     static void FindMethodOverloads(Class klass, std::string methodName, MemberType type, std::vector<const MethodMeta*>& overloads);
-    static const MethodMeta* FindInitializer(v8::Isolate* isolate, Class klass, const InterfaceMeta* interfaceMeta, const v8::FunctionCallbackInfo<v8::Value>& info, std::vector<v8::Local<v8::Value>>& args);
-    static bool CanInvoke(v8::Isolate* isolate, const TypeEncoding* typeEncoding, v8::Local<v8::Value> arg);
-    static bool CanInvoke(v8::Isolate* isolate, const MethodMeta* candidate, const v8::FunctionCallbackInfo<v8::Value>& info);
-    static std::vector<v8::Local<v8::Value>> GetInitializerArgs(v8::Isolate* isolate, v8::Local<v8::Object> obj, std::string& constructorTokens);
+    static const MethodMeta* FindInitializer(v8::Local<v8::Context> context, Class klass, const InterfaceMeta* interfaceMeta, const v8::FunctionCallbackInfo<v8::Value>& info, std::vector<v8::Local<v8::Value>>& args);
+    static bool CanInvoke(v8::Local<v8::Context> context, const TypeEncoding* typeEncoding, v8::Local<v8::Value> arg);
+    static bool CanInvoke(v8::Local<v8::Context> context, const MethodMeta* candidate, const v8::FunctionCallbackInfo<v8::Value>& info);
+    static std::vector<v8::Local<v8::Value>> GetInitializerArgs(v8::Local<v8::Object> obj, std::string& constructorTokens);
     static void IndexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& args);
     static void IndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& args);
     static bool IsErrorOutParameter(const TypeEncoding* typeEncoding);

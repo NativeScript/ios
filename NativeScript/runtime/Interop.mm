@@ -71,11 +71,11 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
     return blockPointer;
 }
 
-Local<Value> Interop::CallFunction(Isolate* isolate, void* functionPointer, const TypeEncoding* typeEncoding, V8Args& args) {
-    return Interop::CallFunctionInternal(isolate, true, functionPointer, typeEncoding, args, nil, nil, nil, false, MetaType::Undefined);
+Local<Value> Interop::CallFunction(Local<Context> context, void* functionPointer, const TypeEncoding* typeEncoding, V8Args& args) {
+    return Interop::CallFunctionInternal(context, true, functionPointer, typeEncoding, args, nil, nil, nil, false, MetaType::Undefined);
 }
 
-Local<Value> Interop::CallFunction(Isolate* isolate, const MethodMeta* meta, id target, Class clazz, V8Args& args, bool callSuper) {
+Local<Value> Interop::CallFunction(Local<Context> context, const MethodMeta* meta, id target, Class clazz, V8Args& args, bool callSuper) {
     SEL selector = nil;
     void* functionPointer = nullptr;
     const TypeEncoding* typeEncoding = nullptr;
@@ -93,10 +93,10 @@ Local<Value> Interop::CallFunction(Isolate* isolate, const MethodMeta* meta, id 
 
     bool provideErrorOutParameter = meta->hasErrorOutParameter() && args.Length() < meta->encodings()->count - 1;
 
-    return Interop::CallFunctionInternal(isolate, isPrimitiveFunction, functionPointer, typeEncoding, args, target, clazz, selector, callSuper, metaType, provideErrorOutParameter);
+    return Interop::CallFunctionInternal(context, isPrimitiveFunction, functionPointer, typeEncoding, args, target, clazz, selector, callSuper, metaType, provideErrorOutParameter);
 }
 
-id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id target, Class clazz, V8Args& args) {
+id Interop::CallInitializer(Local<Context> context, const MethodMeta* methodMeta, id target, Class clazz, V8Args& args) {
     const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
     SEL selector = methodMeta->selector();
     void* functionPointer = (void*)objc_msgSend;
@@ -109,7 +109,7 @@ id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id t
 
     Interop::SetValue(call.ArgumentBuffer(0), target);
     Interop::SetValue(call.ArgumentBuffer(1), selector);
-    Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
+    Interop::SetFFIParams(context, typeEncoding, &call, argsCount, initialParameterIndex, args);
 
     ffi_call(parametrizedCall->Cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
@@ -118,17 +118,19 @@ id Interop::CallInitializer(Isolate* isolate, const MethodMeta* methodMeta, id t
     return result;
 }
 
-void Interop::SetFFIParams(Isolate* isolate, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, V8Args& args) {
+void Interop::SetFFIParams(Local<Context> context, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, V8Args& args) {
     const TypeEncoding* enc = typeEncoding;
     for (int i = initialParameterIndex; i < argsCount; i++) {
         enc = enc->next();
         Local<Value> arg = args[i - initialParameterIndex];
         void* argBuffer = call->ArgumentBuffer(i);
-        Interop::WriteValue(isolate, enc, argBuffer, arg);
+        Interop::WriteValue(context, enc, argBuffer, arg);
     }
 }
 
-void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
+void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
+    Isolate* isolate = context->GetIsolate();
+
     if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
         ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, true);
         size_t size = ffiType->size;
@@ -244,7 +246,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 void* data = pointerWrapper->Data();
                 Interop::SetValue(dest, data);
             } else if (wrapper->Type() == WrapperType::Reference) {
-                void* data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
+                void* data = Reference::GetWrappedPointer(context, arg, typeEncoding);
                 Interop::SetValue(dest, data);
             } else {
                 // TODO:
@@ -259,7 +261,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
                 StructInfo structInfo = FFICall::GetStructInfo(structMeta);
                 data = malloc(structInfo.FFIType()->size);
-                Interop::InitializeStruct(isolate, data, structInfo.Fields(), arg);
+                Interop::InitializeStruct(context, data, structInfo.Fields(), arg);
             } else {
                 if (wrapper == nullptr) {
                     bool isArrayBuffer = false;
@@ -284,7 +286,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                     referenceWrapper->SetEncoding(innerType);
                     // Initialize the ref/out parameter value before passing it to the function call
                     if (!value.IsEmpty()) {
-                        Interop::WriteValue(isolate, innerType, data, value);
+                        Interop::WriteValue(context, innerType, data, value);
                     }
                 } else if (wrapper->Type() == WrapperType::Struct) {
                     StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
@@ -351,7 +353,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 size_t size = structWrapper->StructInfo().FFIType()->size;
                 memcpy(dest, buffer, size);
             } else if (wrapper->Type() == WrapperType::Reference) {
-                void* data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
+                void* data = Reference::GetWrappedPointer(context, arg, typeEncoding);
                 tns::Assert(data != nullptr, isolate);
                 ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
                 size_t size = ffiType->size;
@@ -366,7 +368,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
             StructInfo structInfo = FFICall::GetStructInfo(structMeta);
-            Interop::InitializeStruct(isolate, dest, structInfo.Fields(), obj);
+            Interop::InitializeStruct(context, dest, structInfo.Fields(), obj);
         }
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::AnonymousStructEncoding) {
         Local<Object> obj = arg.As<Object>();
@@ -388,7 +390,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
             const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
             StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
-            Interop::InitializeStruct(isolate, dest, structInfo.Fields(), obj);
+            Interop::InitializeStruct(context, dest, structInfo.Fields(), obj);
         }
     } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
         Local<Object> obj = arg.As<Object>();
@@ -418,7 +420,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             std::shared_ptr<BackingStore> backingStore = arg.As<ArrayBufferView>()->Buffer()->GetBackingStore();
             data = backingStore->Data();
         } else {
-            data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
+            data = Reference::GetWrappedPointer(context, arg, typeEncoding);
         }
         Interop::SetValue(dest, data);
     } else if (typeEncoding->type == BinaryTypeEncodingType::ConstantArrayEncoding) {
@@ -433,10 +435,10 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
                 bool success = array->Get(context, i).ToLocal(&element);
                 tns::Assert(success, isolate);
                 void* ptr = (uint8_t*)dest + i * ffiType->size;
-                Interop::WriteValue(isolate, innerType, ptr, element);
+                Interop::WriteValue(context, innerType, ptr, element);
             }
         } else {
-            void* data = Reference::GetWrappedPointer(isolate, arg, typeEncoding);
+            void* data = Reference::GetWrappedPointer(context, arg, typeEncoding);
             Interop::SetValue(dest, data);
         }
     } else if (arg->IsObject()) {
@@ -487,7 +489,7 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
             NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
             Interop::SetValue(dest, adapter);
         } else if (tns::IsArrayOrArrayLike(isolate, obj)) {
-            Local<v8::Array> array = Interop::ToArray(isolate, obj);
+            Local<v8::Array> array = Interop::ToArray(obj);
             ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
             Interop::SetValue(dest, adapter);
         } else {
@@ -499,7 +501,8 @@ void Interop::WriteValue(Isolate* isolate, const TypeEncoding* typeEncoding, voi
     }
 }
 
-id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
+id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
+    Isolate* isolate = context->GetIsolate();
     if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
         return nil;
     } else if (tns::IsString(arg)) {
@@ -556,7 +559,8 @@ id Interop::ToObject(v8::Isolate* isolate, v8::Local<v8::Value> arg) {
     return nil;
 }
 
-Local<Value> Interop::StructToValue(Isolate* isolate, void* result, StructInfo structInfo, std::shared_ptr<Persistent<Value>> parentStruct) {
+Local<Value> Interop::StructToValue(Local<Context> context, void* result, StructInfo structInfo, std::shared_ptr<Persistent<Value>> parentStruct) {
+    Isolate* isolate = context->GetIsolate();
     StructWrapper* wrapper = nullptr;
     if (parentStruct == nullptr) {
         ffi_type* ffiType = structInfo.FFIType();
@@ -581,21 +585,21 @@ Local<Value> Interop::StructToValue(Isolate* isolate, void* result, StructInfo s
         return it->second->Get(isolate);
     }
 
-    Local<Value> res = ArgConverter::ConvertArgument(isolate, wrapper);
+    Local<Value> res = ArgConverter::ConvertArgument(context, wrapper);
     if (parentStruct == nullptr) {
-        std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(isolate, res);
+        std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, res);
         cache->StructInstances.emplace(key, poResult);
     }
     return res;
 }
 
-void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<StructField> fields, Local<Value> inititalizer) {
+void Interop::InitializeStruct(Local<Context> context, void* destBuffer, std::vector<StructField> fields, Local<Value> inititalizer) {
     ptrdiff_t position = 0;
-    Interop::InitializeStruct(isolate, destBuffer, fields, inititalizer, position);
+    Interop::InitializeStruct(context, destBuffer, fields, inititalizer, position);
 }
 
-void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<StructField> fields, Local<Value> inititalizer, ptrdiff_t& position) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Interop::InitializeStruct(Local<Context> context, void* destBuffer, std::vector<StructField> fields, Local<Value> inititalizer, ptrdiff_t& position) {
+    Isolate* isolate = context->GetIsolate();
     for (auto it = fields.begin(); it != fields.end(); it++) {
         StructField field = *it;
 
@@ -612,7 +616,7 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
             tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
             StructInfo nestedStructInfo = FFICall::GetStructInfo(structMeta);
-            Interop::InitializeStruct(isolate, destBuffer, nestedStructInfo.Fields(), value, position);
+            Interop::InitializeStruct(context, destBuffer, nestedStructInfo.Fields(), value, position);
             position += nestedStructInfo.FFIType()->size;
         } else if (type == BinaryTypeEncodingType::AnonymousStructEncoding) {
             size_t fieldsCount = field.Encoding()->details.anonymousRecord.fieldsCount;
@@ -621,7 +625,7 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
             StructInfo nestedStructInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
             ptrdiff_t offset = position + field.Offset();
             uint8_t* dst = (uint8_t*)destBuffer + offset;
-            Interop::InitializeStruct(isolate, dst, nestedStructInfo.Fields(), value, position);
+            Interop::InitializeStruct(context, dst, nestedStructInfo.Fields(), value, position);
             position += nestedStructInfo.FFIType()->size;
         } else if (type == BinaryTypeEncodingType::ConstantArrayEncoding) {
             const TypeEncoding* innerType = field.Encoding()->details.constantArray.getInnerType();
@@ -639,21 +643,21 @@ void Interop::InitializeStruct(Isolate* isolate, void* destBuffer, std::vector<S
                     bool success = array->Get(context, index).ToLocal(&element);
                     tns::Assert(success, isolate);
                     uint8_t* dst = (uint8_t*)destBuffer + offset;
-                    Interop::WriteValue(isolate, innerType, dst, element);
+                    Interop::WriteValue(context, innerType, dst, element);
                     offset += ffiType->size;
                 }
             } else {
-                void* data = Reference::GetWrappedPointer(isolate, value, field.Encoding());
+                void* data = Reference::GetWrappedPointer(context, value, field.Encoding());
                 if (data != nullptr) {
                     uint8_t* dst = (uint8_t*)destBuffer + offset;
                     memcpy(dst, data, length * ffiType->size);
                 }
             }
         } else if (type == BinaryTypeEncodingType::FunctionPointerEncoding) {
-            Interop::WriteValue(isolate, field.Encoding(), destBuffer, value);
+            Interop::WriteValue(context, field.Encoding(), destBuffer, value);
         } else if (type == BinaryTypeEncodingType::PointerEncoding) {
             const TypeEncoding* innerType = field.Encoding()->details.pointer.getInnerType();
-            Interop::WriteValue(isolate, innerType, destBuffer, value);
+            Interop::WriteValue(context, innerType, destBuffer, value);
         } else {
             ptrdiff_t offset = position + field.Offset();
 
@@ -694,7 +698,9 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
 }
 
-Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember) {
+Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember) {
+    Isolate* isolate = context->GetIsolate();
+
     if (typeEncoding->type == BinaryTypeEncodingType::ExtVectorEncoding) {
         ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, isStructMember);
         const TypeEncoding* innerTypeEncoding = typeEncoding->details.extVector.getInnerType();
@@ -714,7 +720,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
         const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
         StructInfo structInfo = FFICall::GetStructInfo(structMeta, structName);
-        Local<Value> value = Interop::StructToValue(isolate, result, structInfo, parentStruct);
+        Local<Value> value = Interop::StructToValue(context, result, structInfo, parentStruct);
         return value;
     }
 
@@ -724,7 +730,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
         StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
         void* result = call->ResultBuffer();
-        Local<Value> value = Interop::StructToValue(isolate, result, structInfo, parentStruct);
+        Local<Value> value = Interop::StructToValue(context, result, structInfo, parentStruct);
         return value;
     }
 
@@ -733,12 +739,11 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         ffi_type* innerFFIType = FFICall::GetArgumentType(innerType, isStructMember);
         int length = typeEncoding->details.constantArray.size;
         Local<v8::Array> array = v8::Array::New(isolate, length);
-        Local<Context> context = isolate->GetCurrentContext();
 
         for (int i = 0; i < length; i++) {
             size_t offset = i * innerFFIType->size;
             BaseCall bc((uint8_t*)call->ResultBuffer(), offset);
-            Local<Value> element = Interop::GetResult(isolate, innerType, &bc, false);
+            Local<Value> element = Interop::GetResult(context, innerType, &bc, false);
             bool success = array->Set(context, i, element).FromMaybe(false);
             tns::Assert(success, isolate);
         }
@@ -769,7 +774,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         }
 
         auto cache = Caches::Get(isolate);
-        cache->ObjectCtorInitializer(isolate, protocolMeta);
+        cache->ObjectCtorInitializer(context, protocolMeta);
 
         auto it = cache->ProtocolCtorFuncs.find(protocolMeta->name());
         if (it != cache->ProtocolCtorFuncs.end()) {
@@ -792,7 +797,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             const Meta* meta = ArgConverter::GetMeta(name);
             if (meta != nullptr && (meta->type() == MetaType::Interface || meta->type() == MetaType::ProtocolType)) {
                 const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
-                cache->ObjectCtorInitializer(isolate, baseMeta);
+                cache->ObjectCtorInitializer(context, baseMeta);
             }
 
             auto it = cache->CtorFuncs.find(name);
@@ -822,7 +827,6 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             return callback;
         }
 
-        Local<Context> context = isolate->GetCurrentContext();
         BlockWrapper* blockWrapper = new BlockWrapper(block, typeEncoding);
         Local<External> ext = External::New(isolate, blockWrapper);
         Local<v8::Function> callback;
@@ -844,12 +848,13 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
 
             V8FunctionCallbackArgs args(info);
             Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
             Interop::SetValue(call.ArgumentBuffer(0), block);
-            Interop::SetFFIParams(isolate, enc, &call, argsCount, 1, args);
+            Interop::SetFFIParams(context, enc, &call, argsCount, 1, args);
 
             ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(), call.ArgsArray());
 
-            Local<Value> result = Interop::GetResult(isolate, enc, &call, true, nullptr);
+            Local<Value> result = Interop::GetResult(context, enc, &call, true, nullptr);
 
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&callback);
@@ -871,7 +876,6 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         AnonymousFunctionWrapper* wrapper = new AnonymousFunctionWrapper(functionPointer, parametersEncoding, parametersCount);
         Local<External> ext = External::New(isolate, wrapper);
 
-        Local<Context> context = isolate->GetCurrentContext();
         Local<v8::Function> func;
         bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -882,14 +886,15 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             void* functionPointer = wrapper->Data();
             const TypeEncoding* typeEncoding = wrapper->ParametersEncoding();
 
-            Local<Value> result = Interop::CallFunction(isolate, functionPointer, typeEncoding, args);
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Value> result = Interop::CallFunction(context, functionPointer, typeEncoding, args);
 
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&func);
         tns::Assert(success, isolate);
 
         tns::SetValue(isolate, func, wrapper);
-        ObjectManager::Register(isolate, func);
+        ObjectManager::Register(context, func);
 
         return func;
     }
@@ -903,13 +908,13 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
 
         if (innerType->type == BinaryTypeEncodingType::VoidEncoding) {
-            Local<Value> instance = Pointer::NewInstance(isolate, result);
+            Local<Value> instance = Pointer::NewInstance(context, result);
             return instance;
         }
 
         BaseCall c(result);
-        Local<Value> value = Interop::GetResult(isolate, innerType, &c, true);
-        Local<Value> type = Interop::GetInteropType(isolate, innerType->type);
+        Local<Value> value = Interop::GetResult(context, innerType, &c, true);
+        Local<Value> type = Interop::GetInteropType(context, innerType->type);
 
         std::vector<Local<Value>> args;
         args.push_back(value);
@@ -917,9 +922,8 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
             args.insert(args.begin(), type);
         }
 
-        Local<Context> context = isolate->GetCurrentContext();
         Local<Object> instance;
-        Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
+        Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(context);
         bool success = interopReferenceCtorFunc->NewInstance(context, (int)args.size(), args.data()).ToLocal(&instance);
         tns::Assert(success, isolate);
 
@@ -952,7 +956,6 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         }
 
         if (marshalToPrimitive && [result isKindOfClass:[NSDate class]]) {
-            Local<Context> context = isolate->GetCurrentContext();
             double time = [result timeIntervalSince1970] * 1000.0;
             Local<Value> date;
             if (Date::New(context, time).ToLocal(&date)) {
@@ -996,7 +999,7 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         }
 
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
-        Local<Value> jsResult = ArgConverter::ConvertArgument(isolate, wrapper);
+        Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
 
         if ([result isKindOfClass:[NSArray class]]) {
             // attach Symbol.iterator to the instance
@@ -1006,18 +1009,19 @@ Local<Value> Interop::GetResult(Isolate* isolate, const TypeEncoding* typeEncodi
         return jsResult;
     }
 
-    return Interop::GetPrimitiveReturnType(isolate, typeEncoding->type, call);
+    return Interop::GetPrimitiveReturnType(context, typeEncoding->type, call);
 }
 
-Local<Value> Interop::GetPrimitiveReturnType(Isolate* isolate, BinaryTypeEncodingType type, BaseCall* call) {
+Local<Value> Interop::GetPrimitiveReturnType(Local<Context> context, BinaryTypeEncodingType type, BaseCall* call) {
+    Isolate* isolate = context->GetIsolate();
     if (type == BinaryTypeEncodingType::CStringEncoding) {
         unsigned char* result = call->GetResult<unsigned char*>();
         if (result == nullptr) {
             return Null(isolate);
         }
 
-        Local<Value> uint8Type = Interop::GetInteropType(isolate, BinaryTypeEncodingType::UCharEncoding);
-        Local<Value> reference = Reference::FromPointer(isolate, uint8Type, result);
+        Local<Value> uint8Type = Interop::GetInteropType(context, BinaryTypeEncodingType::UCharEncoding);
+        Local<Value> reference = Reference::FromPointer(context, uint8Type, result);
         return reference;
     }
 
@@ -1134,11 +1138,12 @@ bool Interop::IsNumbericType(BinaryTypeEncodingType type) {
         type == BinaryTypeEncodingType::DoubleEncoding;
 }
 
-void Interop::SetStructPropertyValue(Isolate* isolate, StructWrapper* wrapper, StructField field, Local<Value> value) {
+void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrapper, StructField field, Local<Value> value) {
     if (value.IsEmpty()) {
         return;
     }
 
+    Isolate* isolate = context->GetIsolate();
     uint8_t* data = (uint8_t*)wrapper->Data();
     uint8_t* destBuffer = data + field.Offset();
 
@@ -1155,7 +1160,7 @@ void Interop::SetStructPropertyValue(Isolate* isolate, StructWrapper* wrapper, S
             break;
         }
         case BinaryTypeEncodingType::ConstantArrayEncoding: {
-            Interop::WriteValue(isolate, fieldEncoding, destBuffer, value);
+            Interop::WriteValue(context, fieldEncoding, destBuffer, value);
             break;
         }
         case BinaryTypeEncodingType::PointerEncoding: {
@@ -1223,10 +1228,13 @@ void Interop::SetStructPropertyValue(Isolate* isolate, StructWrapper* wrapper, S
     }
 }
 
-Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
+Local<v8::Array> Interop::ToArray(Local<Object> object) {
     if (object->IsArray()) {
         return object.As<v8::Array>();
     }
+
+    Local<Context> context = object->CreationContext();
+    Isolate* isolate = context->GetIsolate();
 
     Local<v8::Function> sliceFunc;
     auto cache = Caches::Get(isolate);
@@ -1255,7 +1263,6 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
 
     Local<Value> sliceArgs[1] { object };
 
-    Local<Context> context = isolate->GetCurrentContext();
     Local<Value> result;
     bool success = sliceFunc->Call(context, object, 1, sliceArgs).ToLocal(&result);
     tns::Assert(success, isolate);
@@ -1263,7 +1270,7 @@ Local<v8::Array> Interop::ToArray(Isolate* isolate, Local<Object> object) {
     return result.As<v8::Array>();
 }
 
-Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, V8Args& args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType, bool provideErrorOurParameter) {
+Local<Value> Interop::CallFunctionInternal(Local<Context> context, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, V8Args& args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType, bool provideErrorOurParameter) {
     int initialParameterIndex = isPrimitiveFunction ? 0 : 2;
 
     int argsCount = initialParameterIndex + (int)args.Length();
@@ -1314,7 +1321,7 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
     bool isInstanceReturnType = typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding;
     bool marshalToPrimitive = isPrimitiveFunction || !isInstanceReturnType;
 
-    Interop::SetFFIParams(isolate, typeEncoding, &call, argsCount, initialParameterIndex, args);
+    Interop::SetFFIParams(context, typeEncoding, &call, argsCount, initialParameterIndex, args);
 
     void* errorRef = nullptr;
     if (provideErrorOurParameter) {
@@ -1339,7 +1346,7 @@ Local<Value> Interop::CallFunctionInternal(Isolate* isolate, bool isPrimitiveFun
         }
     }
 
-    Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, marshalToPrimitive, nullptr);
+    Local<Value> result = Interop::GetResult(context, typeEncoding, &call, marshalToPrimitive, nullptr);
 
     return result;
 }

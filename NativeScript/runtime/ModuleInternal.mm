@@ -4,13 +4,14 @@
 #include "ModuleInternal.h"
 #include "NativeScriptException.h"
 #include "RuntimeConfig.h"
+#include "Caches.h"
 #include "Helpers.h"
 
 using namespace v8;
 
 namespace tns {
 
-ModuleInternal::ModuleInternal(Isolate* isolate) {
+ModuleInternal::ModuleInternal(Local<Context> context) {
     std::string requireFactoryScript =
         "(function() { "
         "    function require_factory(requireInternal, dirName) { "
@@ -21,7 +22,7 @@ ModuleInternal::ModuleInternal(Isolate* isolate) {
         "    return require_factory; "
         "})()";
 
-    Local<Context> context = isolate->GetCurrentContext();
+    Isolate* isolate = context->GetIsolate();
     Local<Object> global = context->Global();
     Local<Script> script;
     TryCatch tc(isolate);
@@ -49,7 +50,8 @@ ModuleInternal::ModuleInternal(Isolate* isolate) {
 }
 
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
-    Local<Context> context = isolate->GetCurrentContext();
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    Local<Context> context = cache->GetContext();
     Local<Object> globalObject = context->Global();
     Local<Value> requireObj;
     bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);

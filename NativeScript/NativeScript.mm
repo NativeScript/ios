@@ -32,12 +32,15 @@ static std::shared_ptr<Runtime> runtime_;
     runtime_ = std::make_shared<Runtime>();
 
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-    runtime_->Init();
+    Isolate* isolate = runtime_->CreateIsolate();
+    runtime_->Init(isolate);
     std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
     printf("Runtime initialization took %llims\n", duration);
 
     if (config.IsDebug) {
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
         v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(runtime_.get());
         inspectorClient->init();
         inspectorClient->registerModules();

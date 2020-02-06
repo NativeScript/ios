@@ -79,7 +79,7 @@ void SymbolIterator::NextCallback(const v8::FunctionCallbackInfo<v8::Value>& arg
         } else if ([item isKindOfClass:[NSString class]]) {
             val = tns::ToV8String(isolate, [item UTF8String]);
         } else {
-            val = ArgConverter::CreateJsWrapper(isolate, new ObjCDataWrapper(item), Local<Object>());
+            val = ArgConverter::CreateJsWrapper(context, new ObjCDataWrapper(item), Local<Object>());
         }
 
         bool success = obj->Set(context, tns::ToV8String(isolate, "done"), v8::Boolean::New(isolate, false)).FromMaybe(false);

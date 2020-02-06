@@ -43,6 +43,7 @@ void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool i
 
 void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
     try {
         if (!info.IsConstructCall()) {
             throw NativeScriptException("Worker function must be called as a constructor.");
@@ -66,26 +67,28 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
         WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
         tns::SetValue(isolate, thiz, worker);
-        std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(isolate, thiz);
+        std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(context, thiz);
 
         std::function<Isolate* ()> func([worker, workerPath]() {
             tns::Runtime* runtime = new tns::Runtime();
-            runtime->Init();
+            Isolate* isolate = runtime->CreateIsolate();
+            v8::Locker locker(isolate);
+            runtime->Init(isolate);
             runtime->SetWorkerId(worker->WorkerId());
-            Isolate* workerIsolate = runtime->GetIsolate();
             int workerId = worker->WorkerId();
-            Worker::SetWorkerId(workerIsolate, workerId);
+            Worker::SetWorkerId(isolate, workerId);
 
-            Isolate::Scope isolate_scope(workerIsolate);
-            HandleScope handle_scope(workerIsolate);
-            TryCatch tc(workerIsolate);
+            TryCatch tc(isolate);
             runtime->RunModule(workerPath);
             if (tc.HasCaught()) {
-                worker->PassUncaughtExceptionFromWorkerToMain(workerIsolate, tc, false);
+                Isolate::Scope isolate_scope(isolate);
+                HandleScope handle_scope(isolate);
+                Local<Context> context = Caches::Get(isolate)->GetContext();
+                worker->PassUncaughtExceptionFromWorkerToMain(context, tc, false);
                 worker->Terminate();
             }
 
-            return workerIsolate;
+            return isolate;
         });
 
         worker->Start(poWorker, func);
@@ -130,6 +133,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
 
         tns::ExecuteOnMainThread([state, message]() {
             Isolate* isolate = state->GetIsolate();
+            v8::Locker locker(isolate);
             Isolate::Scope isolate_scope(isolate);
             HandleScope handle_scope(isolate);
             Local<Value> workerInstance = state->GetWorker()->Get(isolate);
@@ -178,7 +182,7 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
 }
 
 void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::string message) {
-    Local<Context> context = isolate->GetCurrentContext();
+    Local<Context> context = Caches::Get(isolate)->GetContext();
     Local<Value> onMessageValue;
     bool success = receiver.As<Object>()->Get(context, tns::ToV8String(isolate, "onmessage")).ToLocal(&onMessageValue);
     tns::Assert(success, isolate);

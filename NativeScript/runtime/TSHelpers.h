@@ -7,7 +7,7 @@ namespace tns {
 
 class TSHelpers {
 public:
-    static void Init(v8::Isolate* isolate);
+    static void Init(v8::Local<v8::Context> context);
 };
 
 }

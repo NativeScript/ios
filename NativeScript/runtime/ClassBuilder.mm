@@ -62,9 +62,9 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
 
         Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName);
         if (!nativeSignature.IsEmpty()) {
-            ClassBuilder::ExposeDynamicMembers(isolate, extendedClass, implementationObject, nativeSignature);
+            ClassBuilder::ExposeDynamicMembers(context, extendedClass, implementationObject, nativeSignature);
         } else {
-            ClassBuilder::ExposeDynamicMethods(isolate, extendedClass, Local<Value>(), Local<Value>(), implementationObject);
+            ClassBuilder::ExposeDynamicMethods(context, extendedClass, Local<Value>(), Local<Value>(), implementationObject);
         }
 
         auto cache = Caches::Get(isolate);
@@ -119,18 +119,20 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
 
 void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
 
     try {
         CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
         Class klass = item->data_;
 
-        ArgConverter::ConstructObject(isolate, info, klass);
+        ArgConverter::ConstructObject(context, info, klass);
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8(isolate);
     }
 }
 
-void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
+void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
     auto cache = Caches::Get(isolate);
     if (cache->OriginalExtendsFunc.get() != nullptr) {
         return;
@@ -150,7 +152,6 @@ void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
         "    return __extends;"
         "})()";
 
-    Local<Context> context = isolate->GetCurrentContext();
     Local<Script> script;
     tns::Assert(Script::Compile(context, tns::ToV8String(isolate, extendsFuncScript.c_str())).ToLocal(&script), isolate);
 
@@ -160,8 +161,8 @@ void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Isolate* isolate) {
     cache->OriginalExtendsFunc = std::make_unique<Persistent<v8::Function>>(isolate, extendsFunc.As<v8::Function>());
 }
 
-void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
-    Local<Context> context = isolate->GetCurrentContext();
+void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
     Local<Object> global = context->Global();
 
     Local<v8::Function> extendsFunc = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
@@ -220,7 +221,10 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
         cache->CtorFuncs.emplace(extendedClassName, poExtendedClassCtorFunc);
 
         IMP newInitialize = imp_implementationWithBlock(^(id self) {
-            Local<Context> context = isolate->GetCurrentContext();
+            v8::Locker locker(isolate);
+            Isolate::Scope isolate_scope(isolate);
+            HandleScope handle_scope(isolate);
+            Local<Context> context = Caches::Get(isolate)->GetContext();
             Local<v8::Function> extendedClassCtorFunc = poExtendedClassCtorFunc->Get(isolate);
 
             Local<Value> exposedMethods;
@@ -239,7 +243,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
             success = extendedClassCtorFunc->Get(context, tns::ToV8String(isolate, "ObjCProtocols")).ToLocal(&exposedProtocols);
             tns::Assert(success, isolate);
 
-            ClassBuilder::ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject.As<Object>());
+            ClassBuilder::ExposeDynamicMethods(context, extendedClass, exposedMethods, exposedProtocols, implementationObject.As<Object>());
         });
         class_addMethod(object_getClass(extendedClass), @selector(initialize), newInitialize, "v@:");
 
@@ -251,8 +255,8 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Isolate* isolate) {
     tns::Assert(success, isolate);
 }
 
-void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
-    Local<Context> context = isolate->GetCurrentContext();
+void ClassBuilder::ExposeDynamicMembers(v8::Local<v8::Context> context, Class extendedClass, Local<Object> implementationObject, Local<Object> nativeSignature) {
+    Isolate* isolate = context->GetIsolate();
 
     Local<Value> exposedMethods;
     bool success = nativeSignature->Get(context, tns::ToV8String(isolate, "exposedMethods")).ToLocal(&exposedMethods);
@@ -262,7 +266,7 @@ void ClassBuilder::ExposeDynamicMembers(Isolate* isolate, Class extendedClass, L
     success = nativeSignature->Get(context, tns::ToV8String(isolate, "protocols")).ToLocal(&exposedProtocols);
     tns::Assert(success, isolate);
 
-    ClassBuilder::ExposeDynamicMethods(isolate, extendedClass, exposedMethods, exposedProtocols, implementationObject);
+    ClassBuilder::ExposeDynamicMethods(context, extendedClass, exposedMethods, exposedProtocols, implementationObject);
 }
 
 std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
@@ -416,8 +420,8 @@ BinaryTypeEncodingType ClassBuilder::GetTypeEncodingType(Isolate* isolate, Local
     return BinaryTypeEncodingType::VoidEncoding;
 }
 
-void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, Local<Value> exposedMethods, Local<Value> exposedProtocols, Local<Object> implementationObject) {
-    Local<Context> context = isolate->GetCurrentContext();
+void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedClass, Local<Value> exposedMethods, Local<Value> exposedProtocols, Local<Object> implementationObject) {
+    Isolate* isolate = context->GetIsolate();
     std::vector<const ProtocolMeta*> protocols;
     if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
         Local<v8::Array> protocolsArray = exposedProtocols.As<v8::Array>();
@@ -580,7 +584,7 @@ void ClassBuilder::ExposeDynamicMethods(Isolate* isolate, Class extendedClass, L
         }
 
         std::vector<const MethodMeta*> methodMetas;
-        VisitMethods(isolate, extendedClass, methodName, extendedClassMeta, methodMetas, protocols);
+        VisitMethods(extendedClass, methodName, extendedClassMeta, methodMetas, protocols);
 
         for (int j = 0; j < methodMetas.size(); j++) {
             const MethodMeta* methodMeta = methodMetas[j];
@@ -628,7 +632,7 @@ void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta
     }
 }
 
-void ClassBuilder::VisitMethods(Isolate* isolate, Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<const ProtocolMeta*> exposedProtocols) {
+void ClassBuilder::VisitMethods(Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<const ProtocolMeta*> exposedProtocols) {
     for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
         const MethodMeta* methodMeta = (*it).valuePtr();
         if (methodMeta->jsName() == methodName) {
@@ -645,19 +649,19 @@ void ClassBuilder::VisitMethods(Isolate* isolate, Class extendedClass, std::stri
             continue;
         }
         const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(m);
-        VisitMethods(isolate, extendedClass, methodName, protocolMeta, methodMetas, exposedProtocols);
+        VisitMethods(extendedClass, methodName, protocolMeta, methodMetas, exposedProtocols);
     }
 
     for (auto it = exposedProtocols.begin(); it != exposedProtocols.end(); it++) {
         const ProtocolMeta* protocolMeta = *it;
-        VisitMethods(isolate, extendedClass, methodName, protocolMeta, methodMetas, std::vector<const ProtocolMeta*>());
+        VisitMethods(extendedClass, methodName, protocolMeta, methodMetas, std::vector<const ProtocolMeta*>());
     }
 
     if (meta->type() == MetaType::Interface) {
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
         const BaseClassMeta* baseMeta = interfaceMeta->baseMeta();
         if (baseMeta != nullptr) {
-            VisitMethods(isolate, extendedClass, methodName, interfaceMeta->baseMeta(), methodMetas, exposedProtocols);
+            VisitMethods(extendedClass, methodName, interfaceMeta->baseMeta(), methodMetas, exposedProtocols);
         }
     }
 }
@@ -681,6 +685,7 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
 
             FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                 PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                v8::Locker locker(context->isolate_);
                 Isolate::Scope isolate_scope(context->isolate_);
                 HandleScope handle_scope(context->isolate_);
                 Local<v8::Function> getterFunc = context->callback_->Get(context->isolate_);
@@ -692,10 +697,11 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
                 Local<Object> self_ = it != cache->Instances.end()
                     ? it->second->Get(context->isolate_).As<Object>()
                     : context->implementationObject_->Get(context->isolate_);
-                tns::Assert(getterFunc->Call(context->isolate_->GetCurrentContext(), self_, 0, nullptr).ToLocal(&res), context->isolate_);
+                Local<Context> v8Context = Caches::Get(context->isolate_)->GetContext();
+                tns::Assert(getterFunc->Call(v8Context, self_, 0, nullptr).ToLocal(&res), context->isolate_);
 
                 const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
-                ArgConverter::SetValue(context->isolate_, retValue, res, typeEncoding);
+                ArgConverter::SetValue(v8Context, retValue, res, typeEncoding);
             };
             const TypeEncoding* typeEncoding = propertyMeta->getter()->encodings()->first();
             IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback , userData);
@@ -709,6 +715,7 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
 
             FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
                 PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+                v8::Locker locker(context->isolate_);
                 Isolate::Scope isolate_scope(context->isolate_);
                 HandleScope handle_scope(context->isolate_);
                 Local<v8::Function> setterFunc = context->callback_->Get(context->isolate_);
@@ -724,7 +731,8 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
                 uint8_t* argBuffer = (uint8_t*)argValues[2];
                 const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();
                 BaseCall call(argBuffer);
-                Local<Value> jsWrapper = Interop::GetResult(context->isolate_, typeEncoding, &call, true);
+                Local<Context> v8Context = Caches::Get(context->isolate_)->GetContext();
+                Local<Value> jsWrapper = Interop::GetResult(v8Context, typeEncoding, &call, true);
                 Local<Value> params[1] = { jsWrapper };
 
                 tns::Assert(setterFunc->Call(context->isolate_->GetCurrentContext(), self_, 1, params).ToLocal(&res), context->isolate_);

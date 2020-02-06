@@ -6,7 +6,7 @@ using namespace v8;
 
 namespace tns {
 
-void TSHelpers::Init(Isolate* isolate) {
+void TSHelpers::Init(Local<Context> context) {
     // The purpose of this script is to handle the "new" operator when extending native classes:
     //
     // var InheritingClass = (function (_super) {
@@ -127,7 +127,7 @@ void TSHelpers::Init(Isolate* isolate) {
         "    Object.defineProperty(global, \"__extends\", { value: __extends, writable: false });"
         "})()";
 
-    Local<Context> context = isolate->GetCurrentContext();
+    Isolate* isolate = context->GetIsolate();
     Local<Script> script;
     TryCatch tc(isolate);
     if (!Script::Compile(context, tns::ToV8String(isolate, source.c_str())).ToLocal(&script) && tc.HasCaught()) {

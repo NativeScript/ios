@@ -4,6 +4,10 @@ using namespace v8;
 
 namespace tns {
 
+Caches::Caches(Isolate* isolate)
+    : isolate_(isolate) {
+}
+
 Caches::~Caches() {
     this->Prototypes.clear();
     this->ClassPrototypes.clear();
@@ -22,7 +26,7 @@ Caches::~Caches() {
 std::shared_ptr<Caches> Caches::Get(Isolate* isolate) {
     std::shared_ptr<Caches> cache = Caches::perIsolateCaches_.Get(isolate);
     if (cache == nullptr) {
-        cache = std::make_shared<Caches>();
+        cache = std::make_shared<Caches>(isolate);
         Caches::perIsolateCaches_.Insert(isolate, cache);
     }
 
@@ -31,6 +35,14 @@ std::shared_ptr<Caches> Caches::Get(Isolate* isolate) {
 
 void Caches::Remove(v8::Isolate* isolate) {
     Caches::perIsolateCaches_.Remove(isolate);
+}
+
+void Caches::SetContext(Local<Context> context) {
+    this->context_ = std::make_shared<Persistent<Context>>(this->isolate_, context);
+}
+
+Local<Context> Caches::GetContext() {
+    return this->context_->Get(this->isolate_);
 }
 
 ConcurrentMap<Isolate*, std::shared_ptr<Caches>> Caches::perIsolateCaches_;

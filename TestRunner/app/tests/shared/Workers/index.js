@@ -471,12 +471,13 @@ describe("TNS Workers", () => {
             }, 1000);
         });
 
-        it("Worker should marshal callbacks on the worker thread even if the native callback was invoked on a different thread", done => {
-            let  worker = new Worker("./tests/shared/Workers/EvalWorker.js");
+        it("Worker should marshal callbacks on the same thread that the native block was invoked on", done => {
+            let worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
             worker.onmessage = msg => {
-                expect(msg.data.callingThreadHash).toEqual(msg.data.callbackThreadHash);
-                expect(msg.data.callingThreadHash).not.toEqual(NSThread.currentThread.hash);
+                expect(msg.data.callingThreadHash).not.toEqual(msg.data.callbackThreadHash);
+                expect(msg.data.callbackThreadHash).toEqual(NSThread.currentThread.hash);
+                worker.terminate();
                 done();
             };
 

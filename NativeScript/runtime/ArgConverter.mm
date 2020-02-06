@@ -6,20 +6,21 @@
 #include "ObjectManager.h"
 #include "Interop.h"
 #include "Helpers.h"
-#include "Runtime.h"
 
 using namespace v8;
 using namespace std;
 
 namespace tns {
 
-void ArgConverter::Init(Isolate* isolate, GenericNamedPropertyGetterCallback structPropertyGetter, GenericNamedPropertySetterCallback structPropertySetter) {
+void ArgConverter::Init(Local<Context> context, GenericNamedPropertyGetterCallback structPropertyGetter, GenericNamedPropertySetterCallback structPropertySetter) {
+    Isolate* isolate = context->GetIsolate();
     auto cache = Caches::Get(isolate);
-    cache->EmptyObjCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate));
-    cache->EmptyStructCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ArgConverter::CreateEmptyInstanceFunction(isolate, structPropertyGetter, structPropertySetter));
+    cache->EmptyObjCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ArgConverter::CreateEmptyInstanceFunction(context));
+    cache->EmptyStructCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ArgConverter::CreateEmptyInstanceFunction(context, structPropertyGetter, structPropertySetter));
 }
 
-Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> receiver, V8Args& args, const MethodMeta* meta, bool isMethodCallback) {
+Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Object> receiver, V8Args& args, const MethodMeta* meta, bool isMethodCallback) {
+    Isolate* isolate = context->GetIsolate();
     id target = nil;
     bool instanceMethod = !receiver.IsEmpty();
     bool callSuper = false;
@@ -65,52 +66,29 @@ Local<Value> ArgConverter::Invoke(Isolate* isolate, Class klass, Local<Object> r
         throw NativeScriptException(errorMessage);
     }
 
-    return Interop::CallFunction(isolate, meta, target, klass, args, callSuper);
+    return Interop::CallFunction(context, meta, target, klass, args, callSuper);
 }
 
-Local<Value> ArgConverter::ConvertArgument(Isolate* isolate, BaseDataWrapper* wrapper, bool skipGCRegistration) {
+Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapper* wrapper, bool skipGCRegistration) {
+    Isolate* isolate = context->GetIsolate();
     if (wrapper == nullptr) {
         return Null(isolate);
     }
 
-    Local<Value> result = CreateJsWrapper(isolate, wrapper, Local<Object>(), skipGCRegistration);
+    Local<Value> result = CreateJsWrapper(context, wrapper, Local<Object>(), skipGCRegistration);
     return result;
 }
 
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
     MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
 
-    if (data->runLoop_ == CFRunLoopGetCurrent()) {
-        ArgConverter::MethodCallbackInternal(cif, retValue, argValues, userData);
-        return;
-    }
-
-    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-    CFRunLoopPerformBlock(data->runLoop_, kCFRunLoopCommonModes, ^{
-        ArgConverter::MethodCallbackInternal(cif, retValue, argValues, userData);
-        dispatch_semaphore_signal(semaphore);
-    });
-
-    NSTimeInterval interval = 15; // seconds
-    NSDate* end = [[NSDate date] dateByAddingTimeInterval:interval];
-
-    CFRunLoopWakeUp(data->runLoop_);
-    while (dispatch_semaphore_wait(semaphore, DISPATCH_TIME_NOW)) {
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, false);
-        if ([end timeIntervalSinceNow] <= 0) {
-            tns::Assert(false);
-        }
-    }
-}
-
-void ArgConverter::MethodCallbackInternal(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
-    MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
-
     Isolate* isolate = data->isolate_;
-
+    v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
+    Local<Context> context = cache->GetContext();
     std::shared_ptr<Persistent<Value>> poCallback = data->callback_;
 
     bool hasErrorOutParameter = false;
@@ -130,7 +108,7 @@ void ArgConverter::MethodCallbackInternal(ffi_cif* cif, void* retValue, void** a
 
         uint8_t* argBuffer = (uint8_t*)argValues[argIndex];
         BaseCall call(argBuffer);
-        Local<Value> jsWrapper = Interop::GetResult(isolate, typeEncoding, &call, true);
+        Local<Value> jsWrapper = Interop::GetResult(context, typeEncoding, &call, true);
 
         if (!jsWrapper.IsEmpty()) {
             v8Args.push_back(jsWrapper);
@@ -139,17 +117,15 @@ void ArgConverter::MethodCallbackInternal(ffi_cif* cif, void* retValue, void** a
         }
     }
 
-    Local<Context> context = isolate->GetCurrentContext();
     Local<Object> thiz = context->Global();
     if (data->initialParamIndex_ > 1) {
         id self_ = *static_cast<const id*>(argValues[0]);
-        auto cache = Caches::Get(isolate);
         auto it = cache->Instances.find(self_);
         if (it != cache->Instances.end()) {
             thiz = it->second->Get(data->isolate_).As<Object>();
         } else {
             ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
-            thiz = ArgConverter::CreateJsWrapper(isolate, wrapper, Local<Object>(), true).As<Object>();
+            thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();
         }
     }
 
@@ -184,10 +160,10 @@ void ArgConverter::MethodCallbackInternal(ffi_cif* cif, void* retValue, void** a
         return;
     }
 
-    ArgConverter::SetValue(isolate, retValue, result, data->typeEncoding_);
+    ArgConverter::SetValue(context, retValue, result, data->typeEncoding_);
 }
 
-void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value, const TypeEncoding* typeEncoding) {
+void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value> value, const TypeEncoding* typeEncoding) {
     if (typeEncoding->type == BinaryTypeEncodingType::VoidEncoding) {
         return;
     }
@@ -197,6 +173,8 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
         *(ffi_arg *)retValue = (unsigned long)nullPtr;
         return;
     }
+
+    Isolate* isolate = context->GetIsolate();
 
     // TODO: Refactor this to reuse some existing logic in Interop::SetFFIParams
     BinaryTypeEncodingType type = typeEncoding->type;
@@ -284,7 +262,7 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
                 tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
                 const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
                 StructInfo structInfo = FFICall::GetStructInfo(structMeta);
-                Interop::InitializeStruct(isolate, retValue, structInfo.Fields(), value);
+                Interop::InitializeStruct(context, retValue, structInfo.Fields(), value);
                 return;
             } else if (baseWrapper->Type() == WrapperType::Struct) {
                 StructWrapper* structWrapper = static_cast<StructWrapper*>(baseWrapper);
@@ -300,7 +278,8 @@ void ArgConverter::SetValue(Isolate* isolate, void* retValue, Local<Value> value
     tns::Assert(false, isolate);
 }
 
-void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<Value>& info, Class klass, const InterfaceMeta* interfaceMeta) {
+void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbackInfo<Value>& info, Class klass, const InterfaceMeta* interfaceMeta) {
+    Isolate* isolate = context->GetIsolate();
     tns::Assert(klass != nullptr, isolate);
 
     id result = nil;
@@ -322,11 +301,11 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
 
     if (result == nil && interfaceMeta != nullptr && info.Length() > 0) {
         std::vector<Local<Value>> args;
-        const MethodMeta* initializer = ArgConverter::FindInitializer(isolate, klass, interfaceMeta, info, args);
+        const MethodMeta* initializer = ArgConverter::FindInitializer(context, klass, interfaceMeta, info, args);
         result = [klass alloc];
 
         V8VectorArgs vectorArgs(args);
-        result = Interop::CallInitializer(isolate, initializer, result, klass, vectorArgs);
+        result = Interop::CallInitializer(context, initializer, result, klass, vectorArgs);
     }
 
     if (result == nil) {
@@ -341,19 +320,21 @@ void ArgConverter::ConstructObject(Isolate* isolate, const FunctionCallbackInfo<
     } else {
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
         Local<Object> thiz = info.This();
-        ArgConverter::CreateJsWrapper(isolate, wrapper, thiz);
-        std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(isolate, thiz);
+        Local<Context> context = cache->GetContext();
+        ArgConverter::CreateJsWrapper(context, wrapper, thiz);
+        std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
         cache->Instances.emplace(result, poThiz);
     }
 }
 
-const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, const InterfaceMeta* interfaceMeta, const FunctionCallbackInfo<Value>& info, std::vector<Local<Value>>& args) {
+const MethodMeta* ArgConverter::FindInitializer(Local<Context> context, Class klass, const InterfaceMeta* interfaceMeta, const FunctionCallbackInfo<Value>& info, std::vector<Local<Value>>& args) {
+    Isolate* isolate = context->GetIsolate();
     std::vector<const MethodMeta*> candidates;
     args = tns::ArgsToVector(info);
     std::vector<Local<Value>> initializerArgs;
     std::string constructorTokens;
     if (info.Length() == 1 && info[0]->IsObject() && tns::GetValue(isolate, info[0]) == nullptr) {
-        initializerArgs = GetInitializerArgs(isolate, info[0].As<Object>(), constructorTokens);
+        initializerArgs = GetInitializerArgs(info[0].As<Object>(), constructorTokens);
     }
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
@@ -372,7 +353,7 @@ const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, c
                 }
             }
 
-            if (ArgConverter::CanInvoke(isolate, candidate, info)) {
+            if (ArgConverter::CanInvoke(context, candidate, info)) {
                 candidates.push_back(candidate);
             }
         }
@@ -407,7 +388,7 @@ const MethodMeta* ArgConverter::FindInitializer(Isolate* isolate, Class klass, c
     return candidates[0];
 }
 
-bool ArgConverter::CanInvoke(Isolate* isolate, const MethodMeta* candidate, const FunctionCallbackInfo<Value>& info) {
+bool ArgConverter::CanInvoke(Local<Context> context, const MethodMeta* candidate, const FunctionCallbackInfo<Value>& info) {
     if (candidate->encodings()->count - 1 != info.Length()) {
         return false;
     }
@@ -421,7 +402,7 @@ bool ArgConverter::CanInvoke(Isolate* isolate, const MethodMeta* candidate, cons
         typeEncoding = typeEncoding->next();
         Local<Value> arg = info[i];
 
-        if (!CanInvoke(isolate, typeEncoding, arg)) {
+        if (!CanInvoke(context, typeEncoding, arg)) {
             return false;
         }
     }
@@ -429,11 +410,12 @@ bool ArgConverter::CanInvoke(Isolate* isolate, const MethodMeta* candidate, cons
     return true;
 }
 
-bool ArgConverter::CanInvoke(Isolate* isolate, const TypeEncoding* typeEncoding, Local<Value> arg) {
+bool ArgConverter::CanInvoke(Local<Context> context, const TypeEncoding* typeEncoding, Local<Value> arg) {
     if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
         return true;
     }
 
+    Isolate* isolate = context->GetIsolate();
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
         const char* name = typeEncoding->details.declarationReference.name.valuePtr();
         if (strcmp(name, "NSNumber") == 0 && tns::IsNumber(arg)) {
@@ -503,10 +485,11 @@ bool ArgConverter::CanInvoke(Isolate* isolate, const TypeEncoding* typeEncoding,
     return false;
 }
 
-std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Isolate* isolate, Local<Object> obj, std::string& constructorTokens) {
+std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj, std::string& constructorTokens) {
     std::vector<Local<Value>> args;
     constructorTokens = "";
     Local<Context> context = obj->CreationContext();
+    Isolate* isolate = context->GetIsolate();
     Local<v8::Array> properties;
     if (obj->GetOwnPropertyNames(context).ToLocal(&properties)) {
         std::stringstream ss;
@@ -527,8 +510,8 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Isolate* isolate, Loc
     return args;
 }
 
-Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wrapper, Local<Object> receiver, bool skipGCRegistration) {
-    Local<Context> context = isolate->GetCurrentContext();
+Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapper* wrapper, Local<Object> receiver, bool skipGCRegistration) {
+    Isolate* isolate = context->GetIsolate();
 
     if (wrapper == nullptr) {
         return Null(isolate);
@@ -543,7 +526,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
         StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
         StructInfo structInfo = structWrapper->StructInfo();
         auto cache = Caches::Get(isolate);
-        Local<v8::Function> structCtorFunc = cache->StructCtorInitializer(isolate, structInfo);
+        Local<v8::Function> structCtorFunc = cache->StructCtorInitializer(context, structInfo);
         Local<Value> proto;
         bool success = structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto);
 
@@ -591,7 +574,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Isolate* isolate, BaseDataWrapper* wr
                 tns::Assert(false, isolate);
             }
         } else {
-            cache->ObjectCtorInitializer(isolate, static_cast<const BaseClassMeta*>(meta));
+            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta));
             auto it = cache->Prototypes.find(meta);
             if (it != cache->Prototypes.end()) {
                 Local<Value> prototype = it->second->Get(isolate);
@@ -716,7 +699,7 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(Local<Conte
 
     std::shared_ptr<Persistent<Value>> poValue;
     if (!skipGCRegistration) {
-        poValue = ObjectManager::Register(isolate, result);
+        poValue = ObjectManager::Register(context, result);
     } else {
         poValue = std::make_shared<Persistent<Value>>(isolate, result);
     }
@@ -724,7 +707,8 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(Local<Conte
     return poValue;
 }
 
-Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, GenericNamedPropertyGetterCallback propertyGetter, GenericNamedPropertySetterCallback propertySetter) {
+Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Local<Context> context, GenericNamedPropertyGetterCallback propertyGetter, GenericNamedPropertySetterCallback propertySetter) {
+    Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> emptyInstanceCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
     Local<ObjectTemplate> instanceTemplate = emptyInstanceCtorFuncTemplate->InstanceTemplate();
     instanceTemplate->SetInternalFieldCount(2);
@@ -737,7 +721,7 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Isolate* isolate, 
     instanceTemplate->SetIndexedPropertyHandler(IndexedPropertyGetterCallback, IndexedPropertySetterCallback);
 
     Local<v8::Function> emptyInstanceCtorFunc;
-    if (!emptyInstanceCtorFuncTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&emptyInstanceCtorFunc)) {
+    if (!emptyInstanceCtorFuncTemplate->GetFunction(context).ToLocal(&emptyInstanceCtorFunc)) {
         tns::Assert(false, isolate);
     }
     return emptyInstanceCtorFunc;
@@ -810,7 +794,8 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index, const PropertyC
         return;
     }
 
-    Local<Value> result = ArgConverter::ConvertArgument(isolate, new ObjCDataWrapper(obj));
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> result = ArgConverter::ConvertArgument(context, new ObjCDataWrapper(obj));
     args.GetReturnValue().Set(result);
 }
 

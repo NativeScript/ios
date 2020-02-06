@@ -8,20 +8,21 @@ using namespace v8;
 
 namespace tns {
 
-void Pointer::Register(Isolate* isolate, Local<Object> interop) {
-    Local<v8::Function> ctorFunc = Pointer::GetPointerCtorFunc(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
+void Pointer::Register(Local<Context> context, Local<Object> interop) {
+    Isolate* isolate = context->GetIsolate();
+    Local<v8::Function> ctorFunc = Pointer::GetPointerCtorFunc(context);
     bool success = interop->Set(context, tns::ToV8String(isolate, "Pointer"), ctorFunc).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-Local<Value> Pointer::NewInstance(Isolate* isolate, void* handle) {
+Local<Value> Pointer::NewInstance(Local<Context> context, void* handle) {
+    Isolate* isolate = context->GetIsolate();
     intptr_t ptr = static_cast<intptr_t>(reinterpret_cast<size_t>(handle));
 
     Local<Value> arg = Number::New(isolate, ptr);
     Local<Value> args[1] { arg };
     Local<Value> result;
-    Local<v8::Function> ctorFunc = Pointer::GetPointerCtorFunc(isolate);
+    Local<v8::Function> ctorFunc = Pointer::GetPointerCtorFunc(context);
     bool success = ctorFunc->NewInstance(isolate->GetCurrentContext(), 1, args).ToLocal(&result);
     if (!success) {
         return v8::Undefined(isolate);
@@ -29,7 +30,8 @@ Local<Value> Pointer::NewInstance(Isolate* isolate, void* handle) {
     return result;
 }
 
-Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
+Local<v8::Function> Pointer::GetPointerCtorFunc(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
     auto cache = Caches::Get(isolate);
     Persistent<v8::Function>* pointerCtorFunc = cache->PointerCtorFunc.get();
     if (pointerCtorFunc != nullptr) {
@@ -41,7 +43,6 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
     ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "Pointer"));
 
-    Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> ctorFunc;
     if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
         tns::Assert(false, isolate);
@@ -53,12 +54,12 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
     bool success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
     tns::Assert(success && prototypeValue->IsObject(), isolate);
     Local<Object> prototype = prototypeValue.As<Object>();
-    Pointer::RegisterAddMethod(isolate, prototype);
-    Pointer::RegisterSubtractMethod(isolate, prototype);
-    Pointer::RegisterToStringMethod(isolate, prototype);
-    Pointer::RegisterToHexStringMethod(isolate, prototype);
-    Pointer::RegisterToDecimalStringMethod(isolate, prototype);
-    Pointer::RegisterToNumberMethod(isolate, prototype);
+    Pointer::RegisterAddMethod(context, prototype);
+    Pointer::RegisterSubtractMethod(context, prototype);
+    Pointer::RegisterToStringMethod(context, prototype);
+    Pointer::RegisterToHexStringMethod(context, prototype);
+    Pointer::RegisterToDecimalStringMethod(context, prototype);
+    Pointer::RegisterToNumberMethod(context, prototype);
 
     cache->PointerCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
 
@@ -67,6 +68,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Isolate* isolate) {
 
 void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
     try {
         void* ptr = nullptr;
 
@@ -76,7 +78,6 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
             }
 
             Local<Number> arg = info[0].As<Number>();
-            Local<Context> context = isolate->GetCurrentContext();
 
     #if __SIZEOF_POINTER__ == 8
             // JSC stores 64-bit integers as doubles in JSValue.
@@ -106,7 +107,7 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
         PointerWrapper* wrapper = new PointerWrapper(ptr);
         tns::SetValue(isolate, info.This(), wrapper);
 
-        ObjectManager::Register(isolate, info.This());
+        ObjectManager::Register(context, info.This());
 
         cache->PointerInstances.emplace(ptr, std::make_shared<Persistent<Object>>(isolate, info.This()));
     } catch (NativeScriptException& ex) {
@@ -114,7 +115,8 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
     }
 }
 
-void Pointer::RegisterAddMethod(Isolate* isolate, Local<Object> prototype) {
+void Pointer::RegisterAddMethod(Local<Context> context, Local<Object> prototype) {
+    Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         Local<Context> context = isolate->GetCurrentContext();
@@ -126,19 +128,19 @@ void Pointer::RegisterAddMethod(Isolate* isolate, Local<Object> prototype) {
         tns::Assert(info[0].As<Number>()->Int32Value(context).To(&offset), isolate);
 
         void* newValue = reinterpret_cast<void*>(reinterpret_cast<char*>(value) + offset);
-        Local<Value> result = Pointer::NewInstance(isolate, newValue);
+        Local<Value> result = Pointer::NewInstance(context, newValue);
         info.GetReturnValue().Set(result);
     });
 
     Local<v8::Function> func;
-    tns::Assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func), isolate);
+    tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
     bool success = prototype->Set(context, tns::ToV8String(isolate, "add"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Pointer::RegisterSubtractMethod(Isolate* isolate, Local<Object> prototype) {
+void Pointer::RegisterSubtractMethod(Local<Context> context, Local<Object> prototype) {
+    Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         Local<Context> context = isolate->GetCurrentContext();
@@ -152,7 +154,7 @@ void Pointer::RegisterSubtractMethod(Isolate* isolate, Local<Object> prototype) 
         void* newValue = reinterpret_cast<void*>(reinterpret_cast<char*>(value) - offset);
         intptr_t newValuePtr = static_cast<intptr_t>(reinterpret_cast<size_t>(newValue));
 
-        Local<v8::Function> ctorFunc = Pointer::GetPointerCtorFunc(isolate);
+        Local<v8::Function> ctorFunc = Pointer::GetPointerCtorFunc(context);
         Local<Value> arg = Number::New(isolate, newValuePtr);
         Local<Value> args[1] { arg };
         Local<Value> result;
@@ -163,14 +165,14 @@ void Pointer::RegisterSubtractMethod(Isolate* isolate, Local<Object> prototype) 
     });
 
     Local<v8::Function> func;
-    tns::Assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func), isolate);
+    tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
     bool success = prototype->Set(context, tns::ToV8String(isolate, "subtract"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Pointer::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype) {
+void Pointer::RegisterToStringMethod(Local<Context> context, Local<Object> prototype) {
+    Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
@@ -184,14 +186,14 @@ void Pointer::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype) 
     });
 
     Local<v8::Function> func;
-    tns::Assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func), isolate);
+    tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
     bool success = prototype->Set(context, tns::ToV8String(isolate, "toString"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Pointer::RegisterToHexStringMethod(Isolate* isolate, Local<Object> prototype) {
+void Pointer::RegisterToHexStringMethod(Local<Context> context, Local<Object> prototype) {
+    Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
@@ -205,14 +207,14 @@ void Pointer::RegisterToHexStringMethod(Isolate* isolate, Local<Object> prototyp
     });
 
     Local<v8::Function> func;
-    tns::Assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func), isolate);
+    tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
     bool success = prototype->Set(context, tns::ToV8String(isolate, "toHexString"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Pointer::RegisterToDecimalStringMethod(Isolate* isolate, Local<Object> prototype) {
+void Pointer::RegisterToDecimalStringMethod(Local<Context> context, Local<Object> prototype) {
+    Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
@@ -227,14 +229,14 @@ void Pointer::RegisterToDecimalStringMethod(Isolate* isolate, Local<Object> prot
     });
 
     Local<v8::Function> func;
-    tns::Assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func), isolate);
+    tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
     bool success = prototype->Set(context, tns::ToV8String(isolate, "toDecimalString"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Pointer::RegisterToNumberMethod(Isolate* isolate, Local<Object> prototype) {
+void Pointer::RegisterToNumberMethod(Local<Context> context, Local<Object> prototype) {
+    Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
@@ -245,9 +247,8 @@ void Pointer::RegisterToNumberMethod(Isolate* isolate, Local<Object> prototype) 
     });
 
     Local<v8::Function> func;
-    tns::Assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func), isolate);
+    tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
     bool success = prototype->Set(context, tns::ToV8String(isolate, "toNumber"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }

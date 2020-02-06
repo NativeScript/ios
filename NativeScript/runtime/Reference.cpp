@@ -9,29 +9,30 @@ using namespace v8;
 
 namespace tns {
 
-void Reference::Register(Isolate* isolate, Local<Object> interop) {
-    Local<v8::Function> ctorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
+void Reference::Register(Local<Context> context, Local<Object> interop) {
+    Isolate* isolate = context->GetIsolate();
+    Local<v8::Function> ctorFunc = Reference::GetInteropReferenceCtorFunc(context);
     bool success = interop->Set(context, tns::ToV8String(isolate, "Reference"), ctorFunc).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-Local<Value> Reference::FromPointer(Isolate* isolate, Local<Value> type, void* handle) {
-    Local<Value> pointer = Pointer::NewInstance(isolate, handle);
-    ObjectManager::Register(isolate, pointer);
+Local<Value> Reference::FromPointer(Local<Context> context, Local<Value> type, void* handle) {
+    Isolate* isolate = context->GetIsolate();
+    Local<Value> pointer = Pointer::NewInstance(context, handle);
+    ObjectManager::Register(context, pointer);
 
-    Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(isolate);
+    Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(context);
     Local<Value> args[2] = { type, pointer };
-    Local<Context> context = isolate->GetCurrentContext();
     Local<Object> instance;
     bool success = interopReferenceCtorFunc->NewInstance(context, 2, args).ToLocal(&instance);
     tns::Assert(success, isolate);
-    ObjectManager::Register(isolate, instance);
+    ObjectManager::Register(context, instance);
 
     return instance;
 }
 
-Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
+Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
     auto cache = Caches::Get(isolate);
     Persistent<v8::Function>* interopReferenceCtor = cache->InteropReferenceCtorFunc.get();
     if (interopReferenceCtor != nullptr) {
@@ -43,7 +44,6 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
     ctorFuncTemplate->InstanceTemplate()->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetCallback, IndexedPropertySetCallback));
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
-    Local<Context> context = isolate->GetCurrentContext();
     proto->SetAccessor(tns::ToV8String(isolate, "value"), GetValueCallback, SetValueCallback);
 
     Local<v8::Function> ctorFunc;
@@ -56,7 +56,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
     bool success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
     tns::Assert(success && prototypeValue->IsObject(), isolate);
     Local<Object> prototype = prototypeValue.As<Object>();
-    Reference::RegisterToStringMethod(isolate, prototype);
+    Reference::RegisterToStringMethod(context, prototype);
 
     cache->InteropReferenceCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
 
@@ -65,6 +65,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Isolate* isolate) {
 
 void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
     Persistent<Value>* val = nullptr;
     BaseDataWrapper* typeWrapper = nullptr;
     if (info.Length() == 1) {
@@ -84,40 +85,43 @@ void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& 
     Local<Object> thiz = info.This();
     tns::SetValue(isolate, thiz, wrapper);
 
-    ObjectManager::Register(isolate, thiz);
+    ObjectManager::Register(context, thiz);
 }
 
 void Reference::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     Local<Object> thiz = info.This();
+    Local<Context> context = isolate->GetCurrentContext();
 
-    DataPair pair = Reference::GetTypeEncodingDataPair(isolate, thiz);
+    DataPair pair = Reference::GetTypeEncodingDataPair(thiz);
     const TypeEncoding* typeEncoding = pair.typeEncoding_;
     size_t size = pair.size_;
     void* data = pair.data_;
 
     void* ptr = (uint8_t*)data + index * size;
     BaseCall call((uint8_t*)ptr);
-    Local<Value> result = Interop::GetResult(isolate, typeEncoding, &call, false);
+    Local<Value> result = Interop::GetResult(context, typeEncoding, &call, false);
     info.GetReturnValue().Set(result);
 }
 
 void Reference::IndexedPropertySetCallback(uint32_t index, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
     Local<Object> thiz = info.This();
 
-    DataPair pair = Reference::GetTypeEncodingDataPair(isolate, thiz);
+    DataPair pair = Reference::GetTypeEncodingDataPair(thiz);
     const TypeEncoding* typeEncoding = pair.typeEncoding_;
     size_t size = pair.size_;
     void* data = pair.data_;
 
     void* ptr = (uint8_t*)data + index * size;
-    Interop::WriteValue(isolate, typeEncoding, ptr, value);
+    Interop::WriteValue(context, typeEncoding, ptr, value);
 }
 
 void Reference::GetValueCallback(Local<Name> name, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
-    Local<Value> result = GetReferredValue(isolate, info.This());
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> result = Reference::GetReferredValue(context, info.This());
     if (result.IsEmpty()) {
         info.GetReturnValue().Set(v8::Undefined(isolate));
     } else {
@@ -137,7 +141,8 @@ void Reference::SetValueCallback(Local<Name> name, Local<Value> value, const Pro
     wrapper->SetValue(poValue);
 }
 
-Local<Value> Reference::GetReferredValue(Isolate* isolate, Local<Value> value) {
+Local<Value> Reference::GetReferredValue(Local<Context> context, Local<Value> value) {
+    Isolate* isolate = context->GetIsolate();
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
     if (baseWrapper == nullptr || baseWrapper->Type() != WrapperType::Reference) {
         return value;
@@ -149,7 +154,7 @@ Local<Value> Reference::GetReferredValue(Isolate* isolate, Local<Value> value) {
         uint8_t* data = (uint8_t*)wrapper->Data();
 
         BaseCall call(data);
-        Local<Value> jsResult = Interop::GetResult(isolate, encoding, &call, true);
+        Local<Value> jsResult = Interop::GetResult(context, encoding, &call, true);
         if (wrapper->Value() != nullptr) {
             wrapper->Value()->Reset(isolate, jsResult);
         } else {
@@ -170,16 +175,16 @@ Local<Value> Reference::GetReferredValue(Isolate* isolate, Local<Value> value) {
     if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Reference) {
         wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
         if (wrapper->Value() != nullptr) {
-            return GetReferredValue(isolate, wrapper->Value()->Get(isolate));
+            return Reference::GetReferredValue(context, wrapper->Value()->Get(isolate));
         }
     }
 
     BaseDataWrapper* typeWrapper = wrapper->TypeWrapper();
     if (typeWrapper != nullptr && typeWrapper->Type() == WrapperType::Primitive && baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Pointer) {
-        Reference::DataPair pair = GetTypeEncodingDataPair(isolate, value.As<Object>());
+        Reference::DataPair pair = GetTypeEncodingDataPair(value.As<Object>());
         if (pair.data_ != nullptr && pair.typeEncoding_ != nullptr) {
             BaseCall call((uint8_t*)pair.data_);
-            Local<Value> result = Interop::GetResult(isolate, pair.typeEncoding_, &call, false);
+            Local<Value> result = Interop::GetResult(context, pair.typeEncoding_, &call, false);
             return result;
         }
     }
@@ -187,11 +192,13 @@ Local<Value> Reference::GetReferredValue(Isolate* isolate, Local<Value> value) {
     return innerValue;
 }
 
-void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, const TypeEncoding* typeEncoding) {
+void* Reference::GetWrappedPointer(Local<Context> context, Local<Value> reference, const TypeEncoding* typeEncoding) {
     if (reference.IsEmpty() || reference->IsNullOrUndefined()) {
         return nullptr;
     }
 
+
+    Isolate* isolate = context->GetIsolate();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, reference);
     tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
     ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
@@ -213,7 +220,7 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, con
             const TypeEncoding* enc = primitiveWrapper->TypeEncoding();
             size_t size = primitiveWrapper->Size();
             void* data = malloc(size);
-            Interop::WriteValue(isolate, enc, data, value);
+            Interop::WriteValue(context, enc, data, value);
             refWrapper->SetData(data, true);
             return data;
         }
@@ -226,7 +233,7 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, con
 
         StructInfo structInfo = structTypeWrapper->StructInfo();
         void* data = malloc(structInfo.FFIType()->size);
-        Interop::InitializeStruct(isolate, data, structInfo.Fields(), value);
+        Interop::InitializeStruct(context, data, structInfo.Fields(), value);
         refWrapper->SetData(data, true);
         refWrapper->SetEncoding(typeEncoding);
         return data;
@@ -273,7 +280,8 @@ void* Reference::GetWrappedPointer(Isolate* isolate, Local<Value> reference, con
     return nullptr;
 }
 
-void Reference::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype) {
+void Reference::RegisterToStringMethod(Local<Context> context, Local<Object> prototype) {
+    Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
@@ -293,14 +301,15 @@ void Reference::RegisterToStringMethod(Isolate* isolate, Local<Object> prototype
     });
 
     Local<v8::Function> func;
-    tns::Assert(funcTemplate->GetFunction(isolate->GetCurrentContext()).ToLocal(&func), isolate);
+    tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
     bool success = prototype->Set(context, tns::ToV8String(isolate, "toString"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-Reference::DataPair Reference::GetTypeEncodingDataPair(Isolate* isolate, Local<Object> obj) {
+Reference::DataPair Reference::GetTypeEncodingDataPair(Local<Object> obj) {
+    Local<Context> context = obj->CreationContext();
+    Isolate* isolate = context->GetIsolate();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
     tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
     ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);

@@ -8,7 +8,7 @@ namespace tns {
 
 class ModuleInternal {
 public:
-    ModuleInternal(v8::Isolate* isolate);
+    ModuleInternal(v8::Local<v8::Context> context);
     bool RunModule(v8::Isolate* isolate, std::string path);
 private:
     static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

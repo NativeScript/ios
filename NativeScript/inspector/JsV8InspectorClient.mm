@@ -124,10 +124,8 @@ void JsV8InspectorClient::init() {
     }
 
     Isolate* isolate = runtime_->GetIsolate();
-    Isolate::Scope isolate_scope(isolate);
-    HandleScope handle_scope(isolate);
 
-    Local<Context> context = isolate->GetCurrentContext();
+    Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
 
     inspector_ = V8Inspector::create(isolate, this);
 
@@ -150,6 +148,7 @@ void JsV8InspectorClient::createInspectorSession() {
 
 void JsV8InspectorClient::disconnect() {
     Isolate* isolate = runtime_->GetIsolate();
+    v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
@@ -211,6 +210,8 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     std::vector<uint16_t> vector = tns::ToVector(message);
     StringView messageView(vector.data(), vector.size());
+    Isolate* isolate = this->runtime_->GetIsolate();
+    v8::Locker locker(isolate);
     this->session_->dispatchProtocolMessage(messageView);
 }
 
@@ -260,9 +261,7 @@ void JsV8InspectorClient::scheduleBreak() {
 
 void JsV8InspectorClient::registerModules() {
     Isolate* isolate = runtime_->GetIsolate();
-    Isolate::Scope isolate_scope(isolate);
-    HandleScope handle_scope(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
+    Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
     Local<Object> global = context->Global();
     Local<Object> inspectorObject = Object::New(isolate);
 
@@ -279,6 +278,7 @@ void JsV8InspectorClient::registerModules() {
     assert(success && global->Set(context, tns::ToV8String(isolate, "__inspectorTimestamp"), func).FromMaybe(false));
 
     {
+        v8::Locker locker(isolate);
         TryCatch tc(isolate);
         runtime_->RunModule("inspector_modules");
     }

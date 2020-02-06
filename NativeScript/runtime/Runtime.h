@@ -12,7 +12,8 @@ class Runtime {
 public:
     Runtime();
     ~Runtime();
-    void Init();
+    v8::Isolate* CreateIsolate();
+    void Init(v8::Isolate* isolate);
     void RunMainScript();
     void RunScript(std::string file, v8::TryCatch& tc);
     v8::Isolate* GetIsolate();

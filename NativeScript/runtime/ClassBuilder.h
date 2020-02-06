@@ -11,8 +11,8 @@ public:
     static v8::Local<v8::Function> GetExtendFunction(v8::Local<v8::Context> context, const InterfaceMeta* interfaceMeta);
     static Class GetExtendedClass(std::string baseClassName, std::string staticClassName);
 
-    static void RegisterBaseTypeScriptExtendsFunction(v8::Isolate* isolate);
-    static void RegisterNativeTypeScriptExtendsFunction(v8::Isolate* isolate);
+    static void RegisterBaseTypeScriptExtendsFunction(v8::Local<v8::Context> context);
+    static void RegisterNativeTypeScriptExtendsFunction(v8::Local<v8::Context> context);
 private:
     static unsigned long long classNameCounter_;
 
@@ -20,9 +20,9 @@ private:
     static void SuperAccessorGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-    static void ExposeDynamicMethods(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Value> exposedMethods, v8::Local<v8::Value> exposedProtocols, v8::Local<v8::Object> implementationObject);
-    static void ExposeDynamicMembers(v8::Isolate* isolate, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
-    static void VisitMethods(v8::Isolate* isolate, Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<const ProtocolMeta*> exposedProtocols);
+    static void ExposeDynamicMethods(v8::Local<v8::Context> context, Class extendedClass, v8::Local<v8::Value> exposedMethods, v8::Local<v8::Value> exposedProtocols, v8::Local<v8::Object> implementationObject);
+    static void ExposeDynamicMembers(v8::Local<v8::Context> context, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
+    static void VisitMethods(Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<const ProtocolMeta*> exposedProtocols);
     static void VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<const PropertyMeta*>& propertyMetas, std::vector<const ProtocolMeta*> exposedProtocols);
     static void ExposeProperties(v8::Isolate* isolate, Class extendedClass, std::vector<const PropertyMeta*> propertyMetas, v8::Local<v8::Object> implementationObject, v8::Local<v8::Value> getter, v8::Local<v8::Value> setter);
     static std::string GetTypeEncoding(const TypeEncoding* typeEncoding, int argsCount);

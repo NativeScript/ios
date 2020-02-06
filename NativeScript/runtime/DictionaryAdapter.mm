@@ -130,8 +130,9 @@ using namespace tns;
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
     if (self) {
         self->isolate_ = isolate;
-        self->object_ = ObjectManager::Register(isolate, jsObject);
         std::shared_ptr<Caches> cache = Caches::Get(isolate);
+        Local<Context> context = cache->GetContext();
+        self->object_ = ObjectManager::Register(context, jsObject);
         cache->Instances.emplace(self, self->object_);
         tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
     }
@@ -183,7 +184,7 @@ using namespace tns;
         tns::Assert(false, isolate);
     }
 
-    id result = Interop::ToObject(self->isolate_, value);
+    id result = Interop::ToObject(context, value);
 
     return result;
 }

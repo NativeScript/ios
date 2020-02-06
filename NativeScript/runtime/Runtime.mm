@@ -37,21 +37,14 @@ Runtime::Runtime() {
 }
 
 Runtime::~Runtime() {
-    {
-        Isolate::Scope isolate_scope(this->isolate_);
-        HandleScope handle_scope(this->isolate_);
-        Local<Context> context = this->isolate_->GetCurrentContext();
-        context->Exit();
-        this->isolate_->TerminateExecution();
-    }
-
+    this->isolate_->TerminateExecution();
     Caches::Workers.Remove(this->workerId_);
     Caches::Remove(this->isolate_);
     this->isolate_->Dispose();
     currentRuntime_ = nullptr;
 }
 
-void Runtime::Init() {
+Isolate* Runtime::CreateIsolate() {
     if (!mainThreadInitialized_) {
         Runtime::platform_ = RuntimeConfig.IsDebug
             ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
@@ -69,6 +62,10 @@ void Runtime::Init() {
     create_params.array_buffer_allocator = &allocator_;
     Isolate* isolate = Isolate::New(create_params);
 
+    return isolate;
+}
+
+void Runtime::Init(Isolate* isolate) {
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
     cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
@@ -95,26 +92,29 @@ void Runtime::Init() {
 
     DefineGlobalObject(context);
     DefineCollectFunction(context);
-    Console::Init(isolate);
-    this->moduleInternal_ = std::make_unique<ModuleInternal>(isolate);
+    Console::Init(context);
+    this->moduleInternal_ = std::make_unique<ModuleInternal>(context);
 
-    ArgConverter::Init(isolate, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);
-    Interop::RegisterInteropTypes(isolate);
-    MetadataBuilder::CreateToStringFunction(isolate);
+    ArgConverter::Init(context, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);
+    Interop::RegisterInteropTypes(context);
+    MetadataBuilder::CreateToStringFunction(context);
 
-    ClassBuilder::RegisterBaseTypeScriptExtendsFunction(isolate); // Register the __extends function to the global object
-    ClassBuilder::RegisterNativeTypeScriptExtendsFunction(isolate); // Override the __extends function for native objects
-    TSHelpers::Init(isolate);
+    ClassBuilder::RegisterBaseTypeScriptExtendsFunction(context); // Register the __extends function to the global object
+    ClassBuilder::RegisterNativeTypeScriptExtendsFunction(context); // Override the __extends function for native objects
+    TSHelpers::Init(context);
 
-    InlineFunctions::Init(isolate);
+    InlineFunctions::Init(context);
+
+    cache->SetContext(context);
 
     mainThreadInitialized_ = true;
 
-    isolate_ = isolate;
+    this->isolate_ = isolate;
 }
 
 void Runtime::RunMainScript() {
     Isolate* isolate = this->GetIsolate();
+    v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     this->moduleInternal_->RunModule(isolate, "./");
@@ -150,7 +150,10 @@ void Runtime::RunScript(string file, TryCatch& tc) {
 }
 
 void Runtime::RunModule(const std::string moduleName) {
-    this->moduleInternal_->RunModule(this->isolate_, moduleName);
+    Isolate* isolate = this->GetIsolate();
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+    this->moduleInternal_->RunModule(isolate, moduleName);
 }
 
 Isolate* Runtime::GetIsolate() {

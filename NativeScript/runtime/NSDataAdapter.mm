@@ -15,8 +15,9 @@ using namespace v8;
     if (self) {
         tns::Assert(jsObject->IsArrayBuffer() || jsObject->IsArrayBufferView(), isolate);
         self->isolate_ = isolate;
-        self->object_ = ObjectManager::Register(isolate, jsObject);
         std::shared_ptr<Caches> cache = Caches::Get(isolate);
+        Local<Context> context = cache->GetContext();
+        self->object_ = ObjectManager::Register(context, jsObject);
         cache->Instances.emplace(self, self->object_);
         tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
     }
