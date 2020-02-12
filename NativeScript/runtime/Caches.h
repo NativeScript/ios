@@ -45,6 +45,7 @@ public:
         void* userData_;
     };
 
+    Caches(v8::Isolate* isolate);
     ~Caches();
 
     static ConcurrentMap<std::string, const Meta*> Metadata;
@@ -52,6 +53,9 @@ public:
 
     static std::shared_ptr<Caches> Get(v8::Isolate* isolate);
     static void Remove(v8::Isolate* isolate);
+
+    void SetContext(v8::Local<v8::Context> context);
+    v8::Local<v8::Context> GetContext();
 
     robin_hood::unordered_map<const Meta*, std::unique_ptr<v8::Persistent<v8::Value>>> Prototypes;
     robin_hood::unordered_map<std::string, std::unique_ptr<v8::Persistent<v8::Object>>> ClassPrototypes;
@@ -66,8 +70,8 @@ public:
     robin_hood::unordered_map<std::pair<void*, std::string>, std::shared_ptr<v8::Persistent<v8::Value>>, pair_hash> StructInstances;
     robin_hood::unordered_map<const void*, std::shared_ptr<v8::Persistent<v8::Object>>> PointerInstances;
 
-    std::function<v8::Local<v8::FunctionTemplate>(v8::Isolate* isolate, const BaseClassMeta*)> ObjectCtorInitializer;
-    std::function<v8::Local<v8::Function>(v8::Isolate*, StructInfo)> StructCtorInitializer;
+    std::function<v8::Local<v8::FunctionTemplate>(v8::Local<v8::Context>, const BaseClassMeta*)> ObjectCtorInitializer;
+    std::function<v8::Local<v8::Function>(v8::Local<v8::Context>, StructInfo)> StructCtorInitializer;
     robin_hood::unordered_map<std::string, double> Timers;
     robin_hood::unordered_map<const InterfaceMeta*, std::vector<const MethodMeta*>> Initializers;
 
@@ -84,6 +88,8 @@ public:
     std::unique_ptr<v8::Persistent<v8::Function>> FunctionReferenceCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 private:
     static ConcurrentMap<v8::Isolate*, std::shared_ptr<Caches>> perIsolateCaches_;
+    v8::Isolate* isolate_;
+    std::shared_ptr<v8::Persistent<v8::Context>> context_;
 };
 
 }

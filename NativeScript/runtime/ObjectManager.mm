@@ -19,7 +19,8 @@ void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate)
     globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"), FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
 }
 
-std::shared_ptr<Persistent<Value>> ObjectManager::Register(Isolate* isolate, const Local<Value> obj) {
+std::shared_ptr<Persistent<Value>> ObjectManager::Register(Local<Context> context, const Local<Value> obj) {
+    Isolate* isolate = context->GetIsolate();
     std::shared_ptr<Persistent<Value>> objectHandle = std::make_shared<Persistent<Value>>(isolate, obj);
     ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
     objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);

@@ -562,7 +562,7 @@ public:
 
     void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker, std::function<v8::Isolate* ()> func);
     void CallOnErrorHandlers(v8::TryCatch& tc);
-    void PassUncaughtExceptionFromWorkerToMain(v8::Isolate* workerIsolate, v8::TryCatch& tc, bool async = true);
+    void PassUncaughtExceptionFromWorkerToMain(v8::Local<v8::Context> context, v8::TryCatch& tc, bool async = true);
     void PostMessage(std::string message);
     void Close();
     void Terminate();
@@ -586,7 +586,7 @@ private:
 
     void BackgroundLooper(std::function<v8::Isolate* ()> func);
     void DrainPendingTasks();
-    v8::Local<v8::Object> ConstructErrorObject(v8::Isolate* isolate, std::string message, std::string source, std::string stackTrace, int lineNumber);
+    v8::Local<v8::Object> ConstructErrorObject(v8::Local<v8::Context> context, std::string message, std::string source, std::string stackTrace, int lineNumber);
 };
 
 }

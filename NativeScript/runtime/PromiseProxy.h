@@ -1,15 +1,15 @@
-#ifndef TSHelpers_h
-#define TSHelpers_h
+#ifndef PromiseProxy_h
+#define PromiseProxy_h
 
 #include "Common.h"
 
 namespace tns {
 
-class TSHelpers {
+class PromiseProxy {
 public:
     static void Init(v8::Local<v8::Context> context);
 };
 
 }
 
-#endif /* TSHelpers_h */
+#endif /* PromiseProxy_h */

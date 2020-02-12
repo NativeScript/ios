@@ -10,22 +10,22 @@ using namespace v8;
 
 namespace tns {
 
-void Console::Init(Isolate* isolate) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Console::Init(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
     Context::Scope context_scope(context);
     Local<Object> console = Object::New(isolate);
     bool success = console->SetPrototype(context, Object::New(isolate)).FromMaybe(false);
     tns::Assert(success, isolate);
 
-    Console::AttachLogFunction(isolate, console, "log");
-    Console::AttachLogFunction(isolate, console, "info");
-    Console::AttachLogFunction(isolate, console, "error");
-    Console::AttachLogFunction(isolate, console, "warn");
-    Console::AttachLogFunction(isolate, console, "trace");
-    Console::AttachLogFunction(isolate, console, "assert", AssertCallback);
-    Console::AttachLogFunction(isolate, console, "dir", DirCallback);
-    Console::AttachLogFunction(isolate, console, "time", TimeCallback);
-    Console::AttachLogFunction(isolate, console, "timeEnd", TimeEndCallback);
+    Console::AttachLogFunction(context, console, "log");
+    Console::AttachLogFunction(context, console, "info");
+    Console::AttachLogFunction(context, console, "error");
+    Console::AttachLogFunction(context, console, "warn");
+    Console::AttachLogFunction(context, console, "trace");
+    Console::AttachLogFunction(context, console, "assert", AssertCallback);
+    Console::AttachLogFunction(context, console, "dir", DirCallback);
+    Console::AttachLogFunction(context, console, "time", TimeCallback);
+    Console::AttachLogFunction(context, console, "timeEnd", TimeEndCallback);
 
     Local<Object> global = context->Global();
     PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -40,7 +40,7 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     }
 
     Isolate* isolate = args.GetIsolate();
-    std::string stringResult = BuildStringFromArgs(isolate, args);
+    std::string stringResult = BuildStringFromArgs(args);
 
     Local<v8::String> data = args.Data().As<v8::String>();
     std::string verbosityLevel = tns::ToString(isolate, data);
@@ -78,7 +78,7 @@ void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
         ss << "Assertion failed: ";
 
         if (argsLength > 1) {
-            ss << BuildStringFromArgs(isolate, args, 1);
+            ss << BuildStringFromArgs(args, 1);
         } else {
             ss << "console.assert";
         }
@@ -96,6 +96,7 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
 
     int argsLen = args.Length();
     Isolate* isolate = args.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
 
     std::stringstream ss;
     std::string scriptUrl = tns::GetCurrentScriptUrl(isolate);
@@ -103,11 +104,9 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
 
     if (argsLen > 0) {
         if (!args[0]->IsObject()) {
-            std::string logString = BuildStringFromArgs(isolate, args);
+            std::string logString = BuildStringFromArgs(args);
             ss << " " << logString;
         } else {
-            Local<Context> context = isolate->GetCurrentContext();
-
             ss << std::endl << "==== object dump start ====" << std::endl;
             Local<Object> argObject = args[0].As<Object>();
 
@@ -130,12 +129,12 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
                 if (propIsFunction) {
                     ss << "()";
                 } else if (propertyValue->IsArray()) {
-                    Local<v8::String> stringResult = BuildStringFromArg(isolate, propertyValue);
+                    Local<v8::String> stringResult = BuildStringFromArg(context, propertyValue);
                     std::string jsonStringifiedArray = tns::ToString(isolate, stringResult);
                     ss << jsonStringifiedArray;
                 } else if (propertyValue->IsObject()) {
                     Local<Object> obj = propertyValue->ToObject(context).ToLocalChecked();
-                    Local<v8::String> objString = TransformJSObject(isolate, obj);
+                    Local<v8::String> objString = TransformJSObject(obj);
                     std::string jsonStringifiedObject = tns::ToString(isolate, objString);
                     // if object prints out as the error string for circular references, replace with #CR instead for brevity
                     if (jsonStringifiedObject.find("circular structure") != std::string::npos) {
@@ -228,8 +227,8 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
     Log("%s", msgToLog.c_str());
 }
 
-void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const std::string name, v8::FunctionCallback callback) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Console::AttachLogFunction(Local<Context> context, Local<Object> console, const std::string name, v8::FunctionCallback callback) {
+    Isolate* isolate = context->GetIsolate();
 
     Local<v8::Function> func;
     if (!Function::New(context, callback, tns::ToV8String(isolate, name), 0, ConstructorBehavior::kThrow).ToLocal(&func)) {
@@ -243,7 +242,9 @@ void Console::AttachLogFunction(Isolate* isolate, Local<Object> console, const s
     }
 }
 
-std::string Console::BuildStringFromArgs(Isolate* isolate, const FunctionCallbackInfo<Value>& args, int startingIndex) {
+std::string Console::BuildStringFromArgs(const FunctionCallbackInfo<Value>& args, int startingIndex) {
+    Isolate* isolate = args.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
     int argLen = args.Length();
     std::stringstream ss;
 
@@ -251,7 +252,7 @@ std::string Console::BuildStringFromArgs(Isolate* isolate, const FunctionCallbac
         for (int i = startingIndex; i < argLen; i++) {
             Local<v8::String> argString;
 
-            argString = BuildStringFromArg(isolate, args[i]);
+            argString = BuildStringFromArg(context, args[i]);
 
             // separate args with a space
             if (i != startingIndex) {
@@ -268,8 +269,8 @@ std::string Console::BuildStringFromArgs(Isolate* isolate, const FunctionCallbac
     return stringResult;
 }
 
-const Local<v8::String> Console::BuildStringFromArg(Isolate* isolate, const Local<Value>& val) {
-    Local<Context> context = isolate->GetCurrentContext();
+const Local<v8::String> Console::BuildStringFromArg(Local<Context> context, const Local<Value>& val) {
+    Isolate* isolate = context->GetIsolate();
     Local<v8::String> argString;
     if (val->IsFunction()) {
         bool success = val->ToDetailString(context).ToLocal(&argString);
@@ -294,7 +295,7 @@ const Local<v8::String> Console::BuildStringFromArg(Isolate* isolate, const Loca
                 continue;
             }
 
-            Local<v8::String> objectString = BuildStringFromArg(isolate, propertyValue);
+            Local<v8::String> objectString = BuildStringFromArg(context, propertyValue);
 
             argString = v8::String::Concat(isolate, argString, objectString);
 
@@ -307,7 +308,7 @@ const Local<v8::String> Console::BuildStringFromArg(Isolate* isolate, const Loca
     } else if (val->IsObject()) {
         Local<Object> obj = val.As<Object>();
 
-        argString = TransformJSObject(isolate, obj);
+        argString = TransformJSObject(obj);
     } else {
         bool success = val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
         tns::Assert(success, isolate);
@@ -316,8 +317,9 @@ const Local<v8::String> Console::BuildStringFromArg(Isolate* isolate, const Loca
     return argString;
 }
 
-const Local<v8::String> Console::TransformJSObject(Isolate* isolate, Local<Object> object) {
-    Local<Context> context = isolate->GetCurrentContext();
+const Local<v8::String> Console::TransformJSObject(Local<Object> object) {
+    Local<Context> context = object->CreationContext();
+    Isolate* isolate = context->GetIsolate();
     Local<Value> value;
     bool success = object->ToString(context).ToLocal(&value);
     if (!success) {
@@ -331,7 +333,7 @@ const Local<v8::String> Console::TransformJSObject(Isolate* isolate, Local<Objec
     if (hasCustomToStringImplementation) {
         resultString = objToString;
     } else {
-        resultString = tns::JsonStringifyObject(isolate, object);
+        resultString = tns::JsonStringifyObject(context, object);
     }
 
     return resultString;

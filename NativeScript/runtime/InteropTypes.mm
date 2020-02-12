@@ -13,45 +13,45 @@ using namespace v8;
 
 namespace tns {
 
-void Interop::RegisterInteropTypes(Isolate* isolate) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Interop::RegisterInteropTypes(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
     Local<Object> global = context->Global();
 
     Local<Object> interop = Object::New(isolate);
     Local<Object> types = Object::New(isolate);
 
-    Reference::Register(isolate, interop);
-    Pointer::Register(isolate, interop);
+    Reference::Register(context, interop);
+    Pointer::Register(context, interop);
     FunctionReference::Register(isolate, interop);
-    RegisterBufferFromDataFunction(isolate, interop);
-    RegisterHandleOfFunction(isolate, interop);
-    RegisterAllocFunction(isolate, interop);
-    RegisterFreeFunction(isolate, interop);
-    RegisterAdoptFunction(isolate, interop);
-    RegisterSizeOfFunction(isolate, interop);
+    RegisterBufferFromDataFunction(context, interop);
+    RegisterHandleOfFunction(context, interop);
+    RegisterAllocFunction(context, interop);
+    RegisterFreeFunction(context, interop);
+    RegisterAdoptFunction(context, interop);
+    RegisterSizeOfFunction(context, interop);
 
-    RegisterInteropType(isolate, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(isolate, types, "void", new PrimitiveDataWrapper(0, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(isolate, types, "bool", new PrimitiveDataWrapper(sizeof(bool), CreateEncoding(BinaryTypeEncodingType::BoolEncoding)));
-    RegisterInteropType(isolate, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, CreateEncoding(BinaryTypeEncodingType::UCharEncoding)));
-    RegisterInteropType(isolate, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, CreateEncoding(BinaryTypeEncodingType::CharEncoding)));
-    RegisterInteropType(isolate, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, CreateEncoding(BinaryTypeEncodingType::UShortEncoding)));
-    RegisterInteropType(isolate, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, CreateEncoding(BinaryTypeEncodingType::ShortEncoding)));
-    RegisterInteropType(isolate, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, CreateEncoding(BinaryTypeEncodingType::UIntEncoding)));
-    RegisterInteropType(isolate, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, CreateEncoding(BinaryTypeEncodingType::IntEncoding)));
-    RegisterInteropType(isolate, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, CreateEncoding(BinaryTypeEncodingType::ULongEncoding)));
-    RegisterInteropType(isolate, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, CreateEncoding(BinaryTypeEncodingType::LongEncoding)));
-    RegisterInteropType(isolate, types, "ulong", new PrimitiveDataWrapper(ffi_type_ulong.size, CreateEncoding(BinaryTypeEncodingType::ULongLongEncoding)));
-    RegisterInteropType(isolate, types, "slong", new PrimitiveDataWrapper(ffi_type_slong.size, CreateEncoding(BinaryTypeEncodingType::LongLongEncoding)));
-    RegisterInteropType(isolate, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, CreateEncoding(BinaryTypeEncodingType::FloatEncoding)));
-    RegisterInteropType(isolate, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, CreateEncoding(BinaryTypeEncodingType::DoubleEncoding)));
+    RegisterInteropType(context, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(context, types, "void", new PrimitiveDataWrapper(0, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(context, types, "bool", new PrimitiveDataWrapper(sizeof(bool), CreateEncoding(BinaryTypeEncodingType::BoolEncoding)));
+    RegisterInteropType(context, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, CreateEncoding(BinaryTypeEncodingType::UCharEncoding)));
+    RegisterInteropType(context, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, CreateEncoding(BinaryTypeEncodingType::CharEncoding)));
+    RegisterInteropType(context, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, CreateEncoding(BinaryTypeEncodingType::UShortEncoding)));
+    RegisterInteropType(context, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, CreateEncoding(BinaryTypeEncodingType::ShortEncoding)));
+    RegisterInteropType(context, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, CreateEncoding(BinaryTypeEncodingType::UIntEncoding)));
+    RegisterInteropType(context, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, CreateEncoding(BinaryTypeEncodingType::IntEncoding)));
+    RegisterInteropType(context, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, CreateEncoding(BinaryTypeEncodingType::ULongEncoding)));
+    RegisterInteropType(context, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, CreateEncoding(BinaryTypeEncodingType::LongEncoding)));
+    RegisterInteropType(context, types, "ulong", new PrimitiveDataWrapper(ffi_type_ulong.size, CreateEncoding(BinaryTypeEncodingType::ULongLongEncoding)));
+    RegisterInteropType(context, types, "slong", new PrimitiveDataWrapper(ffi_type_slong.size, CreateEncoding(BinaryTypeEncodingType::LongLongEncoding)));
+    RegisterInteropType(context, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, CreateEncoding(BinaryTypeEncodingType::FloatEncoding)));
+    RegisterInteropType(context, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, CreateEncoding(BinaryTypeEncodingType::DoubleEncoding)));
 
-    RegisterInteropType(isolate, types, "id", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::IdEncoding)));
-//    RegisterInteropType(isolate, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(isolate, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, CreateEncoding(BinaryTypeEncodingType::UnicharEncoding)));
-    RegisterInteropType(isolate, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ProtocolEncoding)));
-    RegisterInteropType(isolate, types, "class", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ClassEncoding)));
-    RegisterInteropType(isolate, types, "selector", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::SelectorEncoding)));
+    RegisterInteropType(context, types, "id", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::IdEncoding)));
+//    RegisterInteropType(context, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(context, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, CreateEncoding(BinaryTypeEncodingType::UnicharEncoding)));
+    RegisterInteropType(context, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ProtocolEncoding)));
+    RegisterInteropType(context, types, "class", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ClassEncoding)));
+    RegisterInteropType(context, types, "selector", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::SelectorEncoding)));
 
     bool success = interop->Set(context, tns::ToV8String(isolate, "types"), types).FromMaybe(false);
     tns::Assert(success, isolate);
@@ -60,7 +60,8 @@ void Interop::RegisterInteropTypes(Isolate* isolate) {
     tns::Assert(success, isolate);
 }
 
-Local<Object> Interop::GetInteropType(Isolate* isolate, BinaryTypeEncodingType type) {
+Local<Object> Interop::GetInteropType(Local<Context> context, BinaryTypeEncodingType type) {
+    Isolate* isolate = context->GetIsolate();
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto it = cache->PrimitiveInteropTypes.find(type);
     if (it != cache->PrimitiveInteropTypes.end()) {
@@ -70,8 +71,8 @@ Local<Object> Interop::GetInteropType(Isolate* isolate, BinaryTypeEncodingType t
     return Local<Object>();
 }
 
-void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::string name, PrimitiveDataWrapper* wrapper) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Interop::RegisterInteropType(Local<Context> context, Local<Object> types, std::string name, PrimitiveDataWrapper* wrapper) {
+    Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
     ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, name));
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
@@ -100,8 +101,7 @@ void Interop::RegisterInteropType(Isolate* isolate, Local<Object> types, std::st
     tns::Assert(success, isolate);
 }
 
-void Interop::RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8::Object> interop) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Interop::RegisterBufferFromDataFunction(Local<Context> context, Local<Object> interop) {
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
@@ -123,22 +123,24 @@ void Interop::RegisterBufferFromDataFunction(v8::Isolate* isolate, v8::Local<v8:
         Local<ArrayBuffer> result = ArrayBuffer::New(isolate, std::move(backingStore));
         info.GetReturnValue().Set(result);
     }).ToLocal(&func);
+
+    Isolate* isolate = context->GetIsolate();
     tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "bufferFromData"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Interop::RegisterHandleOfFunction(Local<Context> context, Local<Object> interop) {
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
+        Local<Context> context = isolate->GetCurrentContext();
         tns::Assert(info.Length() == 1, isolate);
         try {
             Local<Value> arg = info[0];
 
-            Local<Value> result = Interop::HandleOf(isolate, arg);
+            Local<Value> result = Interop::HandleOf(context, arg);
             if (result.IsEmpty()) {
                 throw NativeScriptException("Unknown type");
             }
@@ -148,14 +150,15 @@ void Interop::RegisterHandleOfFunction(Isolate* isolate, Local<Object> interop) 
             ex.ReThrowToV8(isolate);
         }
     }).ToLocal(&func);
+
+    Isolate* isolate = context->GetIsolate();
     tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "handleof"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Interop::RegisterAllocFunction(Isolate* isolate, Local<Object> interop) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Interop::RegisterAllocFunction(Local<Context> context, Local<Object> interop) {
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
@@ -171,19 +174,20 @@ void Interop::RegisterAllocFunction(Isolate* isolate, Local<Object> interop) {
 
         void* data = calloc(1, size);
 
-        Local<Value> pointerInstance = Pointer::NewInstance(isolate, data);
+        Local<Value> pointerInstance = Pointer::NewInstance(context, data);
         PointerWrapper* wrapper = static_cast<PointerWrapper*>(pointerInstance.As<Object>()->GetInternalField(0).As<External>()->Value());
         wrapper->SetAdopted(true);
         info.GetReturnValue().Set(pointerInstance);
     }).ToLocal(&func);
+
+    Isolate* isolate = context->GetIsolate();
     tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "alloc"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Interop::RegisterFreeFunction(Isolate* isolate, Local<Object> interop) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Interop::RegisterFreeFunction(Local<Context> context, Local<Object> interop) {
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
@@ -205,14 +209,15 @@ void Interop::RegisterFreeFunction(Isolate* isolate, Local<Object> interop) {
 
         info.GetReturnValue().Set(v8::Undefined(isolate));
     }).ToLocal(&func);
+
+    Isolate* isolate = context->GetIsolate();
     tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "free"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Interop::RegisterAdoptFunction(Isolate* isolate, Local<Object> interop) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Interop::RegisterAdoptFunction(Local<Context> context, Local<Object> interop) {
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
@@ -227,14 +232,15 @@ void Interop::RegisterAdoptFunction(Isolate* isolate, Local<Object> interop) {
 
         info.GetReturnValue().Set(arg);
     }).ToLocal(&func);
+
+    Isolate* isolate = context->GetIsolate();
     tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "adopt"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
-    Local<Context> context = isolate->GetCurrentContext();
+void Interop::RegisterSizeOfFunction(Local<Context> context, Local<Object> interop) {
     Local<v8::Function> func;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
@@ -294,6 +300,8 @@ void Interop::RegisterSizeOfFunction(Isolate* isolate, Local<Object> interop) {
             ex.ReThrowToV8(isolate);
         }
     }).ToLocal(&func);
+
+    Isolate* isolate = context->GetIsolate();
     tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "sizeof"), func).FromMaybe(false);
@@ -307,16 +315,17 @@ const TypeEncoding* Interop::CreateEncoding(BinaryTypeEncodingType type) {
     return typeEncoding;
 }
 
-Local<Value> Interop::HandleOf(Isolate* isolate, Local<Value> value) {
+Local<Value> Interop::HandleOf(Local<Context> context, Local<Value> value) {
+    Isolate* isolate = context->GetIsolate();
     if (!value->IsNullOrUndefined()) {
         if (value->IsArrayBuffer()) {
             Local<ArrayBuffer> buffer = value.As<ArrayBuffer>();
             std::shared_ptr<BackingStore> backingStore = buffer->GetBackingStore();
-            return Pointer::NewInstance(isolate, backingStore->Data());
+            return Pointer::NewInstance(context, backingStore->Data());
         } else if (value->IsArrayBufferView()) {
             Local<ArrayBufferView> bufferView = value.As<ArrayBufferView>();
             std::shared_ptr<BackingStore> backingStore = bufferView->Buffer()->GetBackingStore();
-            return Pointer::NewInstance(isolate, backingStore->Data());
+            return Pointer::NewInstance(context, backingStore->Data());
         } else if (value->IsObject()) {
             Local<Object> obj = value.As<Object>();
             if (BaseDataWrapper* wrapper = tns::GetValue(isolate, obj)) {
@@ -324,7 +333,7 @@ Local<Value> Interop::HandleOf(Isolate* isolate, Local<Value> value) {
                     case WrapperType::Primitive: {
                         PrimitiveDataWrapper* pdw = static_cast<PrimitiveDataWrapper*>(wrapper);
                         void* handle = pdw;
-                        return Pointer::NewInstance(isolate, handle);
+                        return Pointer::NewInstance(context, handle);
                     }
                     case WrapperType::ObjCClass: {
                         ObjCClassWrapper* cw = static_cast<ObjCClassWrapper*>(wrapper);
@@ -332,7 +341,7 @@ Local<Value> Interop::HandleOf(Isolate* isolate, Local<Value> value) {
                             CFTypeRef ref = CFBridgingRetain(cw->Klass());
                             void* handle = const_cast<void*>(ref);
                             CFRelease(ref);
-                            return Pointer::NewInstance(isolate, handle);
+                            return Pointer::NewInstance(context, handle);
                         }
                         break;
                     }
@@ -341,7 +350,7 @@ Local<Value> Interop::HandleOf(Isolate* isolate, Local<Value> value) {
                         CFTypeRef ref = CFBridgingRetain(pw->Proto());
                         void* handle = const_cast<void*>(ref);
                         CFRelease(ref);
-                        return Pointer::NewInstance(isolate, handle);
+                        return Pointer::NewInstance(context, handle);
                     }
                     case WrapperType::ObjCObject: {
                         ObjCDataWrapper* w = static_cast<ObjCDataWrapper*>(wrapper);
@@ -350,24 +359,24 @@ Local<Value> Interop::HandleOf(Isolate* isolate, Local<Value> value) {
                             CFTypeRef ref = CFBridgingRetain(target);
                             void* handle = const_cast<void*>(ref);
                             CFRelease(ref);
-                            return Pointer::NewInstance(isolate, handle);
+                            return Pointer::NewInstance(context, handle);
                         }
                         break;
                     }
                     case WrapperType::Struct: {
                         StructWrapper* w = static_cast<StructWrapper*>(wrapper);
-                        return Pointer::NewInstance(isolate, w->Data());
+                        return Pointer::NewInstance(context, w->Data());
                     }
                     case WrapperType::Reference: {
                         ReferenceWrapper* w = static_cast<ReferenceWrapper*>(wrapper);
                         if (w->Value() != nullptr) {
                             Local<Value> wrappedValue = w->Value()->Get(isolate);
                             if (tns::GetValue(isolate, wrappedValue) == nullptr) {
-                                return Pointer::NewInstance(isolate, w->Value());
+                                return Pointer::NewInstance(context, w->Value());
                             }
-                            return HandleOf(isolate, wrappedValue);
+                            return HandleOf(context, wrappedValue);
                         } else if (w->Data() != nullptr) {
-                            return Pointer::NewInstance(isolate, w->Data());
+                            return Pointer::NewInstance(context, w->Data());
                         }
                         break;
                     }
@@ -378,18 +387,18 @@ Local<Value> Interop::HandleOf(Isolate* isolate, Local<Value> value) {
                         FunctionWrapper* w = static_cast<FunctionWrapper*>(wrapper);
                         const FunctionMeta* meta = w->Meta();
                         void* handle = SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
-                        return Pointer::NewInstance(isolate, handle);
+                        return Pointer::NewInstance(context, handle);
                     }
                     case WrapperType::FunctionReference: {
                         FunctionReferenceWrapper* w = static_cast<FunctionReferenceWrapper*>(wrapper);
                         if (w->Data() != nullptr) {
-                            return Pointer::NewInstance(isolate, w->Data());
+                            return Pointer::NewInstance(context, w->Data());
                         }
                         break;
                     }
                     case WrapperType::Block: {
                         BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
-                        return Pointer::NewInstance(isolate, blockWrapper->Block());
+                        return Pointer::NewInstance(context, blockWrapper->Block());
                     }
                     default:
                         break;

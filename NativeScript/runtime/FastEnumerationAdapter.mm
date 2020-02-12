@@ -75,7 +75,7 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
             success = nextResult.As<Object>()->Get(context, tns::ToV8String(isolate, "value")).ToLocal(&value);
             tns::Assert(success && !value.IsEmpty(), isolate);
 
-            id result = Interop::ToObject(isolate, value);
+            id result = Interop::ToObject(context, value);
             *buffer++ = result;
             count++;
         }

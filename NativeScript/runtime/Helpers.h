@@ -51,7 +51,7 @@ void LogBacktrace(int skip = 1);
 #define Log(...) NSLog(__VA_ARGS__)
 #endif
 
-v8::Local<v8::String> JsonStringifyObject(v8::Isolate* isolate, v8::Local<v8::Value> value, bool handleCircularReferences = true);
+v8::Local<v8::String> JsonStringifyObject(v8::Local<v8::Context> context, v8::Local<v8::Value> value, bool handleCircularReferences = true);
 v8::Local<v8::Function> GetSmartJSONStringifyFunction(v8::Isolate* isolate);
 
 std::string ReplaceAll(const std::string source, std::string find, std::string replacement);

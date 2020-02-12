@@ -30,6 +30,7 @@ Local<Value> ExtVector::NewInstance(Isolate* isolate, void* data, ffi_type* ffiT
 
 void ExtVector::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
     tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::ExtVector, isolate);
     ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
@@ -46,12 +47,14 @@ void ExtVector::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbac
 
     void* data = extVectorWrapper->Data();
     BaseCall call((uint8_t*)data, offset);
-    Local<Value> result = Interop::GetPrimitiveReturnType(isolate, innerTypeEncoding->type, &call);
+    Local<Value> result = Interop::GetPrimitiveReturnType(context, innerTypeEncoding->type, &call);
     info.GetReturnValue().Set(result);
 }
 
 void ExtVector::IndexedPropertySetCallback(uint32_t index, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
     BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
     tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::ExtVector, isolate);
     ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
@@ -67,7 +70,7 @@ void ExtVector::IndexedPropertySetCallback(uint32_t index, Local<Value> value, c
 
     void* data = extVectorWrapper->Data();
     void* dest = (uint8_t*)data + offset;
-    Interop::WriteValue(isolate, innerTypeEncoding, dest, value);
+    Interop::WriteValue(context, innerTypeEncoding, dest, value);
 }
 
 void ExtVector::RegisterToStringMethod(Isolate* isolate, Local<ObjectTemplate> prototypeTemplate) {

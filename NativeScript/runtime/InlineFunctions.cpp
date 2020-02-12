@@ -5,7 +5,7 @@ using namespace v8;
 
 namespace tns {
 
-void InlineFunctions::Init(Isolate* isolate) {
+void InlineFunctions::Init(Local<Context> context) {
 
     std::string inlineFunctionsSource =
         "Object.assign(global, {"
@@ -111,7 +111,7 @@ void InlineFunctions::Init(Isolate* isolate) {
         "});"
     ;
 
-    Local<Context> context = isolate->GetCurrentContext();
+    Isolate* isolate = context->GetIsolate();
 
     Local<Script> script;
     if (!Script::Compile(context, tns::ToV8String(isolate, inlineFunctionsSource)).ToLocal(&script)) {

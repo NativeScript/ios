@@ -1,6 +1,7 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "Helpers.h"
+#include "Caches.h"
 #include <sstream>
 
 using namespace v8;
@@ -89,7 +90,8 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
 }
 
 std::string NativeScriptException::GetErrorMessage(Isolate* isolate, Local<Value>& error, const std::string& prependMessage) {
-    Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    Local<Context> context = cache->GetContext();
 
     // get whole error message from previous stack
     std::stringstream ss;

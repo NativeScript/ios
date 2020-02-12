@@ -16,8 +16,9 @@ using namespace v8;
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
     if (self) {
         self->isolate_ = isolate;
-        self->object_ = ObjectManager::Register(isolate, jsObject);
         std::shared_ptr<Caches> cache = Caches::Get(isolate);
+        Local<Context> context = cache->GetContext();
+        self->object_ = ObjectManager::Register(context, jsObject);
         cache->Instances.emplace(self, self->object_);
         tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
     }
@@ -26,6 +27,10 @@ using namespace v8;
 }
 
 - (NSUInteger)count {
+    v8::Locker locker(self->isolate_);
+    Isolate::Scope isolate_scope(self->isolate_);
+    HandleScope handle_scope(self->isolate_);
+
     Local<Object> object = self->object_->Get(self->isolate_).As<Object>();
     if (object->IsArray()) {
         uint32_t length = object.As<v8::Array>()->Length();
@@ -41,6 +46,10 @@ using namespace v8;
 }
 
 - (id)objectAtIndex:(NSUInteger)index {
+    v8::Locker locker(self->isolate_);
+    Isolate::Scope isolate_scope(self->isolate_);
+    HandleScope handle_scope(self->isolate_);
+
     if (!(index < [self count])) {
         tns::Assert(false, self->isolate_);
     }
@@ -55,7 +64,7 @@ using namespace v8;
         return nil;
     }
 
-    id value = Interop::ToObject(self->isolate_, item);
+    id value = Interop::ToObject(context, item);
     return value;
 }
 
