@@ -1202,7 +1202,7 @@ public:
     void preciseCoverageDeltaUpdate(double timestamp, const String& occassion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result);
 
     void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
+    void sendRawNotification(std::unique_ptr<Serializable>);
 private:
     FrontendChannel* m_frontendChannel;
 };

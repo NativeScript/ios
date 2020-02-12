@@ -246,9 +246,15 @@ void V8Debugger::interruptAndBreak(int targetContextGroupId) {
       nullptr);
 }
 
-void V8Debugger::continueProgram(int targetContextGroupId) {
+void V8Debugger::continueProgram(int targetContextGroupId,
+                                 bool terminateOnResume) {
   if (m_pausedContextGroupId != targetContextGroupId) return;
-  if (isPaused()) m_inspector->client()->quitMessageLoopOnPause();
+  if (isPaused()) {
+    if (terminateOnResume) {
+      v8::debug::SetTerminateOnResume(m_isolate);
+    }
+    m_inspector->client()->quitMessageLoopOnPause();
+  }
 }
 
 void V8Debugger::breakProgramOnAssert(int targetContextGroupId) {
@@ -296,7 +302,10 @@ bool V8Debugger::asyncStepOutOfFunction(int targetContextGroupId,
                                         bool onlyAtReturn) {
   v8::HandleScope handleScope(m_isolate);
   auto iterator = v8::debug::StackTraceIterator::Create(m_isolate);
-  CHECK(!iterator->Done());
+  // When stepping through extensions code, it is possible that the
+  // iterator doesn't have any frames, since we exclude all frames
+  // that correspond to extension scripts.
+  if (iterator->Done()) return false;
   bool atReturn = !iterator->GetReturnValue().IsEmpty();
   iterator->Advance();
   // Synchronous stack has more then one frame.

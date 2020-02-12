@@ -24,50 +24,50 @@ const char Metainfo::version[] = "1.3";
 std::unique_ptr<Frame> Frame::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Frame> result(new Frame());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* idValue = object->get("id");
-    errors->setName("id");
+    errors->SetName("id");
     result->m_id = ValueConversions<String>::fromValue(idValue, errors);
     protocol::Value* parentIdValue = object->get("parentId");
     if (parentIdValue) {
-        errors->setName("parentId");
+        errors->SetName("parentId");
         result->m_parentId = ValueConversions<String>::fromValue(parentIdValue, errors);
     }
     protocol::Value* loaderIdValue = object->get("loaderId");
-    errors->setName("loaderId");
+    errors->SetName("loaderId");
     result->m_loaderId = ValueConversions<String>::fromValue(loaderIdValue, errors);
     protocol::Value* nameValue = object->get("name");
     if (nameValue) {
-        errors->setName("name");
+        errors->SetName("name");
         result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     }
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* urlFragmentValue = object->get("urlFragment");
     if (urlFragmentValue) {
-        errors->setName("urlFragment");
+        errors->SetName("urlFragment");
         result->m_urlFragment = ValueConversions<String>::fromValue(urlFragmentValue, errors);
     }
     protocol::Value* securityOriginValue = object->get("securityOrigin");
-    errors->setName("securityOrigin");
+    errors->SetName("securityOrigin");
     result->m_securityOrigin = ValueConversions<String>::fromValue(securityOriginValue, errors);
     protocol::Value* mimeTypeValue = object->get("mimeType");
-    errors->setName("mimeType");
+    errors->SetName("mimeType");
     result->m_mimeType = ValueConversions<String>::fromValue(mimeTypeValue, errors);
     protocol::Value* unreachableUrlValue = object->get("unreachableUrl");
     if (unreachableUrlValue) {
-        errors->setName("unreachableUrl");
+        errors->SetName("unreachableUrl");
         result->m_unreachableUrl = ValueConversions<String>::fromValue(unreachableUrlValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -117,44 +117,44 @@ std::unique_ptr<Frame> Frame::clone() const
 std::unique_ptr<FrameResource> FrameResource::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameResource> result(new FrameResource());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* typeValue = object->get("type");
-    errors->setName("type");
+    errors->SetName("type");
     result->m_type = ValueConversions<String>::fromValue(typeValue, errors);
     protocol::Value* mimeTypeValue = object->get("mimeType");
-    errors->setName("mimeType");
+    errors->SetName("mimeType");
     result->m_mimeType = ValueConversions<String>::fromValue(mimeTypeValue, errors);
     protocol::Value* lastModifiedValue = object->get("lastModified");
     if (lastModifiedValue) {
-        errors->setName("lastModified");
+        errors->SetName("lastModified");
         result->m_lastModified = ValueConversions<double>::fromValue(lastModifiedValue, errors);
     }
     protocol::Value* contentSizeValue = object->get("contentSize");
     if (contentSizeValue) {
-        errors->setName("contentSize");
+        errors->SetName("contentSize");
         result->m_contentSize = ValueConversions<double>::fromValue(contentSizeValue, errors);
     }
     protocol::Value* failedValue = object->get("failed");
     if (failedValue) {
-        errors->setName("failed");
+        errors->SetName("failed");
         result->m_failed = ValueConversions<bool>::fromValue(failedValue, errors);
     }
     protocol::Value* canceledValue = object->get("canceled");
     if (canceledValue) {
-        errors->setName("canceled");
+        errors->SetName("canceled");
         result->m_canceled = ValueConversions<bool>::fromValue(canceledValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -200,26 +200,26 @@ std::unique_ptr<FrameResource> FrameResource::clone() const
 std::unique_ptr<FrameResourceTree> FrameResourceTree::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameResourceTree> result(new FrameResourceTree());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameValue = object->get("frame");
-    errors->setName("frame");
+    errors->SetName("frame");
     result->m_frame = ValueConversions<protocol::Page::Frame>::fromValue(frameValue, errors);
     protocol::Value* childFramesValue = object->get("childFrames");
     if (childFramesValue) {
-        errors->setName("childFrames");
+        errors->SetName("childFrames");
         result->m_childFrames = ValueConversions<protocol::Array<protocol::Page::FrameResourceTree>>::fromValue(childFramesValue, errors);
     }
     protocol::Value* resourcesValue = object->get("resources");
-    errors->setName("resources");
+    errors->SetName("resources");
     result->m_resources = ValueConversions<protocol::Array<protocol::Page::FrameResource>>::fromValue(resourcesValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -254,23 +254,23 @@ std::unique_ptr<FrameResourceTree> FrameResourceTree::clone() const
 std::unique_ptr<FrameTree> FrameTree::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameTree> result(new FrameTree());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameValue = object->get("frame");
-    errors->setName("frame");
+    errors->SetName("frame");
     result->m_frame = ValueConversions<protocol::Page::Frame>::fromValue(frameValue, errors);
     protocol::Value* childFramesValue = object->get("childFrames");
     if (childFramesValue) {
-        errors->setName("childFrames");
+        errors->SetName("childFrames");
         result->m_childFrames = ValueConversions<protocol::Array<protocol::Page::FrameTree>>::fromValue(childFramesValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -303,27 +303,27 @@ std::unique_ptr<FrameTree> FrameTree::clone() const
 std::unique_ptr<LayoutViewport> LayoutViewport::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<LayoutViewport> result(new LayoutViewport());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* pageXValue = object->get("pageX");
-    errors->setName("pageX");
+    errors->SetName("pageX");
     result->m_pageX = ValueConversions<int>::fromValue(pageXValue, errors);
     protocol::Value* pageYValue = object->get("pageY");
-    errors->setName("pageY");
+    errors->SetName("pageY");
     result->m_pageY = ValueConversions<int>::fromValue(pageYValue, errors);
     protocol::Value* clientWidthValue = object->get("clientWidth");
-    errors->setName("clientWidth");
+    errors->SetName("clientWidth");
     result->m_clientWidth = ValueConversions<int>::fromValue(clientWidthValue, errors);
     protocol::Value* clientHeightValue = object->get("clientHeight");
-    errors->setName("clientHeight");
+    errors->SetName("clientHeight");
     result->m_clientHeight = ValueConversions<int>::fromValue(clientHeightValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -359,41 +359,41 @@ std::unique_ptr<LayoutViewport> LayoutViewport::clone() const
 std::unique_ptr<VisualViewport> VisualViewport::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<VisualViewport> result(new VisualViewport());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* offsetXValue = object->get("offsetX");
-    errors->setName("offsetX");
+    errors->SetName("offsetX");
     result->m_offsetX = ValueConversions<double>::fromValue(offsetXValue, errors);
     protocol::Value* offsetYValue = object->get("offsetY");
-    errors->setName("offsetY");
+    errors->SetName("offsetY");
     result->m_offsetY = ValueConversions<double>::fromValue(offsetYValue, errors);
     protocol::Value* pageXValue = object->get("pageX");
-    errors->setName("pageX");
+    errors->SetName("pageX");
     result->m_pageX = ValueConversions<double>::fromValue(pageXValue, errors);
     protocol::Value* pageYValue = object->get("pageY");
-    errors->setName("pageY");
+    errors->SetName("pageY");
     result->m_pageY = ValueConversions<double>::fromValue(pageYValue, errors);
     protocol::Value* clientWidthValue = object->get("clientWidth");
-    errors->setName("clientWidth");
+    errors->SetName("clientWidth");
     result->m_clientWidth = ValueConversions<double>::fromValue(clientWidthValue, errors);
     protocol::Value* clientHeightValue = object->get("clientHeight");
-    errors->setName("clientHeight");
+    errors->SetName("clientHeight");
     result->m_clientHeight = ValueConversions<double>::fromValue(clientHeightValue, errors);
     protocol::Value* scaleValue = object->get("scale");
-    errors->setName("scale");
+    errors->SetName("scale");
     result->m_scale = ValueConversions<double>::fromValue(scaleValue, errors);
     protocol::Value* zoomValue = object->get("zoom");
     if (zoomValue) {
-        errors->setName("zoom");
+        errors->SetName("zoom");
         result->m_zoom = ValueConversions<double>::fromValue(zoomValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -438,30 +438,30 @@ std::unique_ptr<VisualViewport> VisualViewport::clone() const
 std::unique_ptr<Viewport> Viewport::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Viewport> result(new Viewport());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* xValue = object->get("x");
-    errors->setName("x");
+    errors->SetName("x");
     result->m_x = ValueConversions<double>::fromValue(xValue, errors);
     protocol::Value* yValue = object->get("y");
-    errors->setName("y");
+    errors->SetName("y");
     result->m_y = ValueConversions<double>::fromValue(yValue, errors);
     protocol::Value* widthValue = object->get("width");
-    errors->setName("width");
+    errors->SetName("width");
     result->m_width = ValueConversions<double>::fromValue(widthValue, errors);
     protocol::Value* heightValue = object->get("height");
-    errors->setName("height");
+    errors->SetName("height");
     result->m_height = ValueConversions<double>::fromValue(heightValue, errors);
     protocol::Value* scaleValue = object->get("scale");
-    errors->setName("scale");
+    errors->SetName("scale");
     result->m_scale = ValueConversions<double>::fromValue(scaleValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -499,50 +499,50 @@ std::unique_ptr<Viewport> Viewport::clone() const
 std::unique_ptr<FontFamilies> FontFamilies::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FontFamilies> result(new FontFamilies());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* standardValue = object->get("standard");
     if (standardValue) {
-        errors->setName("standard");
+        errors->SetName("standard");
         result->m_standard = ValueConversions<String>::fromValue(standardValue, errors);
     }
     protocol::Value* fixedValue = object->get("fixed");
     if (fixedValue) {
-        errors->setName("fixed");
+        errors->SetName("fixed");
         result->m_fixed = ValueConversions<String>::fromValue(fixedValue, errors);
     }
     protocol::Value* serifValue = object->get("serif");
     if (serifValue) {
-        errors->setName("serif");
+        errors->SetName("serif");
         result->m_serif = ValueConversions<String>::fromValue(serifValue, errors);
     }
     protocol::Value* sansSerifValue = object->get("sansSerif");
     if (sansSerifValue) {
-        errors->setName("sansSerif");
+        errors->SetName("sansSerif");
         result->m_sansSerif = ValueConversions<String>::fromValue(sansSerifValue, errors);
     }
     protocol::Value* cursiveValue = object->get("cursive");
     if (cursiveValue) {
-        errors->setName("cursive");
+        errors->SetName("cursive");
         result->m_cursive = ValueConversions<String>::fromValue(cursiveValue, errors);
     }
     protocol::Value* fantasyValue = object->get("fantasy");
     if (fantasyValue) {
-        errors->setName("fantasy");
+        errors->SetName("fantasy");
         result->m_fantasy = ValueConversions<String>::fromValue(fantasyValue, errors);
     }
     protocol::Value* pictographValue = object->get("pictograph");
     if (pictographValue) {
-        errors->setName("pictograph");
+        errors->SetName("pictograph");
         result->m_pictograph = ValueConversions<String>::fromValue(pictographValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -591,25 +591,25 @@ std::unique_ptr<FontFamilies> FontFamilies::clone() const
 std::unique_ptr<FontSizes> FontSizes::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FontSizes> result(new FontSizes());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* standardValue = object->get("standard");
     if (standardValue) {
-        errors->setName("standard");
+        errors->SetName("standard");
         result->m_standard = ValueConversions<int>::fromValue(standardValue, errors);
     }
     protocol::Value* fixedValue = object->get("fixed");
     if (fixedValue) {
-        errors->setName("fixed");
+        errors->SetName("fixed");
         result->m_fixed = ValueConversions<int>::fromValue(fixedValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -653,18 +653,18 @@ const char Reload[] = "reload";
 std::unique_ptr<DomContentEventFiredNotification> DomContentEventFiredNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<DomContentEventFiredNotification> result(new DomContentEventFiredNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -697,24 +697,24 @@ const char* FileChooserOpenedNotification::ModeEnum::SelectMultiple = "selectMul
 std::unique_ptr<FileChooserOpenedNotification> FileChooserOpenedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FileChooserOpenedNotification> result(new FileChooserOpenedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* backendNodeIdValue = object->get("backendNodeId");
-    errors->setName("backendNodeId");
+    errors->SetName("backendNodeId");
     result->m_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     protocol::Value* modeValue = object->get("mode");
-    errors->setName("mode");
+    errors->SetName("mode");
     result->m_mode = ValueConversions<String>::fromValue(modeValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -748,26 +748,26 @@ std::unique_ptr<FileChooserOpenedNotification> FileChooserOpenedNotification::cl
 std::unique_ptr<FrameAttachedNotification> FrameAttachedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameAttachedNotification> result(new FrameAttachedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* parentFrameIdValue = object->get("parentFrameId");
-    errors->setName("parentFrameId");
+    errors->SetName("parentFrameId");
     result->m_parentFrameId = ValueConversions<String>::fromValue(parentFrameIdValue, errors);
     protocol::Value* stackValue = object->get("stack");
     if (stackValue) {
-        errors->setName("stack");
+        errors->SetName("stack");
         result->m_stack = ValueConversions<protocol::Runtime::StackTrace>::fromValue(stackValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -802,18 +802,18 @@ std::unique_ptr<FrameAttachedNotification> FrameAttachedNotification::clone() co
 std::unique_ptr<FrameClearedScheduledNavigationNotification> FrameClearedScheduledNavigationNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameClearedScheduledNavigationNotification> result(new FrameClearedScheduledNavigationNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -843,18 +843,18 @@ std::unique_ptr<FrameClearedScheduledNavigationNotification> FrameClearedSchedul
 std::unique_ptr<FrameDetachedNotification> FrameDetachedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameDetachedNotification> result(new FrameDetachedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -884,18 +884,18 @@ std::unique_ptr<FrameDetachedNotification> FrameDetachedNotification::clone() co
 std::unique_ptr<FrameNavigatedNotification> FrameNavigatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameNavigatedNotification> result(new FrameNavigatedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameValue = object->get("frame");
-    errors->setName("frame");
+    errors->SetName("frame");
     result->m_frame = ValueConversions<protocol::Page::Frame>::fromValue(frameValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -925,24 +925,24 @@ std::unique_ptr<FrameNavigatedNotification> FrameNavigatedNotification::clone() 
 std::unique_ptr<FrameRequestedNavigationNotification> FrameRequestedNavigationNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameRequestedNavigationNotification> result(new FrameRequestedNavigationNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* reasonValue = object->get("reason");
-    errors->setName("reason");
+    errors->SetName("reason");
     result->m_reason = ValueConversions<String>::fromValue(reasonValue, errors);
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -984,27 +984,27 @@ const char* FrameScheduledNavigationNotification::ReasonEnum::Reload = "reload";
 std::unique_ptr<FrameScheduledNavigationNotification> FrameScheduledNavigationNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameScheduledNavigationNotification> result(new FrameScheduledNavigationNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* delayValue = object->get("delay");
-    errors->setName("delay");
+    errors->SetName("delay");
     result->m_delay = ValueConversions<double>::fromValue(delayValue, errors);
     protocol::Value* reasonValue = object->get("reason");
-    errors->setName("reason");
+    errors->SetName("reason");
     result->m_reason = ValueConversions<String>::fromValue(reasonValue, errors);
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1040,18 +1040,18 @@ std::unique_ptr<FrameScheduledNavigationNotification> FrameScheduledNavigationNo
 std::unique_ptr<FrameStartedLoadingNotification> FrameStartedLoadingNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameStartedLoadingNotification> result(new FrameStartedLoadingNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1081,18 +1081,18 @@ std::unique_ptr<FrameStartedLoadingNotification> FrameStartedLoadingNotification
 std::unique_ptr<FrameStoppedLoadingNotification> FrameStoppedLoadingNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<FrameStoppedLoadingNotification> result(new FrameStoppedLoadingNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1122,21 +1122,21 @@ std::unique_ptr<FrameStoppedLoadingNotification> FrameStoppedLoadingNotification
 std::unique_ptr<DownloadWillBeginNotification> DownloadWillBeginNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<DownloadWillBeginNotification> result(new DownloadWillBeginNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1168,27 +1168,27 @@ std::unique_ptr<DownloadWillBeginNotification> DownloadWillBeginNotification::cl
 std::unique_ptr<LifecycleEventNotification> LifecycleEventNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<LifecycleEventNotification> result(new LifecycleEventNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* loaderIdValue = object->get("loaderId");
-    errors->setName("loaderId");
+    errors->SetName("loaderId");
     result->m_loaderId = ValueConversions<String>::fromValue(loaderIdValue, errors);
     protocol::Value* nameValue = object->get("name");
-    errors->setName("name");
+    errors->SetName("name");
     result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1224,18 +1224,18 @@ std::unique_ptr<LifecycleEventNotification> LifecycleEventNotification::clone() 
 std::unique_ptr<LoadEventFiredNotification> LoadEventFiredNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<LoadEventFiredNotification> result(new LoadEventFiredNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1265,21 +1265,21 @@ std::unique_ptr<LoadEventFiredNotification> LoadEventFiredNotification::clone() 
 std::unique_ptr<NavigatedWithinDocumentNotification> NavigatedWithinDocumentNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<NavigatedWithinDocumentNotification> result(new NavigatedWithinDocumentNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1311,27 +1311,27 @@ std::unique_ptr<NavigatedWithinDocumentNotification> NavigatedWithinDocumentNoti
 std::unique_ptr<WindowOpenNotification> WindowOpenNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WindowOpenNotification> result(new WindowOpenNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* windowNameValue = object->get("windowName");
-    errors->setName("windowName");
+    errors->SetName("windowName");
     result->m_windowName = ValueConversions<String>::fromValue(windowNameValue, errors);
     protocol::Value* windowFeaturesValue = object->get("windowFeatures");
-    errors->setName("windowFeatures");
+    errors->SetName("windowFeatures");
     result->m_windowFeatures = ValueConversions<protocol::Array<String>>::fromValue(windowFeaturesValue, errors);
     protocol::Value* userGestureValue = object->get("userGesture");
-    errors->setName("userGesture");
+    errors->SetName("userGesture");
     result->m_userGesture = ValueConversions<bool>::fromValue(userGestureValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1367,21 +1367,21 @@ std::unique_ptr<WindowOpenNotification> WindowOpenNotification::clone() const
 std::unique_ptr<CompilationCacheProducedNotification> CompilationCacheProducedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<CompilationCacheProducedNotification> result(new CompilationCacheProducedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* dataValue = object->get("data");
-    errors->setName("data");
+    errors->SetName("data");
     result->m_data = ValueConversions<Binary>::fromValue(dataValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1674,9 +1674,9 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
+void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
+    m_frontendChannel->sendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
@@ -1788,12 +1788,12 @@ void DispatcherImpl::addScriptToEvaluateOnLoad(int callId, const String& method,
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* scriptSourceValue = object ? object->get("scriptSource") : nullptr;
-    errors->setName("scriptSource");
+    errors->SetName("scriptSource");
     String in_scriptSource = ValueConversions<String>::fromValue(scriptSourceValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1819,18 +1819,18 @@ void DispatcherImpl::addScriptToEvaluateOnNewDocument(int callId, const String& 
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* sourceValue = object ? object->get("source") : nullptr;
-    errors->setName("source");
+    errors->SetName("source");
     String in_source = ValueConversions<String>::fromValue(sourceValue, errors);
     protocol::Value* worldNameValue = object ? object->get("worldName") : nullptr;
     Maybe<String> in_worldName;
     if (worldNameValue) {
-        errors->setName("worldName");
+        errors->SetName("worldName");
         in_worldName = ValueConversions<String>::fromValue(worldNameValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1856,24 +1856,24 @@ void DispatcherImpl::createIsolatedWorld(int callId, const String& method, v8_cr
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object ? object->get("frameId") : nullptr;
-    errors->setName("frameId");
+    errors->SetName("frameId");
     String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* worldNameValue = object ? object->get("worldName") : nullptr;
     Maybe<String> in_worldName;
     if (worldNameValue) {
-        errors->setName("worldName");
+        errors->SetName("worldName");
         in_worldName = ValueConversions<String>::fromValue(worldNameValue, errors);
     }
     protocol::Value* grantUniveralAccessValue = object ? object->get("grantUniveralAccess") : nullptr;
     Maybe<bool> in_grantUniveralAccess;
     if (grantUniveralAccessValue) {
-        errors->setName("grantUniveralAccess");
+        errors->SetName("grantUniveralAccess");
         in_grantUniveralAccess = ValueConversions<bool>::fromValue(grantUniveralAccessValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2037,15 +2037,15 @@ void DispatcherImpl::getResourceContent(int callId, const String& method, v8_crd
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object ? object->get("frameId") : nullptr;
-    errors->setName("frameId");
+    errors->SetName("frameId");
     String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* urlValue = object ? object->get("url") : nullptr;
-    errors->setName("url");
+    errors->SetName("url");
     String in_url = ValueConversions<String>::fromValue(urlValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2079,21 +2079,21 @@ void DispatcherImpl::reload(int callId, const String& method, v8_crdtp::span<uin
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* ignoreCacheValue = object ? object->get("ignoreCache") : nullptr;
     Maybe<bool> in_ignoreCache;
     if (ignoreCacheValue) {
-        errors->setName("ignoreCache");
+        errors->SetName("ignoreCache");
         in_ignoreCache = ValueConversions<bool>::fromValue(ignoreCacheValue, errors);
     }
     protocol::Value* scriptToEvaluateOnLoadValue = object ? object->get("scriptToEvaluateOnLoad") : nullptr;
     Maybe<String> in_scriptToEvaluateOnLoad;
     if (scriptToEvaluateOnLoadValue) {
-        errors->setName("scriptToEvaluateOnLoad");
+        errors->SetName("scriptToEvaluateOnLoad");
         in_scriptToEvaluateOnLoad = ValueConversions<String>::fromValue(scriptToEvaluateOnLoadValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2113,12 +2113,12 @@ void DispatcherImpl::removeScriptToEvaluateOnLoad(int callId, const String& meth
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* identifierValue = object ? object->get("identifier") : nullptr;
-    errors->setName("identifier");
+    errors->SetName("identifier");
     String in_identifier = ValueConversions<String>::fromValue(identifierValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2138,12 +2138,12 @@ void DispatcherImpl::removeScriptToEvaluateOnNewDocument(int callId, const Strin
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* identifierValue = object ? object->get("identifier") : nullptr;
-    errors->setName("identifier");
+    errors->SetName("identifier");
     String in_identifier = ValueConversions<String>::fromValue(identifierValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2187,30 +2187,30 @@ void DispatcherImpl::searchInResource(int callId, const String& method, v8_crdtp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object ? object->get("frameId") : nullptr;
-    errors->setName("frameId");
+    errors->SetName("frameId");
     String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* urlValue = object ? object->get("url") : nullptr;
-    errors->setName("url");
+    errors->SetName("url");
     String in_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* queryValue = object ? object->get("query") : nullptr;
-    errors->setName("query");
+    errors->SetName("query");
     String in_query = ValueConversions<String>::fromValue(queryValue, errors);
     protocol::Value* caseSensitiveValue = object ? object->get("caseSensitive") : nullptr;
     Maybe<bool> in_caseSensitive;
     if (caseSensitiveValue) {
-        errors->setName("caseSensitive");
+        errors->SetName("caseSensitive");
         in_caseSensitive = ValueConversions<bool>::fromValue(caseSensitiveValue, errors);
     }
     protocol::Value* isRegexValue = object ? object->get("isRegex") : nullptr;
     Maybe<bool> in_isRegex;
     if (isRegexValue) {
-        errors->setName("isRegex");
+        errors->SetName("isRegex");
         in_isRegex = ValueConversions<bool>::fromValue(isRegexValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2224,12 +2224,12 @@ void DispatcherImpl::setAdBlockingEnabled(int callId, const String& method, v8_c
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* enabledValue = object ? object->get("enabled") : nullptr;
-    errors->setName("enabled");
+    errors->SetName("enabled");
     bool in_enabled = ValueConversions<bool>::fromValue(enabledValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2249,12 +2249,12 @@ void DispatcherImpl::setBypassCSP(int callId, const String& method, v8_crdtp::sp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* enabledValue = object ? object->get("enabled") : nullptr;
-    errors->setName("enabled");
+    errors->SetName("enabled");
     bool in_enabled = ValueConversions<bool>::fromValue(enabledValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2274,12 +2274,12 @@ void DispatcherImpl::setFontFamilies(int callId, const String& method, v8_crdtp:
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* fontFamiliesValue = object ? object->get("fontFamilies") : nullptr;
-    errors->setName("fontFamilies");
+    errors->SetName("fontFamilies");
     std::unique_ptr<protocol::Page::FontFamilies> in_fontFamilies = ValueConversions<protocol::Page::FontFamilies>::fromValue(fontFamiliesValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2299,12 +2299,12 @@ void DispatcherImpl::setFontSizes(int callId, const String& method, v8_crdtp::sp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* fontSizesValue = object ? object->get("fontSizes") : nullptr;
-    errors->setName("fontSizes");
+    errors->SetName("fontSizes");
     std::unique_ptr<protocol::Page::FontSizes> in_fontSizes = ValueConversions<protocol::Page::FontSizes>::fromValue(fontSizesValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2324,15 +2324,15 @@ void DispatcherImpl::setDocumentContent(int callId, const String& method, v8_crd
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object ? object->get("frameId") : nullptr;
-    errors->setName("frameId");
+    errors->SetName("frameId");
     String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* htmlValue = object ? object->get("html") : nullptr;
-    errors->setName("html");
+    errors->SetName("html");
     String in_html = ValueConversions<String>::fromValue(htmlValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2352,12 +2352,12 @@ void DispatcherImpl::setLifecycleEventsEnabled(int callId, const String& method,
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* enabledValue = object ? object->get("enabled") : nullptr;
-    errors->setName("enabled");
+    errors->SetName("enabled");
     bool in_enabled = ValueConversions<bool>::fromValue(enabledValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2377,39 +2377,39 @@ void DispatcherImpl::startScreencast(int callId, const String& method, v8_crdtp:
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* formatValue = object ? object->get("format") : nullptr;
     Maybe<String> in_format;
     if (formatValue) {
-        errors->setName("format");
+        errors->SetName("format");
         in_format = ValueConversions<String>::fromValue(formatValue, errors);
     }
     protocol::Value* qualityValue = object ? object->get("quality") : nullptr;
     Maybe<int> in_quality;
     if (qualityValue) {
-        errors->setName("quality");
+        errors->SetName("quality");
         in_quality = ValueConversions<int>::fromValue(qualityValue, errors);
     }
     protocol::Value* maxWidthValue = object ? object->get("maxWidth") : nullptr;
     Maybe<int> in_maxWidth;
     if (maxWidthValue) {
-        errors->setName("maxWidth");
+        errors->SetName("maxWidth");
         in_maxWidth = ValueConversions<int>::fromValue(maxWidthValue, errors);
     }
     protocol::Value* maxHeightValue = object ? object->get("maxHeight") : nullptr;
     Maybe<int> in_maxHeight;
     if (maxHeightValue) {
-        errors->setName("maxHeight");
+        errors->SetName("maxHeight");
         in_maxHeight = ValueConversions<int>::fromValue(maxHeightValue, errors);
     }
     protocol::Value* everyNthFrameValue = object ? object->get("everyNthFrame") : nullptr;
     Maybe<int> in_everyNthFrame;
     if (everyNthFrameValue) {
-        errors->setName("everyNthFrame");
+        errors->SetName("everyNthFrame");
         in_everyNthFrame = ValueConversions<int>::fromValue(everyNthFrameValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2457,12 +2457,12 @@ void DispatcherImpl::setProduceCompilationCache(int callId, const String& method
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* enabledValue = object ? object->get("enabled") : nullptr;
-    errors->setName("enabled");
+    errors->SetName("enabled");
     bool in_enabled = ValueConversions<bool>::fromValue(enabledValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2482,15 +2482,15 @@ void DispatcherImpl::addCompilationCache(int callId, const String& method, v8_cr
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* urlValue = object ? object->get("url") : nullptr;
-    errors->setName("url");
+    errors->SetName("url");
     String in_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* dataValue = object ? object->get("data") : nullptr;
-    errors->setName("data");
+    errors->SetName("data");
     Binary in_data = ValueConversions<Binary>::fromValue(dataValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2524,18 +2524,18 @@ void DispatcherImpl::generateTestReport(int callId, const String& method, v8_crd
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* messageValue = object ? object->get("message") : nullptr;
-    errors->setName("message");
+    errors->SetName("message");
     String in_message = ValueConversions<String>::fromValue(messageValue, errors);
     protocol::Value* groupValue = object ? object->get("group") : nullptr;
     Maybe<String> in_group;
     if (groupValue) {
-        errors->setName("group");
+        errors->SetName("group");
         in_group = ValueConversions<String>::fromValue(groupValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2569,12 +2569,12 @@ void DispatcherImpl::setInterceptFileChooserDialog(int callId, const String& met
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* enabledValue = object ? object->get("enabled") : nullptr;
-    errors->setName("enabled");
+    errors->SetName("enabled");
     bool in_enabled = ValueConversions<bool>::fromValue(enabledValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }

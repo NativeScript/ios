@@ -1355,7 +1355,7 @@ public:
     virtual DispatchResponse pauseOnAsyncCall(std::unique_ptr<protocol::Runtime::StackTraceId> in_parentStackTraceId) = 0;
     virtual DispatchResponse removeBreakpoint(const String& in_breakpointId) = 0;
     virtual DispatchResponse restartFrame(const String& in_callFrameId, std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>>* out_callFrames, Maybe<protocol::Runtime::StackTrace>* out_asyncStackTrace, Maybe<protocol::Runtime::StackTraceId>* out_asyncStackTraceId) = 0;
-    virtual DispatchResponse resume() = 0;
+    virtual DispatchResponse resume(Maybe<bool> in_terminateOnResume) = 0;
     virtual DispatchResponse searchInContent(const String& in_scriptId, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>>* out_result) = 0;
     virtual DispatchResponse setAsyncCallStackDepth(int in_maxDepth) = 0;
     virtual DispatchResponse setBlackboxPatterns(std::unique_ptr<protocol::Array<String>> in_patterns) = 0;
@@ -1388,7 +1388,7 @@ public:
     void scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<bool> isLiveEdit = Maybe<bool>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>());
 
     void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
+    void sendRawNotification(std::unique_ptr<Serializable>);
 private:
     FrontendChannel* m_frontendChannel;
 };

@@ -245,7 +245,7 @@ public:
     void messageAdded(std::unique_ptr<protocol::Console::ConsoleMessage> message);
 
     void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
+    void sendRawNotification(std::unique_ptr<Serializable>);
 private:
     FrontendChannel* m_frontendChannel;
 };

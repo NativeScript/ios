@@ -43,57 +43,57 @@ const char* LogEntry::LevelEnum::Error = "error";
 std::unique_ptr<LogEntry> LogEntry::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<LogEntry> result(new LogEntry());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* sourceValue = object->get("source");
-    errors->setName("source");
+    errors->SetName("source");
     result->m_source = ValueConversions<String>::fromValue(sourceValue, errors);
     protocol::Value* levelValue = object->get("level");
-    errors->setName("level");
+    errors->SetName("level");
     result->m_level = ValueConversions<String>::fromValue(levelValue, errors);
     protocol::Value* textValue = object->get("text");
-    errors->setName("text");
+    errors->SetName("text");
     result->m_text = ValueConversions<String>::fromValue(textValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* urlValue = object->get("url");
     if (urlValue) {
-        errors->setName("url");
+        errors->SetName("url");
         result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     }
     protocol::Value* lineNumberValue = object->get("lineNumber");
     if (lineNumberValue) {
-        errors->setName("lineNumber");
+        errors->SetName("lineNumber");
         result->m_lineNumber = ValueConversions<int>::fromValue(lineNumberValue, errors);
     }
     protocol::Value* stackTraceValue = object->get("stackTrace");
     if (stackTraceValue) {
-        errors->setName("stackTrace");
+        errors->SetName("stackTrace");
         result->m_stackTrace = ValueConversions<protocol::Runtime::StackTrace>::fromValue(stackTraceValue, errors);
     }
     protocol::Value* networkRequestIdValue = object->get("networkRequestId");
     if (networkRequestIdValue) {
-        errors->setName("networkRequestId");
+        errors->SetName("networkRequestId");
         result->m_networkRequestId = ValueConversions<String>::fromValue(networkRequestIdValue, errors);
     }
     protocol::Value* workerIdValue = object->get("workerId");
     if (workerIdValue) {
-        errors->setName("workerId");
+        errors->SetName("workerId");
         result->m_workerId = ValueConversions<String>::fromValue(workerIdValue, errors);
     }
     protocol::Value* argsValue = object->get("args");
     if (argsValue) {
-        errors->setName("args");
+        errors->SetName("args");
         result->m_args = ValueConversions<protocol::Array<protocol::Runtime::RemoteObject>>::fromValue(argsValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -155,21 +155,21 @@ const char* ViolationSetting::NameEnum::RecurringHandler = "recurringHandler";
 std::unique_ptr<ViolationSetting> ViolationSetting::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ViolationSetting> result(new ViolationSetting());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nameValue = object->get("name");
-    errors->setName("name");
+    errors->SetName("name");
     result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     protocol::Value* thresholdValue = object->get("threshold");
-    errors->setName("threshold");
+    errors->SetName("threshold");
     result->m_threshold = ValueConversions<double>::fromValue(thresholdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -201,18 +201,18 @@ std::unique_ptr<ViolationSetting> ViolationSetting::clone() const
 std::unique_ptr<EntryAddedNotification> EntryAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<EntryAddedNotification> result(new EntryAddedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* entryValue = object->get("entry");
-    errors->setName("entry");
+    errors->SetName("entry");
     result->m_entry = ValueConversions<protocol::Log::LogEntry>::fromValue(entryValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -259,9 +259,9 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
+void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
+    m_frontendChannel->sendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
@@ -356,12 +356,12 @@ void DispatcherImpl::startViolationsReport(int callId, const String& method, v8_
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* configValue = object ? object->get("config") : nullptr;
-    errors->setName("config");
+    errors->SetName("config");
     std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config = ValueConversions<protocol::Array<protocol::Log::ViolationSetting>>::fromValue(configValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }

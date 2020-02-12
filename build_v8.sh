@@ -51,7 +51,10 @@ do
     ZLIB_INPUT="$OUTFOLDER/obj/third_party/zlib/zlib/*.o"
     if [ $CURRENT_ARCH = "arm64" ]; then
         ZLIB_INPUT="$ZLIB_INPUT $OUTFOLDER/obj/third_party/zlib/zlib_adler32_simd/*.o"
+        ZLIB_INPUT="$ZLIB_INPUT $OUTFOLDER/obj/third_party/zlib/zlib_inflate_chunk_simd/*.o"
     fi
+
+    ZLIB_INPUT="$ZLIB_INPUT $OUTFOLDER/obj/third_party/zlib/google/compression_utils_portable/*.o"
 
     ar r $OUTFOLDER/obj/third_party/zlib/libzip.a $ZLIB_INPUT
     cp "$OUTFOLDER/obj/third_party/zlib/libzip.a" "$DIST/$CURRENT_ARCH"

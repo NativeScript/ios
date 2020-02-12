@@ -1,4 +1,5 @@
 #include "v8-css-agent-impl.h"
+#include "../../third_party/inspector_protocol/crdtp/json.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "Helpers.h"
 #include "utils.h"
@@ -88,11 +89,15 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
         assert(v8::JSON::Stringify(context, resultObj->Get(context, tns::ToV8String(isolate, "computedStyle")).ToLocalChecked()).ToLocal(&resultString));
 
         String16 resultProtocolString = toProtocolString(isolate, resultString);
-        std::unique_ptr<protocol::Value> resultJson = protocol::StringUtil::parseJSON(resultProtocolString);
+        std::vector<uint8_t> cbor;
+        v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
+        std::unique_ptr<protocol::Value> resultJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
         protocol::ErrorSupport errorSupport;
         std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> computedStyles = v8_inspector::fromValue<protocol::CSS::CSSComputedStyleProperty>(resultJson.get(), &errorSupport);
 
-        std::string errorSupportString = errorSupport.errors().utf8();
+        std::vector<uint8_t> json;
+        v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+        auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
         if (!errorSupportString.empty()) {
             String16 errorMessage = "Error while parsing CSSComputedStyleProperty object.";
             return DispatchResponse::Error(errorMessage);

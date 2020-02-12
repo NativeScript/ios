@@ -532,11 +532,16 @@ template <class T> class PersistentBase {
   }
 
   /**
-   *  Install a finalization callback on this object.
-   *  NOTE: There is no guarantee as to *when* or even *if* the callback is
-   *  invoked. The invocation is performed solely on a best effort basis.
-   *  As always, GC-based finalization should *not* be relied upon for any
-   *  critical form of resource management!
+   * Install a finalization callback on this object.
+   * NOTE: There is no guarantee as to *when* or even *if* the callback is
+   * invoked. The invocation is performed solely on a best effort basis.
+   * As always, GC-based finalization should *not* be relied upon for any
+   * critical form of resource management!
+   *
+   * The callback is supposed to reset the handle. No further V8 API may be
+   * called in this callback. In case additional work involving V8 needs to be
+   * done, a second callback can be scheduled using
+   * WeakCallbackInfo<void>::SetSecondPassCallback.
    */
   template <typename P>
   V8_INLINE void SetWeak(P* parameter,
@@ -1128,17 +1133,11 @@ class TracedReference : public TracedReferenceBase<T> {
 
   /**
    * Copy assignment operator initializing TracedGlobal from an existing one.
-   *
-   * Note: Prohibited when |other| has a finalization callback set through
-   * |SetFinalizationCallback|.
    */
   V8_INLINE TracedReference& operator=(const TracedReference& rhs);
 
   /**
    * Copy assignment operator initializing TracedGlobal from an existing one.
-   *
-   * Note: Prohibited when |other| has a finalization callback set through
-   * |SetFinalizationCallback|.
    */
   template <class S>
   V8_INLINE TracedReference& operator=(const TracedReference<S>& rhs);
@@ -1155,20 +1154,6 @@ class TracedReference : public TracedReferenceBase<T> {
     return reinterpret_cast<TracedReference<S>&>(
         const_cast<TracedReference<T>&>(*this));
   }
-
-  /**
-   * Adds a finalization callback to the handle. The type of this callback is
-   * similar to WeakCallbackType::kInternalFields, i.e., it will pass the
-   * parameter and the first two internal fields of the object.
-   *
-   * The callback is then supposed to reset the handle in the callback. No
-   * further V8 API may be called in this callback. In case additional work
-   * involving V8 needs to be done, a second callback can be scheduled using
-   * WeakCallbackInfo<void>::SetSecondPassCallback.
-   */
-  V8_DEPRECATED("Use TracedGlobal<> if callbacks are required.")
-  V8_INLINE void SetFinalizationCallback(
-      void* parameter, WeakCallbackInfo<void>::Callback callback);
 };
 
  /**
@@ -2199,6 +2184,7 @@ enum StateTag {
   COMPILER,
   OTHER,
   EXTERNAL,
+  ATOMICS_WAIT,
   IDLE
 };
 
@@ -2463,14 +2449,6 @@ class V8_EXPORT ValueDeserializer {
    * blink::ScriptValueSerializer.
    */
   void SetSupportsLegacyWireFormat(bool supports_legacy_wire_format);
-
-  /**
-   * Expect inline wasm in the data stream (rather than in-memory transfer)
-   */
-  V8_DEPRECATED(
-      "Wasm module serialization is only supported via explicit methods, e.g. "
-      "CompiledWasmModule::Serialize()")
-  void SetExpectInlineWasm(bool allow_inline_wasm) {}
 
   /**
    * Reads the underlying wire format version. Likely mostly to be useful to
@@ -2982,9 +2960,8 @@ enum class NewStringType {
  */
 class V8_EXPORT String : public Name {
  public:
-  static constexpr int kMaxLength = internal::kApiTaggedSize == 4
-                                        ? (1 << 28) - 16
-                                        : internal::kSmiMaxValue / 2 - 24;
+  static constexpr int kMaxLength =
+      internal::kApiSystemPointerSize == 4 ? (1 << 28) - 16 : (1 << 29) - 24;
 
   enum Encoding {
     UNKNOWN_ENCODING = 0x1,
@@ -4784,27 +4761,9 @@ class V8_EXPORT WasmModuleObject : public Object {
    */
   CompiledWasmModule GetCompiledModule();
 
-  /**
-   * If possible, deserialize the module, otherwise compile it from the provided
-   * uncompiled bytes.
-   */
-  V8_DEPRECATED(
-      "Use WasmStreaming for deserialization from cache or the "
-      "CompiledWasmModule to transfer between isolates")
-  static MaybeLocal<WasmModuleObject> DeserializeOrCompile(
-      Isolate* isolate, MemorySpan<const uint8_t> serialized_module,
-      MemorySpan<const uint8_t> wire_bytes);
-
   V8_INLINE static WasmModuleObject* Cast(Value* obj);
 
  private:
-  static MaybeLocal<WasmModuleObject> Deserialize(
-      Isolate* isolate, MemorySpan<const uint8_t> serialized_module,
-      MemorySpan<const uint8_t> wire_bytes);
-  static MaybeLocal<WasmModuleObject> Compile(Isolate* isolate,
-                                              const uint8_t* start,
-                                              size_t length);
-
   static void CheckCast(Value* obj);
 };
 
@@ -4977,6 +4936,15 @@ class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
    */
   bool IsShared() const;
 
+  /**
+   * Wrapper around ArrayBuffer::Allocator::Reallocate that preserves IsShared.
+   * Assumes that the backing_store was allocated by the ArrayBuffer allocator
+   * of the given isolate.
+   */
+  static std::unique_ptr<BackingStore> Reallocate(
+      v8::Isolate* isolate, std::unique_ptr<BackingStore> backing_store,
+      size_t byte_length);
+
  private:
   /**
    * See [Shared]ArrayBuffer::GetBackingStore and
@@ -5018,13 +4986,13 @@ class V8_EXPORT ArrayBuffer : public Object {
     virtual ~Allocator() = default;
 
     /**
-     * Allocate |length| bytes. Return NULL if allocation is not successful.
+     * Allocate |length| bytes. Return nullptr if allocation is not successful.
      * Memory should be initialized to zeroes.
      */
     virtual void* Allocate(size_t length) = 0;
 
     /**
-     * Allocate |length| bytes. Return NULL if allocation is not successful.
+     * Allocate |length| bytes. Return nullptr if allocation is not successful.
      * Memory does not have to be initialized.
      */
     virtual void* AllocateUninitialized(size_t length) = 0;
@@ -5034,6 +5002,20 @@ class V8_EXPORT ArrayBuffer : public Object {
      * That memory is guaranteed to be previously allocated by |Allocate|.
      */
     virtual void Free(void* data, size_t length) = 0;
+
+    /**
+     * Reallocate the memory block of size |old_length| to a memory block of
+     * size |new_length| by expanding, contracting, or copying the existing
+     * memory block. If |new_length| > |old_length|, then the new part of
+     * the memory must be initialized to zeros. Return nullptr if reallocation
+     * is not successful.
+     *
+     * The caller guarantees that the memory block was previously allocated
+     * using Allocate or AllocateUninitialized.
+     *
+     * The default implementation allocates a new block and copies data.
+     */
+    virtual void* Reallocate(void* data, size_t old_length, size_t new_length);
 
     /**
      * ArrayBuffer allocation mode. kNormal is a malloc/free style allocation,
@@ -5930,6 +5912,9 @@ class V8_EXPORT FinalizationGroup : public Object {
    * occurred. Otherwise the result is |true| if the cleanup callback
    * was called successfully. The result is never |false|.
    */
+  V8_DEPRECATED(
+      "FinalizationGroup cleanup is automatic if "
+      "HostCleanupFinalizationGroupCallback is not set")
   static V8_WARN_UNUSED_RESULT Maybe<bool> Cleanup(
       Local<FinalizationGroup> finalization_group);
 };
@@ -8407,6 +8392,8 @@ class V8_EXPORT Isolate {
     kRegExpReplaceCalledOnSlowRegExp = 80,
     kDisplayNames = 81,
     kSharedArrayBufferConstructed = 82,
+    kArrayPrototypeHasElements = 83,
+    kObjectPrototypeHasElements = 84,
 
     // If you add new values here, you'll also need to update Chromium's:
     // web_feature.mojom, use_counter_callback.cc, and enums.xml. V8 changes to
@@ -8497,6 +8484,9 @@ class V8_EXPORT Isolate {
    * are ready to be cleaned up and require FinalizationGroup::Cleanup()
    * to be called in a future task.
    */
+  V8_DEPRECATED(
+      "FinalizationGroup cleanup is automatic if "
+      "HostCleanupFinalizationGroupCallback is not set")
   void SetHostCleanupFinalizationGroupCallback(
       HostCleanupFinalizationGroupCallback callback);
 
@@ -9101,10 +9091,10 @@ class V8_EXPORT Isolate {
   void LowMemoryNotification();
 
   /**
-   * Optional notification that a context has been disposed. V8 uses
-   * these notifications to guide the GC heuristic. Returns the number
-   * of context disposals - including this one - since the last time
-   * V8 had a chance to clean up.
+   * Optional notification that a context has been disposed. V8 uses these
+   * notifications to guide the GC heuristic and cancel FinalizationGroup
+   * cleanup tasks. Returns the number of context disposals - including this one
+   * - since the last time V8 had a chance to clean up.
    *
    * The optional parameter |dependant_context| specifies whether the disposed
    * context was depending on state from other contexts or not.
@@ -10937,13 +10927,6 @@ void TracedGlobal<T>::SetFinalizationCallback(
       reinterpret_cast<internal::Address*>(this->val_), parameter, callback);
 }
 
-template <class T>
-void TracedReference<T>::SetFinalizationCallback(
-    void* parameter, typename WeakCallbackInfo<void>::Callback callback) {
-  V8::SetFinalizationCallbackTraced(
-      reinterpret_cast<internal::Address*>(this->val_), parameter, callback);
-}
-
 template <typename T>
 ReturnValue<T>::ReturnValue(internal::Address* slot) : value_(slot) {}
 
@@ -11854,9 +11837,9 @@ int64_t Isolate::AdjustAmountOfExternalAllocatedMemory(
       reinterpret_cast<uint8_t*>(this) + I::kExternalMemoryOffset);
   int64_t* external_memory_limit = reinterpret_cast<int64_t*>(
       reinterpret_cast<uint8_t*>(this) + I::kExternalMemoryLimitOffset);
-  int64_t* external_memory_at_last_mc =
+  int64_t* external_memory_low_since_mc =
       reinterpret_cast<int64_t*>(reinterpret_cast<uint8_t*>(this) +
-                                 I::kExternalMemoryAtLastMarkCompactOffset);
+                                 I::kExternalMemoryLowSinceMarkCompactOffset);
 
   // Embedders are weird: we see both over- and underflows here. Perform the
   // addition with unsigned types to avoid undefined behavior.
@@ -11865,23 +11848,22 @@ int64_t Isolate::AdjustAmountOfExternalAllocatedMemory(
                            static_cast<uint64_t>(*external_memory));
   *external_memory = amount;
 
-  int64_t allocation_diff_since_last_mc =
-      static_cast<int64_t>(static_cast<uint64_t>(*external_memory) -
-                           static_cast<uint64_t>(*external_memory_at_last_mc));
+  if (amount < *external_memory_low_since_mc) {
+    *external_memory_low_since_mc = amount;
+    *external_memory_limit = amount + I::kExternalAllocationSoftLimit;
+  }
+
+  if (change_in_bytes <= 0) return *external_memory;
+
+  int64_t allocation_diff_since_last_mc = static_cast<int64_t>(
+      static_cast<uint64_t>(*external_memory) -
+      static_cast<uint64_t>(*external_memory_low_since_mc));
   // Only check memory pressure and potentially trigger GC if the amount of
   // external memory increased.
   if (allocation_diff_since_last_mc > kMemoryReducerActivationLimit) {
     CheckMemoryPressure();
   }
-
-  if (change_in_bytes < 0) {
-    const int64_t lower_limit =
-        static_cast<int64_t>(static_cast<uint64_t>(*external_memory_limit) +
-                             static_cast<uint64_t>(change_in_bytes));
-    if (lower_limit > I::kExternalAllocationSoftLimit) {
-      *external_memory_limit = lower_limit;
-    }
-  } else if (change_in_bytes > 0 && amount > *external_memory_limit) {
+  if (amount > *external_memory_limit) {
     ReportExternalAllocationLimitReached();
   }
   return *external_memory;

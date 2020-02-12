@@ -42,39 +42,39 @@ const char* ConsoleMessage::LevelEnum::Info = "info";
 std::unique_ptr<ConsoleMessage> ConsoleMessage::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ConsoleMessage> result(new ConsoleMessage());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* sourceValue = object->get("source");
-    errors->setName("source");
+    errors->SetName("source");
     result->m_source = ValueConversions<String>::fromValue(sourceValue, errors);
     protocol::Value* levelValue = object->get("level");
-    errors->setName("level");
+    errors->SetName("level");
     result->m_level = ValueConversions<String>::fromValue(levelValue, errors);
     protocol::Value* textValue = object->get("text");
-    errors->setName("text");
+    errors->SetName("text");
     result->m_text = ValueConversions<String>::fromValue(textValue, errors);
     protocol::Value* urlValue = object->get("url");
     if (urlValue) {
-        errors->setName("url");
+        errors->SetName("url");
         result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     }
     protocol::Value* lineValue = object->get("line");
     if (lineValue) {
-        errors->setName("line");
+        errors->SetName("line");
         result->m_line = ValueConversions<int>::fromValue(lineValue, errors);
     }
     protocol::Value* columnValue = object->get("column");
     if (columnValue) {
-        errors->setName("column");
+        errors->SetName("column");
         result->m_column = ValueConversions<int>::fromValue(columnValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -117,18 +117,18 @@ std::unique_ptr<ConsoleMessage> ConsoleMessage::clone() const
 std::unique_ptr<MessageAddedNotification> MessageAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<MessageAddedNotification> result(new MessageAddedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* messageValue = object->get("message");
-    errors->setName("message");
+    errors->SetName("message");
     result->m_message = ValueConversions<protocol::Console::ConsoleMessage>::fromValue(messageValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -175,9 +175,9 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
+void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
+    m_frontendChannel->sendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.

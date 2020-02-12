@@ -24,24 +24,24 @@ const char Metainfo::version[] = "1.3";
 std::unique_ptr<BackendNode> BackendNode::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<BackendNode> result(new BackendNode());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nodeTypeValue = object->get("nodeType");
-    errors->setName("nodeType");
+    errors->SetName("nodeType");
     result->m_nodeType = ValueConversions<int>::fromValue(nodeTypeValue, errors);
     protocol::Value* nodeNameValue = object->get("nodeName");
-    errors->setName("nodeName");
+    errors->SetName("nodeName");
     result->m_nodeName = ValueConversions<String>::fromValue(nodeNameValue, errors);
     protocol::Value* backendNodeIdValue = object->get("backendNodeId");
-    errors->setName("backendNodeId");
+    errors->SetName("backendNodeId");
     result->m_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -100,143 +100,143 @@ const char Closed[] = "closed";
 std::unique_ptr<Node> Node::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Node> result(new Node());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* parentIdValue = object->get("parentId");
     if (parentIdValue) {
-        errors->setName("parentId");
+        errors->SetName("parentId");
         result->m_parentId = ValueConversions<int>::fromValue(parentIdValue, errors);
     }
     protocol::Value* backendNodeIdValue = object->get("backendNodeId");
-    errors->setName("backendNodeId");
+    errors->SetName("backendNodeId");
     result->m_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     protocol::Value* nodeTypeValue = object->get("nodeType");
-    errors->setName("nodeType");
+    errors->SetName("nodeType");
     result->m_nodeType = ValueConversions<int>::fromValue(nodeTypeValue, errors);
     protocol::Value* nodeNameValue = object->get("nodeName");
-    errors->setName("nodeName");
+    errors->SetName("nodeName");
     result->m_nodeName = ValueConversions<String>::fromValue(nodeNameValue, errors);
     protocol::Value* localNameValue = object->get("localName");
-    errors->setName("localName");
+    errors->SetName("localName");
     result->m_localName = ValueConversions<String>::fromValue(localNameValue, errors);
     protocol::Value* nodeValueValue = object->get("nodeValue");
-    errors->setName("nodeValue");
+    errors->SetName("nodeValue");
     result->m_nodeValue = ValueConversions<String>::fromValue(nodeValueValue, errors);
     protocol::Value* childNodeCountValue = object->get("childNodeCount");
     if (childNodeCountValue) {
-        errors->setName("childNodeCount");
+        errors->SetName("childNodeCount");
         result->m_childNodeCount = ValueConversions<int>::fromValue(childNodeCountValue, errors);
     }
     protocol::Value* childrenValue = object->get("children");
     if (childrenValue) {
-        errors->setName("children");
+        errors->SetName("children");
         result->m_children = ValueConversions<protocol::Array<protocol::DOM::Node>>::fromValue(childrenValue, errors);
     }
     protocol::Value* attributesValue = object->get("attributes");
     if (attributesValue) {
-        errors->setName("attributes");
+        errors->SetName("attributes");
         result->m_attributes = ValueConversions<protocol::Array<String>>::fromValue(attributesValue, errors);
     }
     protocol::Value* documentURLValue = object->get("documentURL");
     if (documentURLValue) {
-        errors->setName("documentURL");
+        errors->SetName("documentURL");
         result->m_documentURL = ValueConversions<String>::fromValue(documentURLValue, errors);
     }
     protocol::Value* baseURLValue = object->get("baseURL");
     if (baseURLValue) {
-        errors->setName("baseURL");
+        errors->SetName("baseURL");
         result->m_baseURL = ValueConversions<String>::fromValue(baseURLValue, errors);
     }
     protocol::Value* publicIdValue = object->get("publicId");
     if (publicIdValue) {
-        errors->setName("publicId");
+        errors->SetName("publicId");
         result->m_publicId = ValueConversions<String>::fromValue(publicIdValue, errors);
     }
     protocol::Value* systemIdValue = object->get("systemId");
     if (systemIdValue) {
-        errors->setName("systemId");
+        errors->SetName("systemId");
         result->m_systemId = ValueConversions<String>::fromValue(systemIdValue, errors);
     }
     protocol::Value* internalSubsetValue = object->get("internalSubset");
     if (internalSubsetValue) {
-        errors->setName("internalSubset");
+        errors->SetName("internalSubset");
         result->m_internalSubset = ValueConversions<String>::fromValue(internalSubsetValue, errors);
     }
     protocol::Value* xmlVersionValue = object->get("xmlVersion");
     if (xmlVersionValue) {
-        errors->setName("xmlVersion");
+        errors->SetName("xmlVersion");
         result->m_xmlVersion = ValueConversions<String>::fromValue(xmlVersionValue, errors);
     }
     protocol::Value* nameValue = object->get("name");
     if (nameValue) {
-        errors->setName("name");
+        errors->SetName("name");
         result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     }
     protocol::Value* valueValue = object->get("value");
     if (valueValue) {
-        errors->setName("value");
+        errors->SetName("value");
         result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
     }
     protocol::Value* pseudoTypeValue = object->get("pseudoType");
     if (pseudoTypeValue) {
-        errors->setName("pseudoType");
+        errors->SetName("pseudoType");
         result->m_pseudoType = ValueConversions<String>::fromValue(pseudoTypeValue, errors);
     }
     protocol::Value* shadowRootTypeValue = object->get("shadowRootType");
     if (shadowRootTypeValue) {
-        errors->setName("shadowRootType");
+        errors->SetName("shadowRootType");
         result->m_shadowRootType = ValueConversions<String>::fromValue(shadowRootTypeValue, errors);
     }
     protocol::Value* frameIdValue = object->get("frameId");
     if (frameIdValue) {
-        errors->setName("frameId");
+        errors->SetName("frameId");
         result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     }
     protocol::Value* contentDocumentValue = object->get("contentDocument");
     if (contentDocumentValue) {
-        errors->setName("contentDocument");
+        errors->SetName("contentDocument");
         result->m_contentDocument = ValueConversions<protocol::DOM::Node>::fromValue(contentDocumentValue, errors);
     }
     protocol::Value* shadowRootsValue = object->get("shadowRoots");
     if (shadowRootsValue) {
-        errors->setName("shadowRoots");
+        errors->SetName("shadowRoots");
         result->m_shadowRoots = ValueConversions<protocol::Array<protocol::DOM::Node>>::fromValue(shadowRootsValue, errors);
     }
     protocol::Value* templateContentValue = object->get("templateContent");
     if (templateContentValue) {
-        errors->setName("templateContent");
+        errors->SetName("templateContent");
         result->m_templateContent = ValueConversions<protocol::DOM::Node>::fromValue(templateContentValue, errors);
     }
     protocol::Value* pseudoElementsValue = object->get("pseudoElements");
     if (pseudoElementsValue) {
-        errors->setName("pseudoElements");
+        errors->SetName("pseudoElements");
         result->m_pseudoElements = ValueConversions<protocol::Array<protocol::DOM::Node>>::fromValue(pseudoElementsValue, errors);
     }
     protocol::Value* importedDocumentValue = object->get("importedDocument");
     if (importedDocumentValue) {
-        errors->setName("importedDocument");
+        errors->SetName("importedDocument");
         result->m_importedDocument = ValueConversions<protocol::DOM::Node>::fromValue(importedDocumentValue, errors);
     }
     protocol::Value* distributedNodesValue = object->get("distributedNodes");
     if (distributedNodesValue) {
-        errors->setName("distributedNodes");
+        errors->SetName("distributedNodes");
         result->m_distributedNodes = ValueConversions<protocol::Array<protocol::DOM::BackendNode>>::fromValue(distributedNodesValue, errors);
     }
     protocol::Value* isSVGValue = object->get("isSVG");
     if (isSVGValue) {
-        errors->setName("isSVG");
+        errors->SetName("isSVG");
         result->m_isSVG = ValueConversions<bool>::fromValue(isSVGValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -342,29 +342,29 @@ std::unique_ptr<Node> Node::clone() const
 std::unique_ptr<RGBA> RGBA::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<RGBA> result(new RGBA());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* rValue = object->get("r");
-    errors->setName("r");
+    errors->SetName("r");
     result->m_r = ValueConversions<int>::fromValue(rValue, errors);
     protocol::Value* gValue = object->get("g");
-    errors->setName("g");
+    errors->SetName("g");
     result->m_g = ValueConversions<int>::fromValue(gValue, errors);
     protocol::Value* bValue = object->get("b");
-    errors->setName("b");
+    errors->SetName("b");
     result->m_b = ValueConversions<int>::fromValue(bValue, errors);
     protocol::Value* aValue = object->get("a");
     if (aValue) {
-        errors->setName("a");
+        errors->SetName("a");
         result->m_a = ValueConversions<double>::fromValue(aValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -401,38 +401,38 @@ std::unique_ptr<RGBA> RGBA::clone() const
 std::unique_ptr<BoxModel> BoxModel::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<BoxModel> result(new BoxModel());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* contentValue = object->get("content");
-    errors->setName("content");
+    errors->SetName("content");
     result->m_content = ValueConversions<protocol::Array<double>>::fromValue(contentValue, errors);
     protocol::Value* paddingValue = object->get("padding");
-    errors->setName("padding");
+    errors->SetName("padding");
     result->m_padding = ValueConversions<protocol::Array<double>>::fromValue(paddingValue, errors);
     protocol::Value* borderValue = object->get("border");
-    errors->setName("border");
+    errors->SetName("border");
     result->m_border = ValueConversions<protocol::Array<double>>::fromValue(borderValue, errors);
     protocol::Value* marginValue = object->get("margin");
-    errors->setName("margin");
+    errors->SetName("margin");
     result->m_margin = ValueConversions<protocol::Array<double>>::fromValue(marginValue, errors);
     protocol::Value* widthValue = object->get("width");
-    errors->setName("width");
+    errors->SetName("width");
     result->m_width = ValueConversions<int>::fromValue(widthValue, errors);
     protocol::Value* heightValue = object->get("height");
-    errors->setName("height");
+    errors->SetName("height");
     result->m_height = ValueConversions<int>::fromValue(heightValue, errors);
     protocol::Value* shapeOutsideValue = object->get("shapeOutside");
     if (shapeOutsideValue) {
-        errors->setName("shapeOutside");
+        errors->SetName("shapeOutside");
         result->m_shapeOutside = ValueConversions<protocol::DOM::ShapeOutsideInfo>::fromValue(shapeOutsideValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -475,24 +475,24 @@ std::unique_ptr<BoxModel> BoxModel::clone() const
 std::unique_ptr<ShapeOutsideInfo> ShapeOutsideInfo::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ShapeOutsideInfo> result(new ShapeOutsideInfo());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* boundsValue = object->get("bounds");
-    errors->setName("bounds");
+    errors->SetName("bounds");
     result->m_bounds = ValueConversions<protocol::Array<double>>::fromValue(boundsValue, errors);
     protocol::Value* shapeValue = object->get("shape");
-    errors->setName("shape");
+    errors->SetName("shape");
     result->m_shape = ValueConversions<protocol::Array<protocol::Value>>::fromValue(shapeValue, errors);
     protocol::Value* marginShapeValue = object->get("marginShape");
-    errors->setName("marginShape");
+    errors->SetName("marginShape");
     result->m_marginShape = ValueConversions<protocol::Array<protocol::Value>>::fromValue(marginShapeValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -526,27 +526,27 @@ std::unique_ptr<ShapeOutsideInfo> ShapeOutsideInfo::clone() const
 std::unique_ptr<Rect> Rect::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Rect> result(new Rect());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* xValue = object->get("x");
-    errors->setName("x");
+    errors->SetName("x");
     result->m_x = ValueConversions<double>::fromValue(xValue, errors);
     protocol::Value* yValue = object->get("y");
-    errors->setName("y");
+    errors->SetName("y");
     result->m_y = ValueConversions<double>::fromValue(yValue, errors);
     protocol::Value* widthValue = object->get("width");
-    errors->setName("width");
+    errors->SetName("width");
     result->m_width = ValueConversions<double>::fromValue(widthValue, errors);
     protocol::Value* heightValue = object->get("height");
-    errors->setName("height");
+    errors->SetName("height");
     result->m_height = ValueConversions<double>::fromValue(heightValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -582,24 +582,24 @@ std::unique_ptr<Rect> Rect::clone() const
 std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<AttributeModifiedNotification> result(new AttributeModifiedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* nameValue = object->get("name");
-    errors->setName("name");
+    errors->SetName("name");
     result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     protocol::Value* valueValue = object->get("value");
-    errors->setName("value");
+    errors->SetName("value");
     result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -633,21 +633,21 @@ std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::cl
 std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<AttributeRemovedNotification> result(new AttributeRemovedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* nameValue = object->get("name");
-    errors->setName("name");
+    errors->SetName("name");
     result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -679,21 +679,21 @@ std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::clon
 std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<CharacterDataModifiedNotification> result(new CharacterDataModifiedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* characterDataValue = object->get("characterData");
-    errors->setName("characterData");
+    errors->SetName("characterData");
     result->m_characterData = ValueConversions<String>::fromValue(characterDataValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -725,21 +725,21 @@ std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotifica
 std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ChildNodeCountUpdatedNotification> result(new ChildNodeCountUpdatedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* childNodeCountValue = object->get("childNodeCount");
-    errors->setName("childNodeCount");
+    errors->SetName("childNodeCount");
     result->m_childNodeCount = ValueConversions<int>::fromValue(childNodeCountValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -771,24 +771,24 @@ std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotifica
 std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ChildNodeInsertedNotification> result(new ChildNodeInsertedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* parentNodeIdValue = object->get("parentNodeId");
-    errors->setName("parentNodeId");
+    errors->SetName("parentNodeId");
     result->m_parentNodeId = ValueConversions<int>::fromValue(parentNodeIdValue, errors);
     protocol::Value* previousNodeIdValue = object->get("previousNodeId");
-    errors->setName("previousNodeId");
+    errors->SetName("previousNodeId");
     result->m_previousNodeId = ValueConversions<int>::fromValue(previousNodeIdValue, errors);
     protocol::Value* nodeValue = object->get("node");
-    errors->setName("node");
+    errors->SetName("node");
     result->m_node = ValueConversions<protocol::DOM::Node>::fromValue(nodeValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -822,21 +822,21 @@ std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::cl
 std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ChildNodeRemovedNotification> result(new ChildNodeRemovedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* parentNodeIdValue = object->get("parentNodeId");
-    errors->setName("parentNodeId");
+    errors->SetName("parentNodeId");
     result->m_parentNodeId = ValueConversions<int>::fromValue(parentNodeIdValue, errors);
     protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -868,21 +868,21 @@ std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::clon
 std::unique_ptr<DistributedNodesUpdatedNotification> DistributedNodesUpdatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<DistributedNodesUpdatedNotification> result(new DistributedNodesUpdatedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* insertionPointIdValue = object->get("insertionPointId");
-    errors->setName("insertionPointId");
+    errors->SetName("insertionPointId");
     result->m_insertionPointId = ValueConversions<int>::fromValue(insertionPointIdValue, errors);
     protocol::Value* distributedNodesValue = object->get("distributedNodes");
-    errors->setName("distributedNodes");
+    errors->SetName("distributedNodes");
     result->m_distributedNodes = ValueConversions<protocol::Array<protocol::DOM::BackendNode>>::fromValue(distributedNodesValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -914,18 +914,18 @@ std::unique_ptr<DistributedNodesUpdatedNotification> DistributedNodesUpdatedNoti
 std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<InlineStyleInvalidatedNotification> result(new InlineStyleInvalidatedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdsValue = object->get("nodeIds");
-    errors->setName("nodeIds");
+    errors->SetName("nodeIds");
     result->m_nodeIds = ValueConversions<protocol::Array<int>>::fromValue(nodeIdsValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -955,21 +955,21 @@ std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotifi
 std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<PseudoElementAddedNotification> result(new PseudoElementAddedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* parentIdValue = object->get("parentId");
-    errors->setName("parentId");
+    errors->SetName("parentId");
     result->m_parentId = ValueConversions<int>::fromValue(parentIdValue, errors);
     protocol::Value* pseudoElementValue = object->get("pseudoElement");
-    errors->setName("pseudoElement");
+    errors->SetName("pseudoElement");
     result->m_pseudoElement = ValueConversions<protocol::DOM::Node>::fromValue(pseudoElementValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1001,21 +1001,21 @@ std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::
 std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<PseudoElementRemovedNotification> result(new PseudoElementRemovedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* parentIdValue = object->get("parentId");
-    errors->setName("parentId");
+    errors->SetName("parentId");
     result->m_parentId = ValueConversions<int>::fromValue(parentIdValue, errors);
     protocol::Value* pseudoElementIdValue = object->get("pseudoElementId");
-    errors->setName("pseudoElementId");
+    errors->SetName("pseudoElementId");
     result->m_pseudoElementId = ValueConversions<int>::fromValue(pseudoElementIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1047,21 +1047,21 @@ std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotificati
 std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SetChildNodesNotification> result(new SetChildNodesNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* parentIdValue = object->get("parentId");
-    errors->setName("parentId");
+    errors->SetName("parentId");
     result->m_parentId = ValueConversions<int>::fromValue(parentIdValue, errors);
     protocol::Value* nodesValue = object->get("nodes");
-    errors->setName("nodes");
+    errors->SetName("nodes");
     result->m_nodes = ValueConversions<protocol::Array<protocol::DOM::Node>>::fromValue(nodesValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1093,21 +1093,21 @@ std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::clone() co
 std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ShadowRootPoppedNotification> result(new ShadowRootPoppedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* hostIdValue = object->get("hostId");
-    errors->setName("hostId");
+    errors->SetName("hostId");
     result->m_hostId = ValueConversions<int>::fromValue(hostIdValue, errors);
     protocol::Value* rootIdValue = object->get("rootId");
-    errors->setName("rootId");
+    errors->SetName("rootId");
     result->m_rootId = ValueConversions<int>::fromValue(rootIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1139,21 +1139,21 @@ std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::clon
 std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ShadowRootPushedNotification> result(new ShadowRootPushedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* hostIdValue = object->get("hostId");
-    errors->setName("hostId");
+    errors->SetName("hostId");
     result->m_hostId = ValueConversions<int>::fromValue(hostIdValue, errors);
     protocol::Value* rootValue = object->get("root");
-    errors->setName("root");
+    errors->SetName("root");
     result->m_root = ValueConversions<protocol::DOM::Node>::fromValue(rootValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1343,9 +1343,9 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
+void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
+    m_frontendChannel->sendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
@@ -1473,12 +1473,12 @@ void DispatcherImpl::collectClassNamesFromSubtree(int callId, const String& meth
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1504,21 +1504,21 @@ void DispatcherImpl::copyTo(int callId, const String& method, v8_crdtp::span<uin
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* targetNodeIdValue = object ? object->get("targetNodeId") : nullptr;
-    errors->setName("targetNodeId");
+    errors->SetName("targetNodeId");
     int in_targetNodeId = ValueConversions<int>::fromValue(targetNodeIdValue, errors);
     protocol::Value* insertBeforeNodeIdValue = object ? object->get("insertBeforeNodeId") : nullptr;
     Maybe<int> in_insertBeforeNodeId;
     if (insertBeforeNodeIdValue) {
-        errors->setName("insertBeforeNodeId");
+        errors->SetName("insertBeforeNodeId");
         in_insertBeforeNodeId = ValueConversions<int>::fromValue(insertBeforeNodeIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1544,39 +1544,39 @@ void DispatcherImpl::describeNode(int callId, const String& method, v8_crdtp::sp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
-        errors->setName("nodeId");
+        errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
     protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
-        errors->setName("backendNodeId");
+        errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
-        errors->setName("objectId");
+        errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
     protocol::Value* depthValue = object ? object->get("depth") : nullptr;
     Maybe<int> in_depth;
     if (depthValue) {
-        errors->setName("depth");
+        errors->SetName("depth");
         in_depth = ValueConversions<int>::fromValue(depthValue, errors);
     }
     protocol::Value* pierceValue = object ? object->get("pierce") : nullptr;
     Maybe<bool> in_pierce;
     if (pierceValue) {
-        errors->setName("pierce");
+        errors->SetName("pierce");
         in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1616,12 +1616,12 @@ void DispatcherImpl::discardSearchResults(int callId, const String& method, v8_c
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* searchIdValue = object ? object->get("searchId") : nullptr;
-    errors->setName("searchId");
+    errors->SetName("searchId");
     String in_searchId = ValueConversions<String>::fromValue(searchIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1655,27 +1655,27 @@ void DispatcherImpl::focus(int callId, const String& method, v8_crdtp::span<uint
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
-        errors->setName("nodeId");
+        errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
     protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
-        errors->setName("backendNodeId");
+        errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
-        errors->setName("objectId");
+        errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1695,12 +1695,12 @@ void DispatcherImpl::getAttributes(int callId, const String& method, v8_crdtp::s
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1726,27 +1726,27 @@ void DispatcherImpl::getBoxModel(int callId, const String& method, v8_crdtp::spa
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
-        errors->setName("nodeId");
+        errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
     protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
-        errors->setName("backendNodeId");
+        errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
-        errors->setName("objectId");
+        errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1772,27 +1772,27 @@ void DispatcherImpl::getContentQuads(int callId, const String& method, v8_crdtp:
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
-        errors->setName("nodeId");
+        errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
     protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
-        errors->setName("backendNodeId");
+        errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
-        errors->setName("objectId");
+        errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1818,21 +1818,21 @@ void DispatcherImpl::getDocument(int callId, const String& method, v8_crdtp::spa
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* depthValue = object ? object->get("depth") : nullptr;
     Maybe<int> in_depth;
     if (depthValue) {
-        errors->setName("depth");
+        errors->SetName("depth");
         in_depth = ValueConversions<int>::fromValue(depthValue, errors);
     }
     protocol::Value* pierceValue = object ? object->get("pierce") : nullptr;
     Maybe<bool> in_pierce;
     if (pierceValue) {
-        errors->setName("pierce");
+        errors->SetName("pierce");
         in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1858,21 +1858,21 @@ void DispatcherImpl::getFlattenedDocument(int callId, const String& method, v8_c
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* depthValue = object ? object->get("depth") : nullptr;
     Maybe<int> in_depth;
     if (depthValue) {
-        errors->setName("depth");
+        errors->SetName("depth");
         in_depth = ValueConversions<int>::fromValue(depthValue, errors);
     }
     protocol::Value* pierceValue = object ? object->get("pierce") : nullptr;
     Maybe<bool> in_pierce;
     if (pierceValue) {
-        errors->setName("pierce");
+        errors->SetName("pierce");
         in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1898,27 +1898,27 @@ void DispatcherImpl::getNodeForLocation(int callId, const String& method, v8_crd
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* xValue = object ? object->get("x") : nullptr;
-    errors->setName("x");
+    errors->SetName("x");
     int in_x = ValueConversions<int>::fromValue(xValue, errors);
     protocol::Value* yValue = object ? object->get("y") : nullptr;
-    errors->setName("y");
+    errors->SetName("y");
     int in_y = ValueConversions<int>::fromValue(yValue, errors);
     protocol::Value* includeUserAgentShadowDOMValue = object ? object->get("includeUserAgentShadowDOM") : nullptr;
     Maybe<bool> in_includeUserAgentShadowDOM;
     if (includeUserAgentShadowDOMValue) {
-        errors->setName("includeUserAgentShadowDOM");
+        errors->SetName("includeUserAgentShadowDOM");
         in_includeUserAgentShadowDOM = ValueConversions<bool>::fromValue(includeUserAgentShadowDOMValue, errors);
     }
     protocol::Value* ignorePointerEventsNoneValue = object ? object->get("ignorePointerEventsNone") : nullptr;
     Maybe<bool> in_ignorePointerEventsNone;
     if (ignorePointerEventsNoneValue) {
-        errors->setName("ignorePointerEventsNone");
+        errors->SetName("ignorePointerEventsNone");
         in_ignorePointerEventsNone = ValueConversions<bool>::fromValue(ignorePointerEventsNoneValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1949,27 +1949,27 @@ void DispatcherImpl::getOuterHTML(int callId, const String& method, v8_crdtp::sp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
-        errors->setName("nodeId");
+        errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
     protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
-        errors->setName("backendNodeId");
+        errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
-        errors->setName("objectId");
+        errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -1995,12 +1995,12 @@ void DispatcherImpl::getRelayoutBoundary(int callId, const String& method, v8_cr
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2026,18 +2026,18 @@ void DispatcherImpl::getSearchResults(int callId, const String& method, v8_crdtp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* searchIdValue = object ? object->get("searchId") : nullptr;
-    errors->setName("searchId");
+    errors->SetName("searchId");
     String in_searchId = ValueConversions<String>::fromValue(searchIdValue, errors);
     protocol::Value* fromIndexValue = object ? object->get("fromIndex") : nullptr;
-    errors->setName("fromIndex");
+    errors->SetName("fromIndex");
     int in_fromIndex = ValueConversions<int>::fromValue(fromIndexValue, errors);
     protocol::Value* toIndexValue = object ? object->get("toIndex") : nullptr;
-    errors->setName("toIndex");
+    errors->SetName("toIndex");
     int in_toIndex = ValueConversions<int>::fromValue(toIndexValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2077,21 +2077,21 @@ void DispatcherImpl::moveTo(int callId, const String& method, v8_crdtp::span<uin
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* targetNodeIdValue = object ? object->get("targetNodeId") : nullptr;
-    errors->setName("targetNodeId");
+    errors->SetName("targetNodeId");
     int in_targetNodeId = ValueConversions<int>::fromValue(targetNodeIdValue, errors);
     protocol::Value* insertBeforeNodeIdValue = object ? object->get("insertBeforeNodeId") : nullptr;
     Maybe<int> in_insertBeforeNodeId;
     if (insertBeforeNodeIdValue) {
-        errors->setName("insertBeforeNodeId");
+        errors->SetName("insertBeforeNodeId");
         in_insertBeforeNodeId = ValueConversions<int>::fromValue(insertBeforeNodeIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2117,18 +2117,18 @@ void DispatcherImpl::performSearch(int callId, const String& method, v8_crdtp::s
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* queryValue = object ? object->get("query") : nullptr;
-    errors->setName("query");
+    errors->SetName("query");
     String in_query = ValueConversions<String>::fromValue(queryValue, errors);
     protocol::Value* includeUserAgentShadowDOMValue = object ? object->get("includeUserAgentShadowDOM") : nullptr;
     Maybe<bool> in_includeUserAgentShadowDOM;
     if (includeUserAgentShadowDOMValue) {
-        errors->setName("includeUserAgentShadowDOM");
+        errors->SetName("includeUserAgentShadowDOM");
         in_includeUserAgentShadowDOM = ValueConversions<bool>::fromValue(includeUserAgentShadowDOMValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2156,12 +2156,12 @@ void DispatcherImpl::pushNodeByPathToFrontend(int callId, const String& method, 
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* pathValue = object ? object->get("path") : nullptr;
-    errors->setName("path");
+    errors->SetName("path");
     String in_path = ValueConversions<String>::fromValue(pathValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2187,12 +2187,12 @@ void DispatcherImpl::pushNodesByBackendIdsToFrontend(int callId, const String& m
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* backendNodeIdsValue = object ? object->get("backendNodeIds") : nullptr;
-    errors->setName("backendNodeIds");
+    errors->SetName("backendNodeIds");
     std::unique_ptr<protocol::Array<int>> in_backendNodeIds = ValueConversions<protocol::Array<int>>::fromValue(backendNodeIdsValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2218,15 +2218,15 @@ void DispatcherImpl::querySelector(int callId, const String& method, v8_crdtp::s
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* selectorValue = object ? object->get("selector") : nullptr;
-    errors->setName("selector");
+    errors->SetName("selector");
     String in_selector = ValueConversions<String>::fromValue(selectorValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2252,15 +2252,15 @@ void DispatcherImpl::querySelectorAll(int callId, const String& method, v8_crdtp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* selectorValue = object ? object->get("selector") : nullptr;
-    errors->setName("selector");
+    errors->SetName("selector");
     String in_selector = ValueConversions<String>::fromValue(selectorValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2300,15 +2300,15 @@ void DispatcherImpl::removeAttribute(int callId, const String& method, v8_crdtp:
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* nameValue = object ? object->get("name") : nullptr;
-    errors->setName("name");
+    errors->SetName("name");
     String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2328,12 +2328,12 @@ void DispatcherImpl::removeNode(int callId, const String& method, v8_crdtp::span
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2353,24 +2353,24 @@ void DispatcherImpl::requestChildNodes(int callId, const String& method, v8_crdt
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* depthValue = object ? object->get("depth") : nullptr;
     Maybe<int> in_depth;
     if (depthValue) {
-        errors->setName("depth");
+        errors->SetName("depth");
         in_depth = ValueConversions<int>::fromValue(depthValue, errors);
     }
     protocol::Value* pierceValue = object ? object->get("pierce") : nullptr;
     Maybe<bool> in_pierce;
     if (pierceValue) {
-        errors->setName("pierce");
+        errors->SetName("pierce");
         in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2390,12 +2390,12 @@ void DispatcherImpl::requestNode(int callId, const String& method, v8_crdtp::spa
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
-    errors->setName("objectId");
+    errors->SetName("objectId");
     String in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2421,33 +2421,33 @@ void DispatcherImpl::resolveNode(int callId, const String& method, v8_crdtp::spa
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
-        errors->setName("nodeId");
+        errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
     protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
-        errors->setName("backendNodeId");
+        errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
     protocol::Value* objectGroupValue = object ? object->get("objectGroup") : nullptr;
     Maybe<String> in_objectGroup;
     if (objectGroupValue) {
-        errors->setName("objectGroup");
+        errors->SetName("objectGroup");
         in_objectGroup = ValueConversions<String>::fromValue(objectGroupValue, errors);
     }
     protocol::Value* executionContextIdValue = object ? object->get("executionContextId") : nullptr;
     Maybe<int> in_executionContextId;
     if (executionContextIdValue) {
-        errors->setName("executionContextId");
+        errors->SetName("executionContextId");
         in_executionContextId = ValueConversions<int>::fromValue(executionContextIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2473,18 +2473,18 @@ void DispatcherImpl::setAttributeValue(int callId, const String& method, v8_crdt
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* nameValue = object ? object->get("name") : nullptr;
-    errors->setName("name");
+    errors->SetName("name");
     String in_name = ValueConversions<String>::fromValue(nameValue, errors);
     protocol::Value* valueValue = object ? object->get("value") : nullptr;
-    errors->setName("value");
+    errors->SetName("value");
     String in_value = ValueConversions<String>::fromValue(valueValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2504,21 +2504,21 @@ void DispatcherImpl::setAttributesAsText(int callId, const String& method, v8_cr
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* textValue = object ? object->get("text") : nullptr;
-    errors->setName("text");
+    errors->SetName("text");
     String in_text = ValueConversions<String>::fromValue(textValue, errors);
     protocol::Value* nameValue = object ? object->get("name") : nullptr;
     Maybe<String> in_name;
     if (nameValue) {
-        errors->setName("name");
+        errors->SetName("name");
         in_name = ValueConversions<String>::fromValue(nameValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2538,30 +2538,30 @@ void DispatcherImpl::setFileInputFiles(int callId, const String& method, v8_crdt
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* filesValue = object ? object->get("files") : nullptr;
-    errors->setName("files");
+    errors->SetName("files");
     std::unique_ptr<protocol::Array<String>> in_files = ValueConversions<protocol::Array<String>>::fromValue(filesValue, errors);
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
-        errors->setName("nodeId");
+        errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
     protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
-        errors->setName("backendNodeId");
+        errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
-        errors->setName("objectId");
+        errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2581,12 +2581,12 @@ void DispatcherImpl::setNodeStackTracesEnabled(int callId, const String& method,
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* enableValue = object ? object->get("enable") : nullptr;
-    errors->setName("enable");
+    errors->SetName("enable");
     bool in_enable = ValueConversions<bool>::fromValue(enableValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2606,12 +2606,12 @@ void DispatcherImpl::getNodeStackTraces(int callId, const String& method, v8_crd
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2638,12 +2638,12 @@ void DispatcherImpl::getFileInfo(int callId, const String& method, v8_crdtp::spa
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
-    errors->setName("objectId");
+    errors->SetName("objectId");
     String in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2669,12 +2669,12 @@ void DispatcherImpl::setInspectedNode(int callId, const String& method, v8_crdtp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2694,15 +2694,15 @@ void DispatcherImpl::setNodeName(int callId, const String& method, v8_crdtp::spa
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* nameValue = object ? object->get("name") : nullptr;
-    errors->setName("name");
+    errors->SetName("name");
     String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2728,15 +2728,15 @@ void DispatcherImpl::setNodeValue(int callId, const String& method, v8_crdtp::sp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* valueValue = object ? object->get("value") : nullptr;
-    errors->setName("value");
+    errors->SetName("value");
     String in_value = ValueConversions<String>::fromValue(valueValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2756,15 +2756,15 @@ void DispatcherImpl::setOuterHTML(int callId, const String& method, v8_crdtp::sp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* outerHTMLValue = object ? object->get("outerHTML") : nullptr;
-    errors->setName("outerHTML");
+    errors->SetName("outerHTML");
     String in_outerHTML = ValueConversions<String>::fromValue(outerHTMLValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -2798,12 +2798,12 @@ void DispatcherImpl::getFrameOwner(int callId, const String& method, v8_crdtp::s
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object ? object->get("frameId") : nullptr;
-    errors->setName("frameId");
+    errors->SetName("frameId");
     String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }

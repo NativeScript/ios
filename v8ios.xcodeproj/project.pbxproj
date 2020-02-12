@@ -371,6 +371,9 @@
 		C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */; };
 		C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */; };
 		C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D71D7523E18C41000CD5F0 /* robin_hood.h */; };
+		C2D7E9CD23F4024200DB289C /* error_support.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9CC23F4024200DB289C /* error_support.h */; };
+		C2D7E9CF23F4294800DB289C /* export-template.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9CE23F4294800DB289C /* export-template.h */; };
+		C2D7E9D223F4297400DB289C /* handle-for.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9D123F4297400DB289C /* handle-for.h */; };
 		C2DDEB8D229EAC8300345BFE /* Common.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB64229EAC8100345BFE /* Common.h */; };
 		C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB65229EAC8100345BFE /* Interop.h */; };
 		C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB66229EAC8100345BFE /* ArgConverter.h */; };
@@ -938,6 +941,9 @@
 		C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = FastEnumerationAdapter.mm; sourceTree = "<group>"; };
 		C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FastEnumerationAdapter.h; sourceTree = "<group>"; };
 		C2D71D7523E18C41000CD5F0 /* robin_hood.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = robin_hood.h; sourceTree = "<group>"; };
+		C2D7E9CC23F4024200DB289C /* error_support.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = error_support.h; sourceTree = "<group>"; };
+		C2D7E9CE23F4294800DB289C /* export-template.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "export-template.h"; sourceTree = "<group>"; };
+		C2D7E9D123F4297400DB289C /* handle-for.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "handle-for.h"; sourceTree = "<group>"; };
 		C2DDEB16229EA89000345BFE /* TestRunner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestRunner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB26229EA89200345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C2DDEB32229EAB3B00345BFE /* NativeScript.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScript.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1213,6 +1219,7 @@
 		C247C2A822F828E2001D2CA2 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				C2D7E9D023F4297400DB289C /* handles */,
 				C247C2A922F828E2001D2CA2 /* init */,
 				C247C2AB22F828E2001D2CA2 /* tracing */,
 				C247C2AD22F828E2001D2CA2 /* numbers */,
@@ -1375,6 +1382,7 @@
 		C247C31322F828E3001D2CA2 /* base */ = {
 			isa = PBXGroup;
 			children = (
+				C2D7E9CE23F4294800DB289C /* export-template.h */,
 				C263B4CB23D0A87E00D5B872 /* bits.h */,
 				C247C31422F828E3001D2CA2 /* address-region.h */,
 				C247C31522F828E3001D2CA2 /* build_config.h */,
@@ -1731,6 +1739,7 @@
 		C2B30FD0238418CA009D6A46 /* crdtp */ = {
 			isa = PBXGroup;
 			children = (
+				C2D7E9CC23F4024200DB289C /* error_support.h */,
 				C2B07AF923C38FDA00E245BE /* serializer_traits.h */,
 				C23011AA239FF975003CFE86 /* serializable.h */,
 				C2B30FD1238418CA009D6A46 /* json_platform.h */,
@@ -1743,6 +1752,14 @@
 				C2B30FD8238418CA009D6A46 /* parser_handler.h */,
 			);
 			path = crdtp;
+			sourceTree = "<group>";
+		};
+		C2D7E9D023F4297400DB289C /* handles */ = {
+			isa = PBXGroup;
+			children = (
+				C2D7E9D123F4297400DB289C /* handle-for.h */,
+			);
+			path = handles;
 			sourceTree = "<group>";
 		};
 		C2DDEB17229EA89000345BFE /* TestRunner */ = {
@@ -1884,6 +1901,7 @@
 				C247C3AB22F828E3001D2CA2 /* memory.h in Headers */,
 				C247C33522F828E3001D2CA2 /* v8-inspector-platform.h in Headers */,
 				C247C34E22F828E3001D2CA2 /* inspected-context.h in Headers */,
+				C2D7E9CF23F4294800DB289C /* export-template.h in Headers */,
 				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
 				C247C32E22F828E3001D2CA2 /* base64.h in Headers */,
@@ -2010,6 +2028,7 @@
 				C247C38B22F828E3001D2CA2 /* v8-string-conversions.h in Headers */,
 				C247C35C22F828E3001D2CA2 /* v8-dom-agent-impl.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
+				C2D7E9D223F4297400DB289C /* handle-for.h in Headers */,
 				C247C3AE22F828E3001D2CA2 /* compiler-specific.h in Headers */,
 				C247C38922F828E3001D2CA2 /* v8-debugger-script.h in Headers */,
 				C247C37C22F828E3001D2CA2 /* string-util.h in Headers */,
@@ -2020,6 +2039,7 @@
 				C247C39D22F828E3001D2CA2 /* template-utils.h in Headers */,
 				C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */,
 				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
+				C2D7E9CD23F4024200DB289C /* error_support.h in Headers */,
 				C247C37122F828E3001D2CA2 /* Log.h in Headers */,
 				C247C37922F828E3001D2CA2 /* v8-value-utils.h in Headers */,
 				C247C3A522F828E3001D2CA2 /* safe_conversions.h in Headers */,

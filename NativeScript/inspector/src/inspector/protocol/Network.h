@@ -4534,7 +4534,7 @@ public:
     void responseReceivedExtraInfo(const String& requestId, std::unique_ptr<protocol::Array<protocol::Network::BlockedSetCookieWithReason>> blockedCookies, std::unique_ptr<protocol::Network::Headers> headers, Maybe<String> headersText = Maybe<String>());
 
     void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
+    void sendRawNotification(std::unique_ptr<Serializable>);
 private:
     FrontendChannel* m_frontendChannel;
 };

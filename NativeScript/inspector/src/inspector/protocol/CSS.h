@@ -2471,7 +2471,7 @@ public:
     void styleSheetRemoved(const String& styleSheetId);
 
     void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
+    void sendRawNotification(std::unique_ptr<Serializable>);
 private:
     FrontendChannel* m_frontendChannel;
 };

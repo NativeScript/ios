@@ -1,4 +1,5 @@
 #include "v8-network-agent-impl.h"
+#include "../../third_party/inspector_protocol/crdtp/json.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "Helpers.h"
 #include "utils.h"
@@ -176,14 +177,17 @@ void V8NetworkAgentImpl::RequestWillBeSent(const Local<Object>& obj) {
     Local<v8::String> requestJson;
     assert(JSON::Stringify(context, request).ToLocal(&requestJson));
 
-    std::u16string requestJsonString = tns::ToUtf16String(isolate, requestJson);
-    auto requestUtf16Data = requestJsonString.data();
-    std::unique_ptr<protocol::Value> protocolRequestJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) requestUtf16Data));
+    const String16& requestJsonString16 = toProtocolString(isolate, requestJson);
+    std::vector<uint8_t> cbor;
+    v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(requestJsonString16.characters16(), requestJsonString16.length()), &cbor);
+    std::unique_ptr<protocol::Value> protocolRequestJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
     protocol::ErrorSupport errorSupport;
     auto protocolRequestObj = protocol::Network::Request::fromValue(protocolRequestJson.get(), &errorSupport);
 
-    auto errorString = errorSupport.errors().utf8();
+    std::vector<uint8_t> json;
+    v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+    auto errorString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
 
     if (!errorString.empty()) {
         std::string errorMessage = "Error while parsing debug `request` object. ";
@@ -243,14 +247,17 @@ void V8NetworkAgentImpl::ResponseReceived(const Local<Object>& obj) {
     Local<v8::String> responseJson;
     assert(JSON::Stringify(context, response).ToLocal(&responseJson));
 
-    std::u16string responseJsonString = tns::ToUtf16String(isolate, responseJson);
-    auto responseUtf16Data = responseJsonString.data();
-    std::unique_ptr<protocol::Value> protocolResponseJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) responseUtf16Data));
+    const String16 responseJsonString = toProtocolString(isolate, responseJson);
+    std::vector<uint8_t> cbor;
+    v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(responseJsonString.characters16(), responseJsonString.length()), &cbor);
+    std::unique_ptr<protocol::Value> protocolResponseJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
     protocol::ErrorSupport errorSupport;
     auto protocolResponseObj = protocol::Network::Response::fromValue(protocolResponseJson.get(), &errorSupport);
 
-    auto errorString = errorSupport.errors().utf8();
+    std::vector<uint8_t> json;
+    v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+    auto errorString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
 
     if (!errorString.empty()) {
         std::string errorMessage = "Error while parsing debug `response` object.";

@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "third_party/inspector_protocol/crdtp/error_support.h"
 #include "third_party/inspector_protocol/crdtp/glue.h"
 
 namespace v8_inspector {
@@ -22,7 +23,7 @@ namespace protocol {
 
 class DictionaryValue;
 class DispatchResponse;
-class ErrorSupport;
+using ErrorSupport = v8_crdtp::ErrorSupport;
 class FundamentalValue;
 class ListValue;
 class Object;

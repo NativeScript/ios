@@ -24,27 +24,27 @@ const char Metainfo::version[] = "1.3";
 std::unique_ptr<SamplingHeapProfileNode> SamplingHeapProfileNode::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SamplingHeapProfileNode> result(new SamplingHeapProfileNode());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* callFrameValue = object->get("callFrame");
-    errors->setName("callFrame");
+    errors->SetName("callFrame");
     result->m_callFrame = ValueConversions<protocol::Runtime::CallFrame>::fromValue(callFrameValue, errors);
     protocol::Value* selfSizeValue = object->get("selfSize");
-    errors->setName("selfSize");
+    errors->SetName("selfSize");
     result->m_selfSize = ValueConversions<double>::fromValue(selfSizeValue, errors);
     protocol::Value* idValue = object->get("id");
-    errors->setName("id");
+    errors->SetName("id");
     result->m_id = ValueConversions<int>::fromValue(idValue, errors);
     protocol::Value* childrenValue = object->get("children");
-    errors->setName("children");
+    errors->SetName("children");
     result->m_children = ValueConversions<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileNode>>::fromValue(childrenValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -80,24 +80,24 @@ std::unique_ptr<SamplingHeapProfileNode> SamplingHeapProfileNode::clone() const
 std::unique_ptr<SamplingHeapProfileSample> SamplingHeapProfileSample::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SamplingHeapProfileSample> result(new SamplingHeapProfileSample());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* sizeValue = object->get("size");
-    errors->setName("size");
+    errors->SetName("size");
     result->m_size = ValueConversions<double>::fromValue(sizeValue, errors);
     protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* ordinalValue = object->get("ordinal");
-    errors->setName("ordinal");
+    errors->SetName("ordinal");
     result->m_ordinal = ValueConversions<double>::fromValue(ordinalValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -131,21 +131,21 @@ std::unique_ptr<SamplingHeapProfileSample> SamplingHeapProfileSample::clone() co
 std::unique_ptr<SamplingHeapProfile> SamplingHeapProfile::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SamplingHeapProfile> result(new SamplingHeapProfile());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* headValue = object->get("head");
-    errors->setName("head");
+    errors->SetName("head");
     result->m_head = ValueConversions<protocol::HeapProfiler::SamplingHeapProfileNode>::fromValue(headValue, errors);
     protocol::Value* samplesValue = object->get("samples");
-    errors->setName("samples");
+    errors->SetName("samples");
     result->m_samples = ValueConversions<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileSample>>::fromValue(samplesValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -177,18 +177,18 @@ std::unique_ptr<SamplingHeapProfile> SamplingHeapProfile::clone() const
 std::unique_ptr<AddHeapSnapshotChunkNotification> AddHeapSnapshotChunkNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<AddHeapSnapshotChunkNotification> result(new AddHeapSnapshotChunkNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* chunkValue = object->get("chunk");
-    errors->setName("chunk");
+    errors->SetName("chunk");
     result->m_chunk = ValueConversions<String>::fromValue(chunkValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -218,18 +218,18 @@ std::unique_ptr<AddHeapSnapshotChunkNotification> AddHeapSnapshotChunkNotificati
 std::unique_ptr<HeapStatsUpdateNotification> HeapStatsUpdateNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<HeapStatsUpdateNotification> result(new HeapStatsUpdateNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* statsUpdateValue = object->get("statsUpdate");
-    errors->setName("statsUpdate");
+    errors->SetName("statsUpdate");
     result->m_statsUpdate = ValueConversions<protocol::Array<int>>::fromValue(statsUpdateValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -259,21 +259,21 @@ std::unique_ptr<HeapStatsUpdateNotification> HeapStatsUpdateNotification::clone(
 std::unique_ptr<LastSeenObjectIdNotification> LastSeenObjectIdNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<LastSeenObjectIdNotification> result(new LastSeenObjectIdNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* lastSeenObjectIdValue = object->get("lastSeenObjectId");
-    errors->setName("lastSeenObjectId");
+    errors->SetName("lastSeenObjectId");
     result->m_lastSeenObjectId = ValueConversions<int>::fromValue(lastSeenObjectIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -305,26 +305,26 @@ std::unique_ptr<LastSeenObjectIdNotification> LastSeenObjectIdNotification::clon
 std::unique_ptr<ReportHeapSnapshotProgressNotification> ReportHeapSnapshotProgressNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ReportHeapSnapshotProgressNotification> result(new ReportHeapSnapshotProgressNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* doneValue = object->get("done");
-    errors->setName("done");
+    errors->SetName("done");
     result->m_done = ValueConversions<int>::fromValue(doneValue, errors);
     protocol::Value* totalValue = object->get("total");
-    errors->setName("total");
+    errors->SetName("total");
     result->m_total = ValueConversions<int>::fromValue(totalValue, errors);
     protocol::Value* finishedValue = object->get("finished");
     if (finishedValue) {
-        errors->setName("finished");
+        errors->SetName("finished");
         result->m_finished = ValueConversions<bool>::fromValue(finishedValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -417,9 +417,9 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
+void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
+    m_frontendChannel->sendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
@@ -486,12 +486,12 @@ void DispatcherImpl::addInspectedHeapObject(int callId, const String& method, v8
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* heapObjectIdValue = object ? object->get("heapObjectId") : nullptr;
-    errors->setName("heapObjectId");
+    errors->SetName("heapObjectId");
     String in_heapObjectId = ValueConversions<String>::fromValue(heapObjectIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -553,12 +553,12 @@ void DispatcherImpl::getHeapObjectId(int callId, const String& method, v8_crdtp:
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
-    errors->setName("objectId");
+    errors->SetName("objectId");
     String in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -584,18 +584,18 @@ void DispatcherImpl::getObjectByHeapObjectId(int callId, const String& method, v
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
-    errors->setName("objectId");
+    errors->SetName("objectId");
     String in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     protocol::Value* objectGroupValue = object ? object->get("objectGroup") : nullptr;
     Maybe<String> in_objectGroup;
     if (objectGroupValue) {
-        errors->setName("objectGroup");
+        errors->SetName("objectGroup");
         in_objectGroup = ValueConversions<String>::fromValue(objectGroupValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -641,15 +641,15 @@ void DispatcherImpl::startSampling(int callId, const String& method, v8_crdtp::s
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* samplingIntervalValue = object ? object->get("samplingInterval") : nullptr;
     Maybe<double> in_samplingInterval;
     if (samplingIntervalValue) {
-        errors->setName("samplingInterval");
+        errors->SetName("samplingInterval");
         in_samplingInterval = ValueConversions<double>::fromValue(samplingIntervalValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -669,15 +669,15 @@ void DispatcherImpl::startTrackingHeapObjects(int callId, const String& method, 
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* trackAllocationsValue = object ? object->get("trackAllocations") : nullptr;
     Maybe<bool> in_trackAllocations;
     if (trackAllocationsValue) {
-        errors->setName("trackAllocations");
+        errors->SetName("trackAllocations");
         in_trackAllocations = ValueConversions<bool>::fromValue(trackAllocationsValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -717,21 +717,21 @@ void DispatcherImpl::stopTrackingHeapObjects(int callId, const String& method, v
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* reportProgressValue = object ? object->get("reportProgress") : nullptr;
     Maybe<bool> in_reportProgress;
     if (reportProgressValue) {
-        errors->setName("reportProgress");
+        errors->SetName("reportProgress");
         in_reportProgress = ValueConversions<bool>::fromValue(reportProgressValue, errors);
     }
     protocol::Value* treatGlobalObjectsAsRootsValue = object ? object->get("treatGlobalObjectsAsRoots") : nullptr;
     Maybe<bool> in_treatGlobalObjectsAsRoots;
     if (treatGlobalObjectsAsRootsValue) {
-        errors->setName("treatGlobalObjectsAsRoots");
+        errors->SetName("treatGlobalObjectsAsRoots");
         in_treatGlobalObjectsAsRoots = ValueConversions<bool>::fromValue(treatGlobalObjectsAsRootsValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -751,21 +751,21 @@ void DispatcherImpl::takeHeapSnapshot(int callId, const String& method, v8_crdtp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* reportProgressValue = object ? object->get("reportProgress") : nullptr;
     Maybe<bool> in_reportProgress;
     if (reportProgressValue) {
-        errors->setName("reportProgress");
+        errors->SetName("reportProgress");
         in_reportProgress = ValueConversions<bool>::fromValue(reportProgressValue, errors);
     }
     protocol::Value* treatGlobalObjectsAsRootsValue = object ? object->get("treatGlobalObjectsAsRoots") : nullptr;
     Maybe<bool> in_treatGlobalObjectsAsRoots;
     if (treatGlobalObjectsAsRootsValue) {
-        errors->setName("treatGlobalObjectsAsRoots");
+        errors->SetName("treatGlobalObjectsAsRoots");
         in_treatGlobalObjectsAsRoots = ValueConversions<bool>::fromValue(treatGlobalObjectsAsRootsValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }

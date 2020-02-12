@@ -84,63 +84,63 @@ const char High[] = "High";
 std::unique_ptr<ResourceTiming> ResourceTiming::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ResourceTiming> result(new ResourceTiming());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestTimeValue = object->get("requestTime");
-    errors->setName("requestTime");
+    errors->SetName("requestTime");
     result->m_requestTime = ValueConversions<double>::fromValue(requestTimeValue, errors);
     protocol::Value* proxyStartValue = object->get("proxyStart");
-    errors->setName("proxyStart");
+    errors->SetName("proxyStart");
     result->m_proxyStart = ValueConversions<double>::fromValue(proxyStartValue, errors);
     protocol::Value* proxyEndValue = object->get("proxyEnd");
-    errors->setName("proxyEnd");
+    errors->SetName("proxyEnd");
     result->m_proxyEnd = ValueConversions<double>::fromValue(proxyEndValue, errors);
     protocol::Value* dnsStartValue = object->get("dnsStart");
-    errors->setName("dnsStart");
+    errors->SetName("dnsStart");
     result->m_dnsStart = ValueConversions<double>::fromValue(dnsStartValue, errors);
     protocol::Value* dnsEndValue = object->get("dnsEnd");
-    errors->setName("dnsEnd");
+    errors->SetName("dnsEnd");
     result->m_dnsEnd = ValueConversions<double>::fromValue(dnsEndValue, errors);
     protocol::Value* connectStartValue = object->get("connectStart");
-    errors->setName("connectStart");
+    errors->SetName("connectStart");
     result->m_connectStart = ValueConversions<double>::fromValue(connectStartValue, errors);
     protocol::Value* connectEndValue = object->get("connectEnd");
-    errors->setName("connectEnd");
+    errors->SetName("connectEnd");
     result->m_connectEnd = ValueConversions<double>::fromValue(connectEndValue, errors);
     protocol::Value* sslStartValue = object->get("sslStart");
-    errors->setName("sslStart");
+    errors->SetName("sslStart");
     result->m_sslStart = ValueConversions<double>::fromValue(sslStartValue, errors);
     protocol::Value* sslEndValue = object->get("sslEnd");
-    errors->setName("sslEnd");
+    errors->SetName("sslEnd");
     result->m_sslEnd = ValueConversions<double>::fromValue(sslEndValue, errors);
     protocol::Value* workerStartValue = object->get("workerStart");
-    errors->setName("workerStart");
+    errors->SetName("workerStart");
     result->m_workerStart = ValueConversions<double>::fromValue(workerStartValue, errors);
     protocol::Value* workerReadyValue = object->get("workerReady");
-    errors->setName("workerReady");
+    errors->SetName("workerReady");
     result->m_workerReady = ValueConversions<double>::fromValue(workerReadyValue, errors);
     protocol::Value* sendStartValue = object->get("sendStart");
-    errors->setName("sendStart");
+    errors->SetName("sendStart");
     result->m_sendStart = ValueConversions<double>::fromValue(sendStartValue, errors);
     protocol::Value* sendEndValue = object->get("sendEnd");
-    errors->setName("sendEnd");
+    errors->SetName("sendEnd");
     result->m_sendEnd = ValueConversions<double>::fromValue(sendEndValue, errors);
     protocol::Value* pushStartValue = object->get("pushStart");
-    errors->setName("pushStart");
+    errors->SetName("pushStart");
     result->m_pushStart = ValueConversions<double>::fromValue(pushStartValue, errors);
     protocol::Value* pushEndValue = object->get("pushEnd");
-    errors->setName("pushEnd");
+    errors->SetName("pushEnd");
     result->m_pushEnd = ValueConversions<double>::fromValue(pushEndValue, errors);
     protocol::Value* receiveHeadersEndValue = object->get("receiveHeadersEnd");
-    errors->setName("receiveHeadersEnd");
+    errors->SetName("receiveHeadersEnd");
     result->m_receiveHeadersEnd = ValueConversions<double>::fromValue(receiveHeadersEndValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -217,55 +217,55 @@ const char* Request::ReferrerPolicyEnum::StrictOriginWhenCrossOrigin = "strict-o
 std::unique_ptr<Request> Request::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Request> result(new Request());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* urlFragmentValue = object->get("urlFragment");
     if (urlFragmentValue) {
-        errors->setName("urlFragment");
+        errors->SetName("urlFragment");
         result->m_urlFragment = ValueConversions<String>::fromValue(urlFragmentValue, errors);
     }
     protocol::Value* methodValue = object->get("method");
-    errors->setName("method");
+    errors->SetName("method");
     result->m_method = ValueConversions<String>::fromValue(methodValue, errors);
     protocol::Value* headersValue = object->get("headers");
-    errors->setName("headers");
+    errors->SetName("headers");
     result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
     protocol::Value* postDataValue = object->get("postData");
     if (postDataValue) {
-        errors->setName("postData");
+        errors->SetName("postData");
         result->m_postData = ValueConversions<String>::fromValue(postDataValue, errors);
     }
     protocol::Value* hasPostDataValue = object->get("hasPostData");
     if (hasPostDataValue) {
-        errors->setName("hasPostData");
+        errors->SetName("hasPostData");
         result->m_hasPostData = ValueConversions<bool>::fromValue(hasPostDataValue, errors);
     }
     protocol::Value* mixedContentTypeValue = object->get("mixedContentType");
     if (mixedContentTypeValue) {
-        errors->setName("mixedContentType");
+        errors->SetName("mixedContentType");
         result->m_mixedContentType = ValueConversions<String>::fromValue(mixedContentTypeValue, errors);
     }
     protocol::Value* initialPriorityValue = object->get("initialPriority");
-    errors->setName("initialPriority");
+    errors->SetName("initialPriority");
     result->m_initialPriority = ValueConversions<String>::fromValue(initialPriorityValue, errors);
     protocol::Value* referrerPolicyValue = object->get("referrerPolicy");
-    errors->setName("referrerPolicy");
+    errors->SetName("referrerPolicy");
     result->m_referrerPolicy = ValueConversions<String>::fromValue(referrerPolicyValue, errors);
     protocol::Value* isLinkPreloadValue = object->get("isLinkPreload");
     if (isLinkPreloadValue) {
-        errors->setName("isLinkPreload");
+        errors->SetName("isLinkPreload");
         result->m_isLinkPreload = ValueConversions<bool>::fromValue(isLinkPreloadValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -318,39 +318,39 @@ std::unique_ptr<Request> Request::clone() const
 std::unique_ptr<SignedCertificateTimestamp> SignedCertificateTimestamp::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SignedCertificateTimestamp> result(new SignedCertificateTimestamp());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* statusValue = object->get("status");
-    errors->setName("status");
+    errors->SetName("status");
     result->m_status = ValueConversions<String>::fromValue(statusValue, errors);
     protocol::Value* originValue = object->get("origin");
-    errors->setName("origin");
+    errors->SetName("origin");
     result->m_origin = ValueConversions<String>::fromValue(originValue, errors);
     protocol::Value* logDescriptionValue = object->get("logDescription");
-    errors->setName("logDescription");
+    errors->SetName("logDescription");
     result->m_logDescription = ValueConversions<String>::fromValue(logDescriptionValue, errors);
     protocol::Value* logIdValue = object->get("logId");
-    errors->setName("logId");
+    errors->SetName("logId");
     result->m_logId = ValueConversions<String>::fromValue(logIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* hashAlgorithmValue = object->get("hashAlgorithm");
-    errors->setName("hashAlgorithm");
+    errors->SetName("hashAlgorithm");
     result->m_hashAlgorithm = ValueConversions<String>::fromValue(hashAlgorithmValue, errors);
     protocol::Value* signatureAlgorithmValue = object->get("signatureAlgorithm");
-    errors->setName("signatureAlgorithm");
+    errors->SetName("signatureAlgorithm");
     result->m_signatureAlgorithm = ValueConversions<String>::fromValue(signatureAlgorithmValue, errors);
     protocol::Value* signatureDataValue = object->get("signatureData");
-    errors->setName("signatureData");
+    errors->SetName("signatureData");
     result->m_signatureData = ValueConversions<String>::fromValue(signatureDataValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -394,58 +394,58 @@ std::unique_ptr<SignedCertificateTimestamp> SignedCertificateTimestamp::clone() 
 std::unique_ptr<SecurityDetails> SecurityDetails::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SecurityDetails> result(new SecurityDetails());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* protocolValue = object->get("protocol");
-    errors->setName("protocol");
+    errors->SetName("protocol");
     result->m_protocol = ValueConversions<String>::fromValue(protocolValue, errors);
     protocol::Value* keyExchangeValue = object->get("keyExchange");
-    errors->setName("keyExchange");
+    errors->SetName("keyExchange");
     result->m_keyExchange = ValueConversions<String>::fromValue(keyExchangeValue, errors);
     protocol::Value* keyExchangeGroupValue = object->get("keyExchangeGroup");
     if (keyExchangeGroupValue) {
-        errors->setName("keyExchangeGroup");
+        errors->SetName("keyExchangeGroup");
         result->m_keyExchangeGroup = ValueConversions<String>::fromValue(keyExchangeGroupValue, errors);
     }
     protocol::Value* cipherValue = object->get("cipher");
-    errors->setName("cipher");
+    errors->SetName("cipher");
     result->m_cipher = ValueConversions<String>::fromValue(cipherValue, errors);
     protocol::Value* macValue = object->get("mac");
     if (macValue) {
-        errors->setName("mac");
+        errors->SetName("mac");
         result->m_mac = ValueConversions<String>::fromValue(macValue, errors);
     }
     protocol::Value* certificateIdValue = object->get("certificateId");
-    errors->setName("certificateId");
+    errors->SetName("certificateId");
     result->m_certificateId = ValueConversions<int>::fromValue(certificateIdValue, errors);
     protocol::Value* subjectNameValue = object->get("subjectName");
-    errors->setName("subjectName");
+    errors->SetName("subjectName");
     result->m_subjectName = ValueConversions<String>::fromValue(subjectNameValue, errors);
     protocol::Value* sanListValue = object->get("sanList");
-    errors->setName("sanList");
+    errors->SetName("sanList");
     result->m_sanList = ValueConversions<protocol::Array<String>>::fromValue(sanListValue, errors);
     protocol::Value* issuerValue = object->get("issuer");
-    errors->setName("issuer");
+    errors->SetName("issuer");
     result->m_issuer = ValueConversions<String>::fromValue(issuerValue, errors);
     protocol::Value* validFromValue = object->get("validFrom");
-    errors->setName("validFrom");
+    errors->SetName("validFrom");
     result->m_validFrom = ValueConversions<double>::fromValue(validFromValue, errors);
     protocol::Value* validToValue = object->get("validTo");
-    errors->setName("validTo");
+    errors->SetName("validTo");
     result->m_validTo = ValueConversions<double>::fromValue(validToValue, errors);
     protocol::Value* signedCertificateTimestampListValue = object->get("signedCertificateTimestampList");
-    errors->setName("signedCertificateTimestampList");
+    errors->SetName("signedCertificateTimestampList");
     result->m_signedCertificateTimestampList = ValueConversions<protocol::Array<protocol::Network::SignedCertificateTimestamp>>::fromValue(signedCertificateTimestampListValue, errors);
     protocol::Value* certificateTransparencyComplianceValue = object->get("certificateTransparencyCompliance");
-    errors->setName("certificateTransparencyCompliance");
+    errors->SetName("certificateTransparencyCompliance");
     result->m_certificateTransparencyCompliance = ValueConversions<String>::fromValue(certificateTransparencyComplianceValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -518,97 +518,97 @@ const char CollapsedByClient[] = "collapsed-by-client";
 std::unique_ptr<Response> Response::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Response> result(new Response());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* statusValue = object->get("status");
-    errors->setName("status");
+    errors->SetName("status");
     result->m_status = ValueConversions<int>::fromValue(statusValue, errors);
     protocol::Value* statusTextValue = object->get("statusText");
-    errors->setName("statusText");
+    errors->SetName("statusText");
     result->m_statusText = ValueConversions<String>::fromValue(statusTextValue, errors);
     protocol::Value* headersValue = object->get("headers");
-    errors->setName("headers");
+    errors->SetName("headers");
     result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
     protocol::Value* headersTextValue = object->get("headersText");
     if (headersTextValue) {
-        errors->setName("headersText");
+        errors->SetName("headersText");
         result->m_headersText = ValueConversions<String>::fromValue(headersTextValue, errors);
     }
     protocol::Value* mimeTypeValue = object->get("mimeType");
-    errors->setName("mimeType");
+    errors->SetName("mimeType");
     result->m_mimeType = ValueConversions<String>::fromValue(mimeTypeValue, errors);
     protocol::Value* requestHeadersValue = object->get("requestHeaders");
     if (requestHeadersValue) {
-        errors->setName("requestHeaders");
+        errors->SetName("requestHeaders");
         result->m_requestHeaders = ValueConversions<protocol::Network::Headers>::fromValue(requestHeadersValue, errors);
     }
     protocol::Value* requestHeadersTextValue = object->get("requestHeadersText");
     if (requestHeadersTextValue) {
-        errors->setName("requestHeadersText");
+        errors->SetName("requestHeadersText");
         result->m_requestHeadersText = ValueConversions<String>::fromValue(requestHeadersTextValue, errors);
     }
     protocol::Value* connectionReusedValue = object->get("connectionReused");
-    errors->setName("connectionReused");
+    errors->SetName("connectionReused");
     result->m_connectionReused = ValueConversions<bool>::fromValue(connectionReusedValue, errors);
     protocol::Value* connectionIdValue = object->get("connectionId");
-    errors->setName("connectionId");
+    errors->SetName("connectionId");
     result->m_connectionId = ValueConversions<double>::fromValue(connectionIdValue, errors);
     protocol::Value* remoteIPAddressValue = object->get("remoteIPAddress");
     if (remoteIPAddressValue) {
-        errors->setName("remoteIPAddress");
+        errors->SetName("remoteIPAddress");
         result->m_remoteIPAddress = ValueConversions<String>::fromValue(remoteIPAddressValue, errors);
     }
     protocol::Value* remotePortValue = object->get("remotePort");
     if (remotePortValue) {
-        errors->setName("remotePort");
+        errors->SetName("remotePort");
         result->m_remotePort = ValueConversions<int>::fromValue(remotePortValue, errors);
     }
     protocol::Value* fromDiskCacheValue = object->get("fromDiskCache");
     if (fromDiskCacheValue) {
-        errors->setName("fromDiskCache");
+        errors->SetName("fromDiskCache");
         result->m_fromDiskCache = ValueConversions<bool>::fromValue(fromDiskCacheValue, errors);
     }
     protocol::Value* fromServiceWorkerValue = object->get("fromServiceWorker");
     if (fromServiceWorkerValue) {
-        errors->setName("fromServiceWorker");
+        errors->SetName("fromServiceWorker");
         result->m_fromServiceWorker = ValueConversions<bool>::fromValue(fromServiceWorkerValue, errors);
     }
     protocol::Value* fromPrefetchCacheValue = object->get("fromPrefetchCache");
     if (fromPrefetchCacheValue) {
-        errors->setName("fromPrefetchCache");
+        errors->SetName("fromPrefetchCache");
         result->m_fromPrefetchCache = ValueConversions<bool>::fromValue(fromPrefetchCacheValue, errors);
     }
     protocol::Value* encodedDataLengthValue = object->get("encodedDataLength");
-    errors->setName("encodedDataLength");
+    errors->SetName("encodedDataLength");
     result->m_encodedDataLength = ValueConversions<double>::fromValue(encodedDataLengthValue, errors);
     protocol::Value* timingValue = object->get("timing");
     if (timingValue) {
-        errors->setName("timing");
+        errors->SetName("timing");
         result->m_timing = ValueConversions<protocol::Network::ResourceTiming>::fromValue(timingValue, errors);
     }
     protocol::Value* protocolValue = object->get("protocol");
     if (protocolValue) {
-        errors->setName("protocol");
+        errors->SetName("protocol");
         result->m_protocol = ValueConversions<String>::fromValue(protocolValue, errors);
     }
     protocol::Value* securityStateValue = object->get("securityState");
-    errors->setName("securityState");
+    errors->SetName("securityState");
     result->m_securityState = ValueConversions<String>::fromValue(securityStateValue, errors);
     protocol::Value* securityDetailsValue = object->get("securityDetails");
     if (securityDetailsValue) {
-        errors->setName("securityDetails");
+        errors->SetName("securityDetails");
         result->m_securityDetails = ValueConversions<protocol::Network::SecurityDetails>::fromValue(securityDetailsValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -687,18 +687,18 @@ std::unique_ptr<Response> Response::clone() const
 std::unique_ptr<WebSocketRequest> WebSocketRequest::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketRequest> result(new WebSocketRequest());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* headersValue = object->get("headers");
-    errors->setName("headers");
+    errors->SetName("headers");
     result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -728,39 +728,39 @@ std::unique_ptr<WebSocketRequest> WebSocketRequest::clone() const
 std::unique_ptr<WebSocketResponse> WebSocketResponse::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketResponse> result(new WebSocketResponse());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* statusValue = object->get("status");
-    errors->setName("status");
+    errors->SetName("status");
     result->m_status = ValueConversions<int>::fromValue(statusValue, errors);
     protocol::Value* statusTextValue = object->get("statusText");
-    errors->setName("statusText");
+    errors->SetName("statusText");
     result->m_statusText = ValueConversions<String>::fromValue(statusTextValue, errors);
     protocol::Value* headersValue = object->get("headers");
-    errors->setName("headers");
+    errors->SetName("headers");
     result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
     protocol::Value* headersTextValue = object->get("headersText");
     if (headersTextValue) {
-        errors->setName("headersText");
+        errors->SetName("headersText");
         result->m_headersText = ValueConversions<String>::fromValue(headersTextValue, errors);
     }
     protocol::Value* requestHeadersValue = object->get("requestHeaders");
     if (requestHeadersValue) {
-        errors->setName("requestHeaders");
+        errors->SetName("requestHeaders");
         result->m_requestHeaders = ValueConversions<protocol::Network::Headers>::fromValue(requestHeadersValue, errors);
     }
     protocol::Value* requestHeadersTextValue = object->get("requestHeadersText");
     if (requestHeadersTextValue) {
-        errors->setName("requestHeadersText");
+        errors->SetName("requestHeadersText");
         result->m_requestHeadersText = ValueConversions<String>::fromValue(requestHeadersTextValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -803,24 +803,24 @@ std::unique_ptr<WebSocketResponse> WebSocketResponse::clone() const
 std::unique_ptr<WebSocketFrame> WebSocketFrame::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketFrame> result(new WebSocketFrame());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* opcodeValue = object->get("opcode");
-    errors->setName("opcode");
+    errors->SetName("opcode");
     result->m_opcode = ValueConversions<double>::fromValue(opcodeValue, errors);
     protocol::Value* maskValue = object->get("mask");
-    errors->setName("mask");
+    errors->SetName("mask");
     result->m_mask = ValueConversions<bool>::fromValue(maskValue, errors);
     protocol::Value* payloadDataValue = object->get("payloadData");
-    errors->setName("payloadData");
+    errors->SetName("payloadData");
     result->m_payloadData = ValueConversions<String>::fromValue(payloadDataValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -860,33 +860,33 @@ const char* Initiator::TypeEnum::Other = "other";
 std::unique_ptr<Initiator> Initiator::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Initiator> result(new Initiator());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* typeValue = object->get("type");
-    errors->setName("type");
+    errors->SetName("type");
     result->m_type = ValueConversions<String>::fromValue(typeValue, errors);
     protocol::Value* stackValue = object->get("stack");
     if (stackValue) {
-        errors->setName("stack");
+        errors->SetName("stack");
         result->m_stack = ValueConversions<protocol::Runtime::StackTrace>::fromValue(stackValue, errors);
     }
     protocol::Value* urlValue = object->get("url");
     if (urlValue) {
-        errors->setName("url");
+        errors->SetName("url");
         result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     }
     protocol::Value* lineNumberValue = object->get("lineNumber");
     if (lineNumberValue) {
-        errors->setName("lineNumber");
+        errors->SetName("lineNumber");
         result->m_lineNumber = ValueConversions<double>::fromValue(lineNumberValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -925,50 +925,50 @@ std::unique_ptr<Initiator> Initiator::clone() const
 std::unique_ptr<Cookie> Cookie::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Cookie> result(new Cookie());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nameValue = object->get("name");
-    errors->setName("name");
+    errors->SetName("name");
     result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     protocol::Value* valueValue = object->get("value");
-    errors->setName("value");
+    errors->SetName("value");
     result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
     protocol::Value* domainValue = object->get("domain");
-    errors->setName("domain");
+    errors->SetName("domain");
     result->m_domain = ValueConversions<String>::fromValue(domainValue, errors);
     protocol::Value* pathValue = object->get("path");
-    errors->setName("path");
+    errors->SetName("path");
     result->m_path = ValueConversions<String>::fromValue(pathValue, errors);
     protocol::Value* expiresValue = object->get("expires");
-    errors->setName("expires");
+    errors->SetName("expires");
     result->m_expires = ValueConversions<double>::fromValue(expiresValue, errors);
     protocol::Value* sizeValue = object->get("size");
-    errors->setName("size");
+    errors->SetName("size");
     result->m_size = ValueConversions<int>::fromValue(sizeValue, errors);
     protocol::Value* httpOnlyValue = object->get("httpOnly");
-    errors->setName("httpOnly");
+    errors->SetName("httpOnly");
     result->m_httpOnly = ValueConversions<bool>::fromValue(httpOnlyValue, errors);
     protocol::Value* secureValue = object->get("secure");
-    errors->setName("secure");
+    errors->SetName("secure");
     result->m_secure = ValueConversions<bool>::fromValue(secureValue, errors);
     protocol::Value* sessionValue = object->get("session");
-    errors->setName("session");
+    errors->SetName("session");
     result->m_session = ValueConversions<bool>::fromValue(sessionValue, errors);
     protocol::Value* sameSiteValue = object->get("sameSite");
     if (sameSiteValue) {
-        errors->setName("sameSite");
+        errors->SetName("sameSite");
         result->m_sameSite = ValueConversions<String>::fromValue(sameSiteValue, errors);
     }
     protocol::Value* priorityValue = object->get("priority");
-    errors->setName("priority");
+    errors->SetName("priority");
     result->m_priority = ValueConversions<String>::fromValue(priorityValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1046,26 +1046,26 @@ const char UnknownError[] = "UnknownError";
 std::unique_ptr<BlockedSetCookieWithReason> BlockedSetCookieWithReason::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<BlockedSetCookieWithReason> result(new BlockedSetCookieWithReason());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* blockedReasonsValue = object->get("blockedReasons");
-    errors->setName("blockedReasons");
+    errors->SetName("blockedReasons");
     result->m_blockedReasons = ValueConversions<protocol::Array<String>>::fromValue(blockedReasonsValue, errors);
     protocol::Value* cookieLineValue = object->get("cookieLine");
-    errors->setName("cookieLine");
+    errors->SetName("cookieLine");
     result->m_cookieLine = ValueConversions<String>::fromValue(cookieLineValue, errors);
     protocol::Value* cookieValue = object->get("cookie");
     if (cookieValue) {
-        errors->setName("cookie");
+        errors->SetName("cookie");
         result->m_cookie = ValueConversions<protocol::Network::Cookie>::fromValue(cookieValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1100,21 +1100,21 @@ std::unique_ptr<BlockedSetCookieWithReason> BlockedSetCookieWithReason::clone() 
 std::unique_ptr<BlockedCookieWithReason> BlockedCookieWithReason::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<BlockedCookieWithReason> result(new BlockedCookieWithReason());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* blockedReasonsValue = object->get("blockedReasons");
-    errors->setName("blockedReasons");
+    errors->SetName("blockedReasons");
     result->m_blockedReasons = ValueConversions<protocol::Array<String>>::fromValue(blockedReasonsValue, errors);
     protocol::Value* cookieValue = object->get("cookie");
-    errors->setName("cookie");
+    errors->SetName("cookie");
     result->m_cookie = ValueConversions<protocol::Network::Cookie>::fromValue(cookieValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1149,29 +1149,29 @@ const char* AuthChallenge::SourceEnum::Proxy = "Proxy";
 std::unique_ptr<AuthChallenge> AuthChallenge::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<AuthChallenge> result(new AuthChallenge());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* sourceValue = object->get("source");
     if (sourceValue) {
-        errors->setName("source");
+        errors->SetName("source");
         result->m_source = ValueConversions<String>::fromValue(sourceValue, errors);
     }
     protocol::Value* originValue = object->get("origin");
-    errors->setName("origin");
+    errors->SetName("origin");
     result->m_origin = ValueConversions<String>::fromValue(originValue, errors);
     protocol::Value* schemeValue = object->get("scheme");
-    errors->setName("scheme");
+    errors->SetName("scheme");
     result->m_scheme = ValueConversions<String>::fromValue(schemeValue, errors);
     protocol::Value* realmValue = object->get("realm");
-    errors->setName("realm");
+    errors->SetName("realm");
     result->m_realm = ValueConversions<String>::fromValue(realmValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1208,48 +1208,48 @@ std::unique_ptr<AuthChallenge> AuthChallenge::clone() const
 std::unique_ptr<SignedExchangeSignature> SignedExchangeSignature::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SignedExchangeSignature> result(new SignedExchangeSignature());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* labelValue = object->get("label");
-    errors->setName("label");
+    errors->SetName("label");
     result->m_label = ValueConversions<String>::fromValue(labelValue, errors);
     protocol::Value* signatureValue = object->get("signature");
-    errors->setName("signature");
+    errors->SetName("signature");
     result->m_signature = ValueConversions<String>::fromValue(signatureValue, errors);
     protocol::Value* integrityValue = object->get("integrity");
-    errors->setName("integrity");
+    errors->SetName("integrity");
     result->m_integrity = ValueConversions<String>::fromValue(integrityValue, errors);
     protocol::Value* certUrlValue = object->get("certUrl");
     if (certUrlValue) {
-        errors->setName("certUrl");
+        errors->SetName("certUrl");
         result->m_certUrl = ValueConversions<String>::fromValue(certUrlValue, errors);
     }
     protocol::Value* certSha256Value = object->get("certSha256");
     if (certSha256Value) {
-        errors->setName("certSha256");
+        errors->SetName("certSha256");
         result->m_certSha256 = ValueConversions<String>::fromValue(certSha256Value, errors);
     }
     protocol::Value* validityUrlValue = object->get("validityUrl");
-    errors->setName("validityUrl");
+    errors->SetName("validityUrl");
     result->m_validityUrl = ValueConversions<String>::fromValue(validityUrlValue, errors);
     protocol::Value* dateValue = object->get("date");
-    errors->setName("date");
+    errors->SetName("date");
     result->m_date = ValueConversions<int>::fromValue(dateValue, errors);
     protocol::Value* expiresValue = object->get("expires");
-    errors->setName("expires");
+    errors->SetName("expires");
     result->m_expires = ValueConversions<int>::fromValue(expiresValue, errors);
     protocol::Value* certificatesValue = object->get("certificates");
     if (certificatesValue) {
-        errors->setName("certificates");
+        errors->SetName("certificates");
         result->m_certificates = ValueConversions<protocol::Array<String>>::fromValue(certificatesValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1298,30 +1298,30 @@ std::unique_ptr<SignedExchangeSignature> SignedExchangeSignature::clone() const
 std::unique_ptr<SignedExchangeHeader> SignedExchangeHeader::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SignedExchangeHeader> result(new SignedExchangeHeader());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestUrlValue = object->get("requestUrl");
-    errors->setName("requestUrl");
+    errors->SetName("requestUrl");
     result->m_requestUrl = ValueConversions<String>::fromValue(requestUrlValue, errors);
     protocol::Value* responseCodeValue = object->get("responseCode");
-    errors->setName("responseCode");
+    errors->SetName("responseCode");
     result->m_responseCode = ValueConversions<int>::fromValue(responseCodeValue, errors);
     protocol::Value* responseHeadersValue = object->get("responseHeaders");
-    errors->setName("responseHeaders");
+    errors->SetName("responseHeaders");
     result->m_responseHeaders = ValueConversions<protocol::Network::Headers>::fromValue(responseHeadersValue, errors);
     protocol::Value* signaturesValue = object->get("signatures");
-    errors->setName("signatures");
+    errors->SetName("signatures");
     result->m_signatures = ValueConversions<protocol::Array<protocol::Network::SignedExchangeSignature>>::fromValue(signaturesValue, errors);
     protocol::Value* headerIntegrityValue = object->get("headerIntegrity");
-    errors->setName("headerIntegrity");
+    errors->SetName("headerIntegrity");
     result->m_headerIntegrity = ValueConversions<String>::fromValue(headerIntegrityValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1368,28 +1368,28 @@ const char SignatureTimestamps[] = "signatureTimestamps";
 std::unique_ptr<SignedExchangeError> SignedExchangeError::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SignedExchangeError> result(new SignedExchangeError());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* messageValue = object->get("message");
-    errors->setName("message");
+    errors->SetName("message");
     result->m_message = ValueConversions<String>::fromValue(messageValue, errors);
     protocol::Value* signatureIndexValue = object->get("signatureIndex");
     if (signatureIndexValue) {
-        errors->setName("signatureIndex");
+        errors->SetName("signatureIndex");
         result->m_signatureIndex = ValueConversions<int>::fromValue(signatureIndexValue, errors);
     }
     protocol::Value* errorFieldValue = object->get("errorField");
     if (errorFieldValue) {
-        errors->setName("errorField");
+        errors->SetName("errorField");
         result->m_errorField = ValueConversions<String>::fromValue(errorFieldValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1425,33 +1425,33 @@ std::unique_ptr<SignedExchangeError> SignedExchangeError::clone() const
 std::unique_ptr<SignedExchangeInfo> SignedExchangeInfo::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SignedExchangeInfo> result(new SignedExchangeInfo());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* outerResponseValue = object->get("outerResponse");
-    errors->setName("outerResponse");
+    errors->SetName("outerResponse");
     result->m_outerResponse = ValueConversions<protocol::Network::Response>::fromValue(outerResponseValue, errors);
     protocol::Value* headerValue = object->get("header");
     if (headerValue) {
-        errors->setName("header");
+        errors->SetName("header");
         result->m_header = ValueConversions<protocol::Network::SignedExchangeHeader>::fromValue(headerValue, errors);
     }
     protocol::Value* securityDetailsValue = object->get("securityDetails");
     if (securityDetailsValue) {
-        errors->setName("securityDetails");
+        errors->SetName("securityDetails");
         result->m_securityDetails = ValueConversions<protocol::Network::SecurityDetails>::fromValue(securityDetailsValue, errors);
     }
     protocol::Value* errorsValue = object->get("errors");
     if (errorsValue) {
-        errors->setName("errors");
+        errors->SetName("errors");
         result->m_errors = ValueConversions<protocol::Array<protocol::Network::SignedExchangeError>>::fromValue(errorsValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1490,27 +1490,27 @@ std::unique_ptr<SignedExchangeInfo> SignedExchangeInfo::clone() const
 std::unique_ptr<DataReceivedNotification> DataReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<DataReceivedNotification> result(new DataReceivedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* dataLengthValue = object->get("dataLength");
-    errors->setName("dataLength");
+    errors->SetName("dataLength");
     result->m_dataLength = ValueConversions<int>::fromValue(dataLengthValue, errors);
     protocol::Value* encodedDataLengthValue = object->get("encodedDataLength");
-    errors->setName("encodedDataLength");
+    errors->SetName("encodedDataLength");
     result->m_encodedDataLength = ValueConversions<int>::fromValue(encodedDataLengthValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1546,30 +1546,30 @@ std::unique_ptr<DataReceivedNotification> DataReceivedNotification::clone() cons
 std::unique_ptr<EventSourceMessageReceivedNotification> EventSourceMessageReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<EventSourceMessageReceivedNotification> result(new EventSourceMessageReceivedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* eventNameValue = object->get("eventName");
-    errors->setName("eventName");
+    errors->SetName("eventName");
     result->m_eventName = ValueConversions<String>::fromValue(eventNameValue, errors);
     protocol::Value* eventIdValue = object->get("eventId");
-    errors->setName("eventId");
+    errors->SetName("eventId");
     result->m_eventId = ValueConversions<String>::fromValue(eventIdValue, errors);
     protocol::Value* dataValue = object->get("data");
-    errors->setName("data");
+    errors->SetName("data");
     result->m_data = ValueConversions<String>::fromValue(dataValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1607,37 +1607,37 @@ std::unique_ptr<EventSourceMessageReceivedNotification> EventSourceMessageReceiv
 std::unique_ptr<LoadingFailedNotification> LoadingFailedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<LoadingFailedNotification> result(new LoadingFailedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* typeValue = object->get("type");
-    errors->setName("type");
+    errors->SetName("type");
     result->m_type = ValueConversions<String>::fromValue(typeValue, errors);
     protocol::Value* errorTextValue = object->get("errorText");
-    errors->setName("errorText");
+    errors->SetName("errorText");
     result->m_errorText = ValueConversions<String>::fromValue(errorTextValue, errors);
     protocol::Value* canceledValue = object->get("canceled");
     if (canceledValue) {
-        errors->setName("canceled");
+        errors->SetName("canceled");
         result->m_canceled = ValueConversions<bool>::fromValue(canceledValue, errors);
     }
     protocol::Value* blockedReasonValue = object->get("blockedReason");
     if (blockedReasonValue) {
-        errors->setName("blockedReason");
+        errors->SetName("blockedReason");
         result->m_blockedReason = ValueConversions<String>::fromValue(blockedReasonValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1679,29 +1679,29 @@ std::unique_ptr<LoadingFailedNotification> LoadingFailedNotification::clone() co
 std::unique_ptr<LoadingFinishedNotification> LoadingFinishedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<LoadingFinishedNotification> result(new LoadingFinishedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* encodedDataLengthValue = object->get("encodedDataLength");
-    errors->setName("encodedDataLength");
+    errors->SetName("encodedDataLength");
     result->m_encodedDataLength = ValueConversions<double>::fromValue(encodedDataLengthValue, errors);
     protocol::Value* shouldReportCorbBlockingValue = object->get("shouldReportCorbBlocking");
     if (shouldReportCorbBlockingValue) {
-        errors->setName("shouldReportCorbBlocking");
+        errors->SetName("shouldReportCorbBlocking");
         result->m_shouldReportCorbBlocking = ValueConversions<bool>::fromValue(shouldReportCorbBlockingValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1738,65 +1738,65 @@ std::unique_ptr<LoadingFinishedNotification> LoadingFinishedNotification::clone(
 std::unique_ptr<RequestInterceptedNotification> RequestInterceptedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<RequestInterceptedNotification> result(new RequestInterceptedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* interceptionIdValue = object->get("interceptionId");
-    errors->setName("interceptionId");
+    errors->SetName("interceptionId");
     result->m_interceptionId = ValueConversions<String>::fromValue(interceptionIdValue, errors);
     protocol::Value* requestValue = object->get("request");
-    errors->setName("request");
+    errors->SetName("request");
     result->m_request = ValueConversions<protocol::Network::Request>::fromValue(requestValue, errors);
     protocol::Value* frameIdValue = object->get("frameId");
-    errors->setName("frameId");
+    errors->SetName("frameId");
     result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* resourceTypeValue = object->get("resourceType");
-    errors->setName("resourceType");
+    errors->SetName("resourceType");
     result->m_resourceType = ValueConversions<String>::fromValue(resourceTypeValue, errors);
     protocol::Value* isNavigationRequestValue = object->get("isNavigationRequest");
-    errors->setName("isNavigationRequest");
+    errors->SetName("isNavigationRequest");
     result->m_isNavigationRequest = ValueConversions<bool>::fromValue(isNavigationRequestValue, errors);
     protocol::Value* isDownloadValue = object->get("isDownload");
     if (isDownloadValue) {
-        errors->setName("isDownload");
+        errors->SetName("isDownload");
         result->m_isDownload = ValueConversions<bool>::fromValue(isDownloadValue, errors);
     }
     protocol::Value* redirectUrlValue = object->get("redirectUrl");
     if (redirectUrlValue) {
-        errors->setName("redirectUrl");
+        errors->SetName("redirectUrl");
         result->m_redirectUrl = ValueConversions<String>::fromValue(redirectUrlValue, errors);
     }
     protocol::Value* authChallengeValue = object->get("authChallenge");
     if (authChallengeValue) {
-        errors->setName("authChallenge");
+        errors->SetName("authChallenge");
         result->m_authChallenge = ValueConversions<protocol::Network::AuthChallenge>::fromValue(authChallengeValue, errors);
     }
     protocol::Value* responseErrorReasonValue = object->get("responseErrorReason");
     if (responseErrorReasonValue) {
-        errors->setName("responseErrorReason");
+        errors->SetName("responseErrorReason");
         result->m_responseErrorReason = ValueConversions<String>::fromValue(responseErrorReasonValue, errors);
     }
     protocol::Value* responseStatusCodeValue = object->get("responseStatusCode");
     if (responseStatusCodeValue) {
-        errors->setName("responseStatusCode");
+        errors->SetName("responseStatusCode");
         result->m_responseStatusCode = ValueConversions<int>::fromValue(responseStatusCodeValue, errors);
     }
     protocol::Value* responseHeadersValue = object->get("responseHeaders");
     if (responseHeadersValue) {
-        errors->setName("responseHeaders");
+        errors->SetName("responseHeaders");
         result->m_responseHeaders = ValueConversions<protocol::Network::Headers>::fromValue(responseHeadersValue, errors);
     }
     protocol::Value* requestIdValue = object->get("requestId");
     if (requestIdValue) {
-        errors->setName("requestId");
+        errors->SetName("requestId");
         result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1855,18 +1855,18 @@ std::unique_ptr<RequestInterceptedNotification> RequestInterceptedNotification::
 std::unique_ptr<RequestServedFromCacheNotification> RequestServedFromCacheNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<RequestServedFromCacheNotification> result(new RequestServedFromCacheNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1896,56 +1896,56 @@ std::unique_ptr<RequestServedFromCacheNotification> RequestServedFromCacheNotifi
 std::unique_ptr<RequestWillBeSentNotification> RequestWillBeSentNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<RequestWillBeSentNotification> result(new RequestWillBeSentNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* loaderIdValue = object->get("loaderId");
-    errors->setName("loaderId");
+    errors->SetName("loaderId");
     result->m_loaderId = ValueConversions<String>::fromValue(loaderIdValue, errors);
     protocol::Value* documentURLValue = object->get("documentURL");
-    errors->setName("documentURL");
+    errors->SetName("documentURL");
     result->m_documentURL = ValueConversions<String>::fromValue(documentURLValue, errors);
     protocol::Value* requestValue = object->get("request");
-    errors->setName("request");
+    errors->SetName("request");
     result->m_request = ValueConversions<protocol::Network::Request>::fromValue(requestValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* wallTimeValue = object->get("wallTime");
-    errors->setName("wallTime");
+    errors->SetName("wallTime");
     result->m_wallTime = ValueConversions<double>::fromValue(wallTimeValue, errors);
     protocol::Value* initiatorValue = object->get("initiator");
-    errors->setName("initiator");
+    errors->SetName("initiator");
     result->m_initiator = ValueConversions<protocol::Network::Initiator>::fromValue(initiatorValue, errors);
     protocol::Value* redirectResponseValue = object->get("redirectResponse");
     if (redirectResponseValue) {
-        errors->setName("redirectResponse");
+        errors->SetName("redirectResponse");
         result->m_redirectResponse = ValueConversions<protocol::Network::Response>::fromValue(redirectResponseValue, errors);
     }
     protocol::Value* typeValue = object->get("type");
     if (typeValue) {
-        errors->setName("type");
+        errors->SetName("type");
         result->m_type = ValueConversions<String>::fromValue(typeValue, errors);
     }
     protocol::Value* frameIdValue = object->get("frameId");
     if (frameIdValue) {
-        errors->setName("frameId");
+        errors->SetName("frameId");
         result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     }
     protocol::Value* hasUserGestureValue = object->get("hasUserGesture");
     if (hasUserGestureValue) {
-        errors->setName("hasUserGesture");
+        errors->SetName("hasUserGesture");
         result->m_hasUserGesture = ValueConversions<bool>::fromValue(hasUserGestureValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -1999,24 +1999,24 @@ std::unique_ptr<RequestWillBeSentNotification> RequestWillBeSentNotification::cl
 std::unique_ptr<ResourceChangedPriorityNotification> ResourceChangedPriorityNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ResourceChangedPriorityNotification> result(new ResourceChangedPriorityNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* newPriorityValue = object->get("newPriority");
-    errors->setName("newPriority");
+    errors->SetName("newPriority");
     result->m_newPriority = ValueConversions<String>::fromValue(newPriorityValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2050,21 +2050,21 @@ std::unique_ptr<ResourceChangedPriorityNotification> ResourceChangedPriorityNoti
 std::unique_ptr<SignedExchangeReceivedNotification> SignedExchangeReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SignedExchangeReceivedNotification> result(new SignedExchangeReceivedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* infoValue = object->get("info");
-    errors->setName("info");
+    errors->SetName("info");
     result->m_info = ValueConversions<protocol::Network::SignedExchangeInfo>::fromValue(infoValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2096,35 +2096,35 @@ std::unique_ptr<SignedExchangeReceivedNotification> SignedExchangeReceivedNotifi
 std::unique_ptr<ResponseReceivedNotification> ResponseReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ResponseReceivedNotification> result(new ResponseReceivedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* loaderIdValue = object->get("loaderId");
-    errors->setName("loaderId");
+    errors->SetName("loaderId");
     result->m_loaderId = ValueConversions<String>::fromValue(loaderIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* typeValue = object->get("type");
-    errors->setName("type");
+    errors->SetName("type");
     result->m_type = ValueConversions<String>::fromValue(typeValue, errors);
     protocol::Value* responseValue = object->get("response");
-    errors->setName("response");
+    errors->SetName("response");
     result->m_response = ValueConversions<protocol::Network::Response>::fromValue(responseValue, errors);
     protocol::Value* frameIdValue = object->get("frameId");
     if (frameIdValue) {
-        errors->setName("frameId");
+        errors->SetName("frameId");
         result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2165,21 +2165,21 @@ std::unique_ptr<ResponseReceivedNotification> ResponseReceivedNotification::clon
 std::unique_ptr<WebSocketClosedNotification> WebSocketClosedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketClosedNotification> result(new WebSocketClosedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2211,26 +2211,26 @@ std::unique_ptr<WebSocketClosedNotification> WebSocketClosedNotification::clone(
 std::unique_ptr<WebSocketCreatedNotification> WebSocketCreatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketCreatedNotification> result(new WebSocketCreatedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* initiatorValue = object->get("initiator");
     if (initiatorValue) {
-        errors->setName("initiator");
+        errors->SetName("initiator");
         result->m_initiator = ValueConversions<protocol::Network::Initiator>::fromValue(initiatorValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2265,24 +2265,24 @@ std::unique_ptr<WebSocketCreatedNotification> WebSocketCreatedNotification::clon
 std::unique_ptr<WebSocketFrameErrorNotification> WebSocketFrameErrorNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketFrameErrorNotification> result(new WebSocketFrameErrorNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* errorMessageValue = object->get("errorMessage");
-    errors->setName("errorMessage");
+    errors->SetName("errorMessage");
     result->m_errorMessage = ValueConversions<String>::fromValue(errorMessageValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2316,24 +2316,24 @@ std::unique_ptr<WebSocketFrameErrorNotification> WebSocketFrameErrorNotification
 std::unique_ptr<WebSocketFrameReceivedNotification> WebSocketFrameReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketFrameReceivedNotification> result(new WebSocketFrameReceivedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* responseValue = object->get("response");
-    errors->setName("response");
+    errors->SetName("response");
     result->m_response = ValueConversions<protocol::Network::WebSocketFrame>::fromValue(responseValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2367,24 +2367,24 @@ std::unique_ptr<WebSocketFrameReceivedNotification> WebSocketFrameReceivedNotifi
 std::unique_ptr<WebSocketFrameSentNotification> WebSocketFrameSentNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketFrameSentNotification> result(new WebSocketFrameSentNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* responseValue = object->get("response");
-    errors->setName("response");
+    errors->SetName("response");
     result->m_response = ValueConversions<protocol::Network::WebSocketFrame>::fromValue(responseValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2418,24 +2418,24 @@ std::unique_ptr<WebSocketFrameSentNotification> WebSocketFrameSentNotification::
 std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> WebSocketHandshakeResponseReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> result(new WebSocketHandshakeResponseReceivedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* responseValue = object->get("response");
-    errors->setName("response");
+    errors->SetName("response");
     result->m_response = ValueConversions<protocol::Network::WebSocketResponse>::fromValue(responseValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2469,27 +2469,27 @@ std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> WebSocketHandsha
 std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> WebSocketWillSendHandshakeRequestNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> result(new WebSocketWillSendHandshakeRequestNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* timestampValue = object->get("timestamp");
-    errors->setName("timestamp");
+    errors->SetName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     protocol::Value* wallTimeValue = object->get("wallTime");
-    errors->setName("wallTime");
+    errors->SetName("wallTime");
     result->m_wallTime = ValueConversions<double>::fromValue(wallTimeValue, errors);
     protocol::Value* requestValue = object->get("request");
-    errors->setName("request");
+    errors->SetName("request");
     result->m_request = ValueConversions<protocol::Network::WebSocketRequest>::fromValue(requestValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2525,24 +2525,24 @@ std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> WebSocketWillSend
 std::unique_ptr<RequestWillBeSentExtraInfoNotification> RequestWillBeSentExtraInfoNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<RequestWillBeSentExtraInfoNotification> result(new RequestWillBeSentExtraInfoNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* blockedCookiesValue = object->get("blockedCookies");
-    errors->setName("blockedCookies");
+    errors->SetName("blockedCookies");
     result->m_blockedCookies = ValueConversions<protocol::Array<protocol::Network::BlockedCookieWithReason>>::fromValue(blockedCookiesValue, errors);
     protocol::Value* headersValue = object->get("headers");
-    errors->setName("headers");
+    errors->SetName("headers");
     result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2576,29 +2576,29 @@ std::unique_ptr<RequestWillBeSentExtraInfoNotification> RequestWillBeSentExtraIn
 std::unique_ptr<ResponseReceivedExtraInfoNotification> ResponseReceivedExtraInfoNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ResponseReceivedExtraInfoNotification> result(new ResponseReceivedExtraInfoNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object->get("requestId");
-    errors->setName("requestId");
+    errors->SetName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* blockedCookiesValue = object->get("blockedCookies");
-    errors->setName("blockedCookies");
+    errors->SetName("blockedCookies");
     result->m_blockedCookies = ValueConversions<protocol::Array<protocol::Network::BlockedSetCookieWithReason>>::fromValue(blockedCookiesValue, errors);
     protocol::Value* headersValue = object->get("headers");
-    errors->setName("headers");
+    errors->SetName("headers");
     result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
     protocol::Value* headersTextValue = object->get("headersText");
     if (headersTextValue) {
-        errors->setName("headersText");
+        errors->SetName("headersText");
         result->m_headersText = ValueConversions<String>::fromValue(headersTextValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -2912,9 +2912,9 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
+void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
+    m_frontendChannel->sendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
@@ -3042,27 +3042,27 @@ void DispatcherImpl::emulateNetworkConditions(int callId, const String& method, 
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* offlineValue = object ? object->get("offline") : nullptr;
-    errors->setName("offline");
+    errors->SetName("offline");
     bool in_offline = ValueConversions<bool>::fromValue(offlineValue, errors);
     protocol::Value* latencyValue = object ? object->get("latency") : nullptr;
-    errors->setName("latency");
+    errors->SetName("latency");
     double in_latency = ValueConversions<double>::fromValue(latencyValue, errors);
     protocol::Value* downloadThroughputValue = object ? object->get("downloadThroughput") : nullptr;
-    errors->setName("downloadThroughput");
+    errors->SetName("downloadThroughput");
     double in_downloadThroughput = ValueConversions<double>::fromValue(downloadThroughputValue, errors);
     protocol::Value* uploadThroughputValue = object ? object->get("uploadThroughput") : nullptr;
-    errors->setName("uploadThroughput");
+    errors->SetName("uploadThroughput");
     double in_uploadThroughput = ValueConversions<double>::fromValue(uploadThroughputValue, errors);
     protocol::Value* connectionTypeValue = object ? object->get("connectionType") : nullptr;
     Maybe<String> in_connectionType;
     if (connectionTypeValue) {
-        errors->setName("connectionType");
+        errors->SetName("connectionType");
         in_connectionType = ValueConversions<String>::fromValue(connectionTypeValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3082,27 +3082,27 @@ void DispatcherImpl::enable(int callId, const String& method, v8_crdtp::span<uin
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* maxTotalBufferSizeValue = object ? object->get("maxTotalBufferSize") : nullptr;
     Maybe<int> in_maxTotalBufferSize;
     if (maxTotalBufferSizeValue) {
-        errors->setName("maxTotalBufferSize");
+        errors->SetName("maxTotalBufferSize");
         in_maxTotalBufferSize = ValueConversions<int>::fromValue(maxTotalBufferSizeValue, errors);
     }
     protocol::Value* maxResourceBufferSizeValue = object ? object->get("maxResourceBufferSize") : nullptr;
     Maybe<int> in_maxResourceBufferSize;
     if (maxResourceBufferSizeValue) {
-        errors->setName("maxResourceBufferSize");
+        errors->SetName("maxResourceBufferSize");
         in_maxResourceBufferSize = ValueConversions<int>::fromValue(maxResourceBufferSizeValue, errors);
     }
     protocol::Value* maxPostDataSizeValue = object ? object->get("maxPostDataSize") : nullptr;
     Maybe<int> in_maxPostDataSize;
     if (maxPostDataSizeValue) {
-        errors->setName("maxPostDataSize");
+        errors->SetName("maxPostDataSize");
         in_maxPostDataSize = ValueConversions<int>::fromValue(maxPostDataSizeValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3122,12 +3122,12 @@ void DispatcherImpl::getCertificate(int callId, const String& method, v8_crdtp::
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* originValue = object ? object->get("origin") : nullptr;
-    errors->setName("origin");
+    errors->SetName("origin");
     String in_origin = ValueConversions<String>::fromValue(originValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3178,12 +3178,12 @@ void DispatcherImpl::getResponseBody(int callId, const String& method, v8_crdtp:
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object ? object->get("requestId") : nullptr;
-    errors->setName("requestId");
+    errors->SetName("requestId");
     String in_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3221,12 +3221,12 @@ void DispatcherImpl::getRequestPostData(int callId, const String& method, v8_crd
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object ? object->get("requestId") : nullptr;
-    errors->setName("requestId");
+    errors->SetName("requestId");
     String in_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3240,12 +3240,12 @@ void DispatcherImpl::replayXHR(int callId, const String& method, v8_crdtp::span<
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object ? object->get("requestId") : nullptr;
-    errors->setName("requestId");
+    errors->SetName("requestId");
     String in_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3265,27 +3265,27 @@ void DispatcherImpl::searchInResponseBody(int callId, const String& method, v8_c
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* requestIdValue = object ? object->get("requestId") : nullptr;
-    errors->setName("requestId");
+    errors->SetName("requestId");
     String in_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     protocol::Value* queryValue = object ? object->get("query") : nullptr;
-    errors->setName("query");
+    errors->SetName("query");
     String in_query = ValueConversions<String>::fromValue(queryValue, errors);
     protocol::Value* caseSensitiveValue = object ? object->get("caseSensitive") : nullptr;
     Maybe<bool> in_caseSensitive;
     if (caseSensitiveValue) {
-        errors->setName("caseSensitive");
+        errors->SetName("caseSensitive");
         in_caseSensitive = ValueConversions<bool>::fromValue(caseSensitiveValue, errors);
     }
     protocol::Value* isRegexValue = object ? object->get("isRegex") : nullptr;
     Maybe<bool> in_isRegex;
     if (isRegexValue) {
-        errors->setName("isRegex");
+        errors->SetName("isRegex");
         in_isRegex = ValueConversions<bool>::fromValue(isRegexValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3311,12 +3311,12 @@ void DispatcherImpl::setBlockedURLs(int callId, const String& method, v8_crdtp::
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* urlsValue = object ? object->get("urls") : nullptr;
-    errors->setName("urls");
+    errors->SetName("urls");
     std::unique_ptr<protocol::Array<String>> in_urls = ValueConversions<protocol::Array<String>>::fromValue(urlsValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3336,12 +3336,12 @@ void DispatcherImpl::setBypassServiceWorker(int callId, const String& method, v8
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* bypassValue = object ? object->get("bypass") : nullptr;
-    errors->setName("bypass");
+    errors->SetName("bypass");
     bool in_bypass = ValueConversions<bool>::fromValue(bypassValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3361,12 +3361,12 @@ void DispatcherImpl::setCacheDisabled(int callId, const String& method, v8_crdtp
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* cacheDisabledValue = object ? object->get("cacheDisabled") : nullptr;
-    errors->setName("cacheDisabled");
+    errors->SetName("cacheDisabled");
     bool in_cacheDisabled = ValueConversions<bool>::fromValue(cacheDisabledValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3386,15 +3386,15 @@ void DispatcherImpl::setDataSizeLimitsForTest(int callId, const String& method, 
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* maxTotalSizeValue = object ? object->get("maxTotalSize") : nullptr;
-    errors->setName("maxTotalSize");
+    errors->SetName("maxTotalSize");
     int in_maxTotalSize = ValueConversions<int>::fromValue(maxTotalSizeValue, errors);
     protocol::Value* maxResourceSizeValue = object ? object->get("maxResourceSize") : nullptr;
-    errors->setName("maxResourceSize");
+    errors->SetName("maxResourceSize");
     int in_maxResourceSize = ValueConversions<int>::fromValue(maxResourceSizeValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -3414,12 +3414,12 @@ void DispatcherImpl::setExtraHTTPHeaders(int callId, const String& method, v8_cr
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* headersValue = object ? object->get("headers") : nullptr;
-    errors->setName("headers");
+    errors->SetName("headers");
     std::unique_ptr<protocol::Network::Headers> in_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }

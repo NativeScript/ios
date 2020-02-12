@@ -1,4 +1,5 @@
 #include "v8-dom-agent-impl.h"
+#include "../../third_party/inspector_protocol/crdtp/json.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "JsV8InspectorClient.h"
 #include "utils.h"
@@ -111,11 +112,15 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
     assert(v8::JSON::Stringify(context, resultObj->Get(context, tns::ToV8String(isolate, "root")).ToLocalChecked()).ToLocal(&resultString));
 
     String16 resultProtocolString = toProtocolString(isolate, resultString);
-    std::unique_ptr<protocol::Value> resultJson = protocol::StringUtil::parseJSON(resultProtocolString);
+    std::vector<uint8_t> cbor;
+    v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
+    std::unique_ptr<protocol::Value> resultJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
     protocol::ErrorSupport errorSupport;
     std::unique_ptr<protocol::DOM::Node> domNode = protocol::DOM::Node::fromValue(resultJson.get(), &errorSupport);
 
-    std::string errorSupportString = errorSupport.errors().utf8();
+    std::vector<uint8_t> json;
+    v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+    auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
     if (!errorSupportString.empty()) {
         String16 errorMessage = "Error while parsing debug `DOM Node` object.";
         return DispatchResponse::Error(errorMessage);
@@ -340,13 +345,17 @@ void V8DOMAgentImpl::ChildNodeInserted(const Local<Object>& obj) {
 
     std::u16string nodeString = AddBackendNodeIdProperty(isolate, nodeJson);
     auto nodeUtf16Data = nodeString.data();
-
-    std::unique_ptr<protocol::Value> protocolNodeJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) nodeUtf16Data));
+    const String16& nodeString16 = String16((const uint16_t*) nodeUtf16Data);
+    std::vector<uint8_t> cbor;
+    v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(nodeString16.characters16(), nodeString16.length()), &cbor);
+    std::unique_ptr<protocol::Value> protocolNodeJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
     protocol::ErrorSupport errorSupport;
     auto domNode = protocol::DOM::Node::fromValue(protocolNodeJson.get(), &errorSupport);
 
-    auto errorSupportString = errorSupport.errors().utf8();
+    std::vector<uint8_t> json;
+    v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+    auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
     if (!errorSupportString.empty()) {
         std::string errorMessage = "Error while parsing debug `DOM Node` object.";
         Log("%s Error: %s", errorMessage.c_str(), errorSupportString.c_str());

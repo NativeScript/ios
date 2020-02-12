@@ -24,75 +24,75 @@ const char Metainfo::version[] = "1.3";
 std::unique_ptr<HighlightConfig> HighlightConfig::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<HighlightConfig> result(new HighlightConfig());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* showInfoValue = object->get("showInfo");
     if (showInfoValue) {
-        errors->setName("showInfo");
+        errors->SetName("showInfo");
         result->m_showInfo = ValueConversions<bool>::fromValue(showInfoValue, errors);
     }
     protocol::Value* showStylesValue = object->get("showStyles");
     if (showStylesValue) {
-        errors->setName("showStyles");
+        errors->SetName("showStyles");
         result->m_showStyles = ValueConversions<bool>::fromValue(showStylesValue, errors);
     }
     protocol::Value* showRulersValue = object->get("showRulers");
     if (showRulersValue) {
-        errors->setName("showRulers");
+        errors->SetName("showRulers");
         result->m_showRulers = ValueConversions<bool>::fromValue(showRulersValue, errors);
     }
     protocol::Value* showExtensionLinesValue = object->get("showExtensionLines");
     if (showExtensionLinesValue) {
-        errors->setName("showExtensionLines");
+        errors->SetName("showExtensionLines");
         result->m_showExtensionLines = ValueConversions<bool>::fromValue(showExtensionLinesValue, errors);
     }
     protocol::Value* contentColorValue = object->get("contentColor");
     if (contentColorValue) {
-        errors->setName("contentColor");
+        errors->SetName("contentColor");
         result->m_contentColor = ValueConversions<protocol::DOM::RGBA>::fromValue(contentColorValue, errors);
     }
     protocol::Value* paddingColorValue = object->get("paddingColor");
     if (paddingColorValue) {
-        errors->setName("paddingColor");
+        errors->SetName("paddingColor");
         result->m_paddingColor = ValueConversions<protocol::DOM::RGBA>::fromValue(paddingColorValue, errors);
     }
     protocol::Value* borderColorValue = object->get("borderColor");
     if (borderColorValue) {
-        errors->setName("borderColor");
+        errors->SetName("borderColor");
         result->m_borderColor = ValueConversions<protocol::DOM::RGBA>::fromValue(borderColorValue, errors);
     }
     protocol::Value* marginColorValue = object->get("marginColor");
     if (marginColorValue) {
-        errors->setName("marginColor");
+        errors->SetName("marginColor");
         result->m_marginColor = ValueConversions<protocol::DOM::RGBA>::fromValue(marginColorValue, errors);
     }
     protocol::Value* eventTargetColorValue = object->get("eventTargetColor");
     if (eventTargetColorValue) {
-        errors->setName("eventTargetColor");
+        errors->SetName("eventTargetColor");
         result->m_eventTargetColor = ValueConversions<protocol::DOM::RGBA>::fromValue(eventTargetColorValue, errors);
     }
     protocol::Value* shapeColorValue = object->get("shapeColor");
     if (shapeColorValue) {
-        errors->setName("shapeColor");
+        errors->SetName("shapeColor");
         result->m_shapeColor = ValueConversions<protocol::DOM::RGBA>::fromValue(shapeColorValue, errors);
     }
     protocol::Value* shapeMarginColorValue = object->get("shapeMarginColor");
     if (shapeMarginColorValue) {
-        errors->setName("shapeMarginColor");
+        errors->SetName("shapeMarginColor");
         result->m_shapeMarginColor = ValueConversions<protocol::DOM::RGBA>::fromValue(shapeMarginColorValue, errors);
     }
     protocol::Value* cssGridColorValue = object->get("cssGridColor");
     if (cssGridColorValue) {
-        errors->setName("cssGridColor");
+        errors->SetName("cssGridColor");
         result->m_cssGridColor = ValueConversions<protocol::DOM::RGBA>::fromValue(cssGridColorValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -164,18 +164,18 @@ const char None[] = "none";
 std::unique_ptr<InspectNodeRequestedNotification> InspectNodeRequestedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<InspectNodeRequestedNotification> result(new InspectNodeRequestedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* backendNodeIdValue = object->get("backendNodeId");
-    errors->setName("backendNodeId");
+    errors->SetName("backendNodeId");
     result->m_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -205,18 +205,18 @@ std::unique_ptr<InspectNodeRequestedNotification> InspectNodeRequestedNotificati
 std::unique_ptr<NodeHighlightRequestedNotification> NodeHighlightRequestedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<NodeHighlightRequestedNotification> result(new NodeHighlightRequestedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object->get("nodeId");
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -246,18 +246,18 @@ std::unique_ptr<NodeHighlightRequestedNotification> NodeHighlightRequestedNotifi
 std::unique_ptr<ScreenshotRequestedNotification> ScreenshotRequestedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ScreenshotRequestedNotification> result(new ScreenshotRequestedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* viewportValue = object->get("viewport");
-    errors->setName("viewport");
+    errors->SetName("viewport");
     result->m_viewport = ValueConversions<protocol::Page::Viewport>::fromValue(viewportValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -331,9 +331,9 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
+void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
+    m_frontendChannel->sendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
@@ -440,24 +440,24 @@ void DispatcherImpl::getHighlightObjectForTest(int callId, const String& method,
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
+    errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     protocol::Value* includeDistanceValue = object ? object->get("includeDistance") : nullptr;
     Maybe<bool> in_includeDistance;
     if (includeDistanceValue) {
-        errors->setName("includeDistance");
+        errors->SetName("includeDistance");
         in_includeDistance = ValueConversions<bool>::fromValue(includeDistanceValue, errors);
     }
     protocol::Value* includeStyleValue = object ? object->get("includeStyle") : nullptr;
     Maybe<bool> in_includeStyle;
     if (includeStyleValue) {
-        errors->setName("includeStyle");
+        errors->SetName("includeStyle");
         in_includeStyle = ValueConversions<bool>::fromValue(includeStyleValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -497,24 +497,24 @@ void DispatcherImpl::highlightFrame(int callId, const String& method, v8_crdtp::
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* frameIdValue = object ? object->get("frameId") : nullptr;
-    errors->setName("frameId");
+    errors->SetName("frameId");
     String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* contentColorValue = object ? object->get("contentColor") : nullptr;
     Maybe<protocol::DOM::RGBA> in_contentColor;
     if (contentColorValue) {
-        errors->setName("contentColor");
+        errors->SetName("contentColor");
         in_contentColor = ValueConversions<protocol::DOM::RGBA>::fromValue(contentColorValue, errors);
     }
     protocol::Value* contentOutlineColorValue = object ? object->get("contentOutlineColor") : nullptr;
     Maybe<protocol::DOM::RGBA> in_contentOutlineColor;
     if (contentOutlineColorValue) {
-        errors->setName("contentOutlineColor");
+        errors->SetName("contentOutlineColor");
         in_contentOutlineColor = ValueConversions<protocol::DOM::RGBA>::fromValue(contentOutlineColorValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -534,36 +534,36 @@ void DispatcherImpl::highlightNode(int callId, const String& method, v8_crdtp::s
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* highlightConfigValue = object ? object->get("highlightConfig") : nullptr;
-    errors->setName("highlightConfig");
+    errors->SetName("highlightConfig");
     std::unique_ptr<protocol::Overlay::HighlightConfig> in_highlightConfig = ValueConversions<protocol::Overlay::HighlightConfig>::fromValue(highlightConfigValue, errors);
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
-        errors->setName("nodeId");
+        errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
     protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
-        errors->setName("backendNodeId");
+        errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
     protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
-        errors->setName("objectId");
+        errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
     protocol::Value* selectorValue = object ? object->get("selector") : nullptr;
     Maybe<String> in_selector;
     if (selectorValue) {
-        errors->setName("selector");
+        errors->SetName("selector");
         in_selector = ValueConversions<String>::fromValue(selectorValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -583,24 +583,24 @@ void DispatcherImpl::highlightQuad(int callId, const String& method, v8_crdtp::s
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* quadValue = object ? object->get("quad") : nullptr;
-    errors->setName("quad");
+    errors->SetName("quad");
     std::unique_ptr<protocol::Array<double>> in_quad = ValueConversions<protocol::Array<double>>::fromValue(quadValue, errors);
     protocol::Value* colorValue = object ? object->get("color") : nullptr;
     Maybe<protocol::DOM::RGBA> in_color;
     if (colorValue) {
-        errors->setName("color");
+        errors->SetName("color");
         in_color = ValueConversions<protocol::DOM::RGBA>::fromValue(colorValue, errors);
     }
     protocol::Value* outlineColorValue = object ? object->get("outlineColor") : nullptr;
     Maybe<protocol::DOM::RGBA> in_outlineColor;
     if (outlineColorValue) {
-        errors->setName("outlineColor");
+        errors->SetName("outlineColor");
         in_outlineColor = ValueConversions<protocol::DOM::RGBA>::fromValue(outlineColorValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -620,33 +620,33 @@ void DispatcherImpl::highlightRect(int callId, const String& method, v8_crdtp::s
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* xValue = object ? object->get("x") : nullptr;
-    errors->setName("x");
+    errors->SetName("x");
     int in_x = ValueConversions<int>::fromValue(xValue, errors);
     protocol::Value* yValue = object ? object->get("y") : nullptr;
-    errors->setName("y");
+    errors->SetName("y");
     int in_y = ValueConversions<int>::fromValue(yValue, errors);
     protocol::Value* widthValue = object ? object->get("width") : nullptr;
-    errors->setName("width");
+    errors->SetName("width");
     int in_width = ValueConversions<int>::fromValue(widthValue, errors);
     protocol::Value* heightValue = object ? object->get("height") : nullptr;
-    errors->setName("height");
+    errors->SetName("height");
     int in_height = ValueConversions<int>::fromValue(heightValue, errors);
     protocol::Value* colorValue = object ? object->get("color") : nullptr;
     Maybe<protocol::DOM::RGBA> in_color;
     if (colorValue) {
-        errors->setName("color");
+        errors->SetName("color");
         in_color = ValueConversions<protocol::DOM::RGBA>::fromValue(colorValue, errors);
     }
     protocol::Value* outlineColorValue = object ? object->get("outlineColor") : nullptr;
     Maybe<protocol::DOM::RGBA> in_outlineColor;
     if (outlineColorValue) {
-        errors->setName("outlineColor");
+        errors->SetName("outlineColor");
         in_outlineColor = ValueConversions<protocol::DOM::RGBA>::fromValue(outlineColorValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -666,18 +666,18 @@ void DispatcherImpl::setInspectMode(int callId, const String& method, v8_crdtp::
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* modeValue = object ? object->get("mode") : nullptr;
-    errors->setName("mode");
+    errors->SetName("mode");
     String in_mode = ValueConversions<String>::fromValue(modeValue, errors);
     protocol::Value* highlightConfigValue = object ? object->get("highlightConfig") : nullptr;
     Maybe<protocol::Overlay::HighlightConfig> in_highlightConfig;
     if (highlightConfigValue) {
-        errors->setName("highlightConfig");
+        errors->SetName("highlightConfig");
         in_highlightConfig = ValueConversions<protocol::Overlay::HighlightConfig>::fromValue(highlightConfigValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -697,12 +697,12 @@ void DispatcherImpl::setShowAdHighlights(int callId, const String& method, v8_cr
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* showValue = object ? object->get("show") : nullptr;
-    errors->setName("show");
+    errors->SetName("show");
     bool in_show = ValueConversions<bool>::fromValue(showValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -722,15 +722,15 @@ void DispatcherImpl::setPausedInDebuggerMessage(int callId, const String& method
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* messageValue = object ? object->get("message") : nullptr;
     Maybe<String> in_message;
     if (messageValue) {
-        errors->setName("message");
+        errors->SetName("message");
         in_message = ValueConversions<String>::fromValue(messageValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -750,12 +750,12 @@ void DispatcherImpl::setShowDebugBorders(int callId, const String& method, v8_cr
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* showValue = object ? object->get("show") : nullptr;
-    errors->setName("show");
+    errors->SetName("show");
     bool in_show = ValueConversions<bool>::fromValue(showValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -775,12 +775,12 @@ void DispatcherImpl::setShowFPSCounter(int callId, const String& method, v8_crdt
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* showValue = object ? object->get("show") : nullptr;
-    errors->setName("show");
+    errors->SetName("show");
     bool in_show = ValueConversions<bool>::fromValue(showValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -800,12 +800,12 @@ void DispatcherImpl::setShowPaintRects(int callId, const String& method, v8_crdt
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* resultValue = object ? object->get("result") : nullptr;
-    errors->setName("result");
+    errors->SetName("result");
     bool in_result = ValueConversions<bool>::fromValue(resultValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -825,12 +825,12 @@ void DispatcherImpl::setShowLayoutShiftRegions(int callId, const String& method,
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* resultValue = object ? object->get("result") : nullptr;
-    errors->setName("result");
+    errors->SetName("result");
     bool in_result = ValueConversions<bool>::fromValue(resultValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -850,12 +850,12 @@ void DispatcherImpl::setShowScrollBottleneckRects(int callId, const String& meth
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* showValue = object ? object->get("show") : nullptr;
-    errors->setName("show");
+    errors->SetName("show");
     bool in_show = ValueConversions<bool>::fromValue(showValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -875,12 +875,12 @@ void DispatcherImpl::setShowHitTestBorders(int callId, const String& method, v8_
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* showValue = object ? object->get("show") : nullptr;
-    errors->setName("show");
+    errors->SetName("show");
     bool in_show = ValueConversions<bool>::fromValue(showValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
@@ -900,12 +900,12 @@ void DispatcherImpl::setShowViewportSizeOnResize(int callId, const String& metho
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
+    errors->Push();
     protocol::Value* showValue = object ? object->get("show") : nullptr;
-    errors->setName("show");
+    errors->SetName("show");
     bool in_show = ValueConversions<bool>::fromValue(showValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
+    errors->Pop();
+    if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
