@@ -374,6 +374,8 @@
 		C2D7E9CD23F4024200DB289C /* error_support.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9CC23F4024200DB289C /* error_support.h */; };
 		C2D7E9CF23F4294800DB289C /* export-template.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9CE23F4294800DB289C /* export-template.h */; };
 		C2D7E9D223F4297400DB289C /* handle-for.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9D123F4297400DB289C /* handle-for.h */; };
+		C2D7E9D523F42C1100DB289C /* PromiseProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9D323F42C1100DB289C /* PromiseProxy.h */; };
+		C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D7E9D423F42C1100DB289C /* PromiseProxy.cpp */; };
 		C2DDEB8D229EAC8300345BFE /* Common.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB64229EAC8100345BFE /* Common.h */; };
 		C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB65229EAC8100345BFE /* Interop.h */; };
 		C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB66229EAC8100345BFE /* ArgConverter.h */; };
@@ -944,6 +946,8 @@
 		C2D7E9CC23F4024200DB289C /* error_support.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = error_support.h; sourceTree = "<group>"; };
 		C2D7E9CE23F4294800DB289C /* export-template.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "export-template.h"; sourceTree = "<group>"; };
 		C2D7E9D123F4297400DB289C /* handle-for.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "handle-for.h"; sourceTree = "<group>"; };
+		C2D7E9D323F42C1100DB289C /* PromiseProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PromiseProxy.h; sourceTree = "<group>"; };
+		C2D7E9D423F42C1100DB289C /* PromiseProxy.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PromiseProxy.cpp; sourceTree = "<group>"; };
 		C2DDEB16229EA89000345BFE /* TestRunner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestRunner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB26229EA89200345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C2DDEB32229EAB3B00345BFE /* NativeScript.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScript.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1840,6 +1844,8 @@
 				C2DDEB86229EAC8300345BFE /* ObjectManager.mm */,
 				C266569222AFFF7E00EE15CC /* Pointer.h */,
 				C266569122AFFF7E00EE15CC /* Pointer.cpp */,
+				C2D7E9D323F42C1100DB289C /* PromiseProxy.h */,
+				C2D7E9D423F42C1100DB289C /* PromiseProxy.cpp */,
 				C266569622AFFFB000EE15CC /* Reference.h */,
 				C266569522AFFFB000EE15CC /* Reference.cpp */,
 				C2D71D7523E18C41000CD5F0 /* robin_hood.h */,
@@ -1941,6 +1947,7 @@
 				C247C35522F828E3001D2CA2 /* search-util.h in Headers */,
 				C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */,
 				C247C35E22F828E3001D2CA2 /* Protocol.h in Headers */,
+				C2D7E9D523F42C1100DB289C /* PromiseProxy.h in Headers */,
 				C247C35922F828E3001D2CA2 /* value-mirror.h in Headers */,
 				C2A5F86B2359AEB600074AFA /* ExtVector.h in Headers */,
 				C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */,
@@ -2606,6 +2613,7 @@
 				C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */,
 				C247C34822F828E3001D2CA2 /* custom-preview.cc in Sources */,
 				C247C35D22F828E3001D2CA2 /* CSS.cpp in Sources */,
+				C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */,
 				C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */,
 				C247C36222F828E3001D2CA2 /* Page.cpp in Sources */,
 				C2229973235449B400C1DFD6 /* InspectorServer.mm in Sources */,

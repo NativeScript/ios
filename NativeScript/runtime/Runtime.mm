@@ -10,6 +10,7 @@
 #include "SimpleAllocator.h"
 #include "ObjectManager.h"
 #include "RuntimeConfig.h"
+#include "PromiseProxy.h"
 #include "Helpers.h"
 #include "TSHelpers.h"
 #include "WeakRef.h"
@@ -92,6 +93,7 @@ void Runtime::Init(Isolate* isolate) {
 
     DefineGlobalObject(context);
     DefineCollectFunction(context);
+    PromiseProxy::Init(context);
     Console::Init(context);
     this->moduleInternal_ = std::make_unique<ModuleInternal>(context);
 
