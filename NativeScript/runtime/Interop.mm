@@ -281,7 +281,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                     ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
                     Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
                     ffi_type* ffiType = FFICall::GetArgumentType(innerType);
-                    data = malloc(ffiType->size);
+                    data = calloc(1, ffiType->size);
                     referenceWrapper->SetData(data);
                     referenceWrapper->SetEncoding(innerType);
                     // Initialize the ref/out parameter value before passing it to the function call

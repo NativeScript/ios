@@ -114,38 +114,42 @@ describe(module.id, function () {
     });
 
     it("functionWithUInt8ArrayBufferView", function () {
-        let array = Uint8Array.from([ 97, 98, 99 ]);
+        let array = Uint8Array.from([ 97, 98, 99, 0 ]);
         let actual = functionWithUCharPtr(array);
         expect(actual[0]).toBe(97);
         expect(actual[1]).toBe(98);
         expect(actual[2]).toBe(99);
+        expect(actual[3]).toBe(0);
         expect(TNSGetOutput()).toBe("abc");
     });
 
     it("functionWithUInt8ArrayBuffer", function () {
-        let array = Uint8Array.from([ 97, 98, 99 ]).buffer;
+        let array = Uint8Array.from([ 97, 98, 99, 0 ]).buffer;
         let actual = functionWithUCharPtr(array);
         expect(actual[0]).toBe(97);
         expect(actual[1]).toBe(98);
         expect(actual[2]).toBe(99);
+        expect(actual[3]).toBe(0);
         expect(TNSGetOutput()).toBe("abc");
     });
 
     it("functionWithInt8ArrayBufferView", function () {
-        let array = Int8Array.from([ 97, 98, 99 ]);
+        let array = Int8Array.from([ 97, 98, 99, 0 ]);
         let actual = functionWithCharPtr(array);
         expect(actual[0]).toBe(97);
         expect(actual[1]).toBe(98);
         expect(actual[2]).toBe(99);
+        expect(actual[3]).toBe(0);
         expect(TNSGetOutput()).toBe("abc");
     });
 
     it("functionWithInt8ArrayBuffer", function () {
-        let array = Int8Array.from([ 97, 98, 99 ]).buffer;
+        let array = Int8Array.from([ 97, 98, 99, 0 ]).buffer;
         let actual = functionWithCharPtr(array);
         expect(actual[0]).toBe(97);
         expect(actual[1]).toBe(98);
         expect(actual[2]).toBe(99);
+        expect(actual[3]).toBe(0);
         expect(TNSGetOutput()).toBe("abc");
     });
 
