@@ -122,35 +122,6 @@ void Runtime::RunMainScript() {
     this->moduleInternal_->RunModule(isolate, "./");
 }
 
-void Runtime::RunScript(string file, TryCatch& tc) {
-    Isolate* isolate = isolate_;
-    Isolate::Scope isolate_scope(isolate);
-    HandleScope handle_scope(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
-    std::string filename = RuntimeConfig.ApplicationPath + "/" + file;
-
-    if (!tns::Exists(filename.c_str())) {
-        Local<Value> error = Exception::Error(tns::ToV8String(isolate, "The specified script does not exist: \"" + filename + "\""));
-        isolate->ThrowException(error);
-        return;
-    }
-
-    string source = tns::ReadText(filename);
-    Local<v8::String> script_source = v8::String::NewFromUtf8(isolate, source.c_str(), NewStringType::kNormal).ToLocalChecked();
-
-    ScriptOrigin origin(tns::ToV8String(isolate, file));
-
-    Local<Script> script;
-    if (!Script::Compile(context, script_source, &origin).ToLocal(&script)) {
-        return;
-    }
-
-    Local<Value> result;
-    if (!script->Run(context).ToLocal(&result)) {
-        return;
-    }
-}
-
 void Runtime::RunModule(const std::string moduleName) {
     Isolate* isolate = this->GetIsolate();
     Isolate::Scope isolate_scope(isolate);
