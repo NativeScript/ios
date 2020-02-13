@@ -7,14 +7,15 @@ using namespace v8;
 
 namespace tns {
 
-void FunctionReference::Register(Isolate* isolate, Local<Object> interop) {
-    Local<v8::Function> ctorFunc = FunctionReference::GetFunctionReferenceCtorFunc(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
+void FunctionReference::Register(Local<Context> context, Local<Object> interop) {
+    Isolate* isolate = context->GetIsolate();
+    Local<v8::Function> ctorFunc = FunctionReference::GetFunctionReferenceCtorFunc(context);
     bool success = interop->Set(context, tns::ToV8String(isolate, "FunctionReference"), ctorFunc).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
-Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* isolate) {
+Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
     auto cache = Caches::Get(isolate);
     Persistent<v8::Function>* poFunctionReferenceCtor = cache->FunctionReferenceCtorFunc.get();
     if (poFunctionReferenceCtor != nullptr) {
@@ -26,7 +27,6 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Isolate* iso
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
     ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "FunctionReference"));
 
-    Local<Context> context = isolate->GetCurrentContext();
     Local<v8::Function> ctorFunc;
     if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
         tns::Assert(false, isolate);

@@ -22,7 +22,7 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
 
     Reference::Register(context, interop);
     Pointer::Register(context, interop);
-    FunctionReference::Register(isolate, interop);
+    FunctionReference::Register(context, interop);
     RegisterBufferFromDataFunction(context, interop);
     RegisterHandleOfFunction(context, interop);
     RegisterAllocFunction(context, interop);

@@ -7,14 +7,15 @@ using namespace v8;
 
 namespace tns {
 
-void SymbolIterator::Set(Isolate* isolate, Local<Value> object) {
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<v8::Function> iterator;
+void SymbolIterator::Set(Local<Context> context, Local<Value> object) {
+    Isolate* isolate = context->GetIsolate();
 
+    Local<v8::Function> iterator;
     bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& args) {
         Isolate* isolate = args.GetIsolate();
+        Local<Context> context = isolate->GetCurrentContext();
         Local<Value> object = args.Data();
-        Local<Object> result = CreateIteratorObject(isolate, object);
+        Local<Object> result = CreateIteratorObject(context, object);
         args.GetReturnValue().Set(result);
     }, object).ToLocal(&iterator);
     tns::Assert(success, isolate);
@@ -24,8 +25,8 @@ void SymbolIterator::Set(Isolate* isolate, Local<Value> object) {
     tns::Assert(success, isolate);
 }
 
-Local<Object> SymbolIterator::CreateIteratorObject(Isolate* isolate, Local<Value> object) {
-    Local<Context> context = isolate->GetCurrentContext();
+Local<Object> SymbolIterator::CreateIteratorObject(Local<Context> context, Local<Value> object) {
+    Isolate* isolate = context->GetIsolate();
     Local<ObjectTemplate> objectTemplate = ObjectTemplate::New(isolate);
     objectTemplate->SetInternalFieldCount(2);
     Local<Object> result;

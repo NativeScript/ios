@@ -1003,7 +1003,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
         if ([result isKindOfClass:[NSArray class]]) {
             // attach Symbol.iterator to the instance
-            SymbolIterator::Set(isolate, jsResult);
+            SymbolIterator::Set(context, jsResult);
         }
 
         return jsResult;
