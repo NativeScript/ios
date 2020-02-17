@@ -182,8 +182,8 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
             return;
         }
 
-        ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-        Class baseClass = dataWrapper->Data();
+        ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
+        Class baseClass = classWrapper->Klass();
         std::string baseClassName = class_getName(baseClass);
 
         Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
