@@ -18,6 +18,7 @@ enum class WrapperType {
     Enum,
     Struct,
     StructType,
+    ObjCAllocObject,
     ObjCObject,
     ObjCClass,
     ObjCProtocol,
@@ -385,6 +386,23 @@ private:
     std::shared_ptr<v8::Persistent<v8::Value>> parent_;
 };
 
+class ObjCAllocDataWrapper: public BaseDataWrapper {
+public:
+    ObjCAllocDataWrapper(Class klass)
+        : klass_(klass) {
+    }
+
+    const WrapperType Type() {
+        return WrapperType::ObjCAllocObject;
+    }
+
+    Class Klass() {
+        return this->klass_;
+    }
+private:
+    Class klass_;
+};
+
 class ObjCDataWrapper: public BaseDataWrapper {
 public:
     ObjCDataWrapper(id data)
@@ -396,7 +414,7 @@ public:
     }
 
     id Data() {
-        return data_;
+        return this->data_;
     }
 private:
     id data_;

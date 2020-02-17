@@ -611,11 +611,9 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
             klass = objc_getClass(meta->name());
         }
 
-        id obj = [klass alloc];
-
-        std::string className = class_getName(klass);
         Local<Context> context = isolate->GetCurrentContext();
-        Local<Value> result = ArgConverter::CreateJsWrapper(context, new ObjCDataWrapper(obj), Local<Object>());
+        ObjCAllocDataWrapper* allocWrapper = new ObjCAllocDataWrapper(klass);
+        Local<Value> result = ArgConverter::CreateJsWrapper(context, allocWrapper, Local<Object>());
         info.GetReturnValue().Set(result);
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8(isolate);
