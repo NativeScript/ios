@@ -62,6 +62,10 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         return true;
     }
 
+    if (wrapper->IsGcProtected()) {
+        return false;
+    }
+
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     switch (wrapper->Type()) {
         case WrapperType::Struct: {
@@ -100,7 +104,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
                     [target isKindOfClass:[DictionaryAdapter class]] ||
                     [target isKindOfClass:[ArrayAdapter class]] ||
                     [target isKindOfClass:[NSDataAdapter class]];
-                if (isAdapter /**&& retainCount > 2**/) {
+                if (isAdapter) {
                     return false;
                 }
 

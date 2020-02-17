@@ -160,11 +160,29 @@ private:
 
 class BaseDataWrapper {
 public:
+    BaseDataWrapper()
+        : gcProtected_(false) {
+    }
+
     virtual ~BaseDataWrapper() = default;
 
     const virtual WrapperType Type() {
         return WrapperType::Base;
     }
+
+    bool IsGcProtected() {
+        return this->gcProtected_;
+    }
+
+    void GcProtect() {
+        this->gcProtected_ = true;
+    }
+
+    void GcUnprotect() {
+        this->gcProtected_ = false;
+    }
+private:
+    bool gcProtected_;
 };
 
 class EnumDataWrapper: public BaseDataWrapper {
