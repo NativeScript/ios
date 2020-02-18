@@ -49,6 +49,8 @@ static std::shared_ptr<Runtime> runtime_;
 
     runtime_->RunMainScript();
 
+    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+
     tns::Tasks::Drain();
 
     runtime_.reset();
