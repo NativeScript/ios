@@ -28,7 +28,7 @@ void PromiseProxy::Init(v8::Local<v8::Context> context) {
                     return new Proxy(promise, {
                         get: function(target, name) {
                             let orig = target[name];
-                            if (name === "then") {
+                            if (name === "then" || name === "catch") {
                                 return orig.bind(target);
                             }
                             return function(x) {
