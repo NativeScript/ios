@@ -1,8 +1,5 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <sstream>
-#include "DictionaryAdapter.h"
-#include "NSDataAdapter.h"
-#include "ArrayAdapter.h"
 #include "ObjectManager.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
@@ -95,20 +92,8 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
             id target = objCObjectWrapper->Data();
             if (target != nil) {
-                long retainCount = ObjectManager::GetRetainCount(target);
-                if (retainCount > 2) {
-                    return false;
-                }
-
-                bool isAdapter =
-                    [target isKindOfClass:[DictionaryAdapter class]] ||
-                    [target isKindOfClass:[ArrayAdapter class]] ||
-                    [target isKindOfClass:[NSDataAdapter class]];
-                if (isAdapter) {
-                    return false;
-                }
-
                 cache->Instances.erase(target);
+                [target release];
             }
             break;
         }
@@ -220,10 +205,7 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
             cache->Instances.erase(it);
         }
 
-        long retainCount = ObjectManager::GetRetainCount(data);
-        for (int i = 0; i < retainCount - 1; i++) {
-            [data release];
-        }
+        [data dealloc];
 
         delete wrapper;
         tns::SetValue(isolate, value.As<Object>(), nullptr);

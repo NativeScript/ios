@@ -32,7 +32,6 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
             ObjCAllocDataWrapper* allocWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
             Class klass = allocWrapper->Klass();
             target = [klass alloc];
-            CFBridgingRetain(target);
         } else if (wrapper->Type() == WrapperType::ObjCObject) {
             ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
             target = objcWrapper->Data();
@@ -74,7 +73,8 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
         throw NativeScriptException(errorMessage);
     }
 
-    return Interop::CallFunction(context, meta, target, klass, args, callSuper);
+    ObjCMethodCall methodCall(context, meta, target, klass, args, callSuper);
+    return Interop::CallFunction(methodCall);
 }
 
 Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapper* wrapper, bool skipGCRegistration) {
@@ -332,6 +332,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
         ArgConverter::CreateJsWrapper(context, wrapper, thiz);
         std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
         cache->Instances.emplace(result, poThiz);
+        [result retain];
     }
 }
 
@@ -592,8 +593,12 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
         } else {
             std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, skipGCRegistration);
             receiver = poValue->Get(isolate).As<Object>();
+            tns::SetValue(isolate, receiver, wrapper);
             cache->Instances.emplace(target, poValue);
+            [target retain];
         }
+    } else {
+        tns::SetValue(isolate, receiver, wrapper);
     }
 
     Class klass = [target class];
@@ -627,8 +632,6 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
             tns::SetValue(isolate, receiver, wrapper);
         }
     }
-
-    tns::SetValue(isolate, receiver, wrapper);
 
     return receiver;
 }

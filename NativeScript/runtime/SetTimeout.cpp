@@ -1,6 +1,7 @@
 #include <dispatch/dispatch.h>
 #include "SetTimeout.h"
 #include "Helpers.h"
+#include "Caches.h"
 
 using namespace v8;
 
@@ -71,11 +72,13 @@ void SetTimeout::Elapsed(const uint32_t key) {
 
     Isolate* isolate = it->second.isolate_;
     Persistent<v8::Function>* poCallback = it->second.callback_;
+    v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
     Local<v8::Function> cb = poCallback->Get(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    Local<Context> context = cache->GetContext();
     Local<Object> global = context->Global();
     Local<Value> result;
     if (!cb->Call(context, global, 0, nullptr).ToLocal(&result)) {

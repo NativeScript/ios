@@ -1,5 +1,4 @@
 #include "ArrayAdapter.h"
-#include "ObjectManager.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Interop.h"
@@ -17,8 +16,8 @@ using namespace v8;
     if (self) {
         self->isolate_ = isolate;
         std::shared_ptr<Caches> cache = Caches::Get(isolate);
-        Local<Context> context = cache->GetContext();
-        self->object_ = ObjectManager::Register(context, jsObject);
+        // TODO: Handle the lifetime of this persistent js object
+        self->object_ = std::make_shared<Persistent<Value>>(isolate, jsObject);
         cache->Instances.emplace(self, self->object_);
         tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
     }
@@ -101,6 +100,7 @@ using namespace v8;
 
 - (void)dealloc {
     self->object_->Reset();
+    [super dealloc];
 }
 
 @end
