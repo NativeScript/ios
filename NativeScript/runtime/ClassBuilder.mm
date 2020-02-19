@@ -289,11 +289,13 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                   v8::Locker locker(isolate);
                   Isolate::Scope isolate_scope(isolate);
                   HandleScope handle_scope(isolate);
-                  Local<Value> value = it->second->Get(isolate);
-                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                      ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                      objcWrapper->GcUnprotect();
+                  if (it->second != nullptr) {
+                      Local<Value> value = it->second->Get(isolate);
+                      BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+                      if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                          ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                          objcWrapper->GcUnprotect();
+                      }
                   }
               }
           }
