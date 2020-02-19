@@ -28,6 +28,8 @@ private:
     static std::string GetTypeEncoding(const TypeEncoding* typeEncoding, int argsCount);
     static std::string GetTypeEncoding(const TypeEncoding* typeEncoding);
     static BinaryTypeEncodingType GetTypeEncodingType(v8::Isolate* isolate, v8::Local<v8::Value> value);
+    static IMP FindNotOverridenMethod(Class klass, SEL method);
+
 
     struct CacheItem {
     public:

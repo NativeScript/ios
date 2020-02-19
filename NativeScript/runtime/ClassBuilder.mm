@@ -2,6 +2,7 @@
 #include <numeric>
 #include <sstream>
 #include "ClassBuilder.h"
+#include "TNSDerivedClass.h"
 #include "NativeScriptException.h"
 #include "FastEnumerationAdapter.h"
 #include "ArgConverter.h"
@@ -61,6 +62,9 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         }
 
         Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName);
+        class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
+        class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
+
         if (!nativeSignature.IsEmpty()) {
             ClassBuilder::ExposeDynamicMembers(context, extendedClass, implementationObject, nativeSignature);
         } else {
@@ -182,14 +186,17 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
             return;
         }
 
-        ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-        Class baseClass = dataWrapper->Data();
+        ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
+        Class baseClass = classWrapper->Klass();
         std::string baseClassName = class_getName(baseClass);
 
         Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
         std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
 
         __block Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, extendedClassName);
+        class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
+        class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
+
         extendedClassName = class_getName(extendedClass);
 
         tns::SetValue(isolate, extendedClassCtorFunc, new ObjCClassWrapper(extendedClass, true));
@@ -246,6 +253,54 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
             ClassBuilder::ExposeDynamicMethods(context, extendedClass, exposedMethods, exposedProtocols, implementationObject.As<Object>());
         });
         class_addMethod(object_getClass(extendedClass), @selector(initialize), newInitialize, "v@:");
+
+        /// We swizzle the retain and release methods for the following reason:
+        /// When we instantiate a native class via a JavaScript call we add it to the object instances map thus
+        /// incrementing the retainCount by 1. Then, when the native object is referenced somewhere else its count will become more than 1.
+        /// Since we want to keep the corresponding JavaScript object alive even if it is not used anywhere, we call GcProtect on it.
+        /// Whenever the native object is released so that its retainCount is 1 (the object instances map), we unprotect the corresponding JavaScript object
+        /// in order to make both of them destroyable/GC-able. When the JavaScript object is GC-ed we release the native counterpart as well.
+        void (*retain)(id, SEL) = (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
+        IMP newRetain = imp_implementationWithBlock(^(id self) {
+          if ([self retainCount] == 1) {
+              auto it = cache->Instances.find(self);
+              if (it != cache->Instances.end()) {
+                  v8::Locker locker(isolate);
+                  Isolate::Scope isolate_scope(isolate);
+                  HandleScope handle_scope(isolate);
+                  Local<Value> value = it->second->Get(isolate);
+                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                      ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                      objcWrapper->GcProtect();
+                  }
+              }
+          }
+
+          return retain(self, @selector(retain));
+        });
+        class_addMethod(extendedClass, @selector(retain), newRetain, "@@:");
+
+        void (*release)(id, SEL) = (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
+        IMP newRelease = imp_implementationWithBlock(^(id self) {
+          if ([self retainCount] == 2) {
+              auto it = cache->Instances.find(self);
+              if (it != cache->Instances.end()) {
+                  v8::Locker locker(isolate);
+                  Isolate::Scope isolate_scope(isolate);
+                  HandleScope handle_scope(isolate);
+                  Local<Value> value = it->second->Get(isolate);
+                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                      ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                      objcWrapper->GcUnprotect();
+                  }
+              }
+          }
+
+          release(self, @selector(release));
+        });
+        class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
 
         info.GetReturnValue().Set(v8::Undefined(isolate));
     }).ToLocalChecked();
@@ -759,6 +814,14 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<Name> property, const Prope
     superValue->SetInternalField(1, tns::ToV8String(isolate, "super"));
 
     info.GetReturnValue().Set(superValue);
+}
+
+IMP ClassBuilder::FindNotOverridenMethod(Class klass, SEL method) {
+    while (class_conformsToProtocol(klass, @protocol(TNSDerivedClass))) {
+        klass = class_getSuperclass(klass);
+    }
+
+    return class_getMethodImplementation(klass, method);
 }
 
 unsigned long long ClassBuilder::classNameCounter_ = 0;

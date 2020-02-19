@@ -15,6 +15,7 @@
 #include "TSHelpers.h"
 #include "WeakRef.h"
 #include "Worker.h"
+// #include "SetTimeout.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -84,6 +85,7 @@ void Runtime::Init(Isolate* isolate) {
     DefineTimeMethod(isolate, globalTemplate);
     WeakRef::Init(isolate, globalTemplate);
     ObjectManager::Init(isolate, globalTemplate);
+//    SetTimeout::Init(isolate, globalTemplate);
 
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);

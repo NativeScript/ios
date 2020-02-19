@@ -13,25 +13,26 @@ namespace tns {
 class PrimitiveDataWrapper;
 
 enum class WrapperType {
-    Base,
-    Primitive,
-    Enum,
-    Struct,
-    StructType,
-    ObjCObject,
-    ObjCClass,
-    ObjCProtocol,
-    Function,
-    AnonymousFunction,
-    Block,
-    Reference,
-    ReferenceType,
-    Pointer,
-    PointerType,
-    FunctionReference,
-    FunctionReferenceType,
-    ExtVector,
-    Worker,
+    Base = 1 << 0,
+    Primitive = 1 << 1,
+    Enum = 1 << 2,
+    Struct = 1 << 3,
+    StructType = 1 << 4,
+    ObjCAllocObject = 1 << 5,
+    ObjCObject = 1 << 6,
+    ObjCClass = 1 << 7,
+    ObjCProtocol = 1 << 8,
+    Function = 1 << 9,
+    AnonymousFunction = 1 << 10,
+    Block = 1 << 11,
+    Reference = 1 << 12,
+    ReferenceType = 1 << 13,
+    Pointer = 1 << 14,
+    PointerType = 1 << 15,
+    FunctionReference = 1 << 16,
+    FunctionReferenceType = 1 << 17,
+    ExtVector = 1 << 18,
+    Worker = 1 << 19,
 };
 
 struct V8Args {
@@ -160,11 +161,29 @@ private:
 
 class BaseDataWrapper {
 public:
+    BaseDataWrapper()
+        : gcProtected_(false) {
+    }
+
     virtual ~BaseDataWrapper() = default;
 
     const virtual WrapperType Type() {
         return WrapperType::Base;
     }
+
+    bool IsGcProtected() {
+        return this->gcProtected_;
+    }
+
+    void GcProtect() {
+        this->gcProtected_ = true;
+    }
+
+    void GcUnprotect() {
+        this->gcProtected_ = false;
+    }
+private:
+    bool gcProtected_;
 };
 
 class EnumDataWrapper: public BaseDataWrapper {
@@ -367,6 +386,23 @@ private:
     std::shared_ptr<v8::Persistent<v8::Value>> parent_;
 };
 
+class ObjCAllocDataWrapper: public BaseDataWrapper {
+public:
+    ObjCAllocDataWrapper(Class klass)
+        : klass_(klass) {
+    }
+
+    const WrapperType Type() {
+        return WrapperType::ObjCAllocObject;
+    }
+
+    Class Klass() {
+        return this->klass_;
+    }
+private:
+    Class klass_;
+};
+
 class ObjCDataWrapper: public BaseDataWrapper {
 public:
     ObjCDataWrapper(id data)
@@ -378,7 +414,7 @@ public:
     }
 
     id Data() {
-        return data_;
+        return this->data_;
     }
 private:
     id data_;

@@ -25,18 +25,25 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     bool instanceMethod = !receiver.IsEmpty();
     bool callSuper = false;
     if (instanceMethod) {
-        tns::Assert(receiver->InternalFieldCount() > 0, isolate);
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
+        tns::Assert(wrapper != nullptr, isolate);
 
-        Local<External> ext = receiver->GetInternalField(0).As<External>();
-        // TODO: Check the actual type of the DataWrapper
-        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
-        target = wrapper->Data();
+        if (wrapper->Type() == WrapperType::ObjCAllocObject) {
+            ObjCAllocDataWrapper* allocWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
+            Class klass = allocWrapper->Klass();
+            target = [klass alloc];
+        } else if (wrapper->Type() == WrapperType::ObjCObject) {
+            ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+            target = objcWrapper->Data();
 
-        std::string className = object_getClassName(target);
-        auto cache = Caches::Get(isolate);
-        auto it = cache->ClassPrototypes.find(className);
-        // For extended classes we will call the base method
-        callSuper = isMethodCallback && it != cache->ClassPrototypes.end();
+            std::string className = object_getClassName(target);
+            auto cache = Caches::Get(isolate);
+            auto it = cache->ClassPrototypes.find(className);
+            // For extended classes we will call the base method
+            callSuper = isMethodCallback && it != cache->ClassPrototypes.end();
+        } else {
+            tns::Assert(false, isolate);
+        }
     }
 
     if (args.Length() != meta->encodings()->count - 1) {
@@ -66,7 +73,8 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
         throw NativeScriptException(errorMessage);
     }
 
-    return Interop::CallFunction(context, meta, target, klass, args, callSuper);
+    ObjCMethodCall methodCall(context, meta, target, klass, args, callSuper);
+    return Interop::CallFunction(methodCall);
 }
 
 Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapper* wrapper, bool skipGCRegistration) {
@@ -324,6 +332,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
         ArgConverter::CreateJsWrapper(context, wrapper, thiz);
         std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
         cache->Instances.emplace(result, poThiz);
+        [result retain];
     }
 }
 
@@ -540,6 +549,32 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
         return receiver;
     }
 
+    if (wrapper->Type() == WrapperType::ObjCAllocObject) {
+        ObjCAllocDataWrapper* allocDataWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
+        Class klass = allocDataWrapper->Klass();
+
+        std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, false);
+        receiver = poValue->Get(isolate).As<Object>();
+
+        const Meta* meta = FindMeta(klass);
+        if (meta != nullptr) {
+            auto cache = Caches::Get(isolate);
+            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta));
+            auto it = cache->Prototypes.find(meta);
+            if (it != cache->Prototypes.end()) {
+                Local<Value> prototype = it->second->Get(isolate);
+                bool success;
+                if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
+                    tns::Assert(false, isolate);
+                }
+            }
+        }
+
+        tns::SetValue(isolate, receiver, wrapper);
+
+        return receiver;
+    }
+
     id target = nil;
     if (wrapper->Type() == WrapperType::ObjCObject) {
         ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
@@ -558,8 +593,12 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
         } else {
             std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, skipGCRegistration);
             receiver = poValue->Get(isolate).As<Object>();
+            tns::SetValue(isolate, receiver, wrapper);
             cache->Instances.emplace(target, poValue);
+            [target retain];
         }
+    } else {
+        tns::SetValue(isolate, receiver, wrapper);
     }
 
     Class klass = [target class];
@@ -593,8 +632,6 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
             tns::SetValue(isolate, receiver, wrapper);
         }
     }
-
-    tns::SetValue(isolate, receiver, wrapper);
 
     return receiver;
 }

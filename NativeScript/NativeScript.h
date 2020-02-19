@@ -2,7 +2,7 @@
 
 @interface Config : NSObject
 
-@property (nonatomic) NSString* BaseDir;
+@property (nonatomic, retain) NSString* BaseDir;
 @property (nonatomic) void* MetadataPtr;
 @property BOOL IsDebug;
 @property BOOL LogToSystemConsole;

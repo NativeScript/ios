@@ -352,6 +352,12 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
         }
     }
 
+    MetadataBuilder::RegisterStaticMethods(context, ctorFunc, meta, staticMembers);
+    MetadataBuilder::RegisterStaticProperties(context, ctorFunc, meta, meta->name(), staticMembers);
+    MetadataBuilder::RegisterStaticProtocols(context, ctorFunc, meta, meta->name(), staticMembers);
+
+    cache->CtorFuncTemplates.emplace(meta, std::make_unique<Persistent<FunctionTemplate>>(isolate, ctorFuncTemplate));
+
     if (meta->type() == MetaType::Interface) {
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
         MetadataBuilder::RegisterAllocMethod(context, ctorFunc, interfaceMeta);
@@ -360,12 +366,6 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
         bool success = ctorFunc->Set(context, tns::ToV8String(isolate, "extend"), extendFunc).FromMaybe(false);
         tns::Assert(success, isolate);
     }
-
-    MetadataBuilder::RegisterStaticMethods(context, ctorFunc, meta, staticMembers);
-    MetadataBuilder::RegisterStaticProperties(context, ctorFunc, meta, meta->name(), staticMembers);
-    MetadataBuilder::RegisterStaticProtocols(context, ctorFunc, meta, meta->name(), staticMembers);
-
-    cache->CtorFuncTemplates.emplace(meta, std::make_unique<Persistent<FunctionTemplate>>(isolate, ctorFuncTemplate));
 
     Local<Value> prototypeValue;
     success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
@@ -611,11 +611,9 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
             klass = objc_getClass(meta->name());
         }
 
-        id obj = [klass alloc];
-
-        std::string className = class_getName(klass);
         Local<Context> context = isolate->GetCurrentContext();
-        Local<Value> result = ArgConverter::CreateJsWrapper(context, new ObjCDataWrapper(obj), Local<Object>());
+        ObjCAllocDataWrapper* allocWrapper = new ObjCAllocDataWrapper(klass);
+        Local<Value> result = ArgConverter::CreateJsWrapper(context, allocWrapper, Local<Object>());
         info.GetReturnValue().Set(result);
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8(isolate);
@@ -836,7 +834,8 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
                 V8VectorArgs vectorArgs(localArgs);
                 Local<Context> context = Caches::Get(isolate)->GetContext();
                 v8::Unlocker unlocker(isolate);
-                Interop::CallFunction(context, item->userData_, typeEncoding, vectorArgs);
+                CMethodCall methodCall(context, item->userData_, typeEncoding, vectorArgs, item->meta_->ownsReturnedCocoaObject());
+                Interop::CallFunction(methodCall);
             });
 
             return;
@@ -845,7 +844,8 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
         V8FunctionCallbackArgs args(info);
         const TypeEncoding* typeEncoding = item->meta_->encodings()->first();
         Local<Context> context = isolate->GetCurrentContext();
-        Local<Value> result = Interop::CallFunction(context, item->userData_, typeEncoding, args);
+        CMethodCall methodCall(context, item->userData_, typeEncoding, args, item->meta_->ownsReturnedCocoaObject());
+        Local<Value> result = Interop::CallFunction(methodCall);
 
         if (typeEncoding->type != BinaryTypeEncodingType::VoidEncoding) {
             info.GetReturnValue().Set(result);

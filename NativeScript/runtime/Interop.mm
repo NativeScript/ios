@@ -1,5 +1,4 @@
 #include <Foundation/Foundation.h>
-#include <objc/message.h>
 #include <sstream>
 #include "Runtime.h"
 #include "Interop.h"
@@ -35,9 +34,16 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
             Runtime* runtime = Runtime::GetCurrentRuntime();
             if (runtime != nullptr) {
+                Isolate* isolate = runtime->GetIsolate();
+                v8::Locker locker(isolate);
+                Isolate::Scope isolate_scope(isolate);
+                HandleScope handle_scope(isolate);
+                Local<Value> callback = wrapper->callback_->Get(isolate);
+                tns::DeleteValue(isolate, callback);
                 wrapper->callback_->Reset();
             }
             delete wrapper;
+            block->~JSBlock();
         }
     }
 };
@@ -71,29 +77,12 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
     return blockPointer;
 }
 
-Local<Value> Interop::CallFunction(Local<Context> context, void* functionPointer, const TypeEncoding* typeEncoding, V8Args& args) {
-    return Interop::CallFunctionInternal(context, true, functionPointer, typeEncoding, args, nil, nil, nil, false, MetaType::Undefined);
+Local<Value> Interop::CallFunction(CMethodCall& methodCall) {
+    return Interop::CallFunctionInternal(methodCall);
 }
 
-Local<Value> Interop::CallFunction(Local<Context> context, const MethodMeta* meta, id target, Class clazz, V8Args& args, bool callSuper) {
-    SEL selector = nil;
-    void* functionPointer = nullptr;
-    const TypeEncoding* typeEncoding = nullptr;
-    bool isPrimitiveFunction = false;
-    MetaType metaType = MetaType::Undefined;
-
-    metaType = meta->type();
-    selector = meta->selector();
-    typeEncoding = meta->encodings()->first();
-    if (callSuper) {
-        functionPointer = (void*)objc_msgSendSuper;
-    } else {
-        functionPointer = (void*)objc_msgSend;
-    }
-
-    bool provideErrorOutParameter = meta->hasErrorOutParameter() && args.Length() < meta->encodings()->count - 1;
-
-    return Interop::CallFunctionInternal(context, isPrimitiveFunction, functionPointer, typeEncoding, args, target, clazz, selector, callSuper, metaType, provideErrorOutParameter);
+Local<Value> Interop::CallFunction(ObjCMethodCall& methodCall) {
+    return Interop::CallFunctionInternal(methodCall);
 }
 
 id Interop::CallInitializer(Local<Context> context, const MethodMeta* methodMeta, id target, Class clazz, V8Args& args) {
@@ -333,14 +322,21 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
         int argsCount = typeEncoding->details.block.signature.count - 1;
 
-        std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, arg);
-        MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
-        CFTypeRef blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
+        CFTypeRef blockPtr = nullptr;
+        BaseDataWrapper* baseWrapper = tns::GetValue(isolate, arg);
+        if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Block) {
+            BlockWrapper* wrapper = static_cast<BlockWrapper*>(baseWrapper);
+            blockPtr = wrapper->Block();
+        } else {
+            std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, arg);
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
+            blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
 
-        [(id)blockPtr autorelease];
+            [(id)blockPtr autorelease];
 
-        BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding);
-        tns::SetValue(isolate, arg.As<Object>(), wrapper);
+            BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding);
+            tns::SetValue(isolate, arg.As<v8::Function>(), wrapper);
+        }
 
         Interop::SetValue(dest, blockPtr);
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
@@ -698,7 +694,7 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
 }
 
-Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember) {
+Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember, bool ownsReturnedObject, bool isInitializer) {
     Isolate* isolate = context->GetIsolate();
 
     if (typeEncoding->type == BinaryTypeEncodingType::ExtVectorEncoding) {
@@ -887,7 +883,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             const TypeEncoding* typeEncoding = wrapper->ParametersEncoding();
 
             Local<Context> context = isolate->GetCurrentContext();
-            Local<Value> result = Interop::CallFunction(context, functionPointer, typeEncoding, args);
+            CMethodCall methodCall(context, functionPointer, typeEncoding, args, false);
+            Local<Value> result = Interop::CallFunction(methodCall);
 
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&func);
@@ -1000,6 +997,10 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
         Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
+
+        if (ownsReturnedObject || isInitializer) {
+            [result release];
+        }
 
         if ([result isKindOfClass:[NSArray class]]) {
             // attach Symbol.iterator to the instance
@@ -1270,68 +1271,68 @@ Local<v8::Array> Interop::ToArray(Local<Object> object) {
     return result.As<v8::Array>();
 }
 
-Local<Value> Interop::CallFunctionInternal(Local<Context> context, bool isPrimitiveFunction, void* functionPointer, const TypeEncoding* typeEncoding, V8Args& args, id target, Class clazz, SEL selector, bool callSuper, MetaType metaType, bool provideErrorOurParameter) {
-    int initialParameterIndex = isPrimitiveFunction ? 0 : 2;
+Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
+    int initialParameterIndex = methodCall.isPrimitiveFunction_ ? 0 : 2;
 
-    int argsCount = initialParameterIndex + (int)args.Length();
-    int cifArgsCount = provideErrorOurParameter ? argsCount + 1 : argsCount;
+    int argsCount = initialParameterIndex + (int)methodCall.args_.Length();
+    int cifArgsCount = methodCall.provideErrorOutParameter_ ? argsCount + 1 : argsCount;
 
-    ParametrizedCall* parametrizedCall = ParametrizedCall::Get(typeEncoding, initialParameterIndex, cifArgsCount);
+    ParametrizedCall* parametrizedCall = ParametrizedCall::Get(methodCall.typeEncoding_, initialParameterIndex, cifArgsCount);
 
     FFICall call(parametrizedCall);
 
     objc_super sup;
 
-    bool isInstanceMethod = (target && target != nil);
+    bool isInstanceMethod = (methodCall.target_ && methodCall.target_ != nil);
 
     if (initialParameterIndex > 1) {
 #if defined(__x86_64__)
-        if (metaType == MetaType::Undefined || metaType == MetaType::Union || metaType == MetaType::Struct) {
+        if (methodCall.metaType_ == MetaType::Undefined || methodCall.metaType_ == MetaType::Union || methodCall.metaType_ == MetaType::Struct) {
             const unsigned UNIX64_FLAG_RET_IN_MEM = (1 << 10);
 
-            ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
+            ffi_type* returnType = FFICall::GetArgumentType(methodCall.typeEncoding_);
 
             if (returnType->type == FFI_TYPE_LONGDOUBLE) {
-                functionPointer = (void*)objc_msgSend_fpret;
+                methodCall.functionPointer_ = (void*)objc_msgSend_fpret;
             } else if (returnType->type == FFI_TYPE_STRUCT && (parametrizedCall->Cif->flags & UNIX64_FLAG_RET_IN_MEM)) {
-                if (callSuper) {
-                    functionPointer = (void*)objc_msgSendSuper_stret;
+                if (methodCall.callSuper_) {
+                    methodCall.functionPointer_ = (void*)objc_msgSendSuper_stret;
                 } else {
-                    functionPointer = (void*)objc_msgSend_stret;
+                    methodCall.functionPointer_ = (void*)objc_msgSend_stret;
                 }
             }
         }
 #endif
 
         if (isInstanceMethod) {
-            if (callSuper) {
-                sup.receiver = target;
-                sup.super_class = class_getSuperclass(object_getClass(target));
+            if (methodCall.callSuper_) {
+                sup.receiver = methodCall.target_;
+                sup.super_class = class_getSuperclass(object_getClass(methodCall.target_));
                 Interop::SetValue(call.ArgumentBuffer(0), &sup);
             } else {
-                Interop::SetValue(call.ArgumentBuffer(0), target);
+                Interop::SetValue(call.ArgumentBuffer(0), methodCall.target_);
             }
         } else {
-            Interop::SetValue(call.ArgumentBuffer(0), clazz);
+            Interop::SetValue(call.ArgumentBuffer(0), methodCall.clazz_);
         }
 
-        Interop::SetValue(call.ArgumentBuffer(1), selector);
+        Interop::SetValue(call.ArgumentBuffer(1), methodCall.selector_);
     }
 
-    bool isInstanceReturnType = typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding;
-    bool marshalToPrimitive = isPrimitiveFunction || !isInstanceReturnType;
+    bool isInstanceReturnType = methodCall.typeEncoding_->type == BinaryTypeEncodingType::InstanceTypeEncoding;
+    bool marshalToPrimitive = methodCall.isPrimitiveFunction_ || !isInstanceReturnType;
 
-    Interop::SetFFIParams(context, typeEncoding, &call, argsCount, initialParameterIndex, args);
+    Interop::SetFFIParams(methodCall.context_, methodCall.typeEncoding_, &call, argsCount, initialParameterIndex, methodCall.args_);
 
     void* errorRef = nullptr;
-    if (provideErrorOurParameter) {
+    if (methodCall.provideErrorOutParameter_) {
         void* dest = call.ArgumentBuffer(argsCount);
         errorRef = malloc(ffi_type_pointer.size);
         Interop::SetValue(dest, errorRef);
     }
 
     @try {
-        ffi_call(parametrizedCall->Cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
+        ffi_call(parametrizedCall->Cif, FFI_FN(methodCall.functionPointer_), call.ResultBuffer(), call.ArgsArray());
     } @catch (NSException* e) {
         std::string message = [[e description] UTF8String];
         throw NativeScriptException(message);
@@ -1346,7 +1347,7 @@ Local<Value> Interop::CallFunctionInternal(Local<Context> context, bool isPrimit
         }
     }
 
-    Local<Value> result = Interop::GetResult(context, typeEncoding, &call, marshalToPrimitive, nullptr);
+    Local<Value> result = Interop::GetResult(methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, nullptr, false, methodCall.ownsReturnedObject_, methodCall.isInitializer_);
 
     return result;
 }

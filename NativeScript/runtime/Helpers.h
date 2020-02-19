@@ -33,6 +33,7 @@ v8::Local<v8::Value> GetPrivateValue(const v8::Local<v8::Object>& obj, const v8:
 
 void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
 BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
+void DeleteValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 std::vector<v8::Local<v8::Value>> ArgsToVector(const v8::FunctionCallbackInfo<v8::Value>& info);
 
 bool IsString(v8::Local<v8::Value> value);

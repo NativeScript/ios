@@ -18,15 +18,13 @@ public:
           callback_(callback),
           initialParamIndex_(initialParamIndex),
           paramsCount_(paramsCount),
-          typeEncoding_(typeEncoding),
-          runLoop_(CFRunLoopGetCurrent()) {
+          typeEncoding_(typeEncoding) {
     }
     v8::Isolate* isolate_;
     std::shared_ptr<v8::Persistent<v8::Value>> callback_;
     const uint8_t initialParamIndex_;
     const uint8_t paramsCount_;
     const TypeEncoding* typeEncoding_;
-    const CFRunLoopRef runLoop_;
 };
 
 class ArgConverter {
