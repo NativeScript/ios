@@ -34,9 +34,16 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
             Runtime* runtime = Runtime::GetCurrentRuntime();
             if (runtime != nullptr) {
+                Isolate* isolate = runtime->GetIsolate();
+                v8::Locker locker(isolate);
+                Isolate::Scope isolate_scope(isolate);
+                HandleScope handle_scope(isolate);
+                Local<Value> callback = wrapper->callback_->Get(isolate);
+                tns::DeleteValue(isolate, callback);
                 wrapper->callback_->Reset();
             }
             delete wrapper;
+            block->~JSBlock();
         }
     }
 };
@@ -315,14 +322,21 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
         int argsCount = typeEncoding->details.block.signature.count - 1;
 
-        std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, arg);
-        MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
-        CFTypeRef blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
+        CFTypeRef blockPtr = nullptr;
+        BaseDataWrapper* baseWrapper = tns::GetValue(isolate, arg);
+        if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Block) {
+            BlockWrapper* wrapper = static_cast<BlockWrapper*>(baseWrapper);
+            blockPtr = wrapper->Block();
+        } else {
+            std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, arg);
+            MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
+            blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
 
-        [(id)blockPtr autorelease];
+            [(id)blockPtr autorelease];
 
-        BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding);
-        tns::SetValue(isolate, arg.As<Object>(), wrapper);
+            BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding);
+            tns::SetValue(isolate, arg.As<v8::Function>(), wrapper);
+        }
 
         Interop::SetValue(dest, blockPtr);
     } else if (arg->IsObject() && typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {

@@ -159,7 +159,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
 
     delete wrapper;
     wrapper = nullptr;
-    tns::SetValue(isolate, obj, nullptr);
+    tns::DeleteValue(isolate, obj);
     return true;
 }
 

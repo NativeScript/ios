@@ -265,6 +265,30 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
     return static_cast<BaseDataWrapper*>(metadataProp.As<External>()->Value());
 }
 
+void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
+    if (val.IsEmpty() || val->IsNullOrUndefined() || !val->IsObject()) {
+        return;
+    }
+
+    Local<Object> obj = val.As<Object>();
+    if (obj->InternalFieldCount() > 0) {
+        obj->SetInternalField(0, v8::Undefined(isolate));
+        return;
+    }
+
+    Local<v8::String> metadataKey = tns::ToV8String(isolate, "metadata");
+    Local<Value> metadataProp = tns::GetPrivateValue(obj, metadataKey);
+    if (metadataProp.IsEmpty() || metadataProp->IsNullOrUndefined() || !metadataProp->IsExternal()) {
+        return;
+    }
+
+    Local<Context> context = obj->CreationContext();
+    Local<Private> privateKey = Private::ForApi(isolate, metadataKey);
+
+    bool success = obj->DeletePrivate(context, privateKey).FromMaybe(false);
+    tns::Assert(success, isolate);
+}
+
 std::vector<Local<Value>> tns::ArgsToVector(const FunctionCallbackInfo<Value>& info) {
     std::vector<Local<Value>> args;
     args.reserve(info.Length());
