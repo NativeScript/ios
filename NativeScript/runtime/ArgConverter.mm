@@ -329,7 +329,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
         Local<Object> thiz = info.This();
         Local<Context> context = cache->GetContext();
-        ArgConverter::CreateJsWrapper(context, wrapper, thiz);
+        tns::SetValue(isolate, thiz, wrapper);
         std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
         cache->Instances.emplace(result, poThiz);
         [result retain];
