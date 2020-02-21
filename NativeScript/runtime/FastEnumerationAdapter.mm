@@ -66,7 +66,7 @@ NSUInteger FastEnumerationAdapter(Isolate* isolate, id self, NSFastEnumerationSt
 
             if (tns::ToBool(done)) {
                 poIteratorObj->Reset();
-                poIteratorFunc->Reset();
+                delete poIteratorObj;
                 state->state = State::Done;
                 break;
             }
