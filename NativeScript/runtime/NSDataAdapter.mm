@@ -8,16 +8,16 @@ using namespace v8;
 @implementation NSDataAdapter {
     Isolate* isolate_;
     std::shared_ptr<Persistent<Value>> object_;
+    std::shared_ptr<Caches> cache_;
 }
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
     if (self) {
         tns::Assert(jsObject->IsArrayBuffer() || jsObject->IsArrayBufferView(), isolate);
         self->isolate_ = isolate;
-        std::shared_ptr<Caches> cache = Caches::Get(isolate);
-        // TODO: Handle the lifetime of this persistent js object
+        self->cache_ = Caches::Get(isolate);
         self->object_ = std::make_shared<Persistent<Value>>(isolate, jsObject);
-        cache->Instances.emplace(self, self->object_);
+        self->cache_->Instances.emplace(self, self->object_);
         tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
     }
 
@@ -58,6 +58,13 @@ using namespace v8;
 }
 
 - (void)dealloc {
+    self->cache_->Instances.erase(self);
+    Local<Value> value = self->object_->Get(self->isolate_);
+    BaseDataWrapper* wrapper = tns::GetValue(self->isolate_, value);
+    if (wrapper != nullptr) {
+        tns::DeleteValue(self->isolate_, value);
+        delete wrapper;
+    }
     self->object_->Reset();
     [super dealloc];
 }
