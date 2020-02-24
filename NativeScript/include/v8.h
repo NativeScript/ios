@@ -6284,6 +6284,7 @@ typedef bool (*AccessCheckCallback)(Local<Context> accessing_context,
                                     Local<Object> accessed_object,
                                     Local<Value> data);
 
+class CFunction;
 /**
  * A FunctionTemplate is used to create functions at runtime. There
  * can only be one function created from a FunctionTemplate in a
@@ -6383,6 +6384,12 @@ typedef bool (*AccessCheckCallback)(Local<Context> accessing_context,
  *   child_instance.instance_accessor calls 'InstanceAccessorCallback'
  *   child_instance.instance_property == 3;
  * \endcode
+ *
+ * The additional 'c_function' parameter refers to a fast API call, which
+ * must not trigger GC or JavaScript execution, or call into V8 in other
+ * ways. For more information how to define them, see
+ * include/v8-fast-api-calls.h. Please note that this feature is still
+ * experimental.
  */
 class V8_EXPORT FunctionTemplate : public Template {
  public:
@@ -6392,7 +6399,8 @@ class V8_EXPORT FunctionTemplate : public Template {
       Local<Value> data = Local<Value>(),
       Local<Signature> signature = Local<Signature>(), int length = 0,
       ConstructorBehavior behavior = ConstructorBehavior::kAllow,
-      SideEffectType side_effect_type = SideEffectType::kHasSideEffect);
+      SideEffectType side_effect_type = SideEffectType::kHasSideEffect,
+      const CFunction* c_function = nullptr);
 
   /** Get a template included in the snapshot by index. */
   V8_DEPRECATED("Use v8::Isolate::GetDataFromSnapshotOnce instead")
@@ -6424,11 +6432,13 @@ class V8_EXPORT FunctionTemplate : public Template {
   /**
    * Set the call-handler callback for a FunctionTemplate.  This
    * callback is called whenever the function created from this
-   * FunctionTemplate is called.
+   * FunctionTemplate is called. The 'c_function' represents a fast
+   * API call, see the comment above the class declaration.
    */
   void SetCallHandler(
       FunctionCallback callback, Local<Value> data = Local<Value>(),
-      SideEffectType side_effect_type = SideEffectType::kHasSideEffect);
+      SideEffectType side_effect_type = SideEffectType::kHasSideEffect,
+      const CFunction* c_function = nullptr);
 
   /** Set the predefined length property for the FunctionTemplate. */
   void SetLength(int length);
@@ -7282,10 +7292,10 @@ typedef void (*MicrotasksCompletedCallback)(Isolate*);
 typedef void (*MicrotasksCompletedCallbackWithData)(Isolate*, void*);
 typedef void (*MicrotaskCallback)(void* data);
 
-
 /**
  * Policy for running microtasks:
- *   - explicit: microtasks are invoked with Isolate::RunMicrotasks() method;
+ *   - explicit: microtasks are invoked with the
+ *               Isolate::PerformMicrotaskCheckpoint() method;
  *   - scoped: microtasks invocation is controlled by MicrotasksScope objects;
  *   - auto: microtasks are invoked when the script call depth decrements
  *           to zero.
@@ -7376,7 +7386,7 @@ class V8_EXPORT MicrotaskQueue {
 };
 
 /**
- * This scope is used to control microtasks when kScopeMicrotasksInvocation
+ * This scope is used to control microtasks when MicrotasksPolicy::kScoped
  * is used on Isolate. In this mode every non-primitive call to V8 should be
  * done inside some MicrotasksScope.
  * Microtasks are executed when topmost MicrotasksScope marked as kRunMicrotasks
@@ -8459,10 +8469,13 @@ class V8_EXPORT Isolate {
    * objects are originally built when a WeakRef is created or
    * successfully dereferenced.
    *
-   * The embedder is expected to call this when a synchronous sequence
-   * of ECMAScript execution completes. It's the embedders
-   * responsiblity to make this call at a time which does not
-   * interrupt synchronous ECMAScript code execution.
+   * This is invoked automatically after microtasks are run. See
+   * MicrotasksPolicy for when microtasks are run.
+   *
+   * This needs to be manually invoked only if the embedder is manually running
+   * microtasks via a custom MicrotaskQueue class's PerformCheckpoint. In that
+   * case, it is the embedder's responsibility to make this call at a time which
+   * does not interrupt synchronous ECMAScript code execution.
    */
   void ClearKeptObjects();
 
@@ -8990,10 +9003,18 @@ class V8_EXPORT Isolate {
   void SetPromiseRejectCallback(PromiseRejectCallback callback);
 
   /**
-   * Runs the default MicrotaskQueue until it gets empty.
-   * Any exceptions thrown by microtask callbacks are swallowed.
+   * An alias for PerformMicrotaskCheckpoint.
    */
-  void RunMicrotasks();
+  V8_DEPRECATE_SOON("Use PerformMicrotaskCheckpoint.")
+  void RunMicrotasks() { PerformMicrotaskCheckpoint(); }
+
+  /**
+   * Runs the default MicrotaskQueue until it gets empty and perform other
+   * microtask checkpoint steps, such as calling ClearKeptObjects. Asserts that
+   * the MicrotasksPolicy is not kScoped. Any exceptions thrown by microtask
+   * callbacks are swallowed.
+   */
+  void PerformMicrotaskCheckpoint();
 
   /**
    * Enqueues the callback to the default MicrotaskQueue
@@ -11239,7 +11260,7 @@ Local<Value> Object::GetInternalField(int index) {
 #ifdef V8_COMPRESS_POINTERS
     // We read the full pointer value and then decompress it in order to avoid
     // dealing with potential endiannes issues.
-    value = I::DecompressTaggedAnyField(obj, static_cast<int32_t>(value));
+    value = I::DecompressTaggedAnyField(obj, static_cast<uint32_t>(value));
 #endif
     internal::Isolate* isolate =
         internal::IsolateFromNeverReadOnlySpaceObject(obj);
@@ -11883,7 +11904,7 @@ Local<Value> Context::GetEmbedderData(int index) {
   // We read the full pointer value and then decompress it in order to avoid
   // dealing with potential endiannes issues.
   value =
-      I::DecompressTaggedAnyField(embedder_data, static_cast<int32_t>(value));
+      I::DecompressTaggedAnyField(embedder_data, static_cast<uint32_t>(value));
 #endif
   internal::Isolate* isolate = internal::IsolateFromNeverReadOnlySpaceObject(
       *reinterpret_cast<A*>(this));

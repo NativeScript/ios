@@ -13,7 +13,7 @@ static NSOperationQueue* workers_ = nil;
 __attribute__((constructor))
 void staticInitMethod() {
     workers_ = [[NSOperationQueue alloc] init];
-    workers_.maxConcurrentOperationCount = 10;
+    workers_.maxConcurrentOperationCount = 100;
 }
 
 WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage)

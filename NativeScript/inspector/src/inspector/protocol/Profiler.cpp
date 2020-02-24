@@ -937,6 +937,12 @@ void DispatcherImpl::startPreciseCoverage(int callId, const String& method, v8_c
         errors->SetName("detailed");
         in_detailed = ValueConversions<bool>::fromValue(detailedValue, errors);
     }
+    protocol::Value* allowTriggeredUpdatesValue = object ? object->get("allowTriggeredUpdates") : nullptr;
+    Maybe<bool> in_allowTriggeredUpdates;
+    if (allowTriggeredUpdatesValue) {
+        errors->SetName("allowTriggeredUpdates");
+        in_allowTriggeredUpdates = ValueConversions<bool>::fromValue(allowTriggeredUpdatesValue, errors);
+    }
     errors->Pop();
     if (!errors->Errors().empty()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -946,7 +952,7 @@ void DispatcherImpl::startPreciseCoverage(int callId, const String& method, v8_c
     double out_timestamp;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->startPreciseCoverage(std::move(in_callCount), std::move(in_detailed), &out_timestamp);
+    DispatchResponse response = m_backend->startPreciseCoverage(std::move(in_callCount), std::move(in_detailed), std::move(in_allowTriggeredUpdates), &out_timestamp);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;

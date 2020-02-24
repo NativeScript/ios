@@ -46,6 +46,9 @@ constexpr int GB = MB * 1024;
 #if (V8_TARGET_ARCH_PPC && !V8_HOST_ARCH_PPC)
 #define USE_SIMULATOR 1
 #endif
+#if (V8_TARGET_ARCH_PPC64 && !V8_HOST_ARCH_PPC64)
+#define USE_SIMULATOR 1
+#endif
 #if (V8_TARGET_ARCH_MIPS && !V8_HOST_ARCH_MIPS)
 #define USE_SIMULATOR 1
 #endif
@@ -59,7 +62,7 @@ constexpr int GB = MB * 1024;
 
 // Determine whether the architecture uses an embedded constant pool
 // (contiguous constant pool embedded in code object).
-#if V8_TARGET_ARCH_PPC
+#if V8_TARGET_ARCH_PPC || V8_TARGET_ARCH_PPC64
 #define V8_EMBEDDED_CONSTANT_POOL true
 #else
 #define V8_EMBEDDED_CONSTANT_POOL false
@@ -191,8 +194,9 @@ constexpr size_t kMaxWasmCodeSpaceSize = kMaxWasmCodeMemory;
 constexpr int kSystemPointerSizeLog2 = 3;
 constexpr intptr_t kIntptrSignBit =
     static_cast<intptr_t>(uintptr_t{0x8000000000000000});
-constexpr bool kRequiresCodeRange = true;
-#if V8_HOST_ARCH_PPC && V8_TARGET_ARCH_PPC && V8_OS_LINUX
+constexpr bool kPlatformRequiresCodeRange = true;
+#if (V8_HOST_ARCH_PPC || V8_HOST_ARCH_PPC64) && \
+    (V8_TARGET_ARCH_PPC || V8_TARGET_ARCH_PPC64) && V8_OS_LINUX
 constexpr size_t kMaximalCodeRangeSize = 512 * MB;
 constexpr size_t kMinExpectedOSPageSize = 64 * KB;  // OS page on PPC Linux
 #elif V8_TARGET_ARCH_ARM64
@@ -212,18 +216,19 @@ constexpr size_t kReservedCodeRangePages = 0;
 #else
 constexpr int kSystemPointerSizeLog2 = 2;
 constexpr intptr_t kIntptrSignBit = 0x80000000;
-#if V8_HOST_ARCH_PPC && V8_TARGET_ARCH_PPC && V8_OS_LINUX
-constexpr bool kRequiresCodeRange = false;
+#if (V8_HOST_ARCH_PPC || V8_HOST_ARCH_PPC64) && \
+    (V8_TARGET_ARCH_PPC || V8_TARGET_ARCH_PPC64) && V8_OS_LINUX
+constexpr bool kPlatformRequiresCodeRange = false;
 constexpr size_t kMaximalCodeRangeSize = 0 * MB;
 constexpr size_t kMinimumCodeRangeSize = 0 * MB;
 constexpr size_t kMinExpectedOSPageSize = 64 * KB;  // OS page on PPC Linux
 #elif V8_TARGET_ARCH_MIPS
-constexpr bool kRequiresCodeRange = false;
+constexpr bool kPlatformRequiresCodeRange = false;
 constexpr size_t kMaximalCodeRangeSize = 2048LL * MB;
 constexpr size_t kMinimumCodeRangeSize = 0 * MB;
 constexpr size_t kMinExpectedOSPageSize = 4 * KB;  // OS page.
 #else
-constexpr bool kRequiresCodeRange = false;
+constexpr bool kPlatformRequiresCodeRange = false;
 constexpr size_t kMaximalCodeRangeSize = 0 * MB;
 constexpr size_t kMinimumCodeRangeSize = 0 * MB;
 constexpr size_t kMinExpectedOSPageSize = 4 * KB;  // OS page.
@@ -342,7 +347,7 @@ F FUNCTION_CAST(Address addr) {
 // Determine whether the architecture uses function descriptors
 // which provide a level of indirection between the function pointer
 // and the function entrypoint.
-#if V8_HOST_ARCH_PPC &&                                            \
+#if (V8_HOST_ARCH_PPC || V8_HOST_ARCH_PPC64) &&                    \
     (V8_OS_AIX || (V8_TARGET_ARCH_PPC64 && V8_TARGET_BIG_ENDIAN && \
                    (!defined(_CALL_ELF) || _CALL_ELF == 1)))
 #define USES_FUNCTION_DESCRIPTORS 1

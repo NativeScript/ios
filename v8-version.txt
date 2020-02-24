@@ -1,1 +1,1 @@
-https://chromium.googlesource.com/v8/v8.git/+/04c868c1ac484ba09fe004649e973077eec447ba
+https://chromium.googlesource.com/v8/v8.git/+/1d69704dee7088854f5c30198c07adb06d788a23
