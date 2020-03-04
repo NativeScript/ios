@@ -339,80 +339,80 @@ describe(module.id, function () {
         expect(global).toBe(globalScopeThis);
     });
 
-//     it("Swizzle", function () {
-//         var object = TNSSwizzleKlass.alloc().init();
+    it("Swizzle", function () {
+        var object = TNSSwizzleKlass.alloc().init();
 
-//         (function () {
-//             var nativeProperty = Object.getOwnPropertyDescriptor(TNSSwizzleKlass.prototype, 'aProperty');
-//             Object.defineProperty(TNSSwizzleKlass.prototype, 'aProperty', {
-//                 get: function () {
-//                     return 2 * nativeProperty.get.call(this);
-//                 },
-//                 set: function (x) {
-//                     nativeProperty.set.call(this, 2 * x);
-//                 }
-//             });
+        (function () {
+            var nativeProperty = Object.getOwnPropertyDescriptor(TNSSwizzleKlass.prototype, 'aProperty');
+            Object.defineProperty(TNSSwizzleKlass.prototype, 'aProperty', {
+                get: function () {
+                    return 2 * nativeProperty.get.call(this);
+                },
+                set: function (x) {
+                    nativeProperty.set.call(this, 2 * x);
+                }
+            });
 
-//             var nativeStaticMethod = TNSSwizzleKlass.staticMethod;
-//             TNSSwizzleKlass.staticMethod = function (x) {
-//                 return 2 * nativeStaticMethod.apply(this, arguments);
-//             };
+            // var nativeStaticMethod = TNSSwizzleKlass.staticMethod;
+            // TNSSwizzleKlass.staticMethod = function (x) {
+            //     return 2 * nativeStaticMethod.apply(this, arguments);
+            // };
 
-//             var nativeInstanceMethod = TNSSwizzleKlass.prototype.instanceMethod;
-//             TNSSwizzleKlass.prototype.instanceMethod = function (x) {
-//                 return 2 * nativeInstanceMethod.apply(this, arguments);
-//             };
+            var nativeInstanceMethod = TNSSwizzleKlass.prototype.instanceMethod;
+            TNSSwizzleKlass.prototype.instanceMethod = function (x) {
+                return 2 * nativeInstanceMethod.apply(this, arguments);
+            };
 
-//             object.aProperty = 4;
-//             expect(object.aProperty).toBe(16, "property * 4");
-//             expect(TNSSwizzleKlass.staticMethod(4)).toBe(8, "static method * 2");
-//             expect(object.instanceMethod(4)).toBe(8, "instance method * 2");
+            object.aProperty = 4;
+            expect(object.aProperty).toBe(16, "property * 4");
+            // expect(TNSSwizzleKlass.staticMethod(4)).toBe(8, "static method * 2");
+            expect(object.instanceMethod(4)).toBe(8, "instance method * 2");
 
-//             TNSTestNativeCallbacks.apiSwizzle(TNSSwizzleKlass.alloc().init());
-//             expect(TNSGetOutput()).toBe('1266');
-//             TNSClearOutput();
-//         }());
+            TNSTestNativeCallbacks.apiSwizzle(TNSSwizzleKlass.alloc().init());
+            expect(TNSGetOutput()).toBe('1236');
+            TNSClearOutput();
+        }());
 
-//         (function () {
-//             var swizzledProperty = Object.getOwnPropertyDescriptor(TNSSwizzleKlass.prototype, 'aProperty');
-//             Object.defineProperty(TNSSwizzleKlass.prototype, 'aProperty', {
-//                 get: function () {
-//                     return 3 * swizzledProperty.get.call(this);
-//                 },
-//                 set: function (x) {
-//                     swizzledProperty.set.call(this, 3 * x);
-//                 }
-//             });
+        (function () {
+            var swizzledProperty = Object.getOwnPropertyDescriptor(TNSSwizzleKlass.prototype, 'aProperty');
+            Object.defineProperty(TNSSwizzleKlass.prototype, 'aProperty', {
+                get: function () {
+                    return 3 * swizzledProperty.get.call(this);
+                },
+                set: function (x) {
+                    swizzledProperty.set.call(this, 3 * x);
+                }
+            });
 
-//             var swizzledStaticMethod = TNSSwizzleKlass.staticMethod;
-//             TNSSwizzleKlass.staticMethod = function (x) {
-//                 return 3 * swizzledStaticMethod.apply(this, arguments);
-//             };
+            // var swizzledStaticMethod = TNSSwizzleKlass.staticMethod;
+            // TNSSwizzleKlass.staticMethod = function (x) {
+            //     return 3 * swizzledStaticMethod.apply(this, arguments);
+            // };
 
-//             var swizzledInstanceMethod = TNSSwizzleKlass.prototype.instanceMethod;
-//             TNSSwizzleKlass.prototype.instanceMethod = function (x) {
-//                 return 3 * swizzledInstanceMethod.apply(this, arguments);
-//             };
+            var swizzledInstanceMethod = TNSSwizzleKlass.prototype.instanceMethod;
+            TNSSwizzleKlass.prototype.instanceMethod = function (x) {
+                return 3 * swizzledInstanceMethod.apply(this, arguments);
+            };
 
-//             object.aProperty = 4;
-//             // Multiplier is 3*2 (from previous test)
-//             // for methods is 6 and for properties 36 (set*get)
-//             expect(object.aProperty).toBe(144);
-//             expect(TNSSwizzleKlass.staticMethod(4)).toBe(24);
-//             expect(object.instanceMethod(4)).toBe(24);
+            object.aProperty = 4;
+            // Multiplier is 3*2 (from previous test)
+            // for methods is 6 and for properties 36 (set*get)
+            expect(object.aProperty).toBe(144);
+            // expect(TNSSwizzleKlass.staticMethod(4)).toBe(24);
+            expect(object.instanceMethod(4)).toBe(24);
 
-//             TNSTestNativeCallbacks.apiSwizzle(TNSSwizzleKlass.alloc().init());
-//             expect(TNSGetOutput()).toBe('1081818');
-//             TNSClearOutput();
-//         }());
-//     });
+            TNSTestNativeCallbacks.apiSwizzle(TNSSwizzleKlass.alloc().init());
+            expect(TNSGetOutput()).toBe('108318');
+            TNSClearOutput();
+        }());
+    });
 
-//     if (interop.sizeof(interop.Pointer) == 8) {
-//         it("TaggedPointers", function () {
-//             expect(NSDate.dateWithTimeIntervalSinceReferenceDate(0)).toBe(NSDate.dateWithTimeIntervalSinceReferenceDate(0));
-//             expect(NSDate.dateWithTimeIntervalSinceReferenceDate(0).class()).toBe(NSDate);
-//         });
-//     }
+    if (interop.sizeof(interop.Pointer) == 8) {
+        it("TaggedPointers", function () {
+            expect(NSDate.dateWithTimeIntervalSinceReferenceDate(0)).toBe(NSDate.dateWithTimeIntervalSinceReferenceDate(0));
+            expect(NSDate.dateWithTimeIntervalSinceReferenceDate(0).class()).toBe(NSDate);
+        });
+    }
 
     function range(start, end, inclusive) {
         var mapper = (_, k) => start + k;

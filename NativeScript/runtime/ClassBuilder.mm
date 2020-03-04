@@ -15,18 +15,10 @@ using namespace v8;
 
 namespace tns {
 
-Local<v8::Function> ClassBuilder::GetExtendFunction(Local<Context> context, const InterfaceMeta* interfaceMeta) {
-    Isolate* isolate = context->GetIsolate();
+Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate, const InterfaceMeta* interfaceMeta) {
     CacheItem* item = new CacheItem(interfaceMeta, nullptr);
     Local<External> ext = External::New(isolate, item);
-
-    Local<v8::Function> extendFunc;
-
-    if (!v8::Function::New(context, ExtendCallback, ext).ToLocal(&extendFunc)) {
-        tns::Assert(false, isolate);
-    }
-
-    return extendFunc;
+    return FunctionTemplate::New(isolate, ClassBuilder::ExtendCallback, ext);
 }
 
 void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {

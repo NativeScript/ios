@@ -79,13 +79,13 @@ void Runtime::Init(Isolate* isolate) {
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
     DefineNativeScriptVersion(isolate, globalTemplate);
 
-    MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
     Worker::Init(isolate, globalTemplate, mainThreadInitialized_);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
     WeakRef::Init(isolate, globalTemplate);
     ObjectManager::Init(isolate, globalTemplate);
 //    SetTimeout::Init(isolate, globalTemplate);
+    MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
 
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
@@ -101,7 +101,6 @@ void Runtime::Init(Isolate* isolate) {
 
     ArgConverter::Init(context, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);
     Interop::RegisterInteropTypes(context);
-    MetadataBuilder::CreateToStringFunction(context);
 
     ClassBuilder::RegisterBaseTypeScriptExtendsFunction(context); // Register the __extends function to the global object
     ClassBuilder::RegisterNativeTypeScriptExtendsFunction(context); // Override the __extends function for native objects
