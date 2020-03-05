@@ -22,7 +22,6 @@ void SymbolIterator::Set(Local<Context> context, Local<Value> object) {
 
     Local<Value> symbolIteratorKey = Symbol::GetIterator(isolate);
     success = object.As<Object>()->Set(context, symbolIteratorKey, iterator).FromMaybe(false);
-    tns::Assert(success, isolate);
 }
 
 Local<Object> SymbolIterator::CreateIteratorObject(Local<Context> context, Local<Value> object) {

@@ -34,13 +34,20 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
             Runtime* runtime = Runtime::GetCurrentRuntime();
             if (runtime != nullptr) {
-                Isolate* isolate = runtime->GetIsolate();
-                v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                Local<Value> callback = wrapper->callback_->Get(isolate);
-                tns::DeleteValue(isolate, callback);
-                wrapper->callback_->Reset();
+                Isolate* runtimeIsolate = runtime->GetIsolate();
+                v8::Locker locker(runtimeIsolate);
+                Isolate::Scope isolate_scope(runtimeIsolate);
+                HandleScope handle_scope(runtimeIsolate);
+                Local<Value> callback = wrapper->callback_->Get(runtimeIsolate);
+                if (!callback.IsEmpty() && callback->IsObject()) {
+                    Local<Context> context = callback.As<Object>()->CreationContext();
+                    Isolate* isolate = context->GetIsolate();
+                    v8::Locker locker(isolate);
+                    Isolate::Scope isolate_scope(isolate);
+                    HandleScope handle_scope(isolate);
+                    tns::DeleteValue(isolate, callback);
+                    wrapper->callback_->Reset();
+                }
             }
             delete wrapper;
             block->~JSBlock();
