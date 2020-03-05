@@ -324,6 +324,17 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, callingClass, instanceMembers);
     MetadataBuilder::RegisterInstanceProtocols(context, ctorFuncTemplate, meta, meta->name(), callingClass, instanceMembers);
 
+    ctorFuncTemplate->PrototypeTemplate()->Set(tns::ToV8String(isolate, "toString"), FunctionTemplate::New(isolate, MetadataBuilder::ToStringFunctionCallback));
+
+    if (meta->type() == MetaType::Interface) {
+        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+        MetadataBuilder::RegisterAllocMethod(isolate, ctorFuncTemplate, interfaceMeta);
+        ctorFuncTemplate->Set(tns::ToV8String(isolate, "extend"), ClassBuilder::GetExtendFunction(isolate, interfaceMeta));
+    }
+
+    NamedPropertyHandlerConfiguration config(nullptr, MetadataBuilder::SwizzledInstanceMethodCallback, nullptr, nullptr, nullptr, MetadataBuilder::SwizzledPropertyCallback, nullptr, ext);
+    ctorFuncTemplate->PrototypeTemplate()->SetHandler(config);
+
     Local<v8::Function> ctorFunc;
     bool success = ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc);
     tns::Assert(success, isolate);
@@ -359,38 +370,15 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
     cache->CtorFuncTemplates.emplace(meta, std::make_unique<Persistent<FunctionTemplate>>(isolate, ctorFuncTemplate));
 
-    if (meta->type() == MetaType::Interface) {
-        const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
-        MetadataBuilder::RegisterAllocMethod(context, ctorFunc, interfaceMeta);
-
-        Local<v8::Function> extendFunc = ClassBuilder::GetExtendFunction(context, interfaceMeta);
-        bool success = ctorFunc->Set(context, tns::ToV8String(isolate, "extend"), extendFunc).FromMaybe(false);
-        tns::Assert(success, isolate);
-    }
-
     Local<Value> prototypeValue;
     success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
     tns::Assert(success, isolate);
     Local<Object> prototype = prototypeValue.As<Object>();
 
-    success = prototype->Set(context, tns::ToV8String(isolate, "toString"), cache->ToStringFunc->Get(isolate)).FromMaybe(false);
-    tns::Assert(success, isolate);
-
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
     cache->Prototypes.emplace(meta, poPrototype);
 
     return ctorFuncTemplate;
-}
-
-void MetadataBuilder::CreateToStringFunction(Local<Context> context) {
-    Isolate* isolate = context->GetIsolate();
-    Local<FunctionTemplate> toStringFuncTemplate = FunctionTemplate::New(isolate, MetadataBuilder::ToStringFunctionCallback);
-
-    Local<v8::Function> toStringFunc;
-    tns::Assert(toStringFuncTemplate->GetFunction(context).ToLocal(&toStringFunc), isolate);
-
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
-    cache->ToStringFunc = std::make_unique<Persistent<v8::Function>>(isolate, toStringFunc);
 }
 
 void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>& info) {
@@ -415,19 +403,12 @@ void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>
     info.GetReturnValue().Set(returnValue);
 }
 
-void MetadataBuilder::RegisterAllocMethod(Local<Context> context, Local<v8::Function> ctorFunc, const InterfaceMeta* interfaceMeta) {
-    Isolate* isolate = context->GetIsolate();
+void MetadataBuilder::RegisterAllocMethod(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta) {
     std::string className;
     CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, className);
     Local<External> ext = External::New(isolate, item);
     Local<FunctionTemplate> allocFuncTemplate = FunctionTemplate::New(isolate, AllocCallback, ext);
-    Local<v8::Function> allocFunc;
-    if (!allocFuncTemplate->GetFunction(context).ToLocal(&allocFunc)) {
-        tns::Assert(false, isolate);
-    }
-
-    bool success = ctorFunc->Set(context, tns::ToV8String(isolate, "alloc"), allocFunc).FromMaybe(false);
-    tns::Assert(success, isolate);
+    ctorFuncTemplate->Set(tns::ToV8String(isolate, "alloc"), allocFuncTemplate);
 }
 
 void MetadataBuilder::RegisterInstanceMethods(Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta, Class callingClass, robin_hood::unordered_map<std::string, uint8_t>& names) {
@@ -477,7 +458,7 @@ void MetadataBuilder::RegisterInstanceProperties(Local<Context> context, Local<F
             Local<External> ext = External::New(isolate, item);
             Local<FunctionTemplate> getter = FunctionTemplate::New(isolate, PropertyGetterCallback, ext);
             Local<FunctionTemplate> setter = FunctionTemplate::New(isolate, PropertySetterCallback, ext);
-            proto->SetAccessorProperty(tns::ToV8String(isolate, propMeta->jsName()), getter, setter, PropertyAttribute::DontDelete, AccessControl::DEFAULT);
+            proto->SetAccessorProperty(tns::ToV8String(isolate, propMeta->jsName()), getter, setter, PropertyAttribute::None, AccessControl::DEFAULT);
             names.emplace(propertyName, accessors);
         }
     }
@@ -853,6 +834,143 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
         }
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8(isolate);
+    }
+}
+
+void MetadataBuilder::SwizzledInstanceMethodCallback(Local<Name> property, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    std::string methodName = tns::ToString(isolate, property);
+
+    CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
+    const BaseClassMeta* meta = item->meta_;
+
+    Class klass = objc_getClass(meta->name());
+    if (klass == nil) {
+        return;
+    }
+
+    int index = meta->instanceMethods->binarySearch([methodName](const PtrTo<MethodMeta>& current) {
+        const MethodMeta* methodMeta = current.valuePtr();
+        return strcmp(methodMeta->jsName(), methodName.c_str());
+    });
+
+    if (index < 0) {
+        return;
+    }
+
+    const MethodMeta* methodMeta = meta->instanceMethods->operator[](index).valuePtr();
+
+    const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
+    int argsCount = methodMeta->encodings()->count - 1;
+    std::string compilerEncoding = ClassBuilder::GetTypeEncoding(typeEncoding, argsCount);
+    std::shared_ptr<Persistent<Value>> poCallback = std::make_shared<Persistent<Value>>(isolate, value);
+    MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
+    IMP methodBody = Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
+    IMP nativeImp = class_replaceMethod(klass, methodMeta->selector(), methodBody, compilerEncoding.c_str());
+    if (nativeImp) {
+        std::string selector = methodMeta->selectorAsString();
+        SEL nativeSelector = sel_registerName(("__" + selector).c_str());
+        class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding.c_str());
+    }
+}
+
+void MetadataBuilder::SwizzledPropertyCallback(Local<Name> property, const PropertyDescriptor& desc, const PropertyCallbackInfo<Value>& info) {
+    Isolate* isolate = info.GetIsolate();
+    std::string propertyName = tns::ToString(isolate, property);
+
+    CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
+    const BaseClassMeta* meta = item->meta_;
+
+    Class klass = objc_getClass(meta->name());
+    if (klass == nil) {
+        return;
+    }
+
+    int index = meta->instanceProps->binarySearch([propertyName](const PtrTo<PropertyMeta>& current) {
+        const PropertyMeta* propertyMeta = current.valuePtr();
+        return strcmp(propertyMeta->jsName(), propertyName.c_str());
+    });
+
+    if (index < 0) {
+        return;
+    }
+
+    const PropertyMeta* propertyMeta = meta->instanceProps->operator[](index).valuePtr();
+
+    if (desc.has_get()) {
+        FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
+            PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+            v8::Locker locker(context->isolate_);
+            Isolate::Scope isolate_scope(context->isolate_);
+            HandleScope handle_scope(context->isolate_);
+            Local<v8::Function> getterFunc = context->callback_->Get(context->isolate_);
+            Local<Value> res;
+
+            id thiz = *static_cast<const id*>(argValues[0]);
+            auto cache = Caches::Get(context->isolate_);
+            auto it = cache->Instances.find(thiz);
+
+            Local<Context> v8Context = Caches::Get(context->isolate_)->GetContext();
+            Local<Object> self_ = it != cache->Instances.end()
+                ? it->second->Get(context->isolate_).As<Object>()
+                : ArgConverter::CreateJsWrapper(v8Context, new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
+            tns::Assert(getterFunc->Call(v8Context, self_, 0, nullptr).ToLocal(&res), context->isolate_);
+
+            const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
+            ArgConverter::SetValue(v8Context, retValue, res, typeEncoding);
+        };
+
+        const char* compilerEncoding = "@@:";
+        const TypeEncoding* typeEncoding = propertyMeta->getter()->encodings()->first();
+
+        Local<Value> getter = desc.get();
+        std::shared_ptr<Persistent<v8::Function>> poGetterFunc = std::make_shared<Persistent<v8::Function>>(isolate, getter.As<v8::Function>());
+        PropertyCallbackContext* userData = new PropertyCallbackContext(isolate, poGetterFunc, nullptr, propertyMeta);
+        IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback, userData);
+        IMP nativeImp = class_replaceMethod(klass, propertyMeta->getter()->selector(), impGetter, compilerEncoding);
+        std::string selector = propertyMeta->getter()->selectorAsString();
+        SEL nativeSelector = sel_registerName(("__" + selector).c_str());
+        class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding);
+    }
+
+    if (desc.has_set()) {
+        FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues, void* userData) {
+            PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+            v8::Locker locker(context->isolate_);
+            Isolate::Scope isolate_scope(context->isolate_);
+            HandleScope handle_scope(context->isolate_);
+            Local<v8::Function> setterFunc = context->callback_->Get(context->isolate_);
+            Local<Value> res;
+
+            Local<Context> v8Context = Caches::Get(context->isolate_)->GetContext();
+
+            id thiz = *static_cast<const id*>(argValues[0]);
+            auto cache = Caches::Get(context->isolate_);
+            auto it = cache->Instances.find(thiz);
+            Local<Object> self_ = it != cache->Instances.end()
+                ? it->second->Get(context->isolate_).As<Object>()
+                : ArgConverter::CreateJsWrapper(v8Context, new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
+
+            uint8_t* argBuffer = (uint8_t*)argValues[2];
+            const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();
+            BaseCall call(argBuffer);
+            Local<Value> jsWrapper = Interop::GetResult(v8Context, typeEncoding, &call, true);
+            Local<Value> params[1] = { jsWrapper };
+
+            tns::Assert(setterFunc->Call(context->isolate_->GetCurrentContext(), self_, 1, params).ToLocal(&res), context->isolate_);
+        };
+
+        const TypeEncoding* typeEncoding = propertyMeta->setter()->encodings()->first();
+        Local<Value> setter = desc.set();
+        std::shared_ptr<Persistent<v8::Function>> poSetterFunc = std::make_shared<Persistent<v8::Function>>(isolate, setter.As<v8::Function>());
+        PropertyCallbackContext* userData = new PropertyCallbackContext(isolate, poSetterFunc, nullptr, propertyMeta);
+        IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
+
+        const char* compilerEncoding = "v@:@";
+        IMP nativeImp = class_replaceMethod(klass, propertyMeta->setter()->selector(), impSetter, compilerEncoding);
+        std::string selector = propertyMeta->setter()->selectorAsString();
+        SEL nativeSelector = sel_registerName(("__" + selector).c_str());
+        class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding);
     }
 }
 

@@ -1304,7 +1304,13 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
         }
 #endif
 
+        SEL selector = methodCall.selector_;
         if (isInstanceMethod) {
+            SEL swizzledMethodSelector = NSSelectorFromString([@"__" stringByAppendingString:NSStringFromSelector(selector)]);
+            if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
+                selector = swizzledMethodSelector;
+            }
+
             if (methodCall.callSuper_) {
                 sup.receiver = methodCall.target_;
                 sup.super_class = class_getSuperclass(object_getClass(methodCall.target_));
@@ -1316,7 +1322,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
             Interop::SetValue(call.ArgumentBuffer(0), methodCall.clazz_);
         }
 
-        Interop::SetValue(call.ArgumentBuffer(1), methodCall.selector_);
+        Interop::SetValue(call.ArgumentBuffer(1), selector);
     }
 
     bool isInstanceReturnType = methodCall.typeEncoding_->type == BinaryTypeEncodingType::InstanceTypeEncoding;
