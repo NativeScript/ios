@@ -586,11 +586,19 @@ enum class HeapObjectReferenceType {
   STRONG,
 };
 
+enum class ArgumentsType {
+  kRuntime,
+  kJS,
+};
+
 // -----------------------------------------------------------------------------
 // Forward declarations for frequently used classes
 
 class AccessorInfo;
+template <ArgumentsType>
 class Arguments;
+using RuntimeArguments = Arguments<ArgumentsType::kRuntime>;
+using JavaScriptArguments = Arguments<ArgumentsType::kJS>;
 class Assembler;
 class ClassScope;
 class Code;
@@ -638,8 +646,6 @@ class NewSpace;
 class NewLargeObjectSpace;
 class NumberDictionary;
 class Object;
-template <typename T>
-class OffThreadHandle;
 class OldLargeObjectSpace;
 template <HeapObjectReferenceType kRefType, typename StorageType>
 class TaggedImpl;
@@ -1632,6 +1638,8 @@ constexpr int kFunctionLiteralIdTopLevel = 0;
 
 constexpr int kSmallOrderedHashSetMinCapacity = 4;
 constexpr int kSmallOrderedHashMapMinCapacity = 4;
+
+static const uint16_t kDontAdaptArgumentsSentinel = static_cast<uint16_t>(-1);
 
 // Opaque data type for identifying stack frames. Used extensively
 // by the debugger.

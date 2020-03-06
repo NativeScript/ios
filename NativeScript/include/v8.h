@@ -120,6 +120,8 @@ class EscapableHandleScope;
 template<typename T> class ReturnValue;
 
 namespace internal {
+enum class ArgumentsType;
+template <ArgumentsType>
 class Arguments;
 class DeferredHandles;
 class Heap;
@@ -2789,9 +2791,6 @@ class V8_EXPORT Value : public Data {
    */
   bool IsWasmModuleObject() const;
 
-  V8_DEPRECATED("Use IsWasmModuleObject")
-  bool IsWebAssemblyCompiledModule() const;
-
   /**
    * Returns true if the value is a Module Namespace Object.
    */
@@ -4024,6 +4023,13 @@ class V8_EXPORT Object : public Value {
    * v8::ArrayBuffer.
    */
   bool IsApiWrapper();
+
+  /**
+   * True if this object was created from an object template which was marked
+   * as undetectable. See v8::ObjectTemplate::MarkAsUndetectable for more
+   * information.
+   */
+  bool IsUndetectable();
 
   /**
    * Call an Object as a function if a callback is set by the
@@ -5890,14 +5896,15 @@ class V8_EXPORT RegExp : public Object {
 };
 
 /**
- * An instance of the built-in FinalizationGroup constructor.
+ * An instance of the built-in FinalizationRegistry constructor.
  *
- * This API is experimental and may change significantly.
+ * The C++ name is FinalizationGroup for backwards compatibility. This API is
+ * experimental and deprecated.
  */
 class V8_EXPORT FinalizationGroup : public Object {
  public:
   /**
-   * Runs the cleanup callback of the given FinalizationGroup.
+   * Runs the cleanup callback of the given FinalizationRegistry.
    *
    * V8 will inform the embedder that there are finalizer callbacks be
    * called through HostCleanupFinalizationGroupCallback.
@@ -7571,6 +7578,7 @@ class V8_EXPORT HeapStatistics {
   size_t total_heap_size_executable() { return total_heap_size_executable_; }
   size_t total_physical_size() { return total_physical_size_; }
   size_t total_available_size() { return total_available_size_; }
+  size_t total_global_handles_size() { return total_global_handles_size_; }
   size_t used_heap_size() { return used_heap_size_; }
   size_t heap_size_limit() { return heap_size_limit_; }
   size_t malloced_memory() { return malloced_memory_; }
@@ -7598,6 +7606,7 @@ class V8_EXPORT HeapStatistics {
   bool does_zap_garbage_;
   size_t number_of_native_contexts_;
   size_t number_of_detached_contexts_;
+  size_t total_global_handles_size_;
 
   friend class V8;
   friend class Isolate;
@@ -8404,6 +8413,11 @@ class V8_EXPORT Isolate {
     kSharedArrayBufferConstructed = 82,
     kArrayPrototypeHasElements = 83,
     kObjectPrototypeHasElements = 84,
+    kNumberFormatStyleUnit = 85,
+    kDateTimeFormatRange = 86,
+    kDateTimeFormatDateTimeStyle = 87,
+    kBreakIteratorTypeWord = 88,
+    kBreakIteratorTypeLine = 89,
 
     // If you add new values here, you'll also need to update Chromium's:
     // web_feature.mojom, use_counter_callback.cc, and enums.xml. V8 changes to
@@ -8493,12 +8507,12 @@ class V8_EXPORT Isolate {
       AbortOnUncaughtExceptionCallback callback);
 
   /**
-   * This specifies the callback to be called when finalization groups
+   * This specifies the callback to be called when FinalizationRegistries
    * are ready to be cleaned up and require FinalizationGroup::Cleanup()
    * to be called in a future task.
    */
   V8_DEPRECATED(
-      "FinalizationGroup cleanup is automatic if "
+      "FinalizationRegistry cleanup is automatic if "
       "HostCleanupFinalizationGroupCallback is not set")
   void SetHostCleanupFinalizationGroupCallback(
       HostCleanupFinalizationGroupCallback callback);
@@ -9113,7 +9127,7 @@ class V8_EXPORT Isolate {
 
   /**
    * Optional notification that a context has been disposed. V8 uses these
-   * notifications to guide the GC heuristic and cancel FinalizationGroup
+   * notifications to guide the GC heuristic and cancel FinalizationRegistry
    * cleanup tasks. Returns the number of context disposals - including this one
    * - since the last time V8 had a chance to clean up.
    *
@@ -11082,14 +11096,24 @@ FunctionCallbackInfo<T>::FunctionCallbackInfo(internal::Address* implicit_args,
 
 template<typename T>
 Local<Value> FunctionCallbackInfo<T>::operator[](int i) const {
+  // values_ points to the first argument (not the receiver).
   if (i < 0 || length_ <= i) return Local<Value>(*Undefined(GetIsolate()));
+#ifdef V8_REVERSE_JSARGS
+  return Local<Value>(reinterpret_cast<Value*>(values_ + i));
+#else
   return Local<Value>(reinterpret_cast<Value*>(values_ - i));
+#endif
 }
 
 
 template<typename T>
 Local<Object> FunctionCallbackInfo<T>::This() const {
+  // values_ points to the first argument (not the receiver).
+#ifdef V8_REVERSE_JSARGS
+  return Local<Object>(reinterpret_cast<Object*>(values_ - 1));
+#else
   return Local<Object>(reinterpret_cast<Object*>(values_ + 1));
+#endif
 }
 
 

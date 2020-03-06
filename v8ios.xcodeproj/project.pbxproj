@@ -373,7 +373,6 @@
 		C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D71D7523E18C41000CD5F0 /* robin_hood.h */; };
 		C2D7E9CD23F4024200DB289C /* error_support.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9CC23F4024200DB289C /* error_support.h */; };
 		C2D7E9CF23F4294800DB289C /* export-template.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9CE23F4294800DB289C /* export-template.h */; };
-		C2D7E9D223F4297400DB289C /* handle-for.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9D123F4297400DB289C /* handle-for.h */; };
 		C2D7E9D523F42C1100DB289C /* PromiseProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9D323F42C1100DB289C /* PromiseProxy.h */; };
 		C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D7E9D423F42C1100DB289C /* PromiseProxy.cpp */; };
 		C2DDEB8D229EAC8300345BFE /* Common.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB64229EAC8100345BFE /* Common.h */; };
@@ -946,7 +945,6 @@
 		C2D71D7523E18C41000CD5F0 /* robin_hood.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = robin_hood.h; sourceTree = "<group>"; };
 		C2D7E9CC23F4024200DB289C /* error_support.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = error_support.h; sourceTree = "<group>"; };
 		C2D7E9CE23F4294800DB289C /* export-template.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "export-template.h"; sourceTree = "<group>"; };
-		C2D7E9D123F4297400DB289C /* handle-for.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "handle-for.h"; sourceTree = "<group>"; };
 		C2D7E9D323F42C1100DB289C /* PromiseProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PromiseProxy.h; sourceTree = "<group>"; };
 		C2D7E9D423F42C1100DB289C /* PromiseProxy.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PromiseProxy.cpp; sourceTree = "<group>"; };
 		C2DDEB16229EA89000345BFE /* TestRunner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestRunner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1224,7 +1222,6 @@
 		C247C2A822F828E2001D2CA2 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				C2D7E9D023F4297400DB289C /* handles */,
 				C247C2A922F828E2001D2CA2 /* init */,
 				C247C2AB22F828E2001D2CA2 /* tracing */,
 				C247C2AD22F828E2001D2CA2 /* numbers */,
@@ -1759,14 +1756,6 @@
 			path = crdtp;
 			sourceTree = "<group>";
 		};
-		C2D7E9D023F4297400DB289C /* handles */ = {
-			isa = PBXGroup;
-			children = (
-				C2D7E9D123F4297400DB289C /* handle-for.h */,
-			);
-			path = handles;
-			sourceTree = "<group>";
-		};
 		C2DDEB17229EA89000345BFE /* TestRunner */ = {
 			isa = PBXGroup;
 			children = (
@@ -2037,7 +2026,6 @@
 				C247C38B22F828E3001D2CA2 /* v8-string-conversions.h in Headers */,
 				C247C35C22F828E3001D2CA2 /* v8-dom-agent-impl.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
-				C2D7E9D223F4297400DB289C /* handle-for.h in Headers */,
 				C247C3AE22F828E3001D2CA2 /* compiler-specific.h in Headers */,
 				C247C38922F828E3001D2CA2 /* v8-debugger-script.h in Headers */,
 				C247C37C22F828E3001D2CA2 /* string-util.h in Headers */,
@@ -3114,6 +3102,7 @@
 					"-lv8_libbase",
 					"-lv8_libplatform",
 					"-lv8_libsampler",
+					"-lv8_uninitialized",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -3180,6 +3169,7 @@
 					"-lv8_libbase",
 					"-lv8_libplatform",
 					"-lv8_libsampler",
+					"-lv8_uninitialized",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
