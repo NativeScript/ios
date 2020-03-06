@@ -321,9 +321,12 @@ const Local<v8::String> Console::TransformJSObject(Local<Object> object) {
     Local<Context> context = object->CreationContext();
     Isolate* isolate = context->GetIsolate();
     Local<Value> value;
-    bool success = object->ToString(context).ToLocal(&value);
-    if (!success) {
-        return tns::ToV8String(isolate, "");
+    {
+        TryCatch tc(isolate);
+        bool success = object->ToString(context).ToLocal(&value);
+        if (!success) {
+            return tns::ToV8String(isolate, "");
+        }
     }
     Local<v8::String> objToString = value.As<v8::String>();
 
