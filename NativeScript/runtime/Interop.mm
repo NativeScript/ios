@@ -1005,6 +1005,21 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
         Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
 
+        PtrTo<Array<PtrTo<char>>> additionalProtocols;
+        int32_t count = 0;
+        if (typeEncoding->type == BinaryTypeEncodingType::IdEncoding) {
+            additionalProtocols = typeEncoding->details.idDetails._protocols;
+            count = additionalProtocols->count;
+        } else if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+            additionalProtocols = typeEncoding->details.interfaceDeclarationReference._protocols;
+            count = additionalProtocols->count;
+        }
+
+        if (count > 0) {
+            // Attach the protocols to the prototype of the resulting object
+            Interop::AttachProtocols(context, jsResult.As<Object>(), additionalProtocols);
+        }
+
         if (ownsReturnedObject || isInitializer) {
             [result release];
         }
@@ -1128,6 +1143,34 @@ Local<Value> Interop::GetPrimitiveReturnType(Local<Context> context, BinaryTypeE
     // TODO: Handle all the possible return types https://nshipster.com/type-encodings/
 
     return Local<Value>();
+}
+
+void Interop::AttachProtocols(Local<Context> context, Local<Object> instance, PtrTo<Array<PtrTo<char>>> protocols) {
+    Isolate* isolate = context->GetIsolate();
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+
+    Local<Object> prototype = instance->GetPrototype().As<Object>()->Clone();
+    bool success = instance->SetPrototype(context, prototype).FromMaybe(false);
+    tns::Assert(success, isolate);
+    for (auto it = protocols->begin(); it != protocols->end(); it++) {
+        const char* protocolName = (*it).valuePtr();
+        const Meta* protocolMeta = ArgConverter::GetMeta(protocolName);
+        if (protocolMeta == nullptr) {
+            continue;
+        }
+
+        cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(protocolMeta));
+        auto protoIt = cache->Prototypes.find(protocolMeta);
+        if (protoIt == cache->Prototypes.end()) {
+            continue;
+        }
+
+        Local<Object> protocolPrototype = protoIt->second->Get(isolate).As<Object>();
+        bool success = prototype->SetPrototype(context, protocolPrototype).FromMaybe(false);
+        tns::Assert(success, isolate);
+
+        prototype = protocolPrototype;
+    }
 }
 
 bool Interop::IsNumbericType(BinaryTypeEncodingType type) {

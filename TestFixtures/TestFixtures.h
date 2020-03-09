@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 
 #import "Api/TNSApi.h"
+#import "Api/TNSPseudoDataTypes.h"
 #import "Api/TNSBridgedTypes.h"
 #import "Api/TNSDeclarationConflicts.h"
 #import "Api/TNSReturnsRetained.h"

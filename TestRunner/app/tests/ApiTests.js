@@ -736,6 +736,39 @@ describe(module.id, function () {
         expect(actual.size.height).toBe(4);
     });
 
+    it("Additional protocols should be attached to the prototype of id pseudo-types", () => {
+        let actual = TNSPseudoDataType.getId();
+        expect(actual.methodFromProto1).toBeDefined();
+        expect(actual.methodFromProto2).toBeDefined();
+
+        actual.methodFromProto1();
+        actual.methodFromProto2("test");
+
+        expect(TNSGetOutput()).toBe("methodFromProto1 calledmethodFromProto2 called with test");
+
+        let obj = NSObject.alloc().init();
+        expect(obj.methodFromProto1).toBeUndefined();
+        expect(obj.methodFromProto2).toBeUndefined();
+    });
+
+    it("Additional protocols should be attached to the prototype of interface pseudo-types", () => {
+        let actual = TNSPseudoDataType.getType();
+        expect(actual.method).toBeDefined();
+        expect(actual.methodFromProto2).toBeDefined();
+        expect(actual.methodFromProto2).toBeDefined();
+
+        actual.method();
+        actual.methodFromProto1();
+        actual.methodFromProto2("test");
+
+        expect(TNSGetOutput()).toBe("method calledmethodFromProto1 calledmethodFromProto2 called with test");
+
+        let obj = NSObject.alloc().init();
+        expect(obj.method).toBeUndefined();
+        expect(obj.methodFromProto1).toBeUndefined();
+        expect(obj.methodFromProto2).toBeUndefined();
+    });
+
 //     if (TNSIsConfigurationDebug) {
 //         it("ApiIterator", function () {
 //             var counter = 0;

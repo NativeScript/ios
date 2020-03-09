@@ -194,6 +194,7 @@
 		C247C3AF22F828E3001D2CA2 /* atomicops_internals_atomicword_compat.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C32922F828E3001D2CA2 /* atomicops_internals_atomicword_compat.h */; };
 		C247C3B022F828E3001D2CA2 /* interface-types.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C32B22F828E3001D2CA2 /* interface-types.h */; };
 		C247C3B122F828E3001D2CA2 /* debug-interface.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C32C22F828E3001D2CA2 /* debug-interface.h */; };
+		C25376FD2416302D00660D62 /* TNSPseudoDataTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = C25376FC2416302D00660D62 /* TNSPseudoDataTypes.m */; };
 		C263B4CC23D0A87E00D5B872 /* bits.h in Headers */ = {isa = PBXBuildFile; fileRef = C263B4CB23D0A87E00D5B872 /* bits.h */; };
 		C263B4D023D0AF0900D5B872 /* v8-time.h in Headers */ = {isa = PBXBuildFile; fileRef = C263B4CF23D0AF0900D5B872 /* v8-time.h */; };
 		C266567822AA405100EE15CC /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C266567722AA405100EE15CC /* Default-568h@2x.png */; };
@@ -719,6 +720,8 @@
 		C247C32B22F828E3001D2CA2 /* interface-types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "interface-types.h"; sourceTree = "<group>"; };
 		C247C32C22F828E3001D2CA2 /* debug-interface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "debug-interface.h"; sourceTree = "<group>"; };
 		C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "exported-symbols.txt"; sourceTree = "<group>"; };
+		C25376FB24162F5C00660D62 /* TNSPseudoDataTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSPseudoDataTypes.h; sourceTree = "<group>"; };
+		C25376FC2416302D00660D62 /* TNSPseudoDataTypes.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TNSPseudoDataTypes.m; sourceTree = "<group>"; };
 		C263B4CB23D0A87E00D5B872 /* bits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = bits.h; sourceTree = "<group>"; };
 		C263B4CF23D0AF0900D5B872 /* v8-time.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-time.h"; sourceTree = "<group>"; };
 		C266567722AA405100EE15CC /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
@@ -1544,6 +1547,8 @@
 				C2937504229FC1600075CB16 /* TNSReturnsUnmanaged.m */,
 				C2937505229FC1600075CB16 /* TNSVersions.h */,
 				C2937506229FC1600075CB16 /* TNSBridgedTypes.h */,
+				C25376FB24162F5C00660D62 /* TNSPseudoDataTypes.h */,
+				C25376FC2416302D00660D62 /* TNSPseudoDataTypes.m */,
 			);
 			path = Api;
 			sourceTree = "<group>";
@@ -2392,6 +2397,7 @@
 				C2937527229FC1600075CB16 /* TNSPrimitives.m in Sources */,
 				C2937521229FC1600075CB16 /* TNSApi.m in Sources */,
 				C293751E229FC1600075CB16 /* TNSDeclarationConflicts.m in Sources */,
+				C25376FD2416302D00660D62 /* TNSPseudoDataTypes.m in Sources */,
 				C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */,
 				C2937525229FC1600075CB16 /* TNSFunctionPointers.m in Sources */,
 				C2937520229FC1600075CB16 /* TNSVersions.m in Sources */,
