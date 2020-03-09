@@ -1007,10 +1007,10 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
         PtrTo<Array<PtrTo<char>>> additionalProtocols;
         int32_t count = 0;
-        if (typeEncoding->type == BinaryTypeEncodingType::IdEncoding) {
+        if (typeEncoding->type == BinaryTypeEncodingType::IdEncoding && typeEncoding->details.idDetails._protocols.offset > 0) {
             additionalProtocols = typeEncoding->details.idDetails._protocols;
             count = additionalProtocols->count;
-        } else if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+        } else if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference && typeEncoding->details.interfaceDeclarationReference._protocols.offset > 0) {
             additionalProtocols = typeEncoding->details.interfaceDeclarationReference._protocols;
             count = additionalProtocols->count;
         }
