@@ -1,3 +1,19 @@
+7.0.0-beta.3-v8 (2020-03-09)
+====
+
+### Features
+
+- Multithreaded javascript (https://github.com/NativeScript/ns-v8ios-runtime/pull/28)
+- Disable ARC (https://github.com/NativeScript/ns-v8ios-runtime/pull/30)
+- Instance members swizzling (https://github.com/NativeScript/ns-v8ios-runtime/issues/31)
+
+### Bug Fixes
+
+- Do not prematurely dispose blocks (https://github.com/NativeScript/ns-v8ios-runtime/issues/26)
+- Skip undefined properties in console.dir (https://github.com/NativeScript/ns-v8ios-runtime/issues/27)
+- Runtime check for selectors support (https://github.com/NativeScript/ns-v8ios-runtime/issues/33)
+- Types declarations conforming to protocols (https://github.com/NativeScript/ns-v8ios-runtime/issues/36)
+
 6.5.0-beta.2-v8 (2020-01-28)
 ====
 
