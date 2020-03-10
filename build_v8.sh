@@ -4,8 +4,8 @@ set -e
 pushd v8
 
 ARCH_ARR=(x64 arm64)
-#MODULES=(v8_base_without_compiler v8_compiler v8_libplatform v8_libbase v8_libsampler v8_initializers v8_init v8_snapshot torque_generated_initializers torque_generated_definitions)
-MODULES=(v8_base_without_compiler v8_compiler v8_libplatform v8_libbase v8_libsampler v8_initializers v8_init v8_snapshot torque_generated_initializers)
+#MODULES=(v8_base_without_compiler v8_compiler v8_libplatform v8_libbase v8_libsampler v8_snapshot torque_generated_initializers torque_generated_definitions)
+MODULES=(v8_base_without_compiler v8_compiler v8_libplatform v8_libbase v8_libsampler v8_snapshot torque_generated_initializers)
 
 for CURRENT_ARCH in ${ARCH_ARR[@]}
 do
