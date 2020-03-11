@@ -31,7 +31,7 @@ public:
         CFErrorRef error = nullptr;
         bool loaded = CFBundleLoadExecutableAndReturnError(this->_bundle, &error);
         if (error) {
-            tns::Assert(false);
+            NSLog(@"%s", [[(NSError*)error localizedDescription] UTF8String]);
         }
 
         return loaded;
