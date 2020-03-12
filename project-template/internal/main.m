@@ -6,7 +6,7 @@
 
 #ifdef DEBUG
 #include <notify.h>
-#include "TKLiveSync/include/TKLiveSync.h"
+#include <TKLiveSync/TKLiveSync.h>
 
 #define NOTIFICATION(name)                                                      \
     [[NSString stringWithFormat:@"%@:NativeScript.Debug.%s",                    \

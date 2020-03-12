@@ -3,16 +3,26 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 50;
+	objectVersion = 52;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
-		C2229973235449B400C1DFD6 /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2229971235449B300C1DFD6 /* InspectorServer.mm */; };
+		C2229973235449B400C1DFD6 /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2229971235449B300C1DFD6 /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		C2229974235449B400C1DFD6 /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = C2229972235449B400C1DFD6 /* InspectorServer.h */; };
 		C2229977235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = C2229975235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h */; };
 		C2229978235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2229976235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp */; };
+		C22536B5241A318900192740 /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B0241A318900192740 /* ffitarget.h */; };
+		C22536B6241A318900192740 /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B1241A318900192740 /* ffi.h */; };
+		C22536B7241A318900192740 /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B3241A318900192740 /* ffitarget.h */; };
+		C22536B8241A318900192740 /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B4241A318900192740 /* ffi.h */; };
+		C2253789241A41C500192740 /* TKLiveSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; };
+		C225378A241A41C500192740 /* TKLiveSync.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C2253790241A421E00192740 /* zip_fopen_index_encrypted.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E05A2328CA6F00A91A76 /* zip_fopen_index_encrypted.c */; };
+		C2253791241A422400192740 /* zip_get_num_entries.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0422328CA6F00A91A76 /* zip_get_num_entries.c */; };
+		C2253805241A5C3200192740 /* zip_get_encryption_implementation.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0302328CA6F00A91A76 /* zip_get_encryption_implementation.c */; };
+		C2253806241A5CED00192740 /* TKLiveSync.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A5DFE72328C4B900A91A76 /* TKLiveSync.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C22C092222CA3F370080D176 /* Worker.mm in Sources */ = {isa = PBXBuildFile; fileRef = C22C092022CA3F370080D176 /* Worker.mm */; };
 		C22C092322CA3F370080D176 /* Worker.h in Headers */ = {isa = PBXBuildFile; fileRef = C22C092122CA3F370080D176 /* Worker.h */; };
 		C22EF68B2379412100D67CBF /* TNSSwiftLike.m in Sources */ = {isa = PBXBuildFile; fileRef = C22EF68A2379412100D67CBF /* TNSSwiftLike.m */; };
@@ -64,16 +74,12 @@
 		C247C17122F82842001D2CA2 /* v8config.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C15B22F82842001D2CA2 /* v8config.h */; };
 		C247C17222F82842001D2CA2 /* v8-inspector.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C15C22F82842001D2CA2 /* v8-inspector.h */; };
 		C247C17322F82842001D2CA2 /* v8-internal.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C15D22F82842001D2CA2 /* v8-internal.h */; };
-		C247C17422F82842001D2CA2 /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C16022F82842001D2CA2 /* ffitarget.h */; };
-		C247C17522F82842001D2CA2 /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C16122F82842001D2CA2 /* ffi.h */; };
-		C247C17622F82842001D2CA2 /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C16322F82842001D2CA2 /* ffitarget.h */; };
-		C247C17722F82842001D2CA2 /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C16422F82842001D2CA2 /* ffi.h */; };
 		C247C32D22F828E3001D2CA2 /* utils.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C29622F828E2001D2CA2 /* utils.h */; };
 		C247C32E22F828E3001D2CA2 /* base64.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C29722F828E2001D2CA2 /* base64.h */; };
 		C247C32F22F828E3001D2CA2 /* utils.mm in Sources */ = {isa = PBXBuildFile; fileRef = C247C29822F828E2001D2CA2 /* utils.mm */; };
 		C247C33022F828E3001D2CA2 /* base64.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C247C29922F828E2001D2CA2 /* base64.cpp */; };
 		C247C33122F828E3001D2CA2 /* JsV8InspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C29A22F828E2001D2CA2 /* JsV8InspectorClient.h */; };
-		C247C33222F828E3001D2CA2 /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = C247C29B22F828E2001D2CA2 /* JsV8InspectorClient.mm */; };
+		C247C33222F828E3001D2CA2 /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = C247C29B22F828E2001D2CA2 /* JsV8InspectorClient.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		C247C33522F828E3001D2CA2 /* v8-inspector-platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2A222F828E2001D2CA2 /* v8-inspector-platform.h */; };
 		C247C33722F828E3001D2CA2 /* trace_event_common.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2A722F828E2001D2CA2 /* trace_event_common.h */; };
 		C247C33822F828E3001D2CA2 /* v8.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C2AA22F828E2001D2CA2 /* v8.h */; };
@@ -216,8 +222,6 @@
 		C27E5DB522F3206B00498ED0 /* app in Resources */ = {isa = PBXBuildFile; fileRef = C27E5DB422F3206B00498ED0 /* app */; };
 		C27E5DB822F3207800498ED0 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = C27E5DB722F3207800498ED0 /* main.m */; };
 		C27E5DBA22F324C200498ED0 /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C27E5DB922F324C200498ED0 /* Default-568h@2x.png */; };
-		C27FAA412328D7D8000C9066 /* zip_fopen_index_encrypted.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E05A2328CA6F00A91A76 /* zip_fopen_index_encrypted.c */; };
-		C27FAA422328D7F2000C9066 /* zip_get_encryption_implementation.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0302328CA6F00A91A76 /* zip_get_encryption_implementation.c */; };
 		C2937517229FC1600075CB16 /* TNSInheritance.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EE229FC1600075CB16 /* TNSInheritance.m */; };
 		C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2937519229FC1600075CB16 /* TNSConstructorResolution.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374F1229FC1600075CB16 /* TNSConstructorResolution.m */; };
@@ -241,7 +245,6 @@
 		C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */ = {isa = PBXBuildFile; fileRef = C298C026233C9AEA000DDF54 /* TSHelpers.h */; };
 		C2A5DEC82327DCF600A91A76 /* NativeScript.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB34229EAB3B00345BFE /* NativeScript.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C2A5DFE92328C4B900A91A76 /* TKLiveSync.m in Sources */ = {isa = PBXBuildFile; fileRef = C2A5DFE82328C4B900A91A76 /* TKLiveSync.m */; };
-		C2A5DFEA2328C4B900A91A76 /* TKLiveSync.h in CopyFiles */ = {isa = PBXBuildFile; fileRef = C2A5DFE72328C4B900A91A76 /* TKLiveSync.h */; };
 		C2A5DFF02328C4FC00A91A76 /* unzip.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2A5DFEE2328C4FC00A91A76 /* unzip.cpp */; };
 		C2A5E0792328CA6F00A91A76 /* zip_source_tell_write.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5DFF32328CA6F00A91A76 /* zip_source_tell_write.c */; };
 		C2A5E07A2328CA6F00A91A76 /* zip_memdup.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5DFF42328CA6F00A91A76 /* zip_memdup.c */; };
@@ -310,11 +313,9 @@
 		C2A5E0C22328CA7000A91A76 /* zip_rename.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E03F2328CA6F00A91A76 /* zip_rename.c */; };
 		C2A5E0C32328CA7000A91A76 /* zip_source_zip.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0402328CA6F00A91A76 /* zip_source_zip.c */; };
 		C2A5E0C42328CA7000A91A76 /* zip_stat_index.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0412328CA6F00A91A76 /* zip_stat_index.c */; };
-		C2A5E0C52328CA7000A91A76 /* zip_get_num_entries.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0422328CA6F00A91A76 /* zip_get_num_entries.c */; };
 		C2A5E0C62328CA7000A91A76 /* zip_source_function.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0432328CA6F00A91A76 /* zip_source_function.c */; };
 		C2A5E0C72328CA7000A91A76 /* zip_file_set_external_attributes.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0442328CA6F00A91A76 /* zip_file_set_external_attributes.c */; };
 		C2A5E0C82328CA7000A91A76 /* zip_fseek.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0452328CA6F00A91A76 /* zip_fseek.c */; };
-		C2A5E0C92328CA7000A91A76 /* zip_winzip_aes.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0462328CA6F00A91A76 /* zip_winzip_aes.c */; };
 		C2A5E0CA2328CA7000A91A76 /* zip_replace.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0472328CA6F00A91A76 /* zip_replace.c */; };
 		C2A5E0CB2328CA7000A91A76 /* zip_delete.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0482328CA6F00A91A76 /* zip_delete.c */; };
 		C2A5E0CC2328CA7000A91A76 /* zip_source_crc.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0492328CA6F00A91A76 /* zip_source_crc.c */; };
@@ -342,12 +343,10 @@
 		C2A5E0E62328CA7000A91A76 /* zip_source_remove.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0682328CA6F00A91A76 /* zip_source_remove.c */; };
 		C2A5E0E72328CA7000A91A76 /* zip_algorithm_bzip2.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0692328CA6F00A91A76 /* zip_algorithm_bzip2.c */; };
 		C2A5E0EA2328CA7000A91A76 /* zip_file_get_comment.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E06D2328CA6F00A91A76 /* zip_file_get_comment.c */; };
-		C2A5E0EB2328CA7000A91A76 /* zip_source_winzip_aes_decode.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E06E2328CA6F00A91A76 /* zip_source_winzip_aes_decode.c */; };
 		C2A5E0EC2328CA7000A91A76 /* zip_stat_init.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E06F2328CA6F00A91A76 /* zip_stat_init.c */; };
 		C2A5E0ED2328CA7000A91A76 /* zip_fopen.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0702328CA6F00A91A76 /* zip_fopen.c */; };
 		C2A5E0EF2328CA7000A91A76 /* zip_unchange_all.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0732328CA6F00A91A76 /* zip_unchange_all.c */; };
 		C2A5E0F02328CA7000A91A76 /* zip_io_util.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0742328CA6F00A91A76 /* zip_io_util.c */; };
-		C2A5E0F12328CA7000A91A76 /* zip_source_winzip_aes_encode.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0752328CA6F00A91A76 /* zip_source_winzip_aes_encode.c */; };
 		C2A5E0F22328CA7000A91A76 /* zip_source_layered.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0762328CA6F00A91A76 /* zip_source_layered.c */; };
 		C2A5E0F32328CA7000A91A76 /* zip_error_strerror.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0772328CA6F00A91A76 /* zip_error_strerror.c */; };
 		C2A5E0F62328CC4200A91A76 /* zip_source_window.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E06B2328CA6F00A91A76 /* zip_source_window.c */; };
@@ -428,6 +427,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		C2253787241A41C500192740 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2253781241A41C500192740;
+			remoteInfo = TKLiveSync;
+		};
 		C22C091E22CA2E860080D176 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = C27E277822202663009C10A3 /* Project object */;
@@ -494,22 +500,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		C2A5DFE32328C4B900A91A76 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = include;
-			dstSubfolderSpec = 16;
-			files = (
-				C2A5DFEA2328C4B900A91A76 /* TKLiveSync.h in CopyFiles */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		C2C8EE7722CE54EE001F8CEC /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				C225378A241A41C500192740 /* TKLiveSync.framework in Embed Frameworks */,
 				C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -534,6 +531,13 @@
 		C2229972235449B400C1DFD6 /* InspectorServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
 		C2229975235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-ns-debugger-agent-impl.h"; sourceTree = "<group>"; };
 		C2229976235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-ns-debugger-agent-impl.cpp"; sourceTree = "<group>"; };
+		C22536B0241A318900192740 /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
+		C22536B1241A318900192740 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
+		C22536B3241A318900192740 /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
+		C22536B4241A318900192740 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
+		C22536D2241A3D8B00192740 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C2253782241A41C500192740 /* TKLiveSync.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = TKLiveSync.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2253801241A5AA200192740 /* libbz2.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.15.sdk/usr/lib/libbz2.tbd; sourceTree = DEVELOPER_DIR; };
 		C22C092022CA3F370080D176 /* Worker.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Worker.mm; sourceTree = "<group>"; };
 		C22C092122CA3F370080D176 /* Worker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Worker.h; sourceTree = "<group>"; };
 		C22EF68A2379412100D67CBF /* TNSSwiftLike.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TNSSwiftLike.m; sourceTree = "<group>"; };
@@ -589,10 +593,6 @@
 		C247C15B22F82842001D2CA2 /* v8config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = v8config.h; sourceTree = "<group>"; };
 		C247C15C22F82842001D2CA2 /* v8-inspector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-inspector.h"; sourceTree = "<group>"; };
 		C247C15D22F82842001D2CA2 /* v8-internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-internal.h"; sourceTree = "<group>"; };
-		C247C16022F82842001D2CA2 /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
-		C247C16122F82842001D2CA2 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
-		C247C16322F82842001D2CA2 /* ffitarget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffitarget.h; sourceTree = "<group>"; };
-		C247C16422F82842001D2CA2 /* ffi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ffi.h; sourceTree = "<group>"; };
 		C247C29622F828E2001D2CA2 /* utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
 		C247C29722F828E2001D2CA2 /* base64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = base64.h; sourceTree = "<group>"; };
 		C247C29822F828E2001D2CA2 /* utils.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = utils.mm; sourceTree = "<group>"; };
@@ -786,7 +786,6 @@
 		C298C025233C9AEA000DDF54 /* TSHelpers.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TSHelpers.cpp; sourceTree = "<group>"; };
 		C298C026233C9AEA000DDF54 /* TSHelpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TSHelpers.h; sourceTree = "<group>"; };
 		C298C029233DEB8C000DDF54 /* NativeScript-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NativeScript-Prefix.pch"; sourceTree = "<group>"; };
-		C2A5DFE52328C4B900A91A76 /* libTKLiveSync.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libTKLiveSync.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2A5DFE72328C4B900A91A76 /* TKLiveSync.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TKLiveSync.h; sourceTree = "<group>"; };
 		C2A5DFE82328C4B900A91A76 /* TKLiveSync.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TKLiveSync.m; sourceTree = "<group>"; };
 		C2A5DFEE2328C4FC00A91A76 /* unzip.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = unzip.cpp; sourceTree = "<group>"; };
@@ -1011,6 +1010,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		C225377F241A41C500192740 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C23992C4236C2D6E00D2F720 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -1034,17 +1040,11 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		C2A5DFE22328C4B900A91A76 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		C2DDEB13229EA89000345BFE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C2253789241A41C500192740 /* TKLiveSync.framework in Frameworks */,
 				C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1066,6 +1066,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C22536AF241A318900192740 /* arm64 */ = {
+			isa = PBXGroup;
+			children = (
+				C22536B0241A318900192740 /* ffitarget.h */,
+				C22536B1241A318900192740 /* ffi.h */,
+			);
+			path = arm64;
+			sourceTree = "<group>";
+		};
+		C22536B2241A318900192740 /* x86_64 */ = {
+			isa = PBXGroup;
+			children = (
+				C22536B3241A318900192740 /* ffitarget.h */,
+				C22536B4241A318900192740 /* ffi.h */,
+			);
+			path = x86_64;
+			sourceTree = "<group>";
+		};
 		C23992C8236C2D6E00D2F720 /* TestRunnerTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -1155,28 +1173,10 @@
 		C247C15E22F82842001D2CA2 /* libffi */ = {
 			isa = PBXGroup;
 			children = (
-				C247C15F22F82842001D2CA2 /* arm64 */,
-				C247C16222F82842001D2CA2 /* x86_64 */,
+				C22536AF241A318900192740 /* arm64 */,
+				C22536B2241A318900192740 /* x86_64 */,
 			);
 			path = libffi;
-			sourceTree = "<group>";
-		};
-		C247C15F22F82842001D2CA2 /* arm64 */ = {
-			isa = PBXGroup;
-			children = (
-				C247C16022F82842001D2CA2 /* ffitarget.h */,
-				C247C16122F82842001D2CA2 /* ffi.h */,
-			);
-			path = arm64;
-			sourceTree = "<group>";
-		};
-		C247C16222F82842001D2CA2 /* x86_64 */ = {
-			isa = PBXGroup;
-			children = (
-				C247C16322F82842001D2CA2 /* ffitarget.h */,
-				C247C16422F82842001D2CA2 /* ffi.h */,
-			);
-			path = x86_64;
 			sourceTree = "<group>";
 		};
 		C247C29522F828E2001D2CA2 /* inspector */ = {
@@ -1454,8 +1454,8 @@
 				C29374E2229FC0F60075CB16 /* libTestFixtures.a */,
 				C2F4CBB322C60BFD0036B56F /* metadata-generator */,
 				C27E5D8B22F31CC900498ED0 /* AppWithModules.app */,
-				C2A5DFE52328C4B900A91A76 /* libTKLiveSync.a */,
 				C23992C7236C2D6E00D2F720 /* TestRunnerTests.xctest */,
+				C2253782241A41C500192740 /* TKLiveSync.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1580,6 +1580,7 @@
 				C2A5DFE82328C4B900A91A76 /* TKLiveSync.m */,
 				C2A5DFEF2328C4FC00A91A76 /* unzip.h */,
 				C2A5DFEE2328C4FC00A91A76 /* unzip.cpp */,
+				C22536D2241A3D8B00192740 /* Info.plist */,
 			);
 			path = TKLiveSync;
 			sourceTree = "<group>";
@@ -1882,6 +1883,7 @@
 		C2FF3016225203FD00933782 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				C2253801241A5AA200192740 /* libbz2.tbd */,
 				C2FF301F2252065E00933782 /* CoreFoundation.framework */,
 				C2FF301C2252062A00933782 /* UIKit.framework */,
 				C2FF3017225203FD00933782 /* Foundation.framework */,
@@ -1892,6 +1894,14 @@
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
+		C225377D241A41C500192740 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2253806241A5CED00192740 /* TKLiveSync.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C2DDEB2D229EAB3B00345BFE /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
@@ -1903,13 +1913,13 @@
 				C247C3AB22F828E3001D2CA2 /* memory.h in Headers */,
 				C247C33522F828E3001D2CA2 /* v8-inspector-platform.h in Headers */,
 				C247C34E22F828E3001D2CA2 /* inspected-context.h in Headers */,
+				C22536B5241A318900192740 /* ffitarget.h in Headers */,
 				C2D7E9CF23F4294800DB289C /* export-template.h in Headers */,
 				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
 				C247C32E22F828E3001D2CA2 /* base64.h in Headers */,
 				C247C35322F828E3001D2CA2 /* v8-runtime-agent-impl.h in Headers */,
 				C247C35222F828E3001D2CA2 /* v8-stack-trace-impl.h in Headers */,
-				C247C17622F82842001D2CA2 /* ffitarget.h in Headers */,
 				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
 				C263B4CC23D0A87E00D5B872 /* bits.h in Headers */,
 				C247C39E22F828E3001D2CA2 /* base-export.h in Headers */,
@@ -1920,6 +1930,7 @@
 				C247C39922F828E3001D2CA2 /* checks.h in Headers */,
 				C247C3A622F828E3001D2CA2 /* logging.h in Headers */,
 				C23E8F7322CB386F0078FD4C /* ConcurrentQueue.h in Headers */,
+				C22536B8241A318900192740 /* ffi.h in Headers */,
 				C247C3AC22F828E3001D2CA2 /* safe_conversions_impl.h in Headers */,
 				C247C38D22F828E3001D2CA2 /* v8-page-agent-impl.h in Headers */,
 				C247C16F22F82842001D2CA2 /* v8-util.h in Headers */,
@@ -1929,7 +1940,6 @@
 				C2F4D0AE232F85E20008A2EB /* SymbolIterator.h in Headers */,
 				C2DDEBAD229EAC8300345BFE /* Caches.h in Headers */,
 				C247C17022F82842001D2CA2 /* libffi.h in Headers */,
-				C247C17422F82842001D2CA2 /* ffitarget.h in Headers */,
 				C247C33F22F828E3001D2CA2 /* custom-preview.h in Headers */,
 				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
 				C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */,
@@ -1986,6 +1996,7 @@
 				C247C3A722F828E3001D2CA2 /* atomicops.h in Headers */,
 				C247C3A222F828E3001D2CA2 /* platform.h in Headers */,
 				C247C16922F82842001D2CA2 /* v8-tracing.h in Headers */,
+				C22536B7241A318900192740 /* ffitarget.h in Headers */,
 				C247C3B122F828E3001D2CA2 /* debug-interface.h in Headers */,
 				C247C16D22F82842001D2CA2 /* Runtime.h in Headers */,
 				C2DDEBAB229EAC8300345BFE /* WeakRef.h in Headers */,
@@ -2000,7 +2011,6 @@
 				C247C16C22F82842001D2CA2 /* Schema.h in Headers */,
 				C247C38422F828E3001D2CA2 /* v8-network-agent-impl.h in Headers */,
 				C247C38A22F828E3001D2CA2 /* v8-console-message.h in Headers */,
-				C247C17722F82842001D2CA2 /* ffi.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
 				C2F4D0CB2334A6E70008A2EB /* RuntimeConfig.h in Headers */,
 				C247C16B22F82842001D2CA2 /* v8.h in Headers */,
@@ -2008,12 +2018,12 @@
 				C247C3AD22F828E3001D2CA2 /* atomic-utils.h in Headers */,
 				C247C34F22F828E3001D2CA2 /* v8-debugger-agent-impl.h in Headers */,
 				C247C36F22F828E3001D2CA2 /* Runtime.h in Headers */,
+				C22536B6241A318900192740 /* ffi.h in Headers */,
 				C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */,
 				C247C37822F828E3001D2CA2 /* Forward.h in Headers */,
 				C247C33A22F828E3001D2CA2 /* conversions.h in Headers */,
 				C247C39C22F828E3001D2CA2 /* build_config.h in Headers */,
 				C247C34322F828E3001D2CA2 /* remote-object-id.h in Headers */,
-				C247C17522F82842001D2CA2 /* ffi.h in Headers */,
 				C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */,
 				C247C39822F828E3001D2CA2 /* vector.h in Headers */,
 				C247C37522F828E3001D2CA2 /* CSS.h in Headers */,
@@ -2058,6 +2068,24 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
+		C2253781241A41C500192740 /* TKLiveSync */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C225378D241A41C500192740 /* Build configuration list for PBXNativeTarget "TKLiveSync" */;
+			buildPhases = (
+				C225377D241A41C500192740 /* Headers */,
+				C225377E241A41C500192740 /* Sources */,
+				C225377F241A41C500192740 /* Frameworks */,
+				C2253780241A41C500192740 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TKLiveSync;
+			productName = TKLiveSync;
+			productReference = C2253782241A41C500192740 /* TKLiveSync.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 		C23992C6236C2D6E00D2F720 /* TestRunnerTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C23992D0236C2D6E00D2F720 /* Build configuration list for PBXNativeTarget "TestRunnerTests" */;
@@ -2114,23 +2142,6 @@
 			productReference = C29374E2229FC0F60075CB16 /* libTestFixtures.a */;
 			productType = "com.apple.product-type.library.static";
 		};
-		C2A5DFE42328C4B900A91A76 /* TKLiveSync */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = C2A5DFEB2328C4B900A91A76 /* Build configuration list for PBXNativeTarget "TKLiveSync" */;
-			buildPhases = (
-				C2A5DFE12328C4B900A91A76 /* Sources */,
-				C2A5DFE22328C4B900A91A76 /* Frameworks */,
-				C2A5DFE32328C4B900A91A76 /* CopyFiles */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = TKLiveSync;
-			productName = TKLiveSync;
-			productReference = C2A5DFE52328C4B900A91A76 /* libTKLiveSync.a */;
-			productType = "com.apple.product-type.library.static";
-		};
 		C2DDEB15229EA89000345BFE /* TestRunner */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestRunner" */;
@@ -2147,6 +2158,7 @@
 				C22C091F22CA2E860080D176 /* PBXTargetDependency */,
 				C293752B229FC4740075CB16 /* PBXTargetDependency */,
 				C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */,
+				C2253788241A41C500192740 /* PBXTargetDependency */,
 			);
 			name = TestRunner;
 			productName = TestRunner;
@@ -2199,6 +2211,9 @@
 				LastUpgradeCheck = 1030;
 				ORGANIZATIONNAME = Progress;
 				TargetAttributes = {
+					C2253781241A41C500192740 = {
+						CreatedOnToolsVersion = 11.3.1;
+					};
 					C23992C6236C2D6E00D2F720 = {
 						CreatedOnToolsVersion = 11.1;
 						TestTargetID = C2DDEB15229EA89000345BFE;
@@ -2208,9 +2223,6 @@
 					};
 					C29374E1229FC0F60075CB16 = {
 						CreatedOnToolsVersion = 10.2.1;
-					};
-					C2A5DFE42328C4B900A91A76 = {
-						CreatedOnToolsVersion = 10.3;
 					};
 					C2DDEB15229EA89000345BFE = {
 						CreatedOnToolsVersion = 10.2.1;
@@ -2241,13 +2253,20 @@
 				C2DDEB31229EAB3B00345BFE /* NativeScript */,
 				C29374E1229FC0F60075CB16 /* TestFixtures */,
 				C2F4CBB222C60BFD0036B56F /* metadata-generator */,
-				C2A5DFE42328C4B900A91A76 /* TKLiveSync */,
 				C23992C6236C2D6E00D2F720 /* TestRunnerTests */,
+				C2253781241A41C500192740 /* TKLiveSync */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		C2253780241A41C500192740 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C23992C5236C2D6E00D2F720 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -2337,6 +2356,122 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C225377E241A41C500192740 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2253805241A5C3200192740 /* zip_get_encryption_implementation.c in Sources */,
+				C2253791241A422400192740 /* zip_get_num_entries.c in Sources */,
+				C2253790241A421E00192740 /* zip_fopen_index_encrypted.c in Sources */,
+				C2A5E0842328CA6F00A91A76 /* zip_source_buffer.c in Sources */,
+				C2A5E0932328CA6F00A91A76 /* zip_hash.c in Sources */,
+				C2A5E0882328CA6F00A91A76 /* zip_file_rename.c in Sources */,
+				C2A5E0F62328CC4200A91A76 /* zip_source_window.c in Sources */,
+				C2A5E0DD2328CA7000A91A76 /* zip_dirent.c in Sources */,
+				C2A5E09E2328CA6F00A91A76 /* zip_error_get_sys_type.c in Sources */,
+				C2A5E0872328CA6F00A91A76 /* zip_get_archive_comment.c in Sources */,
+				C2A5E0982328CA6F00A91A76 /* zip_unchange.c in Sources */,
+				C2A5E0F32328CA7000A91A76 /* zip_error_strerror.c in Sources */,
+				C2A5DFF02328C4FC00A91A76 /* unzip.cpp in Sources */,
+				C2A5E0BC2328CA6F00A91A76 /* zip_file_set_mtime.c in Sources */,
+				C2A5E0CF2328CA7000A91A76 /* zip_stat.c in Sources */,
+				C2A5E0B62328CA6F00A91A76 /* zip_set_archive_flag.c in Sources */,
+				C2A5E0ED2328CA7000A91A76 /* zip_fopen.c in Sources */,
+				C2A5E0C22328CA7000A91A76 /* zip_rename.c in Sources */,
+				C2A5E0B82328CA6F00A91A76 /* zip_fdopen.c in Sources */,
+				C2A5E08B2328CA6F00A91A76 /* zip_discard.c in Sources */,
+				C2A5E0C62328CA7000A91A76 /* zip_source_function.c in Sources */,
+				C2A5E0B02328CA6F00A91A76 /* zip_error.c in Sources */,
+				C2A5E0CB2328CA7000A91A76 /* zip_delete.c in Sources */,
+				C2A5E0E32328CA7000A91A76 /* zip_source_compress.c in Sources */,
+				C2A5E0BD2328CA6F00A91A76 /* zip_set_default_password.c in Sources */,
+				C2A5E0B32328CA6F00A91A76 /* zip_source_seek.c in Sources */,
+				C2A5E0E22328CA7000A91A76 /* zip_file_error_clear.c in Sources */,
+				C2A5E0E12328CA7000A91A76 /* zip_source_tell.c in Sources */,
+				C2A5E0BF2328CA6F00A91A76 /* zip_fread.c in Sources */,
+				C2A5E0972328CA6F00A91A76 /* zip_file_get_offset.c in Sources */,
+				C2A5E0CE2328CA7000A91A76 /* zip_set_file_comment.c in Sources */,
+				C2A5E0DC2328CA7000A91A76 /* zip_fclose.c in Sources */,
+				C2A5E0C82328CA7000A91A76 /* zip_fseek.c in Sources */,
+				C2A5E0C32328CA7000A91A76 /* zip_source_zip.c in Sources */,
+				C2A5E0892328CA6F00A91A76 /* zip_source_pkware.c in Sources */,
+				C2A5E0C12328CA7000A91A76 /* zip_progress.c in Sources */,
+				C2A5E08F2328CA6F00A91A76 /* zip_entry.c in Sources */,
+				C2A5E0A02328CA6F00A91A76 /* zip_source_is_deleted.c in Sources */,
+				C2A5E0792328CA6F00A91A76 /* zip_source_tell_write.c in Sources */,
+				C2A5E0A82328CA6F00A91A76 /* zip_unchange_archive.c in Sources */,
+				C2A5E0DA2328CA7000A91A76 /* zip_utf-8.c in Sources */,
+				C2A5E0B52328CA6F00A91A76 /* zip_get_archive_flag.c in Sources */,
+				C2A5E0E02328CA7000A91A76 /* zip_source_error.c in Sources */,
+				C2A5E0C72328CA7000A91A76 /* zip_file_set_external_attributes.c in Sources */,
+				C2A5E0862328CA6F00A91A76 /* zip_source_stat.c in Sources */,
+				C2A5E0942328CA6F00A91A76 /* zip_file_error_get.c in Sources */,
+				C2A5E09F2328CA6F00A91A76 /* zip_source_call.c in Sources */,
+				C2A5E09D2328CA6F00A91A76 /* zip_add_dir.c in Sources */,
+				C2A5E0802328CA6F00A91A76 /* zip_get_name.c in Sources */,
+				C2A5E0A62328CA6F00A91A76 /* zip_source_seek_write.c in Sources */,
+				C2A5E08A2328CA6F00A91A76 /* zip_ftell.c in Sources */,
+				C2A5E0EF2328CA7000A91A76 /* zip_unchange_all.c in Sources */,
+				C2A5E0852328CA6F00A91A76 /* zip_error_clear.c in Sources */,
+				C2A5E0DE2328CA7000A91A76 /* zip_source_write.c in Sources */,
+				C2A5E0AF2328CA6F00A91A76 /* zip_source_filep.c in Sources */,
+				C2A5E0E52328CA7000A91A76 /* zip_error_to_str.c in Sources */,
+				C2A5E0E62328CA7000A91A76 /* zip_source_remove.c in Sources */,
+				C2A5E0EC2328CA7000A91A76 /* zip_stat_init.c in Sources */,
+				C2A5E0B92328CA6F00A91A76 /* zip_unchange_data.c in Sources */,
+				C2A5E07D2328CA6F00A91A76 /* zip_source_begin_write.c in Sources */,
+				C2A5E0A22328CA6F00A91A76 /* zip_set_archive_comment.c in Sources */,
+				C2A5E0C02328CA7000A91A76 /* zip_source_rollback_write.c in Sources */,
+				C2A5E09A2328CA6F00A91A76 /* zip_file_set_comment.c in Sources */,
+				C2A5E0C42328CA7000A91A76 /* zip_stat_index.c in Sources */,
+				C2A5E0952328CA6F00A91A76 /* zip_file_replace.c in Sources */,
+				C2A5E0812328CA6F00A91A76 /* zip_file_strerror.c in Sources */,
+				C2A5E0B22328CA6F00A91A76 /* zip_strerror.c in Sources */,
+				C2A5E0922328CA6F00A91A76 /* zip_set_file_compression.c in Sources */,
+				C2A5E0CA2328CA7000A91A76 /* zip_replace.c in Sources */,
+				C2A5E0AB2328CA6F00A91A76 /* zip_err_str.c in Sources */,
+				C2A5E0D32328CA7000A91A76 /* zip_source_close.c in Sources */,
+				C2A5E0D52328CA7000A91A76 /* zip_source_read.c in Sources */,
+				C2A5E0D82328CA7000A91A76 /* zip_source_begin_write_cloning.c in Sources */,
+				C2A5DFE92328C4B900A91A76 /* TKLiveSync.m in Sources */,
+				C2A5E0832328CA6F00A91A76 /* zip_source_commit_write.c in Sources */,
+				C2A5E08E2328CA6F00A91A76 /* zip_set_name.c in Sources */,
+				C2A5E0A72328CA6F00A91A76 /* zip_algorithm_deflate.c in Sources */,
+				C2A5E0CC2328CA7000A91A76 /* zip_source_crc.c in Sources */,
+				C2A5E0AE2328CA6F00A91A76 /* zip_buffer.c in Sources */,
+				C2A5E0A42328CA6F00A91A76 /* zip_dir_add.c in Sources */,
+				C2A5E07B2328CA6F00A91A76 /* zip_source_supports.c in Sources */,
+				C2A5E0E42328CA7000A91A76 /* zip_libzip_version.c in Sources */,
+				C2A5E07F2328CA6F00A91A76 /* zip_filerange_crc.c in Sources */,
+				C2A5E07A2328CA6F00A91A76 /* zip_memdup.c in Sources */,
+				C2A5E0D42328CA7000A91A76 /* zip_source_get_compression_flags.c in Sources */,
+				C2A5E0DF2328CA7000A91A76 /* zip_file_add.c in Sources */,
+				C2A5E0B72328CA6F00A91A76 /* zip_source_zip_new.c in Sources */,
+				C2A5E07E2328CA6F00A91A76 /* zip_add.c in Sources */,
+				C2A5E0E72328CA7000A91A76 /* zip_algorithm_bzip2.c in Sources */,
+				C2A5E0F02328CA7000A91A76 /* zip_io_util.c in Sources */,
+				C2A5E08C2328CA6F00A91A76 /* zip_source_file.c in Sources */,
+				C2A5E07C2328CA6F00A91A76 /* zip_file_get_external_attributes.c in Sources */,
+				C2A5E08D2328CA6F00A91A76 /* zip_string.c in Sources */,
+				C2A5E0DB2328CA7000A91A76 /* zip_error_get.c in Sources */,
+				C2A5E09C2328CA6F00A91A76 /* zip_close.c in Sources */,
+				C2A5E0BE2328CA6F00A91A76 /* zip_extra_field_api.c in Sources */,
+				C2A5E0AC2328CA6F00A91A76 /* zip_add_entry.c in Sources */,
+				C2A5E0A92328CA6F00A91A76 /* zip_source_free.c in Sources */,
+				C2A5E0912328CA6F00A91A76 /* zip_source_open.c in Sources */,
+				C2A5E0AA2328CA6F00A91A76 /* zip_get_num_files.c in Sources */,
+				C2A5E0A52328CA6F00A91A76 /* zip_name_locate.c in Sources */,
+				C2A5E0EA2328CA7000A91A76 /* zip_file_get_comment.c in Sources */,
+				C2A5E0D02328CA7000A91A76 /* zip_get_file_comment.c in Sources */,
+				C2A5E0992328CA6F00A91A76 /* zip_new.c in Sources */,
+				C2A5E0D72328CA7000A91A76 /* zip_open.c in Sources */,
+				C2A5E0F22328CA7000A91A76 /* zip_source_layered.c in Sources */,
+				C2A5E0822328CA6F00A91A76 /* zip_fopen_index.c in Sources */,
+				C2A5E0A32328CA6F00A91A76 /* zip_extra_field.c in Sources */,
+				C2A5E0D12328CA7000A91A76 /* mkstemp.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C23992C3236C2D6E00D2F720 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -2407,125 +2542,6 @@
 				C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */,
 				C2937526229FC1600075CB16 /* TNSRecords.m in Sources */,
 				C2937522229FC1600075CB16 /* TNSReturnsRetained.m in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		C2A5DFE12328C4B900A91A76 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				C27FAA422328D7F2000C9066 /* zip_get_encryption_implementation.c in Sources */,
-				C27FAA412328D7D8000C9066 /* zip_fopen_index_encrypted.c in Sources */,
-				C2A5E0C52328CA7000A91A76 /* zip_get_num_entries.c in Sources */,
-				C2A5E0842328CA6F00A91A76 /* zip_source_buffer.c in Sources */,
-				C2A5E0932328CA6F00A91A76 /* zip_hash.c in Sources */,
-				C2A5E0882328CA6F00A91A76 /* zip_file_rename.c in Sources */,
-				C2A5E0F62328CC4200A91A76 /* zip_source_window.c in Sources */,
-				C2A5E0DD2328CA7000A91A76 /* zip_dirent.c in Sources */,
-				C2A5E09E2328CA6F00A91A76 /* zip_error_get_sys_type.c in Sources */,
-				C2A5E0872328CA6F00A91A76 /* zip_get_archive_comment.c in Sources */,
-				C2A5E0982328CA6F00A91A76 /* zip_unchange.c in Sources */,
-				C2A5E0F32328CA7000A91A76 /* zip_error_strerror.c in Sources */,
-				C2A5DFF02328C4FC00A91A76 /* unzip.cpp in Sources */,
-				C2A5E0F12328CA7000A91A76 /* zip_source_winzip_aes_encode.c in Sources */,
-				C2A5E0BC2328CA6F00A91A76 /* zip_file_set_mtime.c in Sources */,
-				C2A5E0CF2328CA7000A91A76 /* zip_stat.c in Sources */,
-				C2A5E0B62328CA6F00A91A76 /* zip_set_archive_flag.c in Sources */,
-				C2A5E0ED2328CA7000A91A76 /* zip_fopen.c in Sources */,
-				C2A5E0C22328CA7000A91A76 /* zip_rename.c in Sources */,
-				C2A5E0B82328CA6F00A91A76 /* zip_fdopen.c in Sources */,
-				C2A5E08B2328CA6F00A91A76 /* zip_discard.c in Sources */,
-				C2A5E0C62328CA7000A91A76 /* zip_source_function.c in Sources */,
-				C2A5E0B02328CA6F00A91A76 /* zip_error.c in Sources */,
-				C2A5E0CB2328CA7000A91A76 /* zip_delete.c in Sources */,
-				C2A5E0E32328CA7000A91A76 /* zip_source_compress.c in Sources */,
-				C2A5E0BD2328CA6F00A91A76 /* zip_set_default_password.c in Sources */,
-				C2A5E0B32328CA6F00A91A76 /* zip_source_seek.c in Sources */,
-				C2A5E0E22328CA7000A91A76 /* zip_file_error_clear.c in Sources */,
-				C2A5E0E12328CA7000A91A76 /* zip_source_tell.c in Sources */,
-				C2A5E0BF2328CA6F00A91A76 /* zip_fread.c in Sources */,
-				C2A5E0972328CA6F00A91A76 /* zip_file_get_offset.c in Sources */,
-				C2A5E0CE2328CA7000A91A76 /* zip_set_file_comment.c in Sources */,
-				C2A5E0DC2328CA7000A91A76 /* zip_fclose.c in Sources */,
-				C2A5E0C82328CA7000A91A76 /* zip_fseek.c in Sources */,
-				C2A5E0C32328CA7000A91A76 /* zip_source_zip.c in Sources */,
-				C2A5E0892328CA6F00A91A76 /* zip_source_pkware.c in Sources */,
-				C2A5E0C12328CA7000A91A76 /* zip_progress.c in Sources */,
-				C2A5E08F2328CA6F00A91A76 /* zip_entry.c in Sources */,
-				C2A5E0A02328CA6F00A91A76 /* zip_source_is_deleted.c in Sources */,
-				C2A5E0792328CA6F00A91A76 /* zip_source_tell_write.c in Sources */,
-				C2A5E0A82328CA6F00A91A76 /* zip_unchange_archive.c in Sources */,
-				C2A5E0DA2328CA7000A91A76 /* zip_utf-8.c in Sources */,
-				C2A5E0B52328CA6F00A91A76 /* zip_get_archive_flag.c in Sources */,
-				C2A5E0E02328CA7000A91A76 /* zip_source_error.c in Sources */,
-				C2A5E0C72328CA7000A91A76 /* zip_file_set_external_attributes.c in Sources */,
-				C2A5E0862328CA6F00A91A76 /* zip_source_stat.c in Sources */,
-				C2A5E0942328CA6F00A91A76 /* zip_file_error_get.c in Sources */,
-				C2A5E09F2328CA6F00A91A76 /* zip_source_call.c in Sources */,
-				C2A5E09D2328CA6F00A91A76 /* zip_add_dir.c in Sources */,
-				C2A5E0802328CA6F00A91A76 /* zip_get_name.c in Sources */,
-				C2A5E0A62328CA6F00A91A76 /* zip_source_seek_write.c in Sources */,
-				C2A5E08A2328CA6F00A91A76 /* zip_ftell.c in Sources */,
-				C2A5E0EF2328CA7000A91A76 /* zip_unchange_all.c in Sources */,
-				C2A5E0852328CA6F00A91A76 /* zip_error_clear.c in Sources */,
-				C2A5E0DE2328CA7000A91A76 /* zip_source_write.c in Sources */,
-				C2A5E0AF2328CA6F00A91A76 /* zip_source_filep.c in Sources */,
-				C2A5E0E52328CA7000A91A76 /* zip_error_to_str.c in Sources */,
-				C2A5E0E62328CA7000A91A76 /* zip_source_remove.c in Sources */,
-				C2A5E0EC2328CA7000A91A76 /* zip_stat_init.c in Sources */,
-				C2A5E0B92328CA6F00A91A76 /* zip_unchange_data.c in Sources */,
-				C2A5E07D2328CA6F00A91A76 /* zip_source_begin_write.c in Sources */,
-				C2A5E0A22328CA6F00A91A76 /* zip_set_archive_comment.c in Sources */,
-				C2A5E0C02328CA7000A91A76 /* zip_source_rollback_write.c in Sources */,
-				C2A5E09A2328CA6F00A91A76 /* zip_file_set_comment.c in Sources */,
-				C2A5E0C42328CA7000A91A76 /* zip_stat_index.c in Sources */,
-				C2A5E0952328CA6F00A91A76 /* zip_file_replace.c in Sources */,
-				C2A5E0812328CA6F00A91A76 /* zip_file_strerror.c in Sources */,
-				C2A5E0B22328CA6F00A91A76 /* zip_strerror.c in Sources */,
-				C2A5E0922328CA6F00A91A76 /* zip_set_file_compression.c in Sources */,
-				C2A5E0CA2328CA7000A91A76 /* zip_replace.c in Sources */,
-				C2A5E0AB2328CA6F00A91A76 /* zip_err_str.c in Sources */,
-				C2A5E0D32328CA7000A91A76 /* zip_source_close.c in Sources */,
-				C2A5E0D52328CA7000A91A76 /* zip_source_read.c in Sources */,
-				C2A5E0D82328CA7000A91A76 /* zip_source_begin_write_cloning.c in Sources */,
-				C2A5DFE92328C4B900A91A76 /* TKLiveSync.m in Sources */,
-				C2A5E0832328CA6F00A91A76 /* zip_source_commit_write.c in Sources */,
-				C2A5E0C92328CA7000A91A76 /* zip_winzip_aes.c in Sources */,
-				C2A5E08E2328CA6F00A91A76 /* zip_set_name.c in Sources */,
-				C2A5E0A72328CA6F00A91A76 /* zip_algorithm_deflate.c in Sources */,
-				C2A5E0CC2328CA7000A91A76 /* zip_source_crc.c in Sources */,
-				C2A5E0AE2328CA6F00A91A76 /* zip_buffer.c in Sources */,
-				C2A5E0A42328CA6F00A91A76 /* zip_dir_add.c in Sources */,
-				C2A5E07B2328CA6F00A91A76 /* zip_source_supports.c in Sources */,
-				C2A5E0E42328CA7000A91A76 /* zip_libzip_version.c in Sources */,
-				C2A5E07F2328CA6F00A91A76 /* zip_filerange_crc.c in Sources */,
-				C2A5E07A2328CA6F00A91A76 /* zip_memdup.c in Sources */,
-				C2A5E0D42328CA7000A91A76 /* zip_source_get_compression_flags.c in Sources */,
-				C2A5E0DF2328CA7000A91A76 /* zip_file_add.c in Sources */,
-				C2A5E0B72328CA6F00A91A76 /* zip_source_zip_new.c in Sources */,
-				C2A5E07E2328CA6F00A91A76 /* zip_add.c in Sources */,
-				C2A5E0E72328CA7000A91A76 /* zip_algorithm_bzip2.c in Sources */,
-				C2A5E0F02328CA7000A91A76 /* zip_io_util.c in Sources */,
-				C2A5E08C2328CA6F00A91A76 /* zip_source_file.c in Sources */,
-				C2A5E07C2328CA6F00A91A76 /* zip_file_get_external_attributes.c in Sources */,
-				C2A5E08D2328CA6F00A91A76 /* zip_string.c in Sources */,
-				C2A5E0DB2328CA7000A91A76 /* zip_error_get.c in Sources */,
-				C2A5E09C2328CA6F00A91A76 /* zip_close.c in Sources */,
-				C2A5E0EB2328CA7000A91A76 /* zip_source_winzip_aes_decode.c in Sources */,
-				C2A5E0BE2328CA6F00A91A76 /* zip_extra_field_api.c in Sources */,
-				C2A5E0AC2328CA6F00A91A76 /* zip_add_entry.c in Sources */,
-				C2A5E0A92328CA6F00A91A76 /* zip_source_free.c in Sources */,
-				C2A5E0912328CA6F00A91A76 /* zip_source_open.c in Sources */,
-				C2A5E0AA2328CA6F00A91A76 /* zip_get_num_files.c in Sources */,
-				C2A5E0A52328CA6F00A91A76 /* zip_name_locate.c in Sources */,
-				C2A5E0EA2328CA7000A91A76 /* zip_file_get_comment.c in Sources */,
-				C2A5E0D02328CA7000A91A76 /* zip_get_file_comment.c in Sources */,
-				C2A5E0992328CA6F00A91A76 /* zip_new.c in Sources */,
-				C2A5E0D72328CA7000A91A76 /* zip_open.c in Sources */,
-				C2A5E0F22328CA7000A91A76 /* zip_source_layered.c in Sources */,
-				C2A5E0822328CA6F00A91A76 /* zip_fopen_index.c in Sources */,
-				C2A5E0A32328CA6F00A91A76 /* zip_extra_field.c in Sources */,
-				C2A5E0D12328CA7000A91A76 /* mkstemp.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2640,6 +2656,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		C2253788241A41C500192740 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2253781241A41C500192740 /* TKLiveSync */;
+			targetProxy = C2253787241A41C500192740 /* PBXContainerItemProxy */;
+		};
 		C22C091F22CA2E860080D176 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
@@ -2652,6 +2673,7 @@
 		};
 		C27E5DA422F31EF900498ED0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = C2F4CBB222C60BFD0036B56F /* metadata-generator */;
 			targetProxy = C27E5DA322F31EF900498ED0 /* PBXContainerItemProxy */;
 		};
@@ -2667,12 +2689,76 @@
 		};
 		C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = C2F4CBB222C60BFD0036B56F /* metadata-generator */;
 			targetProxy = C2F4CBBB22C61CF20036B56F /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		C225378B241A41C500192740 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"HAVE_CONFIG_H=1",
+				);
+				INFOPLIST_FILE = TKLiveSync/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"-ObjC",
+					"-lbz2",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TKLiveSync;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		C225378C241A41C500192740 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GCC_PREPROCESSOR_DEFINITIONS = "HAVE_CONFIG_H=1";
+				INFOPLIST_FILE = TKLiveSync/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"-ObjC",
+					"-lbz2",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TKLiveSync;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
 		C23992CE236C2D6E00D2F720 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -2940,44 +3026,6 @@
 			};
 			name = Release;
 		};
-		C2A5DFEC2328C4B900A91A76 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
-				GCC_C_LANGUAGE_STANDARD = c11;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"DEBUG=1",
-					"HAVE_CONFIG_H=1",
-					"$(inherited)",
-				);
-				HEADER_SEARCH_PATHS = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
-				LIBRARY_SEARCH_PATHS = "";
-				OTHER_CFLAGS = "-fembed-bitcode";
-				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		C2A5DFED2328C4B900A91A76 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
-				GCC_C_LANGUAGE_STANDARD = c11;
-				GCC_PREPROCESSOR_DEFINITIONS = "HAVE_CONFIG_H=1";
-				HEADER_SEARCH_PATHS = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
-				LIBRARY_SEARCH_PATHS = "";
-				OTHER_CFLAGS = "-fembed-bitcode";
-				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 		C2DDEB2A229EA89200345BFE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -3095,7 +3143,7 @@
 					UIKit,
 					"-framework",
 					MobileCoreServices,
-					"-L\"$(SRCROOT)/NativeScript/lib/$(CURRENT_ARCH)\"",
+					"-L\"$(SRCROOT)/NativeScript/lib/$(CURRENT_ARCH)$(EFFECTIVE_PLATFORM_NAME)\"",
 					"-lzip",
 					"-lffi",
 					"-linspector_protocol",
@@ -3160,7 +3208,7 @@
 					UIKit,
 					"-framework",
 					MobileCoreServices,
-					"-L\"$(SRCROOT)/NativeScript/lib/$(CURRENT_ARCH)\"",
+					"-L\"$(SRCROOT)/NativeScript/lib/$(CURRENT_ARCH)$(EFFECTIVE_PLATFORM_NAME)\"",
 					"-lzip",
 					"-lffi",
 					"-linspector_protocol",
@@ -3214,6 +3262,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		C225378D241A41C500192740 /* Build configuration list for PBXNativeTarget "TKLiveSync" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C225378B241A41C500192740 /* Debug */,
+				C225378C241A41C500192740 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		C23992D0236C2D6E00D2F720 /* Build configuration list for PBXNativeTarget "TestRunnerTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -3246,15 +3303,6 @@
 			buildConfigurations = (
 				C29374E9229FC0F60075CB16 /* Debug */,
 				C29374EA229FC0F60075CB16 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		C2A5DFEB2328C4B900A91A76 /* Build configuration list for PBXNativeTarget "TKLiveSync" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				C2A5DFEC2328C4B900A91A76 /* Debug */,
-				C2A5DFED2328C4B900A91A76 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
