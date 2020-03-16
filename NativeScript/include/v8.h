@@ -151,11 +151,6 @@ class ConsoleCallArguments;
 
 // --- Handles ---
 
-#define TYPE_CHECK(T, S)                                       \
-  while (false) {                                              \
-    *(static_cast<T* volatile*>(0)) = static_cast<S*>(0);      \
-  }
-
 /**
  * An object reference managed by the v8 garbage collector.
  *
@@ -199,7 +194,7 @@ class Local {
      * handles. For example, converting from a Local<String> to a
      * Local<Number>.
      */
-    TYPE_CHECK(T, S);
+    static_assert(std::is_base_of<T, S>::value, "type check");
   }
 
   /**
@@ -365,7 +360,7 @@ class MaybeLocal {
   template <class S>
   V8_INLINE MaybeLocal(Local<S> that)
       : val_(reinterpret_cast<T*>(*that)) {
-    TYPE_CHECK(T, S);
+    static_assert(std::is_base_of<T, S>::value, "type check");
   }
 
   V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
@@ -625,11 +620,8 @@ class NonCopyablePersistentTraits {
   template<class S, class M>
   V8_INLINE static void Copy(const Persistent<S, M>& source,
                              NonCopyablePersistent* dest) {
-    Uncompilable<Object>();
-  }
-  // TODO(dcarney): come up with a good compile error here.
-  template<class O> V8_INLINE static void Uncompilable() {
-    TYPE_CHECK(O, Primitive);
+    static_assert(sizeof(S) < 0,
+                  "NonCopyablePersistentTraits::Copy is not instantiable");
   }
 };
 
@@ -672,7 +664,7 @@ template <class T, class M> class Persistent : public PersistentBase<T> {
   template <class S>
   V8_INLINE Persistent(Isolate* isolate, Local<S> that)
       : PersistentBase<T>(PersistentBase<T>::New(isolate, *that)) {
-    TYPE_CHECK(T, S);
+    static_assert(std::is_base_of<T, S>::value, "type check");
   }
   /**
    * Construct a Persistent from a Persistent.
@@ -682,7 +674,7 @@ template <class T, class M> class Persistent : public PersistentBase<T> {
   template <class S, class M2>
   V8_INLINE Persistent(Isolate* isolate, const Persistent<S, M2>& that)
     : PersistentBase<T>(PersistentBase<T>::New(isolate, *that)) {
-    TYPE_CHECK(T, S);
+    static_assert(std::is_base_of<T, S>::value, "type check");
   }
   /**
    * The copy constructors and assignment operator create a Persistent
@@ -767,7 +759,7 @@ class Global : public PersistentBase<T> {
   template <class S>
   V8_INLINE Global(Isolate* isolate, Local<S> that)
       : PersistentBase<T>(PersistentBase<T>::New(isolate, *that)) {
-    TYPE_CHECK(T, S);
+    static_assert(std::is_base_of<T, S>::value, "type check");
   }
 
   /**
@@ -778,7 +770,7 @@ class Global : public PersistentBase<T> {
   template <class S>
   V8_INLINE Global(Isolate* isolate, const PersistentBase<S>& that)
       : PersistentBase<T>(PersistentBase<T>::New(isolate, that.val_)) {
-    TYPE_CHECK(T, S);
+    static_assert(std::is_base_of<T, S>::value, "type check");
   }
 
   /**
@@ -958,7 +950,7 @@ class TracedGlobal : public TracedReferenceBase<T> {
   TracedGlobal(Isolate* isolate, Local<S> that) : TracedReferenceBase<T>() {
     this->val_ = this->New(isolate, that.val_, &this->val_,
                            TracedReferenceBase<T>::kWithDestructor);
-    TYPE_CHECK(T, S);
+    static_assert(std::is_base_of<T, S>::value, "type check");
   }
 
   /**
@@ -1081,7 +1073,7 @@ class TracedReference : public TracedReferenceBase<T> {
   TracedReference(Isolate* isolate, Local<S> that) : TracedReferenceBase<T>() {
     this->val_ = this->New(isolate, that.val_, &this->val_,
                            TracedReferenceBase<T>::kWithoutDestructor);
-    TYPE_CHECK(T, S);
+    static_assert(std::is_base_of<T, S>::value, "type check");
   }
 
   /**
@@ -3181,6 +3173,23 @@ class V8_EXPORT String : public Name {
 
   V8_INLINE static String* Cast(v8::Value* obj);
 
+  /**
+   * Allocates a new string from a UTF-8 literal. This is equivalent to calling
+   * String::NewFromUtf(isolate, "...").ToLocalChecked(), but without the check
+   * overhead.
+   *
+   * When called on a string literal containing '\0', the inferred length is the
+   * length of the input array minus 1 (for the final '\0') and not the value
+   * returned by strlen.
+   **/
+  template <int N>
+  static V8_WARN_UNUSED_RESULT Local<String> NewFromUtf8Literal(
+      Isolate* isolate, const char (&literal)[N],
+      NewStringType type = NewStringType::kNormal) {
+    static_assert(N <= kMaxLength, "String is too long");
+    return NewFromUtf8Literal(isolate, literal, type, N - 1);
+  }
+
   /** Allocates a new string from UTF-8 data. Only returns an empty value when
    * length > kMaxLength. **/
   static V8_WARN_UNUSED_RESULT MaybeLocal<String> NewFromUtf8(
@@ -3315,9 +3324,20 @@ class V8_EXPORT String : public Name {
   ExternalStringResourceBase* GetExternalStringResourceBaseSlow(
       String::Encoding* encoding_out) const;
 
+  static Local<v8::String> NewFromUtf8Literal(Isolate* isolate,
+                                              const char* literal,
+                                              NewStringType type, int length);
+
   static void CheckCast(v8::Value* obj);
 };
 
+// Zero-length string specialization (templated string size includes
+// terminator).
+template <>
+inline V8_WARN_UNUSED_RESULT Local<String> String::NewFromUtf8Literal(
+    Isolate* isolate, const char (&literal)[1], NewStringType type) {
+  return String::Empty(isolate);
+}
 
 /**
  * A JavaScript symbol (ECMA-262 edition 6)
@@ -4187,7 +4207,7 @@ class ReturnValue {
  public:
   template <class S> V8_INLINE ReturnValue(const ReturnValue<S>& that)
       : value_(that.value_) {
-    TYPE_CHECK(T, S);
+    static_assert(std::is_base_of<T, S>::value, "type check");
   }
   // Local setters
   template <typename S>
@@ -6327,11 +6347,12 @@ class CFunction;
  *    proto_t->Set(isolate, "proto_const", v8::Number::New(isolate, 2));
  *
  *    v8::Local<v8::ObjectTemplate> instance_t = t->InstanceTemplate();
- *    instance_t->SetAccessor(String::NewFromUtf8(isolate, "instance_accessor"),
- *                            InstanceAccessorCallback);
+ *    instance_t->SetAccessor(
+          String::NewFromUtf8Literal(isolate, "instance_accessor"),
+ *        InstanceAccessorCallback);
  *    instance_t->SetHandler(
  *        NamedPropertyHandlerConfiguration(PropertyHandlerCallback));
- *    instance_t->Set(String::NewFromUtf8(isolate, "instance_property"),
+ *    instance_t->Set(String::NewFromUtf8Literal(isolate, "instance_property"),
  *                    Number::New(isolate, 3));
  *
  *    v8::Local<v8::Function> function = t->GetFunction();
@@ -7579,6 +7600,7 @@ class V8_EXPORT HeapStatistics {
   size_t total_physical_size() { return total_physical_size_; }
   size_t total_available_size() { return total_available_size_; }
   size_t total_global_handles_size() { return total_global_handles_size_; }
+  size_t used_global_handles_size() { return used_global_handles_size_; }
   size_t used_heap_size() { return used_heap_size_; }
   size_t heap_size_limit() { return heap_size_limit_; }
   size_t malloced_memory() { return malloced_memory_; }
@@ -7607,6 +7629,7 @@ class V8_EXPORT HeapStatistics {
   size_t number_of_native_contexts_;
   size_t number_of_detached_contexts_;
   size_t total_global_handles_size_;
+  size_t used_global_handles_size_;
 
   friend class V8;
   friend class Isolate;
@@ -10372,6 +10395,18 @@ class V8_EXPORT Context {
   void SetAbortScriptExecution(AbortScriptExecutionCallback callback);
 
   /**
+   * Returns the value that was set or restored by
+   * SetContinuationPreservedEmbedderData(), if any.
+   */
+  Local<Value> GetContinuationPreservedEmbedderData() const;
+
+  /**
+   * Sets a value that will be stored on continuations and reset while the
+   * continuation runs.
+   */
+  void SetContinuationPreservedEmbedderData(Local<Value> context);
+
+  /**
    * Stack-allocated class which sets the execution context for all
    * operations executed within a local scope.
    */
@@ -10657,7 +10692,7 @@ Local<T> Local<T>::New(Isolate* isolate, T* that) {
 template<class T>
 template<class S>
 void Eternal<T>::Set(Isolate* isolate, Local<S> handle) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   val_ = reinterpret_cast<T*>(
       V8::Eternalize(isolate, reinterpret_cast<Value*>(*handle)));
 }
@@ -10701,7 +10736,7 @@ T* PersistentBase<T>::New(Isolate* isolate, T* that) {
 template <class T, class M>
 template <class S, class M2>
 void Persistent<T, M>::Copy(const Persistent<S, M2>& that) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   this->Reset();
   if (that.IsEmpty()) return;
   internal::Address* p = reinterpret_cast<internal::Address*>(that.val_);
@@ -10729,7 +10764,7 @@ void PersistentBase<T>::Reset() {
 template <class T>
 template <class S>
 void PersistentBase<T>::Reset(Isolate* isolate, const Local<S>& other) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   Reset();
   if (other.IsEmpty()) return;
   this->val_ = New(isolate, other.val_);
@@ -10740,7 +10775,7 @@ template <class T>
 template <class S>
 void PersistentBase<T>::Reset(Isolate* isolate,
                               const PersistentBase<S>& other) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   Reset();
   if (other.IsEmpty()) return;
   this->val_ = New(isolate, other.val_);
@@ -10806,7 +10841,7 @@ Global<T>::Global(Global&& other) : PersistentBase<T>(other.val_) {
 template <class T>
 template <class S>
 Global<T>& Global<T>::operator=(Global<S>&& rhs) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   if (this != &rhs) {
     this->Reset();
     if (rhs.val_ != nullptr) {
@@ -10841,7 +10876,7 @@ void TracedReferenceBase<T>::Reset() {
 template <class T>
 template <class S>
 void TracedGlobal<T>::Reset(Isolate* isolate, const Local<S>& other) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   Reset();
   if (other.IsEmpty()) return;
   this->val_ = this->New(isolate, other.val_, &this->val_,
@@ -10851,7 +10886,7 @@ void TracedGlobal<T>::Reset(Isolate* isolate, const Local<S>& other) {
 template <class T>
 template <class S>
 TracedGlobal<T>& TracedGlobal<T>::operator=(TracedGlobal<S>&& rhs) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   *this = std::move(rhs.template As<T>());
   return *this;
 }
@@ -10859,7 +10894,7 @@ TracedGlobal<T>& TracedGlobal<T>::operator=(TracedGlobal<S>&& rhs) {
 template <class T>
 template <class S>
 TracedGlobal<T>& TracedGlobal<T>::operator=(const TracedGlobal<S>& rhs) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   *this = rhs.template As<T>();
   return *this;
 }
@@ -10890,7 +10925,7 @@ TracedGlobal<T>& TracedGlobal<T>::operator=(const TracedGlobal& rhs) {
 template <class T>
 template <class S>
 void TracedReference<T>::Reset(Isolate* isolate, const Local<S>& other) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   Reset();
   if (other.IsEmpty()) return;
   this->val_ = this->New(isolate, other.val_, &this->val_,
@@ -10900,7 +10935,7 @@ void TracedReference<T>::Reset(Isolate* isolate, const Local<S>& other) {
 template <class T>
 template <class S>
 TracedReference<T>& TracedReference<T>::operator=(TracedReference<S>&& rhs) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   *this = std::move(rhs.template As<T>());
   return *this;
 }
@@ -10909,7 +10944,7 @@ template <class T>
 template <class S>
 TracedReference<T>& TracedReference<T>::operator=(
     const TracedReference<S>& rhs) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   *this = rhs.template As<T>();
   return *this;
 }
@@ -10968,7 +11003,7 @@ ReturnValue<T>::ReturnValue(internal::Address* slot) : value_(slot) {}
 template <typename T>
 template <typename S>
 void ReturnValue<T>::Set(const Global<S>& handle) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   if (V8_UNLIKELY(handle.IsEmpty())) {
     *value_ = GetDefaultValue();
   } else {
@@ -10979,7 +11014,7 @@ void ReturnValue<T>::Set(const Global<S>& handle) {
 template <typename T>
 template <typename S>
 void ReturnValue<T>::Set(const TracedReferenceBase<S>& handle) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_base_of<T, S>::value, "type check");
   if (V8_UNLIKELY(handle.IsEmpty())) {
     *value_ = GetDefaultValue();
   } else {
@@ -10990,7 +11025,8 @@ void ReturnValue<T>::Set(const TracedReferenceBase<S>& handle) {
 template <typename T>
 template <typename S>
 void ReturnValue<T>::Set(const Local<S> handle) {
-  TYPE_CHECK(T, S);
+  static_assert(std::is_void<T>::value || std::is_base_of<T, S>::value,
+                "type check");
   if (V8_UNLIKELY(handle.IsEmpty())) {
     *value_ = GetDefaultValue();
   } else {
@@ -11000,13 +11036,13 @@ void ReturnValue<T>::Set(const Local<S> handle) {
 
 template<typename T>
 void ReturnValue<T>::Set(double i) {
-  TYPE_CHECK(T, Number);
+  static_assert(std::is_base_of<T, Number>::value, "type check");
   Set(Number::New(GetIsolate(), i));
 }
 
 template<typename T>
 void ReturnValue<T>::Set(int32_t i) {
-  TYPE_CHECK(T, Integer);
+  static_assert(std::is_base_of<T, Integer>::value, "type check");
   typedef internal::Internals I;
   if (V8_LIKELY(I::IsValidSmi(i))) {
     *value_ = I::IntToSmi(i);
@@ -11017,7 +11053,7 @@ void ReturnValue<T>::Set(int32_t i) {
 
 template<typename T>
 void ReturnValue<T>::Set(uint32_t i) {
-  TYPE_CHECK(T, Integer);
+  static_assert(std::is_base_of<T, Integer>::value, "type check");
   // Can't simply use INT32_MAX here for whatever reason.
   bool fits_into_int32_t = (i & (1U << 31)) == 0;
   if (V8_LIKELY(fits_into_int32_t)) {
@@ -11029,7 +11065,7 @@ void ReturnValue<T>::Set(uint32_t i) {
 
 template<typename T>
 void ReturnValue<T>::Set(bool value) {
-  TYPE_CHECK(T, Boolean);
+  static_assert(std::is_base_of<T, Boolean>::value, "type check");
   typedef internal::Internals I;
   int root_index;
   if (value) {
@@ -11042,21 +11078,21 @@ void ReturnValue<T>::Set(bool value) {
 
 template<typename T>
 void ReturnValue<T>::SetNull() {
-  TYPE_CHECK(T, Primitive);
+  static_assert(std::is_base_of<T, Primitive>::value, "type check");
   typedef internal::Internals I;
   *value_ = *I::GetRoot(GetIsolate(), I::kNullValueRootIndex);
 }
 
 template<typename T>
 void ReturnValue<T>::SetUndefined() {
-  TYPE_CHECK(T, Primitive);
+  static_assert(std::is_base_of<T, Primitive>::value, "type check");
   typedef internal::Internals I;
   *value_ = *I::GetRoot(GetIsolate(), I::kUndefinedValueRootIndex);
 }
 
 template<typename T>
 void ReturnValue<T>::SetEmptyString() {
-  TYPE_CHECK(T, String);
+  static_assert(std::is_base_of<T, String>::value, "type check");
   typedef internal::Internals I;
   *value_ = *I::GetRoot(GetIsolate(), I::kEmptyStringRootIndex);
 }
@@ -11078,8 +11114,7 @@ Local<Value> ReturnValue<T>::Get() const {
 template <typename T>
 template <typename S>
 void ReturnValue<T>::Set(S* whatever) {
-  // Uncompilable to prevent inadvertent misuse.
-  TYPE_CHECK(S*, Primitive);
+  static_assert(sizeof(S) < 0, "incompilable to prevent inadvertent misuse");
 }
 
 template <typename T>
@@ -11989,9 +12024,5 @@ size_t SnapshotCreator::AddData(Local<T> object) {
 
 
 }  // namespace v8
-
-
-#undef TYPE_CHECK
-
 
 #endif  // INCLUDE_V8_H_

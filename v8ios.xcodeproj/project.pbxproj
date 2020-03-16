@@ -3171,7 +3171,6 @@
 					"-lv8_libbase",
 					"-lv8_libplatform",
 					"-lv8_libsampler",
-					"-lv8_uninitialized",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -3237,7 +3236,6 @@
 					"-lv8_libbase",
 					"-lv8_libplatform",
 					"-lv8_libsampler",
-					"-lv8_uninitialized",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
