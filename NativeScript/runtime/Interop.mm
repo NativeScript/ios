@@ -235,6 +235,13 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
         if (innerType->type == BinaryTypeEncodingType::VoidEncoding) {
+            bool isArrayBuffer = false;
+            void* buffer = tns::TryGetBufferFromArrayBuffer(arg, isArrayBuffer);
+            if (isArrayBuffer) {
+                Interop::SetValue(dest, buffer);
+                return;
+            }
+
             tns::Assert(wrapper != nullptr, isolate);
 
             if (wrapper->Type() == WrapperType::Pointer) {

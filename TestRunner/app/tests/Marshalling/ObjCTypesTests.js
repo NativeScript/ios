@@ -227,6 +227,18 @@ describe(module.id, function () {
         //expect(interop.handleof(buffer)).toBe(data.bytes);
     });
 
+    it("should be possible to marshal an ArrayBuffer as void* parameter", () => {
+        var data = NSData.alloc().initWithBase64EncodedStringOptions("MTIzNDU=", NSDataBase64DecodingIgnoreUnknownCharacters);
+        var arr = new ArrayBuffer(5);
+        data.getBytes(arr);
+        const actual = new Uint8Array(arr);
+        expect(actual[0]).toEqual(49);
+        expect(actual[1]).toEqual(50);
+        expect(actual[2]).toEqual(51);
+        expect(actual[3]).toEqual(52);
+        expect(actual[4]).toEqual(53);
+    });
+
     it("NSArray with boolean", () => {
         let actual = NSArray.arrayWithArray([true]);
         expect(actual[0]).toEqual(true);
