@@ -784,7 +784,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         }
 
         auto cache = Caches::Get(isolate);
-        cache->ObjectCtorInitializer(context, protocolMeta);
+        KnownUnknownClassPair pair;
+        cache->ObjectCtorInitializer(context, protocolMeta, pair);
 
         auto it = cache->ProtocolCtorFuncs.find(protocolMeta->name());
         if (it != cache->ProtocolCtorFuncs.end()) {
@@ -807,7 +808,9 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             const Meta* meta = ArgConverter::GetMeta(name);
             if (meta != nullptr && (meta->type() == MetaType::Interface || meta->type() == MetaType::ProtocolType)) {
                 const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
-                cache->ObjectCtorInitializer(context, baseMeta);
+                Class knownClass = meta->type() == MetaType::Interface ? objc_getClass(meta->name()) : nil;
+                KnownUnknownClassPair pair(knownClass);
+                cache->ObjectCtorInitializer(context, baseMeta, pair);
             }
 
             auto it = cache->CtorFuncs.find(name);
@@ -1024,7 +1027,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
         if (count > 0) {
             // Attach the protocols to the prototype of the resulting object
-            Interop::AttachProtocols(context, jsResult.As<Object>(), additionalProtocols);
+            KnownUnknownClassPair pair(nullptr, [result class]);
+            Interop::AttachProtocols(context, jsResult.As<Object>(), additionalProtocols, pair);
         }
 
         if (ownsReturnedObject || isInitializer) {
@@ -1152,7 +1156,7 @@ Local<Value> Interop::GetPrimitiveReturnType(Local<Context> context, BinaryTypeE
     return Local<Value>();
 }
 
-void Interop::AttachProtocols(Local<Context> context, Local<Object> instance, PtrTo<Array<PtrTo<char>>> protocols) {
+void Interop::AttachProtocols(Local<Context> context, Local<Object> instance, PtrTo<Array<PtrTo<char>>> protocols, KnownUnknownClassPair pair) {
     Isolate* isolate = context->GetIsolate();
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
@@ -1166,7 +1170,7 @@ void Interop::AttachProtocols(Local<Context> context, Local<Object> instance, Pt
             continue;
         }
 
-        cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(protocolMeta));
+        cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(protocolMeta), pair);
         auto protoIt = cache->Prototypes.find(protocolMeta);
         if (protoIt == cache->Prototypes.end()) {
             continue;

@@ -559,7 +559,8 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
         const Meta* meta = FindMeta(klass);
         if (meta != nullptr) {
             auto cache = Caches::Get(isolate);
-            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta));
+            KnownUnknownClassPair pair(objc_getClass(meta->name()));
+            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta), pair);
             auto it = cache->Prototypes.find(meta);
             if (it != cache->Prototypes.end()) {
                 Local<Value> prototype = it->second->Get(isolate);
@@ -613,7 +614,9 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
                 tns::Assert(false, isolate);
             }
         } else {
-            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta));
+            Class knownClass = objc_getClass(meta->name());
+            KnownUnknownClassPair pair(knownClass, klass);
+            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta), pair);
             auto it = cache->Prototypes.find(meta);
             if (it != cache->Prototypes.end()) {
                 Local<Value> prototype = it->second->Get(isolate);

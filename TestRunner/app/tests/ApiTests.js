@@ -769,6 +769,23 @@ describe(module.id, function () {
         expect(obj.methodFromProto2).toBeUndefined();
     });
 
+    if (TNSIsConfigurationDebug()) {
+        // skip test in release because it requires downloading from the internet
+        it("NSURLSession.sharedSession.downloadTaskWithURLCompletionHandler's ", done => {
+            const url = NSURL.URLWithString("http://upload.wikimedia.org/wikipedia/commons/7/7f/Williams_River-27527.jpg");
+            const downloadPhotoTask = NSURLSession.sharedSession.downloadTaskWithURLCompletionHandler(url, () => {
+                expect(downloadPhotoTask.response.toString()).toContain("Williams_River-27527.jpg");
+                expect(downloadPhotoTask.response.statusCode).toBe(200);
+                NSOperationQueue.mainQueue.addOperationWithBlock(done);
+            });
+            downloadPhotoTask.resume();
+        });
+
+        it("Completion handler doesn't hijack main tests execution in a worker thread", () => {
+            expect(NSThread.isMainThread).toBe(true);
+        });
+    }
+
 //     if (TNSIsConfigurationDebug) {
 //         it("ApiIterator", function () {
 //             var counter = 0;

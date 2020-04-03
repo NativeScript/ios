@@ -55,6 +55,7 @@ _functionWithULongPtr
 _functionWithUnichar
 _functionWithUShort
 _functionWithUShortPtr
+_TNSIsConfigurationDebug
 _TNSClearOutput
 _TNSConstant
 _TNSConstant10_0Plus

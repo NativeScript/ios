@@ -1,14 +1,16 @@
 #import "TNSTestCommon.h"
 
-#ifdef DEBUG
-//bool TNSIsConfigurationDebug = true;
-#else
-//bool TNSIsConfigurationDebug = false;
-#endif
-
 static NSMutableString* TNSTestOutput;
 
 // TODO: Thread safe
+bool TNSIsConfigurationDebug() {
+#ifdef DEBUG
+    return true;
+#else
+    return false;
+#endif
+}
+
 NSString* TNSGetOutput() {
     if (TNSTestOutput == nil) {
         TNSTestOutput = [NSMutableString new];

@@ -2,7 +2,7 @@
 extern "C" {
 #endif
 
-//bool TNSIsConfigurationDebug;
+bool TNSIsConfigurationDebug();
 
 NSString* TNSGetOutput();
 

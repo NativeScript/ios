@@ -70,7 +70,7 @@ public:
     robin_hood::unordered_map<std::pair<void*, std::string>, std::shared_ptr<v8::Persistent<v8::Value>>, pair_hash> StructInstances;
     robin_hood::unordered_map<const void*, std::shared_ptr<v8::Persistent<v8::Object>>> PointerInstances;
 
-    std::function<v8::Local<v8::FunctionTemplate>(v8::Local<v8::Context>, const BaseClassMeta*)> ObjectCtorInitializer;
+    std::function<v8::Local<v8::FunctionTemplate>(v8::Local<v8::Context>, const BaseClassMeta*, KnownUnknownClassPair)> ObjectCtorInitializer;
     std::function<v8::Local<v8::Function>(v8::Local<v8::Context>, StructInfo)> StructCtorInitializer;
     robin_hood::unordered_map<std::string, double> Timers;
     robin_hood::unordered_map<const InterfaceMeta*, std::vector<const MethodMeta*>> Initializers;
