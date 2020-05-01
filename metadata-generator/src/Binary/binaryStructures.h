@@ -60,8 +60,9 @@ enum BinaryMetaType : uint8_t {
     Protocol
 };
 
-enum BinaryFlags : uint8_t {
+enum BinaryFlags : uint16_t {
     // Common
+    HasDemangledName = 1 << 8,
     HasName = 1 << 7,
     IsIosAppExtensionAvailable = 1 << 6,
     // Function
@@ -85,13 +86,13 @@ enum BinaryFlags : uint8_t {
 struct Meta {
 public:
     Meta(BinaryMetaType type)
-        : _flags(type & 7) // 7 = 111 -> get only the first 3 bits of the type
+        : _flags(type & 0x7) // 7 = 111 -> get only the first 3 bits of the type
     {
     }
 
     MetaFileOffset _names = 0;
     MetaFileOffset _topLevelModule = 0;
-    uint8_t _flags = 0;
+    uint16_t _flags = 0;
     uint8_t _introduced = 0;
 
     virtual MetaFileOffset save(BinaryWriter& writer);

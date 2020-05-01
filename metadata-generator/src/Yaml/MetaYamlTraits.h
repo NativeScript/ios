@@ -234,7 +234,7 @@ namespace yaml {
             }
             case Meta::TypeType::TypeInterface: {
                 Meta::InterfaceType& concreteType = type->as<Meta::InterfaceType>();
-                io.mapRequired("JsName", concreteType.interface->jsName);
+                io.mapRequired("Name", concreteType.interface->name);
                 if (concreteType.typeArguments.size() > 0) {
                     std::vector<Meta::Type*> typeArguments;
                     for (Meta::Type* type : concreteType.typeArguments) {
@@ -275,14 +275,14 @@ namespace yaml {
                 Meta::StructType& concreteType = type->as<Meta::StructType>();
                 std::string fullModuleName = concreteType.structMeta->module->getFullModuleName();
                 io.mapRequired("Module", fullModuleName);
-                io.mapRequired("JsName", concreteType.structMeta->jsName);
+                io.mapRequired("Name", concreteType.structMeta->name);
                 break;
             }
             case Meta::TypeType::TypeUnion: {
                 Meta::UnionType& concreteType = type->as<Meta::UnionType>();
                 std::string fullModuleName = concreteType.unionMeta->module->getFullModuleName();
                 io.mapRequired("Module", fullModuleName);
-                io.mapRequired("JsName", concreteType.unionMeta->jsName);
+                io.mapRequired("Name", concreteType.unionMeta->name);
                 break;
             }
             case Meta::TypeType::TypeAnonymousStruct: {
@@ -323,6 +323,9 @@ namespace yaml {
     {
         io.mapRequired("Name", meta->name);
         io.mapRequired("JsName", meta->jsName);
+        if (!meta->demangledName.empty()) {
+            io.mapRequired("DemangledName", meta->demangledName);
+        }
         io.mapRequired("Filename", meta->fileName);
         io.mapRequired("Module", meta->module);
         io.mapOptional("IntroducedIn", meta->introducedIn, UNKNOWN_VERSION);

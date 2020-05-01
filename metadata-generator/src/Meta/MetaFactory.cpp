@@ -519,7 +519,15 @@ void MetaFactory::populateIdentificationFields(const clang::NamedDecl& decl, Met
     meta.declaration = &decl;
     // calculate name
     clang::ObjCRuntimeNameAttr* objCRuntimeNameAttribute = decl.getAttr<clang::ObjCRuntimeNameAttr>();
-    meta.name = !objCRuntimeNameAttribute ? decl.getNameAsString() : demangleSwiftName(objCRuntimeNameAttribute->getMetadataName().str());
+    if (objCRuntimeNameAttribute) {
+        meta.name = objCRuntimeNameAttribute->getMetadataName().str();
+        auto demangled = demangleSwiftName(meta.name);
+        if (meta.name != demangled) {
+            meta.demangledName = demangled;
+        }
+    } else {
+        meta.name = decl.getNameAsString();
+    }
 
     // calculate file name and module
     clang::SourceLocation location = _sourceManager.getFileLoc(decl.getLocation());
@@ -556,7 +564,7 @@ void MetaFactory::populateIdentificationFields(const clang::NamedDecl& decl, Met
     case clang::Decl::Kind::Record:
     case clang::Decl::Kind::Enum: {
         const clang::TagDecl* tagDecl = clang::dyn_cast<clang::TagDecl>(&decl);
-        meta.jsName = getTypedefOrOwnName(tagDecl);
+        meta.name = meta.jsName = getTypedefOrOwnName(tagDecl);
         break;
     }
     default:

@@ -23,7 +23,7 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
     globalTemplate->SetHandler(config);
 }
 
-void MetadataBuilder::GlobalPropertyGetter(Local<Name> property, const PropertyCallbackInfo<Value>& info) {
+void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     std::string propName = tns::ToString(isolate, property);
 
@@ -669,7 +669,7 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value> &
     MetadataBuilder::InvokeMethod(context, item->meta_->setter(), receiver, args, item->className_, true);
 }
 
-void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const PropertyCallbackInfo<Value> &info) {
+void MetadataBuilder::PropertyNameGetterCallback(Local<v8::Name> name, const PropertyCallbackInfo<Value> &info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
     if (!item->meta_->hasGetter()) {
@@ -686,7 +686,7 @@ void MetadataBuilder::PropertyNameGetterCallback(Local<Name> name, const Propert
     }
 }
 
-void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<void> &info) {
+void MetadataBuilder::PropertyNameSetterCallback(Local<v8::Name> name, Local<Value> value, const PropertyCallbackInfo<void> &info) {
     Isolate* isolate = info.GetIsolate();
     CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
     if (!item->meta_->hasSetter()) {
@@ -700,7 +700,7 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<Name> name, Local<Value> 
     MetadataBuilder::InvokeMethod(context, item->meta_->setter(), Local<Object>(), args, item->className_, false);
 }
 
-void MetadataBuilder::StructPropertyGetterCallback(Local<Name> property, const PropertyCallbackInfo<Value>& info) {
+void MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     Local<Object> thiz = info.This();
 
@@ -744,7 +744,7 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<Name> property, const P
     info.GetReturnValue().Set(result);
 }
 
-void MetadataBuilder::StructPropertySetterCallback(Local<Name> property, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
+void MetadataBuilder::StructPropertySetterCallback(Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> thiz = info.This();
@@ -838,7 +838,7 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
     }
 }
 
-void MetadataBuilder::SwizzledInstanceMethodCallback(Local<Name> property, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
+void MetadataBuilder::SwizzledInstanceMethodCallback(Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     std::string methodName = tns::ToString(isolate, property);
 
@@ -875,7 +875,7 @@ void MetadataBuilder::SwizzledInstanceMethodCallback(Local<Name> property, Local
     }
 }
 
-void MetadataBuilder::SwizzledPropertyCallback(Local<Name> property, const PropertyDescriptor& desc, const PropertyCallbackInfo<Value>& info) {
+void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const PropertyDescriptor& desc, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     std::string propertyName = tns::ToString(isolate, property);
 

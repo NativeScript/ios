@@ -127,7 +127,7 @@ unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitId(c
     auto s = llvm::make_unique<binary::IdEncoding>();
     std::vector<MetaFileOffset> offsets;
     for (auto protocol : type.protocols) {
-        offsets.push_back(this->_heapWriter.push_string(protocol->jsName));
+        offsets.push_back(this->_heapWriter.push_string(protocol->name));
     }
     s->_protocols = this->_heapWriter.push_binaryArray(offsets);
 
@@ -152,11 +152,11 @@ unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitInco
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitInterface(const ::Meta::InterfaceType& type)
 {
     auto* s = new binary::InterfaceDeclarationReferenceEncoding();
-    s->_name = this->_heapWriter.push_string(type.interface->jsName);
+    s->_name = this->_heapWriter.push_string(type.interface->name);
     
     std::vector<MetaFileOffset> offsets;
     for (auto protocol : type.protocols) {
-        offsets.push_back(this->_heapWriter.push_string(protocol->jsName));
+        offsets.push_back(this->_heapWriter.push_string(protocol->name));
     }
     s->_protocols = this->_heapWriter.push_binaryArray(offsets);
     
@@ -172,7 +172,7 @@ unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitBrid
         throw logic_error(std::string("Unresolved bridged interface for BridgedInterfaceType with name '") + type.name + "'.");
     }
     auto s = new binary::InterfaceDeclarationReferenceEncoding();
-    s->_name = this->_heapWriter.push_string(type.bridgedInterface->jsName);
+    s->_name = this->_heapWriter.push_string(type.bridgedInterface->name);
 
     std::vector<MetaFileOffset> offsets;
     s->_protocols = this->_heapWriter.push_binaryArray(offsets);

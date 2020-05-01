@@ -10,10 +10,12 @@ void binary::MetaFile::registerInGlobalTables(const ::Meta::Meta& meta, binary::
 {
     this->_globalTableSymbolsJs->add(meta.jsName, offset);
 
-    if (meta.type == ::Meta::MetaType::Protocol) {
-        this->_globalTableSymbolsNativeProtocols->add(meta.name, offset);
-    } else if (meta.type == ::Meta::MetaType::Interface) {
-        this->_globalTableSymbolsNativeInterfaces->add(meta.name, offset);
+    auto& nativeTable = (meta.type == ::Meta::MetaType::Protocol) ? this->_globalTableSymbolsNativeProtocols : this->_globalTableSymbolsNativeInterfaces;
+
+    nativeTable->add(meta.name, offset);
+
+    if (!meta.demangledName.empty()) {
+        nativeTable->add(meta.demangledName, offset);
     }
 }
 

@@ -2,6 +2,7 @@
 
 #include "CreationException.h"
 #include "MetaFactory.h"
+#include "Filters/ModulesBlacklist.h"
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Frontend/ASTUnit.h>
 #include <clang/Lex/HeaderSearch.h>
@@ -12,10 +13,11 @@
 namespace Meta {
 class DeclarationConverterVisitor : public clang::RecursiveASTVisitor<DeclarationConverterVisitor> {
 public:
-    explicit DeclarationConverterVisitor(clang::SourceManager& sourceManager, clang::HeaderSearch& headerSearch, bool verbose)
+    explicit DeclarationConverterVisitor(clang::SourceManager& sourceManager, clang::HeaderSearch& headerSearch, bool verbose, ModulesBlacklist& modulesBlacklist)
         : _metaContainer()
         , _metaFactory(sourceManager, headerSearch)
         , _verbose(verbose)
+        , _modulesBlacklist(modulesBlacklist)
     {
     }
 
@@ -71,33 +73,68 @@ private:
             // if accessed at runtime.
 
             Meta* meta = this->_metaFactory.create(*decl, /*resetCached*/ true);
-            _metaContainer.push_back(meta);
-            log(std::stringstream() << "verbose: Included " << meta->jsName << " from " << meta->module->getFullModuleName());
+            std::string whitelistRule, blacklistRule;
+            // Never blacklist NSObject - it's special and always needed by both the {N} runtime and the MDG
+            if (meta->name != "NSObject" && meta->module && _modulesBlacklist.shouldBlacklist(meta->module->getFullModuleName(), meta->name.empty() ? meta->jsName : meta->name, /*r*/whitelistRule, /*r*/blacklistRule)) {
+                logSymbolAction("Blacklisted", meta, whitelistRule, blacklistRule);
+            } else {
+                _metaContainer.push_back(meta);
+                logSymbolAction("Included", meta, whitelistRule, blacklistRule);
+            }
         } catch (MetaCreationException& e) {
             if (e.isError()) {
-                log(std::stringstream() << "verbose: Exception " << e.getDetailedMessage());
+                log(std::stringstream() << "Exception " << e.getDetailedMessage());
             } else {
                   // Uncomment for maximum verbosity when debugging metadata generation issues
 //                auto namedDecl = clang::dyn_cast<clang::NamedDecl>(decl);
 //                auto name = namedDecl ? namedDecl->getNameAsString() : "<unknown>";
-//                log(std::stringstream() << "verbose: Skipping " << name << ": " << e.getMessage());
+//                log(std::stringstream() << "Skipping " << name << ": " << e.getMessage());
             }
         }
         return true;
     }
 
+    void logSymbolAction(const std::string& action, const Meta *meta, const std::string &whitelistRule, const std::string &blacklistRule) {
+        std::stringstream ss;
+        ss << action << " ";
+        
+        if (!meta->name.empty() && meta->name != meta->jsName) {
+            ss << meta->name << " (JS: " << meta->jsName << ")";
+        } else {
+            ss << meta->jsName;
+        }
+        
+        ss << " from " << meta->module->getFullModuleName();
+
+        if (!whitelistRule.empty() || !blacklistRule.empty()) {
+            ss << " (";
+            if (!whitelistRule.empty()) {
+                ss << "enabled by '" << whitelistRule << "'";
+                if (!blacklistRule.empty()) {
+                    ss << ", ";
+                }
+            }
+            if (!blacklistRule.empty()) {
+                ss << "disabled by '" << blacklistRule << "'";
+            }
+            ss << ")";
+        }
+        log(ss);
+    }
+    
     inline void log(const std::stringstream& s) {
         this->log(s.str());
     }
     
     inline void log(std::string str) {
         if (this->_verbose) {
-            std::cerr << str << std::endl;
+            std::cerr << "verbose: " << str << std::endl;
         }
     }
     
     std::list<Meta*> _metaContainer;
     MetaFactory _metaFactory;
     bool _verbose;
+    ModulesBlacklist& _modulesBlacklist;
 };
-}
+} // namespace Meta

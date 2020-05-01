@@ -28,6 +28,13 @@ public:
     }
 
     /*
+         * \brief Gets current stream position.
+         */
+    MetaFileOffset currentPosition() const {
+        return this->_stream->position();
+    }
+
+    /*
          * \brief Writes a nil terminated string.
          * \param str
          * \param shouldIntern Specifies if this string should be unique in this stream. Default \c true
