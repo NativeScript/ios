@@ -37,6 +37,7 @@ def map_and_list(func, iterable):
 # process environment variables
 conf_build_dir = env("CONFIGURATION_BUILD_DIR")
 sdk_root = env("SDKROOT")
+src_root = env("SRCROOT")
 deployment_target_flag_name = env("DEPLOYMENT_TARGET_CLANG_FLAG_NAME")
 deployment_target = env(env("DEPLOYMENT_TARGET_CLANG_ENV_NAME"))
 std = env("GCC_C_LANGUAGE_STANDARD")
@@ -46,8 +47,6 @@ framework_search_paths = env_or_empty("FRAMEWORK_SEARCH_PATHS")
 framework_search_paths_parsed = map_and_list((lambda s: "-F" + s), shlex.split(framework_search_paths))
 other_cflags = env_or_empty("OTHER_CFLAGS")
 other_cflags_parsed = shlex.split(other_cflags)
-system_framework_search_paths = env_or_empty("SYSTEM_FRAMEWORK_SEARCH_PATHS")
-system_framework_search_paths_parsed = map_and_list((lambda s: "-F" + s), shlex.split(system_framework_search_paths))
 enable_modules = env_bool("CLANG_ENABLE_MODULES")
 preprocessor_defs = env_or_empty("GCC_PREPROCESSOR_DEFINITIONS")
 preprocessor_defs_parsed = map_and_list((lambda s: "-D" + s), shlex.split(preprocessor_defs, '\''))
@@ -99,6 +98,14 @@ def generate_metadata(arch):
         generator_call.extend(["-output-yaml", current_yaml_output_folder])
         print("Generating debug metadata in: \"{}\"".format(current_yaml_output_folder))
 
+    whitelist_file_name = os.path.join(src_root, "whitelist.mdg")
+    if os.path.exists(whitelist_file_name):
+      generator_call.extend(["--whitelist-modules-file", whitelist_file_name])
+
+    blacklist_file_name = os.path.join(src_root, "blacklist.mdg")
+    if os.path.exists(blacklist_file_name):
+      generator_call.extend(["--blacklist-modules-file", blacklist_file_name])
+
     # clang arguments
     generator_call.extend(["Xclang",
                            "-isysroot", sdk_root,
@@ -112,7 +119,6 @@ def generate_metadata(arch):
 
     generator_call.extend(header_search_paths_parsed)  # HEADER_SEARCH_PATHS
     generator_call.extend(framework_search_paths_parsed)  # FRAMEWORK_SEARCH_PATHS
-    generator_call.extend(system_framework_search_paths_parsed)  # SYSTEM_FRAMEWORK_SEARCH_PATHS
     generator_call.extend(other_cflags_parsed)  # OTHER_CFLAGS
     generator_call.extend(preprocessor_defs_parsed)  # GCC_PREPROCESSOR_DEFINITIONS
 

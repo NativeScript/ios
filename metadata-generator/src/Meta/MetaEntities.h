@@ -104,6 +104,7 @@ public:
     MetaFlags flags = MetaFlags::None;
 
     std::string name;
+    std::string demangledName;
     std::string jsName;
     std::string fileName;
     clang::Module* module = nullptr;

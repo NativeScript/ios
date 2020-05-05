@@ -604,7 +604,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
         std::string methodName = tns::ToString(isolate, key);
 
         Local<Value> propertyDescriptor;
-        tns::Assert(implementationObject->GetOwnPropertyDescriptor(context, key.As<Name>()).ToLocal(&propertyDescriptor), isolate);
+        tns::Assert(implementationObject->GetOwnPropertyDescriptor(context, key.As<v8::Name>()).ToLocal(&propertyDescriptor), isolate);
         if (propertyDescriptor.IsEmpty() || propertyDescriptor->IsNullOrUndefined()) {
             continue;
         }
@@ -795,7 +795,7 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass, std::
     }
 }
 
-void ClassBuilder::SuperAccessorGetterCallback(Local<Name> property, const PropertyCallbackInfo<Value>& info) {
+void ClassBuilder::SuperAccessorGetterCallback(Local<v8::Name> property, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> thiz = info.This();

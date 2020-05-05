@@ -83,7 +83,7 @@ static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleM
     return std::error_code();
 }
 
-static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<std::string>& args, std::vector<SmallString<256>>& umbrellaHeaders, const std::vector<std::string>& moduleBlacklist, std::vector<std::string>& includePaths)
+static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<std::string>& args, std::vector<SmallString<256>>& umbrellaHeaders, std::vector<std::string>& includePaths)
 {
     std::unique_ptr<clang::ASTUnit> ast = clang::tooling::buildASTFromCodeWithArgs("", args, "umbrella.h");
     if (!ast)
@@ -106,8 +106,6 @@ static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<s
 //            clang::Module* sm;
 //            module->isAvailable(ast->getPreprocessor().getLangOpts(), ast->getPreprocessor().getTargetInfo(), req, h, sm);
 //        }
-        if (std::find(moduleBlacklist.begin(), moduleBlacklist.end(), module->getFullModuleName()) != moduleBlacklist.end())
-            return;
 
         // use -idirafter instead of -I in order  add the directories AFTER the include search paths
         std::string includeString = "-idirafter" + module->Directory->getName().str();
@@ -136,11 +134,9 @@ int headerPriority(SmallString<256> h) {
 
 std::string CreateUmbrellaHeader(const std::vector<std::string>& clangArgs, std::vector<std::string>& includePaths)
 {
-    std::vector<std::string> moduleBlacklist;
-
     // Generate umbrella header for all modules from the sdk
     std::vector<SmallString<256>> umbrellaHeaders;
-    CreateUmbrellaHeaderForAmbientModules(clangArgs, umbrellaHeaders, moduleBlacklist, includePaths);
+    CreateUmbrellaHeaderForAmbientModules(clangArgs, umbrellaHeaders, includePaths);
 
     std::stable_sort(umbrellaHeaders.begin(), umbrellaHeaders.end(), [](const SmallString<256>& h1, const SmallString<256>& h2) {
         return headerPriority(h1) < headerPriority(h2);

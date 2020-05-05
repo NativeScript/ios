@@ -681,7 +681,7 @@ void DefinitionWriter::visit(FunctionMeta* meta)
     std::ostringstream params;
     for (size_t i = 1; i < meta->signature.size(); i++) {
         std::string name = sanitizeParameterName(functionDecl.getParamDecl(i - 1)->getNameAsString());
-        params << (name.size() ? name : "p" + std::to_string(i)) << ": " << tsifyType(*meta->signature[i]);
+        params << (name.size() ? name : "p" + std::to_string(i)) << ": " << tsifyType(*meta->signature[i], true);
         if (i < meta->signature.size() - 1) {
             params << ", ";
         }

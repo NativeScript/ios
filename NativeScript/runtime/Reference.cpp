@@ -118,7 +118,7 @@ void Reference::IndexedPropertySetCallback(uint32_t index, Local<Value> value, c
     Interop::WriteValue(context, typeEncoding, ptr, value);
 }
 
-void Reference::GetValueCallback(Local<Name> name, const PropertyCallbackInfo<Value>& info) {
+void Reference::GetValueCallback(Local<v8::Name> name, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     Local<Value> result = Reference::GetReferredValue(context, info.This());
@@ -129,7 +129,7 @@ void Reference::GetValueCallback(Local<Name> name, const PropertyCallbackInfo<Va
     }
 }
 
-void Reference::SetValueCallback(Local<Name> name, Local<Value> value, const PropertyCallbackInfo<void>& info) {
+void Reference::SetValueCallback(Local<v8::Name> name, Local<Value> value, const PropertyCallbackInfo<void>& info) {
     Isolate* isolate = info.GetIsolate();
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, info.This());
     tns::Assert(baseWrapper->Type() == WrapperType::Reference, isolate);

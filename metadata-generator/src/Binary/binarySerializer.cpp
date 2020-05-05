@@ -24,20 +24,33 @@ void binary::BinarySerializer::serializeBase(::Meta::Meta* meta, binary::Meta& b
 {
     // name
     bool hasName = meta->name != meta->jsName;
-    if (hasName) {
-        MetaFileOffset offset1 = this->heapWriter.push_string(meta->jsName);
-        MetaFileOffset offset2 = this->heapWriter.push_string(meta->name);
-        binaryMetaStruct._names = this->heapWriter.push_pointer(offset1);
-        this->heapWriter.push_pointer(offset2);
+    bool hasDemangledName = !meta->demangledName.empty();
+    if (hasName || hasDemangledName) {
+        MetaFileOffset offsets[3] = { 0 };
+        int nOffsets = 0;
+        if (hasName) {
+            offsets[nOffsets++] = this->heapWriter.push_string(meta->jsName);
+        }
+        offsets[nOffsets++] = this->heapWriter.push_string(meta->name);
+        if (hasDemangledName) {
+            offsets[nOffsets++] = this->heapWriter.push_string(meta->demangledName);
+        }
+        binaryMetaStruct._names = this->heapWriter.currentPosition();
+
+        for (int i = 0; i < nOffsets; i++) {
+            this->heapWriter.push_pointer(offsets[i]);
+        }
     }
     else {
         binaryMetaStruct._names = this->heapWriter.push_string(meta->jsName);
     }
 
     // flags
-    uint8_t& flags = binaryMetaStruct._flags;
+    auto& flags = binaryMetaStruct._flags;
     if (hasName)
-        flags = (uint8_t)(flags | BinaryFlags::HasName);
+        flags |= BinaryFlags::HasName;
+    if (hasDemangledName)
+        flags |= BinaryFlags::HasDemangledName;
     if (meta->getFlags(::Meta::MetaFlags::IsIosAppExtensionAvailable))
         flags |= BinaryFlags::IsIosAppExtensionAvailable;
 
