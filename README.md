@@ -28,9 +28,13 @@ export PATH=`pwd`/depot_tools:"$PATH"
 
 2. `fetch v8` (this will create a `v8` repo folder automatically checking out the `master` branch)
 
-3. Apply patches: `apply_patch.sh`
+3. `cd v8; gclient sync` (this will fetch additional dependencies for building the latest revision)
 
-4. Run `build_v8.sh`
+Ensure you navigate back to root of project: `cd ..`
+
+4. Apply patches: `apply_patch.sh`
+
+5. Run `build_v8.sh`
 
 The compiled fat static libraries will be placed inside the `v8/dist` folder.
 
