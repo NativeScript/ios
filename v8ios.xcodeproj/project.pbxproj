@@ -353,6 +353,7 @@
 		C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2A5F8682359AEB500074AFA /* ExtVector.cpp */; };
 		C2A5F86B2359AEB600074AFA /* ExtVector.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A5F8692359AEB600074AFA /* ExtVector.h */; };
 		C2A6EF3123745A0B00E8FBE7 /* MetadataInlines.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A6EF3023745A0B00E8FBE7 /* MetadataInlines.h */; };
+		C2AEC02E24695D1000342025 /* default-platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C2AEC02D24695D1000342025 /* default-platform.h */; };
 		C2B07AFA23C38FDA00E245BE /* serializer_traits.h in Headers */ = {isa = PBXBuildFile; fileRef = C2B07AF923C38FDA00E245BE /* serializer_traits.h */; };
 		C2B30FD9238418CA009D6A46 /* json_platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C2B30FD1238418CA009D6A46 /* json_platform.h */; };
 		C2B30FDA238418CA009D6A46 /* export.h in Headers */ = {isa = PBXBuildFile; fileRef = C2B30FD2238418CA009D6A46 /* export.h */; };
@@ -929,6 +930,7 @@
 		C2A5F8682359AEB500074AFA /* ExtVector.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ExtVector.cpp; sourceTree = "<group>"; };
 		C2A5F8692359AEB600074AFA /* ExtVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ExtVector.h; sourceTree = "<group>"; };
 		C2A6EF3023745A0B00E8FBE7 /* MetadataInlines.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MetadataInlines.h; sourceTree = "<group>"; };
+		C2AEC02D24695D1000342025 /* default-platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "default-platform.h"; sourceTree = "<group>"; };
 		C2B07AF923C38FDA00E245BE /* serializer_traits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = serializer_traits.h; sourceTree = "<group>"; };
 		C2B30FD1238418CA009D6A46 /* json_platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = json_platform.h; sourceTree = "<group>"; };
 		C2B30FD2238418CA009D6A46 /* export.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = export.h; sourceTree = "<group>"; };
@@ -1227,6 +1229,7 @@
 			children = (
 				C247C2A922F828E2001D2CA2 /* init */,
 				C247C2AB22F828E2001D2CA2 /* tracing */,
+				C2AEC02C24695D1000342025 /* libplatform */,
 				C247C2AD22F828E2001D2CA2 /* numbers */,
 				C247C2AF22F828E2001D2CA2 /* inspector */,
 				C247C30D22F828E3001D2CA2 /* utils */,
@@ -1728,6 +1731,14 @@
 			path = libzip;
 			sourceTree = "<group>";
 		};
+		C2AEC02C24695D1000342025 /* libplatform */ = {
+			isa = PBXGroup;
+			children = (
+				C2AEC02D24695D1000342025 /* default-platform.h */,
+			);
+			path = libplatform;
+			sourceTree = "<group>";
+		};
 		C2B30FCE238418CA009D6A46 /* third_party */ = {
 			isa = PBXGroup;
 			children = (
@@ -2043,6 +2054,7 @@
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
 				C247C3AE22F828E3001D2CA2 /* compiler-specific.h in Headers */,
 				C247C38922F828E3001D2CA2 /* v8-debugger-script.h in Headers */,
+				C2AEC02E24695D1000342025 /* default-platform.h in Headers */,
 				C247C37C22F828E3001D2CA2 /* string-util.h in Headers */,
 				C247C37722F828E3001D2CA2 /* Profiler.h in Headers */,
 				C247C39222F828E3001D2CA2 /* v8-console-agent-impl.h in Headers */,

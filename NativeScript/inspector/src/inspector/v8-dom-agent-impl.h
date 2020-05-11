@@ -73,6 +73,7 @@ private:
     protocol::DOM::Frontend m_frontend;
     protocol::DictionaryValue* m_state;
     V8InspectorImpl* m_inspector;
+    V8InspectorSessionImpl* m_session;
 
     bool m_enabled;
 
@@ -81,7 +82,7 @@ private:
     void AttributeModified(const v8::Local<v8::Object>& obj);
     void AttributeRemoved(const v8::Local<v8::Object>& obj);
     void DocumentUpdated();
-    std::u16string AddBackendNodeIdProperty(v8::Isolate* isolate, v8::Local<v8::Value> jsonInput);
+    std::u16string AddBackendNodeIdProperty(v8::Local<v8::Context> context, v8::Local<v8::Value> jsonInput);
 
     DISALLOW_COPY_AND_ASSIGN(V8DOMAgentImpl);
 };

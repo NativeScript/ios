@@ -18,6 +18,7 @@ V8CSSAgentImpl::V8CSSAgentImpl(V8InspectorSessionImpl* session,
     : m_frontend(frontendChannel),
       m_state(state),
       m_inspector(session->inspector()),
+      m_session(session),
       m_enabled(false) {
     Instance = this;
 }
@@ -61,16 +62,23 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
     std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> computedStylePropertyArr = std::make_unique<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>();
 
     Isolate* isolate = m_inspector->isolate();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
+
     Local<Object> cssDomainDebugger;
-    Local<v8::Function> getComputedStylesForNodeFunc = v8_inspector::GetDebuggerFunction(isolate, "CSS", "getComputedStyleForNode", cssDomainDebugger);
+    Local<v8::Function> getComputedStylesForNodeFunc = v8_inspector::GetDebuggerFunction(context, "CSS", "getComputedStyleForNode", cssDomainDebugger);
     if (getComputedStylesForNodeFunc.IsEmpty() || cssDomainDebugger.IsEmpty()) {
         *out_computedStyle = std::move(computedStylePropertyArr);
         return DispatchResponse::Error("Error getting CSS elements.");
     }
 
-    Local<Object> param = Object::New(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
-    bool success = param->Set(context, tns::ToV8String(isolate, "nodeId"), Number::New(isolate, in_nodeId)).FromMaybe(false);
+    Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
+    Local<Object> param;
+    bool success = objTemplate->NewInstance(context).ToLocal(&param);
+    assert(success);
+
+    success = param->Set(context, tns::ToV8String(isolate, "nodeId"), Number::New(isolate, in_nodeId)).FromMaybe(false);
     assert(success);
 
     Local<Value> args[] = { param };

@@ -56,6 +56,7 @@ private:
     protocol::Network::Frontend m_frontend;
     protocol::DictionaryValue* m_state;
     V8InspectorImpl* m_inspector;
+    V8InspectorSessionImpl* m_session;
     bool m_enabled;
 
     void RequestWillBeSent(const v8::Local<v8::Object>& obj);

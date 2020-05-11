@@ -19,6 +19,7 @@ V8DOMAgentImpl::V8DOMAgentImpl(V8InspectorSessionImpl* session,
     : m_frontend(frontendChannel),
       m_state(state),
       m_inspector(session->inspector()),
+      m_session(session),
       m_enabled(false) {
 }
 
@@ -50,7 +51,10 @@ DispatchResponse V8DOMAgentImpl::disable() {
 
 void V8DOMAgentImpl::dispatch(std::string message) {
     Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
+
     Local<Value> value;
     assert(v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&value) && value->IsObject());
     Local<Object> obj = value.As<Object>();
@@ -84,15 +88,18 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
         .build();
 
     Isolate* isolate = m_inspector->isolate();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
+
     Local<Object> domDomainDebugger;
-    Local<v8::Function> getDocumentFunc = v8_inspector::GetDebuggerFunction(isolate, "DOM", "getDocument", domDomainDebugger);
+    Local<v8::Function> getDocumentFunc = v8_inspector::GetDebuggerFunction(context, "DOM", "getDocument", domDomainDebugger);
     if (getDocumentFunc.IsEmpty() || domDomainDebugger.IsEmpty()) {
         *out_root = std::move(defaultNode);
         return DispatchResponse::Error("Error getting DOM tree.");
     }
 
     Local<Value> args[0];
-    Local<Context> context = isolate->GetCurrentContext();
 
     TryCatch tc(isolate);
     MaybeLocal<Value> maybeResult = getDocumentFunc->Call(context, domDomainDebugger, 0, args);
@@ -132,17 +139,23 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
 
 DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
     Isolate* isolate = m_inspector->isolate();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
+
     Local<Object> domDomainDebugger;
-    Local<v8::Function> removeNodeFunc = v8_inspector::GetDebuggerFunction(isolate, "DOM", "removeNode", domDomainDebugger);
+    Local<v8::Function> removeNodeFunc = v8_inspector::GetDebuggerFunction(context, "DOM", "removeNode", domDomainDebugger);
 
     if (removeNodeFunc.IsEmpty() || domDomainDebugger.IsEmpty()) {
         return DispatchResponse::Error("Couldn't remove the selected DOMNode from the visual tree. \"removeNode\" function not found");
     }
 
-    Local<Context> context = isolate->GetCurrentContext();
+    Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
+    Local<Object> param;
+    bool success = objTemplate->NewInstance(context).ToLocal(&param);
+    assert(success);
 
-    Local<Object> param = Object::New(isolate);
-    bool success = param->Set(context, tns::ToV8String(isolate, "nodeId"), Number::New(isolate, in_nodeId)).FromMaybe(false);
+    success = param->Set(context, tns::ToV8String(isolate, "nodeId"), Number::New(isolate, in_nodeId)).FromMaybe(false);
     assert(success);
 
     Local<Value> args[] = { param };
@@ -164,15 +177,22 @@ DispatchResponse V8DOMAgentImpl::setAttributeValue(int in_nodeId, const String& 
 
 DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String& in_text, Maybe<String> in_name) {
     Isolate* isolate = m_inspector->isolate();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
+
     Local<Object> domDomainDebugger;
-    Local<v8::Function> setAttributesAsTextFunc = v8_inspector::GetDebuggerFunction(isolate, "DOM", "setAttributesAsText", domDomainDebugger);
+    Local<v8::Function> setAttributesAsTextFunc = v8_inspector::GetDebuggerFunction(context, "DOM", "setAttributesAsText", domDomainDebugger);
 
     if (setAttributesAsTextFunc.IsEmpty() || domDomainDebugger.IsEmpty()) {
         return DispatchResponse::Error("Couldn't change selected DOM node's attribute. \"setAttributesAsText\" function not found");
     }
 
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> param = Object::New(isolate);
+    Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
+    Local<Object> param;
+    bool success = objTemplate->NewInstance(context).ToLocal(&param);
+    assert(success);
+
     assert(param->Set(context, tns::ToV8String(isolate, "nodeId"), Number::New(isolate, in_nodeId)).FromMaybe(false));
     assert(param->Set(context, tns::ToV8String(isolate, "text"), v8_inspector::toV8String(isolate, in_text)).FromMaybe(false));
     assert(param->Set(context, tns::ToV8String(isolate, "name"), v8_inspector::toV8String(isolate, in_name.fromJust())).FromMaybe(false));
@@ -334,7 +354,9 @@ DispatchResponse V8DOMAgentImpl::getNodeStackTraces(int in_nodeId, Maybe<protoco
 
 void V8DOMAgentImpl::ChildNodeInserted(const Local<Object>& obj) {
     Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
     Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
     Local<Number> parentNodeId = params->Get(context, tns::ToV8String(isolate, "parentNodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
     Local<Number> previousNodeId = params->Get(context, tns::ToV8String(isolate, "previousNodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
@@ -343,7 +365,7 @@ void V8DOMAgentImpl::ChildNodeInserted(const Local<Object>& obj) {
     Local<v8::String> nodeJson;
     assert(JSON::Stringify(context, node).ToLocal(&nodeJson));
 
-    std::u16string nodeString = AddBackendNodeIdProperty(isolate, nodeJson);
+    std::u16string nodeString = AddBackendNodeIdProperty(context, nodeJson);
     auto nodeUtf16Data = nodeString.data();
     const String16& nodeString16 = String16((const uint16_t*) nodeUtf16Data);
     std::vector<uint8_t> cbor;
@@ -367,7 +389,9 @@ void V8DOMAgentImpl::ChildNodeInserted(const Local<Object>& obj) {
 
 void V8DOMAgentImpl::ChildNodeRemoved(const Local<Object>& obj) {
     Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
     Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
     Local<Number> nodeId = params->Get(context, tns::ToV8String(isolate, "nodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
     Local<Number> parentNodeId = params->Get(context, tns::ToV8String(isolate, "parentNodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
@@ -380,7 +404,9 @@ void V8DOMAgentImpl::ChildNodeRemoved(const Local<Object>& obj) {
 
 void V8DOMAgentImpl::AttributeModified(const Local<Object>& obj) {
     Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
     Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
     Local<Number> nodeId = params->Get(context, tns::ToV8String(isolate, "nodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
     Local<v8::String> attributeName = params->Get(context, tns::ToV8String(isolate, "name")).ToLocalChecked()->ToString(context).ToLocalChecked();
@@ -395,7 +421,9 @@ void V8DOMAgentImpl::AttributeModified(const Local<Object>& obj) {
 
 void V8DOMAgentImpl::AttributeRemoved(const Local<Object>& obj) {
     Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
     Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
     Local<Number> nodeId = params->Get(context, tns::ToV8String(isolate, "nodeId")).ToLocalChecked()->ToNumber(context).ToLocalChecked();
     Local<v8::String> attributeName = params->Get(context, tns::ToV8String(isolate, "name")).ToLocalChecked()->ToString(context).ToLocalChecked();
@@ -410,7 +438,7 @@ void V8DOMAgentImpl::DocumentUpdated() {
     this->m_frontend.documentUpdated();
 }
 
-std::u16string V8DOMAgentImpl::AddBackendNodeIdProperty(Isolate* isolate, Local<Value> jsonInput) {
+std::u16string V8DOMAgentImpl::AddBackendNodeIdProperty(Local<Context> context, Local<Value> jsonInput) {
     std::string scriptSource =
         "(function () {"
         "   function addBackendNodeId(node) {"
@@ -434,9 +462,9 @@ std::u16string V8DOMAgentImpl::AddBackendNodeIdProperty(Isolate* isolate, Local<
         "   }"
         "})()";
 
+    Isolate* isolate = context->GetIsolate();
     auto source = tns::ToV8String(isolate, scriptSource);
     Local<Script> script;
-    Local<Context> context = isolate->GetCurrentContext();
     assert(v8::Script::Compile(context, source).ToLocal(&script));
 
     Local<Value> result;

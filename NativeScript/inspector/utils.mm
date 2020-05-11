@@ -51,14 +51,14 @@ std::string v8_inspector::ToStdString(const StringView& value) {
     return result;
 }
 
-Local<v8::Function> v8_inspector::GetDebuggerFunction(Isolate* isolate, std::string domain, std::string functionName, Local<Object>& domainDebugger) {
+Local<v8::Function> v8_inspector::GetDebuggerFunction(Local<Context> context, std::string domain, std::string functionName, Local<Object>& domainDebugger) {
     auto it = JsV8InspectorClient::Domains.find(domain);
     if (it == JsV8InspectorClient::Domains.end()) {
         return Local<v8::Function>();
     }
 
+    Isolate* isolate = context->GetIsolate();
     domainDebugger = it->second->Get(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
 
     Local<Value> value;
     bool success = domainDebugger->Get(context, tns::ToV8String(isolate, functionName)).ToLocal(&value);

@@ -16,6 +16,7 @@ V8NetworkAgentImpl::V8NetworkAgentImpl(V8InspectorSessionImpl* session, protocol
     : m_frontend(frontendChannel),
       m_state(state),
       m_inspector(session->inspector()),
+      m_session(session),
       m_enabled(false) {
 }
 
@@ -48,7 +49,9 @@ DispatchResponse V8NetworkAgentImpl::disable() {
 
 void V8NetworkAgentImpl::dispatch(std::string message) {
     Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
     Local<Value> value;
     assert(v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&value) && value->IsObject());
     Local<Object> obj = value.As<Object>();
@@ -77,16 +80,18 @@ DispatchResponse V8NetworkAgentImpl::emulateNetworkConditions(bool in_offline, d
 
 void V8NetworkAgentImpl::getResponseBody(const String& in_requestId, std::unique_ptr<GetResponseBodyCallback> callback) {
     Isolate* isolate = m_inspector->isolate();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
+
     Local<Object> networkDomainDebugger;
-    Local<v8::Function> getResponseBodyFunc = GetDebuggerFunction(isolate, "Network", "getResponseBody", networkDomainDebugger);
+    Local<v8::Function> getResponseBodyFunc = GetDebuggerFunction(context, "Network", "getResponseBody", networkDomainDebugger);
 
     if (getResponseBodyFunc.IsEmpty() || networkDomainDebugger.IsEmpty()) {
         auto error = "Couldn't get response body. \"getResponseBody\" function not found";
         callback->sendFailure(DispatchResponse::Error(error));
         return;
     }
-
-    Local<Context> context = isolate->GetCurrentContext();
 
     Local<Object> param = Object::New(isolate);
     bool success = param->Set(context, tns::ToV8String(isolate, "requestId"), tns::ToV8String(isolate, in_requestId.utf8())).FromMaybe(false);
@@ -149,7 +154,9 @@ DispatchResponse V8NetworkAgentImpl::setExtraHTTPHeaders(std::unique_ptr<protoco
 
 void V8NetworkAgentImpl::RequestWillBeSent(const Local<Object>& obj) {
     Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
 
     Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
     Local<v8::String> requestId = params->Get(context, tns::ToV8String(isolate, "requestId")).ToLocalChecked()->ToString(context).ToLocalChecked();
@@ -215,7 +222,9 @@ void V8NetworkAgentImpl::RequestWillBeSent(const Local<Object>& obj) {
 
 void V8NetworkAgentImpl::ResponseReceived(const Local<Object>& obj) {
     Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
 
     Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
     Local<v8::String> requestId = params->Get(context, tns::ToV8String(isolate, "requestId")).ToLocalChecked()->ToString(context).ToLocalChecked();
@@ -281,7 +290,9 @@ void V8NetworkAgentImpl::ResponseReceived(const Local<Object>& obj) {
 
 void V8NetworkAgentImpl::LoadingFinished(const Local<Object>& obj) {
     Isolate* isolate = m_inspector->isolate();
-    Local<Context> context = isolate->GetCurrentContext();
+    int contextGroupId = this->m_session->contextGroupId();
+    InspectedContext* inspected = this->m_inspector->getContext(contextGroupId);
+    Local<Context> context = inspected->context();
 
     Local<Object> params = obj->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked().As<Object>();
     Local<v8::String> requestId = params->Get(context, tns::ToV8String(isolate, "requestId")).ToLocalChecked()->ToString(context).ToLocalChecked();

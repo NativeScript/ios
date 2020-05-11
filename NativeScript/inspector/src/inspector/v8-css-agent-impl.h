@@ -50,6 +50,7 @@ private:
     protocol::CSS::Frontend m_frontend;
     protocol::DictionaryValue* m_state;
     V8InspectorImpl* m_inspector;
+    V8InspectorSessionImpl* m_session;
 
     bool m_enabled;
 
