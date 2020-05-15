@@ -1,0 +1,29 @@
+diff --git a/config/ios/BUILD.gn b/config/ios/BUILD.gn
+index 795b4d8a4..31768fa3b 100644
+--- a/config/ios/BUILD.gn
++++ b/config/ios/BUILD.gn
+@@ -33,8 +33,10 @@ config("compiler") {
+   # CPU architecture.
+   if (current_cpu == "x64") {
+     common_ios_flags += [
+-      "-arch",
+-      "x86_64",
++#      "-arch",
++#      "x86_64",
++       "-target",
++       "x86_64-apple-ios13.0-macabi"
+     ]
+   } else if (current_cpu == "x86") {
+     common_ios_flags += [
+@@ -86,9 +88,9 @@ config("runtime_library") {
+   }
+ 
+   if (use_ios_simulator) {
+-    common_flags += [ "-mios-simulator-version-min=$ios_deployment_target" ]
++    #common_flags += [ "-mios-simulator-version-min=$ios_deployment_target" ]
+   } else {
+-    common_flags += [ "-miphoneos-version-min=$ios_deployment_target" ]
++    #common_flags += [ "-miphoneos-version-min=$ios_deployment_target" ]
+   }
+ 
+   if (use_xcode_clang && enable_ios_bitcode && !use_ios_simulator) {

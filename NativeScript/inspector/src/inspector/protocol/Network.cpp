@@ -9,7 +9,9 @@
 #include "src/inspector/protocol/Protocol.h"
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/find_by_first.h"
 #include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+#include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -2639,7 +2641,7 @@ std::unique_ptr<ResponseReceivedExtraInfoNotification> ResponseReceivedExtraInfo
 
 void Frontend::dataReceived(const String& requestId, double timestamp, int dataLength, int encodedDataLength)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<DataReceivedNotification> messageData = DataReceivedNotification::create()
         .setRequestId(requestId)
@@ -2647,12 +2649,12 @@ void Frontend::dataReceived(const String& requestId, double timestamp, int dataL
         .setDataLength(dataLength)
         .setEncodedDataLength(encodedDataLength)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.dataReceived", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.dataReceived", std::move(messageData)));
 }
 
 void Frontend::eventSourceMessageReceived(const String& requestId, double timestamp, const String& eventName, const String& eventId, const String& data)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<EventSourceMessageReceivedNotification> messageData = EventSourceMessageReceivedNotification::create()
         .setRequestId(requestId)
@@ -2661,12 +2663,12 @@ void Frontend::eventSourceMessageReceived(const String& requestId, double timest
         .setEventId(eventId)
         .setData(data)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.eventSourceMessageReceived", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.eventSourceMessageReceived", std::move(messageData)));
 }
 
 void Frontend::loadingFailed(const String& requestId, double timestamp, const String& type, const String& errorText, Maybe<bool> canceled, Maybe<String> blockedReason)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<LoadingFailedNotification> messageData = LoadingFailedNotification::create()
         .setRequestId(requestId)
@@ -2678,12 +2680,12 @@ void Frontend::loadingFailed(const String& requestId, double timestamp, const St
         messageData->setCanceled(std::move(canceled).takeJust());
     if (blockedReason.isJust())
         messageData->setBlockedReason(std::move(blockedReason).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.loadingFailed", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.loadingFailed", std::move(messageData)));
 }
 
 void Frontend::loadingFinished(const String& requestId, double timestamp, double encodedDataLength, Maybe<bool> shouldReportCorbBlocking)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<LoadingFinishedNotification> messageData = LoadingFinishedNotification::create()
         .setRequestId(requestId)
@@ -2692,12 +2694,12 @@ void Frontend::loadingFinished(const String& requestId, double timestamp, double
         .build();
     if (shouldReportCorbBlocking.isJust())
         messageData->setShouldReportCorbBlocking(std::move(shouldReportCorbBlocking).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.loadingFinished", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.loadingFinished", std::move(messageData)));
 }
 
 void Frontend::requestIntercepted(const String& interceptionId, std::unique_ptr<protocol::Network::Request> request, const String& frameId, const String& resourceType, bool isNavigationRequest, Maybe<bool> isDownload, Maybe<String> redirectUrl, Maybe<protocol::Network::AuthChallenge> authChallenge, Maybe<String> responseErrorReason, Maybe<int> responseStatusCode, Maybe<protocol::Network::Headers> responseHeaders, Maybe<String> requestId)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<RequestInterceptedNotification> messageData = RequestInterceptedNotification::create()
         .setInterceptionId(interceptionId)
@@ -2720,22 +2722,22 @@ void Frontend::requestIntercepted(const String& interceptionId, std::unique_ptr<
         messageData->setResponseHeaders(std::move(responseHeaders).takeJust());
     if (requestId.isJust())
         messageData->setRequestId(std::move(requestId).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.requestIntercepted", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.requestIntercepted", std::move(messageData)));
 }
 
 void Frontend::requestServedFromCache(const String& requestId)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<RequestServedFromCacheNotification> messageData = RequestServedFromCacheNotification::create()
         .setRequestId(requestId)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.requestServedFromCache", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.requestServedFromCache", std::move(messageData)));
 }
 
 void Frontend::requestWillBeSent(const String& requestId, const String& loaderId, const String& documentURL, std::unique_ptr<protocol::Network::Request> request, double timestamp, double wallTime, std::unique_ptr<protocol::Network::Initiator> initiator, Maybe<protocol::Network::Response> redirectResponse, Maybe<String> type, Maybe<String> frameId, Maybe<bool> hasUserGesture)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<RequestWillBeSentNotification> messageData = RequestWillBeSentNotification::create()
         .setRequestId(requestId)
@@ -2754,35 +2756,35 @@ void Frontend::requestWillBeSent(const String& requestId, const String& loaderId
         messageData->setFrameId(std::move(frameId).takeJust());
     if (hasUserGesture.isJust())
         messageData->setHasUserGesture(std::move(hasUserGesture).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.requestWillBeSent", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.requestWillBeSent", std::move(messageData)));
 }
 
 void Frontend::resourceChangedPriority(const String& requestId, const String& newPriority, double timestamp)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ResourceChangedPriorityNotification> messageData = ResourceChangedPriorityNotification::create()
         .setRequestId(requestId)
         .setNewPriority(newPriority)
         .setTimestamp(timestamp)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.resourceChangedPriority", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.resourceChangedPriority", std::move(messageData)));
 }
 
 void Frontend::signedExchangeReceived(const String& requestId, std::unique_ptr<protocol::Network::SignedExchangeInfo> info)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<SignedExchangeReceivedNotification> messageData = SignedExchangeReceivedNotification::create()
         .setRequestId(requestId)
         .setInfo(std::move(info))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.signedExchangeReceived", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.signedExchangeReceived", std::move(messageData)));
 }
 
 void Frontend::responseReceived(const String& requestId, const String& loaderId, double timestamp, const String& type, std::unique_ptr<protocol::Network::Response> response, Maybe<String> frameId)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ResponseReceivedNotification> messageData = ResponseReceivedNotification::create()
         .setRequestId(requestId)
@@ -2793,23 +2795,23 @@ void Frontend::responseReceived(const String& requestId, const String& loaderId,
         .build();
     if (frameId.isJust())
         messageData->setFrameId(std::move(frameId).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.responseReceived", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.responseReceived", std::move(messageData)));
 }
 
 void Frontend::webSocketClosed(const String& requestId, double timestamp)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<WebSocketClosedNotification> messageData = WebSocketClosedNotification::create()
         .setRequestId(requestId)
         .setTimestamp(timestamp)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketClosed", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.webSocketClosed", std::move(messageData)));
 }
 
 void Frontend::webSocketCreated(const String& requestId, const String& url, Maybe<protocol::Network::Initiator> initiator)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<WebSocketCreatedNotification> messageData = WebSocketCreatedNotification::create()
         .setRequestId(requestId)
@@ -2817,60 +2819,60 @@ void Frontend::webSocketCreated(const String& requestId, const String& url, Mayb
         .build();
     if (initiator.isJust())
         messageData->setInitiator(std::move(initiator).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketCreated", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.webSocketCreated", std::move(messageData)));
 }
 
 void Frontend::webSocketFrameError(const String& requestId, double timestamp, const String& errorMessage)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<WebSocketFrameErrorNotification> messageData = WebSocketFrameErrorNotification::create()
         .setRequestId(requestId)
         .setTimestamp(timestamp)
         .setErrorMessage(errorMessage)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketFrameError", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.webSocketFrameError", std::move(messageData)));
 }
 
 void Frontend::webSocketFrameReceived(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketFrame> response)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<WebSocketFrameReceivedNotification> messageData = WebSocketFrameReceivedNotification::create()
         .setRequestId(requestId)
         .setTimestamp(timestamp)
         .setResponse(std::move(response))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketFrameReceived", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.webSocketFrameReceived", std::move(messageData)));
 }
 
 void Frontend::webSocketFrameSent(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketFrame> response)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<WebSocketFrameSentNotification> messageData = WebSocketFrameSentNotification::create()
         .setRequestId(requestId)
         .setTimestamp(timestamp)
         .setResponse(std::move(response))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketFrameSent", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.webSocketFrameSent", std::move(messageData)));
 }
 
 void Frontend::webSocketHandshakeResponseReceived(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketResponse> response)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> messageData = WebSocketHandshakeResponseReceivedNotification::create()
         .setRequestId(requestId)
         .setTimestamp(timestamp)
         .setResponse(std::move(response))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketHandshakeResponseReceived", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.webSocketHandshakeResponseReceived", std::move(messageData)));
 }
 
 void Frontend::webSocketWillSendHandshakeRequest(const String& requestId, double timestamp, double wallTime, std::unique_ptr<protocol::Network::WebSocketRequest> request)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> messageData = WebSocketWillSendHandshakeRequestNotification::create()
         .setRequestId(requestId)
@@ -2878,24 +2880,24 @@ void Frontend::webSocketWillSendHandshakeRequest(const String& requestId, double
         .setWallTime(wallTime)
         .setRequest(std::move(request))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketWillSendHandshakeRequest", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.webSocketWillSendHandshakeRequest", std::move(messageData)));
 }
 
 void Frontend::requestWillBeSentExtraInfo(const String& requestId, std::unique_ptr<protocol::Array<protocol::Network::BlockedCookieWithReason>> blockedCookies, std::unique_ptr<protocol::Network::Headers> headers)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<RequestWillBeSentExtraInfoNotification> messageData = RequestWillBeSentExtraInfoNotification::create()
         .setRequestId(requestId)
         .setBlockedCookies(std::move(blockedCookies))
         .setHeaders(std::move(headers))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.requestWillBeSentExtraInfo", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.requestWillBeSentExtraInfo", std::move(messageData)));
 }
 
 void Frontend::responseReceivedExtraInfo(const String& requestId, std::unique_ptr<protocol::Array<protocol::Network::BlockedSetCookieWithReason>> blockedCookies, std::unique_ptr<protocol::Network::Headers> headers, Maybe<String> headersText)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ResponseReceivedExtraInfoNotification> messageData = ResponseReceivedExtraInfoNotification::create()
         .setRequestId(requestId)
@@ -2904,262 +2906,322 @@ void Frontend::responseReceivedExtraInfo(const String& requestId, std::unique_pt
         .build();
     if (headersText.isJust())
         messageData->setHeadersText(std::move(headersText).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.responseReceivedExtraInfo", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Network.responseReceivedExtraInfo", std::move(messageData)));
 }
 
 void Frontend::flush()
 {
-    m_frontendChannel->flushProtocolNotifications();
+    frontend_channel_->FlushProtocolNotifications();
 }
 
 void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(std::move(notification));
+    frontend_channel_->SendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
 
-class DispatcherImpl : public protocol::DispatcherBase {
+class DomainDispatcherImpl : public protocol::DomainDispatcher {
 public:
-    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
-        : DispatcherBase(frontendChannel)
-        , m_backend(backend) {
-        m_dispatchMap["Network.canClearBrowserCache"] = &DispatcherImpl::canClearBrowserCache;
-        m_dispatchMap["Network.canClearBrowserCookies"] = &DispatcherImpl::canClearBrowserCookies;
-        m_dispatchMap["Network.disable"] = &DispatcherImpl::disable;
-        m_dispatchMap["Network.emulateNetworkConditions"] = &DispatcherImpl::emulateNetworkConditions;
-        m_dispatchMap["Network.enable"] = &DispatcherImpl::enable;
-        m_dispatchMap["Network.getCertificate"] = &DispatcherImpl::getCertificate;
-        m_dispatchMap["Network.getResponseBody"] = &DispatcherImpl::getResponseBody;
-        m_dispatchMap["Network.getRequestPostData"] = &DispatcherImpl::getRequestPostData;
-        m_dispatchMap["Network.replayXHR"] = &DispatcherImpl::replayXHR;
-        m_dispatchMap["Network.searchInResponseBody"] = &DispatcherImpl::searchInResponseBody;
-        m_dispatchMap["Network.setBlockedURLs"] = &DispatcherImpl::setBlockedURLs;
-        m_dispatchMap["Network.setBypassServiceWorker"] = &DispatcherImpl::setBypassServiceWorker;
-        m_dispatchMap["Network.setCacheDisabled"] = &DispatcherImpl::setCacheDisabled;
-        m_dispatchMap["Network.setDataSizeLimitsForTest"] = &DispatcherImpl::setDataSizeLimitsForTest;
-        m_dispatchMap["Network.setExtraHTTPHeaders"] = &DispatcherImpl::setExtraHTTPHeaders;
-      m_redirects["Network.setUserAgentOverride"] = "Emulation.setUserAgentOverride";
-    }
-    ~DispatcherImpl() override { }
-    bool canDispatch(const String& method) override;
-    void dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-    std::unordered_map<String, String>& redirects() { return m_redirects; }
+    DomainDispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+        : DomainDispatcher(frontendChannel)
+        , m_backend(backend) {}
+    ~DomainDispatcherImpl() override { }
 
-protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-    using DispatchMap = std::unordered_map<String, CallHandler>;
-    DispatchMap m_dispatchMap;
-    std::unordered_map<String, String> m_redirects;
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
 
-    void canClearBrowserCache(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void canClearBrowserCookies(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void emulateNetworkConditions(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getCertificate(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getResponseBody(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getRequestPostData(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void replayXHR(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void searchInResponseBody(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setBlockedURLs(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setBypassServiceWorker(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setCacheDisabled(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setDataSizeLimitsForTest(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setExtraHTTPHeaders(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
+    void canClearBrowserCache(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void canClearBrowserCookies(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void emulateNetworkConditions(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getCertificate(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getResponseBody(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getRequestPostData(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void replayXHR(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void searchInResponseBody(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setBlockedURLs(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setBypassServiceWorker(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setCacheDisabled(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setDataSizeLimitsForTest(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setExtraHTTPHeaders(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+ protected:
     Backend* m_backend;
 };
 
-bool DispatcherImpl::canDispatch(const String& method) {
-    return m_dispatchMap.find(method) != m_dispatchMap.end();
+namespace {
+// This helper method with a static map of command methods (instance methods
+// of DomainDispatcherImpl declared just above) by their name is used immediately below,
+// in the DomainDispatcherImpl::Dispatch method.
+DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_name) {
+  static auto* commands = [](){
+    auto* commands = new std::vector<std::pair<v8_crdtp::span<uint8_t>,
+                              DomainDispatcherImpl::CallHandler>>{
+    {
+          v8_crdtp::SpanFrom("canClearBrowserCache"),
+          &DomainDispatcherImpl::canClearBrowserCache
+    },
+    {
+          v8_crdtp::SpanFrom("canClearBrowserCookies"),
+          &DomainDispatcherImpl::canClearBrowserCookies
+    },
+    {
+          v8_crdtp::SpanFrom("disable"),
+          &DomainDispatcherImpl::disable
+    },
+    {
+          v8_crdtp::SpanFrom("emulateNetworkConditions"),
+          &DomainDispatcherImpl::emulateNetworkConditions
+    },
+    {
+          v8_crdtp::SpanFrom("enable"),
+          &DomainDispatcherImpl::enable
+    },
+    {
+          v8_crdtp::SpanFrom("getCertificate"),
+          &DomainDispatcherImpl::getCertificate
+    },
+    {
+          v8_crdtp::SpanFrom("getRequestPostData"),
+          &DomainDispatcherImpl::getRequestPostData
+    },
+    {
+          v8_crdtp::SpanFrom("getResponseBody"),
+          &DomainDispatcherImpl::getResponseBody
+    },
+    {
+          v8_crdtp::SpanFrom("replayXHR"),
+          &DomainDispatcherImpl::replayXHR
+    },
+    {
+          v8_crdtp::SpanFrom("searchInResponseBody"),
+          &DomainDispatcherImpl::searchInResponseBody
+    },
+    {
+          v8_crdtp::SpanFrom("setBlockedURLs"),
+          &DomainDispatcherImpl::setBlockedURLs
+    },
+    {
+          v8_crdtp::SpanFrom("setBypassServiceWorker"),
+          &DomainDispatcherImpl::setBypassServiceWorker
+    },
+    {
+          v8_crdtp::SpanFrom("setCacheDisabled"),
+          &DomainDispatcherImpl::setCacheDisabled
+    },
+    {
+          v8_crdtp::SpanFrom("setDataSizeLimitsForTest"),
+          &DomainDispatcherImpl::setDataSizeLimitsForTest
+    },
+    {
+          v8_crdtp::SpanFrom("setExtraHTTPHeaders"),
+          &DomainDispatcherImpl::setExtraHTTPHeaders
+    },
+    };
+    return commands;
+  }();
+  return v8_crdtp::FindByFirst<DomainDispatcherImpl::CallHandler>(*commands, command_name, nullptr);
+}
+}  // namespace
+
+std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
+  CallHandler handler = CommandByName(command_name);
+  if (!handler) return nullptr;
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
+    std::unique_ptr<DictionaryValue> params =
+        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
+        dispatchable.Params().size()));
+    ErrorSupport errors;
+    errors.Push();
+    (this->*handler)(dispatchable, params.get(), &errors);
+  };
 }
 
-void DispatcherImpl::dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject)
-{
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
-    DCHECK(it != m_dispatchMap.end());
-    protocol::ErrorSupport errors;
-    (this->*(it->second))(callId, method, message, std::move(messageObject), &errors);
-}
 
-
-void DispatcherImpl::canClearBrowserCache(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::canClearBrowserCache(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     bool out_result;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->canClearBrowserCache(&out_result);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.canClearBrowserCache"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("result", ValueConversions<bool>::toValue(out_result));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), out_result, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::canClearBrowserCookies(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::canClearBrowserCookies(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     bool out_result;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->canClearBrowserCookies(&out_result);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.canClearBrowserCookies"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("result", ValueConversions<bool>::toValue(out_result));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), out_result, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.disable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::emulateNetworkConditions(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::emulateNetworkConditions(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* offlineValue = object ? object->get("offline") : nullptr;
+    protocol::Value* offlineValue = params ? params->get("offline") : nullptr;
     errors->SetName("offline");
     bool in_offline = ValueConversions<bool>::fromValue(offlineValue, errors);
-    protocol::Value* latencyValue = object ? object->get("latency") : nullptr;
+    protocol::Value* latencyValue = params ? params->get("latency") : nullptr;
     errors->SetName("latency");
     double in_latency = ValueConversions<double>::fromValue(latencyValue, errors);
-    protocol::Value* downloadThroughputValue = object ? object->get("downloadThroughput") : nullptr;
+    protocol::Value* downloadThroughputValue = params ? params->get("downloadThroughput") : nullptr;
     errors->SetName("downloadThroughput");
     double in_downloadThroughput = ValueConversions<double>::fromValue(downloadThroughputValue, errors);
-    protocol::Value* uploadThroughputValue = object ? object->get("uploadThroughput") : nullptr;
+    protocol::Value* uploadThroughputValue = params ? params->get("uploadThroughput") : nullptr;
     errors->SetName("uploadThroughput");
     double in_uploadThroughput = ValueConversions<double>::fromValue(uploadThroughputValue, errors);
-    protocol::Value* connectionTypeValue = object ? object->get("connectionType") : nullptr;
+    protocol::Value* connectionTypeValue = params ? params->get("connectionType") : nullptr;
     Maybe<String> in_connectionType;
     if (connectionTypeValue) {
         errors->SetName("connectionType");
         in_connectionType = ValueConversions<String>::fromValue(connectionTypeValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->emulateNetworkConditions(in_offline, in_latency, in_downloadThroughput, in_uploadThroughput, std::move(in_connectionType));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.emulateNetworkConditions"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* maxTotalBufferSizeValue = object ? object->get("maxTotalBufferSize") : nullptr;
+    protocol::Value* maxTotalBufferSizeValue = params ? params->get("maxTotalBufferSize") : nullptr;
     Maybe<int> in_maxTotalBufferSize;
     if (maxTotalBufferSizeValue) {
         errors->SetName("maxTotalBufferSize");
         in_maxTotalBufferSize = ValueConversions<int>::fromValue(maxTotalBufferSizeValue, errors);
     }
-    protocol::Value* maxResourceBufferSizeValue = object ? object->get("maxResourceBufferSize") : nullptr;
+    protocol::Value* maxResourceBufferSizeValue = params ? params->get("maxResourceBufferSize") : nullptr;
     Maybe<int> in_maxResourceBufferSize;
     if (maxResourceBufferSizeValue) {
         errors->SetName("maxResourceBufferSize");
         in_maxResourceBufferSize = ValueConversions<int>::fromValue(maxResourceBufferSizeValue, errors);
     }
-    protocol::Value* maxPostDataSizeValue = object ? object->get("maxPostDataSize") : nullptr;
+    protocol::Value* maxPostDataSizeValue = params ? params->get("maxPostDataSize") : nullptr;
     Maybe<int> in_maxPostDataSize;
     if (maxPostDataSizeValue) {
         errors->SetName("maxPostDataSize");
         in_maxPostDataSize = ValueConversions<int>::fromValue(maxPostDataSizeValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable(std::move(in_maxTotalBufferSize), std::move(in_maxResourceBufferSize), std::move(in_maxPostDataSize));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.enable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::getCertificate(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getCertificate(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* originValue = object ? object->get("origin") : nullptr;
+    protocol::Value* originValue = params ? params->get("origin") : nullptr;
     errors->SetName("origin");
     String in_origin = ValueConversions<String>::fromValue(originValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<String>> out_tableNames;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getCertificate(in_origin, &out_tableNames);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.getCertificate"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("tableNames", ValueConversions<protocol::Array<String>>::toValue(out_tableNames.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("tableNames"), out_tableNames, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-class GetResponseBodyCallbackImpl : public Backend::GetResponseBodyCallback, public DispatcherBase::Callback {
+class GetResponseBodyCallbackImpl : public Backend::GetResponseBodyCallback, public DomainDispatcher::Callback {
 public:
-    GetResponseBodyCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message)
-        : DispatcherBase::Callback(std::move(backendImpl), callId, method, message) { }
+    GetResponseBodyCallbackImpl(std::unique_ptr<DomainDispatcher::WeakPtr> backendImpl, int callId, v8_crdtp::span<uint8_t> message)
+        : DomainDispatcher::Callback(std::move(backendImpl), callId,
+v8_crdtp::SpanFrom("Network.getResponseBody"), message) { }
 
     void sendSuccess(const String& body, bool base64Encoded) override
     {
-        std::unique_ptr<protocol::DictionaryValue> resultObject = DictionaryValue::create();
-        resultObject->setValue("body", ValueConversions<String>::toValue(body));
-        resultObject->setValue("base64Encoded", ValueConversions<bool>::toValue(base64Encoded));
-        sendIfActive(std::move(resultObject), DispatchResponse::OK());
+        std::vector<uint8_t> result_buffer;
+        v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+        envelope_encoder.EncodeStart(&result_buffer);
+        result_buffer.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+          v8_crdtp::SerializeField(v8_crdtp::SpanFrom("body"), body, &result_buffer);
+          v8_crdtp::SerializeField(v8_crdtp::SpanFrom("base64Encoded"), base64Encoded, &result_buffer);
+        result_buffer.push_back(v8_crdtp::cbor::EncodeStop());
+        envelope_encoder.EncodeStop(&result_buffer);
+        sendIfActive(v8_crdtp::Serializable::From(std::move(result_buffer)), DispatchResponse::Success());
     }
 
     void fallThrough() override
@@ -3169,40 +3231,38 @@ public:
 
     void sendFailure(const DispatchResponse& response) override
     {
-        DCHECK(response.status() == DispatchResponse::kError);
+        DCHECK(response.IsError());
         sendIfActive(nullptr, response);
     }
 };
 
-void DispatcherImpl::getResponseBody(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getResponseBody(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* requestIdValue = object ? object->get("requestId") : nullptr;
+    protocol::Value* requestIdValue = params ? params->get("requestId") : nullptr;
     errors->SetName("requestId");
     String in_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<GetResponseBodyCallbackImpl> callback(new GetResponseBodyCallbackImpl(weakPtr(), callId, method, message));
-    m_backend->getResponseBody(in_requestId, std::move(callback));
-    return;
+    m_backend->getResponseBody(in_requestId, std::make_unique<GetResponseBodyCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
 }
 
-class GetRequestPostDataCallbackImpl : public Backend::GetRequestPostDataCallback, public DispatcherBase::Callback {
+class GetRequestPostDataCallbackImpl : public Backend::GetRequestPostDataCallback, public DomainDispatcher::Callback {
 public:
-    GetRequestPostDataCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message)
-        : DispatcherBase::Callback(std::move(backendImpl), callId, method, message) { }
+    GetRequestPostDataCallbackImpl(std::unique_ptr<DomainDispatcher::WeakPtr> backendImpl, int callId, v8_crdtp::span<uint8_t> message)
+        : DomainDispatcher::Callback(std::move(backendImpl), callId,
+v8_crdtp::SpanFrom("Network.getRequestPostData"), message) { }
 
     void sendSuccess(const String& postData) override
     {
-        std::unique_ptr<protocol::DictionaryValue> resultObject = DictionaryValue::create();
-        resultObject->setValue("postData", ValueConversions<String>::toValue(postData));
-        sendIfActive(std::move(resultObject), DispatchResponse::OK());
+        std::vector<uint8_t> result_buffer;
+        v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+        envelope_encoder.EncodeStart(&result_buffer);
+        result_buffer.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+          v8_crdtp::SerializeField(v8_crdtp::SpanFrom("postData"), postData, &result_buffer);
+        result_buffer.push_back(v8_crdtp::cbor::EncodeStop());
+        envelope_encoder.EncodeStop(&result_buffer);
+        sendIfActive(v8_crdtp::Serializable::From(std::move(result_buffer)), DispatchResponse::Success());
     }
 
     void fallThrough() override
@@ -3212,235 +3272,204 @@ public:
 
     void sendFailure(const DispatchResponse& response) override
     {
-        DCHECK(response.status() == DispatchResponse::kError);
+        DCHECK(response.IsError());
         sendIfActive(nullptr, response);
     }
 };
 
-void DispatcherImpl::getRequestPostData(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getRequestPostData(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* requestIdValue = object ? object->get("requestId") : nullptr;
+    protocol::Value* requestIdValue = params ? params->get("requestId") : nullptr;
     errors->SetName("requestId");
     String in_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<GetRequestPostDataCallbackImpl> callback(new GetRequestPostDataCallbackImpl(weakPtr(), callId, method, message));
-    m_backend->getRequestPostData(in_requestId, std::move(callback));
-    return;
+    m_backend->getRequestPostData(in_requestId, std::make_unique<GetRequestPostDataCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
 }
 
-void DispatcherImpl::replayXHR(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::replayXHR(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* requestIdValue = object ? object->get("requestId") : nullptr;
+    protocol::Value* requestIdValue = params ? params->get("requestId") : nullptr;
     errors->SetName("requestId");
     String in_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->replayXHR(in_requestId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.replayXHR"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::searchInResponseBody(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::searchInResponseBody(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* requestIdValue = object ? object->get("requestId") : nullptr;
+    protocol::Value* requestIdValue = params ? params->get("requestId") : nullptr;
     errors->SetName("requestId");
     String in_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
-    protocol::Value* queryValue = object ? object->get("query") : nullptr;
+    protocol::Value* queryValue = params ? params->get("query") : nullptr;
     errors->SetName("query");
     String in_query = ValueConversions<String>::fromValue(queryValue, errors);
-    protocol::Value* caseSensitiveValue = object ? object->get("caseSensitive") : nullptr;
+    protocol::Value* caseSensitiveValue = params ? params->get("caseSensitive") : nullptr;
     Maybe<bool> in_caseSensitive;
     if (caseSensitiveValue) {
         errors->SetName("caseSensitive");
         in_caseSensitive = ValueConversions<bool>::fromValue(caseSensitiveValue, errors);
     }
-    protocol::Value* isRegexValue = object ? object->get("isRegex") : nullptr;
+    protocol::Value* isRegexValue = params ? params->get("isRegex") : nullptr;
     Maybe<bool> in_isRegex;
     if (isRegexValue) {
         errors->SetName("isRegex");
         in_isRegex = ValueConversions<bool>::fromValue(isRegexValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>> out_result;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->searchInResponseBody(in_requestId, in_query, std::move(in_caseSensitive), std::move(in_isRegex), &out_result);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.searchInResponseBody"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("result", ValueConversions<protocol::Array<protocol::Debugger::SearchMatch>>::toValue(out_result.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), out_result, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setBlockedURLs(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setBlockedURLs(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* urlsValue = object ? object->get("urls") : nullptr;
+    protocol::Value* urlsValue = params ? params->get("urls") : nullptr;
     errors->SetName("urls");
     std::unique_ptr<protocol::Array<String>> in_urls = ValueConversions<protocol::Array<String>>::fromValue(urlsValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setBlockedURLs(std::move(in_urls));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.setBlockedURLs"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setBypassServiceWorker(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setBypassServiceWorker(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* bypassValue = object ? object->get("bypass") : nullptr;
+    protocol::Value* bypassValue = params ? params->get("bypass") : nullptr;
     errors->SetName("bypass");
     bool in_bypass = ValueConversions<bool>::fromValue(bypassValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setBypassServiceWorker(in_bypass);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.setBypassServiceWorker"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setCacheDisabled(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setCacheDisabled(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* cacheDisabledValue = object ? object->get("cacheDisabled") : nullptr;
+    protocol::Value* cacheDisabledValue = params ? params->get("cacheDisabled") : nullptr;
     errors->SetName("cacheDisabled");
     bool in_cacheDisabled = ValueConversions<bool>::fromValue(cacheDisabledValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setCacheDisabled(in_cacheDisabled);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.setCacheDisabled"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setDataSizeLimitsForTest(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setDataSizeLimitsForTest(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* maxTotalSizeValue = object ? object->get("maxTotalSize") : nullptr;
+    protocol::Value* maxTotalSizeValue = params ? params->get("maxTotalSize") : nullptr;
     errors->SetName("maxTotalSize");
     int in_maxTotalSize = ValueConversions<int>::fromValue(maxTotalSizeValue, errors);
-    protocol::Value* maxResourceSizeValue = object ? object->get("maxResourceSize") : nullptr;
+    protocol::Value* maxResourceSizeValue = params ? params->get("maxResourceSize") : nullptr;
     errors->SetName("maxResourceSize");
     int in_maxResourceSize = ValueConversions<int>::fromValue(maxResourceSizeValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setDataSizeLimitsForTest(in_maxTotalSize, in_maxResourceSize);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.setDataSizeLimitsForTest"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setExtraHTTPHeaders(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setExtraHTTPHeaders(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* headersValue = object ? object->get("headers") : nullptr;
+    protocol::Value* headersValue = params ? params->get("headers") : nullptr;
     errors->SetName("headers");
     std::unique_ptr<protocol::Network::Headers> in_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setExtraHTTPHeaders(std::move(in_headers));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Network.setExtraHTTPHeaders"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
+
+namespace {
+// This helper method (with a static map of redirects) is used from Dispatcher::wire
+// immediately below.
+const std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>& SortedRedirects() {
+  static auto* redirects = [](){
+    auto* redirects = new std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>{
+          { v8_crdtp::SpanFrom("Network.setUserAgentOverride"), v8_crdtp::SpanFrom("Emulation.setUserAgentOverride") },
+    };
+    return redirects;
+  }();
+  return *redirects;
+}
+}  // namespace
 
 // static
 void Dispatcher::wire(UberDispatcher* uber, Backend* backend)
 {
-    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend));
-    uber->setupRedirects(dispatcher->redirects());
-    uber->registerBackend("Network", std::move(dispatcher));
+    auto dispatcher = std::make_unique<DomainDispatcherImpl>(uber->channel(), backend);
+    uber->WireBackend(v8_crdtp::SpanFrom("Network"), SortedRedirects(), std::move(dispatcher));
 }
 
 } // Network

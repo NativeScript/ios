@@ -39,23 +39,23 @@ void V8CSSAgentImpl::enable(std::unique_ptr<EnableCallback> callback) {
 
 DispatchResponse V8CSSAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(CSSAgentState::cssEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 // Not supported
 DispatchResponse V8CSSAgentImpl::getMatchedStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle, Maybe<protocol::Array<protocol::CSS::RuleMatch>>* out_matchedCSSRules, Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>* out_pseudoElements, Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited, Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) {
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8CSSAgentImpl::getInlineStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle) {
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) {
@@ -70,7 +70,7 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
     Local<v8::Function> getComputedStylesForNodeFunc = v8_inspector::GetDebuggerFunction(context, "CSS", "getComputedStyleForNode", cssDomainDebugger);
     if (getComputedStylesForNodeFunc.IsEmpty() || cssDomainDebugger.IsEmpty()) {
         *out_computedStyle = std::move(computedStylePropertyArr);
-        return DispatchResponse::Error("Error getting CSS elements.");
+        return DispatchResponse::ServerError("Error getting CSS elements.");
     }
 
     Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
@@ -87,8 +87,8 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
     assert(getComputedStylesForNodeFunc->Call(context, cssDomainDebugger, 1, args).ToLocal(&result));
     if (tc.HasCaught() || result.IsEmpty()) {
         *out_computedStyle = std::move(computedStylePropertyArr);
-        String16 error = toProtocolString(isolate, tc.Message()->Get());
-        return DispatchResponse::Error(error);
+        std::string error = tns::ToString(isolate, tc.Message()->Get());
+        return DispatchResponse::ServerError(error);
     }
 
     if (!result.IsEmpty() && result->IsObject()) {
@@ -107,16 +107,16 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
         v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
         auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
         if (!errorSupportString.empty()) {
-            String16 errorMessage = "Error while parsing CSSComputedStyleProperty object.";
-            return DispatchResponse::Error(errorMessage);
+            std::string errorMessage = "Error while parsing CSSComputedStyleProperty object.";
+            return DispatchResponse::ServerError(errorMessage);
         }
 
         *out_computedStyle = std::move(computedStyles);
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     *out_computedStyle = std::move(computedStylePropertyArr);
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8CSSAgentImpl::getPlatformFontsForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) {
@@ -130,73 +130,73 @@ DispatchResponse V8CSSAgentImpl::getPlatformFontsForNode(int in_nodeId, std::uni
     fontsArr->emplace_back(std::move(fontUsage));
     *out_fonts = std::move(fontsArr);
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8CSSAgentImpl::getStyleSheetText(const String& in_styleSheetId, String* out_text) {
     *out_text = "";
 
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::addRule(const String& in_styleSheetId, const String& in_ruleText, std::unique_ptr<protocol::CSS::SourceRange> in_location, std::unique_ptr<protocol::CSS::CSSRule>* out_rule) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::collectClassNames(const String& in_styleSheetId, std::unique_ptr<protocol::Array<String>>* out_classNames) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::createStyleSheet(const String& in_frameId, String* out_styleSheetId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::forcePseudoState(int in_nodeId, std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::getBackgroundColors(int in_nodeId, Maybe<protocol::Array<String>>* out_backgroundColors, Maybe<String>* out_computedFontSize, Maybe<String>* out_computedFontWeight) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::getMediaQueries(std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>>* out_medias) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::setEffectivePropertyValueForNode(int in_nodeId, const String& in_propertyName, const String& in_value) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::setKeyframeKey(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_keyText, std::unique_ptr<protocol::CSS::Value>* out_keyText) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::setMediaText(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_text, std::unique_ptr<protocol::CSS::CSSMedia>* out_media) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::setRuleSelector(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_selector, std::unique_ptr<protocol::CSS::SelectorList>* out_selectorList) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::setStyleSheetText(const String& in_styleSheetId, const String& in_text, Maybe<String>* out_sourceMapURL) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::setStyleTexts(std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits, std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>>* out_styles) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::startRuleUsageTracking() {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::stopRuleUsageTracking(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_ruleUsage) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8CSSAgentImpl::takeCoverageDelta(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 V8CSSAgentImpl* V8CSSAgentImpl::Instance = 0;

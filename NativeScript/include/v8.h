@@ -24,9 +24,9 @@
 #include <utility>
 #include <vector>
 
-#include "v8-internal.h"  // NOLINT(build/include)
-#include "v8-version.h"   // NOLINT(build/include)
-#include "v8config.h"     // NOLINT(build/include)
+#include "v8-internal.h"  // NOLINT(build/include_directory)
+#include "v8-version.h"   // NOLINT(build/include_directory)
+#include "v8config.h"     // NOLINT(build/include_directory)
 
 // We reserve the V8_* prefix for macros defined in V8 public API and
 // assume there are no name conflicts with the embedder's code.
@@ -123,19 +123,21 @@ namespace internal {
 enum class ArgumentsType;
 template <ArgumentsType>
 class Arguments;
+template <typename T>
+class CustomArguments;
 class DeferredHandles;
+class FunctionCallbackArguments;
+class GlobalHandles;
 class Heap;
 class HeapObject;
 class ExternalString;
 class Isolate;
 class LocalEmbedderHeapTracer;
 class MicrotaskQueue;
-struct ScriptStreamingData;
-template<typename T> class CustomArguments;
 class PropertyCallbackArguments;
-class FunctionCallbackArguments;
-class GlobalHandles;
+class ReadOnlyHeap;
 class ScopedExternalStringLock;
+struct ScriptStreamingData;
 class ThreadLocalTop;
 
 namespace wasm {
@@ -4762,11 +4764,17 @@ class V8_EXPORT CompiledWasmModule {
    */
   MemorySpan<const uint8_t> GetWireBytesRef();
 
+  const std::string& source_url() const { return source_url_; }
+
  private:
-  explicit CompiledWasmModule(std::shared_ptr<internal::wasm::NativeModule>);
-  friend class Utils;
+  friend class WasmModuleObject;
+  friend class WasmStreaming;
+
+  explicit CompiledWasmModule(std::shared_ptr<internal::wasm::NativeModule>,
+                              const char* source_url, size_t url_length);
 
   const std::shared_ptr<internal::wasm::NativeModule> native_module_;
+  const std::string source_url_;
 };
 
 // An instance of WebAssembly.Module.
@@ -4971,6 +4979,25 @@ class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
       v8::Isolate* isolate, std::unique_ptr<BackingStore> backing_store,
       size_t byte_length);
 
+  /**
+   * This callback is used only if the memory block for a BackingStore cannot be
+   * allocated with an ArrayBuffer::Allocator. In such cases the destructor of
+   * the BackingStore invokes the callback to free the memory block.
+   */
+  using DeleterCallback = void (*)(void* data, size_t length,
+                                   void* deleter_data);
+
+  /**
+   * If the memory block of a BackingStore is static or is managed manually,
+   * then this empty deleter along with nullptr deleter_data can be passed to
+   * ArrayBuffer::NewBackingStore to indicate that.
+   *
+   * The manually managed case should be used with caution and only when it
+   * is guaranteed that the memory block freeing happens after detaching its
+   * ArrayBuffer.
+   */
+  static void EmptyDeleter(void* data, size_t length, void* deleter_data);
+
  private:
   /**
    * See [Shared]ArrayBuffer::GetBackingStore and
@@ -4979,13 +5006,12 @@ class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
   BackingStore();
 };
 
-/**
- * This callback is used only if the memory block for this backing store cannot
- * be allocated with an ArrayBuffer::Allocator. In such cases the destructor
- * of this backing store object invokes the callback to free the memory block.
- */
+#if !defined(V8_IMMINENT_DEPRECATION_WARNINGS)
+// Use v8::BackingStore::DeleterCallback instead.
 using BackingStoreDeleterCallback = void (*)(void* data, size_t length,
                                              void* deleter_data);
+
+#endif
 
 /**
  * An instance of the built-in ArrayBuffer constructor (ES6 draft 15.13.5).
@@ -5174,7 +5200,7 @@ class V8_EXPORT ArrayBuffer : public Object {
    * to the buffer must not be passed again to any V8 API function.
    */
   static std::unique_ptr<BackingStore> NewBackingStore(
-      void* data, size_t byte_length, BackingStoreDeleterCallback deleter,
+      void* data, size_t byte_length, v8::BackingStore::DeleterCallback deleter,
       void* deleter_data);
 
   /**
@@ -5656,7 +5682,7 @@ class V8_EXPORT SharedArrayBuffer : public Object {
    * to the buffer must not be passed again to any V8 functions.
    */
   static std::unique_ptr<BackingStore> NewBackingStore(
-      void* data, size_t byte_length, BackingStoreDeleterCallback deleter,
+      void* data, size_t byte_length, v8::BackingStore::DeleterCallback deleter,
       void* deleter_data);
 
   /**
@@ -5916,37 +5942,6 @@ class V8_EXPORT RegExp : public Object {
 };
 
 /**
- * An instance of the built-in FinalizationRegistry constructor.
- *
- * The C++ name is FinalizationGroup for backwards compatibility. This API is
- * experimental and deprecated.
- */
-class V8_EXPORT FinalizationGroup : public Object {
- public:
-  /**
-   * Runs the cleanup callback of the given FinalizationRegistry.
-   *
-   * V8 will inform the embedder that there are finalizer callbacks be
-   * called through HostCleanupFinalizationGroupCallback.
-   *
-   * HostCleanupFinalizationGroupCallback should schedule a task to
-   * call FinalizationGroup::Cleanup() at some point in the
-   * future. It's the embedders responsiblity to make this call at a
-   * time which does not interrupt synchronous ECMAScript code
-   * execution.
-   *
-   * If the result is Nothing<bool> then an exception has
-   * occurred. Otherwise the result is |true| if the cleanup callback
-   * was called successfully. The result is never |false|.
-   */
-  V8_DEPRECATED(
-      "FinalizationGroup cleanup is automatic if "
-      "HostCleanupFinalizationGroupCallback is not set")
-  static V8_WARN_UNUSED_RESULT Maybe<bool> Cleanup(
-      Local<FinalizationGroup> finalization_group);
-};
-
-/**
  * A JavaScript value that wraps a C++ void*. This type of value is mainly used
  * to associate C++ data structures with JavaScript objects.
  */
@@ -5959,13 +5954,14 @@ class V8_EXPORT External : public Value {
   static void CheckCast(v8::Value* obj);
 };
 
-#define V8_INTRINSICS_LIST(F)                    \
-  F(ArrayProto_entries, array_entries_iterator)  \
-  F(ArrayProto_forEach, array_for_each_iterator) \
-  F(ArrayProto_keys, array_keys_iterator)        \
-  F(ArrayProto_values, array_values_iterator)    \
-  F(ErrorPrototype, initial_error_prototype)     \
-  F(IteratorPrototype, initial_iterator_prototype)
+#define V8_INTRINSICS_LIST(F)                      \
+  F(ArrayProto_entries, array_entries_iterator)    \
+  F(ArrayProto_forEach, array_for_each_iterator)   \
+  F(ArrayProto_keys, array_keys_iterator)          \
+  F(ArrayProto_values, array_values_iterator)      \
+  F(ErrorPrototype, initial_error_prototype)       \
+  F(IteratorPrototype, initial_iterator_prototype) \
+  F(ObjProto_valueOf, object_value_of_function)
 
 enum Intrinsic {
 #define V8_DECL_INTRINSIC(name, iname) k##name,
@@ -6430,11 +6426,6 @@ class V8_EXPORT FunctionTemplate : public Template {
       SideEffectType side_effect_type = SideEffectType::kHasSideEffect,
       const CFunction* c_function = nullptr);
 
-  /** Get a template included in the snapshot by index. */
-  V8_DEPRECATED("Use v8::Isolate::GetDataFromSnapshotOnce instead")
-  static MaybeLocal<FunctionTemplate> FromSnapshot(Isolate* isolate,
-                                                   size_t index);
-
   /**
    * Creates a function template backed/cached by a private property.
    */
@@ -6723,11 +6714,6 @@ class V8_EXPORT ObjectTemplate : public Template {
   static Local<ObjectTemplate> New(
       Isolate* isolate,
       Local<FunctionTemplate> constructor = Local<FunctionTemplate>());
-
-  /** Get a template included in the snapshot by index. */
-  V8_DEPRECATED("Use v8::Isolate::GetDataFromSnapshotOnce instead")
-  static MaybeLocal<ObjectTemplate> FromSnapshot(Isolate* isolate,
-                                                 size_t index);
 
   /** Creates a new instance of this template.*/
   V8_WARN_UNUSED_RESULT MaybeLocal<Object> NewInstance(Local<Context> context);
@@ -7161,6 +7147,9 @@ class V8_EXPORT Exception {
   static Local<Value> ReferenceError(Local<String> message);
   static Local<Value> SyntaxError(Local<String> message);
   static Local<Value> TypeError(Local<String> message);
+  static Local<Value> WasmCompileError(Local<String> message);
+  static Local<Value> WasmLinkError(Local<String> message);
+  static Local<Value> WasmRuntimeError(Local<String> message);
   static Local<Value> Error(Local<String> message);
 
   /**
@@ -7203,20 +7192,6 @@ typedef void (*AddCrashKeyCallback)(CrashKeyId id, const std::string& value);
 // --- Enter/Leave Script Callback ---
 typedef void (*BeforeCallEnteredCallback)(Isolate*);
 typedef void (*CallCompletedCallback)(Isolate*);
-
-/**
- * HostCleanupFinalizationGroupCallback is called when we require the
- * embedder to enqueue a task that would call
- * FinalizationGroup::Cleanup().
- *
- * The FinalizationGroup is the one for which the embedder needs to
- * call FinalizationGroup::Cleanup() on.
- *
- * The context provided is the one in which the FinalizationGroup was
- * created in.
- */
-typedef void (*HostCleanupFinalizationGroupCallback)(
-    Local<Context> context, Local<FinalizationGroup> fg);
 
 /**
  * HostImportModuleDynamicallyCallback is called when we require the
@@ -7503,7 +7478,7 @@ typedef void (*WasmStreamingCallback)(const FunctionCallbackInfo<Value>&);
 // --- Callback for checking if WebAssembly threads are enabled ---
 typedef bool (*WasmThreadsEnabledCallback)(Local<Context> context);
 
-// --- Callback for loading source map file for WASM profiling support
+// --- Callback for loading source map file for Wasm profiling support
 typedef Local<String> (*WasmLoadSourceMapCallback)(Isolate* isolate,
                                                    const char* name);
 
@@ -7584,6 +7559,7 @@ class V8_EXPORT SharedMemoryStatistics {
   size_t read_only_space_physical_size_;
 
   friend class V8;
+  friend class internal::ReadOnlyHeap;
 };
 
 /**
@@ -7866,6 +7842,7 @@ class V8_EXPORT EmbedderHeapTracer {
   enum TraceFlags : uint64_t {
     kNoFlags = 0,
     kReduceMemory = 1 << 0,
+    kForced = 1 << 2,
   };
 
   // Indicator for the stack state of the embedder.
@@ -8164,7 +8141,9 @@ class V8_EXPORT Isolate {
           array_buffer_allocator_shared(),
           external_references(nullptr),
           allow_atomics_wait(true),
-          only_terminate_in_safe_scope(false) {}
+          only_terminate_in_safe_scope(false),
+          embedder_wrapper_type_index(-1),
+          embedder_wrapper_object_index(-1) {}
 
     /**
      * Allows the host application to provide the address of a function that is
@@ -8228,6 +8207,14 @@ class V8_EXPORT Isolate {
      * Termination is postponed when there is no active SafeForTerminationScope.
      */
     bool only_terminate_in_safe_scope;
+
+    /**
+     * The following parameters describe the offsets for addressing type info
+     * for wrapped API objects and are used by the fast C API
+     * (for details see v8-fast-api-calls.h).
+     */
+    int embedder_wrapper_type_index;
+    int embedder_wrapper_object_index;
   };
 
 
@@ -8425,7 +8412,7 @@ class V8_EXPORT Isolate {
     kOptimizedFunctionWithOneShotBytecode = 71,
     kRegExpMatchIsTrueishOnNonJSRegExp = 72,
     kRegExpMatchIsFalseishOnJSRegExp = 73,
-    kDateGetTimezoneOffset = 74,
+    kDateGetTimezoneOffset = 74,  // Unused.
     kStringNormalize = 75,
     kCallSiteAPIGetFunctionSloppyCall = 76,
     kCallSiteAPIGetThisSloppyCall = 77,
@@ -8441,6 +8428,22 @@ class V8_EXPORT Isolate {
     kDateTimeFormatDateTimeStyle = 87,
     kBreakIteratorTypeWord = 88,
     kBreakIteratorTypeLine = 89,
+    kInvalidatedArrayBufferDetachingProtector = 90,
+    kInvalidatedArrayConstructorProtector = 91,
+    kInvalidatedArrayIteratorLookupChainProtector = 92,
+    kInvalidatedArraySpeciesLookupChainProtector = 93,
+    kInvalidatedIsConcatSpreadableLookupChainProtector = 94,
+    kInvalidatedMapIteratorLookupChainProtector = 95,
+    kInvalidatedNoElementsProtector = 96,
+    kInvalidatedPromiseHookProtector = 97,
+    kInvalidatedPromiseResolveLookupChainProtector = 98,
+    kInvalidatedPromiseSpeciesLookupChainProtector = 99,
+    kInvalidatedPromiseThenLookupChainProtector = 100,
+    kInvalidatedRegExpSpeciesLookupChainProtector = 101,
+    kInvalidatedSetIteratorLookupChainProtector = 102,
+    kInvalidatedStringIteratorLookupChainProtector = 103,
+    kInvalidatedStringLengthOverflowLookupChainProtector = 104,
+    kInvalidatedTypedArraySpeciesLookupChainProtector = 105,
 
     // If you add new values here, you'll also need to update Chromium's:
     // web_feature.mojom, use_counter_callback.cc, and enums.xml. V8 changes to
@@ -8528,17 +8531,6 @@ class V8_EXPORT Isolate {
   typedef bool (*AbortOnUncaughtExceptionCallback)(Isolate*);
   void SetAbortOnUncaughtExceptionCallback(
       AbortOnUncaughtExceptionCallback callback);
-
-  /**
-   * This specifies the callback to be called when FinalizationRegistries
-   * are ready to be cleaned up and require FinalizationGroup::Cleanup()
-   * to be called in a future task.
-   */
-  V8_DEPRECATED(
-      "FinalizationRegistry cleanup is automatic if "
-      "HostCleanupFinalizationGroupCallback is not set")
-  void SetHostCleanupFinalizationGroupCallback(
-      HostCleanupFinalizationGroupCallback callback);
 
   /**
    * This specifies the callback called by the upcoming dynamic
@@ -9266,7 +9258,7 @@ class V8_EXPORT Isolate {
    * Returns the UnwindState necessary for use with the Unwinder API.
    */
   // TODO(petermarshall): Remove this API.
-  V8_DEPRECATE_SOON("Use entry_stubs + code_pages version.")
+  V8_DEPRECATED("Use entry_stubs + code_pages version.")
   UnwindState GetUnwindState();
 
   /**
@@ -9492,7 +9484,6 @@ class V8_EXPORT Isolate {
 
   internal::Address* GetDataFromSnapshotOnce(size_t index);
   void ReportExternalAllocationLimitReached();
-  void CheckMemoryPressure();
 };
 
 class V8_EXPORT StartupData {
@@ -9578,7 +9569,13 @@ class V8_EXPORT V8 {
    * Initializes V8. This function needs to be called before the first Isolate
    * is created. It always returns true.
    */
-  static bool Initialize();
+  V8_INLINE static bool Initialize() {
+    const int kBuildConfiguration =
+        (internal::PointerCompressionIsEnabled() ? kPointerCompression : 0) |
+        (internal::SmiValuesAre31Bits() ? k31BitSmis : 0) |
+        (internal::HeapSandboxIsEnabled() ? kHeapSandbox : 0);
+    return Initialize(kBuildConfiguration);
+  }
 
   /**
    * Allows the host application to provide a callback which can be used
@@ -9712,6 +9709,18 @@ class V8_EXPORT V8 {
  private:
   V8();
 
+  enum BuildConfigurationFeatures {
+    kPointerCompression = 1 << 0,
+    k31BitSmis = 1 << 1,
+    kHeapSandbox = 1 << 2,
+  };
+
+  /**
+   * Checks that the embedder build configuration is compatible with
+   * the V8 binary and if so initializes V8.
+   */
+  static bool Initialize(int build_config);
+
   static internal::Address* GlobalizeReference(internal::Isolate* isolate,
                                                internal::Address* handle);
   static internal::Address* GlobalizeTracedReference(internal::Isolate* isolate,
@@ -9768,6 +9777,11 @@ class V8_EXPORT V8 {
 
 /**
  * Helper class to create a snapshot data blob.
+ *
+ * The Isolate used by a SnapshotCreator is owned by it, and will be entered
+ * and exited by the constructor and destructor, respectively; The destructor
+ * will also destroy the Isolate. Experimental language features, including
+ * those available by default, are not available while creating a snapshot.
  */
 class V8_EXPORT SnapshotCreator {
  public:
@@ -9796,6 +9810,10 @@ class V8_EXPORT SnapshotCreator {
   SnapshotCreator(const intptr_t* external_references = nullptr,
                   StartupData* existing_blob = nullptr);
 
+  /**
+   * Destroy the snapshot creator, and exit and dispose of the Isolate
+   * associated with it.
+   */
   ~SnapshotCreator();
 
   /**
@@ -9825,13 +9843,6 @@ class V8_EXPORT SnapshotCreator {
   size_t AddContext(Local<Context> context,
                     SerializeInternalFieldsCallback callback =
                         SerializeInternalFieldsCallback());
-
-  /**
-   * Add a template to be included in the snapshot blob.
-   * \returns the index of the template in the snapshot blob.
-   */
-  V8_DEPRECATED("use AddData instead")
-  size_t AddTemplate(Local<Template> template_obj);
 
   /**
    * Attach arbitrary V8::Data to the context snapshot, which can be retrieved
@@ -10623,7 +10634,7 @@ class V8_EXPORT Unwinder {
    * \return True on success.
    */
   // TODO(petermarshall): Remove this API
-  V8_DEPRECATE_SOON("Use entry_stubs + code_pages version.")
+  V8_DEPRECATED("Use entry_stubs + code_pages version.")
   static bool TryUnwindV8Frames(const UnwindState& unwind_state,
                                 RegisterState* register_state,
                                 const void* stack_base);
@@ -10651,7 +10662,7 @@ class V8_EXPORT Unwinder {
    * (but not necessarily) be successful.
    */
   // TODO(petermarshall): Remove this API
-  V8_DEPRECATE_SOON("Use code_pages version.")
+  V8_DEPRECATED("Use code_pages version.")
   static bool PCIsInV8(const UnwindState& unwind_state, void* pc);
 
   /**
@@ -11343,7 +11354,10 @@ void* Object::GetAlignedPointerFromInternalField(int index) {
                 instance_type == I::kJSApiObjectType ||
                 instance_type == I::kJSSpecialApiObjectType)) {
     int offset = I::kJSObjectHeaderSize + (I::kEmbedderDataSlotSize * index);
-    return I::ReadRawField<void*>(obj, offset);
+    internal::Isolate* isolate =
+        internal::IsolateFromNeverReadOnlySpaceObject(obj);
+    A value = I::ReadExternalPointerField(isolate, obj, offset);
+    return reinterpret_cast<void*>(value);
   }
 #endif
   return SlowGetAlignedPointerFromInternalField(index);
@@ -11373,7 +11387,10 @@ String::ExternalStringResource* String::GetExternalStringResource() const {
 
   ExternalStringResource* result;
   if (I::IsExternalTwoByteString(I::GetInstanceType(obj))) {
-    void* value = I::ReadRawField<void*>(obj, I::kStringResourceOffset);
+    internal::Isolate* isolate =
+        internal::IsolateFromNeverReadOnlySpaceObject(obj);
+    A value =
+        I::ReadExternalPointerField(isolate, obj, I::kStringResourceOffset);
     result = reinterpret_cast<String::ExternalStringResource*>(value);
   } else {
     result = GetExternalStringResourceSlow();
@@ -11395,8 +11412,11 @@ String::ExternalStringResourceBase* String::GetExternalStringResourceBase(
   ExternalStringResourceBase* resource;
   if (type == I::kExternalOneByteRepresentationTag ||
       type == I::kExternalTwoByteRepresentationTag) {
-    void* value = I::ReadRawField<void*>(obj, I::kStringResourceOffset);
-    resource = static_cast<ExternalStringResourceBase*>(value);
+    internal::Isolate* isolate =
+        internal::IsolateFromNeverReadOnlySpaceObject(obj);
+    A value =
+        I::ReadExternalPointerField(isolate, obj, I::kStringResourceOffset);
+    resource = reinterpret_cast<ExternalStringResourceBase*>(value);
   } else {
     resource = GetExternalStringResourceBaseSlow(encoding_out);
   }
@@ -11912,7 +11932,6 @@ MaybeLocal<T> Isolate::GetDataFromSnapshotOnce(size_t index) {
 int64_t Isolate::AdjustAmountOfExternalAllocatedMemory(
     int64_t change_in_bytes) {
   typedef internal::Internals I;
-  constexpr int64_t kMemoryReducerActivationLimit = 32 * 1024 * 1024;
   int64_t* external_memory = reinterpret_cast<int64_t*>(
       reinterpret_cast<uint8_t*>(this) + I::kExternalMemoryOffset);
   int64_t* external_memory_limit = reinterpret_cast<int64_t*>(
@@ -11935,14 +11954,6 @@ int64_t Isolate::AdjustAmountOfExternalAllocatedMemory(
 
   if (change_in_bytes <= 0) return *external_memory;
 
-  int64_t allocation_diff_since_last_mc = static_cast<int64_t>(
-      static_cast<uint64_t>(*external_memory) -
-      static_cast<uint64_t>(*external_memory_low_since_mc));
-  // Only check memory pressure and potentially trigger GC if the amount of
-  // external memory increased.
-  if (allocation_diff_since_last_mc > kMemoryReducerActivationLimit) {
-    CheckMemoryPressure();
-  }
   if (amount > *external_memory_limit) {
     ReportExternalAllocationLimitReached();
   }
@@ -11984,7 +11995,10 @@ void* Context::GetAlignedPointerFromEmbedderData(int index) {
       I::ReadTaggedPointerField(ctx, I::kNativeContextEmbedderDataOffset);
   int value_offset =
       I::kEmbedderDataArrayHeaderSize + (I::kEmbedderDataSlotSize * index);
-  return I::ReadRawField<void*>(embedder_data, value_offset);
+  internal::Isolate* isolate = internal::IsolateFromNeverReadOnlySpaceObject(
+      *reinterpret_cast<A*>(this));
+  return reinterpret_cast<void*>(
+      I::ReadExternalPointerField(isolate, embedder_data, value_offset));
 #else
   return SlowGetAlignedPointerFromEmbedderData(index);
 #endif

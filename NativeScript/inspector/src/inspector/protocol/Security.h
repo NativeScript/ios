@@ -1032,7 +1032,7 @@ public:
 
     virtual DispatchResponse disable()
     {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 };
 
@@ -1040,15 +1040,15 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void certificateError(int eventId, const String& errorType, const String& requestURL);
     void visibleSecurityStateChanged(std::unique_ptr<protocol::Security::VisibleSecurityState> visibleSecurityState);
     void securityStateChanged(const String& securityState, bool schemeIsCryptographic, std::unique_ptr<protocol::Array<protocol::Security::SecurityStateExplanation>> explanations, std::unique_ptr<protocol::Security::InsecureContentStatus> insecureContentStatus, Maybe<String> summary = Maybe<String>());
 
-    void flush();
-    void sendRawNotification(std::unique_ptr<Serializable>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

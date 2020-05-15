@@ -8,12 +8,17 @@ using namespace v8;
 
 namespace tns {
 
-void WeakRef::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
-    Local<FunctionTemplate> weakRefCtorFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback, Local<Value>());
+void WeakRef::Init(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
+
+    Local<v8::Function> weakRefCtorFunc;
+    bool success = Function::New(context, ConstructorCallback, Local<Value>()).ToLocal(&weakRefCtorFunc);
+    tns::Assert(success, isolate);
 
     Local<v8::String> name = tns::ToV8String(isolate, "WeakRef");
-    weakRefCtorFuncTemplate->SetClassName(name);
-    globalTemplate->Set(name, weakRefCtorFuncTemplate);
+    Local<Object> global = context->Global();
+    success = global->Set(context, name, weakRefCtorFunc).FromMaybe(false);
+    tns::Assert(success, isolate);
 }
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
@@ -39,6 +44,9 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kFinalizer);
 
         bool success = weakRef->Set(context, tns::ToV8String(isolate, "get"), GetGetterFunction(isolate)).FromMaybe(false);
+        tns::Assert(success, isolate);
+
+        success = weakRef->Set(context, tns::ToV8String(isolate, "deref"), GetGetterFunction(isolate)).FromMaybe(false);
         tns::Assert(success, isolate);
 
         success = weakRef->Set(context, tns::ToV8String(isolate, "clear"), GetClearFunction(isolate)).FromMaybe(false);
@@ -100,7 +108,9 @@ Local<v8::Function> WeakRef::GetGetterFunction(Isolate* isolate) {
     }
 
     Local<Context> context = isolate->GetCurrentContext();
-    Local<v8::Function> getterFunc = FunctionTemplate::New(isolate, GetCallback)->GetFunction(context).ToLocalChecked();
+    Local<v8::Function> getterFunc;
+    bool success = FunctionTemplate::New(isolate, GetCallback)->GetFunction(context).ToLocal(&getterFunc);
+    tns::Assert(success, isolate);
     cache->WeakRefGetterFunc = std::make_unique<Persistent<v8::Function>>(isolate, getterFunc);
     return getterFunc;
 }

@@ -3,7 +3,7 @@ describe("WeakRef", function () {
         expect(WeakRef).toBeDefined();
     });
 
-    it("should work", function () {
+    it("get should work", function () {
         var obj = {};
         var weakref = new WeakRef(obj);
 
@@ -11,6 +11,16 @@ describe("WeakRef", function () {
         gc();
 
         expect(weakref.get()).toBe(null);
+    });
+
+    it("deref should work", function () {
+        var obj = {};
+        var weakref = new WeakRef(obj);
+
+        obj = null;
+        gc();
+
+        expect(weakref.deref()).toBe(null);
     });
 
     it("should throw when constructed with zero parameters", function () {

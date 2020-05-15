@@ -14,7 +14,7 @@ Response NSV8DebuggerAgentImpl::getPossibleBreakpoints(
     std::unique_ptr<protocol::Array<protocol::Debugger::BreakLocation>>* locations) {
 //    return V8DebuggerAgentImpl::getPossibleBreakpoints(std::move(start), std::move(end), std::move(restrictToFunction), locations);
     *locations = std::make_unique<protocol::Array<protocol::Debugger::BreakLocation>>();
-    return Response::OK();
+    return Response::Success();
 }
 
 }  // namespace v8_inspector
