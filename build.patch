@@ -1,28 +1,13 @@
-diff --git a/config/compiler/BUILD.gn b/config/compiler/BUILD.gn
-index 03dab6d..cf88653 100644
---- a/config/compiler/BUILD.gn
-+++ b/config/compiler/BUILD.gn
-@@ -1542,7 +1542,7 @@ config("chromium_code") {
-   } else {
-     cflags = [ "-Wall" ]
-     if (treat_warnings_as_errors) {
--      cflags += [ "-Werror" ]
-+      #cflags += [ "-Werror" ]
+diff --git a/config/ios/ios_sdk.gni b/config/ios/ios_sdk.gni
+index 3f0577054..9b871dae0 100644
+--- a/config/ios/ios_sdk.gni
++++ b/config/ios/ios_sdk.gni
+@@ -32,7 +32,7 @@ declare_args() {
+   # ios_enable_code_signing_flag=<bool> flag to make the invocation clearer.
+   ios_enable_code_signing = true
+   ios_code_signing_identity = ""
+-  ios_code_signing_identity_description = "iPhone Developer"
++  ios_code_signing_identity_description = "Apple Development"
  
-       # The compiler driver can sometimes (rarely) emit warnings before calling
-       # the actual linker.  Make sure these warnings are treated as errors as
-diff --git a/config/ios/BUILD.gn b/config/ios/BUILD.gn
-index 47d36fc..5e786f4 100644
---- a/config/ios/BUILD.gn
-+++ b/config/ios/BUILD.gn
-@@ -86,6 +86,10 @@ config("runtime_library") {
-     common_flags += [ "-miphoneos-version-min=$ios_deployment_target" ]
-   }
- 
-+  if (current_cpu == "arm") {
-+    common_flags += [ "-D__ARM_EABI__" ]
-+  }
-+
-   if (use_xcode_clang && enable_ios_bitcode && !use_ios_simulator) {
-     if (is_debug) {
-       common_flags += [ "-fembed-bitcode-marker" ]
+   # Prefix for CFBundleIdentifier property of iOS bundles (correspond to the
+   # "Organization Identifier" in Xcode). Code signing will fail if no mobile

@@ -21,7 +21,7 @@ namespace v8_inspector {
 
 class V8InspectorPlatform: public DefaultPlatform {
 public:
-    explicit V8InspectorPlatform(v8::platform::IdleTaskSupport idle_task_support = IdleTaskSupport::kDisabled, unique_ptr<TracingController> tracing_controller = {}) {
+    explicit V8InspectorPlatform(int thread_pool_size = 0, v8::platform::IdleTaskSupport idle_task_support = IdleTaskSupport::kDisabled, unique_ptr<TracingController> tracing_controller = {}) {
     }
 
     void CallDelayedOnWorkerThread(unique_ptr<Task> task, double delay_in_seconds) override {
@@ -34,7 +34,6 @@ public:
 private:
     static unique_ptr<Platform> NewDefaultPlatform() {
         unique_ptr<DefaultPlatform> platform(new V8InspectorPlatform());
-        platform->SetThreadPoolSize(0);
         platform->EnsureBackgroundTaskRunnerInitialized();
         return move(platform);
     }

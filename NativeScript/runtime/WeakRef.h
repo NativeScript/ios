@@ -7,7 +7,7 @@ namespace tns {
 
 class WeakRef {
 public:
-    static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+    static void Init(v8::Local<v8::Context> context);
 private:
     struct CallbackState {
         CallbackState(v8::Persistent<v8::Object>* target, v8::Persistent<v8::Object>* holder)

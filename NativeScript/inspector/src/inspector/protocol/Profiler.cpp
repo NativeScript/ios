@@ -9,7 +9,9 @@
 #include "src/inspector/protocol/Protocol.h"
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/find_by_first.h"
 #include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+#include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -720,7 +722,7 @@ std::unique_ptr<PreciseCoverageDeltaUpdateNotification> PreciseCoverageDeltaUpda
 
 void Frontend::consoleProfileFinished(const String& id, std::unique_ptr<protocol::Debugger::Location> location, std::unique_ptr<protocol::Profiler::Profile> profile, Maybe<String> title)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ConsoleProfileFinishedNotification> messageData = ConsoleProfileFinishedNotification::create()
         .setId(id)
@@ -729,12 +731,12 @@ void Frontend::consoleProfileFinished(const String& id, std::unique_ptr<protocol
         .build();
     if (title.isJust())
         messageData->setTitle(std::move(title).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Profiler.consoleProfileFinished", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Profiler.consoleProfileFinished", std::move(messageData)));
 }
 
 void Frontend::consoleProfileStarted(const String& id, std::unique_ptr<protocol::Debugger::Location> location, Maybe<String> title)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ConsoleProfileStartedNotification> messageData = ConsoleProfileStartedNotification::create()
         .setId(id)
@@ -742,388 +744,479 @@ void Frontend::consoleProfileStarted(const String& id, std::unique_ptr<protocol:
         .build();
     if (title.isJust())
         messageData->setTitle(std::move(title).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Profiler.consoleProfileStarted", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Profiler.consoleProfileStarted", std::move(messageData)));
 }
 
 void Frontend::preciseCoverageDeltaUpdate(double timestamp, const String& occassion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<PreciseCoverageDeltaUpdateNotification> messageData = PreciseCoverageDeltaUpdateNotification::create()
         .setTimestamp(timestamp)
         .setOccassion(occassion)
         .setResult(std::move(result))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Profiler.preciseCoverageDeltaUpdate", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Profiler.preciseCoverageDeltaUpdate", std::move(messageData)));
 }
 
 void Frontend::flush()
 {
-    m_frontendChannel->flushProtocolNotifications();
+    frontend_channel_->FlushProtocolNotifications();
 }
 
 void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(std::move(notification));
+    frontend_channel_->SendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
 
-class DispatcherImpl : public protocol::DispatcherBase {
+class DomainDispatcherImpl : public protocol::DomainDispatcher {
 public:
-    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
-        : DispatcherBase(frontendChannel)
-        , m_backend(backend) {
-        m_dispatchMap["Profiler.disable"] = &DispatcherImpl::disable;
-        m_dispatchMap["Profiler.enable"] = &DispatcherImpl::enable;
-        m_dispatchMap["Profiler.getBestEffortCoverage"] = &DispatcherImpl::getBestEffortCoverage;
-        m_dispatchMap["Profiler.setSamplingInterval"] = &DispatcherImpl::setSamplingInterval;
-        m_dispatchMap["Profiler.start"] = &DispatcherImpl::start;
-        m_dispatchMap["Profiler.startPreciseCoverage"] = &DispatcherImpl::startPreciseCoverage;
-        m_dispatchMap["Profiler.startTypeProfile"] = &DispatcherImpl::startTypeProfile;
-        m_dispatchMap["Profiler.stop"] = &DispatcherImpl::stop;
-        m_dispatchMap["Profiler.stopPreciseCoverage"] = &DispatcherImpl::stopPreciseCoverage;
-        m_dispatchMap["Profiler.stopTypeProfile"] = &DispatcherImpl::stopTypeProfile;
-        m_dispatchMap["Profiler.takePreciseCoverage"] = &DispatcherImpl::takePreciseCoverage;
-        m_dispatchMap["Profiler.takeTypeProfile"] = &DispatcherImpl::takeTypeProfile;
-        m_dispatchMap["Profiler.enableRuntimeCallStats"] = &DispatcherImpl::enableRuntimeCallStats;
-        m_dispatchMap["Profiler.disableRuntimeCallStats"] = &DispatcherImpl::disableRuntimeCallStats;
-        m_dispatchMap["Profiler.getRuntimeCallStats"] = &DispatcherImpl::getRuntimeCallStats;
-    }
-    ~DispatcherImpl() override { }
-    bool canDispatch(const String& method) override;
-    void dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-    std::unordered_map<String, String>& redirects() { return m_redirects; }
+    DomainDispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+        : DomainDispatcher(frontendChannel)
+        , m_backend(backend) {}
+    ~DomainDispatcherImpl() override { }
 
-protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-    using DispatchMap = std::unordered_map<String, CallHandler>;
-    DispatchMap m_dispatchMap;
-    std::unordered_map<String, String> m_redirects;
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
 
-    void disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getBestEffortCoverage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setSamplingInterval(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void start(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void startPreciseCoverage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void startTypeProfile(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void stop(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void stopPreciseCoverage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void stopTypeProfile(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void takePreciseCoverage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void takeTypeProfile(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void enableRuntimeCallStats(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disableRuntimeCallStats(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getRuntimeCallStats(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
+    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getBestEffortCoverage(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setSamplingInterval(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void start(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void startPreciseCoverage(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void startTypeProfile(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void stop(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void stopPreciseCoverage(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void stopTypeProfile(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void takePreciseCoverage(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void takeTypeProfile(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void enableRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void disableRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+ protected:
     Backend* m_backend;
 };
 
-bool DispatcherImpl::canDispatch(const String& method) {
-    return m_dispatchMap.find(method) != m_dispatchMap.end();
+namespace {
+// This helper method with a static map of command methods (instance methods
+// of DomainDispatcherImpl declared just above) by their name is used immediately below,
+// in the DomainDispatcherImpl::Dispatch method.
+DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_name) {
+  static auto* commands = [](){
+    auto* commands = new std::vector<std::pair<v8_crdtp::span<uint8_t>,
+                              DomainDispatcherImpl::CallHandler>>{
+    {
+          v8_crdtp::SpanFrom("disable"),
+          &DomainDispatcherImpl::disable
+    },
+    {
+          v8_crdtp::SpanFrom("disableRuntimeCallStats"),
+          &DomainDispatcherImpl::disableRuntimeCallStats
+    },
+    {
+          v8_crdtp::SpanFrom("enable"),
+          &DomainDispatcherImpl::enable
+    },
+    {
+          v8_crdtp::SpanFrom("enableRuntimeCallStats"),
+          &DomainDispatcherImpl::enableRuntimeCallStats
+    },
+    {
+          v8_crdtp::SpanFrom("getBestEffortCoverage"),
+          &DomainDispatcherImpl::getBestEffortCoverage
+    },
+    {
+          v8_crdtp::SpanFrom("getRuntimeCallStats"),
+          &DomainDispatcherImpl::getRuntimeCallStats
+    },
+    {
+          v8_crdtp::SpanFrom("setSamplingInterval"),
+          &DomainDispatcherImpl::setSamplingInterval
+    },
+    {
+          v8_crdtp::SpanFrom("start"),
+          &DomainDispatcherImpl::start
+    },
+    {
+          v8_crdtp::SpanFrom("startPreciseCoverage"),
+          &DomainDispatcherImpl::startPreciseCoverage
+    },
+    {
+          v8_crdtp::SpanFrom("startTypeProfile"),
+          &DomainDispatcherImpl::startTypeProfile
+    },
+    {
+          v8_crdtp::SpanFrom("stop"),
+          &DomainDispatcherImpl::stop
+    },
+    {
+          v8_crdtp::SpanFrom("stopPreciseCoverage"),
+          &DomainDispatcherImpl::stopPreciseCoverage
+    },
+    {
+          v8_crdtp::SpanFrom("stopTypeProfile"),
+          &DomainDispatcherImpl::stopTypeProfile
+    },
+    {
+          v8_crdtp::SpanFrom("takePreciseCoverage"),
+          &DomainDispatcherImpl::takePreciseCoverage
+    },
+    {
+          v8_crdtp::SpanFrom("takeTypeProfile"),
+          &DomainDispatcherImpl::takeTypeProfile
+    },
+    };
+    return commands;
+  }();
+  return v8_crdtp::FindByFirst<DomainDispatcherImpl::CallHandler>(*commands, command_name, nullptr);
+}
+}  // namespace
+
+std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
+  CallHandler handler = CommandByName(command_name);
+  if (!handler) return nullptr;
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
+    std::unique_ptr<DictionaryValue> params =
+        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
+        dispatchable.Params().size()));
+    ErrorSupport errors;
+    errors.Push();
+    (this->*handler)(dispatchable, params.get(), &errors);
+  };
 }
 
-void DispatcherImpl::dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject)
-{
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
-    DCHECK(it != m_dispatchMap.end());
-    protocol::ErrorSupport errors;
-    (this->*(it->second))(callId, method, message, std::move(messageObject), &errors);
-}
 
-
-void DispatcherImpl::disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.disable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.enable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::getBestEffortCoverage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getBestEffortCoverage(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> out_result;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getBestEffortCoverage(&out_result);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.getBestEffortCoverage"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("result", ValueConversions<protocol::Array<protocol::Profiler::ScriptCoverage>>::toValue(out_result.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), out_result, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setSamplingInterval(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setSamplingInterval(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* intervalValue = object ? object->get("interval") : nullptr;
+    protocol::Value* intervalValue = params ? params->get("interval") : nullptr;
     errors->SetName("interval");
     int in_interval = ValueConversions<int>::fromValue(intervalValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setSamplingInterval(in_interval);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.setSamplingInterval"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::start(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::start(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->start();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.start"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::startPreciseCoverage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::startPreciseCoverage(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* callCountValue = object ? object->get("callCount") : nullptr;
+    protocol::Value* callCountValue = params ? params->get("callCount") : nullptr;
     Maybe<bool> in_callCount;
     if (callCountValue) {
         errors->SetName("callCount");
         in_callCount = ValueConversions<bool>::fromValue(callCountValue, errors);
     }
-    protocol::Value* detailedValue = object ? object->get("detailed") : nullptr;
+    protocol::Value* detailedValue = params ? params->get("detailed") : nullptr;
     Maybe<bool> in_detailed;
     if (detailedValue) {
         errors->SetName("detailed");
         in_detailed = ValueConversions<bool>::fromValue(detailedValue, errors);
     }
-    protocol::Value* allowTriggeredUpdatesValue = object ? object->get("allowTriggeredUpdates") : nullptr;
+    protocol::Value* allowTriggeredUpdatesValue = params ? params->get("allowTriggeredUpdates") : nullptr;
     Maybe<bool> in_allowTriggeredUpdates;
     if (allowTriggeredUpdatesValue) {
         errors->SetName("allowTriggeredUpdates");
         in_allowTriggeredUpdates = ValueConversions<bool>::fromValue(allowTriggeredUpdatesValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     double out_timestamp;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->startPreciseCoverage(std::move(in_callCount), std::move(in_detailed), std::move(in_allowTriggeredUpdates), &out_timestamp);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.startPreciseCoverage"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("timestamp", ValueConversions<double>::toValue(out_timestamp));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), out_timestamp, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::startTypeProfile(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::startTypeProfile(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->startTypeProfile();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.startTypeProfile"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::stop(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::stop(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Profiler::Profile> out_profile;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stop(&out_profile);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.stop"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("profile", ValueConversions<protocol::Profiler::Profile>::toValue(out_profile.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("profile"), out_profile, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::stopPreciseCoverage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::stopPreciseCoverage(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stopPreciseCoverage();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.stopPreciseCoverage"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::stopTypeProfile(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::stopTypeProfile(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stopTypeProfile();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.stopTypeProfile"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::takePreciseCoverage(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::takePreciseCoverage(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> out_result;
     double out_timestamp;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->takePreciseCoverage(&out_result, &out_timestamp);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.takePreciseCoverage"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("result", ValueConversions<protocol::Array<protocol::Profiler::ScriptCoverage>>::toValue(out_result.get()));
-        result->setValue("timestamp", ValueConversions<double>::toValue(out_timestamp));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), out_result, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("timestamp"), out_timestamp, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::takeTypeProfile(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::takeTypeProfile(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Profiler::ScriptTypeProfile>> out_result;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->takeTypeProfile(&out_result);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.takeTypeProfile"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("result", ValueConversions<protocol::Array<protocol::Profiler::ScriptTypeProfile>>::toValue(out_result.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), out_result, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::enableRuntimeCallStats(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::enableRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enableRuntimeCallStats();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.enableRuntimeCallStats"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::disableRuntimeCallStats(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::disableRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disableRuntimeCallStats();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.disableRuntimeCallStats"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::getRuntimeCallStats(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getRuntimeCallStats(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Profiler::CounterInfo>> out_result;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getRuntimeCallStats(&out_result);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Profiler.getRuntimeCallStats"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("result", ValueConversions<protocol::Array<protocol::Profiler::CounterInfo>>::toValue(out_result.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), out_result, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
+
+namespace {
+// This helper method (with a static map of redirects) is used from Dispatcher::wire
+// immediately below.
+const std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>& SortedRedirects() {
+  static auto* redirects = [](){
+    auto* redirects = new std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>{
+    };
+    return redirects;
+  }();
+  return *redirects;
+}
+}  // namespace
 
 // static
 void Dispatcher::wire(UberDispatcher* uber, Backend* backend)
 {
-    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend));
-    uber->setupRedirects(dispatcher->redirects());
-    uber->registerBackend("Profiler", std::move(dispatcher));
+    auto dispatcher = std::make_unique<DomainDispatcherImpl>(uber->channel(), backend);
+    uber->WireBackend(v8_crdtp::SpanFrom("Profiler"), SortedRedirects(), std::move(dispatcher));
 }
 
 } // Profiler

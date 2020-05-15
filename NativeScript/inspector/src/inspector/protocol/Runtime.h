@@ -88,6 +88,7 @@ public:
         static const char* Boolean;
         static const char* Symbol;
         static const char* Bigint;
+        static const char* Wasm;
     }; // TypeEnum
 
     String getType() { return m_type; }
@@ -111,6 +112,12 @@ public:
         static const char* Typedarray;
         static const char* Arraybuffer;
         static const char* Dataview;
+        static const char* I32;
+        static const char* I64;
+        static const char* F32;
+        static const char* F64;
+        static const char* V128;
+        static const char* Anyref;
     }; // SubtypeEnum
 
     bool hasSubtype() { return m_subtype.isJust(); }
@@ -2277,7 +2284,7 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void bindingCalled(const String& name, const String& payload, int executionContextId);
     void consoleAPICalled(const String& type, std::unique_ptr<protocol::Array<protocol::Runtime::RemoteObject>> args, int executionContextId, double timestamp, Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>(), Maybe<String> context = Maybe<String>());
     void exceptionRevoked(const String& reason, int exceptionId);
@@ -2287,10 +2294,10 @@ public:
     void executionContextsCleared();
     void inspectRequested(std::unique_ptr<protocol::Runtime::RemoteObject> object, std::unique_ptr<protocol::DictionaryValue> hints);
 
-    void flush();
-    void sendRawNotification(std::unique_ptr<Serializable>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

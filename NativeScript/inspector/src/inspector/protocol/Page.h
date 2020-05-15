@@ -2425,7 +2425,7 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void domContentEventFired(double timestamp);
     void fileChooserOpened(const String& frameId, int backendNodeId, const String& mode);
     void frameAttached(const String& frameId, const String& parentFrameId, Maybe<protocol::Runtime::StackTrace> stack = Maybe<protocol::Runtime::StackTrace>());
@@ -2444,10 +2444,10 @@ public:
     void windowOpen(const String& url, const String& windowName, std::unique_ptr<protocol::Array<String>> windowFeatures, bool userGesture);
     void compilationCacheProduced(const String& url, const Binary& data);
 
-    void flush();
-    void sendRawNotification(std::unique_ptr<Serializable>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

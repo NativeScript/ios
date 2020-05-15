@@ -9,7 +9,9 @@
 #include "src/inspector/protocol/Protocol.h"
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/find_by_first.h"
 #include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+#include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -246,157 +248,188 @@ std::unique_ptr<EntryAddedNotification> EntryAddedNotification::clone() const
 
 void Frontend::entryAdded(std::unique_ptr<protocol::Log::LogEntry> entry)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<EntryAddedNotification> messageData = EntryAddedNotification::create()
         .setEntry(std::move(entry))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Log.entryAdded", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Log.entryAdded", std::move(messageData)));
 }
 
 void Frontend::flush()
 {
-    m_frontendChannel->flushProtocolNotifications();
+    frontend_channel_->FlushProtocolNotifications();
 }
 
 void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(std::move(notification));
+    frontend_channel_->SendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
 
-class DispatcherImpl : public protocol::DispatcherBase {
+class DomainDispatcherImpl : public protocol::DomainDispatcher {
 public:
-    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
-        : DispatcherBase(frontendChannel)
-        , m_backend(backend) {
-        m_dispatchMap["Log.clear"] = &DispatcherImpl::clear;
-        m_dispatchMap["Log.disable"] = &DispatcherImpl::disable;
-        m_dispatchMap["Log.enable"] = &DispatcherImpl::enable;
-        m_dispatchMap["Log.startViolationsReport"] = &DispatcherImpl::startViolationsReport;
-        m_dispatchMap["Log.stopViolationsReport"] = &DispatcherImpl::stopViolationsReport;
-    }
-    ~DispatcherImpl() override { }
-    bool canDispatch(const String& method) override;
-    void dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-    std::unordered_map<String, String>& redirects() { return m_redirects; }
+    DomainDispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+        : DomainDispatcher(frontendChannel)
+        , m_backend(backend) {}
+    ~DomainDispatcherImpl() override { }
 
-protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-    using DispatchMap = std::unordered_map<String, CallHandler>;
-    DispatchMap m_dispatchMap;
-    std::unordered_map<String, String> m_redirects;
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
 
-    void clear(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void startViolationsReport(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void stopViolationsReport(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
+    void clear(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void startViolationsReport(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void stopViolationsReport(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+ protected:
     Backend* m_backend;
 };
 
-bool DispatcherImpl::canDispatch(const String& method) {
-    return m_dispatchMap.find(method) != m_dispatchMap.end();
+namespace {
+// This helper method with a static map of command methods (instance methods
+// of DomainDispatcherImpl declared just above) by their name is used immediately below,
+// in the DomainDispatcherImpl::Dispatch method.
+DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_name) {
+  static auto* commands = [](){
+    auto* commands = new std::vector<std::pair<v8_crdtp::span<uint8_t>,
+                              DomainDispatcherImpl::CallHandler>>{
+    {
+          v8_crdtp::SpanFrom("clear"),
+          &DomainDispatcherImpl::clear
+    },
+    {
+          v8_crdtp::SpanFrom("disable"),
+          &DomainDispatcherImpl::disable
+    },
+    {
+          v8_crdtp::SpanFrom("enable"),
+          &DomainDispatcherImpl::enable
+    },
+    {
+          v8_crdtp::SpanFrom("startViolationsReport"),
+          &DomainDispatcherImpl::startViolationsReport
+    },
+    {
+          v8_crdtp::SpanFrom("stopViolationsReport"),
+          &DomainDispatcherImpl::stopViolationsReport
+    },
+    };
+    return commands;
+  }();
+  return v8_crdtp::FindByFirst<DomainDispatcherImpl::CallHandler>(*commands, command_name, nullptr);
+}
+}  // namespace
+
+std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
+  CallHandler handler = CommandByName(command_name);
+  if (!handler) return nullptr;
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
+    std::unique_ptr<DictionaryValue> params =
+        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
+        dispatchable.Params().size()));
+    ErrorSupport errors;
+    errors.Push();
+    (this->*handler)(dispatchable, params.get(), &errors);
+  };
 }
 
-void DispatcherImpl::dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject)
-{
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
-    DCHECK(it != m_dispatchMap.end());
-    protocol::ErrorSupport errors;
-    (this->*(it->second))(callId, method, message, std::move(messageObject), &errors);
-}
 
-
-void DispatcherImpl::clear(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::clear(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->clear();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Log.clear"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Log.disable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Log.enable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::startViolationsReport(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::startViolationsReport(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* configValue = object ? object->get("config") : nullptr;
+    protocol::Value* configValue = params ? params->get("config") : nullptr;
     errors->SetName("config");
     std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config = ValueConversions<protocol::Array<protocol::Log::ViolationSetting>>::fromValue(configValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->startViolationsReport(std::move(in_config));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Log.startViolationsReport"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::stopViolationsReport(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::stopViolationsReport(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stopViolationsReport();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Log.stopViolationsReport"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
+
+namespace {
+// This helper method (with a static map of redirects) is used from Dispatcher::wire
+// immediately below.
+const std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>& SortedRedirects() {
+  static auto* redirects = [](){
+    auto* redirects = new std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>{
+    };
+    return redirects;
+  }();
+  return *redirects;
+}
+}  // namespace
 
 // static
 void Dispatcher::wire(UberDispatcher* uber, Backend* backend)
 {
-    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend));
-    uber->setupRedirects(dispatcher->redirects());
-    uber->registerBackend("Log", std::move(dispatcher));
+    auto dispatcher = std::make_unique<DomainDispatcherImpl>(uber->channel(), backend);
+    uber->WireBackend(v8_crdtp::SpanFrom("Log"), SortedRedirects(), std::move(dispatcher));
 }
 
 } // Log

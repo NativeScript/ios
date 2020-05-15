@@ -30,26 +30,26 @@ V8PageAgentImpl::~V8PageAgentImpl() {
 
 DispatchResponse V8PageAgentImpl::enable() {
     if (m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(PageAgentState::pageEnabled, true);
 
     m_enabled = true;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8PageAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(PageAgentState::pageEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 void V8PageAgentImpl::restore() {
@@ -91,7 +91,7 @@ DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page
         .setResources(std::move(subresources))
         .build();
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String& in_url, std::unique_ptr<GetResourceContentCallback> callback) {
@@ -110,41 +110,41 @@ void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String&
 }
 
 DispatchResponse V8PageAgentImpl::addScriptToEvaluateOnLoad(const String& in_scriptSource, String* out_identifier) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::setFontFamilies(std::unique_ptr<protocol::Page::FontFamilies> in_fontFamilies) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::removeScriptToEvaluateOnLoad(const String& in_identifier) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::addScriptToEvaluateOnNewDocument(const String& in_source, Maybe<String> in_worldName, String* out_identifier) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::createIsolatedWorld(const String& in_frameId, Maybe<String> in_worldName, Maybe<bool> in_grantUniveralAccess, int* out_executionContextId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::getLayoutMetrics(std::unique_ptr<protocol::Page::LayoutViewport>* out_layoutViewport, std::unique_ptr<protocol::Page::VisualViewport>* out_visualViewport, std::unique_ptr<protocol::DOM::Rect>* out_contentSize) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::reload(Maybe<bool> in_ignoreCache, Maybe<String> in_scriptToEvaluateOnLoad) {
     bool success = tns::LiveSync(this->m_isolate);
     if (!success) {
         Log("LiveSync failed");
-        return protocol::DispatchResponse::Error("LiveSync failed.");
+        return protocol::DispatchResponse::ServerError("LiveSync failed.");
     }
 
-    return protocol::DispatchResponse::OK();
+    return protocol::DispatchResponse::Success();
 }
 
 DispatchResponse V8PageAgentImpl::removeScriptToEvaluateOnNewDocument(const String& in_identifier) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 void V8PageAgentImpl::searchInResource(const String& in_frameId, const String& in_url, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<SearchInResourceCallback> callback) {
@@ -165,71 +165,71 @@ void V8PageAgentImpl::searchInResource(const String& in_frameId, const String& i
 }
 
 DispatchResponse V8PageAgentImpl::setBypassCSP(bool in_enabled) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::startScreencast(Maybe<String> in_format, Maybe<int> in_quality, Maybe<int> in_maxWidth, Maybe<int> in_maxHeight, Maybe<int> in_everyNthFrame) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::setFontSizes(std::unique_ptr<protocol::Page::FontSizes> in_fontSizes) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::setAdBlockingEnabled(bool in_enabled) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::stopLoading() {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::setDocumentContent(const String& in_frameId, const String& in_html) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::stopScreencast() {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::getFrameTree(std::unique_ptr<protocol::Page::FrameTree>* out_frameTree) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::clearCompilationCache() {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::generateTestReport(const String& in_message, Maybe<String> in_group) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::setLifecycleEventsEnabled(bool in_enabled) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::setProduceCompilationCache(bool in_enabled) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::addCompilationCache(const String& in_url, const protocol::Binary& in_data) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::waitForDebugger() {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::setInterceptFileChooserDialog(bool in_enabled) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::getInstallabilityErrors(std::unique_ptr<protocol::Array<String>>* out_errors) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8PageAgentImpl::getManifestIcons(Maybe<protocol::Binary>* out_primaryIcon) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 void V8PageAgentImpl::ReadEntries(std::string baseDir, std::vector<V8PageAgentImpl::PageEntry>& entries) {

@@ -27,26 +27,26 @@ V8DOMAgentImpl::~V8DOMAgentImpl() { }
 
 DispatchResponse V8DOMAgentImpl::enable() {
     if (m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(DOMAgentState::domEnabled, true);
 
     m_enabled = true;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8DOMAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(DOMAgentState::domEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 void V8DOMAgentImpl::dispatch(std::string message) {
@@ -74,7 +74,7 @@ void V8DOMAgentImpl::dispatch(std::string message) {
 }
 
 DispatchResponse V8DOMAgentImpl::getContentQuads(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::Array<protocol::Array<double>>>* out_quads) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_root) {
@@ -96,7 +96,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
     Local<v8::Function> getDocumentFunc = v8_inspector::GetDebuggerFunction(context, "DOM", "getDocument", domDomainDebugger);
     if (getDocumentFunc.IsEmpty() || domDomainDebugger.IsEmpty()) {
         *out_root = std::move(defaultNode);
-        return DispatchResponse::Error("Error getting DOM tree.");
+        return DispatchResponse::ServerError("Error getting DOM tree.");
     }
 
     Local<Value> args[0];
@@ -104,14 +104,14 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
     TryCatch tc(isolate);
     MaybeLocal<Value> maybeResult = getDocumentFunc->Call(context, domDomainDebugger, 0, args);
     if (tc.HasCaught()) {
-        String16 error = toProtocolString(isolate, tc.Message()->Get());
+        std::string error = tns::ToString(isolate, tc.Message()->Get());
         *out_root = std::move(defaultNode);
-        return protocol::DispatchResponse::Error(error);
+        return protocol::DispatchResponse::ServerError(error);
     }
 
     Local<Value> result;
     if (!maybeResult.ToLocal(&result) || !result->IsObject()) {
-        return protocol::DispatchResponse::Error("Didn't get a proper result from getDocument call. Returning empty visual tree.");
+        return protocol::DispatchResponse::ServerError("Didn't get a proper result from getDocument call. Returning empty visual tree.");
     }
 
     Local<Object> resultObj = result.As<Object>();
@@ -129,12 +129,12 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
     v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
     auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
     if (!errorSupportString.empty()) {
-        String16 errorMessage = "Error while parsing debug `DOM Node` object.";
-        return DispatchResponse::Error(errorMessage);
+        std::string errorMessage = "Error while parsing debug `DOM Node` object.";
+        return DispatchResponse::ServerError(errorMessage);
     }
 
     *out_root = std::move(domNode);
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
@@ -147,7 +147,7 @@ DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
     Local<v8::Function> removeNodeFunc = v8_inspector::GetDebuggerFunction(context, "DOM", "removeNode", domDomainDebugger);
 
     if (removeNodeFunc.IsEmpty() || domDomainDebugger.IsEmpty()) {
-        return DispatchResponse::Error("Couldn't remove the selected DOMNode from the visual tree. \"removeNode\" function not found");
+        return DispatchResponse::ServerError("Couldn't remove the selected DOMNode from the visual tree. \"removeNode\" function not found");
     }
 
     Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
@@ -164,15 +164,15 @@ DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
     assert(removeNodeFunc->Call(context, domDomainDebugger, 1, args).ToLocal(&result));
 
     if (tc.HasCaught() || result.IsEmpty()) {
-        String16 error = toProtocolString(isolate, tc.Message()->Get());
-        return DispatchResponse::Error(error);
+        std::string error = tns::ToString(isolate, tc.Message()->Get());
+        return DispatchResponse::ServerError(error);
     }
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8DOMAgentImpl::setAttributeValue(int in_nodeId, const String& in_name, const String& in_value) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String& in_text, Maybe<String> in_name) {
@@ -185,7 +185,7 @@ DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String
     Local<v8::Function> setAttributesAsTextFunc = v8_inspector::GetDebuggerFunction(context, "DOM", "setAttributesAsText", domDomainDebugger);
 
     if (setAttributesAsTextFunc.IsEmpty() || domDomainDebugger.IsEmpty()) {
-        return DispatchResponse::Error("Couldn't change selected DOM node's attribute. \"setAttributesAsText\" function not found");
+        return DispatchResponse::ServerError("Couldn't change selected DOM node's attribute. \"setAttributesAsText\" function not found");
     }
 
     Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
@@ -203,27 +203,27 @@ DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String
     assert(setAttributesAsTextFunc->Call(context, domDomainDebugger, 1, args).ToLocal(&result));
 
     if (tc.HasCaught() || result.IsEmpty()) {
-        String16 error = toProtocolString(isolate, tc.Message()->Get());
-        return DispatchResponse::Error(error);
+        std::string error = tns::ToString(isolate, tc.Message()->Get());
+        return DispatchResponse::ServerError(error);
     }
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8DOMAgentImpl::removeAttribute(int in_nodeId, const String& in_name) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::performSearch(const String& in_query, Maybe<bool> in_includeUserAgentShadowDOM, String* out_searchId, int* out_resultCount) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getSearchResults(const String& in_searchId, int in_fromIndex, int in_toIndex, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::discardSearchResults(const String& in_searchId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::resolveNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectGroup, Maybe<int> in_executionContextId, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) {
@@ -233,123 +233,123 @@ DispatchResponse V8DOMAgentImpl::resolveNode(Maybe<int> in_nodeId, Maybe<int> in
 
     *out_object = std::move(resolvedNode);
 
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::collectClassNamesFromSubtree(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_classNames) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::copyTo(int in_nodeId, int in_targetNodeId, Maybe<int> in_insertBeforeNodeId, int* out_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::describeNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_node) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::focus(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getAttributes(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_attributes) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getBoxModel(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::DOM::BoxModel>* out_model) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getFlattenedDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::Array<protocol::DOM::Node>>* out_nodes) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, Maybe<bool> in_ignorePointerEventsNone, int* out_backendNodeId, String* out_frameId, Maybe<int>* out_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getOuterHTML(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, String* out_outerHTML) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getRelayoutBoundary(int in_nodeId, int* out_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::markUndoableState() {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::moveTo(int in_nodeId, int in_targetNodeId, Maybe<int> in_insertBeforeNodeId, int* out_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::pushNodeByPathToFrontend(const String& in_path, int* out_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::pushNodesByBackendIdsToFrontend(std::unique_ptr<protocol::Array<int>> in_backendNodeIds, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::querySelector(int in_nodeId, const String& in_selector, int* out_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::querySelectorAll(int in_nodeId, const String& in_selector, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::redo() {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::requestChildNodes(int in_nodeId, Maybe<int> in_depth, Maybe<bool> in_pierce) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::requestNode(const String& in_objectId, int* out_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::setFileInputFiles(std::unique_ptr<protocol::Array<String>> in_files, Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getFileInfo(const String& in_objectId, String* out_path) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::setInspectedNode(int in_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::setNodeName(int in_nodeId, const String& in_name, int* out_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::setNodeValue(int in_nodeId, const String& in_value) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::setOuterHTML(int in_nodeId, const String& in_outerHTML) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::undo() {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_backendNodeId, Maybe<int>* out_nodeId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::setNodeStackTracesEnabled(bool in_enable) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8DOMAgentImpl::getNodeStackTraces(int in_nodeId, Maybe<protocol::Runtime::StackTrace>* out_creation) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 void V8DOMAgentImpl::ChildNodeInserted(const Local<Object>& obj) {

@@ -82,7 +82,6 @@ void Runtime::Init(Isolate* isolate) {
     Worker::Init(isolate, globalTemplate, mainThreadInitialized_);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
-    WeakRef::Init(isolate, globalTemplate);
     ObjectManager::Init(isolate, globalTemplate);
 //    SetTimeout::Init(isolate, globalTemplate);
     MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
@@ -97,6 +96,8 @@ void Runtime::Init(Isolate* isolate) {
     DefineCollectFunction(context);
     PromiseProxy::Init(context);
     Console::Init(context);
+    WeakRef::Init(context);
+
     this->moduleInternal_ = std::make_unique<ModuleInternal>(context);
 
     ArgConverter::Init(context, MetadataBuilder::StructPropertyGetterCallback, MetadataBuilder::StructPropertySetterCallback);

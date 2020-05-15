@@ -24,17 +24,6 @@ using String = v8_inspector::String16;
 
 class StringUtil {
  public:
-  static String substring(const String& s, size_t pos, size_t len) {
-    return s.substring(pos, len);
-  }
-  static size_t find(const String& s, const char* needle) {
-    return s.find(needle);
-  }
-  static size_t find(const String& s, const String& needle) {
-    return s.find(needle);
-  }
-  static const size_t kNotFound = String::kNotFound;
-
   static String fromUTF8(const uint8_t* data, size_t length) {
     return String16::fromUTF8(reinterpret_cast<const char*>(data), length);
   }
@@ -52,23 +41,14 @@ class StringUtil {
 };
 
 // A read-only sequence of uninterpreted bytes with reference-counted storage.
-// Though the templates for generating the protocol bindings reference
-// this type, js_protocol.pdl doesn't have a field of type 'binary', so
-// therefore it's unnecessary to provide an implementation here.
-class Binary {
+class V8_EXPORT Binary {
  public:
   Binary() = default;
 
-  void AppendSerialized(std::vector<uint8_t>* out) const {
-    v8_crdtp::cbor::EncodeBinary(v8_crdtp::span<uint8_t>(data(), size()), out);
-  }
-
   const uint8_t* data() const { return bytes_->data(); }
   size_t size() const { return bytes_->size(); }
-  String toBase64() const { UNIMPLEMENTED(); }
-  static Binary fromBase64(const String& base64, bool* success) {
-    UNIMPLEMENTED();
-  }
+  String toBase64() const;
+  static Binary fromBase64(const String& base64, bool* success);
   static Binary fromSpan(const uint8_t* data, size_t size) {
     return Binary(std::make_shared<std::vector<uint8_t>>(data, data + size));
   }
@@ -103,5 +83,14 @@ std::unique_ptr<StringBuffer> StringBufferFrom(std::vector<uint8_t> str);
 String16 stackTraceIdToString(uintptr_t id);
 
 }  //  namespace v8_inspector
+
+// See third_party/inspector_protocol/crdtp/serializer_traits.h.
+namespace v8_crdtp {
+template <>
+struct SerializerTraits<v8_inspector::protocol::Binary> {
+  static void Serialize(const v8_inspector::protocol::Binary& binary,
+                        std::vector<uint8_t>* out);
+};
+}  // namespace v8_crdtp
 
 #endif  // V8_INSPECTOR_STRING_UTIL_H_

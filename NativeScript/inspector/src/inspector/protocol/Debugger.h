@@ -26,11 +26,18 @@ class CallFrame;
 class Scope;
 class SearchMatch;
 class BreakLocation;
+using ScriptLanguage = String;
+class DebugSymbols;
 class BreakpointResolvedNotification;
 class PausedNotification;
 using ResumedNotification = Object;
 class ScriptFailedToParseNotification;
 class ScriptParsedNotification;
+
+namespace ScriptLanguageEnum {
+ extern const char JavaScript[];
+ extern const char WebAssembly[];
+} // namespace ScriptLanguageEnum
 
 namespace ContinueToLocation {
 namespace TargetCallFramesEnum {
@@ -395,6 +402,7 @@ public:
         static const char* Script;
         static const char* Eval;
         static const char* Module;
+        static const char* WasmExpressionStack;
     }; // TypeEnum
 
     String getType() { return m_type; }
@@ -675,6 +683,86 @@ private:
 };
 
 
+class  DebugSymbols : public Serializable{
+    PROTOCOL_DISALLOW_COPY(DebugSymbols);
+public:
+    static std::unique_ptr<DebugSymbols> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~DebugSymbols() override { }
+
+    struct  TypeEnum {
+        static const char* None;
+        static const char* SourceMap;
+        static const char* EmbeddedDWARF;
+        static const char* ExternalDWARF;
+    }; // TypeEnum
+
+    String getType() { return m_type; }
+    void setType(const String& value) { m_type = value; }
+
+    bool hasExternalURL() { return m_externalURL.isJust(); }
+    String getExternalURL(const String& defaultValue) { return m_externalURL.isJust() ? m_externalURL.fromJust() : defaultValue; }
+    void setExternalURL(const String& value) { m_externalURL = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<DebugSymbols> clone() const;
+
+    template<int STATE>
+    class DebugSymbolsBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            TypeSet = 1 << 1,
+            AllFieldsSet = (TypeSet | 0)};
+
+
+        DebugSymbolsBuilder<STATE | TypeSet>& setType(const String& value)
+        {
+            static_assert(!(STATE & TypeSet), "property type should not be set yet");
+            m_result->setType(value);
+            return castState<TypeSet>();
+        }
+
+        DebugSymbolsBuilder<STATE>& setExternalURL(const String& value)
+        {
+            m_result->setExternalURL(value);
+            return *this;
+        }
+
+        std::unique_ptr<DebugSymbols> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class DebugSymbols;
+        DebugSymbolsBuilder() : m_result(new DebugSymbols()) { }
+
+        template<int STEP> DebugSymbolsBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<DebugSymbolsBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Debugger::DebugSymbols> m_result;
+    };
+
+    static DebugSymbolsBuilder<0> create()
+    {
+        return DebugSymbolsBuilder<0>();
+    }
+
+private:
+    DebugSymbols()
+    {
+    }
+
+    String m_type;
+    Maybe<String> m_externalURL;
+};
+
+
 class  BreakpointResolvedNotification : public Serializable{
     PROTOCOL_DISALLOW_COPY(BreakpointResolvedNotification);
 public:
@@ -947,6 +1035,14 @@ public:
     protocol::Runtime::StackTrace* getStackTrace(protocol::Runtime::StackTrace* defaultValue) { return m_stackTrace.isJust() ? m_stackTrace.fromJust() : defaultValue; }
     void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
 
+    bool hasCodeOffset() { return m_codeOffset.isJust(); }
+    int getCodeOffset(int defaultValue) { return m_codeOffset.isJust() ? m_codeOffset.fromJust() : defaultValue; }
+    void setCodeOffset(int value) { m_codeOffset = value; }
+
+    bool hasScriptLanguage() { return m_scriptLanguage.isJust(); }
+    String getScriptLanguage(const String& defaultValue) { return m_scriptLanguage.isJust() ? m_scriptLanguage.fromJust() : defaultValue; }
+    void setScriptLanguage(const String& value) { m_scriptLanguage = value; }
+
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ScriptFailedToParseNotification> clone() const;
@@ -1059,6 +1155,18 @@ public:
             return *this;
         }
 
+        ScriptFailedToParseNotificationBuilder<STATE>& setCodeOffset(int value)
+        {
+            m_result->setCodeOffset(value);
+            return *this;
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE>& setScriptLanguage(const String& value)
+        {
+            m_result->setScriptLanguage(value);
+            return *this;
+        }
+
         std::unique_ptr<ScriptFailedToParseNotification> build()
         {
             static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
@@ -1106,6 +1214,8 @@ private:
     Maybe<bool> m_isModule;
     Maybe<int> m_length;
     Maybe<protocol::Runtime::StackTrace> m_stackTrace;
+    Maybe<int> m_codeOffset;
+    Maybe<String> m_scriptLanguage;
 };
 
 
@@ -1167,6 +1277,18 @@ public:
     bool hasStackTrace() { return m_stackTrace.isJust(); }
     protocol::Runtime::StackTrace* getStackTrace(protocol::Runtime::StackTrace* defaultValue) { return m_stackTrace.isJust() ? m_stackTrace.fromJust() : defaultValue; }
     void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
+
+    bool hasCodeOffset() { return m_codeOffset.isJust(); }
+    int getCodeOffset(int defaultValue) { return m_codeOffset.isJust() ? m_codeOffset.fromJust() : defaultValue; }
+    void setCodeOffset(int value) { m_codeOffset = value; }
+
+    bool hasScriptLanguage() { return m_scriptLanguage.isJust(); }
+    String getScriptLanguage(const String& defaultValue) { return m_scriptLanguage.isJust() ? m_scriptLanguage.fromJust() : defaultValue; }
+    void setScriptLanguage(const String& value) { m_scriptLanguage = value; }
+
+    bool hasDebugSymbols() { return m_debugSymbols.isJust(); }
+    protocol::Debugger::DebugSymbols* getDebugSymbols(protocol::Debugger::DebugSymbols* defaultValue) { return m_debugSymbols.isJust() ? m_debugSymbols.fromJust() : defaultValue; }
+    void setDebugSymbols(std::unique_ptr<protocol::Debugger::DebugSymbols> value) { m_debugSymbols = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
     void AppendSerialized(std::vector<uint8_t>* out) const override;
@@ -1286,6 +1408,24 @@ public:
             return *this;
         }
 
+        ScriptParsedNotificationBuilder<STATE>& setCodeOffset(int value)
+        {
+            m_result->setCodeOffset(value);
+            return *this;
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setScriptLanguage(const String& value)
+        {
+            m_result->setScriptLanguage(value);
+            return *this;
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setDebugSymbols(std::unique_ptr<protocol::Debugger::DebugSymbols> value)
+        {
+            m_result->setDebugSymbols(std::move(value));
+            return *this;
+        }
+
         std::unique_ptr<ScriptParsedNotification> build()
         {
             static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
@@ -1334,6 +1474,9 @@ private:
     Maybe<bool> m_isModule;
     Maybe<int> m_length;
     Maybe<protocol::Runtime::StackTrace> m_stackTrace;
+    Maybe<int> m_codeOffset;
+    Maybe<String> m_scriptLanguage;
+    Maybe<protocol::Debugger::DebugSymbols> m_debugSymbols;
 };
 
 
@@ -1347,6 +1490,7 @@ public:
     virtual DispatchResponse disable() = 0;
     virtual DispatchResponse enable(Maybe<double> in_maxScriptsCacheSize, String* out_debuggerId) = 0;
     virtual DispatchResponse evaluateOnCallFrame(const String& in_callFrameId, const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, std::unique_ptr<protocol::Runtime::RemoteObject>* out_result, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
+    virtual DispatchResponse executeWasmEvaluator(const String& in_callFrameId, const Binary& in_evaluator, Maybe<double> in_timeout, std::unique_ptr<protocol::Runtime::RemoteObject>* out_result, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
     virtual DispatchResponse getPossibleBreakpoints(std::unique_ptr<protocol::Debugger::Location> in_start, Maybe<protocol::Debugger::Location> in_end, Maybe<bool> in_restrictToFunction, std::unique_ptr<protocol::Array<protocol::Debugger::BreakLocation>>* out_locations) = 0;
     virtual DispatchResponse getScriptSource(const String& in_scriptId, String* out_scriptSource, Maybe<Binary>* out_bytecode) = 0;
     virtual DispatchResponse getWasmBytecode(const String& in_scriptId, Binary* out_bytecode) = 0;
@@ -1380,17 +1524,17 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void breakpointResolved(const String& breakpointId, std::unique_ptr<protocol::Debugger::Location> location);
     void paused(std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> callFrames, const String& reason, Maybe<protocol::DictionaryValue> data = Maybe<protocol::DictionaryValue>(), Maybe<protocol::Array<String>> hitBreakpoints = Maybe<protocol::Array<String>>(), Maybe<protocol::Runtime::StackTrace> asyncStackTrace = Maybe<protocol::Runtime::StackTrace>(), Maybe<protocol::Runtime::StackTraceId> asyncStackTraceId = Maybe<protocol::Runtime::StackTraceId>(), Maybe<protocol::Runtime::StackTraceId> asyncCallStackTraceId = Maybe<protocol::Runtime::StackTraceId>());
     void resumed();
-    void scriptFailedToParse(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>());
-    void scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<bool> isLiveEdit = Maybe<bool>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>());
+    void scriptFailedToParse(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>(), Maybe<int> codeOffset = Maybe<int>(), Maybe<String> scriptLanguage = Maybe<String>());
+    void scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<bool> isLiveEdit = Maybe<bool>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>(), Maybe<int> codeOffset = Maybe<int>(), Maybe<String> scriptLanguage = Maybe<String>(), Maybe<protocol::Debugger::DebugSymbols> debugSymbols = Maybe<protocol::Debugger::DebugSymbols>());
 
-    void flush();
-    void sendRawNotification(std::unique_ptr<Serializable>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

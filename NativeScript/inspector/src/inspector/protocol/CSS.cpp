@@ -9,7 +9,9 @@
 #include "src/inspector/protocol/Protocol.h"
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/find_by_first.h"
 #include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+#include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -1480,264 +1482,346 @@ std::unique_ptr<StyleSheetRemovedNotification> StyleSheetRemovedNotification::cl
 
 void Frontend::fontsUpdated(Maybe<protocol::CSS::FontFace> font)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<FontsUpdatedNotification> messageData = FontsUpdatedNotification::create()
         .build();
     if (font.isJust())
         messageData->setFont(std::move(font).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.fontsUpdated", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.fontsUpdated", std::move(messageData)));
 }
 
 void Frontend::mediaQueryResultChanged()
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.mediaQueryResultChanged"));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.mediaQueryResultChanged"));
 }
 
 void Frontend::styleSheetAdded(std::unique_ptr<protocol::CSS::CSSStyleSheetHeader> header)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<StyleSheetAddedNotification> messageData = StyleSheetAddedNotification::create()
         .setHeader(std::move(header))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.styleSheetAdded", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.styleSheetAdded", std::move(messageData)));
 }
 
 void Frontend::styleSheetChanged(const String& styleSheetId)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<StyleSheetChangedNotification> messageData = StyleSheetChangedNotification::create()
         .setStyleSheetId(styleSheetId)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.styleSheetChanged", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.styleSheetChanged", std::move(messageData)));
 }
 
 void Frontend::styleSheetRemoved(const String& styleSheetId)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<StyleSheetRemovedNotification> messageData = StyleSheetRemovedNotification::create()
         .setStyleSheetId(styleSheetId)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.styleSheetRemoved", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("CSS.styleSheetRemoved", std::move(messageData)));
 }
 
 void Frontend::flush()
 {
-    m_frontendChannel->flushProtocolNotifications();
+    frontend_channel_->FlushProtocolNotifications();
 }
 
 void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(std::move(notification));
+    frontend_channel_->SendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
 
-class DispatcherImpl : public protocol::DispatcherBase {
+class DomainDispatcherImpl : public protocol::DomainDispatcher {
 public:
-    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
-        : DispatcherBase(frontendChannel)
-        , m_backend(backend) {
-        m_dispatchMap["CSS.addRule"] = &DispatcherImpl::addRule;
-        m_dispatchMap["CSS.collectClassNames"] = &DispatcherImpl::collectClassNames;
-        m_dispatchMap["CSS.createStyleSheet"] = &DispatcherImpl::createStyleSheet;
-        m_dispatchMap["CSS.disable"] = &DispatcherImpl::disable;
-        m_dispatchMap["CSS.enable"] = &DispatcherImpl::enable;
-        m_dispatchMap["CSS.forcePseudoState"] = &DispatcherImpl::forcePseudoState;
-        m_dispatchMap["CSS.getBackgroundColors"] = &DispatcherImpl::getBackgroundColors;
-        m_dispatchMap["CSS.getComputedStyleForNode"] = &DispatcherImpl::getComputedStyleForNode;
-        m_dispatchMap["CSS.getInlineStylesForNode"] = &DispatcherImpl::getInlineStylesForNode;
-        m_dispatchMap["CSS.getMatchedStylesForNode"] = &DispatcherImpl::getMatchedStylesForNode;
-        m_dispatchMap["CSS.getMediaQueries"] = &DispatcherImpl::getMediaQueries;
-        m_dispatchMap["CSS.getPlatformFontsForNode"] = &DispatcherImpl::getPlatformFontsForNode;
-        m_dispatchMap["CSS.getStyleSheetText"] = &DispatcherImpl::getStyleSheetText;
-        m_dispatchMap["CSS.setEffectivePropertyValueForNode"] = &DispatcherImpl::setEffectivePropertyValueForNode;
-        m_dispatchMap["CSS.setKeyframeKey"] = &DispatcherImpl::setKeyframeKey;
-        m_dispatchMap["CSS.setMediaText"] = &DispatcherImpl::setMediaText;
-        m_dispatchMap["CSS.setRuleSelector"] = &DispatcherImpl::setRuleSelector;
-        m_dispatchMap["CSS.setStyleSheetText"] = &DispatcherImpl::setStyleSheetText;
-        m_dispatchMap["CSS.setStyleTexts"] = &DispatcherImpl::setStyleTexts;
-        m_dispatchMap["CSS.startRuleUsageTracking"] = &DispatcherImpl::startRuleUsageTracking;
-        m_dispatchMap["CSS.stopRuleUsageTracking"] = &DispatcherImpl::stopRuleUsageTracking;
-        m_dispatchMap["CSS.takeCoverageDelta"] = &DispatcherImpl::takeCoverageDelta;
-    }
-    ~DispatcherImpl() override { }
-    bool canDispatch(const String& method) override;
-    void dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-    std::unordered_map<String, String>& redirects() { return m_redirects; }
+    DomainDispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+        : DomainDispatcher(frontendChannel)
+        , m_backend(backend) {}
+    ~DomainDispatcherImpl() override { }
 
-protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-    using DispatchMap = std::unordered_map<String, CallHandler>;
-    DispatchMap m_dispatchMap;
-    std::unordered_map<String, String> m_redirects;
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
 
-    void addRule(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void collectClassNames(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void createStyleSheet(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void forcePseudoState(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getBackgroundColors(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getComputedStyleForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getInlineStylesForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getMatchedStylesForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getMediaQueries(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getPlatformFontsForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getStyleSheetText(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setEffectivePropertyValueForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setKeyframeKey(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setMediaText(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setRuleSelector(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setStyleSheetText(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setStyleTexts(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void startRuleUsageTracking(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void stopRuleUsageTracking(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void takeCoverageDelta(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
+    void addRule(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void collectClassNames(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void createStyleSheet(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void forcePseudoState(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getBackgroundColors(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getComputedStyleForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getInlineStylesForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getMatchedStylesForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getMediaQueries(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getPlatformFontsForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getStyleSheetText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setEffectivePropertyValueForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setKeyframeKey(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setMediaText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setRuleSelector(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setStyleSheetText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setStyleTexts(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void startRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void stopRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void takeCoverageDelta(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+ protected:
     Backend* m_backend;
 };
 
-bool DispatcherImpl::canDispatch(const String& method) {
-    return m_dispatchMap.find(method) != m_dispatchMap.end();
+namespace {
+// This helper method with a static map of command methods (instance methods
+// of DomainDispatcherImpl declared just above) by their name is used immediately below,
+// in the DomainDispatcherImpl::Dispatch method.
+DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_name) {
+  static auto* commands = [](){
+    auto* commands = new std::vector<std::pair<v8_crdtp::span<uint8_t>,
+                              DomainDispatcherImpl::CallHandler>>{
+    {
+          v8_crdtp::SpanFrom("addRule"),
+          &DomainDispatcherImpl::addRule
+    },
+    {
+          v8_crdtp::SpanFrom("collectClassNames"),
+          &DomainDispatcherImpl::collectClassNames
+    },
+    {
+          v8_crdtp::SpanFrom("createStyleSheet"),
+          &DomainDispatcherImpl::createStyleSheet
+    },
+    {
+          v8_crdtp::SpanFrom("disable"),
+          &DomainDispatcherImpl::disable
+    },
+    {
+          v8_crdtp::SpanFrom("enable"),
+          &DomainDispatcherImpl::enable
+    },
+    {
+          v8_crdtp::SpanFrom("forcePseudoState"),
+          &DomainDispatcherImpl::forcePseudoState
+    },
+    {
+          v8_crdtp::SpanFrom("getBackgroundColors"),
+          &DomainDispatcherImpl::getBackgroundColors
+    },
+    {
+          v8_crdtp::SpanFrom("getComputedStyleForNode"),
+          &DomainDispatcherImpl::getComputedStyleForNode
+    },
+    {
+          v8_crdtp::SpanFrom("getInlineStylesForNode"),
+          &DomainDispatcherImpl::getInlineStylesForNode
+    },
+    {
+          v8_crdtp::SpanFrom("getMatchedStylesForNode"),
+          &DomainDispatcherImpl::getMatchedStylesForNode
+    },
+    {
+          v8_crdtp::SpanFrom("getMediaQueries"),
+          &DomainDispatcherImpl::getMediaQueries
+    },
+    {
+          v8_crdtp::SpanFrom("getPlatformFontsForNode"),
+          &DomainDispatcherImpl::getPlatformFontsForNode
+    },
+    {
+          v8_crdtp::SpanFrom("getStyleSheetText"),
+          &DomainDispatcherImpl::getStyleSheetText
+    },
+    {
+          v8_crdtp::SpanFrom("setEffectivePropertyValueForNode"),
+          &DomainDispatcherImpl::setEffectivePropertyValueForNode
+    },
+    {
+          v8_crdtp::SpanFrom("setKeyframeKey"),
+          &DomainDispatcherImpl::setKeyframeKey
+    },
+    {
+          v8_crdtp::SpanFrom("setMediaText"),
+          &DomainDispatcherImpl::setMediaText
+    },
+    {
+          v8_crdtp::SpanFrom("setRuleSelector"),
+          &DomainDispatcherImpl::setRuleSelector
+    },
+    {
+          v8_crdtp::SpanFrom("setStyleSheetText"),
+          &DomainDispatcherImpl::setStyleSheetText
+    },
+    {
+          v8_crdtp::SpanFrom("setStyleTexts"),
+          &DomainDispatcherImpl::setStyleTexts
+    },
+    {
+          v8_crdtp::SpanFrom("startRuleUsageTracking"),
+          &DomainDispatcherImpl::startRuleUsageTracking
+    },
+    {
+          v8_crdtp::SpanFrom("stopRuleUsageTracking"),
+          &DomainDispatcherImpl::stopRuleUsageTracking
+    },
+    {
+          v8_crdtp::SpanFrom("takeCoverageDelta"),
+          &DomainDispatcherImpl::takeCoverageDelta
+    },
+    };
+    return commands;
+  }();
+  return v8_crdtp::FindByFirst<DomainDispatcherImpl::CallHandler>(*commands, command_name, nullptr);
+}
+}  // namespace
+
+std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
+  CallHandler handler = CommandByName(command_name);
+  if (!handler) return nullptr;
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
+    std::unique_ptr<DictionaryValue> params =
+        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
+        dispatchable.Params().size()));
+    ErrorSupport errors;
+    errors.Push();
+    (this->*handler)(dispatchable, params.get(), &errors);
+  };
 }
 
-void DispatcherImpl::dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject)
-{
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
-    DCHECK(it != m_dispatchMap.end());
-    protocol::ErrorSupport errors;
-    (this->*(it->second))(callId, method, message, std::move(messageObject), &errors);
-}
 
-
-void DispatcherImpl::addRule(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::addRule(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
     errors->SetName("styleSheetId");
     String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
-    protocol::Value* ruleTextValue = object ? object->get("ruleText") : nullptr;
+    protocol::Value* ruleTextValue = params ? params->get("ruleText") : nullptr;
     errors->SetName("ruleText");
     String in_ruleText = ValueConversions<String>::fromValue(ruleTextValue, errors);
-    protocol::Value* locationValue = object ? object->get("location") : nullptr;
+    protocol::Value* locationValue = params ? params->get("location") : nullptr;
     errors->SetName("location");
     std::unique_ptr<protocol::CSS::SourceRange> in_location = ValueConversions<protocol::CSS::SourceRange>::fromValue(locationValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::CSS::CSSRule> out_rule;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->addRule(in_styleSheetId, in_ruleText, std::move(in_location), &out_rule);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.addRule"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("rule", ValueConversions<protocol::CSS::CSSRule>::toValue(out_rule.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("rule"), out_rule, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::collectClassNames(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::collectClassNames(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
     errors->SetName("styleSheetId");
     String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<String>> out_classNames;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->collectClassNames(in_styleSheetId, &out_classNames);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.collectClassNames"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("classNames", ValueConversions<protocol::Array<String>>::toValue(out_classNames.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("classNames"), out_classNames, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::createStyleSheet(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::createStyleSheet(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* frameIdValue = object ? object->get("frameId") : nullptr;
+    protocol::Value* frameIdValue = params ? params->get("frameId") : nullptr;
     errors->SetName("frameId");
     String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_styleSheetId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->createStyleSheet(in_frameId, &out_styleSheetId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.createStyleSheet"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("styleSheetId", ValueConversions<String>::toValue(out_styleSheetId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styleSheetId"), out_styleSheetId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.disable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-class EnableCallbackImpl : public Backend::EnableCallback, public DispatcherBase::Callback {
+class EnableCallbackImpl : public Backend::EnableCallback, public DomainDispatcher::Callback {
 public:
-    EnableCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, v8_crdtp::span<uint8_t> message)
-        : DispatcherBase::Callback(std::move(backendImpl), callId, method, message) { }
+    EnableCallbackImpl(std::unique_ptr<DomainDispatcher::WeakPtr> backendImpl, int callId, v8_crdtp::span<uint8_t> message)
+        : DomainDispatcher::Callback(std::move(backendImpl), callId,
+v8_crdtp::SpanFrom("CSS.enable"), message) { }
 
     void sendSuccess() override
     {
-        std::unique_ptr<protocol::DictionaryValue> resultObject = DictionaryValue::create();
-        sendIfActive(std::move(resultObject), DispatchResponse::OK());
+        std::vector<uint8_t> result_buffer;
+        v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+        envelope_encoder.EncodeStart(&result_buffer);
+        result_buffer.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+        result_buffer.push_back(v8_crdtp::cbor::EncodeStop());
+        envelope_encoder.EncodeStop(&result_buffer);
+        sendIfActive(v8_crdtp::Serializable::From(std::move(result_buffer)), DispatchResponse::Success());
     }
 
     void fallThrough() override
@@ -1747,164 +1831,145 @@ public:
 
     void sendFailure(const DispatchResponse& response) override
     {
-        DCHECK(response.status() == DispatchResponse::kError);
+        DCHECK(response.IsError());
         sendIfActive(nullptr, response);
     }
 };
 
-void DispatcherImpl::enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<EnableCallbackImpl> callback(new EnableCallbackImpl(weakPtr(), callId, method, message));
-    m_backend->enable(std::move(callback));
-    return;
+    m_backend->enable(std::make_unique<EnableCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
 }
 
-void DispatcherImpl::forcePseudoState(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::forcePseudoState(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* forcedPseudoClassesValue = object ? object->get("forcedPseudoClasses") : nullptr;
+    protocol::Value* forcedPseudoClassesValue = params ? params->get("forcedPseudoClasses") : nullptr;
     errors->SetName("forcedPseudoClasses");
     std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses = ValueConversions<protocol::Array<String>>::fromValue(forcedPseudoClassesValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->forcePseudoState(in_nodeId, std::move(in_forcedPseudoClasses));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.forcePseudoState"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::getBackgroundColors(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getBackgroundColors(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<protocol::Array<String>> out_backgroundColors;
     Maybe<String> out_computedFontSize;
     Maybe<String> out_computedFontWeight;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getBackgroundColors(in_nodeId, &out_backgroundColors, &out_computedFontSize, &out_computedFontWeight);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getBackgroundColors"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        if (out_backgroundColors.isJust())
-            result->setValue("backgroundColors", ValueConversions<protocol::Array<String>>::toValue(out_backgroundColors.fromJust()));
-        if (out_computedFontSize.isJust())
-            result->setValue("computedFontSize", ValueConversions<String>::toValue(out_computedFontSize.fromJust()));
-        if (out_computedFontWeight.isJust())
-            result->setValue("computedFontWeight", ValueConversions<String>::toValue(out_computedFontWeight.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backgroundColors"), out_backgroundColors, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("computedFontSize"), out_computedFontSize, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("computedFontWeight"), out_computedFontWeight, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getComputedStyleForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getComputedStyleForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> out_computedStyle;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getComputedStyleForNode(in_nodeId, &out_computedStyle);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getComputedStyleForNode"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("computedStyle", ValueConversions<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>::toValue(out_computedStyle.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("computedStyle"), out_computedStyle, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getInlineStylesForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getInlineStylesForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<protocol::CSS::CSSStyle> out_inlineStyle;
     Maybe<protocol::CSS::CSSStyle> out_attributesStyle;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getInlineStylesForNode(in_nodeId, &out_inlineStyle, &out_attributesStyle);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getInlineStylesForNode"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        if (out_inlineStyle.isJust())
-            result->setValue("inlineStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(out_inlineStyle.fromJust()));
-        if (out_attributesStyle.isJust())
-            result->setValue("attributesStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(out_attributesStyle.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("inlineStyle"), out_inlineStyle, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("attributesStyle"), out_attributesStyle, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getMatchedStylesForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getMatchedStylesForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<protocol::CSS::CSSStyle> out_inlineStyle;
     Maybe<protocol::CSS::CSSStyle> out_attributesStyle;
@@ -1913,382 +1978,405 @@ void DispatcherImpl::getMatchedStylesForNode(int callId, const String& method, v
     Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>> out_inherited;
     Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>> out_cssKeyframesRules;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getMatchedStylesForNode(in_nodeId, &out_inlineStyle, &out_attributesStyle, &out_matchedCSSRules, &out_pseudoElements, &out_inherited, &out_cssKeyframesRules);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getMatchedStylesForNode"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        if (out_inlineStyle.isJust())
-            result->setValue("inlineStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(out_inlineStyle.fromJust()));
-        if (out_attributesStyle.isJust())
-            result->setValue("attributesStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(out_attributesStyle.fromJust()));
-        if (out_matchedCSSRules.isJust())
-            result->setValue("matchedCSSRules", ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::toValue(out_matchedCSSRules.fromJust()));
-        if (out_pseudoElements.isJust())
-            result->setValue("pseudoElements", ValueConversions<protocol::Array<protocol::CSS::PseudoElementMatches>>::toValue(out_pseudoElements.fromJust()));
-        if (out_inherited.isJust())
-            result->setValue("inherited", ValueConversions<protocol::Array<protocol::CSS::InheritedStyleEntry>>::toValue(out_inherited.fromJust()));
-        if (out_cssKeyframesRules.isJust())
-            result->setValue("cssKeyframesRules", ValueConversions<protocol::Array<protocol::CSS::CSSKeyframesRule>>::toValue(out_cssKeyframesRules.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("inlineStyle"), out_inlineStyle, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("attributesStyle"), out_attributesStyle, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("matchedCSSRules"), out_matchedCSSRules, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("pseudoElements"), out_pseudoElements, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("inherited"), out_inherited, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("cssKeyframesRules"), out_cssKeyframesRules, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getMediaQueries(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getMediaQueries(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>> out_medias;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getMediaQueries(&out_medias);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getMediaQueries"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("medias", ValueConversions<protocol::Array<protocol::CSS::CSSMedia>>::toValue(out_medias.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("medias"), out_medias, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getPlatformFontsForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getPlatformFontsForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>> out_fonts;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getPlatformFontsForNode(in_nodeId, &out_fonts);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getPlatformFontsForNode"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("fonts", ValueConversions<protocol::Array<protocol::CSS::PlatformFontUsage>>::toValue(out_fonts.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("fonts"), out_fonts, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getStyleSheetText(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getStyleSheetText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
     errors->SetName("styleSheetId");
     String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_text;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getStyleSheetText(in_styleSheetId, &out_text);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.getStyleSheetText"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("text", ValueConversions<String>::toValue(out_text));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("text"), out_text, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setEffectivePropertyValueForNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setEffectivePropertyValueForNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* propertyNameValue = object ? object->get("propertyName") : nullptr;
+    protocol::Value* propertyNameValue = params ? params->get("propertyName") : nullptr;
     errors->SetName("propertyName");
     String in_propertyName = ValueConversions<String>::fromValue(propertyNameValue, errors);
-    protocol::Value* valueValue = object ? object->get("value") : nullptr;
+    protocol::Value* valueValue = params ? params->get("value") : nullptr;
     errors->SetName("value");
     String in_value = ValueConversions<String>::fromValue(valueValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setEffectivePropertyValueForNode(in_nodeId, in_propertyName, in_value);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setEffectivePropertyValueForNode"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setKeyframeKey(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setKeyframeKey(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
     errors->SetName("styleSheetId");
     String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
-    protocol::Value* rangeValue = object ? object->get("range") : nullptr;
+    protocol::Value* rangeValue = params ? params->get("range") : nullptr;
     errors->SetName("range");
     std::unique_ptr<protocol::CSS::SourceRange> in_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
-    protocol::Value* keyTextValue = object ? object->get("keyText") : nullptr;
+    protocol::Value* keyTextValue = params ? params->get("keyText") : nullptr;
     errors->SetName("keyText");
     String in_keyText = ValueConversions<String>::fromValue(keyTextValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::CSS::Value> out_keyText;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setKeyframeKey(in_styleSheetId, std::move(in_range), in_keyText, &out_keyText);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setKeyframeKey"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("keyText", ValueConversions<protocol::CSS::Value>::toValue(out_keyText.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("keyText"), out_keyText, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setMediaText(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setMediaText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
     errors->SetName("styleSheetId");
     String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
-    protocol::Value* rangeValue = object ? object->get("range") : nullptr;
+    protocol::Value* rangeValue = params ? params->get("range") : nullptr;
     errors->SetName("range");
     std::unique_ptr<protocol::CSS::SourceRange> in_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
-    protocol::Value* textValue = object ? object->get("text") : nullptr;
+    protocol::Value* textValue = params ? params->get("text") : nullptr;
     errors->SetName("text");
     String in_text = ValueConversions<String>::fromValue(textValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::CSS::CSSMedia> out_media;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setMediaText(in_styleSheetId, std::move(in_range), in_text, &out_media);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setMediaText"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("media", ValueConversions<protocol::CSS::CSSMedia>::toValue(out_media.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("media"), out_media, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setRuleSelector(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setRuleSelector(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
     errors->SetName("styleSheetId");
     String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
-    protocol::Value* rangeValue = object ? object->get("range") : nullptr;
+    protocol::Value* rangeValue = params ? params->get("range") : nullptr;
     errors->SetName("range");
     std::unique_ptr<protocol::CSS::SourceRange> in_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
-    protocol::Value* selectorValue = object ? object->get("selector") : nullptr;
+    protocol::Value* selectorValue = params ? params->get("selector") : nullptr;
     errors->SetName("selector");
     String in_selector = ValueConversions<String>::fromValue(selectorValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::CSS::SelectorList> out_selectorList;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setRuleSelector(in_styleSheetId, std::move(in_range), in_selector, &out_selectorList);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setRuleSelector"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("selectorList", ValueConversions<protocol::CSS::SelectorList>::toValue(out_selectorList.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("selectorList"), out_selectorList, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setStyleSheetText(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setStyleSheetText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    protocol::Value* styleSheetIdValue = params ? params->get("styleSheetId") : nullptr;
     errors->SetName("styleSheetId");
     String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
-    protocol::Value* textValue = object ? object->get("text") : nullptr;
+    protocol::Value* textValue = params ? params->get("text") : nullptr;
     errors->SetName("text");
     String in_text = ValueConversions<String>::fromValue(textValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<String> out_sourceMapURL;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setStyleSheetText(in_styleSheetId, in_text, &out_sourceMapURL);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setStyleSheetText"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        if (out_sourceMapURL.isJust())
-            result->setValue("sourceMapURL", ValueConversions<String>::toValue(out_sourceMapURL.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceMapURL"), out_sourceMapURL, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setStyleTexts(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setStyleTexts(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* editsValue = object ? object->get("edits") : nullptr;
+    protocol::Value* editsValue = params ? params->get("edits") : nullptr;
     errors->SetName("edits");
     std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits = ValueConversions<protocol::Array<protocol::CSS::StyleDeclarationEdit>>::fromValue(editsValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>> out_styles;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setStyleTexts(std::move(in_edits), &out_styles);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.setStyleTexts"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("styles", ValueConversions<protocol::Array<protocol::CSS::CSSStyle>>::toValue(out_styles.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("styles"), out_styles, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::startRuleUsageTracking(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::startRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->startRuleUsageTracking();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.startRuleUsageTracking"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::stopRuleUsageTracking(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::stopRuleUsageTracking(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>> out_ruleUsage;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stopRuleUsageTracking(&out_ruleUsage);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.stopRuleUsageTracking"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("ruleUsage", ValueConversions<protocol::Array<protocol::CSS::RuleUsage>>::toValue(out_ruleUsage.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("ruleUsage"), out_ruleUsage, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::takeCoverageDelta(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::takeCoverageDelta(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>> out_coverage;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->takeCoverageDelta(&out_coverage);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("CSS.takeCoverageDelta"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("coverage", ValueConversions<protocol::Array<protocol::CSS::RuleUsage>>::toValue(out_coverage.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("coverage"), out_coverage, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
+
+namespace {
+// This helper method (with a static map of redirects) is used from Dispatcher::wire
+// immediately below.
+const std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>& SortedRedirects() {
+  static auto* redirects = [](){
+    auto* redirects = new std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>{
+    };
+    return redirects;
+  }();
+  return *redirects;
+}
+}  // namespace
 
 // static
 void Dispatcher::wire(UberDispatcher* uber, Backend* backend)
 {
-    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend));
-    uber->setupRedirects(dispatcher->redirects());
-    uber->registerBackend("CSS", std::move(dispatcher));
+    auto dispatcher = std::make_unique<DomainDispatcherImpl>(uber->channel(), backend);
+    uber->WireBackend(v8_crdtp::SpanFrom("CSS"), SortedRedirects(), std::move(dispatcher));
 }
 
 } // CSS

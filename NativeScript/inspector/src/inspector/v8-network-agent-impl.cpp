@@ -25,26 +25,26 @@ V8NetworkAgentImpl::~V8NetworkAgentImpl() {
 
 DispatchResponse V8NetworkAgentImpl::enable(Maybe<int> in_maxTotalBufferSize, Maybe<int> in_maxResourceBufferSize, Maybe<int> in_maxPostDataSize) {
     if (m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(NetworkAgentState::networkEnabled, true);
 
     m_enabled = true;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8NetworkAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(NetworkAgentState::networkEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 void V8NetworkAgentImpl::dispatch(std::string message) {
@@ -67,15 +67,15 @@ void V8NetworkAgentImpl::dispatch(std::string message) {
 }
 
 DispatchResponse V8NetworkAgentImpl::canClearBrowserCache(bool* out_result) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8NetworkAgentImpl::canClearBrowserCookies(bool* out_result) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8NetworkAgentImpl::emulateNetworkConditions(bool in_offline, double in_latency, double in_downloadThroughput, double in_uploadThroughput, Maybe<String> in_connectionType) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 void V8NetworkAgentImpl::getResponseBody(const String& in_requestId, std::unique_ptr<GetResponseBodyCallback> callback) {
@@ -89,7 +89,7 @@ void V8NetworkAgentImpl::getResponseBody(const String& in_requestId, std::unique
 
     if (getResponseBodyFunc.IsEmpty() || networkDomainDebugger.IsEmpty()) {
         auto error = "Couldn't get response body. \"getResponseBody\" function not found";
-        callback->sendFailure(DispatchResponse::Error(error));
+        callback->sendFailure(DispatchResponse::ServerError(error));
         return;
     }
 
@@ -103,8 +103,8 @@ void V8NetworkAgentImpl::getResponseBody(const String& in_requestId, std::unique
 
     TryCatch tc(isolate);
     if (tc.HasCaught() || result.IsEmpty() || !result->IsObject()) {
-        String16 error = toProtocolString(isolate, tc.Message()->Get());
-        callback->sendFailure(DispatchResponse::Error(error));
+        std::string error = tns::ToString(isolate, tc.Message()->Get());
+        callback->sendFailure(DispatchResponse::ServerError(error));
     }
 
     Local<Object> resultObj = result.As<Object>();
@@ -121,35 +121,35 @@ void V8NetworkAgentImpl::getRequestPostData(const String& in_requestId, std::uni
 }
 
 DispatchResponse V8NetworkAgentImpl::searchInResponseBody(const String& in_requestId, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>>* out_result) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8NetworkAgentImpl::setBypassServiceWorker(bool in_bypass) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8NetworkAgentImpl::getCertificate(const String& in_origin, std::unique_ptr<protocol::Array<String>>* out_tableNames) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8NetworkAgentImpl::setCacheDisabled(bool in_cacheDisabled) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8NetworkAgentImpl::setDataSizeLimitsForTest(int in_maxTotalSize, int in_maxResourceSize) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8NetworkAgentImpl::replayXHR(const String& in_requestId) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8NetworkAgentImpl::setBlockedURLs(std::unique_ptr<protocol::Array<String>> in_urls) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 DispatchResponse V8NetworkAgentImpl::setExtraHTTPHeaders(std::unique_ptr<protocol::Network::Headers> in_headers) {
-    return protocol::DispatchResponse::Error("Protocol command not supported.");
+    return protocol::DispatchResponse::ServerError("Protocol command not supported.");
 }
 
 void V8NetworkAgentImpl::RequestWillBeSent(const Local<Object>& obj) {

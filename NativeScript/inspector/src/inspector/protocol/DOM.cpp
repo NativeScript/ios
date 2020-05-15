@@ -9,7 +9,9 @@
 #include "src/inspector/protocol/Protocol.h"
 
 #include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/find_by_first.h"
 #include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+#include "third_party/inspector_protocol/crdtp/span.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -1189,1651 +1191,1721 @@ std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::clon
 
 void Frontend::attributeModified(int nodeId, const String& name, const String& value)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<AttributeModifiedNotification> messageData = AttributeModifiedNotification::create()
         .setNodeId(nodeId)
         .setName(name)
         .setValue(value)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.attributeModified", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.attributeModified", std::move(messageData)));
 }
 
 void Frontend::attributeRemoved(int nodeId, const String& name)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<AttributeRemovedNotification> messageData = AttributeRemovedNotification::create()
         .setNodeId(nodeId)
         .setName(name)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.attributeRemoved", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.attributeRemoved", std::move(messageData)));
 }
 
 void Frontend::characterDataModified(int nodeId, const String& characterData)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<CharacterDataModifiedNotification> messageData = CharacterDataModifiedNotification::create()
         .setNodeId(nodeId)
         .setCharacterData(characterData)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.characterDataModified", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.characterDataModified", std::move(messageData)));
 }
 
 void Frontend::childNodeCountUpdated(int nodeId, int childNodeCount)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ChildNodeCountUpdatedNotification> messageData = ChildNodeCountUpdatedNotification::create()
         .setNodeId(nodeId)
         .setChildNodeCount(childNodeCount)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.childNodeCountUpdated", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.childNodeCountUpdated", std::move(messageData)));
 }
 
 void Frontend::childNodeInserted(int parentNodeId, int previousNodeId, std::unique_ptr<protocol::DOM::Node> node)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ChildNodeInsertedNotification> messageData = ChildNodeInsertedNotification::create()
         .setParentNodeId(parentNodeId)
         .setPreviousNodeId(previousNodeId)
         .setNode(std::move(node))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.childNodeInserted", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.childNodeInserted", std::move(messageData)));
 }
 
 void Frontend::childNodeRemoved(int parentNodeId, int nodeId)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ChildNodeRemovedNotification> messageData = ChildNodeRemovedNotification::create()
         .setParentNodeId(parentNodeId)
         .setNodeId(nodeId)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.childNodeRemoved", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.childNodeRemoved", std::move(messageData)));
 }
 
 void Frontend::distributedNodesUpdated(int insertionPointId, std::unique_ptr<protocol::Array<protocol::DOM::BackendNode>> distributedNodes)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<DistributedNodesUpdatedNotification> messageData = DistributedNodesUpdatedNotification::create()
         .setInsertionPointId(insertionPointId)
         .setDistributedNodes(std::move(distributedNodes))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.distributedNodesUpdated", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.distributedNodesUpdated", std::move(messageData)));
 }
 
 void Frontend::documentUpdated()
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.documentUpdated"));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.documentUpdated"));
 }
 
 void Frontend::inlineStyleInvalidated(std::unique_ptr<protocol::Array<int>> nodeIds)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<InlineStyleInvalidatedNotification> messageData = InlineStyleInvalidatedNotification::create()
         .setNodeIds(std::move(nodeIds))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.inlineStyleInvalidated", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.inlineStyleInvalidated", std::move(messageData)));
 }
 
 void Frontend::pseudoElementAdded(int parentId, std::unique_ptr<protocol::DOM::Node> pseudoElement)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<PseudoElementAddedNotification> messageData = PseudoElementAddedNotification::create()
         .setParentId(parentId)
         .setPseudoElement(std::move(pseudoElement))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.pseudoElementAdded", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.pseudoElementAdded", std::move(messageData)));
 }
 
 void Frontend::pseudoElementRemoved(int parentId, int pseudoElementId)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<PseudoElementRemovedNotification> messageData = PseudoElementRemovedNotification::create()
         .setParentId(parentId)
         .setPseudoElementId(pseudoElementId)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.pseudoElementRemoved", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.pseudoElementRemoved", std::move(messageData)));
 }
 
 void Frontend::setChildNodes(int parentId, std::unique_ptr<protocol::Array<protocol::DOM::Node>> nodes)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<SetChildNodesNotification> messageData = SetChildNodesNotification::create()
         .setParentId(parentId)
         .setNodes(std::move(nodes))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.setChildNodes", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.setChildNodes", std::move(messageData)));
 }
 
 void Frontend::shadowRootPopped(int hostId, int rootId)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ShadowRootPoppedNotification> messageData = ShadowRootPoppedNotification::create()
         .setHostId(hostId)
         .setRootId(rootId)
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.shadowRootPopped", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.shadowRootPopped", std::move(messageData)));
 }
 
 void Frontend::shadowRootPushed(int hostId, std::unique_ptr<protocol::DOM::Node> root)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ShadowRootPushedNotification> messageData = ShadowRootPushedNotification::create()
         .setHostId(hostId)
         .setRoot(std::move(root))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.shadowRootPushed", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("DOM.shadowRootPushed", std::move(messageData)));
 }
 
 void Frontend::flush()
 {
-    m_frontendChannel->flushProtocolNotifications();
+    frontend_channel_->FlushProtocolNotifications();
 }
 
 void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(std::move(notification));
+    frontend_channel_->SendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
 
-class DispatcherImpl : public protocol::DispatcherBase {
+class DomainDispatcherImpl : public protocol::DomainDispatcher {
 public:
-    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
-        : DispatcherBase(frontendChannel)
-        , m_backend(backend) {
-        m_dispatchMap["DOM.collectClassNamesFromSubtree"] = &DispatcherImpl::collectClassNamesFromSubtree;
-        m_dispatchMap["DOM.copyTo"] = &DispatcherImpl::copyTo;
-        m_dispatchMap["DOM.describeNode"] = &DispatcherImpl::describeNode;
-        m_dispatchMap["DOM.disable"] = &DispatcherImpl::disable;
-        m_dispatchMap["DOM.discardSearchResults"] = &DispatcherImpl::discardSearchResults;
-        m_dispatchMap["DOM.enable"] = &DispatcherImpl::enable;
-        m_dispatchMap["DOM.focus"] = &DispatcherImpl::focus;
-        m_dispatchMap["DOM.getAttributes"] = &DispatcherImpl::getAttributes;
-        m_dispatchMap["DOM.getBoxModel"] = &DispatcherImpl::getBoxModel;
-        m_dispatchMap["DOM.getContentQuads"] = &DispatcherImpl::getContentQuads;
-        m_dispatchMap["DOM.getDocument"] = &DispatcherImpl::getDocument;
-        m_dispatchMap["DOM.getFlattenedDocument"] = &DispatcherImpl::getFlattenedDocument;
-        m_dispatchMap["DOM.getNodeForLocation"] = &DispatcherImpl::getNodeForLocation;
-        m_dispatchMap["DOM.getOuterHTML"] = &DispatcherImpl::getOuterHTML;
-        m_dispatchMap["DOM.getRelayoutBoundary"] = &DispatcherImpl::getRelayoutBoundary;
-        m_dispatchMap["DOM.getSearchResults"] = &DispatcherImpl::getSearchResults;
-      m_redirects["DOM.hideHighlight"] = "Overlay.hideHighlight";
-      m_redirects["DOM.highlightNode"] = "Overlay.highlightNode";
-      m_redirects["DOM.highlightRect"] = "Overlay.highlightRect";
-        m_dispatchMap["DOM.markUndoableState"] = &DispatcherImpl::markUndoableState;
-        m_dispatchMap["DOM.moveTo"] = &DispatcherImpl::moveTo;
-        m_dispatchMap["DOM.performSearch"] = &DispatcherImpl::performSearch;
-        m_dispatchMap["DOM.pushNodeByPathToFrontend"] = &DispatcherImpl::pushNodeByPathToFrontend;
-        m_dispatchMap["DOM.pushNodesByBackendIdsToFrontend"] = &DispatcherImpl::pushNodesByBackendIdsToFrontend;
-        m_dispatchMap["DOM.querySelector"] = &DispatcherImpl::querySelector;
-        m_dispatchMap["DOM.querySelectorAll"] = &DispatcherImpl::querySelectorAll;
-        m_dispatchMap["DOM.redo"] = &DispatcherImpl::redo;
-        m_dispatchMap["DOM.removeAttribute"] = &DispatcherImpl::removeAttribute;
-        m_dispatchMap["DOM.removeNode"] = &DispatcherImpl::removeNode;
-        m_dispatchMap["DOM.requestChildNodes"] = &DispatcherImpl::requestChildNodes;
-        m_dispatchMap["DOM.requestNode"] = &DispatcherImpl::requestNode;
-        m_dispatchMap["DOM.resolveNode"] = &DispatcherImpl::resolveNode;
-        m_dispatchMap["DOM.setAttributeValue"] = &DispatcherImpl::setAttributeValue;
-        m_dispatchMap["DOM.setAttributesAsText"] = &DispatcherImpl::setAttributesAsText;
-        m_dispatchMap["DOM.setFileInputFiles"] = &DispatcherImpl::setFileInputFiles;
-        m_dispatchMap["DOM.setNodeStackTracesEnabled"] = &DispatcherImpl::setNodeStackTracesEnabled;
-        m_dispatchMap["DOM.getNodeStackTraces"] = &DispatcherImpl::getNodeStackTraces;
-        m_dispatchMap["DOM.getFileInfo"] = &DispatcherImpl::getFileInfo;
-        m_dispatchMap["DOM.setInspectedNode"] = &DispatcherImpl::setInspectedNode;
-        m_dispatchMap["DOM.setNodeName"] = &DispatcherImpl::setNodeName;
-        m_dispatchMap["DOM.setNodeValue"] = &DispatcherImpl::setNodeValue;
-        m_dispatchMap["DOM.setOuterHTML"] = &DispatcherImpl::setOuterHTML;
-        m_dispatchMap["DOM.undo"] = &DispatcherImpl::undo;
-        m_dispatchMap["DOM.getFrameOwner"] = &DispatcherImpl::getFrameOwner;
-    }
-    ~DispatcherImpl() override { }
-    bool canDispatch(const String& method) override;
-    void dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-    std::unordered_map<String, String>& redirects() { return m_redirects; }
+    DomainDispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+        : DomainDispatcher(frontendChannel)
+        , m_backend(backend) {}
+    ~DomainDispatcherImpl() override { }
 
-protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-    using DispatchMap = std::unordered_map<String, CallHandler>;
-    DispatchMap m_dispatchMap;
-    std::unordered_map<String, String> m_redirects;
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
 
-    void collectClassNamesFromSubtree(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void copyTo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void describeNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void discardSearchResults(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void focus(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getAttributes(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getBoxModel(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getContentQuads(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getDocument(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getFlattenedDocument(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getNodeForLocation(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getOuterHTML(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getRelayoutBoundary(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getSearchResults(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void markUndoableState(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void moveTo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void performSearch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void pushNodeByPathToFrontend(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void pushNodesByBackendIdsToFrontend(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void querySelector(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void querySelectorAll(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void redo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void removeAttribute(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void removeNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void requestChildNodes(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void requestNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void resolveNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setAttributeValue(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setAttributesAsText(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setFileInputFiles(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setNodeStackTracesEnabled(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getNodeStackTraces(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getFileInfo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setInspectedNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setNodeName(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setNodeValue(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setOuterHTML(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void undo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getFrameOwner(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
+    void collectClassNamesFromSubtree(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void copyTo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void describeNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void discardSearchResults(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void focus(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getAttributes(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getBoxModel(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getContentQuads(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getFlattenedDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getNodeForLocation(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getOuterHTML(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getRelayoutBoundary(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getSearchResults(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void markUndoableState(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void moveTo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void performSearch(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void pushNodeByPathToFrontend(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void pushNodesByBackendIdsToFrontend(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void querySelector(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void querySelectorAll(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void redo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void removeAttribute(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void removeNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void requestChildNodes(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void requestNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void resolveNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setAttributeValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setAttributesAsText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setFileInputFiles(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setNodeStackTracesEnabled(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getNodeStackTraces(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getFileInfo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setInspectedNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setNodeName(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setNodeValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setOuterHTML(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void undo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getFrameOwner(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+ protected:
     Backend* m_backend;
 };
 
-bool DispatcherImpl::canDispatch(const String& method) {
-    return m_dispatchMap.find(method) != m_dispatchMap.end();
+namespace {
+// This helper method with a static map of command methods (instance methods
+// of DomainDispatcherImpl declared just above) by their name is used immediately below,
+// in the DomainDispatcherImpl::Dispatch method.
+DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_name) {
+  static auto* commands = [](){
+    auto* commands = new std::vector<std::pair<v8_crdtp::span<uint8_t>,
+                              DomainDispatcherImpl::CallHandler>>{
+    {
+          v8_crdtp::SpanFrom("collectClassNamesFromSubtree"),
+          &DomainDispatcherImpl::collectClassNamesFromSubtree
+    },
+    {
+          v8_crdtp::SpanFrom("copyTo"),
+          &DomainDispatcherImpl::copyTo
+    },
+    {
+          v8_crdtp::SpanFrom("describeNode"),
+          &DomainDispatcherImpl::describeNode
+    },
+    {
+          v8_crdtp::SpanFrom("disable"),
+          &DomainDispatcherImpl::disable
+    },
+    {
+          v8_crdtp::SpanFrom("discardSearchResults"),
+          &DomainDispatcherImpl::discardSearchResults
+    },
+    {
+          v8_crdtp::SpanFrom("enable"),
+          &DomainDispatcherImpl::enable
+    },
+    {
+          v8_crdtp::SpanFrom("focus"),
+          &DomainDispatcherImpl::focus
+    },
+    {
+          v8_crdtp::SpanFrom("getAttributes"),
+          &DomainDispatcherImpl::getAttributes
+    },
+    {
+          v8_crdtp::SpanFrom("getBoxModel"),
+          &DomainDispatcherImpl::getBoxModel
+    },
+    {
+          v8_crdtp::SpanFrom("getContentQuads"),
+          &DomainDispatcherImpl::getContentQuads
+    },
+    {
+          v8_crdtp::SpanFrom("getDocument"),
+          &DomainDispatcherImpl::getDocument
+    },
+    {
+          v8_crdtp::SpanFrom("getFileInfo"),
+          &DomainDispatcherImpl::getFileInfo
+    },
+    {
+          v8_crdtp::SpanFrom("getFlattenedDocument"),
+          &DomainDispatcherImpl::getFlattenedDocument
+    },
+    {
+          v8_crdtp::SpanFrom("getFrameOwner"),
+          &DomainDispatcherImpl::getFrameOwner
+    },
+    {
+          v8_crdtp::SpanFrom("getNodeForLocation"),
+          &DomainDispatcherImpl::getNodeForLocation
+    },
+    {
+          v8_crdtp::SpanFrom("getNodeStackTraces"),
+          &DomainDispatcherImpl::getNodeStackTraces
+    },
+    {
+          v8_crdtp::SpanFrom("getOuterHTML"),
+          &DomainDispatcherImpl::getOuterHTML
+    },
+    {
+          v8_crdtp::SpanFrom("getRelayoutBoundary"),
+          &DomainDispatcherImpl::getRelayoutBoundary
+    },
+    {
+          v8_crdtp::SpanFrom("getSearchResults"),
+          &DomainDispatcherImpl::getSearchResults
+    },
+    {
+          v8_crdtp::SpanFrom("markUndoableState"),
+          &DomainDispatcherImpl::markUndoableState
+    },
+    {
+          v8_crdtp::SpanFrom("moveTo"),
+          &DomainDispatcherImpl::moveTo
+    },
+    {
+          v8_crdtp::SpanFrom("performSearch"),
+          &DomainDispatcherImpl::performSearch
+    },
+    {
+          v8_crdtp::SpanFrom("pushNodeByPathToFrontend"),
+          &DomainDispatcherImpl::pushNodeByPathToFrontend
+    },
+    {
+          v8_crdtp::SpanFrom("pushNodesByBackendIdsToFrontend"),
+          &DomainDispatcherImpl::pushNodesByBackendIdsToFrontend
+    },
+    {
+          v8_crdtp::SpanFrom("querySelector"),
+          &DomainDispatcherImpl::querySelector
+    },
+    {
+          v8_crdtp::SpanFrom("querySelectorAll"),
+          &DomainDispatcherImpl::querySelectorAll
+    },
+    {
+          v8_crdtp::SpanFrom("redo"),
+          &DomainDispatcherImpl::redo
+    },
+    {
+          v8_crdtp::SpanFrom("removeAttribute"),
+          &DomainDispatcherImpl::removeAttribute
+    },
+    {
+          v8_crdtp::SpanFrom("removeNode"),
+          &DomainDispatcherImpl::removeNode
+    },
+    {
+          v8_crdtp::SpanFrom("requestChildNodes"),
+          &DomainDispatcherImpl::requestChildNodes
+    },
+    {
+          v8_crdtp::SpanFrom("requestNode"),
+          &DomainDispatcherImpl::requestNode
+    },
+    {
+          v8_crdtp::SpanFrom("resolveNode"),
+          &DomainDispatcherImpl::resolveNode
+    },
+    {
+          v8_crdtp::SpanFrom("setAttributeValue"),
+          &DomainDispatcherImpl::setAttributeValue
+    },
+    {
+          v8_crdtp::SpanFrom("setAttributesAsText"),
+          &DomainDispatcherImpl::setAttributesAsText
+    },
+    {
+          v8_crdtp::SpanFrom("setFileInputFiles"),
+          &DomainDispatcherImpl::setFileInputFiles
+    },
+    {
+          v8_crdtp::SpanFrom("setInspectedNode"),
+          &DomainDispatcherImpl::setInspectedNode
+    },
+    {
+          v8_crdtp::SpanFrom("setNodeName"),
+          &DomainDispatcherImpl::setNodeName
+    },
+    {
+          v8_crdtp::SpanFrom("setNodeStackTracesEnabled"),
+          &DomainDispatcherImpl::setNodeStackTracesEnabled
+    },
+    {
+          v8_crdtp::SpanFrom("setNodeValue"),
+          &DomainDispatcherImpl::setNodeValue
+    },
+    {
+          v8_crdtp::SpanFrom("setOuterHTML"),
+          &DomainDispatcherImpl::setOuterHTML
+    },
+    {
+          v8_crdtp::SpanFrom("undo"),
+          &DomainDispatcherImpl::undo
+    },
+    };
+    return commands;
+  }();
+  return v8_crdtp::FindByFirst<DomainDispatcherImpl::CallHandler>(*commands, command_name, nullptr);
+}
+}  // namespace
+
+std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
+  CallHandler handler = CommandByName(command_name);
+  if (!handler) return nullptr;
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
+    std::unique_ptr<DictionaryValue> params =
+        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
+        dispatchable.Params().size()));
+    ErrorSupport errors;
+    errors.Push();
+    (this->*handler)(dispatchable, params.get(), &errors);
+  };
 }
 
-void DispatcherImpl::dispatch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<protocol::DictionaryValue> messageObject)
-{
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
-    DCHECK(it != m_dispatchMap.end());
-    protocol::ErrorSupport errors;
-    (this->*(it->second))(callId, method, message, std::move(messageObject), &errors);
-}
 
-
-void DispatcherImpl::collectClassNamesFromSubtree(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::collectClassNamesFromSubtree(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<String>> out_classNames;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->collectClassNamesFromSubtree(in_nodeId, &out_classNames);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.collectClassNamesFromSubtree"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("classNames", ValueConversions<protocol::Array<String>>::toValue(out_classNames.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("classNames"), out_classNames, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::copyTo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::copyTo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* targetNodeIdValue = object ? object->get("targetNodeId") : nullptr;
+    protocol::Value* targetNodeIdValue = params ? params->get("targetNodeId") : nullptr;
     errors->SetName("targetNodeId");
     int in_targetNodeId = ValueConversions<int>::fromValue(targetNodeIdValue, errors);
-    protocol::Value* insertBeforeNodeIdValue = object ? object->get("insertBeforeNodeId") : nullptr;
+    protocol::Value* insertBeforeNodeIdValue = params ? params->get("insertBeforeNodeId") : nullptr;
     Maybe<int> in_insertBeforeNodeId;
     if (insertBeforeNodeIdValue) {
         errors->SetName("insertBeforeNodeId");
         in_insertBeforeNodeId = ValueConversions<int>::fromValue(insertBeforeNodeIdValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     int out_nodeId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->copyTo(in_nodeId, in_targetNodeId, std::move(in_insertBeforeNodeId), &out_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.copyTo"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::describeNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::describeNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
         errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
-    protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
+    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
         errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
+    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
         errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    protocol::Value* depthValue = object ? object->get("depth") : nullptr;
+    protocol::Value* depthValue = params ? params->get("depth") : nullptr;
     Maybe<int> in_depth;
     if (depthValue) {
         errors->SetName("depth");
         in_depth = ValueConversions<int>::fromValue(depthValue, errors);
     }
-    protocol::Value* pierceValue = object ? object->get("pierce") : nullptr;
+    protocol::Value* pierceValue = params ? params->get("pierce") : nullptr;
     Maybe<bool> in_pierce;
     if (pierceValue) {
         errors->SetName("pierce");
         in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::DOM::Node> out_node;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->describeNode(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId), std::move(in_depth), std::move(in_pierce), &out_node);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.describeNode"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("node", ValueConversions<protocol::DOM::Node>::toValue(out_node.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("node"), out_node, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::disable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.disable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::discardSearchResults(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::discardSearchResults(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* searchIdValue = object ? object->get("searchId") : nullptr;
+    protocol::Value* searchIdValue = params ? params->get("searchId") : nullptr;
     errors->SetName("searchId");
     String in_searchId = ValueConversions<String>::fromValue(searchIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->discardSearchResults(in_searchId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.discardSearchResults"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::enable(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.enable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::focus(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::focus(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
         errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
-    protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
+    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
         errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
+    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
         errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->focus(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.focus"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::getAttributes(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getAttributes(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<String>> out_attributes;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getAttributes(in_nodeId, &out_attributes);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getAttributes"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("attributes", ValueConversions<protocol::Array<String>>::toValue(out_attributes.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("attributes"), out_attributes, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getBoxModel(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getBoxModel(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
         errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
-    protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
+    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
         errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
+    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
         errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::DOM::BoxModel> out_model;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getBoxModel(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId), &out_model);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getBoxModel"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("model", ValueConversions<protocol::DOM::BoxModel>::toValue(out_model.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("model"), out_model, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getContentQuads(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getContentQuads(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
         errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
-    protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
+    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
         errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
+    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
         errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Array<double>>> out_quads;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getContentQuads(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId), &out_quads);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getContentQuads"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("quads", ValueConversions<protocol::Array<protocol::Array<double>>>::toValue(out_quads.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("quads"), out_quads, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getDocument(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* depthValue = object ? object->get("depth") : nullptr;
+    protocol::Value* depthValue = params ? params->get("depth") : nullptr;
     Maybe<int> in_depth;
     if (depthValue) {
         errors->SetName("depth");
         in_depth = ValueConversions<int>::fromValue(depthValue, errors);
     }
-    protocol::Value* pierceValue = object ? object->get("pierce") : nullptr;
+    protocol::Value* pierceValue = params ? params->get("pierce") : nullptr;
     Maybe<bool> in_pierce;
     if (pierceValue) {
         errors->SetName("pierce");
         in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::DOM::Node> out_root;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getDocument(std::move(in_depth), std::move(in_pierce), &out_root);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getDocument"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("root", ValueConversions<protocol::DOM::Node>::toValue(out_root.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("root"), out_root, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getFlattenedDocument(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getFlattenedDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* depthValue = object ? object->get("depth") : nullptr;
+    protocol::Value* depthValue = params ? params->get("depth") : nullptr;
     Maybe<int> in_depth;
     if (depthValue) {
         errors->SetName("depth");
         in_depth = ValueConversions<int>::fromValue(depthValue, errors);
     }
-    protocol::Value* pierceValue = object ? object->get("pierce") : nullptr;
+    protocol::Value* pierceValue = params ? params->get("pierce") : nullptr;
     Maybe<bool> in_pierce;
     if (pierceValue) {
         errors->SetName("pierce");
         in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::DOM::Node>> out_nodes;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getFlattenedDocument(std::move(in_depth), std::move(in_pierce), &out_nodes);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getFlattenedDocument"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodes", ValueConversions<protocol::Array<protocol::DOM::Node>>::toValue(out_nodes.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodes"), out_nodes, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getNodeForLocation(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getNodeForLocation(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* xValue = object ? object->get("x") : nullptr;
+    protocol::Value* xValue = params ? params->get("x") : nullptr;
     errors->SetName("x");
     int in_x = ValueConversions<int>::fromValue(xValue, errors);
-    protocol::Value* yValue = object ? object->get("y") : nullptr;
+    protocol::Value* yValue = params ? params->get("y") : nullptr;
     errors->SetName("y");
     int in_y = ValueConversions<int>::fromValue(yValue, errors);
-    protocol::Value* includeUserAgentShadowDOMValue = object ? object->get("includeUserAgentShadowDOM") : nullptr;
+    protocol::Value* includeUserAgentShadowDOMValue = params ? params->get("includeUserAgentShadowDOM") : nullptr;
     Maybe<bool> in_includeUserAgentShadowDOM;
     if (includeUserAgentShadowDOMValue) {
         errors->SetName("includeUserAgentShadowDOM");
         in_includeUserAgentShadowDOM = ValueConversions<bool>::fromValue(includeUserAgentShadowDOMValue, errors);
     }
-    protocol::Value* ignorePointerEventsNoneValue = object ? object->get("ignorePointerEventsNone") : nullptr;
+    protocol::Value* ignorePointerEventsNoneValue = params ? params->get("ignorePointerEventsNone") : nullptr;
     Maybe<bool> in_ignorePointerEventsNone;
     if (ignorePointerEventsNoneValue) {
         errors->SetName("ignorePointerEventsNone");
         in_ignorePointerEventsNone = ValueConversions<bool>::fromValue(ignorePointerEventsNoneValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     int out_backendNodeId;
     String out_frameId;
     Maybe<int> out_nodeId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getNodeForLocation(in_x, in_y, std::move(in_includeUserAgentShadowDOM), std::move(in_ignorePointerEventsNone), &out_backendNodeId, &out_frameId, &out_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getNodeForLocation"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("backendNodeId", ValueConversions<int>::toValue(out_backendNodeId));
-        result->setValue("frameId", ValueConversions<String>::toValue(out_frameId));
-        if (out_nodeId.isJust())
-            result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), out_backendNodeId, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("frameId"), out_frameId, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getOuterHTML(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getOuterHTML(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
         errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
-    protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
+    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
         errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
+    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
         errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_outerHTML;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getOuterHTML(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId), &out_outerHTML);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getOuterHTML"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("outerHTML", ValueConversions<String>::toValue(out_outerHTML));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("outerHTML"), out_outerHTML, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getRelayoutBoundary(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getRelayoutBoundary(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     int out_nodeId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getRelayoutBoundary(in_nodeId, &out_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getRelayoutBoundary"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getSearchResults(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getSearchResults(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* searchIdValue = object ? object->get("searchId") : nullptr;
+    protocol::Value* searchIdValue = params ? params->get("searchId") : nullptr;
     errors->SetName("searchId");
     String in_searchId = ValueConversions<String>::fromValue(searchIdValue, errors);
-    protocol::Value* fromIndexValue = object ? object->get("fromIndex") : nullptr;
+    protocol::Value* fromIndexValue = params ? params->get("fromIndex") : nullptr;
     errors->SetName("fromIndex");
     int in_fromIndex = ValueConversions<int>::fromValue(fromIndexValue, errors);
-    protocol::Value* toIndexValue = object ? object->get("toIndex") : nullptr;
+    protocol::Value* toIndexValue = params ? params->get("toIndex") : nullptr;
     errors->SetName("toIndex");
     int in_toIndex = ValueConversions<int>::fromValue(toIndexValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<int>> out_nodeIds;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getSearchResults(in_searchId, in_fromIndex, in_toIndex, &out_nodeIds);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getSearchResults"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeIds", ValueConversions<protocol::Array<int>>::toValue(out_nodeIds.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeIds"), out_nodeIds, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::markUndoableState(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::markUndoableState(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->markUndoableState();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.markUndoableState"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::moveTo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::moveTo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* targetNodeIdValue = object ? object->get("targetNodeId") : nullptr;
+    protocol::Value* targetNodeIdValue = params ? params->get("targetNodeId") : nullptr;
     errors->SetName("targetNodeId");
     int in_targetNodeId = ValueConversions<int>::fromValue(targetNodeIdValue, errors);
-    protocol::Value* insertBeforeNodeIdValue = object ? object->get("insertBeforeNodeId") : nullptr;
+    protocol::Value* insertBeforeNodeIdValue = params ? params->get("insertBeforeNodeId") : nullptr;
     Maybe<int> in_insertBeforeNodeId;
     if (insertBeforeNodeIdValue) {
         errors->SetName("insertBeforeNodeId");
         in_insertBeforeNodeId = ValueConversions<int>::fromValue(insertBeforeNodeIdValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     int out_nodeId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->moveTo(in_nodeId, in_targetNodeId, std::move(in_insertBeforeNodeId), &out_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.moveTo"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::performSearch(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::performSearch(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* queryValue = object ? object->get("query") : nullptr;
+    protocol::Value* queryValue = params ? params->get("query") : nullptr;
     errors->SetName("query");
     String in_query = ValueConversions<String>::fromValue(queryValue, errors);
-    protocol::Value* includeUserAgentShadowDOMValue = object ? object->get("includeUserAgentShadowDOM") : nullptr;
+    protocol::Value* includeUserAgentShadowDOMValue = params ? params->get("includeUserAgentShadowDOM") : nullptr;
     Maybe<bool> in_includeUserAgentShadowDOM;
     if (includeUserAgentShadowDOMValue) {
         errors->SetName("includeUserAgentShadowDOM");
         in_includeUserAgentShadowDOM = ValueConversions<bool>::fromValue(includeUserAgentShadowDOMValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_searchId;
     int out_resultCount;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->performSearch(in_query, std::move(in_includeUserAgentShadowDOM), &out_searchId, &out_resultCount);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.performSearch"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("searchId", ValueConversions<String>::toValue(out_searchId));
-        result->setValue("resultCount", ValueConversions<int>::toValue(out_resultCount));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("searchId"), out_searchId, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("resultCount"), out_resultCount, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::pushNodeByPathToFrontend(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::pushNodeByPathToFrontend(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* pathValue = object ? object->get("path") : nullptr;
+    protocol::Value* pathValue = params ? params->get("path") : nullptr;
     errors->SetName("path");
     String in_path = ValueConversions<String>::fromValue(pathValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     int out_nodeId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->pushNodeByPathToFrontend(in_path, &out_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.pushNodeByPathToFrontend"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::pushNodesByBackendIdsToFrontend(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::pushNodesByBackendIdsToFrontend(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* backendNodeIdsValue = object ? object->get("backendNodeIds") : nullptr;
+    protocol::Value* backendNodeIdsValue = params ? params->get("backendNodeIds") : nullptr;
     errors->SetName("backendNodeIds");
     std::unique_ptr<protocol::Array<int>> in_backendNodeIds = ValueConversions<protocol::Array<int>>::fromValue(backendNodeIdsValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<int>> out_nodeIds;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->pushNodesByBackendIdsToFrontend(std::move(in_backendNodeIds), &out_nodeIds);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.pushNodesByBackendIdsToFrontend"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeIds", ValueConversions<protocol::Array<int>>::toValue(out_nodeIds.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeIds"), out_nodeIds, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::querySelector(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::querySelector(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* selectorValue = object ? object->get("selector") : nullptr;
+    protocol::Value* selectorValue = params ? params->get("selector") : nullptr;
     errors->SetName("selector");
     String in_selector = ValueConversions<String>::fromValue(selectorValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     int out_nodeId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->querySelector(in_nodeId, in_selector, &out_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.querySelector"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::querySelectorAll(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::querySelectorAll(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* selectorValue = object ? object->get("selector") : nullptr;
+    protocol::Value* selectorValue = params ? params->get("selector") : nullptr;
     errors->SetName("selector");
     String in_selector = ValueConversions<String>::fromValue(selectorValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<int>> out_nodeIds;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->querySelectorAll(in_nodeId, in_selector, &out_nodeIds);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.querySelectorAll"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeIds", ValueConversions<protocol::Array<int>>::toValue(out_nodeIds.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeIds"), out_nodeIds, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::redo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::redo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->redo();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.redo"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::removeAttribute(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::removeAttribute(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* nameValue = object ? object->get("name") : nullptr;
+    protocol::Value* nameValue = params ? params->get("name") : nullptr;
     errors->SetName("name");
     String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->removeAttribute(in_nodeId, in_name);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.removeAttribute"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::removeNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::removeNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->removeNode(in_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.removeNode"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::requestChildNodes(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::requestChildNodes(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* depthValue = object ? object->get("depth") : nullptr;
+    protocol::Value* depthValue = params ? params->get("depth") : nullptr;
     Maybe<int> in_depth;
     if (depthValue) {
         errors->SetName("depth");
         in_depth = ValueConversions<int>::fromValue(depthValue, errors);
     }
-    protocol::Value* pierceValue = object ? object->get("pierce") : nullptr;
+    protocol::Value* pierceValue = params ? params->get("pierce") : nullptr;
     Maybe<bool> in_pierce;
     if (pierceValue) {
         errors->SetName("pierce");
         in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->requestChildNodes(in_nodeId, std::move(in_depth), std::move(in_pierce));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.requestChildNodes"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::requestNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::requestNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
+    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
     errors->SetName("objectId");
     String in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     int out_nodeId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->requestNode(in_objectId, &out_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.requestNode"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::resolveNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::resolveNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
         errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
-    protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
+    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
         errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
-    protocol::Value* objectGroupValue = object ? object->get("objectGroup") : nullptr;
+    protocol::Value* objectGroupValue = params ? params->get("objectGroup") : nullptr;
     Maybe<String> in_objectGroup;
     if (objectGroupValue) {
         errors->SetName("objectGroup");
         in_objectGroup = ValueConversions<String>::fromValue(objectGroupValue, errors);
     }
-    protocol::Value* executionContextIdValue = object ? object->get("executionContextId") : nullptr;
+    protocol::Value* executionContextIdValue = params ? params->get("executionContextId") : nullptr;
     Maybe<int> in_executionContextId;
     if (executionContextIdValue) {
         errors->SetName("executionContextId");
         in_executionContextId = ValueConversions<int>::fromValue(executionContextIdValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Runtime::RemoteObject> out_object;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->resolveNode(std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectGroup), std::move(in_executionContextId), &out_object);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.resolveNode"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("object", ValueConversions<protocol::Runtime::RemoteObject>::toValue(out_object.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("object"), out_object, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setAttributeValue(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setAttributeValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* nameValue = object ? object->get("name") : nullptr;
+    protocol::Value* nameValue = params ? params->get("name") : nullptr;
     errors->SetName("name");
     String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    protocol::Value* valueValue = object ? object->get("value") : nullptr;
+    protocol::Value* valueValue = params ? params->get("value") : nullptr;
     errors->SetName("value");
     String in_value = ValueConversions<String>::fromValue(valueValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setAttributeValue(in_nodeId, in_name, in_value);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setAttributeValue"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setAttributesAsText(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setAttributesAsText(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* textValue = object ? object->get("text") : nullptr;
+    protocol::Value* textValue = params ? params->get("text") : nullptr;
     errors->SetName("text");
     String in_text = ValueConversions<String>::fromValue(textValue, errors);
-    protocol::Value* nameValue = object ? object->get("name") : nullptr;
+    protocol::Value* nameValue = params ? params->get("name") : nullptr;
     Maybe<String> in_name;
     if (nameValue) {
         errors->SetName("name");
         in_name = ValueConversions<String>::fromValue(nameValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setAttributesAsText(in_nodeId, in_text, std::move(in_name));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setAttributesAsText"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setFileInputFiles(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setFileInputFiles(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* filesValue = object ? object->get("files") : nullptr;
+    protocol::Value* filesValue = params ? params->get("files") : nullptr;
     errors->SetName("files");
     std::unique_ptr<protocol::Array<String>> in_files = ValueConversions<protocol::Array<String>>::fromValue(filesValue, errors);
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     Maybe<int> in_nodeId;
     if (nodeIdValue) {
         errors->SetName("nodeId");
         in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     }
-    protocol::Value* backendNodeIdValue = object ? object->get("backendNodeId") : nullptr;
+    protocol::Value* backendNodeIdValue = params ? params->get("backendNodeId") : nullptr;
     Maybe<int> in_backendNodeId;
     if (backendNodeIdValue) {
         errors->SetName("backendNodeId");
         in_backendNodeId = ValueConversions<int>::fromValue(backendNodeIdValue, errors);
     }
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
+    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
     Maybe<String> in_objectId;
     if (objectIdValue) {
         errors->SetName("objectId");
         in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
     }
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setFileInputFiles(std::move(in_files), std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setFileInputFiles"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setNodeStackTracesEnabled(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setNodeStackTracesEnabled(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* enableValue = object ? object->get("enable") : nullptr;
+    protocol::Value* enableValue = params ? params->get("enable") : nullptr;
     errors->SetName("enable");
     bool in_enable = ValueConversions<bool>::fromValue(enableValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setNodeStackTracesEnabled(in_enable);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setNodeStackTracesEnabled"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::getNodeStackTraces(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getNodeStackTraces(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<protocol::Runtime::StackTrace> out_creation;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getNodeStackTraces(in_nodeId, &out_creation);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getNodeStackTraces"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        if (out_creation.isJust())
-            result->setValue("creation", ValueConversions<protocol::Runtime::StackTrace>::toValue(out_creation.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("creation"), out_creation, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getFileInfo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getFileInfo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
+    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
     errors->SetName("objectId");
     String in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_path;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getFileInfo(in_objectId, &out_path);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getFileInfo"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("path", ValueConversions<String>::toValue(out_path));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("path"), out_path, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setInspectedNode(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setInspectedNode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setInspectedNode(in_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setInspectedNode"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setNodeName(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setNodeName(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* nameValue = object ? object->get("name") : nullptr;
+    protocol::Value* nameValue = params ? params->get("name") : nullptr;
     errors->SetName("name");
     String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     int out_nodeId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setNodeName(in_nodeId, in_name, &out_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setNodeName"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setNodeValue(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setNodeValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* valueValue = object ? object->get("value") : nullptr;
+    protocol::Value* valueValue = params ? params->get("value") : nullptr;
     errors->SetName("value");
     String in_value = ValueConversions<String>::fromValue(valueValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setNodeValue(in_nodeId, in_value);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setNodeValue"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setOuterHTML(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setOuterHTML(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    protocol::Value* nodeIdValue = params ? params->get("nodeId") : nullptr;
     errors->SetName("nodeId");
     int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
-    protocol::Value* outerHTMLValue = object ? object->get("outerHTML") : nullptr;
+    protocol::Value* outerHTMLValue = params ? params->get("outerHTML") : nullptr;
     errors->SetName("outerHTML");
     String in_outerHTML = ValueConversions<String>::fromValue(outerHTMLValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setOuterHTML(in_nodeId, in_outerHTML);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.setOuterHTML"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::undo(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::undo(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->undo();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.undo"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::getFrameOwner(int callId, const String& method, v8_crdtp::span<uint8_t> message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getFrameOwner(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->Push();
-    protocol::Value* frameIdValue = object ? object->get("frameId") : nullptr;
+    protocol::Value* frameIdValue = params ? params->get("frameId") : nullptr;
     errors->SetName("frameId");
     String in_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
-    errors->Pop();
-    if (!errors->Errors().empty()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     int out_backendNodeId;
     Maybe<int> out_nodeId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getFrameOwner(in_frameId, &out_backendNodeId, &out_nodeId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getFrameOwner"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("backendNodeId", ValueConversions<int>::toValue(out_backendNodeId));
-        if (out_nodeId.isJust())
-            result->setValue("nodeId", ValueConversions<int>::toValue(out_nodeId.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("backendNodeId"), out_backendNodeId, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("nodeId"), out_nodeId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
+
+namespace {
+// This helper method (with a static map of redirects) is used from Dispatcher::wire
+// immediately below.
+const std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>& SortedRedirects() {
+  static auto* redirects = [](){
+    auto* redirects = new std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>{
+          { v8_crdtp::SpanFrom("DOM.hideHighlight"), v8_crdtp::SpanFrom("Overlay.hideHighlight") },
+          { v8_crdtp::SpanFrom("DOM.highlightNode"), v8_crdtp::SpanFrom("Overlay.highlightNode") },
+          { v8_crdtp::SpanFrom("DOM.highlightRect"), v8_crdtp::SpanFrom("Overlay.highlightRect") },
+    };
+    return redirects;
+  }();
+  return *redirects;
+}
+}  // namespace
 
 // static
 void Dispatcher::wire(UberDispatcher* uber, Backend* backend)
 {
-    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend));
-    uber->setupRedirects(dispatcher->redirects());
-    uber->registerBackend("DOM", std::move(dispatcher));
+    auto dispatcher = std::make_unique<DomainDispatcherImpl>(uber->channel(), backend);
+    uber->WireBackend(v8_crdtp::SpanFrom("DOM"), SortedRedirects(), std::move(dispatcher));
 }
 
 } // DOM
