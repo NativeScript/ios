@@ -10,6 +10,7 @@
 #include "SymbolLoader.h"
 #include "ArrayAdapter.h"
 #include "NSDataAdapter.h"
+#include "Constants.h"
 #include "Caches.h"
 #include "Reference.h"
 #include "Pointer.h"
@@ -1367,7 +1368,9 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
         SEL selector = methodCall.selector_;
         if (isInstanceMethod) {
-            SEL swizzledMethodSelector = NSSelectorFromString([@"__" stringByAppendingString:NSStringFromSelector(selector)]);
+            NSString* selectorStr = NSStringFromSelector(selector);
+            NSString* swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
+            SEL swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
             if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
                 selector = swizzledMethodSelector;
             }
