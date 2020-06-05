@@ -372,6 +372,8 @@
 		C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */; };
 		C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */; };
 		C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */; };
+		C2D21600248AAAD900EDC646 /* Constants.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D215FE248AAAD900EDC646 /* Constants.cpp */; };
+		C2D21601248AAAD900EDC646 /* Constants.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D215FF248AAAD900EDC646 /* Constants.h */; };
 		C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D71D7523E18C41000CD5F0 /* robin_hood.h */; };
 		C2D7E9CD23F4024200DB289C /* error_support.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9CC23F4024200DB289C /* error_support.h */; };
 		C2D7E9CF23F4294800DB289C /* export-template.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9CE23F4294800DB289C /* export-template.h */; };
@@ -948,6 +950,8 @@
 		C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SimpleAllocator.h; sourceTree = "<group>"; };
 		C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = FastEnumerationAdapter.mm; sourceTree = "<group>"; };
 		C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FastEnumerationAdapter.h; sourceTree = "<group>"; };
+		C2D215FE248AAAD900EDC646 /* Constants.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Constants.cpp; sourceTree = "<group>"; };
+		C2D215FF248AAAD900EDC646 /* Constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Constants.h; sourceTree = "<group>"; };
 		C2D71D7523E18C41000CD5F0 /* robin_hood.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = robin_hood.h; sourceTree = "<group>"; };
 		C2D7E9CC23F4024200DB289C /* error_support.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = error_support.h; sourceTree = "<group>"; };
 		C2D7E9CE23F4294800DB289C /* export-template.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "export-template.h"; sourceTree = "<group>"; };
@@ -1882,6 +1886,8 @@
 				C22C092122CA3F370080D176 /* Worker.h */,
 				C22C092022CA3F370080D176 /* Worker.mm */,
 				C23E8F7422CDE88D0078FD4C /* WorkerWrapper.mm */,
+				C2D215FF248AAAD900EDC646 /* Constants.h */,
+				C2D215FE248AAAD900EDC646 /* Constants.cpp */,
 			);
 			path = runtime;
 			sourceTree = "<group>";
@@ -1940,6 +1946,7 @@
 				C247C33122F828E3001D2CA2 /* JsV8InspectorClient.h in Headers */,
 				C2B30FDA238418CA009D6A46 /* export.h in Headers */,
 				C247C16E22F82842001D2CA2 /* Debugger.h in Headers */,
+				C2D21601248AAAD900EDC646 /* Constants.h in Headers */,
 				C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */,
 				C247C39922F828E3001D2CA2 /* checks.h in Headers */,
 				C247C3A622F828E3001D2CA2 /* logging.h in Headers */,
@@ -2599,6 +2606,7 @@
 				C247C37E22F828E3001D2CA2 /* v8-stack-trace-impl.cc in Sources */,
 				C247C33022F828E3001D2CA2 /* base64.cpp in Sources */,
 				C247C33D22F828E3001D2CA2 /* v8-profiler-agent-impl.cc in Sources */,
+				C2D21600248AAAD900EDC646 /* Constants.cpp in Sources */,
 				C2DDEB9E229EAC8300345BFE /* SymbolLoader.mm in Sources */,
 				C247C37222F828E3001D2CA2 /* Debugger.cpp in Sources */,
 				C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */,

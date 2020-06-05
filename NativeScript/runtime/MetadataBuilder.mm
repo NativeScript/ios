@@ -5,6 +5,7 @@
 #include "ObjectManager.h"
 #include "InlineFunctions.h"
 #include "SymbolLoader.h"
+#include "Constants.h"
 #include "Helpers.h"
 #include "Interop.h"
 #include "Worker.h"
@@ -870,7 +871,7 @@ void MetadataBuilder::SwizzledInstanceMethodCallback(Local<v8::Name> property, L
     IMP nativeImp = class_replaceMethod(klass, methodMeta->selector(), methodBody, compilerEncoding.c_str());
     if (nativeImp) {
         std::string selector = methodMeta->selectorAsString();
-        SEL nativeSelector = sel_registerName(("__" + selector).c_str());
+        SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
         class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding.c_str());
     }
 }
@@ -930,7 +931,7 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const P
         IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback, userData);
         IMP nativeImp = class_replaceMethod(klass, propertyMeta->getter()->selector(), impGetter, compilerEncoding);
         std::string selector = propertyMeta->getter()->selectorAsString();
-        SEL nativeSelector = sel_registerName(("__" + selector).c_str());
+        SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
         class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding);
     }
 
@@ -970,7 +971,7 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const P
         const char* compilerEncoding = "v@:@";
         IMP nativeImp = class_replaceMethod(klass, propertyMeta->setter()->selector(), impSetter, compilerEncoding);
         std::string selector = propertyMeta->setter()->selectorAsString();
-        SEL nativeSelector = sel_registerName(("__" + selector).c_str());
+        SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
         class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding);
     }
 }
