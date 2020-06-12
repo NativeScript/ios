@@ -26,6 +26,8 @@
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array/>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Listen Music</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

@@ -2,4 +2,6 @@
 
 @interface TNSClassWithPlaceholder : NSObject
 
+@property(readonly) TNSClassWithPlaceholder* testEmbeddedClass;
+
 @end

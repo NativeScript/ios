@@ -25,6 +25,10 @@
     return (id)[[TNSClassWithPlaceholderReal alloc] init];
 }
 
+- (TNSClassWithPlaceholder*)testEmbeddedClass {
+    return (id)[[TNSClassWithPlaceholderReal alloc] init];
+}
+
 #pragma clang diagnostic pop
 
 - (instancetype)retain {
@@ -49,6 +53,10 @@
     }
 
     return [super alloc];
+}
+
+- (TNSClassWithPlaceholder*)testEmbeddedClass {
+    return [TNSClassWithPlaceholderPlaceholder alloc];
 }
 
 @end
