@@ -90,7 +90,7 @@ describe("NSNotificationCenter", function () {
    * however it's only a NSProxy with no valid properties
    * This same code works 100% in JavaScript Core runtime where the nowPlayingItem has all valid properties with valid values
    */
-  it("Apple Music should emit nowPlayingItem MPMediaItem stance", done => {
+  it("Apple Music should emit nowPlayingItem MPMediaItem instance and not NSProxy object", done => {
     new Promise((resolve, reject) => {
       var observers = [];
 
