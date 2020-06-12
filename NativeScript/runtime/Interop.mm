@@ -1013,6 +1013,12 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             return it->second->Get(isolate);
         }
 
+        if ([result isProxy]) {
+            printf("NSPROXY!!!!!!! \n");
+            /**
+                            NSProxy must be handled here
+             */
+        }
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
         Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
 

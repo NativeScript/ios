@@ -39,48 +39,50 @@ global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).str
 
 require("./Infrastructure/Jasmine/jasmine-2.0.1/boot");
 
+
+
 describe("NSNotificationCenter", function () {
 
   /**
    * Trying to check if simpler case could exhibit same behavior with native classes as properties on the notification object
    * however this case appears to work fine
    */
-  it("NSNotification object should be native class and not NSProxy", done => {
-    new Promise((resolve, reject) => {
-
-      var observers = [];
-      var observer = NSNotificationCenter.defaultCenter.addObserverForNameObjectQueueUsingBlock(
-          'testv8',
-          null,
-          null,
-          function(notification) {
-            console.log('notification:', notification);
-            console.log('notification.name:', notification.name);
-            console.log('notification.object:', notification.object);
-            console.log('notification.object.testEmbeddedClass:', notification.object.testEmbeddedClass);
-            console.log('typeof notification.object:', typeof notification.object);
-            console.log('notification.object.constructor.name:', notification.object.constructor.name);
-            resolve(true);
-          }
-        );
-        observers.push(observer);
-
-        setTimeout(() => {
-          var obj = new TNSClassWithPlaceholder();
-
-          expect(obj.description).toBe("real");
-          NSNotificationCenter.defaultCenter.postNotificationNameObject('testv8', obj);
-        }, 1000);
-
-    }).then(res => {
-        expect(res).toBe(true);
-    }).catch(e => {
-        expect(true).toBe(false, "The catch callback of the promise was called");
-        done();
-    }).finally(() => {
-        done();
-    });
-  });
+//  it("NSNotification object should be native class and not NSProxy", done => {
+//    new Promise((resolve, reject) => {
+//
+//      var observers = [];
+//      var observer = NSNotificationCenter.defaultCenter.addObserverForNameObjectQueueUsingBlock(
+//          'testv8',
+//          null,
+//          null,
+//          function(notification) {
+//            console.log('notification:', notification);
+//            console.log('notification.name:', notification.name);
+//            console.log('notification.object:', notification.object);
+//            console.log('notification.object.testEmbeddedClass:', notification.object.testEmbeddedClass);
+//            console.log('typeof notification.object:', typeof notification.object);
+//            console.log('notification.object.constructor.name:', notification.object.constructor.name);
+//            resolve(true);
+//          }
+//        );
+//        observers.push(observer);
+//
+//        setTimeout(() => {
+//          var obj = new TNSClassWithPlaceholder();
+//
+//          expect(obj.description).toBe("real");
+//          NSNotificationCenter.defaultCenter.postNotificationNameObject('testv8', obj);
+//        }, 1000);
+//
+//    }).then(res => {
+//        expect(res).toBe(true);
+//    }).catch(e => {
+//        expect(true).toBe(false, "The catch callback of the promise was called");
+//        done();
+//    }).finally(() => {
+//        done();
+//    });
+//  });
 
   /**
    * Problem Case:
@@ -99,8 +101,8 @@ describe("NSNotificationCenter", function () {
           if (error) {
             console.log('prepareToPlayWithCompletionHandler error:', error);
           }
-          console.log('MPMusicPlayerController.systemMusicPlayer:', MPMusicPlayerController.systemMusicPlayer);
-          console.log('MPMusicPlayerController.systemMusicPlayer.nowPlayingItem:', MPMusicPlayerController.systemMusicPlayer.nowPlayingItem);
+//          console.log('MPMusicPlayerController.systemMusicPlayer:', MPMusicPlayerController.systemMusicPlayer);
+//          console.log('MPMusicPlayerController.systemMusicPlayer.nowPlayingItem:', MPMusicPlayerController.systemMusicPlayer.nowPlayingItem);
           MPMusicPlayerController.systemMusicPlayer.play();
           MPMusicPlayerController.systemMusicPlayer.currentPlaybackRate = 1.0;
         });
@@ -110,11 +112,11 @@ describe("NSNotificationCenter", function () {
             null,
             null,
             function(notification) {
-              console.log('notification:', notification);
-              console.log('notification.name:', notification.name);
+//              console.log('notification:', notification);
+//              console.log('notification.name:', notification.name);
               if (notification.object) {
-                console.log('notification.object:', notification.object);
-                console.log('notification.object.constructor.name:', notification.object.constructor.name);
+//                console.log('notification.object:', notification.object);
+//                console.log('notification.object.constructor.name:', notification.object.constructor.name);
                 if (notification.object.nowPlayingItem) {
                   console.log('notification.object.nowPlayingItem:', notification.object.nowPlayingItem);
                   console.log('SHOULD HAVE THIS PROPERTY nowPlayingItem.playbackStoreID:', notification.object.nowPlayingItem.playbackStoreID);
@@ -133,7 +135,7 @@ describe("NSNotificationCenter", function () {
           if (error) {
             console.log('requestCapabilitiesWithCompletionHandler error:', error);
           }
-          console.log('capability:', capability);
+//          console.log('capability:', capability);
           
           // switch (capability) {
           //   case SKCloudServiceCapability.MusicCatalogPlayback:
