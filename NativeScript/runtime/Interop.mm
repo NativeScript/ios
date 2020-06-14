@@ -1008,17 +1008,37 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         }
 
         auto cache = Caches::Get(isolate);
+
+        if ([result isProxy]) {
+            // find concrete class from proxy
+            while (true) {
+                const char* name = class_getName([result class]);
+
+                const Meta* meta = ArgConverter::GetMeta(name);
+                if (meta != nullptr && (meta->type() == MetaType::Interface || meta->type() == MetaType::ProtocolType)) {
+                    const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
+                    Class knownClass = meta->type() == MetaType::Interface ? objc_getClass(meta->name()) : nil;
+                    KnownUnknownClassPair pair(knownClass);
+                    cache->ObjectCtorInitializer(context, baseMeta, pair);
+                }
+
+                // Peek at class:
+                // printf("NSProxy class: %s", name);
+
+                id superCheck = class_getSuperclass(result);
+                if (superCheck) {
+                    result = superCheck;
+                } else {
+                    break;
+                }
+            }
+        }
+        
         auto it = cache->Instances.find(result);
         if (it != cache->Instances.end()) {
             return it->second->Get(isolate);
         }
-
-        if ([result isProxy]) {
-            printf("NSPROXY!!!!!!! \n");
-            /**
-                            NSProxy must be handled here
-             */
-        }
+        
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
         Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
 
