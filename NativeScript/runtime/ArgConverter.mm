@@ -577,9 +577,11 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     }
 
     id target = nil;
+    const TypeEncoding* typeEncoding = nullptr;
     if (wrapper->Type() == WrapperType::ObjCObject) {
         ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
         target = dataWrapper->Data();
+        typeEncoding = dataWrapper->TypeEncoding();
     }
 
     if (target == nil) {
@@ -603,7 +605,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     }
 
     Class klass = [target class];
-    const Meta* meta = FindMeta(klass);
+    const Meta* meta = FindMeta(klass, typeEncoding);
     if (meta != nullptr) {
         std::string className = object_getClassName(target);
         auto it = cache->ClassPrototypes.find(className);
@@ -639,7 +641,15 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     return receiver;
 }
 
-const Meta* ArgConverter::FindMeta(Class klass) {
+const Meta* ArgConverter::FindMeta(Class klass, const TypeEncoding* typeEncoding) {
+    if (typeEncoding != nullptr && typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+        const char* name = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
+        const Meta* result = GetMeta(name);
+        if (result != nullptr && result->type() == MetaType::Interface) {
+            return result;
+        }
+    }
+
     std::string origClassName = class_getName(klass);
     const Meta* meta = Caches::Metadata.Get(origClassName);
     if (meta != nullptr) {
