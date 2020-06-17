@@ -80,6 +80,10 @@ require("./RuntimeImplementedAPIs");
 // Tests common for all runtimes.
 require("./shared/index").runAllTests();
 
+// (Optional) Custom testing for various optional sdk's and frameworks
+// These can be turned on manually to verify if needed anytime
+//require("./sdks/MusicKit");
+
 execute();
 
 UIApplicationMain(0, null, null, null);

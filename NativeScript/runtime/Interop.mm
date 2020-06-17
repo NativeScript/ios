@@ -1013,7 +1013,11 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             return it->second->Get(isolate);
         }
 
-        ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
+        // For NSProxy we will try to read the metadata from typeEncoding->details.interfaceDeclarationReference.name
+        // because class_getSuperclass will directly return NSProxy and thus missing to attach all instance members
+        const TypeEncoding* te = [result isProxy] ? typeEncoding : nullptr;
+
+        ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
         Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
 
         PtrTo<Array<PtrTo<char>>> additionalProtocols;

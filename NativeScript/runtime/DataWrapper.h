@@ -405,8 +405,8 @@ private:
 
 class ObjCDataWrapper: public BaseDataWrapper {
 public:
-    ObjCDataWrapper(id data)
-        : data_(data) {
+    ObjCDataWrapper(id data, const TypeEncoding* typeEncoding = nullptr)
+        : data_(data), typeEncoding_(typeEncoding) {
     }
 
     const WrapperType Type() {
@@ -416,8 +416,13 @@ public:
     id Data() {
         return this->data_;
     }
+
+    const TypeEncoding* TypeEncoding() {
+        return this->typeEncoding_;
+    }
 private:
     id data_;
+    const tns::TypeEncoding* typeEncoding_;
 };
 
 class ObjCClassWrapper: public BaseDataWrapper {

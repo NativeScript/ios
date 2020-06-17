@@ -35,7 +35,7 @@ public:
     static v8::Local<v8::Value> CreateJsWrapper(v8::Local<v8::Context> context, BaseDataWrapper* wrapper, v8::Local<v8::Object> receiver, bool skipGCRegistration = false);
     static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyObject(v8::Local<v8::Context> context, bool skipGCRegistration = false);
     static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyStruct(v8::Local<v8::Context> context);
-    static const Meta* FindMeta(Class klass);
+    static const Meta* FindMeta(Class klass, const TypeEncoding* typeEncoding = nullptr);
     static const Meta* GetMeta(std::string name);
     static const ProtocolMeta* FindProtocolMeta(Protocol* protocol);
     static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData);
