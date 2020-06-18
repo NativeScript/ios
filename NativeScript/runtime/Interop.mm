@@ -1165,9 +1165,7 @@ void Interop::AttachProtocols(Local<Context> context, Local<Object> instance, Pt
     Isolate* isolate = context->GetIsolate();
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
-    Local<Object> prototype = instance->GetPrototype().As<Object>()->Clone();
-    bool success = instance->SetPrototype(context, prototype).FromMaybe(false);
-    tns::Assert(success, isolate);
+    Local<Object> prototype = instance->GetPrototype().As<Object>();
     for (auto it = protocols->begin(); it != protocols->end(); it++) {
         const char* protocolName = (*it).valuePtr();
         const Meta* protocolMeta = ArgConverter::GetMeta(protocolName);
@@ -1182,8 +1180,8 @@ void Interop::AttachProtocols(Local<Context> context, Local<Object> instance, Pt
         }
 
         Local<Object> protocolPrototype = protoIt->second->Get(isolate).As<Object>();
-        bool success = prototype->SetPrototype(context, protocolPrototype).FromMaybe(false);
-        tns::Assert(success, isolate);
+
+        prototype->SetPrototype(context, protocolPrototype).FromMaybe(false);
 
         prototype = protocolPrototype;
     }
