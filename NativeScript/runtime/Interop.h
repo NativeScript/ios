@@ -4,6 +4,7 @@
 #include <CoreFoundation/CFBase.h>
 #include <objc/message.h>
 #include "libffi.h"
+#include "Caches.h"
 #include "Common.h"
 #include "Metadata.h"
 #include "DataWrapper.h"
@@ -140,6 +141,7 @@ private:
     static bool IsNumbericType(BinaryTypeEncodingType type);
     static v8::Local<v8::Object> GetInteropType(v8::Local<v8::Context> context, BinaryTypeEncodingType type);
     static void AttachProtocols(v8::Local<v8::Context> context, v8::Local<v8::Object> instance, PtrTo<Array<PtrTo<char>>> protocols, KnownUnknownClassPair pair);
+    static v8::Local<v8::Object> ShallowClone(std::shared_ptr<Caches> cache, v8::Local<v8::Context> context, v8::Local<v8::Value> source);
 
     template <typename T>
     static inline void SetValue(void* dest, T value) {

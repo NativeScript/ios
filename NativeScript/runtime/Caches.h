@@ -85,6 +85,7 @@ public:
     std::unique_ptr<v8::Persistent<v8::Function>> InteropReferenceCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
     std::unique_ptr<v8::Persistent<v8::Function>> PointerCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
     std::unique_ptr<v8::Persistent<v8::Function>> FunctionReferenceCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+    std::unique_ptr<v8::Persistent<v8::Function>> ObjectAssignFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 private:
     static ConcurrentMap<v8::Isolate*, std::shared_ptr<Caches>> perIsolateCaches_;
     v8::Isolate* isolate_;
