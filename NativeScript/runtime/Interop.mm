@@ -11,6 +11,7 @@
 #include "ArrayAdapter.h"
 #include "NSDataAdapter.h"
 #include "Constants.h"
+#include "Caches.h"
 #include "Reference.h"
 #include "Pointer.h"
 #include "ExtVector.h"
@@ -1164,9 +1165,7 @@ void Interop::AttachProtocols(Local<Context> context, Local<Object> instance, Pt
     Isolate* isolate = context->GetIsolate();
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
-    Local<Object> prototype = Interop::ShallowClone(cache, context, instance->GetPrototype().As<Object>());
-    bool success = instance->SetPrototype(context, prototype).FromMaybe(false);
-    tns::Assert(success, isolate);
+    Local<Object> prototype = instance->GetPrototype().As<Object>();
     for (auto it = protocols->begin(); it != protocols->end(); it++) {
         const char* protocolName = (*it).valuePtr();
         const Meta* protocolMeta = ArgConverter::GetMeta(protocolName);
@@ -1181,43 +1180,11 @@ void Interop::AttachProtocols(Local<Context> context, Local<Object> instance, Pt
         }
 
         Local<Object> protocolPrototype = protoIt->second->Get(isolate).As<Object>();
-        bool success = prototype->SetPrototype(context, protocolPrototype).FromMaybe(false);
-        tns::Assert(success, isolate);
+
+        prototype->SetPrototype(context, protocolPrototype).FromMaybe(false);
 
         prototype = protocolPrototype;
     }
-}
-
-Local<Object> Interop::ShallowClone(std::shared_ptr<Caches> cache, Local<Context> context, Local<Value> source) {
-    Persistent<v8::Function>* poObjectAssignFunc = cache->ObjectAssignFunc.get();
-    Isolate* isolate = context->GetIsolate();
-    Local<v8::Function> objectAssignFunc;
-
-    if (poObjectAssignFunc != nullptr) {
-        objectAssignFunc = poObjectAssignFunc->Get(isolate);
-    } else {
-        Local<Script> script;
-        bool success = Script::Compile(context, tns::ToV8String(isolate, "Object.assign")).ToLocal(&script);
-        tns::Assert(success && !script.IsEmpty(), isolate);
-
-        Local<Value> result;
-        success = script->Run(context).ToLocal(&result) && result->IsFunction();
-        tns::Assert(success, isolate);
-
-        objectAssignFunc = result.As<v8::Function>();
-        cache->ObjectAssignFunc = std::make_unique<Persistent<v8::Function>>(isolate, objectAssignFunc);
-    }
-
-    Local<Value> args[] = {
-        Object::New(isolate),
-        source
-    };
-
-    Local<Value> result;
-    bool success = objectAssignFunc->Call(context, context->Global(), 2, args).ToLocal(&result);
-    tns::Assert(success, isolate);
-
-    return result.As<Object>();
 }
 
 bool Interop::IsNumbericType(BinaryTypeEncodingType type) {
