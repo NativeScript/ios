@@ -48,8 +48,8 @@ public:
     Caches(v8::Isolate* isolate);
     ~Caches();
 
-    static ConcurrentMap<std::string, const Meta*> Metadata;
-    static ConcurrentMap<int, std::shared_ptr<WorkerState>> Workers;
+    static std::shared_ptr<ConcurrentMap<std::string, const Meta*>> Metadata;
+    static std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> Workers;
 
     static std::shared_ptr<Caches> Get(v8::Isolate* isolate);
     static void Remove(v8::Isolate* isolate);
@@ -86,7 +86,7 @@ public:
     std::unique_ptr<v8::Persistent<v8::Function>> PointerCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
     std::unique_ptr<v8::Persistent<v8::Function>> FunctionReferenceCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 private:
-    static ConcurrentMap<v8::Isolate*, std::shared_ptr<Caches>> perIsolateCaches_;
+    static std::shared_ptr<ConcurrentMap<v8::Isolate*, std::shared_ptr<Caches>>> perIsolateCaches_;
     v8::Isolate* isolate_;
     std::shared_ptr<v8::Persistent<v8::Context>> context_;
 };
