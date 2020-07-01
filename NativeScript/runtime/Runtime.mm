@@ -40,9 +40,16 @@ Runtime::Runtime() {
 
 Runtime::~Runtime() {
     this->isolate_->TerminateExecution();
-    Caches::Workers.Remove(this->workerId_);
-    Caches::Remove(this->isolate_);
+
+    if (![NSThread isMainThread]) {
+        Caches::Workers->Remove(this->workerId_);
+        Caches::Remove(this->isolate_);
+    } else {
+        this->isolate_->Exit();
+    }
+
     this->isolate_->Dispose();
+
     currentRuntime_ = nullptr;
 }
 

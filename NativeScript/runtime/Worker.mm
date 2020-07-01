@@ -95,7 +95,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
         std::shared_ptr<Caches::WorkerState> state = std::make_shared<Caches::WorkerState>(isolate, poWorker, worker);
         int workerId = worker->Id();
-        Caches::Workers.Insert(workerId, state);
+        Caches::Workers->Insert(workerId, state);
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8(isolate);
     }
@@ -115,7 +115,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
         }
 
         int workerId = Worker::GetWorkerId(isolate, info.This());
-        std::shared_ptr<Caches::WorkerState> state = Caches::Workers.Get(workerId);
+        std::shared_ptr<Caches::WorkerState> state = Caches::Workers->Get(workerId);
         tns::Assert(state != nullptr, isolate);
         WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
         if (!worker->IsRunning()) {
@@ -206,7 +206,7 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::str
 void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     int workerId = Worker::GetWorkerId(isolate, info.This());
-    std::shared_ptr<Caches::WorkerState> state = Caches::Workers.Get(workerId);
+    std::shared_ptr<Caches::WorkerState> state = Caches::Workers->Get(workerId);
     tns::Assert(state != nullptr, isolate);
     WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
 

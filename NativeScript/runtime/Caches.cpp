@@ -24,17 +24,17 @@ Caches::~Caches() {
 }
 
 std::shared_ptr<Caches> Caches::Get(Isolate* isolate) {
-    std::shared_ptr<Caches> cache = Caches::perIsolateCaches_.Get(isolate);
+    std::shared_ptr<Caches> cache = perIsolateCaches_->Get(isolate);
     if (cache == nullptr) {
         cache = std::make_shared<Caches>(isolate);
-        Caches::perIsolateCaches_.Insert(isolate, cache);
+        Caches::perIsolateCaches_->Insert(isolate, cache);
     }
 
     return cache;
 }
 
 void Caches::Remove(v8::Isolate* isolate) {
-    Caches::perIsolateCaches_.Remove(isolate);
+    Caches::perIsolateCaches_->Remove(isolate);
 }
 
 void Caches::SetContext(Local<Context> context) {
@@ -45,9 +45,9 @@ Local<Context> Caches::GetContext() {
     return this->context_->Get(this->isolate_);
 }
 
-ConcurrentMap<Isolate*, std::shared_ptr<Caches>> Caches::perIsolateCaches_;
+std::shared_ptr<ConcurrentMap<Isolate*, std::shared_ptr<Caches>>> Caches::perIsolateCaches_ = std::make_shared<ConcurrentMap<Isolate*, std::shared_ptr<Caches>>>();
 
-ConcurrentMap<std::string, const Meta*> Caches::Metadata;
-ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>> Caches::Workers;
+std::shared_ptr<ConcurrentMap<std::string, const Meta*>> Caches::Metadata = std::make_shared<ConcurrentMap<std::string, const Meta*>>();
+std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> Caches::Workers = std::make_shared<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>>();
 
 }

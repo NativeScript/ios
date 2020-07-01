@@ -651,7 +651,7 @@ const Meta* ArgConverter::FindMeta(Class klass, const TypeEncoding* typeEncoding
     }
 
     std::string origClassName = class_getName(klass);
-    const Meta* meta = Caches::Metadata.Get(origClassName);
+    const Meta* meta = Caches::Metadata->Get(origClassName);
     if (meta != nullptr) {
         return meta;
     }
@@ -661,7 +661,7 @@ const Meta* ArgConverter::FindMeta(Class klass, const TypeEncoding* typeEncoding
     while (true) {
         const Meta* result = GetMeta(className);
         if (result != nullptr && result->type() == MetaType::Interface) {
-            Caches::Metadata.Insert(origClassName, result);
+            Caches::Metadata->Insert(origClassName, result);
             return result;
         }
 
@@ -678,7 +678,7 @@ const Meta* ArgConverter::FindMeta(Class klass, const TypeEncoding* typeEncoding
 
 const Meta* ArgConverter::GetMeta(std::string name) {
     bool found;
-    const Meta* meta = Caches::Metadata.Get(name, found);
+    const Meta* meta = Caches::Metadata->Get(name, found);
     if (meta != nullptr || found) {
         return meta;
     }
@@ -696,7 +696,7 @@ const Meta* ArgConverter::GetMeta(std::string name) {
         }
     }
 
-    Caches::Metadata.Insert(name, result);
+    Caches::Metadata->Insert(name, result);
 
     return result;
 }
