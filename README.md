@@ -14,6 +14,7 @@ open v8ios.xcodeproj
 ```
 
 Select the `TestRunner` target and an emulator and hit Run (the play button).
+
 <img width="453" alt="Screenshot 2020-09-09 at 18 25 43" src="https://user-images.githubusercontent.com/879060/92626234-ee627680-f2c9-11ea-941b-6b43600f54e4.png">
 
 This should take a while, but once built the emulator should start and show a black screen (this is normal). In this phase the app will run all the built-in tests, and report the results to the console:
@@ -29,9 +30,11 @@ If all tests pass, everything is good! At this point you can make changes to the
 # Attaching the runtime to a NativeScript app
 
 In the existing app, we need to prepare the XCode project using `ns prepare ios`. This should create a folder named `platforms/ios` and in there a `<appname>.xcworkspace` (if there is no `.xcworkspace` use the `.xcodeproj` instead). Open it in XCode and then drag the `v8ios.xcodeproj` from the `ns-v8ios-runtime` folder under the `<appname>` in the XCode sidebar.
+
 <img width="941" alt="Screenshot 2020-09-09 at 18 46 18" src="https://user-images.githubusercontent.com/879060/92628228-c294c000-f2cc-11ea-8822-58df689d3cd3.png">
 
 Remove the `NativeScript.xcframework` from the General tab, as we will no longer be using the framework from node_modules and instead will use the source directly:
+
 <img width="693" alt="Screenshot 2020-09-09 at 18 47 23" src="https://user-images.githubusercontent.com/879060/92628311-e6f09c80-f2cc-11ea-8977-201517badc3b.png">
 
 Hitting Run in XCode should start the app in the simulator, and we can now add breakpoints to the runtime and step through it with the debugger. To apply changes to the javascript, make sure you run `ns prepare ios` to re-bundle it into the `platforms/ios` folder.
