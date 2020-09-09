@@ -1,7 +1,7 @@
 {
-  "name": "tns-ios",
-  "description": "Telerik NativeScript Runtime for iOS",
-  "version": "7.0.0-beta.3-v8",
+  "name": "@nativescript/ios",
+  "description": "NativeScript Runtime for iOS",
+  "version": "7.0.0",
   "keywords": [
     "NativeScript",
     "iOS",
@@ -12,8 +12,8 @@
     "url": "https://github.com/NativeScript/ios-runtime"
   },
   "author": {
-    "name": "Telerik",
-    "email": "support@telerik.com"
+    "name": "NativeScript Team",
+    "email": "oss@nativescript.org"
   },
   "directories": {},
   "files": [

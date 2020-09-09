@@ -40,4 +40,4 @@ The compiled fat static libraries will be placed inside the `v8/dist` folder.
 
 # Building a Distribution Package
 
-Use the `build_all.sh` script included in this repository to produce the `dist/npm/tns-ios-{version}.tgz` NPM package.
+Use the `build_all.sh` script included in this repository to produce the `dist/npm/nativescript-ios-{version}.tgz` NPM package.

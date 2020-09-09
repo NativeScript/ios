@@ -214,7 +214,7 @@
             try {
                 __JUnitSaveResults(text);
                 return;
-            } catch (f) { errors.push('  tns-ios attempt: ' + f.message); }
+            } catch (f) { errors.push('  @nativescript/ios attempt: ' + f.message); }
 
             // If made it here, no write succeeded.  Let user know.
             log("Warning: writing junit report failed for '" + path + "', '" +
