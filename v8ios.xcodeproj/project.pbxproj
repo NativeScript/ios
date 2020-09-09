@@ -2356,7 +2356,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator\ncmake .\nmake\n";
+			shellScript = "export PATH=\"/usr/local/opt/llvm@8/bin:$PATH\"\ncd ${PROJECT_DIR}/metadata-generator\ncmake .\nmake\n";
 		};
 		C2F4CBBD22C61D480036B56F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
