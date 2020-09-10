@@ -18,12 +18,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+
 #include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
+#include "cppgc/common.h"
 #include "v8-internal.h"  // NOLINT(build/include_directory)
 #include "v8-version.h"   // NOLINT(build/include_directory)
 #include "v8config.h"     // NOLINT(build/include_directory)
@@ -1542,6 +1544,23 @@ class V8_EXPORT Module : public Data {
    * kEvaluated or kErrored.
    */
   Local<UnboundModuleScript> GetUnboundModuleScript();
+
+  /**
+   * Returns the underlying script's id.
+   *
+   * The module must be a SourceTextModule and must not have a kErrored status.
+   */
+  int ScriptId();
+
+  /**
+   * Returns whether the module is a SourceTextModule.
+   */
+  bool IsSourceTextModule() const;
+
+  /**
+   * Returns whether the module is a SyntheticModule.
+   */
+  bool IsSyntheticModule() const;
 
   /*
    * Callback defined in the embedder.  This is responsible for setting
@@ -3614,11 +3633,11 @@ enum PropertyFilter {
 
 /**
  * Options for marking whether callbacks may trigger JS-observable side effects.
- * Side-effect-free callbacks are whitelisted during debug evaluation with
+ * Side-effect-free callbacks are allowlisted during debug evaluation with
  * throwOnSideEffect. It applies when calling a Function, FunctionTemplate,
  * or an Accessor callback. For Interceptors, please see
  * PropertyHandlerFlags's kHasNoSideEffect.
- * Callbacks that only cause side effects to the receiver are whitelisted if
+ * Callbacks that only cause side effects to the receiver are allowlisted if
  * invoked on receiver objects that are created within the same debug-evaluate
  * call, as these objects are temporary and the side effect does not escape.
  */
@@ -5346,9 +5365,10 @@ class V8_EXPORT TypedArray : public ArrayBufferView {
   /*
    * The largest typed array size that can be constructed using New.
    */
-  static constexpr size_t kMaxLength = internal::kApiSystemPointerSize == 4
-                                           ? internal::kSmiMaxValue
-                                           : 0xFFFFFFFF;
+  static constexpr size_t kMaxLength =
+      internal::kApiSystemPointerSize == 4
+          ? internal::kSmiMaxValue
+          : static_cast<size_t>(uint64_t{1} << 32);
 
   /**
    * Number of elements in this typed array
@@ -7219,7 +7239,8 @@ typedef MaybeLocal<Promise> (*HostImportModuleDynamicallyCallback)(
 
 /**
  * HostInitializeImportMetaObjectCallback is called the first time import.meta
- * is accessed for a module. Subsequent access will reuse the same value.
+ * is accessed for a module. Subsequent access will reuse the same value. The
+ * callback must not throw.
  *
  * The method combines two implementation-defined abstract operations into one:
  * HostGetImportMetaProperties and HostFinalizeImportMeta.
@@ -7481,6 +7502,9 @@ typedef bool (*WasmThreadsEnabledCallback)(Local<Context> context);
 // --- Callback for loading source map file for Wasm profiling support
 typedef Local<String> (*WasmLoadSourceMapCallback)(Isolate* isolate,
                                                    const char* name);
+
+// --- Callback for checking if WebAssembly Simd is enabled ---
+typedef bool (*WasmSimdEnabledCallback)(Local<Context> context);
 
 // --- Garbage Collection Callbacks ---
 
@@ -7839,17 +7863,12 @@ enum class MemoryPressureLevel { kNone, kModerate, kCritical };
  */
 class V8_EXPORT EmbedderHeapTracer {
  public:
+  using EmbedderStackState = cppgc::EmbedderStackState;
+
   enum TraceFlags : uint64_t {
     kNoFlags = 0,
     kReduceMemory = 1 << 0,
     kForced = 1 << 2,
-  };
-
-  // Indicator for the stack state of the embedder.
-  enum EmbedderStackState {
-    kUnknown,
-    kNonEmpty,
-    kEmpty,
   };
 
   /**
@@ -8307,7 +8326,7 @@ class V8_EXPORT Isolate {
 
   /**
    * This scope allows terminations inside direct V8 API calls and forbid them
-   * inside any recursice API calls without explicit SafeForTerminationScope.
+   * inside any recursive API calls without explicit SafeForTerminationScope.
    */
   class V8_EXPORT SafeForTerminationScope {
    public:
@@ -8444,6 +8463,11 @@ class V8_EXPORT Isolate {
     kInvalidatedStringIteratorLookupChainProtector = 103,
     kInvalidatedStringLengthOverflowLookupChainProtector = 104,
     kInvalidatedTypedArraySpeciesLookupChainProtector = 105,
+    kWasmSimdOpcodes = 106,
+    kVarRedeclaredCatchBinding = 107,
+    kWasmRefTypes = 108,
+    kWasmBulkMemory = 109,
+    kWasmMultiValue = 110,
 
     // If you add new values here, you'll also need to update Chromium's:
     // web_feature.mojom, use_counter_callback.cc, and enums.xml. V8 changes to
@@ -8540,7 +8564,7 @@ class V8_EXPORT Isolate {
       HostImportModuleDynamicallyCallback callback);
 
   /**
-   * This specifies the callback called by the upcoming importa.meta
+   * This specifies the callback called by the upcoming import.meta
    * language feature to retrieve host-defined meta data for a module.
    */
   void SetHostInitializeImportMetaObjectCallback(
@@ -9346,6 +9370,8 @@ class V8_EXPORT Isolate {
 
   void SetWasmLoadSourceMapCallback(WasmLoadSourceMapCallback callback);
 
+  void SetWasmSimdEnabledCallback(WasmSimdEnabledCallback callback);
+
   /**
   * Check if V8 is dead and therefore unusable.  This is the case after
   * fatal errors such as out-of-memory situations.
@@ -9494,11 +9520,15 @@ class V8_EXPORT StartupData {
    * Only valid for StartupData returned by SnapshotCreator::CreateBlob().
    */
   bool CanBeRehashed() const;
+  /**
+   * Allows embedders to verify whether the data is valid for the current
+   * V8 instance.
+   */
+  bool IsValid() const;
 
   const char* data;
   int raw_size;
 };
-
 
 /**
  * EntropySource is used as a callback function when v8 needs a source
@@ -10799,8 +10829,15 @@ V8_INLINE void PersistentBase<T>::SetWeak(
     P* parameter, typename WeakCallbackInfo<P>::Callback callback,
     WeakCallbackType type) {
   typedef typename WeakCallbackInfo<void>::Callback Callback;
+#if (__GNUC__ >= 8) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
   V8::MakeWeak(reinterpret_cast<internal::Address*>(this->val_), parameter,
                reinterpret_cast<Callback>(callback), type);
+#if (__GNUC__ >= 8) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 }
 
 template <class T>
@@ -11354,8 +11391,7 @@ void* Object::GetAlignedPointerFromInternalField(int index) {
                 instance_type == I::kJSApiObjectType ||
                 instance_type == I::kJSSpecialApiObjectType)) {
     int offset = I::kJSObjectHeaderSize + (I::kEmbedderDataSlotSize * index);
-    internal::Isolate* isolate =
-        internal::IsolateFromNeverReadOnlySpaceObject(obj);
+    internal::Isolate* isolate = I::GetIsolateForHeapSandbox(obj);
     A value = I::ReadExternalPointerField(isolate, obj, offset);
     return reinterpret_cast<void*>(value);
   }
@@ -11387,8 +11423,7 @@ String::ExternalStringResource* String::GetExternalStringResource() const {
 
   ExternalStringResource* result;
   if (I::IsExternalTwoByteString(I::GetInstanceType(obj))) {
-    internal::Isolate* isolate =
-        internal::IsolateFromNeverReadOnlySpaceObject(obj);
+    internal::Isolate* isolate = I::GetIsolateForHeapSandbox(obj);
     A value =
         I::ReadExternalPointerField(isolate, obj, I::kStringResourceOffset);
     result = reinterpret_cast<String::ExternalStringResource*>(value);
@@ -11412,8 +11447,7 @@ String::ExternalStringResourceBase* String::GetExternalStringResourceBase(
   ExternalStringResourceBase* resource;
   if (type == I::kExternalOneByteRepresentationTag ||
       type == I::kExternalTwoByteRepresentationTag) {
-    internal::Isolate* isolate =
-        internal::IsolateFromNeverReadOnlySpaceObject(obj);
+    internal::Isolate* isolate = I::GetIsolateForHeapSandbox(obj);
     A value =
         I::ReadExternalPointerField(isolate, obj, I::kStringResourceOffset);
     resource = reinterpret_cast<ExternalStringResourceBase*>(value);
@@ -11995,8 +12029,7 @@ void* Context::GetAlignedPointerFromEmbedderData(int index) {
       I::ReadTaggedPointerField(ctx, I::kNativeContextEmbedderDataOffset);
   int value_offset =
       I::kEmbedderDataArrayHeaderSize + (I::kEmbedderDataSlotSize * index);
-  internal::Isolate* isolate = internal::IsolateFromNeverReadOnlySpaceObject(
-      *reinterpret_cast<A*>(this));
+  internal::Isolate* isolate = I::GetIsolateForHeapSandbox(ctx);
   return reinterpret_cast<void*>(
       I::ReadExternalPointerField(isolate, embedder_data, value_offset));
 #else

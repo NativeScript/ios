@@ -55,7 +55,7 @@ const char* RemoteObject::SubtypeEnum::I64 = "i64";
 const char* RemoteObject::SubtypeEnum::F32 = "f32";
 const char* RemoteObject::SubtypeEnum::F64 = "f64";
 const char* RemoteObject::SubtypeEnum::V128 = "v128";
-const char* RemoteObject::SubtypeEnum::Anyref = "anyref";
+const char* RemoteObject::SubtypeEnum::Externref = "externref";
 
 std::unique_ptr<RemoteObject> RemoteObject::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
@@ -2080,9 +2080,15 @@ void DomainDispatcherImpl::evaluate(const v8_crdtp::Dispatchable& dispatchable, 
         errors->SetName("replMode");
         in_replMode = ValueConversions<bool>::fromValue(replModeValue, errors);
     }
+    protocol::Value* allowUnsafeEvalBlockedByCSPValue = params ? params->get("allowUnsafeEvalBlockedByCSP") : nullptr;
+    Maybe<bool> in_allowUnsafeEvalBlockedByCSP;
+    if (allowUnsafeEvalBlockedByCSPValue) {
+        errors->SetName("allowUnsafeEvalBlockedByCSP");
+        in_allowUnsafeEvalBlockedByCSP = ValueConversions<bool>::fromValue(allowUnsafeEvalBlockedByCSPValue, errors);
+    }
     if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(in_timeout), std::move(in_disableBreaks), std::move(in_replMode), std::make_unique<EvaluateCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
+    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(in_timeout), std::move(in_disableBreaks), std::move(in_replMode), std::move(in_allowUnsafeEvalBlockedByCSP), std::make_unique<EvaluateCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
 }
 
 void DomainDispatcherImpl::getIsolateId(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)

@@ -70,8 +70,8 @@ bool V8InspectorSession::canDispatchMethod(StringView method) {
                               protocol::Debugger::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
                               protocol::Profiler::Metainfo::commandPrefix) ||
-         stringViewStartsWith(method,
-                              protocol::HeapProfiler::Metainfo::commandPrefix) ||
+         stringViewStartsWith(
+             method, protocol::HeapProfiler::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
                               protocol::Console::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
@@ -154,7 +154,7 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       this, this, agentState(protocol::Schema::Metainfo::domainName)));
   protocol::Schema::Dispatcher::wire(&m_dispatcher, m_schemaAgent.get());
 
-  m_pageAgent.reset(new V8PageAgentImpl(
+m_pageAgent.reset(new V8PageAgentImpl(
       this, this, agentState(protocol::Page::Metainfo::domainName)));
   protocol::Page::Dispatcher::wire(&m_dispatcher, m_pageAgent.get());
 
@@ -465,7 +465,7 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
                        .setName(protocol::Schema::Metainfo::domainName)
                        .setVersion(protocol::Schema::Metainfo::version)
                        .build());
-  result.push_back(protocol::Schema::Domain::create()
+                         result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::Page::Metainfo::domainName)
                        .setVersion(protocol::Page::Metainfo::version)
                        .build());
