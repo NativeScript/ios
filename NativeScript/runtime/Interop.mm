@@ -495,7 +495,13 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
             return;
         }
 
-        if (obj->IsArrayBuffer() || obj->IsArrayBufferView()) {
+        bool isNSArray = false;
+        if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+            std::string name = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
+            isNSArray = name == "NSArray";
+        }
+
+        if ((obj->IsArrayBuffer() || obj->IsArrayBufferView()) && !isNSArray) {
             Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
             NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
             Interop::SetValue(dest, adapter);
