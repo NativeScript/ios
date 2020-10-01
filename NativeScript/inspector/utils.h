@@ -23,7 +23,8 @@ static std::unique_ptr<protocol::Array<T>> fromValue(protocol::Value* value, pro
     std::unique_ptr<protocol::Array<T>> result(new protocol::Array<T>());
     errors->Push();
     for (size_t i = 0; i < array->size(); ++i) {
-        const char* name = std::to_string(i).c_str();
+        auto nameStr = std::to_string(i);
+        const char* name = nameStr.c_str();
         errors->SetName(name);
         std::unique_ptr<T> item = protocol::ValueConversions<T>::fromValue(array->at(i), errors);
         result->push_back(std::move(item));

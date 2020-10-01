@@ -15,6 +15,7 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -destination "platform=macOS,variant=Mac Catalyst" \
                    -quiet \
                    SKIP_INSTALL=NO \
+                   EXCLUDED_ARCHS=arm64 \
                    -archivePath $DIST/NativeScript.maccatalyst.xcarchive
 
 echo "Building for iphone simulator"
