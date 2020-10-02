@@ -19,5 +19,6 @@ LDPLUSPLUS = $SRCROOT/internal/nsld.sh
 // TNS_DEBUG_METADATA_PATH = $(SRCROOT)/debug-metadata
 
 // Xcode 12 
-EXCLUDED_ARCHS__PLATFORM_NAME_iphonesimulator__NATIVE_ARCH_64_BIT_x86_64=arm64 arm64e armv7 armv7s armv6 armv8
-EXCLUDED_ARCHS=$(EXCLUDED_ARCHS__PLATFORM_NAME_$(PLATFORM_NAME)__NATIVE_ARCH_64_BIT_$(NATIVE_ARCH_64_BIT))
+EXCLUDED_ARCHS_x86_64 = arm64 arm64e
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386 armv6 armv7 armv7s armv8 $(EXCLUDED_ARCHS_$(NATIVE_ARCH_64_BIT))
+EXCLUDED_ARCHS[sdk=iphoneos*] = i386 armv6 armv7 armv7s armv8 x86_64
