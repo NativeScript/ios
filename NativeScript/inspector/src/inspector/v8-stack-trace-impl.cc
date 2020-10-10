@@ -151,7 +151,7 @@ V8StackTraceId::V8StackTraceId(StringView json)
   V8DebuggerId debuggerId(s);
   if (!debuggerId.isValid()) return;
   if (!dict->getBoolean(kShouldPause, &should_pause)) return;
-  id = parsedId;
+  id = (unsigned int)parsedId;
   debugger_id = debuggerId.pair();
 }
 

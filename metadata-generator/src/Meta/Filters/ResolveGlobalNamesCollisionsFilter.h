@@ -37,7 +37,7 @@ public:
         for (auto& mptr : v) {
             auto& module = *mptr;
             std::pair<clang::Module*, std::vector<Meta*> > modulePair(module.first, std::vector<Meta*>());
-            for (const std::pair<std::string, std::vector<Meta*> >& metas : module.second) {
+            for (const std::pair<std::string, std::vector<Meta*> > metas : module.second) {
                 assert(metas.second.size() == 1);
                 for (Meta* meta : metas.second) {
                     modulePair.second.push_back(meta);
