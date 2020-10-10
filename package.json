@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/ios",
   "description": "NativeScript Runtime for iOS",
-  "version": "7.0.0",
+  "version": "7.0.2-rc1",
   "keywords": [
     "NativeScript",
     "iOS",
@@ -9,7 +9,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/NativeScript/ios-runtime"
+    "url": "https://github.com/NativeScript/ns-v8ios-runtime"
   },
   "author": {
     "name": "NativeScript Team",
