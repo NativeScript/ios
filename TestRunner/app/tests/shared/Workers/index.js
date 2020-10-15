@@ -497,6 +497,44 @@ describe("TNS Workers", () => {
                 task.resume();
             ` });
         });
+
+        it("Should not crash if the worker registers a notification", done => {
+            var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
+            worker.onmessage = (msg) => {
+                worker.terminate();
+                NSNotificationCenter.defaultCenter.postNotificationNameObject("MyNotification", null);
+                done();
+            };
+
+            var workerScript = `
+                var NotificationObserver = /** @class */ (function (_super) {
+                    __extends(NotificationObserver, _super);
+                    function NotificationObserver() {
+                        return _super !== null && _super.apply(this, arguments) || this;
+                    }
+                    NotificationObserver.initWithCallback = function (onReceiveCallback) {
+                        var observer = _super.new.call(this);
+                        observer._onReceiveCallback = onReceiveCallback;
+                        return observer;
+                    };
+                    NotificationObserver.prototype.onReceive = function (notification) {
+                        this._onReceiveCallback(notification);
+                    };
+                    NotificationObserver.ObjCExposedMethods = {
+                        onReceive: { returns: interop.types.void, params: [NSNotification] },
+                    };
+                    return NotificationObserver;
+                    }(NSObject));
+
+                    const observer = NotificationObserver.initWithCallback(notification => { });
+
+                    NSNotificationCenter.defaultCenter.addObserverSelectorNameObject(observer, "onReceive", "MyNotification", null);
+
+                    postMessage(self === global);
+            `;
+
+            worker.postMessage({ eval: workerScript });
+        });
     }
 
     function generateRandomString(strLen) {
