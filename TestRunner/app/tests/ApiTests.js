@@ -738,34 +738,46 @@ describe(module.id, function () {
 
     it("Additional protocols should be attached to the prototype of id pseudo-types", () => {
         let actual = TNSPseudoDataType.getId();
+        expect(actual.propertyFromProto1).toBeDefined();
         expect(actual.methodFromProto1).toBeDefined();
+        expect(actual.propertyFromProto2).toBeDefined();
         expect(actual.methodFromProto2).toBeDefined();
 
+        expect(actual.propertyFromProto1).toBe("property from proto1");
         actual.methodFromProto1();
+        expect(actual.propertyFromProto2).toBe("property from proto2");
         actual.methodFromProto2("test");
 
         expect(TNSGetOutput()).toBe("methodFromProto1 calledmethodFromProto2 called with test");
 
         let obj = NSObject.alloc().init();
+        expect(obj.propertyFromProto1).toBeUndefined();
         expect(obj.methodFromProto1).toBeUndefined();
+        expect(obj.propertyFromProto2).toBeUndefined();
         expect(obj.methodFromProto2).toBeUndefined();
     });
 
     it("Additional protocols should be attached to the prototype of interface pseudo-types", () => {
         let actual = TNSPseudoDataType.getType();
         expect(actual.method).toBeDefined();
-        expect(actual.methodFromProto2).toBeDefined();
+        expect(actual.propertyFromProto1).toBeDefined();
+        expect(actual.methodFromProto1).toBeDefined();
+        expect(actual.propertyFromProto2).toBeDefined();
         expect(actual.methodFromProto2).toBeDefined();
 
         actual.method();
+        expect(actual.propertyFromProto1).toBe("property from proto1");
         actual.methodFromProto1();
+        expect(actual.propertyFromProto2).toBe("property from proto2");
         actual.methodFromProto2("test");
 
         expect(TNSGetOutput()).toBe("method calledmethodFromProto1 calledmethodFromProto2 called with test");
 
         let obj = NSObject.alloc().init();
         expect(obj.method).toBeUndefined();
+        expect(obj.propertyFromProto1).toBeUndefined();
         expect(obj.methodFromProto1).toBeUndefined();
+        expect(obj.propertyFromProto2).toBeUndefined();
         expect(obj.methodFromProto2).toBeUndefined();
     });
 

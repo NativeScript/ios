@@ -2,12 +2,14 @@
 
 @protocol Proto1
 
+@property (nonatomic) NSString* propertyFromProto1;
 -(void)methodFromProto1;
 
 @end
 
 @protocol Proto2
 
+@property (nonatomic) NSString* propertyFromProto2;
 -(void)methodFromProto2:(NSString*)param;
 
 @end

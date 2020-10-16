@@ -78,13 +78,13 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     return Interop::CallFunction(methodCall);
 }
 
-Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapper* wrapper, bool skipGCRegistration) {
+Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapper* wrapper, bool skipGCRegistration, const std::vector<std::string>& additionalProtocols) {
     Isolate* isolate = context->GetIsolate();
     if (wrapper == nullptr) {
         return Null(isolate);
     }
 
-    Local<Value> result = CreateJsWrapper(context, wrapper, Local<Object>(), skipGCRegistration);
+    Local<Value> result = CreateJsWrapper(context, wrapper, Local<Object>(), skipGCRegistration, additionalProtocols);
     return result;
 }
 
@@ -526,7 +526,7 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj, st
     return args;
 }
 
-Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapper* wrapper, Local<Object> receiver, bool skipGCRegistration) {
+Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapper* wrapper, Local<Object> receiver, bool skipGCRegistration, const std::vector<std::string>& additionalProtocols) {
     Isolate* isolate = context->GetIsolate();
 
     if (wrapper == nullptr) {
@@ -567,7 +567,8 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
         if (meta != nullptr) {
             auto cache = Caches::Get(isolate);
             KnownUnknownClassPair pair(objc_getClass(meta->name()));
-            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta), pair);
+            std::vector<std::string> emptyProtocols;
+            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta), pair, emptyProtocols);
             auto it = cache->Prototypes.find(meta);
             if (it != cache->Prototypes.end()) {
                 Local<Value> prototype = it->second->Get(isolate);
@@ -625,7 +626,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
         } else {
             Class knownClass = objc_getClass(meta->name());
             KnownUnknownClassPair pair(knownClass, klass);
-            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta), pair);
+            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta), pair, additionalProtocols);
             auto it = cache->Prototypes.find(meta);
             if (it != cache->Prototypes.end()) {
                 Local<Value> prototype = it->second->Get(isolate);

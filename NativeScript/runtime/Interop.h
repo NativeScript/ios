@@ -139,7 +139,7 @@ private:
     static v8::Local<v8::Value> CallFunctionInternal(MethodCall& methodCall);
     static bool IsNumbericType(BinaryTypeEncodingType type);
     static v8::Local<v8::Object> GetInteropType(v8::Local<v8::Context> context, BinaryTypeEncodingType type);
-    static void AttachProtocols(v8::Local<v8::Context> context, v8::Local<v8::Object> instance, PtrTo<Array<PtrTo<char>>> protocols, KnownUnknownClassPair pair);
+    static std::vector<std::string> GetAdditionalProtocols(const TypeEncoding* typeEncoding);
 
     template <typename T>
     static inline void SetValue(void* dest, T value) {

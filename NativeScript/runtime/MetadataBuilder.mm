@@ -265,20 +265,23 @@ std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Local<Context> contex
     return std::make_pair(ffiType, data);
 }
 
-Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(Local<Context> context, const BaseClassMeta* meta, KnownUnknownClassPair pair) {
+Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(Local<Context> context, const BaseClassMeta* meta, KnownUnknownClassPair pair, const std::vector<std::string>& additionalProtocols) {
     robin_hood::unordered_map<std::string, uint8_t> instanceMembers;
     robin_hood::unordered_map<std::string, uint8_t> staticMembers;
-    return MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(context, meta, pair, instanceMembers, staticMembers);
+    return MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(context, meta, pair, instanceMembers, staticMembers, additionalProtocols);
 }
 
-Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(Local<Context> context, const BaseClassMeta* meta, KnownUnknownClassPair pair, robin_hood::unordered_map<std::string, uint8_t>& instanceMembers, robin_hood::unordered_map<std::string, uint8_t>& staticMembers) {
+Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(Local<Context> context, const BaseClassMeta* meta, KnownUnknownClassPair pair, robin_hood::unordered_map<std::string, uint8_t>& instanceMembers, robin_hood::unordered_map<std::string, uint8_t>& staticMembers, const std::vector<std::string>& additionalProtocols) {
     Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> ctorFuncTemplate;
     auto cache = Caches::Get(isolate);
-    auto it = cache->CtorFuncTemplates.find(meta);
-    if (it != cache->CtorFuncTemplates.end()) {
-        ctorFuncTemplate = it->second->Get(isolate);
-        return ctorFuncTemplate;
+
+    if (additionalProtocols.empty()) {
+        auto it = cache->CtorFuncTemplates.find(meta);
+        if (it != cache->CtorFuncTemplates.end()) {
+            ctorFuncTemplate = it->second->Get(isolate);
+            return ctorFuncTemplate;
+        }
     }
 
     std::string className;
@@ -325,6 +328,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, meta, meta->name(), pair, instanceMembers);
     MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, instanceMembers);
     MetadataBuilder::RegisterInstanceProtocols(context, ctorFuncTemplate, meta, meta->name(), pair, instanceMembers);
+    MetadataBuilder::RegisterAdditionalProtocols(context, ctorFuncTemplate, pair, additionalProtocols, instanceMembers);
 
     ctorFuncTemplate->PrototypeTemplate()->Set(tns::ToV8String(isolate, "toString"), FunctionTemplate::New(isolate, MetadataBuilder::ToStringFunctionCallback));
 
@@ -478,6 +482,17 @@ void MetadataBuilder::RegisterInstanceProtocols(Local<Context> context, Local<Fu
         if (m != nullptr) {
             const BaseClassMeta* protoMeta = static_cast<const BaseClassMeta*>(m);
             MetadataBuilder::RegisterInstanceProtocols(context, ctorFuncTemplate, protoMeta, className, pair, names);
+        }
+    }
+}
+
+void MetadataBuilder::RegisterAdditionalProtocols(Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, KnownUnknownClassPair pair, const std::vector<std::string>& additionalProtocols, robin_hood::unordered_map<std::string, uint8_t>& names) {
+    for (std::string protocolName : additionalProtocols) {
+        const Meta* meta = ArgConverter::GetMeta(protocolName.c_str());
+        if (meta != nullptr) {
+            const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
+            MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, baseMeta, pair, names);
+            MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, baseMeta, baseMeta->name(), pair, names);
         }
     }
 }

@@ -19,6 +19,9 @@
 
 @implementation TNSPseudoDataTypeInternal
 
+@synthesize propertyFromProto1;
+@synthesize propertyFromProto2;
+
 -(void)methodFromProto1 {
     TNSLog(@"methodFromProto1 called");
 }
@@ -33,11 +36,15 @@
 
 +(id<Proto1, Proto2>)getId {
     TNSPseudoDataTypeInternal* internal = [[TNSPseudoDataTypeInternal alloc] init];
+    internal.propertyFromProto1 = @"property from proto1";
+    internal.propertyFromProto2 = @"property from proto2";
     return internal;
 }
 
 +(TNSType<Proto1, Proto2>*)getType {
     TNSPseudoDataTypeInternal* internal = [[TNSPseudoDataTypeInternal alloc] init];
+    internal.propertyFromProto1 = @"property from proto1";
+    internal.propertyFromProto2 = @"property from proto2";
     return internal;
 }
 
