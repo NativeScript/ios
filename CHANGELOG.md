@@ -1,3 +1,33 @@
+7.0.3
+===
+
+### Bug Fixes
+
+- Native Object Prototype corruption(https://github.com/NativeScript/ns-v8ios-runtime/pull/70)
+- Ensure Isolate is alive before accessing (https://github.com/NativeScript/ns-v8ios-runtime/pull/69)
+- Fix issues with Debug line number dangling pointer (https://github.com/NativeScript/ns-v8ios-runtime/pull/66)
+
+
+7.0.2(-rc)
+===
+
+### Issue
+
+- Fix Build so it no longer is compiled with XCode Beta (https://github.com/NativeScript/ns-v8ios-runtime/pull/66)
+
+
+7.0.1
+===
+
+### Features
+
+- TypedArray to NSArray auto-conversion  (https://github.com/NativeScript/ns-v8ios-runtime/pull/59)
+ 
+
+### Bug Fixes
+- Support for XCode 12 (https://github.com/NativeScript/ns-v8ios-runtime/pull/66)
+
+
 7.0.0-beta.3-v8 (2020-03-09)
 ====
 
