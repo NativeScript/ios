@@ -48,6 +48,8 @@ Runtime::~Runtime() {
         this->isolate_->Exit();
     }
 
+    Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
+
     this->isolate_->Dispose();
 
     currentRuntime_ = nullptr;
@@ -70,6 +72,8 @@ Isolate* Runtime::CreateIsolate() {
     Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = &allocator_;
     Isolate* isolate = Isolate::New(create_params);
+
+    Runtime::isolates_.emplace_back(isolate);
 
     return isolate;
 }
@@ -226,7 +230,12 @@ void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplat
     globalTemplate->Set(ToV8String(isolate, "__time"), timeFunctionTemplate);
 }
 
+bool Runtime::IsAlive(Isolate* isolate) {
+    return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
+}
+
 std::shared_ptr<Platform> Runtime::platform_;
+std::vector<Isolate*> Runtime::isolates_;
 bool Runtime::mainThreadInitialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;
 

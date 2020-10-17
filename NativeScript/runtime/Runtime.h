@@ -42,9 +42,12 @@ public:
     }
 
     static id GetAppConfigValue(std::string key);
+
+    static bool IsAlive(v8::Isolate* isolate);
 private:
     static thread_local Runtime* currentRuntime_;
     static std::shared_ptr<v8::Platform> platform_;
+    static std::vector<v8::Isolate*> isolates_;
     static bool mainThreadInitialized_;
 
     void DefineGlobalObject(v8::Local<v8::Context> context);

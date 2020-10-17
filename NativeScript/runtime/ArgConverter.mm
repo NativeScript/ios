@@ -6,6 +6,7 @@
 #include "ObjectManager.h"
 #include "Interop.h"
 #include "Helpers.h"
+#include "Runtime.h"
 
 using namespace v8;
 using namespace std;
@@ -91,6 +92,12 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
 
     Isolate* isolate = data->isolate_;
+
+    if (!Runtime::IsAlive(isolate)) {
+        memset(retValue, 0, cif->rtype->size);
+        return;
+    }
+
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
