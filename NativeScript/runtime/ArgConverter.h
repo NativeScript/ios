@@ -31,8 +31,8 @@ class ArgConverter {
 public:
     static void Init(v8::Local<v8::Context> context, v8::GenericNamedPropertyGetterCallback structPropertyGetter, v8::GenericNamedPropertySetterCallback structPropertySetter);
     static v8::Local<v8::Value> Invoke(v8::Local<v8::Context> context, Class klass, v8::Local<v8::Object> receiver, V8Args& args, const MethodMeta* meta, bool isMethodCallback);
-    static v8::Local<v8::Value> ConvertArgument(v8::Local<v8::Context> context, BaseDataWrapper* wrapper, bool skipGCRegistration = false);
-    static v8::Local<v8::Value> CreateJsWrapper(v8::Local<v8::Context> context, BaseDataWrapper* wrapper, v8::Local<v8::Object> receiver, bool skipGCRegistration = false);
+    static v8::Local<v8::Value> ConvertArgument(v8::Local<v8::Context> context, BaseDataWrapper* wrapper, bool skipGCRegistration = false, const std::vector<std::string>& additionalProtocols = std::vector<std::string>());
+    static v8::Local<v8::Value> CreateJsWrapper(v8::Local<v8::Context> context, BaseDataWrapper* wrapper, v8::Local<v8::Object> receiver, bool skipGCRegistration = false, const std::vector<std::string>& additionalProtocols = std::vector<std::string>());
     static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyObject(v8::Local<v8::Context> context, bool skipGCRegistration = false);
     static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyStruct(v8::Local<v8::Context> context);
     static const Meta* FindMeta(Class klass, const TypeEncoding* typeEncoding = nullptr);

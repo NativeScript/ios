@@ -792,7 +792,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
         auto cache = Caches::Get(isolate);
         KnownUnknownClassPair pair;
-        cache->ObjectCtorInitializer(context, protocolMeta, pair);
+        std::vector<std::string> emptyProtocols;
+        cache->ObjectCtorInitializer(context, protocolMeta, pair, emptyProtocols);
 
         auto it = cache->ProtocolCtorFuncs.find(protocolMeta->name());
         if (it != cache->ProtocolCtorFuncs.end()) {
@@ -817,7 +818,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
                 const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
                 Class knownClass = meta->type() == MetaType::Interface ? objc_getClass(meta->name()) : nil;
                 KnownUnknownClassPair pair(knownClass);
-                cache->ObjectCtorInitializer(context, baseMeta, pair);
+                std::vector<std::string> emptyProtocols;
+                cache->ObjectCtorInitializer(context, baseMeta, pair, emptyProtocols);
             }
 
             auto it = cache->CtorFuncs.find(name);
@@ -1024,23 +1026,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         const TypeEncoding* te = [result isProxy] ? typeEncoding : nullptr;
 
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
-        Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
-
-        PtrTo<Array<PtrTo<char>>> additionalProtocols;
-        int32_t count = 0;
-        if (typeEncoding->type == BinaryTypeEncodingType::IdEncoding && typeEncoding->details.idDetails._protocols.offset > 0) {
-            additionalProtocols = typeEncoding->details.idDetails._protocols;
-            count = additionalProtocols->count;
-        } else if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference && typeEncoding->details.interfaceDeclarationReference._protocols.offset > 0) {
-            additionalProtocols = typeEncoding->details.interfaceDeclarationReference._protocols;
-            count = additionalProtocols->count;
-        }
-
-        if (count > 0) {
-            // Attach the protocols to the prototype of the resulting object
-            KnownUnknownClassPair pair(nullptr, [result class]);
-            Interop::AttachProtocols(context, jsResult.As<Object>(), additionalProtocols, pair);
-        }
+        std::vector<std::string> additionalProtocols = Interop::GetAdditionalProtocols(typeEncoding);
+        Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper, false, additionalProtocols);
 
         if (ownsReturnedObject || isInitializer) {
             [result release];
@@ -1167,30 +1154,24 @@ Local<Value> Interop::GetPrimitiveReturnType(Local<Context> context, BinaryTypeE
     return Local<Value>();
 }
 
-void Interop::AttachProtocols(Local<Context> context, Local<Object> instance, PtrTo<Array<PtrTo<char>>> protocols, KnownUnknownClassPair pair) {
-    Isolate* isolate = context->GetIsolate();
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+std::vector<std::string> Interop::GetAdditionalProtocols(const TypeEncoding* typeEncoding) {
+    std::vector<std::string> additionalProtocols;
 
-    Local<Object> prototype = instance->GetPrototype().As<Object>();
-    for (auto it = protocols->begin(); it != protocols->end(); it++) {
-        const char* protocolName = (*it).valuePtr();
-        const Meta* protocolMeta = ArgConverter::GetMeta(protocolName);
-        if (protocolMeta == nullptr) {
-            continue;
+    if (typeEncoding->type == BinaryTypeEncodingType::IdEncoding && typeEncoding->details.idDetails._protocols.offset > 0) {
+        PtrTo<Array<String>> protocols = typeEncoding->details.idDetails._protocols;
+        for (auto it = protocols->begin(); it != protocols->end(); it++) {
+            const char* protocolName = (*it).valuePtr();
+            additionalProtocols.push_back(protocolName);
         }
-
-        cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(protocolMeta), pair);
-        auto protoIt = cache->Prototypes.find(protocolMeta);
-        if (protoIt == cache->Prototypes.end()) {
-            continue;
+    } else if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference && typeEncoding->details.interfaceDeclarationReference._protocols.offset > 0) {
+        PtrTo<Array<String>> protocols = typeEncoding->details.interfaceDeclarationReference._protocols;
+        for (auto it = protocols->begin(); it != protocols->end(); it++) {
+            const char* protocolName = (*it).valuePtr();
+            additionalProtocols.push_back(protocolName);
         }
-
-        Local<Object> protocolPrototype = protoIt->second->Get(isolate).As<Object>();
-
-        prototype->SetPrototype(context, protocolPrototype).FromMaybe(false);
-
-        prototype = protocolPrototype;
     }
+
+    return additionalProtocols;
 }
 
 bool Interop::IsNumbericType(BinaryTypeEncodingType type) {
