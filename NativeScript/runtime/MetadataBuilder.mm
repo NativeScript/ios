@@ -493,6 +493,14 @@ void MetadataBuilder::RegisterAdditionalProtocols(Local<Context> context, Local<
             const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
             MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, baseMeta, pair, names);
             MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, baseMeta, baseMeta->name(), pair, names);
+
+            std::vector<std::string> metaProtocols;
+            for (auto it = baseMeta->protocols->begin(); it != baseMeta->protocols->end(); it++) {
+                std::string name = (*it).valuePtr();
+                metaProtocols.push_back(name);
+            }
+
+            MetadataBuilder::RegisterAdditionalProtocols(context, ctorFuncTemplate, pair, metaProtocols, names);
         }
     }
 }

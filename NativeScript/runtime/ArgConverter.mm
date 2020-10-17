@@ -626,14 +626,18 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
         } else {
             Class knownClass = objc_getClass(meta->name());
             KnownUnknownClassPair pair(knownClass, klass);
-            cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta), pair, additionalProtocols);
-            auto it = cache->Prototypes.find(meta);
-            if (it != cache->Prototypes.end()) {
-                Local<Value> prototype = it->second->Get(isolate);
-                bool success;
-                if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
-                    tns::Assert(false, isolate);
-                }
+            Local<FunctionTemplate> ctorFuncTemplate = cache->ObjectCtorInitializer(context, static_cast<const BaseClassMeta*>(meta), pair, additionalProtocols);
+            Local<v8::Function> ctorFunc;
+            bool success = ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc);
+            tns::Assert(success, isolate);
+
+            Local<Value> prototypeValue;
+            success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
+            tns::Assert(success, isolate);
+            Local<Object> prototype = prototypeValue.As<Object>();
+
+            if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
+                tns::Assert(false, isolate);
             }
         }
     }
