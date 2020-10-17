@@ -4,6 +4,8 @@
 #include "include/v8-inspector.h"
 #include "src/inspector/protocol/Protocol.h"
 #include <vector>
+#include <cmath>
+#include <cstdio>
 
 namespace v8_inspector {
 
@@ -22,8 +24,15 @@ static std::unique_ptr<protocol::Array<T>> fromValue(protocol::Value* value, pro
 
     std::unique_ptr<protocol::Array<T>> result(new protocol::Array<T>());
     errors->Push();
+    
+    // This (log10) will return the max number of digits(-1) in the length of the array that we have to worry about, +1 for the null
+    int sizeArray = log10(array->size()) + 2;
+    
     for (size_t i = 0; i < array->size(); ++i) {
-        const char* name = std::to_string(i).c_str();
+	// Convert array index to a string value
+	char* name = new char[sizeArray];
+	sprintf(name, "%lu", i);
+	
         errors->SetName(name);
         std::unique_ptr<T> item = protocol::ValueConversions<T>::fromValue(array->at(i), errors);
         result->push_back(std::move(item));
