@@ -97,6 +97,13 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             }
             break;
         }
+        case WrapperType::UnmanagedType: {
+            UnmanagedTypeWrapper* unmanagedTypeWrapper = static_cast<UnmanagedTypeWrapper*>(wrapper);
+            if (unmanagedTypeWrapper != nullptr) {
+                delete unmanagedTypeWrapper;
+            }
+            break;
+        }
         case WrapperType::Block: {
             BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
             std::free(blockWrapper->Block());

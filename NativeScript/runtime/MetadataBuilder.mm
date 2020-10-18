@@ -841,7 +841,7 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
                 V8VectorArgs vectorArgs(localArgs);
                 Local<Context> context = Caches::Get(isolate)->GetContext();
                 v8::Unlocker unlocker(isolate);
-                CMethodCall methodCall(context, item->userData_, typeEncoding, vectorArgs, item->meta_->ownsReturnedCocoaObject());
+                CMethodCall methodCall(context, item->userData_, typeEncoding, vectorArgs, item->meta_->ownsReturnedCocoaObject(), false);
                 Interop::CallFunction(methodCall);
             });
 
@@ -851,7 +851,8 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
         V8FunctionCallbackArgs args(info);
         const TypeEncoding* typeEncoding = item->meta_->encodings()->first();
         Local<Context> context = isolate->GetCurrentContext();
-        CMethodCall methodCall(context, item->userData_, typeEncoding, args, item->meta_->ownsReturnedCocoaObject());
+        const FunctionMeta* funcMeta = item->meta_;
+        CMethodCall methodCall(context, item->userData_, typeEncoding, args, funcMeta->ownsReturnedCocoaObject(), funcMeta->returnsUnmanaged());
         Local<Value> result = Interop::CallFunction(methodCall);
 
         if (typeEncoding->type != BinaryTypeEncodingType::VoidEncoding) {

@@ -213,6 +213,8 @@
 		C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C266569C22B282BA00EE15CC /* FunctionReference.cpp */; };
 		C266569F22B282BA00EE15CC /* FunctionReference.h in Headers */ = {isa = PBXBuildFile; fileRef = C266569D22B282BA00EE15CC /* FunctionReference.h */; };
 		C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */ = {isa = PBXBuildFile; fileRef = C26656B222B3768C00EE15CC /* InteropTypes.mm */; };
+		C275F477253B37AB00A997D5 /* UnmanagedType.mm in Sources */ = {isa = PBXBuildFile; fileRef = C275F475253B37AB00A997D5 /* UnmanagedType.mm */; };
+		C275F478253B37AB00A997D5 /* UnmanagedType.h in Headers */ = {isa = PBXBuildFile; fileRef = C275F476253B37AB00A997D5 /* UnmanagedType.h */; };
 		C27E5D8522F2FDDB00498ED0 /* KnownUnknownClassPair.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */; };
 		C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */ = {isa = PBXBuildFile; fileRef = C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */; };
 		C27E5DA922F31F3D00498ED0 /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
@@ -738,6 +740,8 @@
 		C266569C22B282BA00EE15CC /* FunctionReference.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FunctionReference.cpp; sourceTree = "<group>"; };
 		C266569D22B282BA00EE15CC /* FunctionReference.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FunctionReference.h; sourceTree = "<group>"; };
 		C26656B222B3768C00EE15CC /* InteropTypes.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = InteropTypes.mm; sourceTree = "<group>"; };
+		C275F475253B37AB00A997D5 /* UnmanagedType.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = UnmanagedType.mm; sourceTree = "<group>"; };
+		C275F476253B37AB00A997D5 /* UnmanagedType.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = UnmanagedType.h; sourceTree = "<group>"; };
 		C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = KnownUnknownClassPair.cpp; sourceTree = "<group>"; };
 		C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KnownUnknownClassPair.h; sourceTree = "<group>"; };
 		C27E5D8B22F31CC900498ED0 /* AppWithModules.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppWithModules.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1888,6 +1892,8 @@
 				C23E8F7422CDE88D0078FD4C /* WorkerWrapper.mm */,
 				C2D215FF248AAAD900EDC646 /* Constants.h */,
 				C2D215FE248AAAD900EDC646 /* Constants.cpp */,
+				C275F476253B37AB00A997D5 /* UnmanagedType.h */,
+				C275F475253B37AB00A997D5 /* UnmanagedType.mm */,
 			);
 			path = runtime;
 			sourceTree = "<group>";
@@ -2004,6 +2010,7 @@
 				C2B30FDB238418CA009D6A46 /* status.h in Headers */,
 				C247C36D22F828E3001D2CA2 /* HeapProfiler.h in Headers */,
 				C247C35122F828E3001D2CA2 /* v8-inspector-impl.h in Headers */,
+				C275F478253B37AB00A997D5 /* UnmanagedType.h in Headers */,
 				C247C39B22F828E3001D2CA2 /* address-region.h in Headers */,
 				C247C33922F828E3001D2CA2 /* trace-event.h in Headers */,
 				C2229974235449B400C1DFD6 /* InspectorServer.h in Headers */,
@@ -2650,6 +2657,7 @@
 				C247C34822F828E3001D2CA2 /* custom-preview.cc in Sources */,
 				C247C35D22F828E3001D2CA2 /* CSS.cpp in Sources */,
 				C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */,
+				C275F477253B37AB00A997D5 /* UnmanagedType.mm in Sources */,
 				C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */,
 				C247C36222F828E3001D2CA2 /* Page.cpp in Sources */,
 				C2229973235449B400C1DFD6 /* InspectorServer.mm in Sources */,
