@@ -128,7 +128,7 @@ Local<v8::String> tns::ReadModule(Isolate* isolate, const std::string &filePath)
     strcpy(newBuffer, "(function(module, exports, require, __filename, __dirname) { ");  // 61 Characters
     read(file, &newBuffer[61], length);
     close(file);
-    length += 62;
+    length += 61;
 
     // Add the closing "\n})"
     newBuffer[length] = 10;
@@ -136,6 +136,8 @@ Local<v8::String> tns::ReadModule(Isolate* isolate, const std::string &filePath)
     newBuffer[length] = '}';
     ++length;
     newBuffer[length] = ')';
+    ++length;
+    newBuffer[length] = 0;
 
     Local<v8::String> str = v8::String::NewFromUtf8(isolate, newBuffer, NewStringType::kNormal, (int)length).ToLocalChecked();
     delete[] newBuffer;
