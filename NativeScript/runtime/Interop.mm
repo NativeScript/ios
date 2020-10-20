@@ -16,6 +16,7 @@
 #include "Pointer.h"
 #include "ExtVector.h"
 #include "SymbolIterator.h"
+#include "UnmanagedType.h"
 
 using namespace v8;
 
@@ -715,8 +716,15 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
 }
 
-Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember, bool ownsReturnedObject, bool isInitializer) {
+Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged, bool isInitializer) {
     Isolate* isolate = context->GetIsolate();
+
+    if (returnsUnmanaged) {
+        uint8_t* data = call->GetResult<uint8_t*>();
+        UnmanagedTypeWrapper* wrapper = new UnmanagedTypeWrapper(data, typeEncoding);
+        Local<Value> result = UnmanagedType::Create(context, wrapper);
+        return result;
+    }
 
     if (typeEncoding->type == BinaryTypeEncodingType::ExtVectorEncoding) {
         ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, isStructMember);
@@ -909,7 +917,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             const TypeEncoding* typeEncoding = wrapper->ParametersEncoding();
 
             Local<Context> context = isolate->GetCurrentContext();
-            CMethodCall methodCall(context, functionPointer, typeEncoding, args, false);
+            CMethodCall methodCall(context, functionPointer, typeEncoding, args, false, false);
             Local<Value> result = Interop::CallFunction(methodCall);
 
             info.GetReturnValue().Set(result);
@@ -1406,7 +1414,16 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
         }
     }
 
-    Local<Value> result = Interop::GetResult(methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, nullptr, false, methodCall.ownsReturnedObject_, methodCall.isInitializer_);
+    Local<Value> result = Interop::GetResult(
+        methodCall.context_,
+        methodCall.typeEncoding_,
+        &call,
+        marshalToPrimitive,
+        nullptr,
+        false,
+        methodCall.ownsReturnedObject_,
+        methodCall.returnsUnmanaged_,
+        methodCall.isInitializer_);
 
     return result;
 }

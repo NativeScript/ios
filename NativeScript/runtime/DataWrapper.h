@@ -33,6 +33,7 @@ enum class WrapperType {
     FunctionReferenceType = 1 << 17,
     ExtVector = 1 << 18,
     Worker = 1 << 19,
+    UnmanagedType = 1 << 20,
 };
 
 struct V8Args {
@@ -401,6 +402,34 @@ public:
     }
 private:
     Class klass_;
+};
+
+class UnmanagedTypeWrapper: public BaseDataWrapper {
+public:
+    UnmanagedTypeWrapper(uint8_t* data, const TypeEncoding* typeEncoding)
+        : data_(data), typeEncoding_(typeEncoding), valueTaken_(false) {
+    }
+    
+    const WrapperType Type() {
+        return WrapperType::UnmanagedType;
+    }
+    
+    uint8_t* Data() {
+        this->valueTaken_ = true;
+        return this->data_;
+    }
+    
+    const TypeEncoding* TypeEncoding() {
+        return this->typeEncoding_;
+    }
+    
+    bool ValueTaken() {
+        return this->valueTaken_;
+    }
+private:
+    uint8_t* data_;
+    const tns::TypeEncoding* typeEncoding_;
+    bool valueTaken_;
 };
 
 class ObjCDataWrapper: public BaseDataWrapper {

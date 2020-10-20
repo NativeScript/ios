@@ -584,35 +584,35 @@ describe(module.id, function () {
         expect(TNSMutableObjectGet() instanceof NSObject).toBe(true);
     });
 
-//     it("returns retained", function () {
-//         expect(functionReturnsNSRetained().retainCount()).toBe(1);
-//         expect(functionReturnsCFRetained().retainCount()).toBe(1);
-//         expect(functionImplicitCreate().retainCount()).toBe(1);
+    it("returns retained", function () {
+        expect(functionReturnsNSRetained().retainCount()).toBe(1);
+        expect(functionReturnsCFRetained().retainCount()).toBe(1);
+        expect(functionImplicitCreate().retainCount()).toBe(1);
 
-//         var obj = functionExplicitCreateNSObject();
-//         expect(obj.retainCount()).toBe(2);
-//         CFRelease(obj);
+        var obj = functionExplicitCreateNSObject();
+        expect(obj.retainCount()).toBe(2);
+        CFRelease(obj);
 
-//         expect(TNSReturnsRetained.methodReturnsNSRetained().retainCount()).toBe(1);
-//         expect(TNSReturnsRetained.methodReturnsCFRetained().retainCount()).toBe(1);
-//         expect(TNSReturnsRetained.newNSObjectMethod().retainCount()).toBe(1);
-//     });
+        expect(TNSReturnsRetained.methodReturnsNSRetained().retainCount()).toBe(1);
+        expect(TNSReturnsRetained.methodReturnsCFRetained().retainCount()).toBe(1);
+        expect(TNSReturnsRetained.newNSObjectMethod().retainCount()).toBe(1);
+    });
 
-//     it("unmanaged", function () {
-//         var unmanaged = functionReturnsUnmanaged();
-//         expect('takeRetainedValue' in unmanaged).toBe(true);
-//         expect('takeUnretainedValue' in unmanaged).toBe(true);
-//         expect(functionReturnsUnmanaged().takeRetainedValue().retainCount()).toBe(1);
+    it("unmanaged", function () {
+        var unmanaged = functionReturnsUnmanaged();
+        expect('takeRetainedValue' in unmanaged).toBe(true);
+        expect('takeUnretainedValue' in unmanaged).toBe(true);
+        expect(functionReturnsUnmanaged().takeRetainedValue().retainCount()).toBe(1);
 
-//         var value = functionReturnsUnmanaged().takeUnretainedValue();
-//         expect(value.retainCount()).toBe(2);
-//         CFRelease(value);
+        var value = functionReturnsUnmanaged().takeUnretainedValue();
+        expect(value.retainCount()).toBe(2);
+        CFRelease(value);
 
-//         unmanaged.takeRetainedValue();
-//         expect(function() {
-//             unmanaged.takeUnretainedValue();
-//         }).toThrow();
-//     });
+        unmanaged.takeRetainedValue();
+        expect(function() {
+            unmanaged.takeUnretainedValue();
+        }).toThrow();
+    });
 
     it('methods can be recursively called', function() {
         var result = TNSTestNativeCallbacks.callRecursively(function() {
