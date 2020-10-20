@@ -113,6 +113,36 @@ bool tns::Exists(const char* fullPath) {
     return false;
 }
 
+Local<v8::String> tns::ReadModule(Isolate* isolate, const std::string &filePath) {
+    struct stat finfo;
+
+    int file = open(filePath.c_str(), O_RDONLY);
+    if (file < 0) {
+        tns::Assert(false);
+    }
+
+    fstat(file, &finfo);
+    long length = finfo.st_size;
+
+    char* newBuffer = new char[length + 128];
+    strcpy(newBuffer, "(function(module, exports, require, __filename, __dirname) { ");  // 61 Characters
+    read(file, &newBuffer[61], length);
+    close(file);
+    length += 62;
+
+    // Add the closing "\n})"
+    newBuffer[length] = 10;
+    ++length;
+    newBuffer[length] = '}';
+    ++length;
+    newBuffer[length] = ')';
+
+    Local<v8::String> str = v8::String::NewFromUtf8(isolate, newBuffer, NewStringType::kNormal, (int)length).ToLocalChecked();
+    delete[] newBuffer;
+
+    return str;
+}
+
 const char* tns::ReadText(const std::string& filePath, long& length, bool& isNew) {
     FILE* file = fopen(filePath.c_str(), "rb");
     if (file == nullptr) {

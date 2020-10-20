@@ -283,12 +283,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pa
 }
 
 Local<v8::String> ModuleInternal::WrapModuleContent(Isolate* isolate, const std::string& path) {
-    std::string content = tns::ReadText(path);
-    std::string result("(function(module, exports, require, __filename, __dirname) { ");
-    result.reserve(content.length() + 1024);
-    result += content;
-    result += "\n})";
-    return tns::ToV8String(isolate, result);
+    return tns::ReadModule(isolate, path);
 }
 
 std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& baseDir, const std::string& moduleName) {
