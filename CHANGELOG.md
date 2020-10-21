@@ -1,3 +1,14 @@
+7.0.4
+===
+
+### Features
+- Faster JS loading (https://github.com/NativeScript/ns-v8ios-runtime/pull/73)
+- Support unmanaged types (https://github.com/NativeScript/ns-v8ios-runtime/pull/72)
+
+### Bug Fixes
+- Fix random crash on exit (https://github.com/NativeScript/ns-v8ios-runtime/pull/74)
+
+
 7.0.3
 ===
 
