@@ -1,3 +1,11 @@
+7.0.5
+===
+
+### Bug Fixes
+- Reverted pull 74, this fixes crash on swipe exit.
+- Fixes Crashing in Workers (https://github.com/NativeScript/ns-v8ios-runtime/pull/78)
+
+
 7.0.4
 ===
 
