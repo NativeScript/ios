@@ -347,8 +347,6 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
             blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
 
-            [(id)blockPtr autorelease];
-
             BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding);
             tns::SetValue(isolate, arg.As<v8::Function>(), wrapper);
         }
