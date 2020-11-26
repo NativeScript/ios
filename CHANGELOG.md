@@ -2,7 +2,7 @@
 ===
 
 ### Bug Fixes
-- Do not prematurely release blocks (https://github.com/NativeScript/ns-v8ios-runtime/pull5/83)
+- Do not prematurely release blocks (https://github.com/NativeScript/ns-v8ios-runtime/pull/83)
 
 
 7.0.5
