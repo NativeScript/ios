@@ -7,6 +7,7 @@ pushd libffi
 
 OUTPUT_DIR=./dist
 OUTPUT_ARM64=$OUTPUT_DIR/arm64-iphoneos
+OUTPUT_ARM64_SIMULATOR=$OUTPUT_DIR/arm64-iphonesimulator
 OUTPUT_X86_64_SIMULATOR=$OUTPUT_DIR/x86_64-iphonesimulator
 OUTPUT_X86_64_MACCATALYST=$OUTPUT_DIR/x86_64-maccatalyst
 
@@ -24,6 +25,16 @@ mkdir -p $OUTPUT_ARM64/lib
 ar r $OUTPUT_ARM64/lib/libffi.a ./$ARM64_OUT/src/*.o ./$ARM64_OUT/src/aarch64/*.o
 cp -r $ARM64_OUT/include $OUTPUT_ARM64
 rm -rf $ARM64_OUT
+
+ARM64_SIMULATOR_OUT="aarch64-apple-darwin13"
+export CC="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -arch arm64 -fembed-bitcode -mios-simulator-version-min=9.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk"
+export CXX="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++ -arch arm64 -fembed-bitcode -mios-simulator-version-min=9.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk"
+./configure --disable-shared --host="$ARM64_SIMULATOR_OUT"
+make
+mkdir -p $OUTPUT_ARM64_SIMULATOR/lib
+ar r $OUTPUT_ARM64_SIMULATOR/lib/libffi.a ./$ARM64_SIMULATOR_OUT/src/*.o ./$ARM64_SIMULATOR_OUT/src/aarch64/*.o
+cp -r $ARM64_SIMULATOR_OUT/include $OUTPUT_ARM64_SIMULATOR
+rm -rf $ARM64_SIMULATOR_OUT
 
 #ARM_OUT="armv7-apple-darwin13"
 #export CC="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -arch armv7 -fembed-bitcode -miphoneos-version-min=9.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"

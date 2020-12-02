@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
+		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
+		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C20525A82577D86600C12A5C /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
 		C2229973235449B400C1DFD6 /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2229971235449B300C1DFD6 /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		C2229974235449B400C1DFD6 /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = C2229972235449B400C1DFD6 /* InspectorServer.h */; };
 		C2229977235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = C2229975235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h */; };
@@ -217,10 +220,6 @@
 		C275F478253B37AB00A997D5 /* UnmanagedType.h in Headers */ = {isa = PBXBuildFile; fileRef = C275F476253B37AB00A997D5 /* UnmanagedType.h */; };
 		C27E5D8522F2FDDB00498ED0 /* KnownUnknownClassPair.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C27E5D8322F2FDDB00498ED0 /* KnownUnknownClassPair.cpp */; };
 		C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */ = {isa = PBXBuildFile; fileRef = C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */; };
-		C27E5DA922F31F3D00498ED0 /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
-		C27E5DAA22F31F3D00498ED0 /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		C27E5DB122F31FA900498ED0 /* TNSWidgets.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C27E5DAF22F31F7A00498ED0 /* TNSWidgets.framework */; };
-		C27E5DB222F31FA900498ED0 /* TNSWidgets.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C27E5DAF22F31F7A00498ED0 /* TNSWidgets.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C27E5DB522F3206B00498ED0 /* app in Resources */ = {isa = PBXBuildFile; fileRef = C27E5DB422F3206B00498ED0 /* app */; };
 		C27E5DB822F3207800498ED0 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = C27E5DB722F3207800498ED0 /* main.m */; };
 		C27E5DBA22F324C200498ED0 /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C27E5DB922F324C200498ED0 /* Default-568h@2x.png */; };
@@ -498,8 +497,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				C27E5DB222F31FA900498ED0 /* TNSWidgets.framework in Embed Frameworks */,
-				C27E5DAA22F31F3D00498ED0 /* NativeScript.framework in Embed Frameworks */,
+				C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -540,6 +538,7 @@
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
+		C20525A72577D86600C12A5C /* TNSWidgets.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = TNSWidgets.xcframework; sourceTree = "<group>"; };
 		C2229971235449B300C1DFD6 /* InspectorServer.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorServer.mm; sourceTree = "<group>"; };
 		C2229972235449B400C1DFD6 /* InspectorServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
 		C2229975235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-ns-debugger-agent-impl.h"; sourceTree = "<group>"; };
@@ -753,7 +752,6 @@
 		C27E5D8422F2FDDB00498ED0 /* KnownUnknownClassPair.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KnownUnknownClassPair.h; sourceTree = "<group>"; };
 		C27E5D8B22F31CC900498ED0 /* AppWithModules.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppWithModules.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C27E5D9B22F31CCC00498ED0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C27E5DAF22F31F7A00498ED0 /* TNSWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = TNSWidgets.framework; sourceTree = "<group>"; };
 		C27E5DB422F3206B00498ED0 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
 		C27E5DB722F3207800498ED0 /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		C27E5DB922F324C200498ED0 /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
@@ -1054,8 +1052,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C27E5DB122F31FA900498ED0 /* TNSWidgets.framework in Frameworks */,
-				C27E5DA922F31F3D00498ED0 /* NativeScript.framework in Frameworks */,
+				C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */,
+				C20525A82577D86600C12A5C /* TNSWidgets.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1505,7 +1503,7 @@
 		C27E5DAE22F31F7A00498ED0 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				C27E5DAF22F31F7A00498ED0 /* TNSWidgets.framework */,
+				C20525A72577D86600C12A5C /* TNSWidgets.xcframework */,
 			);
 			path = Frameworks;
 			sourceTree = "<group>";

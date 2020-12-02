@@ -16,14 +16,24 @@ xcodebuild archive -project v8ios.xcodeproj \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/TKLiveSync.maccatalyst.xcarchive
 
-#generates library for simulator target
+#generates library for x86_64 simulator target
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
                    -sdk iphonesimulator \
                    -quiet \
                    SKIP_INSTALL=NO \
-                   -archivePath $DIST/TKLiveSync.iphonesimulator.xcarchive
+                   -archivePath $DIST/TKLiveSync.x86_64-iphonesimulator.xcarchive
+
+#generates library for arm64 simulator target
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme TKLiveSync \
+                   -configuration Release \
+                   -sdk iphonesimulator \
+                   -arch arm64 \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   -archivePath $DIST/TKLiveSync.arm64-iphonesimulator.xcarchive
 
 #generates library for device target
 xcodebuild archive -project v8ios.xcodeproj \
@@ -38,6 +48,21 @@ xcodebuild archive -project v8ios.xcodeproj \
 OUTPUT_DIR="$DIST/TKLiveSync.xcframework"
 rm -rf "${OUTPUT_PATH}"
 
+#Create fat library for simulator
+rm -rf "$DIST/TKLiveSync.iphonesimulator.xcarchive"
+
+cp -R \
+    "$DIST/TKLiveSync.x86_64-iphonesimulator.xcarchive" \
+    "$DIST/TKLiveSync.iphonesimulator.xcarchive"
+
+rm "$DIST/TKLiveSync.iphonesimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework/TKLiveSync"
+
+lipo -create \
+    "$DIST/TKLiveSync.x86_64-iphonesimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework/TKLiveSync" \
+    "$DIST/TKLiveSync.arm64-iphonesimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework/TKLiveSync" \
+    -output \
+    "$DIST/TKLiveSync.iphonesimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework/TKLiveSync"
+
 #Creates xcframework
 xcodebuild -create-xcframework \
            -framework "$DIST/TKLiveSync.maccatalyst.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
@@ -46,5 +71,7 @@ xcodebuild -create-xcframework \
            -output "$OUTPUT_DIR"
 
 rm -rf "$DIST/TKLiveSync.maccatalyst.xcarchive"
+rm -rf "$DIST/TKLiveSync.x86_64-iphonesimulator.xcarchive"
+rm -rf "$DIST/TKLiveSync.arm64-iphonesimulator.xcarchive"
 rm -rf "$DIST/TKLiveSync.iphonesimulator.xcarchive"
 rm -rf "$DIST/TKLiveSync.iphoneos.xcarchive"
