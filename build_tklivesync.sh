@@ -51,8 +51,8 @@ rm -rf "${OUTPUT_PATH}"
 #Create fat library for simulator
 rm -rf "$DIST/TKLiveSync.iphonesimulator.xcarchive"
 
-cp -R \
-    "$DIST/TKLiveSync.x86_64-iphonesimulator.xcarchive" \
+cp -r \
+    "$DIST/TKLiveSync.x86_64-iphonesimulator.xcarchive/." \
     "$DIST/TKLiveSync.iphonesimulator.xcarchive"
 
 rm "$DIST/TKLiveSync.iphonesimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework/TKLiveSync"

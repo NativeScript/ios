@@ -2253,7 +2253,7 @@
 				C2F4CBAF22C60BFD0036B56F /* Sources */,
 				C2F4CBB022C60BFD0036B56F /* Frameworks */,
 				C2F4CBB122C60BFD0036B56F /* CopyFiles */,
-				C2F4CBBA22C60C0F0036B56F /* ShellScript */,
+				C2F4CBBA22C60C0F0036B56F /* Run Script */,
 			);
 			buildRules = (
 			);
@@ -2380,9 +2380,9 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator/bin\ncp ../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n";
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n";
 		};
-		C2F4CBBA22C60C0F0036B56F /* ShellScript */ = {
+		C2F4CBBA22C60C0F0036B56F /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -2391,13 +2391,14 @@
 			);
 			inputPaths = (
 			);
+			name = "Run Script";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "export PATH=\"/usr/local/opt/llvm@8/bin:$PATH\"\ncd ${PROJECT_DIR}/metadata-generator\ncmake .\nmake\n";
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator\nmkdir build\ncd ./build\ncmake -DCMAKE_BUILD_TYPE=Release ../\nmake\n";
 		};
 		C2F4CBBD22C61D480036B56F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -2414,7 +2415,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator/bin\ncp ../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n";
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
