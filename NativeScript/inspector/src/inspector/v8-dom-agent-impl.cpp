@@ -122,18 +122,14 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
     std::vector<uint8_t> cbor;
     v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
     std::unique_ptr<protocol::Value> resultJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
-    protocol::ErrorSupport errorSupport;
-    std::unique_ptr<protocol::DOM::Node> domNode = protocol::DOM::Node::fromValue(resultJson.get(), &errorSupport);
 
-    std::vector<uint8_t> json;
-    v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
-    auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
-    if (!errorSupportString.empty()) {
+    auto status = protocol::DOM::Node::ReadFrom(cbor);
+    if (!status.ok()) {
         std::string errorMessage = "Error while parsing debug `DOM Node` object.";
         return DispatchResponse::ServerError(errorMessage);
     }
 
-    *out_root = std::move(domNode);
+    *out_root = std::move(*status);
     return DispatchResponse::Success();
 }
 
@@ -373,18 +369,14 @@ void V8DOMAgentImpl::ChildNodeInserted(const Local<Object>& obj) {
     std::unique_ptr<protocol::Value> protocolNodeJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
     protocol::ErrorSupport errorSupport;
-    auto domNode = protocol::DOM::Node::fromValue(protocolNodeJson.get(), &errorSupport);
-
-    std::vector<uint8_t> json;
-    v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
-    auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
-    if (!errorSupportString.empty()) {
+    auto status = protocol::DOM::Node::ReadFrom(cbor);
+    if (!status.ok()) {
         std::string errorMessage = "Error while parsing debug `DOM Node` object.";
-        Log("%s Error: %s", errorMessage.c_str(), errorSupportString.c_str());
+        Log("%s Error: %s", errorMessage.c_str(), status.status().Message().c_str());
         return;
     }
 
-    this->m_frontend.childNodeInserted(parentNodeId->Int32Value(context).ToChecked(), previousNodeId->Int32Value(context).ToChecked(), std::move(domNode));
+    this->m_frontend.childNodeInserted(parentNodeId->Int32Value(context).ToChecked(), previousNodeId->Int32Value(context).ToChecked(), std::move(*status));
 }
 
 void V8DOMAgentImpl::ChildNodeRemoved(const Local<Object>& obj) {
