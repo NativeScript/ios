@@ -93,42 +93,25 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
 
     if (!result.IsEmpty() && result->IsObject()) {
         Local<Object> resultObj = result.As<Object>();
-        Local<Value> computedStyleValue;
-        bool success = resultObj->Get(context, tns::ToV8String(isolate, "computedStyle")).ToLocal(&computedStyleValue);
-        if (!success || computedStyleValue.IsEmpty() || !computedStyleValue->IsArray()) {
+        Local<v8::String> resultString;
+        assert(v8::JSON::Stringify(context, resultObj->Get(context, tns::ToV8String(isolate, "computedStyle")).ToLocalChecked()).ToLocal(&resultString));
+
+        String16 resultProtocolString = toProtocolString(isolate, resultString);
+        std::vector<uint8_t> cbor;
+        v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
+        std::unique_ptr<protocol::Value> resultJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
+        protocol::ErrorSupport errorSupport;
+        std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> computedStyles = v8_inspector::fromValue<protocol::CSS::CSSComputedStyleProperty>(resultJson.get(), &errorSupport);
+
+        std::vector<uint8_t> json;
+        v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+        auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
+        if (!errorSupportString.empty()) {
             std::string errorMessage = "Error while parsing CSSComputedStyleProperty object.";
             return DispatchResponse::ServerError(errorMessage);
         }
 
-        Local<Array> computedStyleArr = computedStyleValue.As<Array>();
-        protocol::Array<protocol::CSS::CSSComputedStyleProperty> computedStyles;
-
-        for (uint32_t i = 0; i < computedStyleArr->Length(); i++) {
-            Local<Value> element;
-            bool success = computedStyleArr->Get(context, i).ToLocal(&element);
-            if (!success) {
-                std::string errorMessage = "Error while parsing CSSComputedStyleProperty object.";
-                return DispatchResponse::ServerError(errorMessage);
-            }
-
-            Local<v8::String> resultString;
-            assert(v8::JSON::Stringify(context, element).ToLocal(&resultString));
-
-            String16 resultProtocolString = toProtocolString(isolate, resultString);
-            std::vector<uint8_t> cbor;
-            v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
-
-            auto status = protocol::CSS::CSSComputedStyleProperty::ReadFrom(cbor);
-            if (!status.ok()) {
-                std::string errorMessage = "Error while parsing CSSComputedStyleProperty object.";
-                return DispatchResponse::ServerError(errorMessage);
-            }
-
-            computedStyles.push_back(std::move(*status));
-        }
-
-        auto result = std::make_unique<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>(std::move(computedStyles));
-        *out_computedStyle = std::move(result);
+        *out_computedStyle = std::move(computedStyles);
         return DispatchResponse::Success();
     }
 

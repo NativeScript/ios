@@ -6,7 +6,6 @@
 
 #include <vector>
 
-#include "include/v8-profiler.h"
 #include "src/base/atomicops.h"
 #include "src/base/platform/v8-time.h"
 #include "src/debug/debug-interface.h"
@@ -16,7 +15,8 @@
 #include "src/inspector/v8-inspector-impl.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-stack-trace-impl.h"
-#include "src/logging/tracing-flags.h"
+
+#include "include/v8-profiler.h"
 
 namespace v8_inspector {
 
@@ -30,8 +30,6 @@ static const char preciseCoverageDetailed[] = "preciseCoverageDetailed";
 static const char preciseCoverageAllowTriggeredUpdates[] =
     "preciseCoverageAllowTriggeredUpdates";
 static const char typeProfileStarted[] = "typeProfileStarted";
-static const char countersEnabled[] = "countersEnabled";
-static const char runtimeCallStatsEnabled[] = "runtimeCallStatsEnabled";
 }  // namespace ProfilerAgentState
 
 namespace {
@@ -222,36 +220,22 @@ void V8ProfilerAgentImpl::consoleProfileEnd(const String16& title) {
 }
 
 Response V8ProfilerAgentImpl::enable() {
-  if (!m_enabled) {
-    m_enabled = true;
-    m_state->setBoolean(ProfilerAgentState::profilerEnabled, true);
-  }
-
+  if (m_enabled) return Response::Success();
+  m_enabled = true;
+  m_state->setBoolean(ProfilerAgentState::profilerEnabled, true);
   return Response::Success();
 }
 
 Response V8ProfilerAgentImpl::disable() {
-  if (m_enabled) {
-    for (size_t i = m_startedProfiles.size(); i > 0; --i)
-      stopProfiling(m_startedProfiles[i - 1].m_id, false);
-    m_startedProfiles.clear();
-    stop(nullptr);
-    stopPreciseCoverage();
-    DCHECK(!m_profiler);
-    m_enabled = false;
-    m_state->setBoolean(ProfilerAgentState::profilerEnabled, false);
-  }
-
-  if (m_counters) {
-    disableCounters();
-    m_state->setBoolean(ProfilerAgentState::countersEnabled, false);
-  }
-
-  if (m_runtime_call_stats_enabled) {
-    disableRuntimeCallStats();
-    m_state->setBoolean(ProfilerAgentState::runtimeCallStatsEnabled, false);
-  }
-
+  if (!m_enabled) return Response::Success();
+  for (size_t i = m_startedProfiles.size(); i > 0; --i)
+    stopProfiling(m_startedProfiles[i - 1].m_id, false);
+  m_startedProfiles.clear();
+  stop(nullptr);
+  stopPreciseCoverage();
+  DCHECK(!m_profiler);
+  m_enabled = false;
+  m_state->setBoolean(ProfilerAgentState::profilerEnabled, false);
   return Response::Success();
 }
 
@@ -266,34 +250,25 @@ Response V8ProfilerAgentImpl::setSamplingInterval(int interval) {
 
 void V8ProfilerAgentImpl::restore() {
   DCHECK(!m_enabled);
-  if (m_state->booleanProperty(ProfilerAgentState::profilerEnabled, false)) {
-    m_enabled = true;
-    DCHECK(!m_profiler);
-    if (m_state->booleanProperty(ProfilerAgentState::userInitiatedProfiling,
-                                 false)) {
-      start();
-    }
-    if (m_state->booleanProperty(ProfilerAgentState::preciseCoverageStarted,
-                                 false)) {
-      bool callCount = m_state->booleanProperty(
-          ProfilerAgentState::preciseCoverageCallCount, false);
-      bool detailed = m_state->booleanProperty(
-          ProfilerAgentState::preciseCoverageDetailed, false);
-      bool updatesAllowed = m_state->booleanProperty(
-          ProfilerAgentState::preciseCoverageAllowTriggeredUpdates, false);
-      double timestamp;
-      startPreciseCoverage(Maybe<bool>(callCount), Maybe<bool>(detailed),
-                           Maybe<bool>(updatesAllowed), &timestamp);
-    }
-  }
-
-  if (m_state->booleanProperty(ProfilerAgentState::countersEnabled, false)) {
-    enableCounters();
-  }
-
-  if (m_state->booleanProperty(ProfilerAgentState::runtimeCallStatsEnabled,
+  if (!m_state->booleanProperty(ProfilerAgentState::profilerEnabled, false))
+    return;
+  m_enabled = true;
+  DCHECK(!m_profiler);
+  if (m_state->booleanProperty(ProfilerAgentState::userInitiatedProfiling,
                                false)) {
-    enableRuntimeCallStats();
+    start();
+  }
+  if (m_state->booleanProperty(ProfilerAgentState::preciseCoverageStarted,
+                               false)) {
+    bool callCount = m_state->booleanProperty(
+        ProfilerAgentState::preciseCoverageCallCount, false);
+    bool detailed = m_state->booleanProperty(
+        ProfilerAgentState::preciseCoverageDetailed, false);
+    bool updatesAllowed = m_state->booleanProperty(
+        ProfilerAgentState::preciseCoverageAllowTriggeredUpdates, false);
+    double timestamp;
+    startPreciseCoverage(Maybe<bool>(callCount), Maybe<bool>(detailed),
+                         Maybe<bool>(updatesAllowed), &timestamp);
   }
 }
 
@@ -550,9 +525,10 @@ Response V8ProfilerAgentImpl::takeTypeProfile(
   return Response::Success();
 }
 
-Response V8ProfilerAgentImpl::enableCounters() {
+Response V8ProfilerAgentImpl::enableRuntimeCallStats() {
   if (m_counters)
-    return Response::ServerError("Counters collection already enabled.");
+    return Response::ServerError(
+        "RuntimeCallStats collection already enabled.");
 
   if (V8Inspector* inspector = v8::debug::GetInspector(m_isolate))
     m_counters = inspector->enableCounters();
@@ -562,16 +538,16 @@ Response V8ProfilerAgentImpl::enableCounters() {
   return Response::Success();
 }
 
-Response V8ProfilerAgentImpl::disableCounters() {
+Response V8ProfilerAgentImpl::disableRuntimeCallStats() {
   if (m_counters) m_counters.reset();
   return Response::Success();
 }
 
-Response V8ProfilerAgentImpl::getCounters(
+Response V8ProfilerAgentImpl::getRuntimeCallStats(
     std::unique_ptr<protocol::Array<protocol::Profiler::CounterInfo>>*
         out_result) {
   if (!m_counters)
-    return Response::ServerError("Counters collection is not enabled.");
+    return Response::ServerError("RuntimeCallStats collection is not enabled.");
 
   *out_result =
       std::make_unique<protocol::Array<protocol::Profiler::CounterInfo>>();
@@ -584,66 +560,6 @@ Response V8ProfilerAgentImpl::getCounters(
                 .setValue(counter.second)
                 .build());
   }
-
-  return Response::Success();
-}
-
-Response V8ProfilerAgentImpl::enableRuntimeCallStats() {
-  if (v8::internal::TracingFlags::runtime_stats.load()) {
-    return Response::ServerError(
-        "Runtime Call Stats collection is already enabled.");
-  }
-
-  v8::internal::TracingFlags::runtime_stats.store(true);
-  m_runtime_call_stats_enabled = true;
-
-  return Response::Success();
-}
-
-Response V8ProfilerAgentImpl::disableRuntimeCallStats() {
-  if (!v8::internal::TracingFlags::runtime_stats.load()) {
-    return Response::ServerError(
-        "Runtime Call Stats collection is not enabled.");
-  }
-
-  if (!m_runtime_call_stats_enabled) {
-    return Response::ServerError(
-        "Runtime Call Stats collection was not enabled by this session.");
-  }
-
-  v8::internal::TracingFlags::runtime_stats.store(false);
-  m_runtime_call_stats_enabled = false;
-
-  return Response::Success();
-}
-
-Response V8ProfilerAgentImpl::getRuntimeCallStats(
-    std::unique_ptr<
-        protocol::Array<protocol::Profiler::RuntimeCallCounterInfo>>*
-        out_result) {
-  if (!m_runtime_call_stats_enabled) {
-    return Response::ServerError(
-        "Runtime Call Stats collection is not enabled.");
-  }
-
-  if (!v8::internal::TracingFlags::runtime_stats.load()) {
-    return Response::ServerError(
-        "Runtime Call Stats collection was disabled outside of this session.");
-  }
-
-  *out_result = std::make_unique<
-      protocol::Array<protocol::Profiler::RuntimeCallCounterInfo>>();
-
-  v8::debug::EnumerateRuntimeCallCounters(
-      m_isolate,
-      [&](const char* name, int64_t count, v8::base::TimeDelta time) {
-        (*out_result)
-            ->emplace_back(protocol::Profiler::RuntimeCallCounterInfo::create()
-                               .setName(String16(name))
-                               .setValue(static_cast<double>(count))
-                               .setTime(time.InSecondsF())
-                               .build());
-      });
 
   return Response::Success();
 }

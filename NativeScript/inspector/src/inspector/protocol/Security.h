@@ -14,6 +14,8 @@
 namespace v8_inspector {
 namespace protocol {
 namespace Security {
+
+// ------------- Forward and enum declarations.
 using CertificateId = int;
 using MixedContentType = String;
 using SecurityState = String;
@@ -23,8 +25,9 @@ class SafetyTipInfo;
 class VisibleSecurityState;
 class SecurityStateExplanation;
 class InsecureContentStatus;
-
-// ------------- Forward and enum declarations.
+class CertificateErrorNotification;
+class VisibleSecurityStateChangedNotification;
+class SecurityStateChangedNotification;
 
 namespace MixedContentTypeEnum {
  extern const char Blockable[];
@@ -48,8 +51,11 @@ namespace SafetyTipStatusEnum {
 
 // ------------- Type and builder declarations.
 
-class  CertificateSecurityState : public ::v8_crdtp::ProtocolObject<CertificateSecurityState> {
+class  CertificateSecurityState : public Serializable{
+    PROTOCOL_DISALLOW_COPY(CertificateSecurityState);
 public:
+    static std::unique_ptr<CertificateSecurityState> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~CertificateSecurityState() override { }
 
     String getProtocol() { return m_protocol; }
@@ -108,6 +114,10 @@ public:
 
     bool getObsoleteSslSignature() { return m_obsoleteSslSignature; }
     void setObsoleteSslSignature(bool value) { m_obsoleteSslSignature = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<CertificateSecurityState> clone() const;
 
     template<int STATE>
     class CertificateSecurityStateBuilder {
@@ -279,8 +289,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     CertificateSecurityState()
     {
           m_validFrom = 0;
@@ -315,8 +323,11 @@ private:
 };
 
 
-class  SafetyTipInfo : public ::v8_crdtp::ProtocolObject<SafetyTipInfo> {
+class  SafetyTipInfo : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SafetyTipInfo);
 public:
+    static std::unique_ptr<SafetyTipInfo> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~SafetyTipInfo() override { }
 
     String getSafetyTipStatus() { return m_safetyTipStatus; }
@@ -325,6 +336,10 @@ public:
     bool hasSafeUrl() { return m_safeUrl.isJust(); }
     String getSafeUrl(const String& defaultValue) { return m_safeUrl.isJust() ? m_safeUrl.fromJust() : defaultValue; }
     void setSafeUrl(const String& value) { m_safeUrl = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SafetyTipInfo> clone() const;
 
     template<int STATE>
     class SafetyTipInfoBuilder {
@@ -372,8 +387,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     SafetyTipInfo()
     {
     }
@@ -383,8 +396,11 @@ private:
 };
 
 
-class  VisibleSecurityState : public ::v8_crdtp::ProtocolObject<VisibleSecurityState> {
+class  VisibleSecurityState : public Serializable{
+    PROTOCOL_DISALLOW_COPY(VisibleSecurityState);
 public:
+    static std::unique_ptr<VisibleSecurityState> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~VisibleSecurityState() override { }
 
     String getSecurityState() { return m_securityState; }
@@ -400,6 +416,10 @@ public:
 
     protocol::Array<String>* getSecurityStateIssueIds() { return m_securityStateIssueIds.get(); }
     void setSecurityStateIssueIds(std::unique_ptr<protocol::Array<String>> value) { m_securityStateIssueIds = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<VisibleSecurityState> clone() const;
 
     template<int STATE>
     class VisibleSecurityStateBuilder {
@@ -461,8 +481,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     VisibleSecurityState()
     {
     }
@@ -474,8 +492,11 @@ private:
 };
 
 
-class  SecurityStateExplanation : public ::v8_crdtp::ProtocolObject<SecurityStateExplanation> {
+class  SecurityStateExplanation : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SecurityStateExplanation);
 public:
+    static std::unique_ptr<SecurityStateExplanation> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~SecurityStateExplanation() override { }
 
     String getSecurityState() { return m_securityState; }
@@ -499,6 +520,10 @@ public:
     bool hasRecommendations() { return m_recommendations.isJust(); }
     protocol::Array<String>* getRecommendations(protocol::Array<String>* defaultValue) { return m_recommendations.isJust() ? m_recommendations.fromJust() : defaultValue; }
     void setRecommendations(std::unique_ptr<protocol::Array<String>> value) { m_recommendations = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SecurityStateExplanation> clone() const;
 
     template<int STATE>
     class SecurityStateExplanationBuilder {
@@ -586,8 +611,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     SecurityStateExplanation()
     {
     }
@@ -602,8 +625,11 @@ private:
 };
 
 
-class  InsecureContentStatus : public ::v8_crdtp::ProtocolObject<InsecureContentStatus> {
+class  InsecureContentStatus : public Serializable{
+    PROTOCOL_DISALLOW_COPY(InsecureContentStatus);
 public:
+    static std::unique_ptr<InsecureContentStatus> fromValue(protocol::Value* value, ErrorSupport* errors);
+
     ~InsecureContentStatus() override { }
 
     bool getRanMixedContent() { return m_ranMixedContent; }
@@ -626,6 +652,10 @@ public:
 
     String getDisplayedInsecureContentStyle() { return m_displayedInsecureContentStyle; }
     void setDisplayedInsecureContentStyle(const String& value) { m_displayedInsecureContentStyle = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<InsecureContentStatus> clone() const;
 
     template<int STATE>
     class InsecureContentStatusBuilder {
@@ -715,8 +745,6 @@ public:
     }
 
 private:
-    DECLARE_SERIALIZATION_SUPPORT();
-
     InsecureContentStatus()
     {
           m_ranMixedContent = false;
@@ -733,6 +761,265 @@ private:
     bool m_displayedContentWithCertErrors;
     String m_ranInsecureContentStyle;
     String m_displayedInsecureContentStyle;
+};
+
+
+class  CertificateErrorNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(CertificateErrorNotification);
+public:
+    static std::unique_ptr<CertificateErrorNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~CertificateErrorNotification() override { }
+
+    int getEventId() { return m_eventId; }
+    void setEventId(int value) { m_eventId = value; }
+
+    String getErrorType() { return m_errorType; }
+    void setErrorType(const String& value) { m_errorType = value; }
+
+    String getRequestURL() { return m_requestURL; }
+    void setRequestURL(const String& value) { m_requestURL = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<CertificateErrorNotification> clone() const;
+
+    template<int STATE>
+    class CertificateErrorNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            EventIdSet = 1 << 1,
+            ErrorTypeSet = 1 << 2,
+            RequestURLSet = 1 << 3,
+            AllFieldsSet = (EventIdSet | ErrorTypeSet | RequestURLSet | 0)};
+
+
+        CertificateErrorNotificationBuilder<STATE | EventIdSet>& setEventId(int value)
+        {
+            static_assert(!(STATE & EventIdSet), "property eventId should not be set yet");
+            m_result->setEventId(value);
+            return castState<EventIdSet>();
+        }
+
+        CertificateErrorNotificationBuilder<STATE | ErrorTypeSet>& setErrorType(const String& value)
+        {
+            static_assert(!(STATE & ErrorTypeSet), "property errorType should not be set yet");
+            m_result->setErrorType(value);
+            return castState<ErrorTypeSet>();
+        }
+
+        CertificateErrorNotificationBuilder<STATE | RequestURLSet>& setRequestURL(const String& value)
+        {
+            static_assert(!(STATE & RequestURLSet), "property requestURL should not be set yet");
+            m_result->setRequestURL(value);
+            return castState<RequestURLSet>();
+        }
+
+        std::unique_ptr<CertificateErrorNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class CertificateErrorNotification;
+        CertificateErrorNotificationBuilder() : m_result(new CertificateErrorNotification()) { }
+
+        template<int STEP> CertificateErrorNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<CertificateErrorNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Security::CertificateErrorNotification> m_result;
+    };
+
+    static CertificateErrorNotificationBuilder<0> create()
+    {
+        return CertificateErrorNotificationBuilder<0>();
+    }
+
+private:
+    CertificateErrorNotification()
+    {
+          m_eventId = 0;
+    }
+
+    int m_eventId;
+    String m_errorType;
+    String m_requestURL;
+};
+
+
+class  VisibleSecurityStateChangedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(VisibleSecurityStateChangedNotification);
+public:
+    static std::unique_ptr<VisibleSecurityStateChangedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~VisibleSecurityStateChangedNotification() override { }
+
+    protocol::Security::VisibleSecurityState* getVisibleSecurityState() { return m_visibleSecurityState.get(); }
+    void setVisibleSecurityState(std::unique_ptr<protocol::Security::VisibleSecurityState> value) { m_visibleSecurityState = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<VisibleSecurityStateChangedNotification> clone() const;
+
+    template<int STATE>
+    class VisibleSecurityStateChangedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            VisibleSecurityStateSet = 1 << 1,
+            AllFieldsSet = (VisibleSecurityStateSet | 0)};
+
+
+        VisibleSecurityStateChangedNotificationBuilder<STATE | VisibleSecurityStateSet>& setVisibleSecurityState(std::unique_ptr<protocol::Security::VisibleSecurityState> value)
+        {
+            static_assert(!(STATE & VisibleSecurityStateSet), "property visibleSecurityState should not be set yet");
+            m_result->setVisibleSecurityState(std::move(value));
+            return castState<VisibleSecurityStateSet>();
+        }
+
+        std::unique_ptr<VisibleSecurityStateChangedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class VisibleSecurityStateChangedNotification;
+        VisibleSecurityStateChangedNotificationBuilder() : m_result(new VisibleSecurityStateChangedNotification()) { }
+
+        template<int STEP> VisibleSecurityStateChangedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<VisibleSecurityStateChangedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Security::VisibleSecurityStateChangedNotification> m_result;
+    };
+
+    static VisibleSecurityStateChangedNotificationBuilder<0> create()
+    {
+        return VisibleSecurityStateChangedNotificationBuilder<0>();
+    }
+
+private:
+    VisibleSecurityStateChangedNotification()
+    {
+    }
+
+    std::unique_ptr<protocol::Security::VisibleSecurityState> m_visibleSecurityState;
+};
+
+
+class  SecurityStateChangedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(SecurityStateChangedNotification);
+public:
+    static std::unique_ptr<SecurityStateChangedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~SecurityStateChangedNotification() override { }
+
+    String getSecurityState() { return m_securityState; }
+    void setSecurityState(const String& value) { m_securityState = value; }
+
+    bool getSchemeIsCryptographic() { return m_schemeIsCryptographic; }
+    void setSchemeIsCryptographic(bool value) { m_schemeIsCryptographic = value; }
+
+    protocol::Array<protocol::Security::SecurityStateExplanation>* getExplanations() { return m_explanations.get(); }
+    void setExplanations(std::unique_ptr<protocol::Array<protocol::Security::SecurityStateExplanation>> value) { m_explanations = std::move(value); }
+
+    protocol::Security::InsecureContentStatus* getInsecureContentStatus() { return m_insecureContentStatus.get(); }
+    void setInsecureContentStatus(std::unique_ptr<protocol::Security::InsecureContentStatus> value) { m_insecureContentStatus = std::move(value); }
+
+    bool hasSummary() { return m_summary.isJust(); }
+    String getSummary(const String& defaultValue) { return m_summary.isJust() ? m_summary.fromJust() : defaultValue; }
+    void setSummary(const String& value) { m_summary = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<SecurityStateChangedNotification> clone() const;
+
+    template<int STATE>
+    class SecurityStateChangedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            SecurityStateSet = 1 << 1,
+            SchemeIsCryptographicSet = 1 << 2,
+            ExplanationsSet = 1 << 3,
+            InsecureContentStatusSet = 1 << 4,
+            AllFieldsSet = (SecurityStateSet | SchemeIsCryptographicSet | ExplanationsSet | InsecureContentStatusSet | 0)};
+
+
+        SecurityStateChangedNotificationBuilder<STATE | SecurityStateSet>& setSecurityState(const String& value)
+        {
+            static_assert(!(STATE & SecurityStateSet), "property securityState should not be set yet");
+            m_result->setSecurityState(value);
+            return castState<SecurityStateSet>();
+        }
+
+        SecurityStateChangedNotificationBuilder<STATE | SchemeIsCryptographicSet>& setSchemeIsCryptographic(bool value)
+        {
+            static_assert(!(STATE & SchemeIsCryptographicSet), "property schemeIsCryptographic should not be set yet");
+            m_result->setSchemeIsCryptographic(value);
+            return castState<SchemeIsCryptographicSet>();
+        }
+
+        SecurityStateChangedNotificationBuilder<STATE | ExplanationsSet>& setExplanations(std::unique_ptr<protocol::Array<protocol::Security::SecurityStateExplanation>> value)
+        {
+            static_assert(!(STATE & ExplanationsSet), "property explanations should not be set yet");
+            m_result->setExplanations(std::move(value));
+            return castState<ExplanationsSet>();
+        }
+
+        SecurityStateChangedNotificationBuilder<STATE | InsecureContentStatusSet>& setInsecureContentStatus(std::unique_ptr<protocol::Security::InsecureContentStatus> value)
+        {
+            static_assert(!(STATE & InsecureContentStatusSet), "property insecureContentStatus should not be set yet");
+            m_result->setInsecureContentStatus(std::move(value));
+            return castState<InsecureContentStatusSet>();
+        }
+
+        SecurityStateChangedNotificationBuilder<STATE>& setSummary(const String& value)
+        {
+            m_result->setSummary(value);
+            return *this;
+        }
+
+        std::unique_ptr<SecurityStateChangedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class SecurityStateChangedNotification;
+        SecurityStateChangedNotificationBuilder() : m_result(new SecurityStateChangedNotification()) { }
+
+        template<int STEP> SecurityStateChangedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<SecurityStateChangedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Security::SecurityStateChangedNotification> m_result;
+    };
+
+    static SecurityStateChangedNotificationBuilder<0> create()
+    {
+        return SecurityStateChangedNotificationBuilder<0>();
+    }
+
+private:
+    SecurityStateChangedNotification()
+    {
+          m_schemeIsCryptographic = false;
+    }
+
+    String m_securityState;
+    bool m_schemeIsCryptographic;
+    std::unique_ptr<protocol::Array<protocol::Security::SecurityStateExplanation>> m_explanations;
+    std::unique_ptr<protocol::Security::InsecureContentStatus> m_insecureContentStatus;
+    Maybe<String> m_summary;
 };
 
 
