@@ -34,6 +34,10 @@ using namespace tns;
 
 - (id)nextObject {
     Isolate* isolate = self->isolate_;
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+
     Local<Context> context = self->cache_->GetContext();
     Local<v8::Array> array = self->map_->Get(isolate).As<Map>()->AsArray();
 
@@ -82,15 +86,23 @@ using namespace tns;
 }
 
 - (Local<v8::Array>)getProperties {
+    v8::Locker locker(self->isolate_);
+    Isolate::Scope isolate_scope(self->isolate_);
+    EscapableHandleScope handle_scope(self->isolate_);
+
     Local<Context> context = self->cache_->GetContext();
     Local<v8::Array> properties;
     Local<Object> dictionary = self->dictionary_->Get(self->isolate_).As<Object>();
     tns::Assert(dictionary->GetOwnPropertyNames(context).ToLocal(&properties), self->isolate_);
-    return properties;
+    return handle_scope.Escape(properties);
 }
 
 - (id)nextObject {
     Isolate* isolate = self->isolate_;
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+
     Local<Context> context = self->cache_->GetContext();
     Local<v8::Array> properties = [self getProperties];
     if (self->index_ < properties->Length()) {
@@ -107,6 +119,10 @@ using namespace tns;
 
 - (NSArray*)allObjects {
     Isolate* isolate = self->isolate_;
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+
     Local<Context> context = self->cache_->GetContext();
     NSMutableArray* array = [NSMutableArray array];
     Local<v8::Array> properties = [self getProperties];
@@ -146,6 +162,10 @@ using namespace tns;
 }
 
 - (NSUInteger)count {
+    v8::Locker locker(self->isolate_);
+    Isolate::Scope isolate_scope(self->isolate_);
+    HandleScope handle_scope(self->isolate_);
+
     Local<Object> obj = self->object_->Get(self->isolate_).As<Object>();
 
     if (obj->IsMap()) {
@@ -163,6 +183,10 @@ using namespace tns;
 
 - (id)objectForKey:(id)aKey {
     Isolate* isolate = self->isolate_;
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+
     Local<Context> context = self->cache_->GetContext();
     Local<Object> obj = self->object_->Get(self->isolate_).As<Object>();
 
@@ -194,6 +218,10 @@ using namespace tns;
 }
 
 - (NSEnumerator*)keyEnumerator {
+    v8::Locker locker(self->isolate_);
+    Isolate::Scope isolate_scope(self->isolate_);
+    HandleScope handle_scope(self->isolate_);
+
     Local<Value> obj = self->object_->Get(self->isolate_);
 
     if (obj->IsMap()) {

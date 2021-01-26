@@ -1,8 +1,26 @@
+7.1.1
+===
+
+- Reverted: Updated V8 to 8.9 (https://github.com/NativeScript/ns-v8ios-runtime/pull/84)
+
+This release should restore debugging in chrome-devtools.
+
+7.1.0
+===
+
+### Features
+- Updated V8 to 8.9 (https://github.com/NativeScript/ns-v8ios-runtime/pull/84)
+
+### Bug Fixes
+- XCode 12.3 support (https://github.com/NativeScript/ns-v8ios-runtime/pull/92)
+- DictionaryAdapter missing handle scopes and locks (https://github.com/NativeScript/ns-v8ios-runtime/pull/90)
+- PromiseProxy returns function regardless of underlying property type (https://github.com/NativeScript/ns-v8ios-runtime/pull/90)
+
 7.0.6
 ===
 
 ### Bug Fixes
-- Do not prematurely release blocks (https://github.com/NativeScript/ns-v8ios-runtime/pull5/83)
+- Do not prematurely release blocks (https://github.com/NativeScript/ns-v8ios-runtime/pull/83)
 
 
 7.0.5
