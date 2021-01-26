@@ -19,12 +19,16 @@ public:
 
     virtual void* loadFunctionSymbol(const char* symbolName) override {
         CFStringRef cfName = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, symbolName, kCFStringEncodingUTF8, kCFAllocatorNull);
-        return CFBundleGetFunctionPointerForName(this->_bundle, cfName);
+        void* functionPointer = CFBundleGetFunctionPointerForName(this->_bundle, cfName);
+        CFRelease(cfName);
+        return functionPointer;
     }
 
     virtual void* loadDataSymbol(const char* symbolName) override {
         CFStringRef cfName = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, symbolName, kCFStringEncodingUTF8, kCFAllocatorNull);
-        return CFBundleGetDataPointerForName(this->_bundle, cfName);
+        void* dataPointer = CFBundleGetDataPointerForName(this->_bundle, cfName);
+        CFRelease(cfName);
+        return dataPointer;
     }
 
     virtual bool load() override {
