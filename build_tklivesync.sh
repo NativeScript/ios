@@ -21,7 +21,6 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
                    -sdk iphonesimulator \
-                   -arch x86_64 \
                    -quiet \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/TKLiveSync.iphonesimulator.xcarchive
@@ -31,7 +30,6 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
                    -sdk iphoneos \
-                   -arch arm64 \
                    -quiet \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/TKLiveSync.iphoneos.xcarchive
