@@ -50,6 +50,14 @@ inline void SeqCst_MemoryFence() {
 #endif
 }
 
+inline Atomic8 Relaxed_CompareAndSwap(volatile Atomic8* ptr, Atomic8 old_value,
+                                      Atomic8 new_value) {
+  bool result = __atomic_compare_exchange_n(ptr, &old_value, new_value, false,
+                                            __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+  USE(result);  // Make gcc compiler happy.
+  return old_value;
+}
+
 inline Atomic16 Relaxed_CompareAndSwap(volatile Atomic16* ptr,
                                        Atomic16 old_value, Atomic16 new_value) {
   __atomic_compare_exchange_n(ptr, &old_value, new_value, false,
@@ -116,6 +124,10 @@ inline void Relaxed_Store(volatile Atomic32* ptr, Atomic32 value) {
   __atomic_store_n(ptr, value, __ATOMIC_RELAXED);
 }
 
+inline void Release_Store(volatile Atomic8* ptr, Atomic8 value) {
+  __atomic_store_n(ptr, value, __ATOMIC_RELEASE);
+}
+
 inline void Release_Store(volatile Atomic32* ptr, Atomic32 value) {
   __atomic_store_n(ptr, value, __ATOMIC_RELEASE);
 }
@@ -130,6 +142,10 @@ inline Atomic16 Relaxed_Load(volatile const Atomic16* ptr) {
 
 inline Atomic32 Relaxed_Load(volatile const Atomic32* ptr) {
   return __atomic_load_n(ptr, __ATOMIC_RELAXED);
+}
+
+inline Atomic8 Acquire_Load(volatile const Atomic8* ptr) {
+  return __atomic_load_n(ptr, __ATOMIC_ACQUIRE);
 }
 
 inline Atomic32 Acquire_Load(volatile const Atomic32* ptr) {

@@ -67,8 +67,14 @@ char* StrNDup(const char* str, int n);
 // and free. Used as the default policy for lists.
 class FreeStoreAllocationPolicy {
  public:
-  V8_INLINE void* New(size_t size) { return Malloced::operator new(size); }
-  V8_INLINE static void Delete(void* p) { Malloced::operator delete(p); }
+  template <typename T, typename TypeTag = T[]>
+  V8_INLINE T* NewArray(size_t length) {
+    return static_cast<T*>(Malloced::operator new(length * sizeof(T)));
+  }
+  template <typename T, typename TypeTag = T[]>
+  V8_INLINE void DeleteArray(T* p, size_t length) {
+    Malloced::operator delete(p);
+  }
 };
 
 // Performs a malloc, with retry logic on failure. Returns nullptr on failure.
@@ -150,16 +156,21 @@ V8_EXPORT_PRIVATE bool OnCriticalMemoryPressure(size_t length);
 // Represents and controls an area of reserved memory.
 class VirtualMemory final {
  public:
+  enum JitPermission { kNoJit, kMapAsJittable };
+
   // Empty VirtualMemory object, controlling no reserved memory.
   V8_EXPORT_PRIVATE VirtualMemory();
+
+  VirtualMemory(const VirtualMemory&) = delete;
+  VirtualMemory& operator=(const VirtualMemory&) = delete;
 
   // Reserves virtual memory containing an area of the given size that is
   // aligned per |alignment| rounded up to the |page_allocator|'s allocate page
   // size. The |size| must be aligned with |page_allocator|'s commit page size.
   // This may not be at the position returned by address().
   V8_EXPORT_PRIVATE VirtualMemory(v8::PageAllocator* page_allocator,
-                                  size_t size, void* hint,
-                                  size_t alignment = 1);
+                                  size_t size, void* hint, size_t alignment = 1,
+                                  JitPermission jit = kNoJit);
 
   // Construct a virtual memory by assigning it some already mapped address
   // and size.
@@ -227,6 +238,10 @@ class VirtualMemory final {
   // Frees all memory.
   V8_EXPORT_PRIVATE void Free();
 
+  // As with Free but does not write to the VirtualMemory object itself so it
+  // can be called on a VirtualMemory that is itself not writable.
+  V8_EXPORT_PRIVATE void FreeReadOnly();
+
   bool InVM(Address address, size_t size) {
     return region_.contains(address, size);
   }
@@ -235,8 +250,6 @@ class VirtualMemory final {
   // Page allocator that controls the virtual memory.
   v8::PageAllocator* page_allocator_ = nullptr;
   base::AddressRegion region_;
-
-  DISALLOW_COPY_AND_ASSIGN(VirtualMemory);
 };
 
 }  // namespace internal

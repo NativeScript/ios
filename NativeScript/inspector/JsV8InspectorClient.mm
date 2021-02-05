@@ -174,8 +174,7 @@ void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
 
         std::shared_ptr<Platform> platform = tns::Runtime::GetPlatform();
         Isolate* isolate = runtime_->GetIsolate();
-        while (platform::PumpMessageLoop(platform.get(), isolate)) {
-        }
+        platform::PumpMessageLoop(platform.get(), isolate, platform::MessageLoopBehavior::kDoNotWait);
     }
 
     terminated_ = false;

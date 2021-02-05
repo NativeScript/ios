@@ -374,6 +374,13 @@
 		C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */; };
 		C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */; };
 		C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */; };
+		C2D1168F25666B090020BF3E /* wrappers.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D1168E25666B090020BF3E /* wrappers.h */; };
+		C2D116A425666C130020BF3E /* tracing-flags.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D116A325666C130020BF3E /* tracing-flags.h */; };
+		C2D116AF25666C460020BF3E /* frontend_channel.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D116AA25666C460020BF3E /* frontend_channel.h */; };
+		C2D116B025666C460020BF3E /* protocol_core.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D116AB25666C460020BF3E /* protocol_core.h */; };
+		C2D116B125666C460020BF3E /* find_by_first.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D116AC25666C460020BF3E /* find_by_first.h */; };
+		C2D116B225666C460020BF3E /* maybe.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D116AD25666C460020BF3E /* maybe.h */; };
+		C2D116B325666C460020BF3E /* dispatch.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D116AE25666C460020BF3E /* dispatch.h */; };
 		C2D21600248AAAD900EDC646 /* Constants.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D215FE248AAAD900EDC646 /* Constants.cpp */; };
 		C2D21601248AAAD900EDC646 /* Constants.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D215FF248AAAD900EDC646 /* Constants.h */; };
 		C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D71D7523E18C41000CD5F0 /* robin_hood.h */; };
@@ -954,6 +961,13 @@
 		C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SimpleAllocator.h; sourceTree = "<group>"; };
 		C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = FastEnumerationAdapter.mm; sourceTree = "<group>"; };
 		C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FastEnumerationAdapter.h; sourceTree = "<group>"; };
+		C2D1168E25666B090020BF3E /* wrappers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = wrappers.h; sourceTree = "<group>"; };
+		C2D116A325666C130020BF3E /* tracing-flags.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "tracing-flags.h"; sourceTree = "<group>"; };
+		C2D116AA25666C460020BF3E /* frontend_channel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = frontend_channel.h; sourceTree = "<group>"; };
+		C2D116AB25666C460020BF3E /* protocol_core.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = protocol_core.h; sourceTree = "<group>"; };
+		C2D116AC25666C460020BF3E /* find_by_first.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = find_by_first.h; sourceTree = "<group>"; };
+		C2D116AD25666C460020BF3E /* maybe.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = maybe.h; sourceTree = "<group>"; };
+		C2D116AE25666C460020BF3E /* dispatch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dispatch.h; sourceTree = "<group>"; };
 		C2D215FE248AAAD900EDC646 /* Constants.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Constants.cpp; sourceTree = "<group>"; };
 		C2D215FF248AAAD900EDC646 /* Constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Constants.h; sourceTree = "<group>"; };
 		C2D71D7523E18C41000CD5F0 /* robin_hood.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = robin_hood.h; sourceTree = "<group>"; };
@@ -1238,6 +1252,7 @@
 		C247C2A822F828E2001D2CA2 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				C2D116A225666C130020BF3E /* logging */,
 				C247C2A922F828E2001D2CA2 /* init */,
 				C247C2AB22F828E2001D2CA2 /* tracing */,
 				C2AEC02C24695D1000342025 /* libplatform */,
@@ -1429,6 +1444,7 @@
 		C247C31922F828E3001D2CA2 /* platform */ = {
 			isa = PBXGroup;
 			children = (
+				C2D1168E25666B090020BF3E /* wrappers.h */,
 				C263B4CF23D0AF0900D5B872 /* v8-time.h */,
 				C247C31A22F828E3001D2CA2 /* semaphore.h */,
 				C247C31B22F828E3001D2CA2 /* mutex.h */,
@@ -1769,6 +1785,11 @@
 		C2B30FD0238418CA009D6A46 /* crdtp */ = {
 			isa = PBXGroup;
 			children = (
+				C2D116AE25666C460020BF3E /* dispatch.h */,
+				C2D116AC25666C460020BF3E /* find_by_first.h */,
+				C2D116AA25666C460020BF3E /* frontend_channel.h */,
+				C2D116AD25666C460020BF3E /* maybe.h */,
+				C2D116AB25666C460020BF3E /* protocol_core.h */,
 				C2D7E9CC23F4024200DB289C /* error_support.h */,
 				C2B07AF923C38FDA00E245BE /* serializer_traits.h */,
 				C23011AA239FF975003CFE86 /* serializable.h */,
@@ -1782,6 +1803,14 @@
 				C2B30FD8238418CA009D6A46 /* parser_handler.h */,
 			);
 			path = crdtp;
+			sourceTree = "<group>";
+		};
+		C2D116A225666C130020BF3E /* logging */ = {
+			isa = PBXGroup;
+			children = (
+				C2D116A325666C130020BF3E /* tracing-flags.h */,
+			);
+			path = logging;
 			sourceTree = "<group>";
 		};
 		C2DDEB17229EA89000345BFE /* TestRunner */ = {
@@ -1932,6 +1961,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C2D116B225666C460020BF3E /* maybe.h in Headers */,
 				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
 				C2A5DEC82327DCF600A91A76 /* NativeScript.h in Headers */,
 				C247C17122F82842001D2CA2 /* v8config.h in Headers */,
@@ -1945,6 +1975,7 @@
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
 				C247C32E22F828E3001D2CA2 /* base64.h in Headers */,
 				C247C35322F828E3001D2CA2 /* v8-runtime-agent-impl.h in Headers */,
+				C2D116B025666C460020BF3E /* protocol_core.h in Headers */,
 				C247C35222F828E3001D2CA2 /* v8-stack-trace-impl.h in Headers */,
 				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
 				C263B4CC23D0A87E00D5B872 /* bits.h in Headers */,
@@ -1970,8 +2001,10 @@
 				C247C33F22F828E3001D2CA2 /* custom-preview.h in Headers */,
 				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
 				C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */,
+				C2D116B125666C460020BF3E /* find_by_first.h in Headers */,
 				C23011AB239FF975003CFE86 /* serializable.h in Headers */,
 				C266569F22B282BA00EE15CC /* FunctionReference.h in Headers */,
+				C2D116A425666C130020BF3E /* tracing-flags.h in Headers */,
 				C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */,
 				C247C38722F828E3001D2CA2 /* string-16.h in Headers */,
 				C2B30FE0238418CA009D6A46 /* parser_handler.h in Headers */,
@@ -2003,6 +2036,7 @@
 				C247C3A022F828E3001D2CA2 /* semaphore.h in Headers */,
 				C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */,
 				C2B07AFA23C38FDA00E245BE /* serializer_traits.h in Headers */,
+				C2D116AF25666C460020BF3E /* frontend_channel.h in Headers */,
 				C247C38022F828E3001D2CA2 /* v8-schema-agent-impl.h in Headers */,
 				C247C39A22F828E3001D2CA2 /* globals.h in Headers */,
 				C247C33722F828E3001D2CA2 /* trace_event_common.h in Headers */,
@@ -2048,6 +2082,7 @@
 				C247C36F22F828E3001D2CA2 /* Runtime.h in Headers */,
 				C22536B6241A318900192740 /* ffi.h in Headers */,
 				C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */,
+				C2D1168F25666B090020BF3E /* wrappers.h in Headers */,
 				C247C37822F828E3001D2CA2 /* Forward.h in Headers */,
 				C247C33A22F828E3001D2CA2 /* conversions.h in Headers */,
 				C247C39C22F828E3001D2CA2 /* build_config.h in Headers */,
@@ -2062,6 +2097,7 @@
 				C247C16822F82842001D2CA2 /* libplatform-export.h in Headers */,
 				C247C39F22F828E3001D2CA2 /* flags.h in Headers */,
 				C247C3A922F828E3001D2CA2 /* macros.h in Headers */,
+				C2D116B325666C460020BF3E /* dispatch.h in Headers */,
 				C247C3A422F828E3001D2CA2 /* atomicops_internals_portable.h in Headers */,
 				C2B30FD9238418CA009D6A46 /* json_platform.h in Headers */,
 				C247C37B22F828E3001D2CA2 /* v8-profiler-agent-impl.h in Headers */,
@@ -3203,6 +3239,9 @@
 					"-lffi",
 					"-linspector_protocol",
 					"-ltorque_generated_initializers",
+					"-ltorque_generated_definitions",
+					"-lcppgc_base",
+					"-lv8_cppgc_shared",
 					"-lv8_base_without_compiler",
 					"-lv8_compiler",
 					"-lv8_snapshot",
@@ -3268,6 +3307,9 @@
 					"-lffi",
 					"-linspector_protocol",
 					"-ltorque_generated_initializers",
+					"-ltorque_generated_definitions",
+					"-lcppgc_base",
+					"-lv8_cppgc_shared",
 					"-lv8_base_without_compiler",
 					"-lv8_compiler",
 					"-lv8_snapshot",

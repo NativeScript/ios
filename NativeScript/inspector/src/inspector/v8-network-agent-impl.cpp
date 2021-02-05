@@ -189,16 +189,11 @@ void V8NetworkAgentImpl::RequestWillBeSent(const Local<Object>& obj) {
     v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(requestJsonString16.characters16(), requestJsonString16.length()), &cbor);
     std::unique_ptr<protocol::Value> protocolRequestJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
-    protocol::ErrorSupport errorSupport;
-    auto protocolRequestObj = protocol::Network::Request::fromValue(protocolRequestJson.get(), &errorSupport);
+    auto status = protocol::Network::Request::ReadFrom(cbor);
 
-    std::vector<uint8_t> json;
-    v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
-    auto errorString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
-
-    if (!errorString.empty()) {
+    if (!status.ok()) {
         std::string errorMessage = "Error while parsing debug `request` object. ";
-        Log("%s Error: %s", errorMessage.c_str(), errorString.c_str());
+        Log("%s Error: %s", errorMessage.c_str(), status.status().Message().c_str());
         return;
     }
 
@@ -210,7 +205,7 @@ void V8NetworkAgentImpl::RequestWillBeSent(const Local<Object>& obj) {
         tns::ToString(isolate, requestId).c_str(),
         "Loader Identifier",
         tns::ToString(isolate, url).c_str(),
-        std::move(protocolRequestObj),
+        std::move(*status),
         timestamp,
         wallTime,
         protocol::Network::Initiator::create().setType(protocol::Network::Initiator::TypeEnum::Script).build(),
@@ -261,16 +256,10 @@ void V8NetworkAgentImpl::ResponseReceived(const Local<Object>& obj) {
     v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(responseJsonString.characters16(), responseJsonString.length()), &cbor);
     std::unique_ptr<protocol::Value> protocolResponseJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
-    protocol::ErrorSupport errorSupport;
-    auto protocolResponseObj = protocol::Network::Response::fromValue(protocolResponseJson.get(), &errorSupport);
-
-    std::vector<uint8_t> json;
-    v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
-    auto errorString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
-
-    if (!errorString.empty()) {
+    auto status = protocol::Network::Response::ReadFrom(cbor);
+    if (!status.ok()) {
         std::string errorMessage = "Error while parsing debug `response` object.";
-        Log("%s Error: %s", errorMessage.c_str(), errorString.c_str());
+        Log("%s Error: %s", errorMessage.c_str(), status.status().Message().c_str());
         return;
     }
 
@@ -283,7 +272,7 @@ void V8NetworkAgentImpl::ResponseReceived(const Local<Object>& obj) {
         "Loader Identifier",
         timestamp,
         tns::ToString(isolate, type).c_str(),
-        std::move(protocolResponseObj),
+        std::move(*status),
         std::move(frameId)
     );
 }
