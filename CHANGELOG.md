@@ -1,3 +1,12 @@
+7.2.0
+===
+
+### Features
+- Updated V8 to 8.9 (https://github.com/NativeScript/ns-v8ios-runtime/pull/84)
+
+### Bug Fixes
+- breakpoint debugging
+
 7.1.1
 ===
 
