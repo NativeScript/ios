@@ -23,6 +23,9 @@ void WeakRef::Init(Local<Context> context) {
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+    
     tns::Assert(info.IsConstructCall(), isolate);
     try {
         if (info.Length() < 1 || !info[0]->IsObject()) {
@@ -32,9 +35,10 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         Local<Object> target = info[0].As<Object>();
         Local<Context> context = isolate->GetCurrentContext();
 
-        std::shared_ptr<Persistent<Value>> poValue = ArgConverter::CreateEmptyObject(context);
-        Local<Object> weakRef = poValue->Get(isolate).As<Object>();
-        poValue->Reset();
+        // std::shared_ptr< Persistent<Value> > poValue = ArgConverter::CreateEmptyObject(context);
+        // Local<Object> weakRef = poValue->Get(isolate).As<Object>();
+        // poValue->Reset();
+        Local<Object> weakRef = v8::Object::New(isolate);
 
         Persistent<Object>* poTarget = new Persistent<Object>(isolate, target);
         Persistent<Object>* poHolder = new Persistent<Object>(isolate, weakRef);
