@@ -2,3 +2,7 @@
 	path = libffi
 	url = https://github.com/NativeScript/libffi.git
 	branch = darind/v8-ios
+[submodule "llvm"]
+	path = llvm
+	url = https://github.com/NativeScript/ios-llvm.git
+	branch = master

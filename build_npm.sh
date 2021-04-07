@@ -11,8 +11,11 @@ cp -r "./project-template/" "$OUTPUT_DIR/framework"
 cp -r "dist/NativeScript.xcframework" "$OUTPUT_DIR/framework/internal"
 cp -r "dist/TKLiveSync.xcframework" "$OUTPUT_DIR/framework/internal"
 
-mkdir -p "$OUTPUT_DIR/framework/internal/metadata-generator"
-cp -r "metadata-generator/bin" "$OUTPUT_DIR/framework/internal/metadata-generator"
+mkdir -p "$OUTPUT_DIR/framework/internal/metadata-generator-x86_64"
+cp -r "metadata-generator/dist/x86_64/." "$OUTPUT_DIR/framework/internal/metadata-generator-x86_64"
+
+mkdir -p "$OUTPUT_DIR/framework/internal/metadata-generator-arm64"
+cp -r "metadata-generator/dist/arm64/." "$OUTPUT_DIR/framework/internal/metadata-generator-arm64"
 
 # Add xcframeworks to .zip (NPM modules do not support symlinks, unzipping is done by {N} CLI)
 (

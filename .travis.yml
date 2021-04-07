@@ -2,14 +2,10 @@ os: osx
 osx_image: xcode11
 language: objective-c
 git:
-  submodules: false
+  submodules: true
   depth: 1
 
 before_install:
-  - curl https://releases.llvm.org/8.0.0/clang+llvm-8.0.0-x86_64-apple-darwin.tar.xz --output $HOME/clang+llvm-8.0.0-x86_64-apple-darwin.tar.xz
-  - tar -xzf $HOME/clang+llvm-8.0.0-x86_64-apple-darwin.tar.xz --directory $HOME
-  - export PATH=$PATH:$HOME/clang+llvm-8.0.0-x86_64-apple-darwin/bin
-  - llvm-config --version
   - cmake --version
   - make --version
   - brew install chargepoint/xcparse/xcparse

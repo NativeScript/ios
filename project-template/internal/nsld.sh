@@ -45,8 +45,8 @@ function GEN_MODULEMAP() {
 
 function GEN_METADATA() {
     set -e
-
-    pushd "$SRCROOT/internal/metadata-generator/bin"
+    cpu_arch=$(uname -m)
+    pushd "$SRCROOT/internal/metadata-generator-${cpu_arch}/bin"
     ./build-step-metadata-generator.py
     popd
 }
