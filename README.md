@@ -2,14 +2,17 @@
 
 To start diving into the v8 iOS runtime make sure you have XCode and [Homebrew](https://brew.sh/) installed, and then run the following
 ```bash
-# Clone repo
-git clone https://github.com/NativeScript/ns-v8ios-runtime.git
-
 # Install CMake
 brew install cmake
 
-# Open the runtime in XCode
+# Clone repo
+git clone https://github.com/NativeScript/ns-v8ios-runtime.git
+
+# Initialize and clone the submodules
 cd ns-v8ios-runtime
+git submodule update --init
+
+# Open the runtime in XCode
 open v8ios.xcodeproj
 ```
 
