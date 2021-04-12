@@ -55,6 +55,10 @@ using namespace tns;
 }
 
 - (void)dealloc {
+    self->isolate_ = nullptr;
+    self->map_ = nil;
+    self->cache_ = nil;
+    
     [super dealloc];
 }
 
@@ -138,6 +142,10 @@ using namespace tns;
 }
 
 - (void)dealloc {
+    self->isolate_ = nullptr;
+    self->dictionary_ = nil;
+    self->cache_ = nil;
+    
     [super dealloc];
 }
 
@@ -240,6 +248,10 @@ using namespace tns;
         delete wrapper;
     }
     self->object_->Reset();
+    
+    self->isolate_ = nil;
+    self->cache_ = nil;
+    self->object_ = nil;
     [super dealloc];
 }
 
