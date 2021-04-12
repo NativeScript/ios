@@ -249,7 +249,7 @@ using namespace tns;
     }
     self->object_->Reset();
     
-    self->isolate_ = nil;
+    self->isolate_ = nullptr;
     self->cache_ = nil;
     self->object_ = nil;
     [super dealloc];
