@@ -259,6 +259,17 @@ public:
           disposeData_(false) {
     }
 
+    ~ReferenceWrapper() {
+        if(this->value_ != nullptr) {
+            value_->Reset();
+            delete value_;
+        }
+        
+        if (this->data_ != nullptr && this->disposeData_) {
+            std::free(this->data_);
+        }
+    }
+
     const WrapperType Type() {
         return WrapperType::Reference;
     }
