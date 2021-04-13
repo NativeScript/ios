@@ -157,7 +157,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     } else if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
         if (arg->IsString()) {
             v8::String::Utf8Value utf8Value(isolate, arg);
-            const char* strCopy = strdup(*utf8Value);
+            const char* strCopy = *utf8Value; // strdup(*utf8Value);
             Interop::SetValue(dest, strCopy);
         } else {
             BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
@@ -296,7 +296,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                     Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
                     ffi_type* ffiType = FFICall::GetArgumentType(innerType);
                     data = calloc(1, ffiType->size);
-                    referenceWrapper->SetData(data);
+                    referenceWrapper->SetData(data, true);
                     referenceWrapper->SetEncoding(innerType);
                     // Initialize the ref/out parameter value before passing it to the function call
                     if (!value.IsEmpty()) {
