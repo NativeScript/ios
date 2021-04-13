@@ -265,7 +265,7 @@ public:
             delete value_;
         }
         
-        if (this->data_ != nullptr && this->disposeData_) {
+        if (this->data_ != nullptr) {
             std::free(this->data_);
         }
     }

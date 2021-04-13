@@ -147,6 +147,7 @@ using namespace tns;
     Isolate* isolate_;
     std::shared_ptr<Persistent<Value>> object_;
     std::shared_ptr<Caches> cache_;
+    NSEnumerator* enumerator_;
 }
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
@@ -225,10 +226,14 @@ using namespace tns;
     Local<Value> obj = self->object_->Get(self->isolate_);
 
     if (obj->IsMap()) {
-        return [[DictionaryAdapterMapKeysEnumerator alloc] initWithMap:self->object_ isolate:self->isolate_ cache:self->cache_];
+        self->enumerator_ = [[DictionaryAdapterMapKeysEnumerator alloc] initWithMap:self->object_ isolate:self->isolate_ cache:self->cache_];
+        
+        return self->enumerator_;
     }
 
-    return [[DictionaryAdapterObjectKeysEnumerator alloc] initWithProperties:self->object_ isolate:self->isolate_ cache:self->cache_];
+    self->enumerator_ = [[DictionaryAdapterObjectKeysEnumerator alloc] initWithProperties:self->object_ isolate:self->isolate_ cache:self->cache_];
+    
+    return self->enumerator_;
 }
 
 - (void)dealloc {
@@ -240,6 +245,11 @@ using namespace tns;
         delete wrapper;
     }
     self->object_->Reset();
+    self->isolate_ = nullptr;
+    self->cache_ = nil;
+    self->object_ = nil;
+    CFAutorelease(self->enumerator_);
+    self->enumerator_ = nullptr;
     [super dealloc];
 }
 
