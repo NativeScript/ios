@@ -256,8 +256,12 @@ using namespace tns;
     self->isolate_ = nullptr;
     self->cache_ = nil;
     self->object_ = nil;
-    CFAutorelease(self->enumerator_);
-    self->enumerator_ = nullptr;
+    
+    if (self->enumerator_ != nullptr) {
+        CFAutorelease(self->enumerator_);
+        self->enumerator_ = nullptr;
+    }
+    
     [super dealloc];
 }
 
