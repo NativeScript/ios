@@ -302,15 +302,11 @@ public:
     }
 
     void SetData(void* data, bool disposeData = false) {
-        if (this->data_ != nullptr && disposeData_) {
+        if (this->data_ != nullptr && this->disposeData_) {
             std::free(this->data_);
         }
         this->data_ = data;
         this->disposeData_ = disposeData;
-    }
-
-    bool ShouldDisposeData() {
-        return this->disposeData_;
     }
 private:
     BaseDataWrapper* typeWrapper_;

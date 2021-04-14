@@ -295,13 +295,13 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                     ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
                     Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
                     ffi_type* ffiType = FFICall::GetArgumentType(innerType);
-                    data = calloc(1, ffiType->size);
-                    referenceWrapper->SetData(data, true);
-                    referenceWrapper->SetEncoding(innerType);
                     // Initialize the ref/out parameter value before passing it to the function call
                     if (!value.IsEmpty()) {
+                        data = calloc(1, ffiType->size);
+                        referenceWrapper->SetData(data, true);
                         Interop::WriteValue(context, innerType, data, value);
                     }
+                    referenceWrapper->SetEncoding(innerType);
                 } else if (wrapper->Type() == WrapperType::Struct) {
                     StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
                     data = structWrapper->Data();
