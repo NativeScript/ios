@@ -132,6 +132,10 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, true);
         size_t size = ffiType->size;
         memset(dest, 0, size);
+    } else if (tns::IsBool(arg) && typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+        bool value = tns::ToBool(arg);
+        NSNumber *num = [NSNumber numberWithBool: value];
+        Interop::SetValue(dest, num);
     } else if (tns::IsBool(arg) && typeEncoding->type == BinaryTypeEncodingType::IdEncoding) {
         bool value = tns::ToBool(arg);
         NSObject* o = @(value);
