@@ -157,7 +157,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     } else if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
         if (arg->IsString()) {
             v8::String::Utf8Value utf8Value(isolate, arg);
-            const char* strCopy = *utf8Value; // strdup(*utf8Value);
+            const char* strCopy = strdup(*utf8Value);
             Interop::SetValue(dest, strCopy);
         } else {
             BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
