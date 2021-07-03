@@ -126,6 +126,7 @@ public:
     static id ToObject(v8::Local<v8::Context> context, v8::Local<v8::Value> arg);
     static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Local<v8::Context> context, BinaryTypeEncodingType type, BaseCall* call);
 private:
+    static std::pair<IMP, ffi_closure*> CreateMethodInternal(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     static CFTypeRef CreateBlock(const uint8_t initialParamIndex, const uint8_t argsCount, const TypeEncoding* typeEncoding, FFIMethodCallback callback, void* userData);
     template <typename T>
     static void SetStructValue(v8::Local<v8::Value> value, void* destBuffer, ptrdiff_t position);
@@ -187,7 +188,8 @@ private:
         const void* invoke;
         JSBlockDescriptor* descriptor;
         void* userData;
-
+        ffi_closure* ffiClosure;
+        
         static JSBlockDescriptor kJSBlockDescriptor;
     } JSBlock;
 };
