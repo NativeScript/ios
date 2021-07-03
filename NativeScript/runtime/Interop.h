@@ -138,6 +138,7 @@ private:
     static void RegisterAdoptFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
     static void RegisterSizeOfFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
     static void SetFFIParams(v8::Local<v8::Context> context, const TypeEncoding* typeEncoding, FFICall* call, const int argsCount, const int initialParameterIndex, V8Args& args);
+    static bool isRefTypeEqual(const TypeEncoding* typeEncoding,const char* clazz);
     static v8::Local<v8::Array> ToArray(v8::Local<v8::Object> object);
     static v8::Local<v8::Value> StructToValue(v8::Local<v8::Context> context, void* result, StructInfo structInfo, std::shared_ptr<v8::Persistent<v8::Value>> parentStruct);
     static const TypeEncoding* CreateEncoding(BinaryTypeEncodingType type);

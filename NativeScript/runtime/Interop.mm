@@ -125,6 +125,11 @@ void Interop::SetFFIParams(Local<Context> context, const TypeEncoding* typeEncod
     }
 }
 
+bool Interop::isRefTypeEqual(const TypeEncoding* typeEncoding, const char* clazz){
+    std::string n(&typeEncoding->details.interfaceDeclarationReference.name.value());
+    return n.compare(clazz) == 0;
+}
+
 void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
     Isolate* isolate = context->GetIsolate();
 
@@ -132,6 +137,10 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, true);
         size_t size = ffiType->size;
         memset(dest, 0, size);
+    } else if (tns::IsBool(arg) && typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference && isRefTypeEqual(typeEncoding, "NSNumber")) {
+        bool value = tns::ToBool(arg);
+        NSNumber *num = [NSNumber numberWithBool: value];
+        Interop::SetValue(dest, num);
     } else if (tns::IsBool(arg) && typeEncoding->type == BinaryTypeEncodingType::IdEncoding) {
         bool value = tns::ToBool(arg);
         NSObject* o = @(value);
