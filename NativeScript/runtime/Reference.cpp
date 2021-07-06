@@ -58,7 +58,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Local<Context> contex
     Local<Object> prototype = prototypeValue.As<Object>();
     Reference::RegisterToStringMethod(context, prototype);
 
-    cache->InteropReferenceCtorFunc = std::make_unique<Persistent<v8::Function> >(isolate, ctorFunc);
+    cache->InteropReferenceCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
 
     return ctorFunc;
 }

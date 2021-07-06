@@ -521,15 +521,22 @@ void MetadataBuilder::RegisterStaticMethods(Local<Context> context, Local<v8::Fu
             Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate, MethodCallback, ext);
             Local<v8::Function> staticMethod;
             if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
+                // Log(@"Method name \"%s\"", methodName.c_str());
                 tns::Assert(false, isolate);
             }
 
             DefineFunctionLengthProperty(context, methodMeta->encodings(), staticMethod);
 
-            bool success = ctorFunc->Set(context, tns::ToV8String(isolate, methodMeta->jsName()), staticMethod).FromMaybe(false);
-            tns::Assert(success, isolate);
+            if (methodName != "layerClass") {
+                bool success = ctorFunc->Set(context, tns::ToV8String(isolate, methodMeta->jsName()), staticMethod).FromMaybe(false);
+                if (!success) {
+                    Log(@"Method name \"%s\"", methodName.c_str());
+                }
+                tns::Assert(success, isolate);
+                names.emplace(methodName, 0);
+            }
+            
 
-            names.emplace(methodName, 0);
         }
     }
 }

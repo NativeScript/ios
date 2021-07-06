@@ -92,7 +92,7 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
 
     object_setClass((__bridge id)blockPointer, objc_getClass("__NSMallocBlock__"));
 
-    return CFAutorelease(blockPointer);
+    return blockPointer;
 }
 
 Local<Value> Interop::CallFunction(CMethodCall& methodCall) {
