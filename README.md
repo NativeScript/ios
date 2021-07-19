@@ -61,37 +61,110 @@ iOS deployment target:
 
 The `--jitless` mode in which V8 is running is explained in the following [document](https://docs.google.com/document/d/1YYU17VqFMBeSJ8whCqXknOGXtXDVDLulchsTkmi0YdI/edit#heading=h.mz26kq2dsu6k)
 
-# Building V8
+# Updating/Building V8 engine source
 
-In order to build the V8 engine for iOS and produce the static libraries used in this project follow those steps:
+In order to build the V8 engine for iOS and produce the static libraries used in the NativeScript iOS runtime follow these steps:
 
-1. Get [depot_tools](https://www.chromium.org/developers/how-tos/install-depot-tools)
+**Prerequisites:**
+
+```
+git clone https://github.com/NativeScript/ns-v8ios-runtime.git
+cd ns-v8ios-runtime
+```
+
+You will need Google [depot_tools](https://www.chromium.org/developers/how-tos/install-depot-tools)
+
+* If you have not cloned the repo yet, clone the following and export a path setting so they can be referenced properly:
 
 ```
 git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+
+// copy/paste this command in current terminal window:
 export PATH=`pwd`/depot_tools:"$PATH"
 ```
 
-2. `fetch v8` (this will create a `v8` repo folder automatically checking out the `master` branch)
+1. Fetch the latest v8 source (or specific version):
 
-3. `cd v8; gclient sync` (this will fetch additional dependencies for building the latest revision)
+> If you have an existing v8 source fetched, delete the folder, and fetch it fresh each time updates are needed.
 
-Ensure you navigate back to root of project: `cd ..`
+```
+// IMPORTANT: Make sure you are inside the clone of this repo...
+cd ns-v8ios-runtime
 
-4. Apply patches: `apply_patch.sh`
+// Fetch v8 source:
+fetch v8
+```
 
-5. Run `build_v8.sh`
+This will create a `v8` repo folder automatically checking out the `master` branch.
+
+Always check https://omahaproxy.appspot.com/ for the specific version you intend to build.
+
+2. Ensure you checkout the version you intend to build:
+
+```
+cd v8
+
+// for example:
+git checkout 9.2.230.18
+
+gclient sync
+```
+
+This will checkout a specific tag and fetch additional dependencies for building the intended version.
+
+3. Apply patches from v8 updates to the iOS runtime:
+
+```
+npm run apply-patches
+```
+
+NOTE: Oftentimes the patches may not apply immediately and can run into issues like this:
+
+```
+error: patch failed: BUILD.gn:538
+error: BUILD.gn: patch does not apply
+error: patch failed: src/inspector/inspector_protocol_config.json:21
+error: src/inspector/inspector_protocol_config.json: patch does not apply
+~/Documents/ns-v8ios-runtime/v8/build ~/Documents/ns-v8ios-runtime/v8 ~/Documents/ns-v8ios-runtime
+error: patch failed: config/ios/ios_sdk.gni:32
+error: config/ios/ios_sdk.gni: patch does not apply
+```
+
+You can look at each patch failure, for example `BUILD.gn: patch does not apply`, you can apply the patch manually instead. This can be done by opening the `./v8.patch` file and applying each patch manually to the corresponding file.
+
+4. Build v8 source:
+
+```
+npm run build-v8-source
+```
+
+*NOTE: Sometimes this can fail. Here's an example failure:*
+
+```
+@Mac ns-v8ios-runtime % npm run build-v8-source
+
+> @nativescript/ios@8.1.0 build-v8-source
+> ./build_v8_source.sh
+
+~/Documents/ns-v8ios-runtime/v8 ~/Documents/ns-v8ios-runtime
+Building for out.gn/x64-release (simulator)
+Done. Made 212 targets from 92 files in 4004ms
+ninja: Entering directory `out.gn/x64-release'
+ninja: error: unknown target 'v8_libsampler'
+```
+
+In this case, the v8_libsampler module no longer needs to be built specifically as a target, therefore the MODULES inside the `build_v8_source.sh` can be modified to remove the target of `v8_libsampler` and the build can be invoked again.
+
+5. Verify the build output.
 
 The compiled fat static libraries will be placed inside the `v8/dist` folder.
 
 # Building a Distribution Package
 
 1. Bump the version in package.json
-2. Run: `npm run update-version` (*This will update the runtime headers with version info*)
-3. Finally build/pack with the following:
 
-```
-npm run build
-```
+2. Run: `npm run update-version` (*This will update the runtime headers with version info*)
+
+3. Build & pack: `npm run build`
 
 This will create: `dist/npm/nativescript-ios-{version}.tgz` NPM package ready for publishing.
