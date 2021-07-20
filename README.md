@@ -138,7 +138,9 @@ You can look at each patch failure, for example `BUILD.gn: patch does not apply`
 npm run build-v8-source
 ```
 
-*NOTE: Sometimes this can fail. Here's an example failure:*
+*Troubleshooting build errors*
+
+* Example failure 1:
 
 ```
 @Mac ns-v8ios-runtime % npm run build-v8-source
@@ -154,6 +156,44 @@ ninja: error: unknown target 'v8_libsampler'
 ```
 
 In this case, the v8_libsampler module no longer needs to be built specifically as a target, therefore the MODULES inside the `build_v8_source.sh` can be modified to remove the target of `v8_libsampler` and the build can be invoked again.
+
+* Example failure 2:
+
+```
+ERROR at //build/config/ios/ios_sdk.gni:181:33: Script returned non-zero exit code.
+    ios_code_signing_identity = exec_script("find_signing_identity.py",
+
+Automatic code signing identity selection was enabled but could not
+find exactly one codesigning identity matching "Apple Development".
+
+Check that the keychain is accessible and that there is exactly one
+valid codesigning identity matching the pattern. Here is the parsed
+output of `xcrun security find-identity -v -p codesigning`:
+
+  1) 1ABE0***********************************: "Apple Development: Your Name (U4********)"
+  2) CB529***********************************: "Apple Distribution: Your Org (29********)"
+  3) BACD5***********************************: "Apple Development: Your Name (VV********)"
+  4) 0D42D***********************************: "Apple Development: Your Team (D3********)"
+  5) 055BA***********************************: "Apple Development: Your Name (GF********)"
+  6) A5306***********************************: "Apple Development: Your Name (9V***********)"
+    6 valid identities found
+```
+
+If this occurs you can manually modify `v8/build/config/ios/ios_sdk.gni`. A property named `ios_code_signing_identity`. You can set that explicitly to one of your code signing identities. You can use the command it suggests to list out your identities in full: `xcrun security find-identity -v -p codesigning` - Copy the id and paste it as the value of `ios_code_signing_identity`.
+
+You will want to make `ios_code_signing_identity_description` an empty string so the final change should look something like this:
+
+```
+# Explicitly select the identity to use for codesigning. If defined, must
+# be set to a non-empty string that will be passed to codesigning. Can be
+# left unspecified if ios_code_signing_identity_description is used instead.
+ios_code_signing_identity = "...your-id..."
+
+# Pattern used to select the identity to use for codesigning. If defined,
+# must be a substring of the description of exactly one of the identities by
+# `security find-identity -v -p codesigning`.
+ios_code_signing_identity_description = ""
+```
 
 5. Verify the build output.
 
