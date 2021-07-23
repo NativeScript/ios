@@ -195,7 +195,20 @@ ios_code_signing_identity = "...your-id..."
 ios_code_signing_identity_description = ""
 ```
 
-5. Verify the build output.
+* Example failure 3:
+
+```
+constexpr function never produces a constant expression
+```
+
+You can edit `v8/BUILD.gn` and add additional flag `-Wno-invalid-constexpr` to clang flags like this:
+
+```
+if (is_clang) {
+    cflags += [ "-Wmissing-field-initializers", "-Wno-invalid-constexpr" ]
+```
+
+5. If building of the v8 source succeeds, Verify the build output.
 
 The compiled fat static libraries will be placed inside the `v8/dist` folder.
 

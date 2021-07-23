@@ -11,7 +11,7 @@ do
     OUTFOLDER=out.gn/$CURRENT_ARCH-release
     TARGET_ENV=$([ "$CURRENT_ARCH" = "x64" ] && echo "simulator" || echo "device")
     echo "Building for $OUTFOLDER ($TARGET_ENV)"
-    gn gen $OUTFOLDER --args="v8_enable_pointer_compression=false is_official_build=true use_custom_libcxx=false is_component_build=false symbol_level=0 v8_enable_v8_checks=false v8_enable_debugging_features=false is_debug=false v8_use_external_startup_data=false use_xcode_clang=true enable_ios_bitcode=true v8_enable_i18n_support=false target_environment=\"$TARGET_ENV\" target_cpu=\"$CURRENT_ARCH\" v8_target_cpu=\"$CURRENT_ARCH\" target_os=\"ios\" ios_deployment_target=\"9.0\""
+    gn gen $OUTFOLDER --args="v8_enable_pointer_compression=false is_official_build=true use_custom_libcxx=false is_component_build=false symbol_level=0 v8_enable_webassembly=false v8_enable_v8_checks=false v8_enable_debugging_features=false is_debug=false v8_use_external_startup_data=false use_xcode_clang=true enable_ios_bitcode=true v8_enable_i18n_support=false target_environment=\"$TARGET_ENV\" target_cpu=\"$CURRENT_ARCH\" v8_target_cpu=\"$CURRENT_ARCH\" target_os=\"ios\" ios_deployment_target=\"9.0\""
     ninja -C $OUTFOLDER ${MODULES[@]} inspector
 
     for MODULE in ${MODULES[@]}
