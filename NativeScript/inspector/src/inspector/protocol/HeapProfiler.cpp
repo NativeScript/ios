@@ -570,10 +570,12 @@ namespace {
 struct stopTrackingHeapObjectsParams : public v8_crdtp::DeserializableProtocolObject<stopTrackingHeapObjectsParams> {
     Maybe<bool> reportProgress;
     Maybe<bool> treatGlobalObjectsAsRoots;
+    Maybe<bool> captureNumericValue;
     DECLARE_DESERIALIZATION_SUPPORT();
 };
 
 V8_CRDTP_BEGIN_DESERIALIZER(stopTrackingHeapObjectsParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("captureNumericValue", captureNumericValue),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("reportProgress", reportProgress),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("treatGlobalObjectsAsRoots", treatGlobalObjectsAsRoots),
 V8_CRDTP_END_DESERIALIZER()
@@ -591,7 +593,7 @@ void DomainDispatcherImpl::stopTrackingHeapObjects(const v8_crdtp::Dispatchable&
 
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->stopTrackingHeapObjects(std::move(params.reportProgress), std::move(params.treatGlobalObjectsAsRoots));
+    DispatchResponse response = m_backend->stopTrackingHeapObjects(std::move(params.reportProgress), std::move(params.treatGlobalObjectsAsRoots), std::move(params.captureNumericValue));
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("HeapProfiler.stopTrackingHeapObjects"), dispatchable.Serialized());
         return;
@@ -606,10 +608,12 @@ namespace {
 struct takeHeapSnapshotParams : public v8_crdtp::DeserializableProtocolObject<takeHeapSnapshotParams> {
     Maybe<bool> reportProgress;
     Maybe<bool> treatGlobalObjectsAsRoots;
+    Maybe<bool> captureNumericValue;
     DECLARE_DESERIALIZATION_SUPPORT();
 };
 
 V8_CRDTP_BEGIN_DESERIALIZER(takeHeapSnapshotParams)
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("captureNumericValue", captureNumericValue),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("reportProgress", reportProgress),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("treatGlobalObjectsAsRoots", treatGlobalObjectsAsRoots),
 V8_CRDTP_END_DESERIALIZER()
@@ -627,7 +631,7 @@ void DomainDispatcherImpl::takeHeapSnapshot(const v8_crdtp::Dispatchable& dispat
 
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->takeHeapSnapshot(std::move(params.reportProgress), std::move(params.treatGlobalObjectsAsRoots));
+    DispatchResponse response = m_backend->takeHeapSnapshot(std::move(params.reportProgress), std::move(params.treatGlobalObjectsAsRoots), std::move(params.captureNumericValue));
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("HeapProfiler.takeHeapSnapshot"), dispatchable.Serialized());
         return;

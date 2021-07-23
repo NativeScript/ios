@@ -21,6 +21,8 @@ public:
     V8NetworkAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
                        protocol::DictionaryValue* state);
     ~V8NetworkAgentImpl() override;
+    V8NetworkAgentImpl(const V8NetworkAgentImpl&) = delete;
+    V8NetworkAgentImpl& operator=(const V8NetworkAgentImpl&) = delete;
 
     DispatchResponse enable(Maybe<int> in_maxTotalBufferSize, Maybe<int> in_maxResourceBufferSize, Maybe<int> in_maxPostDataSize) override;
     DispatchResponse disable() override;
@@ -62,8 +64,6 @@ private:
     void RequestWillBeSent(const v8::Local<v8::Object>& obj);
     void ResponseReceived(const v8::Local<v8::Object>& obj);
     void LoadingFinished(const v8::Local<v8::Object>& obj);
-
-    DISALLOW_COPY_AND_ASSIGN(V8NetworkAgentImpl);
 };
 
 }

@@ -37,7 +37,6 @@ const char* RemoteObject::TypeEnum::Number = "number";
 const char* RemoteObject::TypeEnum::Boolean = "boolean";
 const char* RemoteObject::TypeEnum::Symbol = "symbol";
 const char* RemoteObject::TypeEnum::Bigint = "bigint";
-const char* RemoteObject::TypeEnum::Wasm = "wasm";
 
 const char* RemoteObject::SubtypeEnum::Array = "array";
 const char* RemoteObject::SubtypeEnum::Null = "null";
@@ -56,12 +55,8 @@ const char* RemoteObject::SubtypeEnum::Promise = "promise";
 const char* RemoteObject::SubtypeEnum::Typedarray = "typedarray";
 const char* RemoteObject::SubtypeEnum::Arraybuffer = "arraybuffer";
 const char* RemoteObject::SubtypeEnum::Dataview = "dataview";
-const char* RemoteObject::SubtypeEnum::I32 = "i32";
-const char* RemoteObject::SubtypeEnum::I64 = "i64";
-const char* RemoteObject::SubtypeEnum::F32 = "f32";
-const char* RemoteObject::SubtypeEnum::F64 = "f64";
-const char* RemoteObject::SubtypeEnum::V128 = "v128";
-const char* RemoteObject::SubtypeEnum::Externref = "externref";
+const char* RemoteObject::SubtypeEnum::Webassemblymemory = "webassemblymemory";
+const char* RemoteObject::SubtypeEnum::Wasmvalue = "wasmvalue";
 V8_CRDTP_BEGIN_DESERIALIZER(RemoteObject)
     V8_CRDTP_DESERIALIZE_FIELD_OPT("className", m_className),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("customPreview", m_customPreview),
@@ -125,6 +120,13 @@ const char* ObjectPreview::SubtypeEnum::Weakset = "weakset";
 const char* ObjectPreview::SubtypeEnum::Iterator = "iterator";
 const char* ObjectPreview::SubtypeEnum::Generator = "generator";
 const char* ObjectPreview::SubtypeEnum::Error = "error";
+const char* ObjectPreview::SubtypeEnum::Proxy = "proxy";
+const char* ObjectPreview::SubtypeEnum::Promise = "promise";
+const char* ObjectPreview::SubtypeEnum::Typedarray = "typedarray";
+const char* ObjectPreview::SubtypeEnum::Arraybuffer = "arraybuffer";
+const char* ObjectPreview::SubtypeEnum::Dataview = "dataview";
+const char* ObjectPreview::SubtypeEnum::Webassemblymemory = "webassemblymemory";
+const char* ObjectPreview::SubtypeEnum::Wasmvalue = "wasmvalue";
 V8_CRDTP_BEGIN_DESERIALIZER(ObjectPreview)
     V8_CRDTP_DESERIALIZE_FIELD_OPT("description", m_description),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("entries", m_entries),
@@ -167,6 +169,13 @@ const char* PropertyPreview::SubtypeEnum::Weakset = "weakset";
 const char* PropertyPreview::SubtypeEnum::Iterator = "iterator";
 const char* PropertyPreview::SubtypeEnum::Generator = "generator";
 const char* PropertyPreview::SubtypeEnum::Error = "error";
+const char* PropertyPreview::SubtypeEnum::Proxy = "proxy";
+const char* PropertyPreview::SubtypeEnum::Promise = "promise";
+const char* PropertyPreview::SubtypeEnum::Typedarray = "typedarray";
+const char* PropertyPreview::SubtypeEnum::Arraybuffer = "arraybuffer";
+const char* PropertyPreview::SubtypeEnum::Dataview = "dataview";
+const char* PropertyPreview::SubtypeEnum::Webassemblymemory = "webassemblymemory";
+const char* PropertyPreview::SubtypeEnum::Wasmvalue = "wasmvalue";
 V8_CRDTP_BEGIN_DESERIALIZER(PropertyPreview)
     V8_CRDTP_DESERIALIZE_FIELD("name", m_name),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("subtype", m_subtype),
@@ -267,12 +276,14 @@ V8_CRDTP_BEGIN_DESERIALIZER(ExecutionContextDescription)
     V8_CRDTP_DESERIALIZE_FIELD("id", m_id),
     V8_CRDTP_DESERIALIZE_FIELD("name", m_name),
     V8_CRDTP_DESERIALIZE_FIELD("origin", m_origin),
+    V8_CRDTP_DESERIALIZE_FIELD("uniqueId", m_uniqueId),
 V8_CRDTP_END_DESERIALIZER()
 
 V8_CRDTP_BEGIN_SERIALIZER(ExecutionContextDescription)
     V8_CRDTP_SERIALIZE_FIELD("id", m_id);
     V8_CRDTP_SERIALIZE_FIELD("origin", m_origin);
     V8_CRDTP_SERIALIZE_FIELD("name", m_name);
+    V8_CRDTP_SERIALIZE_FIELD("uniqueId", m_uniqueId);
     V8_CRDTP_SERIALIZE_FIELD("auxData", m_auxData);
 V8_CRDTP_END_SERIALIZER();
 
@@ -908,6 +919,7 @@ struct evaluateParams : public v8_crdtp::DeserializableProtocolObject<evaluatePa
     Maybe<bool> disableBreaks;
     Maybe<bool> replMode;
     Maybe<bool> allowUnsafeEvalBlockedByCSP;
+    Maybe<String> uniqueContextId;
     DECLARE_DESERIALIZATION_SUPPORT();
 };
 
@@ -925,6 +937,7 @@ V8_CRDTP_BEGIN_DESERIALIZER(evaluateParams)
     V8_CRDTP_DESERIALIZE_FIELD_OPT("silent", silent),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("throwOnSideEffect", throwOnSideEffect),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("timeout", timeout),
+    V8_CRDTP_DESERIALIZE_FIELD_OPT("uniqueContextId", uniqueContextId),
     V8_CRDTP_DESERIALIZE_FIELD_OPT("userGesture", userGesture),
 V8_CRDTP_END_DESERIALIZER()
 
@@ -940,7 +953,7 @@ void DomainDispatcherImpl::evaluate(const v8_crdtp::Dispatchable& dispatchable)
       return;
 
 
-    m_backend->evaluate(params.expression, std::move(params.objectGroup), std::move(params.includeCommandLineAPI), std::move(params.silent), std::move(params.contextId), std::move(params.returnByValue), std::move(params.generatePreview), std::move(params.userGesture), std::move(params.awaitPromise), std::move(params.throwOnSideEffect), std::move(params.timeout), std::move(params.disableBreaks), std::move(params.replMode), std::move(params.allowUnsafeEvalBlockedByCSP), std::make_unique<EvaluateCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
+    m_backend->evaluate(params.expression, std::move(params.objectGroup), std::move(params.includeCommandLineAPI), std::move(params.silent), std::move(params.contextId), std::move(params.returnByValue), std::move(params.generatePreview), std::move(params.userGesture), std::move(params.awaitPromise), std::move(params.throwOnSideEffect), std::move(params.timeout), std::move(params.disableBreaks), std::move(params.replMode), std::move(params.allowUnsafeEvalBlockedByCSP), std::move(params.uniqueContextId), std::make_unique<EvaluateCallbackImpl>(weakPtr(), dispatchable.CallId(), dispatchable.Serialized()));
 }
 
 namespace {

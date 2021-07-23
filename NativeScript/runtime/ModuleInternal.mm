@@ -257,7 +257,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pa
     Local<Context> context = isolate->GetCurrentContext();
     std::string baseOrigin = tns::ReplaceAll(path, RuntimeConfig.BaseDir, "");
     std::string fullRequiredModulePathWithSchema = "file://" + baseOrigin;
-    ScriptOrigin origin(tns::ToV8String(isolate, fullRequiredModulePathWithSchema));
+    ScriptOrigin origin(isolate, tns::ToV8String(isolate, fullRequiredModulePathWithSchema));
     Local<v8::String> scriptText = WrapModuleContent(isolate, path);
     ScriptCompiler::CachedData* cacheData = LoadScriptCache(path);
     ScriptCompiler::Source source(scriptText, origin, cacheData);

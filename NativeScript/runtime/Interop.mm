@@ -1290,7 +1290,9 @@ Local<v8::Array> Interop::ToArray(Local<Object> object) {
         return object.As<v8::Array>();
     }
 
-    Local<Context> context = object->CreationContext();
+    Local<Context> context;
+    bool success = object->GetCreationContext().ToLocal(&context);
+    tns::Assert(success);
     Isolate* isolate = context->GetIsolate();
 
     Local<v8::Function> sliceFunc;
@@ -1321,7 +1323,7 @@ Local<v8::Array> Interop::ToArray(Local<Object> object) {
     Local<Value> sliceArgs[1] { object };
 
     Local<Value> result;
-    bool success = sliceFunc->Call(context, object, 1, sliceArgs).ToLocal(&result);
+    success = sliceFunc->Call(context, object, 1, sliceArgs).ToLocal(&result);
     tns::Assert(success, isolate);
 
     return result.As<v8::Array>();
