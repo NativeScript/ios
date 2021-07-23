@@ -189,7 +189,6 @@
 		C247C3A122F828E3001D2CA2 /* mutex.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C31B22F828E3001D2CA2 /* mutex.h */; };
 		C247C3A222F828E3001D2CA2 /* platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C31C22F828E3001D2CA2 /* platform.h */; };
 		C247C3A322F828E3001D2CA2 /* v8-fallthrough.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C31D22F828E3001D2CA2 /* v8-fallthrough.h */; };
-		C247C3A422F828E3001D2CA2 /* atomicops_internals_portable.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C31E22F828E3001D2CA2 /* atomicops_internals_portable.h */; };
 		C247C3A522F828E3001D2CA2 /* safe_conversions.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C31F22F828E3001D2CA2 /* safe_conversions.h */; };
 		C247C3A622F828E3001D2CA2 /* logging.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C32022F828E3001D2CA2 /* logging.h */; };
 		C247C3A722F828E3001D2CA2 /* atomicops.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C32122F828E3001D2CA2 /* atomicops.h */; };
@@ -429,11 +428,14 @@
 		C2DDEBB5229EAC8300345BFE /* Tasks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB8C229EAC8300345BFE /* Tasks.cpp */; };
 		C2DDEBDC229EB37A00345BFE /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEBDB229EB37A00345BFE /* main.m */; };
 		C2DDEBDE229EB4A900345BFE /* app in Resources */ = {isa = PBXBuildFile; fileRef = C2DDEBDD229EB4A900345BFE /* app */; };
+		C2EDE27726AB0D1100CCF95B /* immediate-crash.h in Headers */ = {isa = PBXBuildFile; fileRef = C2EDE27626AB0D1100CCF95B /* immediate-crash.h */; };
 		C2F4D0AD232F85E20008A2EB /* SymbolIterator.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F4D0AB232F85E20008A2EB /* SymbolIterator.mm */; };
 		C2F4D0AE232F85E20008A2EB /* SymbolIterator.h in Headers */ = {isa = PBXBuildFile; fileRef = C2F4D0AC232F85E20008A2EB /* SymbolIterator.h */; };
 		C2F4D0CB2334A6E70008A2EB /* RuntimeConfig.h in Headers */ = {isa = PBXBuildFile; fileRef = C2F4D0C92334A6E70008A2EB /* RuntimeConfig.h */; };
 		C2F4D0CD2334B1BC0008A2EB /* RuntimeConfig.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2F4D0CC2334B1BC0008A2EB /* RuntimeConfig.cpp */; };
 		C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F64E8222E870A300EDB057 /* NativeScript.mm */; };
+		C2FAAE2A26A99E7400538598 /* v8-debugger-id.cc in Sources */ = {isa = PBXBuildFile; fileRef = C2FAAE2826A99E7400538598 /* v8-debugger-id.cc */; };
+		C2FAAE2B26A99E7400538598 /* v8-debugger-id.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FAAE2926A99E7400538598 /* v8-debugger-id.h */; };
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
 		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
 /* End PBXBuildFile section */
@@ -717,7 +719,6 @@
 		C247C31B22F828E3001D2CA2 /* mutex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mutex.h; sourceTree = "<group>"; };
 		C247C31C22F828E3001D2CA2 /* platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = platform.h; sourceTree = "<group>"; };
 		C247C31D22F828E3001D2CA2 /* v8-fallthrough.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-fallthrough.h"; sourceTree = "<group>"; };
-		C247C31E22F828E3001D2CA2 /* atomicops_internals_portable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = atomicops_internals_portable.h; sourceTree = "<group>"; };
 		C247C31F22F828E3001D2CA2 /* safe_conversions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = safe_conversions.h; sourceTree = "<group>"; };
 		C247C32022F828E3001D2CA2 /* logging.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = logging.h; sourceTree = "<group>"; };
 		C247C32122F828E3001D2CA2 /* atomicops.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = atomicops.h; sourceTree = "<group>"; };
@@ -1020,12 +1021,15 @@
 		C2DDEB8C229EAC8300345BFE /* Tasks.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Tasks.cpp; sourceTree = "<group>"; };
 		C2DDEBDB229EB37A00345BFE /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		C2DDEBDD229EB4A900345BFE /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
+		C2EDE27626AB0D1100CCF95B /* immediate-crash.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "immediate-crash.h"; sourceTree = "<group>"; };
 		C2F4CBB322C60BFD0036B56F /* metadata-generator */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "metadata-generator"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2F4D0AB232F85E20008A2EB /* SymbolIterator.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = SymbolIterator.mm; sourceTree = "<group>"; };
 		C2F4D0AC232F85E20008A2EB /* SymbolIterator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SymbolIterator.h; sourceTree = "<group>"; };
 		C2F4D0C92334A6E70008A2EB /* RuntimeConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RuntimeConfig.h; sourceTree = "<group>"; };
 		C2F4D0CC2334B1BC0008A2EB /* RuntimeConfig.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RuntimeConfig.cpp; sourceTree = "<group>"; };
 		C2F64E8222E870A300EDB057 /* NativeScript.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScript.mm; sourceTree = "<group>"; };
+		C2FAAE2826A99E7400538598 /* v8-debugger-id.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "v8-debugger-id.cc"; sourceTree = "<group>"; };
+		C2FAAE2926A99E7400538598 /* v8-debugger-id.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-debugger-id.h"; sourceTree = "<group>"; };
 		C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InlineFunctions.cpp; sourceTree = "<group>"; };
 		C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InlineFunctions.h; sourceTree = "<group>"; };
 		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -1316,6 +1320,8 @@
 				C247C2F522F828E2001D2CA2 /* v8-css-agent-impl.cpp */,
 				C247C2C422F828E2001D2CA2 /* v8-debugger-agent-impl.h */,
 				C247C2C222F828E2001D2CA2 /* v8-debugger-agent-impl.cc */,
+				C2FAAE2826A99E7400538598 /* v8-debugger-id.cc */,
+				C2FAAE2926A99E7400538598 /* v8-debugger-id.h */,
 				C247C2FF22F828E2001D2CA2 /* v8-debugger-script.h */,
 				C247C2C122F828E2001D2CA2 /* v8-debugger-script.cc */,
 				C247C2BA22F828E2001D2CA2 /* v8-debugger.h */,
@@ -1414,6 +1420,7 @@
 		C247C31322F828E3001D2CA2 /* base */ = {
 			isa = PBXGroup;
 			children = (
+				C2EDE27626AB0D1100CCF95B /* immediate-crash.h */,
 				C2D7E9CE23F4294800DB289C /* export-template.h */,
 				C263B4CB23D0A87E00D5B872 /* bits.h */,
 				C247C31422F828E3001D2CA2 /* address-region.h */,
@@ -1423,7 +1430,6 @@
 				C247C31822F828E3001D2CA2 /* flags.h */,
 				C247C31922F828E3001D2CA2 /* platform */,
 				C247C31D22F828E3001D2CA2 /* v8-fallthrough.h */,
-				C247C31E22F828E3001D2CA2 /* atomicops_internals_portable.h */,
 				C247C31F22F828E3001D2CA2 /* safe_conversions.h */,
 				C247C32022F828E3001D2CA2 /* logging.h */,
 				C247C32122F828E3001D2CA2 /* atomicops.h */,
@@ -1961,6 +1967,7 @@
 			files = (
 				C2D116B225666C460020BF3E /* maybe.h in Headers */,
 				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
+				C2EDE27726AB0D1100CCF95B /* immediate-crash.h in Headers */,
 				C2A5DEC82327DCF600A91A76 /* NativeScript.h in Headers */,
 				C247C17122F82842001D2CA2 /* v8config.h in Headers */,
 				C247C36022F828E3001D2CA2 /* Console.h in Headers */,
@@ -2069,6 +2076,7 @@
 				C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */,
 				C2229977235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h in Headers */,
 				C247C16C22F82842001D2CA2 /* Schema.h in Headers */,
+				C2FAAE2B26A99E7400538598 /* v8-debugger-id.h in Headers */,
 				C247C38422F828E3001D2CA2 /* v8-network-agent-impl.h in Headers */,
 				C247C38A22F828E3001D2CA2 /* v8-console-message.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
@@ -2096,7 +2104,6 @@
 				C247C39F22F828E3001D2CA2 /* flags.h in Headers */,
 				C247C3A922F828E3001D2CA2 /* macros.h in Headers */,
 				C2D116B325666C460020BF3E /* dispatch.h in Headers */,
-				C247C3A422F828E3001D2CA2 /* atomicops_internals_portable.h in Headers */,
 				C2B30FD9238418CA009D6A46 /* json_platform.h in Headers */,
 				C247C37B22F828E3001D2CA2 /* v8-profiler-agent-impl.h in Headers */,
 				C247C39722F828E3001D2CA2 /* allocation.h in Headers */,
@@ -2646,6 +2653,7 @@
 				C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */,
 				C247C38522F828E3001D2CA2 /* v8-dom-agent-impl.cpp in Sources */,
 				C247C37E22F828E3001D2CA2 /* v8-stack-trace-impl.cc in Sources */,
+				C2FAAE2A26A99E7400538598 /* v8-debugger-id.cc in Sources */,
 				C247C33022F828E3001D2CA2 /* base64.cpp in Sources */,
 				C247C33D22F828E3001D2CA2 /* v8-profiler-agent-impl.cc in Sources */,
 				C2D21600248AAAD900EDC646 /* Constants.cpp in Sources */,
@@ -3248,7 +3256,7 @@
 					"-lv8_snapshot",
 					"-lv8_libbase",
 					"-lv8_libplatform",
-					"-lv8_libsampler",
+					"-lv8_bigint",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -3316,7 +3324,7 @@
 					"-lv8_snapshot",
 					"-lv8_libbase",
 					"-lv8_libplatform",
-					"-lv8_libsampler",
+					"-lv8_bigint",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";

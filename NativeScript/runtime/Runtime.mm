@@ -44,8 +44,6 @@ Runtime::~Runtime() {
     if (![NSThread isMainThread]) {
         Caches::Workers->Remove(this->workerId_);
         Caches::Remove(this->isolate_);
-    } else {
-        this->isolate_->Exit();
     }
 
     Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());

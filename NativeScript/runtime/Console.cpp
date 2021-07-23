@@ -318,7 +318,9 @@ const Local<v8::String> Console::BuildStringFromArg(Local<Context> context, cons
 }
 
 const Local<v8::String> Console::TransformJSObject(Local<Object> object) {
-    Local<Context> context = object->CreationContext();
+    Local<Context> context;
+    bool success = object->GetCreationContext().ToLocal(&context);
+    tns::Assert(success);
     Isolate* isolate = context->GetIsolate();
     Local<Value> value;
     {

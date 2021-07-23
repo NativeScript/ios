@@ -19,6 +19,8 @@ public:
                    protocol::DictionaryValue* state);
 
     ~V8DOMAgentImpl() override;
+    V8DOMAgentImpl(const V8DOMAgentImpl&) = delete;
+    V8DOMAgentImpl& operator=(const V8DOMAgentImpl&) = delete;
 
     virtual DispatchResponse enable() override;
     virtual DispatchResponse disable() override;
@@ -83,8 +85,6 @@ private:
     void AttributeRemoved(const v8::Local<v8::Object>& obj);
     void DocumentUpdated();
     std::u16string AddBackendNodeIdProperty(v8::Local<v8::Context> context, v8::Local<v8::Value> jsonInput);
-
-    DISALLOW_COPY_AND_ASSIGN(V8DOMAgentImpl);
 };
 
 }
