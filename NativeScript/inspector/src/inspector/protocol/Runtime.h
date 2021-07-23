@@ -78,7 +78,6 @@ public:
         static const char* Boolean;
         static const char* Symbol;
         static const char* Bigint;
-        static const char* Wasm;
     }; // TypeEnum
 
     String getType() { return m_type; }
@@ -102,12 +101,8 @@ public:
         static const char* Typedarray;
         static const char* Arraybuffer;
         static const char* Dataview;
-        static const char* I32;
-        static const char* I64;
-        static const char* F32;
-        static const char* F64;
-        static const char* V128;
-        static const char* Externref;
+        static const char* Webassemblymemory;
+        static const char* Wasmvalue;
     }; // SubtypeEnum
 
     bool hasSubtype() { return m_subtype.isJust(); }
@@ -347,6 +342,13 @@ public:
         static const char* Iterator;
         static const char* Generator;
         static const char* Error;
+        static const char* Proxy;
+        static const char* Promise;
+        static const char* Typedarray;
+        static const char* Arraybuffer;
+        static const char* Dataview;
+        static const char* Webassemblymemory;
+        static const char* Wasmvalue;
     }; // SubtypeEnum
 
     bool hasSubtype() { return m_subtype.isJust(); }
@@ -500,6 +502,13 @@ public:
         static const char* Iterator;
         static const char* Generator;
         static const char* Error;
+        static const char* Proxy;
+        static const char* Promise;
+        static const char* Typedarray;
+        static const char* Arraybuffer;
+        static const char* Dataview;
+        static const char* Webassemblymemory;
+        static const char* Wasmvalue;
     }; // SubtypeEnum
 
     bool hasSubtype() { return m_subtype.isJust(); }
@@ -1063,6 +1072,9 @@ public:
     String getName() { return m_name; }
     void setName(const String& value) { m_name = value; }
 
+    String getUniqueId() { return m_uniqueId; }
+    void setUniqueId(const String& value) { m_uniqueId = value; }
+
     bool hasAuxData() { return m_auxData.isJust(); }
     protocol::DictionaryValue* getAuxData(protocol::DictionaryValue* defaultValue) { return m_auxData.isJust() ? m_auxData.fromJust() : defaultValue; }
     void setAuxData(std::unique_ptr<protocol::DictionaryValue> value) { m_auxData = std::move(value); }
@@ -1075,7 +1087,8 @@ public:
             IdSet = 1 << 1,
             OriginSet = 1 << 2,
             NameSet = 1 << 3,
-            AllFieldsSet = (IdSet | OriginSet | NameSet | 0)};
+            UniqueIdSet = 1 << 4,
+            AllFieldsSet = (IdSet | OriginSet | NameSet | UniqueIdSet | 0)};
 
 
         ExecutionContextDescriptionBuilder<STATE | IdSet>& setId(int value)
@@ -1097,6 +1110,13 @@ public:
             static_assert(!(STATE & NameSet), "property name should not be set yet");
             m_result->setName(value);
             return castState<NameSet>();
+        }
+
+        ExecutionContextDescriptionBuilder<STATE | UniqueIdSet>& setUniqueId(const String& value)
+        {
+            static_assert(!(STATE & UniqueIdSet), "property uniqueId should not be set yet");
+            m_result->setUniqueId(value);
+            return castState<UniqueIdSet>();
         }
 
         ExecutionContextDescriptionBuilder<STATE>& setAuxData(std::unique_ptr<protocol::DictionaryValue> value)
@@ -1139,6 +1159,7 @@ private:
     int m_id;
     String m_origin;
     String m_name;
+    String m_uniqueId;
     Maybe<protocol::DictionaryValue> m_auxData;
 };
 
@@ -1594,7 +1615,7 @@ public:
         virtual void fallThrough() = 0;
         virtual ~EvaluateCallback() { }
     };
-    virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, Maybe<bool> in_disableBreaks, Maybe<bool> in_replMode, Maybe<bool> in_allowUnsafeEvalBlockedByCSP, std::unique_ptr<EvaluateCallback> callback) = 0;
+    virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, Maybe<bool> in_disableBreaks, Maybe<bool> in_replMode, Maybe<bool> in_allowUnsafeEvalBlockedByCSP, Maybe<String> in_uniqueContextId, std::unique_ptr<EvaluateCallback> callback) = 0;
     virtual DispatchResponse getIsolateId(String* out_id) = 0;
     virtual DispatchResponse getHeapUsage(double* out_usedSize, double* out_totalSize) = 0;
     virtual DispatchResponse getProperties(const String& in_objectId, Maybe<bool> in_ownProperties, Maybe<bool> in_accessorPropertiesOnly, Maybe<bool> in_generatePreview, std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>* out_result, Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>* out_internalProperties, Maybe<protocol::Array<protocol::Runtime::PrivatePropertyDescriptor>>* out_privateProperties, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;

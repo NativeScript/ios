@@ -104,6 +104,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
     Local<Context> context = cache->GetContext();
+    Context::Scope context_scope(context);
     std::shared_ptr<Persistent<Value>> poCallback = data->callback_;
 
     bool hasErrorOutParameter = false;
@@ -505,7 +506,9 @@ bool ArgConverter::CanInvoke(Local<Context> context, const TypeEncoding* typeEnc
 std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj, std::string& constructorTokens) {
     std::vector<Local<Value>> args;
     constructorTokens = "";
-    Local<Context> context = obj->CreationContext();
+    Local<Context> context;
+    bool success = obj->GetCreationContext().ToLocal(&context);
+    tns::Assert(success);
     Isolate* isolate = context->GetIsolate();
     Local<v8::Array> properties;
     if (obj->GetOwnPropertyNames(context).ToLocal(&properties)) {

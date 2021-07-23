@@ -101,9 +101,9 @@ MaybeHandle<BigInt> StringToBigInt(Isolate* isolate, Handle<String> string);
 //   0x -> hex
 //   0o -> octal
 //   0b -> binary
-template <typename LocalIsolate>
+template <typename IsolateT>
 EXPORT_TEMPLATE_DECLARE(V8_EXPORT_PRIVATE)
-MaybeHandle<BigInt> BigIntLiteral(LocalIsolate* isolate, const char* string);
+MaybeHandle<BigInt> BigIntLiteral(IsolateT* isolate, const char* string);
 
 const int kDoubleToCStringMinBufferSize = 100;
 
@@ -166,7 +166,8 @@ double StringToDouble(Isolate* isolate, Handle<String> string, int flags,
 // {max_length_for_conversion}. 23 was chosen because any representable double
 // can be represented using a string of length 23.
 V8_EXPORT_PRIVATE base::Optional<double> TryStringToDouble(
-    Handle<String> object, int max_length_for_conversion = 23);
+    LocalIsolate* isolate, Handle<String> object,
+    int max_length_for_conversion = 23);
 
 inline bool TryNumberToSize(Object number, size_t* result);
 

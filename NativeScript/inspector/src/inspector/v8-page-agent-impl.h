@@ -19,6 +19,8 @@ class V8PageAgentImpl : public protocol::Page::Backend {
 public:
     V8PageAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*, protocol::DictionaryValue* state);
     ~V8PageAgentImpl() override;
+    V8PageAgentImpl(const V8PageAgentImpl&) = delete;
+    V8PageAgentImpl& operator=(const V8PageAgentImpl&) = delete;
 
     DispatchResponse enable() override;
     DispatchResponse disable() override;
@@ -79,8 +81,6 @@ private:
     void ReadEntries(std::string baseDir, std::vector<PageEntry>& entries);
     bool HasTextContent(std::string type);
     String16 GetResourceContent(const String& url, bool& shouldEncode);
-
-    DISALLOW_COPY_AND_ASSIGN(V8PageAgentImpl);
 };
 
 }

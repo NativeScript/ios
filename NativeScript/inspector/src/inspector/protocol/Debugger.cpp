@@ -346,7 +346,6 @@ public:
     void disable(const v8_crdtp::Dispatchable& dispatchable);
     void enable(const v8_crdtp::Dispatchable& dispatchable);
     void evaluateOnCallFrame(const v8_crdtp::Dispatchable& dispatchable);
-    void executeWasmEvaluator(const v8_crdtp::Dispatchable& dispatchable);
     void getPossibleBreakpoints(const v8_crdtp::Dispatchable& dispatchable);
     void getScriptSource(const v8_crdtp::Dispatchable& dispatchable);
     void getWasmBytecode(const v8_crdtp::Dispatchable& dispatchable);
@@ -400,10 +399,6 @@ DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_
     {
           v8_crdtp::SpanFrom("evaluateOnCallFrame"),
           &DomainDispatcherImpl::evaluateOnCallFrame
-    },
-    {
-          v8_crdtp::SpanFrom("executeWasmEvaluator"),
-          &DomainDispatcherImpl::executeWasmEvaluator
     },
     {
           v8_crdtp::SpanFrom("getPossibleBreakpoints"),
@@ -674,57 +669,6 @@ void DomainDispatcherImpl::evaluateOnCallFrame(const v8_crdtp::Dispatchable& dis
     DispatchResponse response = m_backend->evaluateOnCallFrame(params.callFrameId, params.expression, std::move(params.objectGroup), std::move(params.includeCommandLineAPI), std::move(params.silent), std::move(params.returnByValue), std::move(params.generatePreview), std::move(params.throwOnSideEffect), std::move(params.timeout), &out_result, &out_exceptionDetails);
     if (response.IsFallThrough()) {
         channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.evaluateOnCallFrame"), dispatchable.Serialized());
-        return;
-    }
-      if (weak->get()) {
-        std::unique_ptr<v8_crdtp::Serializable> result;
-        if (response.IsSuccess()) {
-          v8_crdtp::ObjectSerializer serializer;
-          serializer.AddField(v8_crdtp::MakeSpan("result"), out_result);
-          serializer.AddField(v8_crdtp::MakeSpan("exceptionDetails"), out_exceptionDetails);
-          result = serializer.Finish();
-        } else {
-          result = Serializable::From({});
-        }
-        weak->get()->sendResponse(dispatchable.CallId(), response, std::move(result));
-      }
-    return;
-}
-
-namespace {
-
-struct executeWasmEvaluatorParams : public v8_crdtp::DeserializableProtocolObject<executeWasmEvaluatorParams> {
-    String callFrameId;
-    Binary evaluator;
-    Maybe<double> timeout;
-    DECLARE_DESERIALIZATION_SUPPORT();
-};
-
-V8_CRDTP_BEGIN_DESERIALIZER(executeWasmEvaluatorParams)
-    V8_CRDTP_DESERIALIZE_FIELD("callFrameId", callFrameId),
-    V8_CRDTP_DESERIALIZE_FIELD("evaluator", evaluator),
-    V8_CRDTP_DESERIALIZE_FIELD_OPT("timeout", timeout),
-V8_CRDTP_END_DESERIALIZER()
-
-}  // namespace
-
-void DomainDispatcherImpl::executeWasmEvaluator(const v8_crdtp::Dispatchable& dispatchable)
-{
-    // Prepare input parameters.
-    auto deserializer = v8_crdtp::DeferredMessage::FromSpan(dispatchable.Params())->MakeDeserializer();
-    executeWasmEvaluatorParams params;
-    executeWasmEvaluatorParams::Deserialize(&deserializer, &params);
-    if (MaybeReportInvalidParams(dispatchable, deserializer))
-      return;
-
-    // Declare output parameters.
-    std::unique_ptr<protocol::Runtime::RemoteObject> out_result;
-    Maybe<protocol::Runtime::ExceptionDetails> out_exceptionDetails;
-
-    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->executeWasmEvaluator(params.callFrameId, params.evaluator, std::move(params.timeout), &out_result, &out_exceptionDetails);
-    if (response.IsFallThrough()) {
-        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.executeWasmEvaluator"), dispatchable.Serialized());
         return;
     }
       if (weak->get()) {

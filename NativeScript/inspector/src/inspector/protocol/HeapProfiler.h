@@ -295,8 +295,8 @@ public:
     virtual DispatchResponse startSampling(Maybe<double> in_samplingInterval) = 0;
     virtual DispatchResponse startTrackingHeapObjects(Maybe<bool> in_trackAllocations) = 0;
     virtual DispatchResponse stopSampling(std::unique_ptr<protocol::HeapProfiler::SamplingHeapProfile>* out_profile) = 0;
-    virtual DispatchResponse stopTrackingHeapObjects(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots) = 0;
-    virtual DispatchResponse takeHeapSnapshot(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots) = 0;
+    virtual DispatchResponse stopTrackingHeapObjects(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots, Maybe<bool> in_captureNumericValue) = 0;
+    virtual DispatchResponse takeHeapSnapshot(Maybe<bool> in_reportProgress, Maybe<bool> in_treatGlobalObjectsAsRoots, Maybe<bool> in_captureNumericValue) = 0;
 
 };
 

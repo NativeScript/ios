@@ -230,17 +230,21 @@ bool tns::WriteBinary(const std::string& path, const void* data, long length) {
 }
 
 void tns::SetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName, const Local<Value>& value) {
-    Local<Context> context = obj->CreationContext();
+    Local<Context> context;
+    bool success = obj->GetCreationContext().ToLocal(&context);
+    tns::Assert(success);
     Isolate* isolate = context->GetIsolate();
     Local<Private> privateKey = Private::ForApi(isolate, propName);
-    bool success;
+
     if (!obj->SetPrivate(context, privateKey, value).To(&success) || !success) {
         tns::Assert(false, isolate);
     }
 }
 
 Local<Value> tns::GetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName) {
-    Local<Context> context = obj->CreationContext();
+    Local<Context> context;
+    bool success = obj->GetCreationContext().ToLocal(&context);
+    tns::Assert(success);
     Isolate* isolate = context->GetIsolate();
     Local<Private> privateKey = Private::ForApi(isolate, propName);
 
@@ -315,10 +319,12 @@ void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
         return;
     }
 
-    Local<Context> context = obj->CreationContext();
+    Local<Context> context;
+    bool success = obj->GetCreationContext().ToLocal(&context);
+    tns::Assert(success, isolate);
     Local<Private> privateKey = Private::ForApi(isolate, metadataKey);
 
-    bool success = obj->DeletePrivate(context, privateKey).FromMaybe(false);
+    success = obj->DeletePrivate(context, privateKey).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
@@ -353,7 +359,9 @@ bool tns::IsArrayOrArrayLike(Isolate* isolate, Local<Value> value) {
     }
 
     Local<Object> obj = value.As<Object>();
-    Local<Context> context = obj->CreationContext();
+    Local<Context> context;
+    bool success = obj->GetCreationContext().ToLocal(&context);
+    tns::Assert(success, isolate);
     return obj->Has(context, ToV8String(isolate, "length")).FromMaybe(false);
 }
 

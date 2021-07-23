@@ -20,6 +20,8 @@ public:
                    protocol::DictionaryValue* state);
 
     ~V8CSSAgentImpl() override;
+    V8CSSAgentImpl(const V8CSSAgentImpl&) = delete;
+    V8CSSAgentImpl& operator=(const V8CSSAgentImpl&) = delete;
 
     void enable(std::unique_ptr<EnableCallback> callback) override;
     DispatchResponse disable() override;
@@ -53,8 +55,6 @@ private:
     V8InspectorSessionImpl* m_session;
 
     bool m_enabled;
-
-    DISALLOW_COPY_AND_ASSIGN(V8CSSAgentImpl);
 };
 
 }
