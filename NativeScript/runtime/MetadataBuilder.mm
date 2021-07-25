@@ -526,8 +526,10 @@ void MetadataBuilder::RegisterStaticMethods(Local<Context> context, Local<v8::Fu
 
             DefineFunctionLengthProperty(context, methodMeta->encodings(), staticMethod);
 
-            bool success = ctorFunc->Set(context, tns::ToV8String(isolate, methodMeta->jsName()), staticMethod).FromMaybe(false);
-            tns::Assert(success, isolate);
+            if (!ctorFunc->Has(context, tns::ToV8String(isolate, methodMeta->jsName())).FromJust()) {
+                bool success = ctorFunc->Set(context, tns::ToV8String(isolate, methodMeta->jsName()), staticMethod).FromMaybe(false);
+                tns::Assert(success, isolate);
+            }
 
             names.emplace(methodName, 0);
             
