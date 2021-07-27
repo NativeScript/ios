@@ -258,7 +258,7 @@ using namespace tns;
     self->object_ = nil;
     
     if (self->enumerator_ != nullptr) {
-        CFAutorelease(self->enumerator_);
+        // CFAutorelease(self->enumerator_);
         self->enumerator_ = nullptr;
     }
     
