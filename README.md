@@ -47,6 +47,18 @@ Add the `Nativescript.framework` from the v8ios workspace (only required when ru
 
 Hitting Run in XCode should start the app in the simulator, and we can now add breakpoints to the runtime and step through it with the debugger. To apply changes to the javascript, make sure you run `ns prepare ios` to re-bundle it into the `platforms/ios` folder.
 
+## Troubleshooting
+
+If you encounter vague errors like this when building your app with the runtime included (This has been observed sometimes while Profiling apps in Xcode):
+
+```
+/path/to/ns-v8ios-runtime/NativeScript/inspector/src/base/atomicops.h:311:11: No matching function for call to 'Relaxed_Load'
+```
+
+This is most likely related to `Build Active Architecture Only` setting in Xcode for various targets (your app and the included v8ios runtime). You should check to make sure your app `Build Settings` and the v8ios targets `NativeScript` and `TKLiveSync` Build Settings are set to YES for both Debug and Release. See this reference:
+https://github.com/QuickBlox/quickblox-ios-sdk/issues/993#issuecomment-379656716
+
+
 # Overview
 
 POC showing the [{N} iOS runtime](https://github.com/NativeScript/ios-runtime) running with the V8 engine.
