@@ -80,6 +80,10 @@ void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& 
             val = new Persistent<Value>(isolate, info[1]);
         }
     }
+    
+    if(val != nullptr) {
+        val->SetWeak();
+    }
 
     ReferenceWrapper* wrapper = new ReferenceWrapper(typeWrapper, val);
     Local<Object> thiz = info.This();

@@ -532,6 +532,7 @@ void MetadataBuilder::RegisterStaticMethods(Local<Context> context, Local<v8::Fu
             }
 
             names.emplace(methodName, 0);
+            
         }
     }
 }

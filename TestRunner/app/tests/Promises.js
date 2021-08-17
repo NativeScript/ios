@@ -1,3 +1,6 @@
+/**
+ TODO: Revisit thread handling with promises regarding these tests
+ */
 describe("Promise scheduling", function () {
     it("should be executed", function(done) {
         Promise.resolve().then(done);

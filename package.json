@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/ios",
   "description": "NativeScript Runtime for iOS",
-  "version": "7.2.0",
+  "version": "8.1.0-rc.1",
   "keywords": [
     "NativeScript",
     "iOS",
@@ -19,5 +19,12 @@
   "files": [
     "**/*"
   ],
+  "scripts": {
+    "apply-patches": "./apply_patches.sh",
+    "build-v8-source": "./build_v8_source.sh",
+    "build-v8-source-catalyst": "./build_v8_source_catalyst.sh",
+    "build": "./build_all.sh",
+    "update-version": "./update_version.sh"
+  },
   "license": "Apache-2.0"
 }
