@@ -48,8 +48,10 @@ Runtime::~Runtime() {
 
     Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
 
-    this->isolate_->Dispose();
-
+    if (![NSThread isMainThread]) {
+        this->isolate_->Dispose();
+    }
+    
     currentRuntime_ = nullptr;
 }
 
