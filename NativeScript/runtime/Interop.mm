@@ -17,6 +17,7 @@
 #include "ExtVector.h"
 #include "SymbolIterator.h"
 #include "UnmanagedType.h"
+#include "OneByteStringResource.h"
 
 using namespace v8;
 
@@ -165,9 +166,19 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         Interop::SetValue(dest, selector);
     } else if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
         if (arg->IsString()) {
-            v8::String::Utf8Value utf8Value(isolate, arg);
-            const char* strCopy = strdup(*utf8Value);
-            Interop::SetValue(dest, strCopy);
+            const char* value = nullptr;
+            Local<v8::String> strArg = arg.As<v8::String>();
+            if (strArg->IsExternalOneByte()) {
+                const v8::String::ExternalOneByteStringResource* resource = strArg->GetExternalOneByteStringResource();
+                value = resource->data();
+            } else {
+                v8::String::Utf8Value utf8Value(isolate, arg);
+                value = strdup(*utf8Value);
+                OneByteStringResource* resource = new OneByteStringResource(value, strArg->Length());
+                bool success = v8::String::NewExternalOneByte(isolate, resource).ToLocal(&arg);
+                tns::Assert(success, isolate);
+            }
+            Interop::SetValue(dest, value);
         } else {
             BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
             if (wrapper == nullptr) {

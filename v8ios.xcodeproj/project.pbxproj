@@ -12,6 +12,8 @@
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
 		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C20525A82577D86600C12A5C /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
+		C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */; };
+		C20AB5E726E1015300E2B41D /* OneByteStringResource.h in Headers */ = {isa = PBXBuildFile; fileRef = C20AB5E526E1015200E2B41D /* OneByteStringResource.h */; };
 		C2229973235449B400C1DFD6 /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2229971235449B300C1DFD6 /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		C2229974235449B400C1DFD6 /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = C2229972235449B400C1DFD6 /* InspectorServer.h */; };
 		C2229977235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = C2229975235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h */; };
@@ -541,6 +543,8 @@
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
 		C20525A72577D86600C12A5C /* TNSWidgets.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = TNSWidgets.xcframework; sourceTree = "<group>"; };
+		C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OneByteStringResource.cpp; sourceTree = "<group>"; };
+		C20AB5E526E1015200E2B41D /* OneByteStringResource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OneByteStringResource.h; sourceTree = "<group>"; };
 		C2229971235449B300C1DFD6 /* InspectorServer.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorServer.mm; sourceTree = "<group>"; };
 		C2229972235449B400C1DFD6 /* InspectorServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
 		C2229975235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-ns-debugger-agent-impl.h"; sourceTree = "<group>"; };
@@ -1893,6 +1897,8 @@
 				C266567922AA630F00EE15CC /* NSDataAdapter.mm */,
 				C2DDEB83229EAC8300345BFE /* ObjectManager.h */,
 				C2DDEB86229EAC8300345BFE /* ObjectManager.mm */,
+				C20AB5E526E1015200E2B41D /* OneByteStringResource.h */,
+				C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */,
 				C266569222AFFF7E00EE15CC /* Pointer.h */,
 				C266569122AFFF7E00EE15CC /* Pointer.cpp */,
 				C2D7E9D323F42C1100DB289C /* PromiseProxy.h */,
@@ -1977,6 +1983,7 @@
 				C22536B5241A318900192740 /* ffitarget.h in Headers */,
 				C2D7E9CF23F4294800DB289C /* export-template.h in Headers */,
 				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
+				C20AB5E726E1015300E2B41D /* OneByteStringResource.h in Headers */,
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
 				C247C32E22F828E3001D2CA2 /* base64.h in Headers */,
 				C247C35322F828E3001D2CA2 /* v8-runtime-agent-impl.h in Headers */,
@@ -2629,6 +2636,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C247C36822F828E3001D2CA2 /* Console.cpp in Sources */,
+				C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */,
 				C247C36422F828E3001D2CA2 /* Log.cpp in Sources */,
 				C247C34922F828E3001D2CA2 /* v8-string-conversions.cc in Sources */,
 				C247C38C22F828E3001D2CA2 /* v8-network-agent-impl.cpp in Sources */,
