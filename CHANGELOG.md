@@ -1,3 +1,20 @@
+# [8.1.0](https://github.com/NativeScript/ns-v8ios-runtime/compare/v7.2.0...v8.1.0) (2021-09-08)
+
+
+### Bug Fixes
+
+* check if a static method is already set ([#122](https://github.com/NativeScript/ns-v8ios-runtime/issues/122)) ([1f40861](https://github.com/NativeScript/ns-v8ios-runtime/commit/1f408616e3df3012f6ae42adff8c77907be23354))
+* isolate dispose on app exit handling ([57ec2ec](https://github.com/NativeScript/ns-v8ios-runtime/commit/57ec2ec012f5c9b5322be1e330cc3e747926bc0d))
+* memory leak when marshalling C string parameters ([#127](https://github.com/NativeScript/ns-v8ios-runtime/issues/127)) ([f946828](https://github.com/NativeScript/ns-v8ios-runtime/commit/f946828f4555defdbf12c5eb7cad47b741150fbf))
+* general memory leak fixes [62dff97](https://github.com/NativeScript/ns-v8ios-runtime/commit/62dff97cba05785b69db6c5b4001998f313bd449)
+
+
+### Features
+
+* Update V8 to 9.2.230.18 ([#121](https://github.com/NativeScript/ns-v8ios-runtime/issues/121)) ([b4239fa](https://github.com/NativeScript/ns-v8ios-runtime/commit/b4239facbfcaec13f7efbb8c44ce633ab319ffdc))
+
+
+
 7.2.0
 ===
 
