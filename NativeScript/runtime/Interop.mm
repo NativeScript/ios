@@ -174,7 +174,8 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
             } else {
                 v8::String::Utf8Value utf8Value(isolate, arg);
                 value = strdup(*utf8Value);
-                OneByteStringResource* resource = new OneByteStringResource(value, strArg->Length());
+                auto length = strArg->Length() + 1;
+                OneByteStringResource* resource = new OneByteStringResource(value, length);
                 bool success = v8::String::NewExternalOneByte(isolate, resource).ToLocal(&arg);
                 tns::Assert(success, isolate);
             }
