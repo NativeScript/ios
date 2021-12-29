@@ -14,7 +14,7 @@
 
 @interface NativeScript : NSObject
 
-+ (void)start:(Config*)config;
-+ (bool)liveSync;
+- (instancetype)initWithConfig:(Config*)config;
+- (bool)liveSync;
 
 @end
