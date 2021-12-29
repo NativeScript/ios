@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
         config.ArgumentsCount = argc;
         config.Arguments = argv;
 
-        [NativeScript start:config];
+        [[NativeScript alloc] initWithConfig:config];
 
         return 0;
     }
