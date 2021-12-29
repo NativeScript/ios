@@ -1,6 +1,7 @@
 #import <NativeScript/NativeScript.h>
 
 extern char startOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
+NativeScript* nativescript;
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
@@ -23,7 +24,7 @@ int main(int argc, char *argv[]) {
         config.ArgumentsCount = argc;
         config.Arguments = argv;
 
-        [[NativeScript alloc] initWithConfig: config];
+        nativescript = [NativeScript alloc] initWithConfig: config];
 
         return 0;
     }

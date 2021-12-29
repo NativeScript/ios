@@ -14,6 +14,7 @@
 #endif
 
 extern char startOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
+NativeScript* nativescript;
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
@@ -23,7 +24,7 @@ int main(int argc, char *argv[]) {
         int refreshRequestSubscription;
         notify_register_dispatch(NOTIFICATION("RefreshRequest"), &refreshRequestSubscription, dispatch_get_main_queue(), ^(int token) {
             notify_post(NOTIFICATION("AppRefreshStarted"));
-            bool success = [NativeScript liveSync];
+            bool success = [nativescript liveSync];
             if (success) {
                 notify_post(NOTIFICATION("AppRefreshSucceeded"));
             } else {
@@ -55,7 +56,7 @@ int main(int argc, char *argv[]) {
         config.ArgumentsCount = argc;
         config.Arguments = argv;
 
-        [[NativeScript alloc] initWithConfig:config];
+        nativescript = [[NativeScript alloc] initWithConfig:config];
 
         return 0;
     }
