@@ -12,6 +12,7 @@ using namespace tns;
 @implementation Config
 
 @synthesize BaseDir;
+@synthesize ApplicationPath;
 @synthesize MetadataPtr;
 @synthesize IsDebug;
 
@@ -23,7 +24,11 @@ static std::shared_ptr<Runtime> runtime_;
 
 + (void)start:(Config*)config {
     RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
-    RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
+    if (config.ApplicationPath != nil) {
+        RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:config.ApplicationPath] UTF8String];
+    } else {
+        RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
+    }
     RuntimeConfig.MetadataPtr = [config MetadataPtr];
     RuntimeConfig.IsDebug = [config IsDebug];
     RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
