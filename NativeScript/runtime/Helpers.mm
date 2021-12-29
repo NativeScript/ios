@@ -273,6 +273,11 @@ void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* 
     Local<External> ext = External::New(isolate, value);
 
     if (obj->InternalFieldCount() > 0) {
+        if(value) {
+            isolate->AdjustAmountOfExternalAllocatedMemory(
+                value->SelfSize()
+            );
+        }
         obj->SetInternalField(0, ext);
     } else {
         tns::SetPrivateValue(obj, tns::ToV8String(isolate, "metadata"), ext);
@@ -308,6 +313,7 @@ void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
     }
 
     Local<Object> obj = val.As<Object>();
+
     if (obj->InternalFieldCount() > 0) {
         obj->SetInternalField(0, v8::Undefined(isolate));
         return;

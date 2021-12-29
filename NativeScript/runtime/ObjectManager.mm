@@ -62,6 +62,10 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
     if (wrapper->IsGcProtected()) {
         return false;
     }
+    
+    isolate->AdjustAmountOfExternalAllocatedMemory(
+        - (wrapper->SelfSize())
+    );
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     switch (wrapper->Type()) {

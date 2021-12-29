@@ -168,6 +168,10 @@ public:
 
     virtual ~BaseDataWrapper() = default;
 
+    virtual size_t SelfSize() {
+        return 0;
+    }
+
     const virtual WrapperType Type() {
         return WrapperType::Base;
     }
@@ -216,6 +220,10 @@ public:
     PointerWrapper(void* data)
         : data_(data),
           isAdopted_(false) {
+    }
+
+    size_t SelfSize() {
+        return sizeof(void*);
     }
 
     const WrapperType Type() {
@@ -268,6 +276,10 @@ public:
         if (this->data_ != nullptr) {
             std::free(this->data_);
         }
+    }
+
+    size_t SelfSize() {
+        return sizeof(BaseDataWrapper*) + sizeof(void*);
     }
 
     const WrapperType Type() {
@@ -325,6 +337,10 @@ public:
 
     const WrapperType Type() {
         return WrapperType::Primitive;
+    }
+
+    size_t SelfSize() {
+        return this->size_;
     }
 
     size_t Size() {
@@ -443,6 +459,12 @@ class ObjCDataWrapper: public BaseDataWrapper {
 public:
     ObjCDataWrapper(id data, const TypeEncoding* typeEncoding = nullptr)
         : data_(data), typeEncoding_(typeEncoding) {
+    }
+
+    size_t SelfSize() {
+        auto size = class_getInstanceSize(object_getClass(this->Data()));
+        //
+        return size;
     }
 
     const WrapperType Type() {
