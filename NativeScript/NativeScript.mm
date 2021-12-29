@@ -59,8 +59,6 @@ std::unique_ptr<Runtime> runtime_;
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
 
         tns::Tasks::Drain();
-
-        runtime_.reset();
     }
     
     return self;
