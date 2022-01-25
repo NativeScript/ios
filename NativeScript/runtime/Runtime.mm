@@ -158,10 +158,10 @@ id Runtime::GetAppConfigValue(std::string key) {
     if (AppPackageJson == nil) {
         NSString* packageJsonPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:@"package.json"];
         NSData* data = [NSData dataWithContentsOfFile:packageJsonPath];
-        AppPackageJson = @{};
         if (data) {
             NSError* error = nil;
-            AppPackageJson = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&error];
+            NSDictionary* dict = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&error];
+            AppPackageJson = [[NSDictionary alloc] initWithDictionary:dict];
         }
     }
 
