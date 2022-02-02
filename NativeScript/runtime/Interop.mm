@@ -15,6 +15,7 @@
 #include "Reference.h"
 #include "Pointer.h"
 #include "ExtVector.h"
+#include "RuntimeConfig.h"
 #include "SymbolIterator.h"
 #include "UnmanagedType.h"
 #include "OneByteStringResource.h"
@@ -143,7 +144,7 @@ bool Interop::isRefTypeEqual(const TypeEncoding* typeEncoding, const char* clazz
 
 void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
     Isolate* isolate = context->GetIsolate();
-
+    ExecuteWriteValueDebugValidationsIfInDebug(context, typeEncoding, dest, arg);
     if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
         ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, true);
         size_t size = ffiType->size;
@@ -1464,4 +1465,67 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     return result;
 }
 
+// MARK: - Debug Messages for the runtime
+
+void ExecuteWriteValueValidationsAndStopExecutionAndLogStackTraceIfInDebug(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
+    Isolate* isolate = context->GetIsolate();
+    
+    std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
+    Local<Value> originArg = arg;
+    if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+        if (originArg->IsObject()) {
+            Local<Object> originObj = originArg.As<Object>();
+            if ((originObj->IsArrayBuffer() || originObj->IsArrayBufferView()) &&
+                destName != "NSArray") {
+                tns::StopExecutionAndLogStackTraceIfInDebug(isolate);
+            }
+        }
+        if (destName == "NSString" && tns::IsNumber(originArg)) {
+            tns::StopExecutionAndLogStackTraceIfInDebug(isolate);
+        }
+        if (destName == "NSString" && tns::IsBool(originArg)) {
+            tns::StopExecutionAndLogStackTraceIfInDebug(isolate);
+        }
+        if (destName == "NSString" && tns::IsArrayOrArrayLike(isolate, originArg)) {
+            tns::StopExecutionAndLogStackTraceIfInDebug(isolate);
+        }
+    }
+}
+
+bool IsTypeEncondingHandldedByDebugMessages(const TypeEncoding* typeEncoding) {
+    if (typeEncoding->type != BinaryTypeEncodingType::InterfaceDeclarationReference &&
+        typeEncoding->type != BinaryTypeEncodingType::StructDeclarationReference &&
+        typeEncoding->type != BinaryTypeEncodingType::IdEncoding) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void LogWriteValueTraceMessage(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
+    Isolate* isolate = context->GetIsolate();
+    std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
+    std::string originName = tns::ToString(isolate, arg);
+    if (originName == "") {
+        // empty string
+        originName = "\"\"";
+    }
+    NSString* message = [NSString stringWithFormat:@"Interop::WriteValue: from {%s} to {%s}", originName.c_str(), destName.c_str()];
+    tns::LogDebugMessage(message.UTF8String);
+}
+
+void Interop::ExecuteWriteValueDebugValidationsIfInDebug(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
+    if (!RuntimeConfig.IsDebug) {
+        return;
+    }
+    if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
+        return;
+    }
+    if (IsTypeEncondingHandldedByDebugMessages(typeEncoding)) {
+        return;
+    }
+    LogWriteValueTraceMessage(context, typeEncoding, dest, arg);
+    ExecuteWriteValueValidationsAndStopExecutionAndLogStackTraceIfInDebug(context, typeEncoding, dest, arg);
+}
+    
 }

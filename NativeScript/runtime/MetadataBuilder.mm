@@ -810,6 +810,14 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
     Class klass = objc_getClass(containingClass.c_str());
     // TODO: Find out if the isMethodCallback property can be determined based on a UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
 
+    NSString* message = [NSString stringWithFormat:@"MetadataBuilder::InvokeMethod class {%s}, selector {%s}, isInitializer {%s}, type {%s}, lib {%s}",
+                         containingClass.c_str(),
+                         meta->selectorAsString(),
+                         meta->isInitializer() ? "true":"false",
+                         meta->typeName(),
+                         meta->topLevelModule()->getName()];
+    tns::LogDebugMessage(message.UTF8String);
+
     try {
         return ArgConverter::Invoke(context, klass, receiver, args, meta, isMethodCallback);
     } catch (NativeScriptException& ex) {

@@ -691,3 +691,13 @@ void tns::Assert(bool condition, Isolate* isolate) {
     Log(@"%s", stack.c_str());
     assert(false);
 }
+
+void tns::StopExecutionAndLogStackTraceIfInDebug(v8::Isolate* isolate) {
+    Assert(false, isolate);
+}
+
+void tns::LogDebugMessage(std::string message) {
+    if (RuntimeConfig.IsDebug) {
+        Log(@"%s", message.c_str());
+    }
+}

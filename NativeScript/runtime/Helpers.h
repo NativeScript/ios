@@ -67,6 +67,9 @@ bool LiveSync(v8::Isolate* isolate);
 
 void Assert(bool condition, v8::Isolate* isolate = nullptr);
 
+void LogDebugMessage(std::string message);
+void StopExecutionAndLogStackTraceIfInDebug(v8::Isolate* isolate);
+
 }
 
 #endif /* Helpers_h */
