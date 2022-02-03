@@ -1467,9 +1467,11 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
 // MARK: - Debug Messages for the runtime
 
-void ExecuteWriteValueValidationsAndStopExecutionAndLogStackTraceIfInDebug(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
+void ExecuteWriteValueValidationsAndStopExecutionAndLogStackTrace(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
+    if (!RuntimeConfig.IsDebug) {
+        return;
+    }
     Isolate* isolate = context->GetIsolate();
-    
     std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
     Local<Value> originArg = arg;
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
@@ -1477,17 +1479,17 @@ void ExecuteWriteValueValidationsAndStopExecutionAndLogStackTraceIfInDebug(Local
             Local<Object> originObj = originArg.As<Object>();
             if ((originObj->IsArrayBuffer() || originObj->IsArrayBufferView()) &&
                 destName != "NSArray") {
-                tns::StopExecutionAndLogStackTraceIfInDebug(isolate);
+                tns::StopExecutionAndLogStackTrace(isolate);
             }
         }
         if (destName == "NSString" && tns::IsNumber(originArg)) {
-            tns::StopExecutionAndLogStackTraceIfInDebug(isolate);
+            tns::StopExecutionAndLogStackTrace(isolate);
         }
         if (destName == "NSString" && tns::IsBool(originArg)) {
-            tns::StopExecutionAndLogStackTraceIfInDebug(isolate);
+            tns::StopExecutionAndLogStackTrace(isolate);
         }
         if (destName == "NSString" && tns::IsArrayOrArrayLike(isolate, originArg)) {
-            tns::StopExecutionAndLogStackTraceIfInDebug(isolate);
+            tns::StopExecutionAndLogStackTrace(isolate);
         }
     }
 }
@@ -1503,6 +1505,9 @@ bool IsTypeEncondingHandldedByDebugMessages(const TypeEncoding* typeEncoding) {
 }
 
 void LogWriteValueTraceMessage(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
+    if (!RuntimeConfig.IsDebug) {
+        return;
+    }
     Isolate* isolate = context->GetIsolate();
     std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
     std::string originName = tns::ToString(isolate, arg);
@@ -1511,7 +1516,7 @@ void LogWriteValueTraceMessage(Local<Context> context, const TypeEncoding* typeE
         originName = "\"\"";
     }
     NSString* message = [NSString stringWithFormat:@"Interop::WriteValue: from {%s} to {%s}", originName.c_str(), destName.c_str()];
-    tns::LogDebugMessage(message.UTF8String);
+    Log(@"%@", message);
 }
 
 void Interop::ExecuteWriteValueDebugValidationsIfInDebug(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
@@ -1525,7 +1530,7 @@ void Interop::ExecuteWriteValueDebugValidationsIfInDebug(Local<Context> context,
         return;
     }
     LogWriteValueTraceMessage(context, typeEncoding, dest, arg);
-    ExecuteWriteValueValidationsAndStopExecutionAndLogStackTraceIfInDebug(context, typeEncoding, dest, arg);
+    ExecuteWriteValueValidationsAndStopExecutionAndLogStackTrace(context, typeEncoding, dest, arg);
 }
     
 }
