@@ -548,6 +548,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
             SEL selector = sel_registerName(methodNameStr.c_str());
 
             TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(malloc((argsCount + 1) * sizeof(TypeEncoding)));
+            memset(typeEncoding, 0, (argsCount + 1) * sizeof(TypeEncoding));
             typeEncoding->type = returnType;
 
             if (!paramsVal.IsEmpty() && paramsVal->IsArray()) {
