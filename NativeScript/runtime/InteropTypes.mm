@@ -309,8 +309,7 @@ void Interop::RegisterSizeOfFunction(Local<Context> context, Local<Object> inter
 }
 
 const TypeEncoding* Interop::CreateEncoding(BinaryTypeEncodingType type) {
-    TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(malloc(sizeof(TypeEncoding)));
-    memset(typeEncoding, 0, sizeof(TypeEncoding));
+    TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc(1, sizeof(TypeEncoding)));
     typeEncoding->type = type;
 
     return typeEncoding;
