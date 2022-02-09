@@ -422,11 +422,13 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
     }
 
     Local<UnboundScript> unboundScript = script->GetUnboundScript();
+    // CachedData returned by this function should be owned by the caller (v8 docs)
     ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
 
     int length = cachedData->length;
     std::string cachePath = GetCacheFileName(path + ".cache");
     tns::WriteBinary(cachePath, cachedData->data, length);
+    delete cachedData;
 }
 
 std::string ModuleInternal::GetCacheFileName(const std::string& path) {
