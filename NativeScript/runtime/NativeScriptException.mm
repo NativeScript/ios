@@ -43,7 +43,12 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
         Local<Object> thiz = Object::New(isolate);
         Local<Value> args[] = { error };
         Local<Value> result;
+        TryCatch tc(isolate);
         success = errorHandlerFunc->Call(context, thiz, 1, args).ToLocal(&result);
+        if (tc.HasCaught()) {
+            tns::LogError(isolate, tc);
+        }
+
         tns::Assert(success, isolate);
     }
 
