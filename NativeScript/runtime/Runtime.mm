@@ -106,7 +106,7 @@ void Runtime::Init(Isolate* isolate) {
 
     DefineGlobalObject(context);
     DefineCollectFunction(context);
-    PromiseProxy::Init(context);
+    //PromiseProxy::Init(context);
     Console::Init(context);
     WeakRef::Init(context);
 
