@@ -4,6 +4,9 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Caches.h"
+#import <malloc/malloc.h>
+#import "Runtime.h"
+#import <mach/mach.h>
 
 using namespace v8;
 using namespace std;
@@ -16,11 +19,92 @@ void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate)
     globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"), FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
 }
 
+size_t get_current_memory_usage() {
+    struct task_basic_info info;
+      mach_msg_type_number_t size = TASK_BASIC_INFO_COUNT;
+      kern_return_t kerr = task_info(mach_task_self(),
+                                     TASK_BASIC_INFO,
+                                     (task_info_t)&info,
+                                     &size);
+      if( kerr == KERN_SUCCESS ) {
+        // NSLog(@"Memory in use (in bytes): %lu", info.resident_size);
+         // NSLog(@"Memory in use (in MiB): %f", ((float)info.resident_size / 1048576));
+      } else {
+        NSLog(@"Error with task_info(): %s", mach_error_string(kerr));
+          return -1;
+      }
+    return info.resident_size;
+}
+
+bool enable_stuff = true;
+
+void updateV8Memory(Isolate* isolate) {
+    if(!enable_stuff) return;
+    static long current_memory = get_current_memory_usage();
+    long last_mem = current_memory;
+    current_memory = get_current_memory_usage();
+    if(current_memory == -1 || last_mem == -1 || last_mem == current_memory) {
+        // isolate->AdjustAmountOfExternalAllocatedMemory(5* 1024 * 1024);
+        return;
+    }
+    long delta = current_memory - last_mem;
+    NSLog(@"adjust by %ld", delta);
+    isolate->AdjustAmountOfExternalAllocatedMemory(delta);
+    if(delta > 20 * 1024 * 1024){
+        NSLog(@"Too much memory allocated, inform v8 %ld", delta);
+        // Runtime::GetCurrentRuntime()->GetIsolate()->LowMemoryNotification();
+    }
+}
+void ActiveSenseTimerCallback(CFRunLoopTimerRef timer, void *info)
+{
+  // NSLog(@"Timeout");
+  CFRunLoopTimerContext TimerContext;
+  TimerContext.version = 0;
+
+  CFRunLoopTimerGetContext(timer, &TimerContext);
+  // uncomment if you want to use the timer
+    // updateV8Memory(Runtime::GetCurrentRuntime()->GetIsolate());
+    // Runtime::GetCurrentRuntime()->GetIsolate()->SetGetExternallyAllocatedMemoryInBytesCallback(&duh);
+    // Runtime::GetCurrentRuntime()->GetIsolate()->LowMemoryNotification();
+    // bool __unused ret = Runtime::GetCurrentRuntime()->GetIsolate()->IdleNotificationDeadline(Runtime::GetCurrentRuntime()->GetPlatform()->MonotonicallyIncreasingTime() + 1.0);
+    // if(!ret)
+    // NSLog(@"------------------------------------Timeout %d", ret);
+    //Runtime::GetCurrentRuntime()->GetIsolate()->memory;
+  // ((cClass *)TimerContext.info)->Timeout();
+}
+
+void ObjectManager::updateV8memory2() {
+    updateV8Memory(Runtime::GetCurrentRuntime()->GetIsolate());
+}
+
 std::shared_ptr<Persistent<Value>> ObjectManager::Register(Local<Context> context, const Local<Value> obj) {
+    // context->GetIsolate()->AdjustAmountOfExternalAllocatedMemory(5 * 1024 * 1024);
+    // context->GetIsolate()->AdjustAmountOfExternalAllocatedMemory(100);
+    static bool started = false;
+    if(!started) {
+        started = true;
+        
+    
+    CFTimeInterval TIMER_INTERVAL = 1;
+        get_current_memory_usage();
+        CFRunLoopTimerContext TimerContext = {0, context->GetIsolate(), NULL, NULL, NULL};
+        CFAbsoluteTime FireTime = CFAbsoluteTimeGetCurrent() + TIMER_INTERVAL;
+        auto __unused mTimer = CFRunLoopTimerCreate(kCFAllocatorDefault,
+                                      FireTime,
+                                      1, 0, 0,
+                                      ActiveSenseTimerCallback,
+                                      &TimerContext);
+    
+    CFRunLoopAddTimer(CFRunLoopGetCurrent(), mTimer, kCFRunLoopCommonModes);
+    }
+
+        
+    
     Isolate* isolate = context->GetIsolate();
     std::shared_ptr<Persistent<Value>> objectHandle = std::make_shared<Persistent<Value>>(isolate, obj);
     ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
     objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+    updateV8Memory(isolate);
     return objectHandle;
 }
 
@@ -31,12 +115,14 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
     bool disposed = ObjectManager::DisposeValue(isolate, value);
 
     if (disposed) {
+        // isolate->AdjustAmountOfExternalAllocatedMemory(-1 * 5 * 1024 * 1024);
         state->target_->Reset();
         delete state;
     } else {
         state->target_->ClearWeak();
         state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
     }
+    updateV8Memory(isolate);
 }
 
 bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
@@ -90,6 +176,13 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         }
         case WrapperType::ObjCObject: {
             ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+            // NSLog(@"size of myObject: %zd", malloc_size(objCObjectWrapper->Data()));
+            // isolate->AdjustAmountOfExternalAllocatedMemory(-1 * malloc_size(objCObjectWrapper->Data()));
+            auto retainCount = CFGetRetainCount((__bridge CFTypeRef)objCObjectWrapper->Data());
+            if(retainCount > 2) {
+                // NSLog(@"Retain count is %ld", retainCount);
+                // return false;
+            }
             id target = objCObjectWrapper->Data();
             if (target != nil) {
                 cache->Instances.erase(target);

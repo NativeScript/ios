@@ -16,6 +16,7 @@ struct ObjectWeakCallbackState {
 
 class ObjectManager {
 public:
+    static void updateV8memory2();
     static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     static std::shared_ptr<v8::Persistent<v8::Value>> Register(v8::Local<v8::Context> context, const v8::Local<v8::Value> obj);
     static void FinalizerCallback(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);

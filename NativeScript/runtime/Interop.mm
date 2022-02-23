@@ -1440,6 +1440,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
         std::string message = [[e description] UTF8String];
         throw NativeScriptException(message);
     }
+    tns::ObjectManager::updateV8memory2();
 
     if (errorRef != nullptr) {
         NSError*__strong* errorPtr = (NSError*__strong*)errorRef;
