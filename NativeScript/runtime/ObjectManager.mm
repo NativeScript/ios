@@ -74,6 +74,9 @@ void ActiveSenseTimerCallback(CFRunLoopTimerRef timer, void *info)
 }
 
 void ObjectManager::updateV8memory2() {
+    if(Runtime::GetCurrentRuntime() == nullptr) {
+        return;
+    }
     updateV8Memory(Runtime::GetCurrentRuntime()->GetIsolate());
 }
 
