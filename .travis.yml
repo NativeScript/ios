@@ -1,5 +1,5 @@
 os: osx
-osx_image: xcode11
+osx_image: xcode13.2
 language: objective-c
 git:
   submodules: true
@@ -12,7 +12,7 @@ before_install:
   - npm install junit-cli-report-viewer
 
 script:
-  - set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -resultBundleVersion 3 -destination platform\=iOS\ Simulator,OS\=13.0,name\=iPhone\ 11\ Pro\ Max build test | xcpretty
+  - set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -resultBundleVersion 3 -destination platform\=iOS\ Simulator,OS\=15.2,name\=iPhone\ 11\ Pro\ Max build test | xcpretty
   - set -e && xcparse attachments $HOME/test_results.xcresult $HOME
   - set -e && find $HOME -name "*junit*.xml" -maxdepth 1 -exec npx junit-cli-report-viewer {} \;
 
