@@ -252,6 +252,7 @@ inline Local<TypeName> JsV8InspectorClient::PersistentToLocal(Isolate* isolate, 
 
 void JsV8InspectorClient::scheduleBreak() {
     Isolate* isolate = runtime_->GetIsolate();
+    v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     this->session_->schedulePauseOnNextStatement(StringView(), StringView());
