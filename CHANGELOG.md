@@ -1,3 +1,27 @@
+# [8.2.0](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.1.0...v8.2.0) (2022-03-07)
+
+
+### Bug Fixes
+
+* don't leak code cache data ([#146](https://github.com/NativeScript/ns-v8ios-runtime/issues/146)) ([c580098](https://github.com/NativeScript/ns-v8ios-runtime/commit/c5800985c26a39f209bffa0b30a41f748fa76594))
+* lock isolate before handle_scope ([#149](https://github.com/NativeScript/ns-v8ios-runtime/issues/149)) ([3c23fd8](https://github.com/NativeScript/ns-v8ios-runtime/commit/3c23fd872b9ea0e4bd3e61864a2df98a3e77a9bc))
+* only warn once about WeakRef.clear() deprecation. ([#140](https://github.com/NativeScript/ns-v8ios-runtime/issues/140)) ([fc0f18c](https://github.com/NativeScript/ns-v8ios-runtime/commit/fc0f18c80902315c0cce5766ae77b42df0ce2ecd))
+* prevent crashes during onuncaughterror ([#141](https://github.com/NativeScript/ns-v8ios-runtime/issues/141)) ([65be29b](https://github.com/NativeScript/ns-v8ios-runtime/commit/65be29b187fc1f8d59ed943df1d65ab98e4d0413))
+* retain instance on init ([2d6f455](https://github.com/NativeScript/ns-v8ios-runtime/commit/2d6f4559847058170a33cbfd909c8e6f5093654e))
+* runtime init and reset handling ([1893356](https://github.com/NativeScript/ns-v8ios-runtime/commit/189335674e1c78898d8ee73bb4e2d195b02396c4))
+* take into account null terminated C strings ([#132](https://github.com/NativeScript/ns-v8ios-runtime/issues/132)) ([63ac554](https://github.com/NativeScript/ns-v8ios-runtime/commit/63ac55459bab9336c2c577434d196369c9a33960))
+* TypeEncoding might be initialized with random data ([#144](https://github.com/NativeScript/ns-v8ios-runtime/issues/144)) ([02d681e](https://github.com/NativeScript/ns-v8ios-runtime/commit/02d681e6c440caea00aa297bf846b65011fff31c))
+
+
+### Features
+
+* add support for custom ApplicationPath ([391ef8f](https://github.com/NativeScript/ns-v8ios-runtime/commit/391ef8f3cab9d0608e19b7fb12c197042a576103))
+* expose `PerformMicrotaskCheckpoint` ([#133](https://github.com/NativeScript/ns-v8ios-runtime/issues/133)) ([f868384](https://github.com/NativeScript/ns-v8ios-runtime/commit/f868384d757087e887d6cd5ac579155b9ad435a5))
+* run app from NativeScript initializer instead of static method ([#137](https://github.com/NativeScript/ns-v8ios-runtime/issues/137)) ([a676ecf](https://github.com/NativeScript/ns-v8ios-runtime/commit/a676ecf3dcc65131c8a426fb5b99058da32f67cf))
+* support Xcode 13.3 and iOS 15.4 ([#150](https://github.com/NativeScript/ns-v8ios-runtime/issues/150)) ([1e0c0ce](https://github.com/NativeScript/ns-v8ios-runtime/commit/1e0c0cec0e9627cd72652208347e760809f7d1e1))
+
+
+
 # [8.1.0](https://github.com/NativeScript/ns-v8ios-runtime/compare/v7.2.0...v8.1.0) (2021-09-08)
 
 
