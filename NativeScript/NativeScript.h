@@ -15,6 +15,8 @@
 @interface NativeScript : NSObject
 
 - (instancetype)initWithConfig:(Config*)config;
+- (void) runMainScript;
+- (void)runScriptString: (NSString*) script runLoop: (BOOL) runLoop;
 - (bool)liveSync;
 
 @end
