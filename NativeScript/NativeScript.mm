@@ -5,6 +5,7 @@
 #include "runtime/Helpers.h"
 #include "runtime/Runtime.h"
 #include "runtime/Tasks.h"
+#include <iostream>
 
 using namespace v8;
 using namespace tns;
@@ -21,6 +22,17 @@ using namespace tns;
 @implementation NativeScript
 
 std::unique_ptr<Runtime> runtime_;
+
+- (void)runScriptString: (NSString*) script runLoop: (BOOL) runLoop {
+
+    std::string cppString = std::string([script UTF8String]);
+    runtime_->RunScript(cppString);
+    
+    if (runLoop) {
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+    }
+    tns::Tasks::Drain();
+}
 
 - (instancetype)initWithConfig:(Config*)config {
     
@@ -54,15 +66,19 @@ std::unique_ptr<Runtime> runtime_;
             inspectorClient->connect([config ArgumentsCount], [config Arguments]);
         }
 
-        runtime_->RunMainScript();
-
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
-
-        tns::Tasks::Drain();
+        
     }
     
     return self;
     
+}
+
+- (void) runMainScript {
+    runtime_->RunMainScript();
+
+    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+
+    tns::Tasks::Drain();
 }
 
 - (bool)liveSync {

@@ -242,9 +242,19 @@ bool Runtime::IsAlive(Isolate* isolate) {
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
 }
 
+void Runtime::RunScript(const std::string script) {
+    Isolate* isolate = this->GetIsolate();
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+    this->moduleInternal_->RunScript(isolate, script);
+}
+
 std::shared_ptr<Platform> Runtime::platform_;
 std::vector<Isolate*> Runtime::isolates_;
 bool Runtime::mainThreadInitialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;
 
 }
+
+
