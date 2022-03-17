@@ -44,13 +44,14 @@ private:
     std::vector<std::string> messages_;
     bool runningNestedLoops_;
     dispatch_queue_t messagesQueue_;
+    dispatch_semaphore_t messageArrived_;
     std::function<void (std::string)> sender_;
     bool isWaitingForDebugger_;
 
     void enableInspector(int argc, char** argv);
     void notify(std::unique_ptr<StringBuffer> message);
     void onFrontendConnected(std::function<void (std::string)> sender);
-    void onFrontendMessageReceived(std::string message);
+    void onFrontendMessageReceived(std::string &message);
     template <class TypeName>
     static v8::Local<TypeName> PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent);
     std::string PumpMessage();
