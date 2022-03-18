@@ -17,11 +17,21 @@ void PromiseProxy::Init(v8::Local<v8::Context> context) {
 
                     let promise = new target(function(resolve, reject) {
                         origFunc(value => {
-                            CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, resolve.bind(this, value));
-                            CFRunLoopWakeUp(runloop);
+                            const resolveCall = resolve.bind(this, value);
+                            if (runloop === CFRunLoopGetCurrent()) {
+                                resolveCall();
+                            } else {
+                                CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, resolveCall);
+                                CFRunLoopWakeUp(runloop);
+                            }
                         }, reason => {
-                            CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, reject.bind(this, reason));
-                            CFRunLoopWakeUp(runloop);
+                            const rejectCall = reject.bind(this, reason);
+                            if (runloop === CFRunLoopGetCurrent()) {
+                                rejectCall();
+                            } else {
+                                CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, rejectCall);
+                                CFRunLoopWakeUp(runloop);
+                            }
                         });
                     });
 
@@ -32,6 +42,10 @@ void PromiseProxy::Init(v8::Local<v8::Context> context) {
                                 return orig.bind(target);
                             }
                             return typeof orig === 'function' ? function(x) {
+                                if (runloop === CFRunLoopGetCurrent()) {
+                                    orig.bind(target, x)();
+                                    return target;
+                                }
                                 CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, orig.bind(target, x));
                                 CFRunLoopWakeUp(runloop);
                                 return target;
