@@ -83,6 +83,7 @@ JsV8InspectorClient::JsV8InspectorClient(tns::Runtime* runtime)
       messages_(),
       runningNestedLoops_(false) {
      this->messagesQueue_ = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+     this->messageArrived_ = dispatch_semaphore_create(0);
 }
 
 void JsV8InspectorClient::onFrontendConnected(std::function<void (std::string)> sender) {
@@ -100,9 +101,11 @@ void JsV8InspectorClient::onFrontendConnected(std::function<void (std::string)> 
     this->disconnect();
 }
 
-void JsV8InspectorClient::onFrontendMessageReceived(std::string message) {
+void JsV8InspectorClient::onFrontendMessageReceived(std::string &message) {
+    __block std::string strCopy = message;
     dispatch_sync(this->messagesQueue_, ^{
-        this->messages_.push_back(message);
+        this->messages_.push_back(strCopy);
+        dispatch_semaphore_signal(messageArrived_);
     });
 
     tns::ExecuteOnMainThread([this, message]() {
@@ -166,15 +169,22 @@ void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
 
     terminated_ = false;
     this->runningNestedLoops_ = true;
+    bool shouldWait = false;
     while (!terminated_) {
         std::string message = this->PumpMessage();
         if (!message.empty()) {
             this->dispatchMessage(message);
+            shouldWait = false;
+        } else {
+            shouldWait = true;
         }
 
         std::shared_ptr<Platform> platform = tns::Runtime::GetPlatform();
         Isolate* isolate = runtime_->GetIsolate();
         platform::PumpMessageLoop(platform.get(), isolate, platform::MessageLoopBehavior::kDoNotWait);
+        if(shouldWait && !terminated_) {
+            dispatch_semaphore_wait(messageArrived_, dispatch_time(DISPATCH_TIME_NOW, 1000000)); // 1ms in ns
+        }
     }
 
     terminated_ = false;
