@@ -1,3 +1,13 @@
+## [8.2.2](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.2.1...v8.2.2) (2022-03-22)
+
+
+### Bug Fixes
+
+* **inspector:** ensure socket message is copied and stored ([#155](https://github.com/NativeScript/ns-v8ios-runtime/issues/155)) ([3098976](https://github.com/NativeScript/ns-v8ios-runtime/commit/3098976b328f45cc2ebd4b918fcd4d069ea575a9))
+* only delay promise resolution when needed ([#154](https://github.com/NativeScript/ns-v8ios-runtime/issues/154)) ([f46c425](https://github.com/NativeScript/ns-v8ios-runtime/commit/f46c4256b6e5b3b4340d6570d0876c25990e9d79))
+
+
+
 # [8.2.0](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.1.0...v8.2.0) (2022-03-07)
 
 
