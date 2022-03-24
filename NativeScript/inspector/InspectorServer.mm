@@ -78,10 +78,7 @@ in_port_t InspectorServer::Init(std::function<void (std::function<void (std::str
                         if (size) {
                             NSString* payload = [[NSString alloc] initWithData:(NSData*)data encoding:NSUTF16LittleEndianStringEncoding];
 
-                            if (payload) {
-                                std::string result = [payload UTF8String];
-                                onMessage(result);
-                            }
+                            onMessage([payload UTF8String]);
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-retain-cycles"
