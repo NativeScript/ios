@@ -82,7 +82,8 @@ JsV8InspectorClient::JsV8InspectorClient(tns::Runtime* runtime)
     : runtime_(runtime),
       messages_(),
       runningNestedLoops_(false) {
-     this->messagesQueue_ = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+     this->messagesQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_queue", DISPATCH_QUEUE_SERIAL);
+     this->messageLoopQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_loop_queue", DISPATCH_QUEUE_SERIAL);
      this->messageArrived_ = dispatch_semaphore_create(0);
 }
 
@@ -101,22 +102,27 @@ void JsV8InspectorClient::onFrontendConnected(std::function<void (std::string)> 
     this->disconnect();
 }
 
-void JsV8InspectorClient::onFrontendMessageReceived(std::string &message) {
-    __block std::string strCopy = message;
+void JsV8InspectorClient::onFrontendMessageReceived(std::string message) {
     dispatch_sync(this->messagesQueue_, ^{
-        this->messages_.push_back(strCopy);
+        this->messages_.push_back(message);
         dispatch_semaphore_signal(messageArrived_);
     });
 
     tns::ExecuteOnMainThread([this, message]() {
-        dispatch_sync(this->messagesQueue_, ^{
-            while (this->messages_.size() > 0) {
-                std::string message = this->PumpMessage();
+        dispatch_sync(this->messageLoopQueue_, ^{
+            // prevent execution if we're already pumping messages
+            if (runningNestedLoops_ && !terminated_) {
+                return;
+            };
+            std::string message;
+            do {
+                message = this->PumpMessage();
                 if (!message.empty()) {
                     this->dispatchMessage(message);
                 }
-            }
+            } while (!message.empty());
         });
+
     });
 }
 
@@ -163,12 +169,20 @@ void JsV8InspectorClient::disconnect() {
 }
 
 void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
-    if (runningNestedLoops_) {
+    __block auto loopsRunning = false;
+    dispatch_sync(this->messageLoopQueue_, ^{
+        loopsRunning = runningNestedLoops_;
+        terminated_ = false;
+        if (runningNestedLoops_) {
+            return;
+        }
+        this->runningNestedLoops_ = true;
+    });
+    
+    if (loopsRunning) {
         return;
     }
-
-    terminated_ = false;
-    this->runningNestedLoops_ = true;
+    
     bool shouldWait = false;
     while (!terminated_) {
         std::string message = this->PumpMessage();
@@ -183,16 +197,20 @@ void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
         Isolate* isolate = runtime_->GetIsolate();
         platform::PumpMessageLoop(platform.get(), isolate, platform::MessageLoopBehavior::kDoNotWait);
         if(shouldWait && !terminated_) {
-            dispatch_semaphore_wait(messageArrived_, dispatch_time(DISPATCH_TIME_NOW, 1000000)); // 1ms in ns
+            dispatch_semaphore_wait(messageArrived_, dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_MSEC)); // 1ms
         }
     }
-
-    terminated_ = false;
-    runningNestedLoops_ = false;
+    
+    dispatch_sync(this->messageLoopQueue_, ^{
+        terminated_ = false;
+        runningNestedLoops_ = false;
+    });
 }
 
 void JsV8InspectorClient::quitMessageLoopOnPause() {
-    terminated_ = true;
+    dispatch_sync(this->messageLoopQueue_, ^{
+        terminated_ = true;
+    });
 }
 
 void JsV8InspectorClient::sendResponse(int callId, std::unique_ptr<StringBuffer> message) {
