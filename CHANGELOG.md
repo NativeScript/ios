@@ -1,3 +1,12 @@
+## [8.2.3](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.2.2...v8.2.3) (2022-03-30)
+
+
+### Bug Fixes
+
+* use serial queues and revert string copy changes ([#156](https://github.com/NativeScript/ns-v8ios-runtime/issues/156)) ([e8681ff](https://github.com/NativeScript/ns-v8ios-runtime/commit/e8681ff46ca240e819b1eaffc2c6c5b2d7cac866))
+
+
+
 ## [8.2.2](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.2.1...v8.2.2) (2022-03-22)
 
 
