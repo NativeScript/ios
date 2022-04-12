@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import shlex
@@ -39,27 +39,27 @@ effective_platofrm_name = env("EFFECTIVE_PLATFORM_NAME")
 docset_platform = "iOS"
 default_deployment_target_flag_name = "-mios-simulator-version-min"
 default_deployment_target_clang_env_name = "IPHONEOS_DEPLOYMENT_TARGET"
-if effective_platofrm_name is "-macosx":
+if effective_platofrm_name == "-macosx":
     docset_platform = "OSX"
     default_deployment_target_flag_name = "-mmacosx-version-min"
     default_deployment_target_clang_env_name = "MACOSX_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-watchos":
+elif effective_platofrm_name == "-watchos":
     docset_platform = "watchOS"
     default_deployment_target_flag_name = "-mwatchos-version-min"
     default_deployment_target_clang_env_name = "WATCHOS_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-watchsimulator":
+elif effective_platofrm_name == "-watchsimulator":
     docset_platform = "watchOS"
     default_deployment_target_flag_name = "-mwatchos-simulator-version-min"
     default_deployment_target_clang_env_name = "WATCHOS_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-appletvos":
+elif effective_platofrm_name == "-appletvos":
     docset_platform = "tvOS"
     default_deployment_target_flag_name = "-mappletvos-version-min"
     default_deployment_target_clang_env_name = "APPLETVOS_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-appletvsimulator":
+elif effective_platofrm_name == "-appletvsimulator":
     docset_platform = "tvOS"
     default_deployment_target_flag_name = "-mappletvsimulator-version-min"
     default_deployment_target_clang_env_name = "APPLETVOS_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-iphoneos":
+elif effective_platofrm_name == "-iphoneos":
     default_deployment_target_flag_name = "-miphoneos-version-min"
 
 conf_build_dir = env("CONFIGURATION_BUILD_DIR")
@@ -133,7 +133,7 @@ def generate_metadata(arch):
                            "-" + deployment_target_flag_name + "=" + deployment_target,
                            "-std=" + std])
 
-    if env_or_empty("IS_UIKITFORMAC").capitalize() is "YES":
+    if env_or_empty("IS_UIKITFORMAC").capitalize() == "YES":
       generator_call.extend(["-arch", arch])
     else:
       generator_call.extend(["-target", "{}-apple-ios13.0-macabi".format(arch)])
