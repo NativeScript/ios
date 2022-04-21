@@ -15,6 +15,10 @@
 @interface NativeScript : NSObject
 
 - (instancetype)initWithConfig:(Config*)config;
+/**
+ WARNING: this method does not return in most applications. (UIApplicationMain)
+ */
+- (void)runMainApplication;
 - (bool)liveSync;
 
 @end
