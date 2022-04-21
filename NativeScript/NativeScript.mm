@@ -53,16 +53,18 @@ std::unique_ptr<Runtime> runtime_;
             inspectorClient->registerModules();
             inspectorClient->connect([config ArgumentsCount], [config Arguments]);
         }
-
-        runtime_->RunMainScript();
-
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
-
-        tns::Tasks::Drain();
     }
     
     return self;
     
+}
+
+- (void)runMainApplication {
+    runtime_->RunMainScript();
+
+    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+
+    tns::Tasks::Drain();
 }
 
 - (bool)liveSync {

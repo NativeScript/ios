@@ -24,7 +24,8 @@ int main(int argc, char *argv[]) {
         config.ArgumentsCount = argc;
         config.Arguments = argv;
 
-        nativescript = [NativeScript alloc] initWithConfig: config];
+        nativescript = [[NativeScript alloc] initWithConfig: config];
+        [nativescript runMainApplication];
 
         return 0;
     }

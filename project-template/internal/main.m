@@ -57,6 +57,7 @@ int main(int argc, char *argv[]) {
         config.Arguments = argv;
 
         nativescript = [[NativeScript alloc] initWithConfig:config];
+        [nativescript runMainApplication];
 
         return 0;
     }
