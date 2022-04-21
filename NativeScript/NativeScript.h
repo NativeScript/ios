@@ -16,5 +16,6 @@
 
 - (instancetype)initWithConfig:(Config*)config;
 - (bool)liveSync;
+- (void)tasksDrain;
 
 @end

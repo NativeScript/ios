@@ -57,12 +57,14 @@ std::unique_ptr<Runtime> runtime_;
         runtime_->RunMainScript();
 
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
-
-        tns::Tasks::Drain();
     }
     
     return self;
     
+}
+
+- (void)tasksDrain {
+    tns::Tasks::Drain();
 }
 
 - (bool)liveSync {
