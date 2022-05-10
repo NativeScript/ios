@@ -43,3 +43,5 @@ package-lock.json
 *.pyc
 v8
 .npmrc
+
+llvm/

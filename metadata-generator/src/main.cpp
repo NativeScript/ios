@@ -70,7 +70,7 @@ public:
             for (clang::Module*& module : modules) {
                 std::string filePath = std::string(cla_outputModuleMapsFolder) + std::string("/") + module->getFullModuleName() + ".modulemap";
                 std::error_code error;
-                llvm::raw_fd_ostream file(filePath, error, llvm::sys::fs::F_Text);
+                llvm::raw_fd_ostream file(filePath, error, llvm::sys::fs::OF_Text);
                 if (error) {
                     std::cout << error.message();
                     continue;
@@ -112,7 +112,7 @@ public:
                 llvm::SmallString<128> path;
                 llvm::sys::path::append(path, cla_outputDtsFolder, "objc!" + modulePair.first->getFullModuleName() + ".d.ts");
                 std::error_code error;
-                llvm::raw_fd_ostream file(path.str(), error, llvm::sys::fs::F_Text);
+                llvm::raw_fd_ostream file(path.str(), error, llvm::sys::fs::OF_Text);
                 if (error) {
                     std::cout << error.message();
                     return;
@@ -222,7 +222,7 @@ int main(int argc, const char** argv)
         // Save the umbrella file
         if (!cla_outputUmbrellaHeaderFile.empty()) {
             std::error_code errorCode;
-            llvm::raw_fd_ostream umbrellaFileStream(cla_outputUmbrellaHeaderFile, errorCode, llvm::sys::fs::OpenFlags::F_None);
+            llvm::raw_fd_ostream umbrellaFileStream(cla_outputUmbrellaHeaderFile, errorCode, llvm::sys::fs::OpenFlags::OF_None);
             if (!errorCode) {
                 umbrellaFileStream << umbrellaContent;
                 umbrellaFileStream.close();
@@ -230,7 +230,7 @@ int main(int argc, const char** argv)
         }
         // generate metadata for the intermediate sdk header
         Meta::ModulesBlacklist modulesBlacklist(cla_whiteListModuleRegexesFile, cla_blackListModuleRegexesFile);
-        clang::tooling::runToolOnCodeWithArgs(new MetaGenerationFrontendAction(/*r*/modulesBlacklist), umbrellaContent, clangArgs, "umbrella.h", "objc-metadata-generator");
+        clang::tooling::runToolOnCodeWithArgs(std::unique_ptr<MetaGenerationFrontendAction>(new MetaGenerationFrontendAction(/*r*/modulesBlacklist)), umbrellaContent, clangArgs, "umbrella.h", "objc-metadata-generator");
 
         std::clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;

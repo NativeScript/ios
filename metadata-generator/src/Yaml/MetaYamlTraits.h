@@ -328,7 +328,7 @@ namespace yaml {
         }
         io.mapRequired("Filename", meta->fileName);
         io.mapRequired("Module", meta->module);
-        io.mapOptional("IntroducedIn", meta->introducedIn, UNKNOWN_VERSION);
+        io.mapOptional("IntroducedIn", meta->introducedIn);
         io.mapRequired("Flags", meta->flags);
         io.mapRequired("Type", meta->type);
     }

@@ -167,15 +167,15 @@ Meta* MetaFactory::create(const clang::Decl& decl, bool resetCached /* = false*/
         return insertedMetaPtrRef.get();
     } catch (MetaCreationException& e) {
         if (e.getMeta() == insertedMetaPtrRef.get()) {
-            insertedException = llvm::make_unique<MetaCreationException>(e);
+            insertedException = std::make_unique<MetaCreationException>(e);
             throw;
         }
         std::string message = CreationException::constructMessage("Can't create meta dependency.", e.getDetailedMessage());
-        insertedException = llvm::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
+        insertedException = std::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
         POLYMORPHIC_THROW(insertedException);
     } catch (TypeCreationException& e) {
         std::string message = CreationException::constructMessage("Can't create type dependency.", e.getDetailedMessage());
-        insertedException = llvm::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
+        insertedException = std::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
         POLYMORPHIC_THROW(insertedException);
     }
 }
@@ -294,8 +294,8 @@ void MetaFactory::createFromVar(const clang::VarDecl& var, VarMeta& varMeta)
             throw MetaCreationException(&varMeta, "Not supported compile-time constant value: Union.", false);
         case clang::APValue::ValueKind::Vector:
             throw MetaCreationException(&varMeta, "Not supported compile-time constant value: Vector.", false);
-        case clang::APValue::ValueKind::Uninitialized:
-            throw MetaCreationException(&varMeta, "Not supported compile-time constant value: Uninitialized.", false);
+        case clang::APValue::ValueKind::Indeterminate:
+            throw MetaCreationException(&varMeta, "Not supported compile-time constant value: Indeterminate.", false);
         default:
             throw MetaCreationException(&varMeta, "Not supported compile-time constant value: -.", false);
         }
@@ -321,8 +321,10 @@ void MetaFactory::createFromEnum(const clang::EnumDecl& enumeration, EnumMeta& e
         // Convert values having the signed bit set to 1 to signed in order to represent them correctly in JS (-1, -2, etc)
         // NOTE: Values having bits 53 to 62 different than the sign bit will continue to not be represented exactly
         // as MAX_SAFE_INTEGER is 2 ^ 53 - 1
-        bool asSigned = enumField->getInitVal().isSigned() || enumField->getInitVal().getActiveBits() > 63;
-        std::string valueStr = enumField->getInitVal().toString(10, asSigned);
+        // bool asSigned = enumField->getInitVal().isSigned() || enumField->getInitVal().getActiveBits() > 63;
+        llvm::SmallString<100> valueAsString;
+        enumField->getInitVal().toString(valueAsString, 10);
+        std::string valueStr = valueAsString.c_str();
 
         if (fieldNamePrefixLength > 0) {
             enumMeta.swiftNameFields.push_back({ enumField->getNameAsString().substr(fieldNamePrefixLength, std::string::npos), valueStr });

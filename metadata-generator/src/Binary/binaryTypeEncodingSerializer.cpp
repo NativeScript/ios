@@ -19,112 +19,112 @@ binary::MetaFileOffset binary::BinaryTypeEncodingSerializer::visit(std::vector< 
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitVoid()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Void);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Void);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitBool()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Bool);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Bool);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitShort()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Short);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Short);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitUShort()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::UShort);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::UShort);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitInt()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Int);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Int);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitUInt()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::UInt);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::UInt);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitLong()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Long);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Long);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitUlong()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::ULong);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::ULong);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitLongLong()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::LongLong);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::LongLong);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitULongLong()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::ULongLong);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::ULongLong);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitSignedChar()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Char);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Char);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitUnsignedChar()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::UChar);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::UChar);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitUnichar()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Unichar);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Unichar);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitCString()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::CString);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::CString);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitFloat()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Float);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Float);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitDouble()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Double);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Double);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitVaList()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::VaList);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::VaList);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitSelector()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Selector);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Selector);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitInstancetype()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::InstanceType);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::InstanceType);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitClass(const ::Meta::ClassType& type)
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Class); // TODO: Add protocols
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::Class); // TODO: Add protocols
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitProtocol()
 {
-    return llvm::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::ProtocolType);
+    return std::make_unique<binary::TypeEncoding>(binary::BinaryTypeEncodingType::ProtocolType);
 }
 
 unique_ptr<binary::TypeEncoding> binary::BinaryTypeEncodingSerializer::visitId(const ::Meta::IdType& type)
 {
-    auto s = llvm::make_unique<binary::IdEncoding>();
+    auto s = std::make_unique<binary::IdEncoding>();
     std::vector<MetaFileOffset> offsets;
     for (auto protocol : type.protocols) {
         offsets.push_back(this->_heapWriter.push_string(protocol->name));

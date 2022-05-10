@@ -1,13 +1,19 @@
 #!/bin/bash
 set -e
 
+./download_llvm.sh
+
+# try to build in the amount of threads available
+# change this to 1 if you want single threaded builds
+NUMJOBS=$(nproc)
+
 function build {
     rm -rf build
     mkdir build
     pushd "build"
     cmake -DCMAKE_BUILD_TYPE=Release -DMETADATA_BINARY_ARCH=$1 -DCMAKE_OSX_ARCHITECTURES=$1 ../
     make clean
-    make
+    make -j$NUMJOBS
     cp ../build-step-metadata-generator.py bin
     popd
     mkdir "dist/$1"

@@ -59,11 +59,11 @@ static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleM
                 continue;
 
             // If this header is marked 'unavailable' in this module, don't include it.
-            if (const FileEntry* header = fileMgr.getFile(dir->path())) {
-                if (modMap.isHeaderUnavailableInModule(header, module))
+            if (const llvm::ErrorOr<const FileEntry*> header = fileMgr.getFile(dir->path())) {
+                if (modMap.isHeaderUnavailableInModule(*header, module))
                     continue;
 
-                addHeaderInclude(header, includes);
+                addHeaderInclude(*header, includes);
             }
 
             // Include this header as part of the umbrella directory.

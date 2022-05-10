@@ -192,23 +192,25 @@ shared_ptr<Type> TypeFactory::create(const clang::Type* type)
             resultType = createFromAttributedType(concreteType);
         else if (const clang::ObjCTypeParamType* concreteType = clang::dyn_cast<clang::ObjCTypeParamType>(type))
             resultType = createFromObjCTypeParamType(concreteType);
+        else if (const clang::MacroQualifiedType* concreteType = clang::dyn_cast<clang::MacroQualifiedType>(type))
+            resultType = createFromMacroQualifiedParamType(concreteType);
         else
             throw TypeCreationException(type, "Unable to create encoding for this type.", true);
     }
     catch (TypeCreationException& e) {
         if (e.getType() == type) {
-            _cache.insert(make_pair(&typeRef, make_pair(nullptr, llvm::make_unique<TypeCreationException>(e))));
+            _cache.insert(make_pair(&typeRef, make_pair(nullptr, std::make_unique<TypeCreationException>(e))));
             throw;
         };
         pair<Cache::iterator, bool> insertionResult = _cache.insert(make_pair(&typeRef, make_pair(nullptr, nullptr)));
         string message = CreationException::constructMessage("Can't create type dependency.", e.getDetailedMessage());
-        insertionResult.first->second.second = llvm::make_unique<TypeCreationException>(type, message, e.isError());
+        insertionResult.first->second.second = std::make_unique<TypeCreationException>(type, message, e.isError());
         POLYMORPHIC_THROW(insertionResult.first->second.second);
     }
     catch (MetaCreationException& e) {
         pair<Cache::iterator, bool> insertionResult = _cache.insert(make_pair(&typeRef, make_pair(nullptr, nullptr)));
         string message = CreationException::constructMessage("Can't create meta dependency.", e.getDetailedMessage());
-        insertionResult.first->second.second = llvm::make_unique<TypeCreationException>(type, message, e.isError());
+        insertionResult.first->second.second = std::make_unique<TypeCreationException>(type, message, e.isError());
         POLYMORPHIC_THROW(insertionResult.first->second.second);
     }
 
@@ -491,6 +493,11 @@ shared_ptr<Type> TypeFactory::createFromObjCTypeParamType(const clang::ObjCTypeP
     }
 
     return make_shared<TypeArgumentType>(this->create(typeParamDecl->getUnderlyingType()).get(), typeParamDecl->getNameAsString(), protocols);
+}
+
+shared_ptr<Type> TypeFactory::createFromMacroQualifiedParamType(const clang::MacroQualifiedType* type)
+{
+    return create(type->desugar());
 }
 
 bool TypeFactory::isSpecificTypedefType(const clang::TypedefType* type, const string& typedefName)
