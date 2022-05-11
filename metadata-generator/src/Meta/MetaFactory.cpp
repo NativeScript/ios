@@ -321,9 +321,13 @@ void MetaFactory::createFromEnum(const clang::EnumDecl& enumeration, EnumMeta& e
         // Convert values having the signed bit set to 1 to signed in order to represent them correctly in JS (-1, -2, etc)
         // NOTE: Values having bits 53 to 62 different than the sign bit will continue to not be represented exactly
         // as MAX_SAFE_INTEGER is 2 ^ 53 - 1
-        // bool asSigned = enumField->getInitVal().isSigned() || enumField->getInitVal().getActiveBits() > 63;
         llvm::SmallString<100> valueAsString;
-        enumField->getInitVal().toString(valueAsString, 10);
+        if(enumField->getInitVal().getActiveBits() > 63 && !enumField->getInitVal().isSigned()) {
+            llvm::APSInt intVal = enumField->getInitVal();
+            intVal.setIsSigned(true);
+        } else {
+            enumField->getInitVal().toString(valueAsString, 10);
+        }
         std::string valueStr = valueAsString.c_str();
 
         if (fieldNamePrefixLength > 0) {
