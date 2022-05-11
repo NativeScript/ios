@@ -325,6 +325,7 @@ void MetaFactory::createFromEnum(const clang::EnumDecl& enumeration, EnumMeta& e
         if(enumField->getInitVal().getActiveBits() > 63 && !enumField->getInitVal().isSigned()) {
             llvm::APSInt intVal = enumField->getInitVal();
             intVal.setIsSigned(true);
+            intVal.toString(valueAsString, 10);
         } else {
             enumField->getInitVal().toString(valueAsString, 10);
         }
