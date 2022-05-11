@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+source "$(dirname "$0")/build_utils.sh"
 
 ./download_llvm.sh
 
@@ -20,10 +21,10 @@ function build {
 pushd "metadata-generator"
 rm -rf dist
 mkdir dist
-echo "Building metadata generator for x86_64 ..."
+checkpoint "Building metadata generator for x86_64 ..."
 build "x86_64"
 
-echo "Building metadata generator for arm64 ..."
+checkpoint "Building metadata generator for arm64 ..."
 build "arm64"
 rm -rf build
 popd

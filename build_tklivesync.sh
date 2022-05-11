@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+source "$(dirname "$0")/build_utils.sh"
 
 DIST=$(PWD)/dist
 mkdir -p $DIST
@@ -7,9 +8,14 @@ mkdir -p $DIST
 mkdir -p $DIST/intermediates
 
 #cleanup
-xcodebuild -project v8ios.xcodeproj -target TKLiveSync -configuration Release clean
+checkpoint "Cleanup TKLiveSync"
+xcodebuild -project v8ios.xcodeproj \
+           -target TKLiveSync \
+           -configuration Release clean \
+           -quiet
 
 #generates library for Mac Catalyst target
+checkpoint "Building TKLiveSync for Mac Catalyst"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
@@ -38,20 +44,22 @@ xcodebuild archive -project v8ios.xcodeproj \
 #                    -archivePath $DIST/TKLiveSync.arm64-iphonesimulator.xcarchive
 
 # generates library for simulator targets (usually includes arm64, x86_64)
+checkpoint "Building TKLiveSync for iphone simulators (multi-arch)"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
+                   -destination "generic/platform=iOS Simulator" \
                    -sdk iphonesimulator \
-                   -arch x86_64 \
-                   -arch arm64 \
                    -quiet \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/intermediates/TKLiveSync.iphonesimulator.xcarchive
 
 #generates library for device target
+checkpoint "Building TKLiveSync for ARM64 device"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
+                   -destination "generic/platform=iOS" \
                    -sdk iphoneos \
                    -quiet \
                    SKIP_INSTALL=NO \
@@ -77,6 +85,7 @@ rm -rf "${OUTPUT_PATH}"
 #     "$DIST/TKLiveSync.iphonesimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework/TKLiveSync"
 
 #Creates xcframework
+checkpoint "Creating TKLiveSync.xcframework"
 xcodebuild -create-xcframework \
            -framework "$DIST/intermediates/TKLiveSync.maccatalyst.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
            -debug-symbols "$DIST/intermediates/TKLiveSync.maccatalyst.xcarchive/dSYMs/TKLiveSync.framework.dSYM" \
