@@ -41,3 +41,5 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 add_subdirectory(src)
+# copy build-step-metadata-generator.py to the bin folder
+configure_file(build-step-metadata-generator.py ${CMAKE_CURRENT_BINARY_DIR}/bin/build-step-metadata-generator.py COPYONLY)
