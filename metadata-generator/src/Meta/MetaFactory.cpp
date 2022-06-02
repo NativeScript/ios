@@ -497,7 +497,8 @@ std::string demangleSwiftName(std::string name) {
     // Otherwise, `swift demange` starts bufferring its stdout when it discovers that its not
     // in an interactive terminal.
     using namespace redi;
-    static const std::string cmd = "script -q /dev/null xcrun swift demangle";
+    // script always pipes stderr to stdout, so ensure to discard stderr through sh
+    static const std::string cmd = "script -q /dev/null sh -c 'xcrun swift demangle 2>/dev/null'";
     static pstream ps(cmd, pstreams::pstdin|pstreams::pstdout|pstreams::pstderr);
 
     // Send the name to child process
