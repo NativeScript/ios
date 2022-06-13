@@ -20,7 +20,7 @@ public:
 
     std::unique_ptr<std::pair<MetasByModules, InterfacesByName> > getResult()
     {
-        std::unique_ptr<std::pair<MetasByModules, InterfacesByName> > result = llvm::make_unique<std::pair<MetasByModules, InterfacesByName> >(MetasByModules(), InterfacesByName());
+        std::unique_ptr<std::pair<MetasByModules, InterfacesByName> > result = std::make_unique<std::pair<MetasByModules, InterfacesByName> >(MetasByModules(), InterfacesByName());
         MetasByModules& metasByModules = result->first;
         InterfacesByName& interfacesByName = result->second;
         

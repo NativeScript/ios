@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import shlex
@@ -35,32 +35,39 @@ def map_and_list(func, iterable):
 
 
 # process environment variables
-effective_platofrm_name = env("EFFECTIVE_PLATFORM_NAME")
+effective_platform_name = env("EFFECTIVE_PLATFORM_NAME")
 docset_platform = "iOS"
 default_deployment_target_flag_name = "-mios-simulator-version-min"
 default_deployment_target_clang_env_name = "IPHONEOS_DEPLOYMENT_TARGET"
-if effective_platofrm_name is "-macosx":
+if effective_platform_name == "-macosx":
     docset_platform = "OSX"
     default_deployment_target_flag_name = "-mmacosx-version-min"
     default_deployment_target_clang_env_name = "MACOSX_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-watchos":
+elif effective_platform_name == "-watchos":
     docset_platform = "watchOS"
     default_deployment_target_flag_name = "-mwatchos-version-min"
     default_deployment_target_clang_env_name = "WATCHOS_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-watchsimulator":
+elif effective_platform_name == "-watchsimulator":
     docset_platform = "watchOS"
     default_deployment_target_flag_name = "-mwatchos-simulator-version-min"
     default_deployment_target_clang_env_name = "WATCHOS_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-appletvos":
+elif effective_platform_name == "-appletvos":
     docset_platform = "tvOS"
     default_deployment_target_flag_name = "-mappletvos-version-min"
     default_deployment_target_clang_env_name = "APPLETVOS_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-appletvsimulator":
+elif effective_platform_name == "-appletvsimulator":
     docset_platform = "tvOS"
     default_deployment_target_flag_name = "-mappletvsimulator-version-min"
     default_deployment_target_clang_env_name = "APPLETVOS_DEPLOYMENT_TARGET"
-elif effective_platofrm_name is "-iphoneos":
+elif effective_platform_name == "-iphoneos":
     default_deployment_target_flag_name = "-miphoneos-version-min"
+
+sdk_version = env("SDK_VERSION") or "13.0"
+llvm_target_triple_suffix = env_or_empty("LLVM_TARGET_TRIPLE_SUFFIX")
+llvm_target_triple_os_version = "ios{}".format(sdk_version)
+# env("LLVM_TARGET_TRIPLE_OS_VERSION") is the deployment target, so doesn't have all APIs
+# usually it's ios9.0 for NativeScript projects
+llvm_target_triple_vendor = env("LLVM_TARGET_TRIPLE_VENDOR") or "apple"
 
 conf_build_dir = env("CONFIGURATION_BUILD_DIR")
 sdk_root = env("SDKROOT")
@@ -77,16 +84,12 @@ other_cflags_parsed = shlex.split(other_cflags)
 enable_modules = env_bool("CLANG_ENABLE_MODULES")
 preprocessor_defs = env_or_empty("GCC_PREPROCESSOR_DEFINITIONS")
 preprocessor_defs_parsed = map_and_list((lambda s: "-D" + s), shlex.split(preprocessor_defs, '\''))
-typescript_output_folder = env_or_none("TNS_TYPESCRIPT_DECLARATIONS_PATH")
-
-
-
-
+typescript_output_folder = env_or_none("NS_TYPESCRIPT_DECLARATIONS_PATH") or env_or_none("TNS_TYPESCRIPT_DECLARATIONS_PATH")
 docset_path = os.path.join(os.path.expanduser("~"),
                            "Library/Developer/Shared/Documentation/DocSets/com.apple.adc.documentation.{}.docset"
                            .format(docset_platform))
-yaml_output_folder = env_or_none("TNS_DEBUG_METADATA_PATH")
-strict_includes = env_or_none("TNS_DEBUG_METADATA_STRICT_INCLUDES")
+yaml_output_folder = env_or_none("NS_DEBUG_METADATA_PATH") or env_or_none("TNS_DEBUG_METADATA_PATH")
+strict_includes = env_or_none("NS_DEBUG_METADATA_STRICT_INCLUDES") or env_or_none("TNS_DEBUG_METADATA_STRICT_INCLUDES")
 
 
 def save_stream_to_file(filename, stream):
@@ -130,13 +133,13 @@ def generate_metadata(arch):
     # clang arguments
     generator_call.extend(["Xclang",
                            "-isysroot", sdk_root,
-                           "-" + deployment_target_flag_name + "=" + deployment_target,
                            "-std=" + std])
 
-    if env_or_empty("IS_UIKITFORMAC").capitalize() is "YES":
-      generator_call.extend(["-arch", arch])
+    if env_or_empty("IS_UIKITFORMAC").capitalize() == "YES":
+      generator_call.extend(["-arch", arch,
+                             deployment_target_flag_name + "=" + deployment_target])
     else:
-      generator_call.extend(["-target", "{}-apple-ios13.0-macabi".format(arch)])
+      generator_call.extend(["-target", "{}-{}-{}{}".format(arch, llvm_target_triple_vendor, llvm_target_triple_os_version, llvm_target_triple_suffix)])
 
     generator_call.extend(header_search_paths_parsed)  # HEADER_SEARCH_PATHS
     generator_call.extend(framework_search_paths_parsed)  # FRAMEWORK_SEARCH_PATHS

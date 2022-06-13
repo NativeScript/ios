@@ -167,15 +167,15 @@ Meta* MetaFactory::create(const clang::Decl& decl, bool resetCached /* = false*/
         return insertedMetaPtrRef.get();
     } catch (MetaCreationException& e) {
         if (e.getMeta() == insertedMetaPtrRef.get()) {
-            insertedException = llvm::make_unique<MetaCreationException>(e);
+            insertedException = std::make_unique<MetaCreationException>(e);
             throw;
         }
         std::string message = CreationException::constructMessage("Can't create meta dependency.", e.getDetailedMessage());
-        insertedException = llvm::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
+        insertedException = std::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
         POLYMORPHIC_THROW(insertedException);
     } catch (TypeCreationException& e) {
         std::string message = CreationException::constructMessage("Can't create type dependency.", e.getDetailedMessage());
-        insertedException = llvm::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
+        insertedException = std::make_unique<MetaCreationException>(insertedMetaPtrRef.get(), message, e.isError());
         POLYMORPHIC_THROW(insertedException);
     }
 }
@@ -294,8 +294,8 @@ void MetaFactory::createFromVar(const clang::VarDecl& var, VarMeta& varMeta)
             throw MetaCreationException(&varMeta, "Not supported compile-time constant value: Union.", false);
         case clang::APValue::ValueKind::Vector:
             throw MetaCreationException(&varMeta, "Not supported compile-time constant value: Vector.", false);
-        case clang::APValue::ValueKind::Uninitialized:
-            throw MetaCreationException(&varMeta, "Not supported compile-time constant value: Uninitialized.", false);
+        case clang::APValue::ValueKind::Indeterminate:
+            throw MetaCreationException(&varMeta, "Not supported compile-time constant value: Indeterminate.", false);
         default:
             throw MetaCreationException(&varMeta, "Not supported compile-time constant value: -.", false);
         }
@@ -322,7 +322,9 @@ void MetaFactory::createFromEnum(const clang::EnumDecl& enumeration, EnumMeta& e
         // NOTE: Values having bits 53 to 62 different than the sign bit will continue to not be represented exactly
         // as MAX_SAFE_INTEGER is 2 ^ 53 - 1
         bool asSigned = enumField->getInitVal().isSigned() || enumField->getInitVal().getActiveBits() > 63;
-        std::string valueStr = enumField->getInitVal().toString(10, asSigned);
+        llvm::SmallString<100> valueAsString;
+        enumField->getInitVal().toString(valueAsString, 10, asSigned);
+        std::string valueStr = valueAsString.c_str();
 
         if (fieldNamePrefixLength > 0) {
             enumMeta.swiftNameFields.push_back({ enumField->getNameAsString().substr(fieldNamePrefixLength, std::string::npos), valueStr });
@@ -495,7 +497,8 @@ std::string demangleSwiftName(std::string name) {
     // Otherwise, `swift demange` starts bufferring its stdout when it discovers that its not
     // in an interactive terminal.
     using namespace redi;
-    static const std::string cmd = "script -q /dev/null xcrun swift demangle";
+    // script always pipes stderr to stdout, so ensure to discard stderr through sh
+    static const std::string cmd = "script -q /dev/null sh -c 'xcrun swift demangle 2>/dev/null'";
     static pstream ps(cmd, pstreams::pstdin|pstreams::pstdout|pstreams::pstderr);
 
     // Send the name to child process

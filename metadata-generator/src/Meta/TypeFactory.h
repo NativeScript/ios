@@ -99,6 +99,8 @@ private:
     std::shared_ptr<Type> createFromAttributedType(const clang::AttributedType* type);
 
     std::shared_ptr<Type> createFromObjCTypeParamType(const clang::ObjCTypeParamType* type);
+    
+    std::shared_ptr<Type> createFromMacroQualifiedParamType(const clang::MacroQualifiedType* type);
 
     // helpers
     bool isSpecificTypedefType(const clang::TypedefType* type, const std::string& typedefName);

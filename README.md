@@ -5,12 +5,19 @@ To start diving into the v8 iOS runtime make sure you have XCode and [Homebrew](
 # Install CMake
 brew install cmake
 
+# To avoid errors, you might need to link cmake to: /usr/local/bin/cmake
+# xcode doesn't read your profile during the build step, which causes it to ignore the PATH
+sudo ln -s /usr/local/bin/cmake $(which cmake)
+
 # Clone repo
 git clone https://github.com/NativeScript/ns-v8ios-runtime.git
 
 # Initialize and clone the submodules
 cd ns-v8ios-runtime
 git submodule update --init
+
+# Ensure that you have the required llvm binaries for building the metadata generator
+./download_llvm.sh
 
 # Open the runtime in XCode
 open v8ios.xcodeproj

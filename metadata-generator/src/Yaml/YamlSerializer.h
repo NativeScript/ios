@@ -11,7 +11,7 @@ public:
     static void serialize(std::string outputFilePath, T& object)
     {
         std::error_code errorCode;
-        llvm::raw_fd_ostream fileStream(outputFilePath, errorCode, llvm::sys::fs::OpenFlags::F_None);
+        llvm::raw_fd_ostream fileStream(outputFilePath, errorCode, llvm::sys::fs::OpenFlags::OF_None);
         if (errorCode)
             throw std::runtime_error(std::string("Unable to open file ") + outputFilePath + ".");
         llvm::yaml::Output output(fileStream);
