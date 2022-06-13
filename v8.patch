@@ -1,9 +1,9 @@
 diff --git a/BUILD.gn b/BUILD.gn
-index 80cb4d61d5..41e3f9bd02 100644
+index 5e3045bfdc..05164747bf 100644
 --- a/BUILD.gn
 +++ b/BUILD.gn
-@@ -538,7 +538,7 @@ config("toolchain") {
-   visibility = [ ":*" ]  # Only targets in this file can depend on this.
+@@ -866,7 +866,7 @@ config("toolchain") {
+   visibility = [ "./*" ]
  
    defines = []
 -  cflags = []
@@ -12,10 +12,10 @@ index 80cb4d61d5..41e3f9bd02 100644
  
    if (v8_current_cpu == "arm") {
 diff --git a/include/js_protocol.pdl b/include/js_protocol.pdl
-index d4e82caad3..9dd7acc5c4 100644
+index 9c0483ae70..d0d7610306 100644
 --- a/include/js_protocol.pdl
 +++ b/include/js_protocol.pdl
-@@ -1563,3 +1563,3788 @@ deprecated domain Schema
+@@ -1683,3 +1683,3788 @@ deprecated domain Schema
      returns
        # List of supported domains.
        array of Domain domains
@@ -3805,10 +3805,10 @@ index d4e82caad3..9dd7acc5c4 100644
 +      # Identifier of the removed stylesheet.
 +      StyleSheetId styleSheetId
 diff --git a/src/inspector/inspector_protocol_config.json b/src/inspector/inspector_protocol_config.json
-index 92bce2ad24..a314d29a07 100644
+index bd4f9c534c..5cb4c16ac3 100644
 --- a/src/inspector/inspector_protocol_config.json
 +++ b/src/inspector/inspector_protocol_config.json
-@@ -21,11 +21,39 @@
+@@ -21,12 +21,40 @@
              {
                  "domain": "Console"
              },
@@ -3819,7 +3819,8 @@ index 92bce2ad24..a314d29a07 100644
                  "domain": "Profiler"
              },
              {
-                 "domain": "HeapProfiler"
+                 "domain": "HeapProfiler",
+                 "async": ["collectGarbage"]
 +            },
 +            {
 +                "domain": "Log"
