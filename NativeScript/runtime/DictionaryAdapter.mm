@@ -234,12 +234,12 @@ using namespace tns;
     Local<Value> obj = self->object_->Get(self->isolate_);
 
     if (obj->IsMap()) {
-        self->enumerator_ = [[DictionaryAdapterMapKeysEnumerator alloc] initWithMap:self->object_ isolate:self->isolate_ cache:self->cache_];
+        self->enumerator_ = [[[DictionaryAdapterMapKeysEnumerator alloc] initWithMap:self->object_ isolate:self->isolate_ cache:self->cache_] autorelease];
         
         return self->enumerator_;
     }
 
-    self->enumerator_ = [[DictionaryAdapterObjectKeysEnumerator alloc] initWithProperties:self->object_ isolate:self->isolate_ cache:self->cache_];
+    self->enumerator_ = [[[DictionaryAdapterObjectKeysEnumerator alloc] initWithProperties:self->object_ isolate:self->isolate_ cache:self->cache_] autorelease];
     
     return self->enumerator_;
 }
@@ -261,6 +261,8 @@ using namespace tns;
         // CFAutorelease(self->enumerator_);
         self->enumerator_ = nullptr;
     }
+    self->cache_ = nullptr;
+    self->object_ = nullptr;
     
     [super dealloc];
 }
