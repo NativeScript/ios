@@ -66,6 +66,9 @@ using namespace v8;
         delete wrapper;
     }
     self->object_->Reset();
+    self->isolate_ = nullptr;
+    self->cache_ = nullptr;
+    self->object_ = nullptr;
     [super dealloc];
 }
 

@@ -67,36 +67,6 @@ using namespace v8;
     return value;
 }
 
-- (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *)state objects:(id __unsafe_unretained _Nullable [_Nonnull])buffer count:(NSUInteger)len {
-    if (state->state == 0) { // uninitialized
-        state->state = 1;
-        void* selfPtr = (__bridge void*)self;
-        state->mutationsPtr = (unsigned long*)selfPtr;
-        state->extra[0] = 0; // current index
-        NSUInteger cnt = [self count];
-        state->extra[1] = cnt;
-    }
-
-    NSUInteger currentIndex = state->extra[0];
-    unsigned long length = state->extra[1];
-    NSUInteger count = 0;
-    state->itemsPtr = buffer;
-
-    @autoreleasepool {
-        while (count < len && currentIndex < length) {
-            id obj = [self objectAtIndex:currentIndex];
-            CFBridgingRetain(obj);
-            *buffer++ = obj;
-            currentIndex++;
-            count++;
-        }
-    }
-
-    state->extra[0] = currentIndex;
-
-    return count;
-}
-
 - (void)dealloc {
     self->cache_->Instances.erase(self);
     Local<Value> value = self->object_->Get(self->isolate_);
@@ -106,6 +76,9 @@ using namespace v8;
         delete wrapper;
     }
     self->object_->Reset();
+    self->isolate_ = nullptr;
+    self->cache_ = nullptr;
+    self->object_ = nullptr;
     [super dealloc];
 }
 
