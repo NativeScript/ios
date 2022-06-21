@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 52;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -221,6 +221,7 @@
 /* Begin PBXShellScriptBuildPhase section */
 		C97FD7AC1ADE5369004DB2A4 /* NativeScript PreBuild */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -228,6 +229,10 @@
 			);
 			name = "NativeScript PreBuild";
 			outputPaths = (
+				"$CONFIGURATION_BUILD_DIR/metadata-arm64.bin",
+				"$CONFIGURATION_BUILD_DIR/metadata-arm64e.bin",
+				"$CONFIGURATION_BUILD_DIR/metadata-i386.bin",
+				"$CONFIGURATION_BUILD_DIR/metadata-x86_64.bin",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -236,6 +241,7 @@
 		};
 		CD3EAD351B05FF060042DBFC /* NativeScript PostBuild */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -246,11 +252,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"$SRCROOT/internal/nativescript-post-build\"";
+			shellScript = "\"$SRCROOT/internal/nativescript-post-build\"\n";
 			showEnvVarsInLog = 0;
 		};
 		CD62955B1BB2651D00AE3A93 /* NativeScript PreLink */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -261,7 +268,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"$SRCROOT/internal/nativescript-pre-link\"";
+			shellScript = "\"$SRCROOT/internal/nativescript-pre-link\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
