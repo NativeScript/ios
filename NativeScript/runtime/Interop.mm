@@ -18,6 +18,7 @@
 #include "SymbolIterator.h"
 #include "UnmanagedType.h"
 #include "OneByteStringResource.h"
+#include "robin_hood.h"
 
 using namespace v8;
 
@@ -1376,7 +1377,9 @@ SEL Interop::GetSwizzledMethodSelector(SEL selector) {
         return swizzledMethodSelector;
     }
     
-    static std::map<SEL, SEL> *swizzledMethodSelectorCache = new std::map<SEL, SEL>();
+    static robin_hood::unordered_map<SEL, SEL> *swizzledMethodSelectorCache = new robin_hood::unordered_map<SEL, SEL>();
+    
+//    static std::map<SEL, SEL> *swizzledMethodSelectorCache = new std::map<SEL, SEL>();
     
 //    static NSMutableDictionary<NSValue*, NSValue*> *swizzledMethodSelectorCache = [[NSMutableDictionary alloc] init];
     
