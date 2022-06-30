@@ -148,6 +148,7 @@ private:
     static bool IsNumbericType(BinaryTypeEncodingType type);
     static v8::Local<v8::Object> GetInteropType(v8::Local<v8::Context> context, BinaryTypeEncodingType type);
     static std::vector<std::string> GetAdditionalProtocols(const TypeEncoding* typeEncoding);
+    static SEL GetSwizzledMethodSelector(SEL selector);
 
     template <typename T>
     static inline void SetValue(void* dest, T value) {
@@ -192,6 +193,7 @@ private:
         
         static JSBlockDescriptor kJSBlockDescriptor;
     } JSBlock;
+    
 };
 
 }

@@ -1366,6 +1366,63 @@ Local<v8::Array> Interop::ToArray(Local<Object> object) {
     return result.As<v8::Array>();
 }
 
+SEL Interop::GetSwizzledMethodSelector(SEL selector) {
+    if(/* DISABLES CODE */ (false)) {
+        // old impl
+        NSString* selectorStr = NSStringFromSelector(selector);
+        NSString* swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
+        SEL swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
+            
+        return swizzledMethodSelector;
+    }
+    
+    static std::map<SEL, SEL> *swizzledMethodSelectorCache = new std::map<SEL, SEL>();
+    
+//    static NSMutableDictionary<NSValue*, NSValue*> *swizzledMethodSelectorCache = [[NSMutableDictionary alloc] init];
+    
+//    auto key = [NSValue valueWithPointer:selector];
+    SEL swizzledMethodSelector = NULL;
+    
+    try {
+        swizzledMethodSelector = swizzledMethodSelectorCache->at(selector);
+    } catch(const std::out_of_range&) {
+        // ignore...
+    }
+//    swizzledMethodSelector = static_cast<SEL>([[swizzledMethodSelectorCache objectForKey:key] pointerValue]);
+    
+    if(!swizzledMethodSelector) {
+        NSString* selectorStr = NSStringFromSelector(selector);
+        NSString* swizzledMethodSelectorStr;
+        // todo: replace with faster string concat if that makes an impact...
+        swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
+        
+        swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
+        
+        // save to cache
+        swizzledMethodSelectorCache->emplace(selector, swizzledMethodSelector);
+//        swizzledMethodSelectorCacheAmazeballs->insert(selector, swizzledMethodSelector);
+//        [swizzledMethodSelectorCache setObject: [NSValue valueWithPointer:swizzledMethodSelector] forKey:key];
+    }
+    
+    return swizzledMethodSelector;
+    
+// CACHE based on strings...
+//    static NSMutableDictionary<NSString *, NSString*> *cache = [[NSMutableDictionary alloc] init];
+//    NSString* selectorStr = NSStringFromSelector(selector);
+//    NSString* swizzledMethodSelectorStr;
+//
+//    swizzledMethodSelectorStr = [cache valueForKey:selectorStr];
+//
+//    if(!swizzledMethodSelectorStr) {
+//        swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
+//
+//        // save it to the cache...
+//        [cache setObject:swizzledMethodSelectorStr forKey:selectorStr];
+//    }
+//
+//    return NSSelectorFromString(swizzledMethodSelectorStr);
+}
+
 Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     int initialParameterIndex = methodCall.isPrimitiveFunction_ ? 0 : 2;
 
@@ -1401,9 +1458,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
         SEL selector = methodCall.selector_;
         if (isInstanceMethod) {
-            NSString* selectorStr = NSStringFromSelector(selector);
-            NSString* swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
-            SEL swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
+            SEL swizzledMethodSelector = Interop::GetSwizzledMethodSelector(selector);
             if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
                 selector = swizzledMethodSelector;
             }

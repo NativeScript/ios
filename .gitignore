@@ -45,3 +45,8 @@ v8
 .npmrc
 
 llvm/
+
+# v8 build files...
+.gclient_entries
+.gclient
+.cipd/
