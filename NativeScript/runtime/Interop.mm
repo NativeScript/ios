@@ -1394,12 +1394,14 @@ SEL Interop::GetSwizzledMethodSelector(SEL selector) {
 //    swizzledMethodSelector = static_cast<SEL>([[swizzledMethodSelectorCache objectForKey:key] pointerValue]);
     
     if(!swizzledMethodSelector) {
-        NSString* selectorStr = NSStringFromSelector(selector);
-        NSString* swizzledMethodSelectorStr;
-        // todo: replace with faster string concat if that makes an impact...
-        swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
+        swizzledMethodSelector = sel_registerName((Constants::SwizzledPrefix + std::string(sel_getName(selector))).c_str());
         
-        swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
+//        NSString* selectorStr = NSStringFromSelector(selector);
+//        NSString* swizzledMethodSelectorStr;
+        // todo: replace with faster string concat if that makes an impact...
+//        swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
+        
+//        swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
         
         // save to cache
         swizzledMethodSelectorCache->emplace(selector, swizzledMethodSelector);
