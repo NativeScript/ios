@@ -91,7 +91,7 @@ unichar functionWithUnichar(unichar x) {
     return x;
 }
 + (int)methodWithInt:(int)x {
-    TNSLog([NSString stringWithFormat:@"%d", x]);
+//    TNSLog([NSString stringWithFormat:@"%d", x]);
     return x;
 }
 + (long)methodWithLong:(long)x {

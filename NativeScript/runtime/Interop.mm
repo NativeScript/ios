@@ -1401,13 +1401,56 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
         SEL selector = methodCall.selector_;
         if (isInstanceMethod) {
-            NSString* selectorStr = NSStringFromSelector(selector);
-            NSString* swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
-            SEL swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
+            // ORIGINAL from: https://github.com/NativeScript/ns-v8ios-runtime/pull/46/files
+//            SEL swizzledMethodSelector = NSSelectorFromString([@"__NativeScript__" stringByAppendingString:NSStringFromSelector(selector)]);
+            
+//            NSString* selectorStr = NSStringFromSelector(selector);
+//            NSString* swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
+//            NSString* swizzledMethodSelectorStr = [NSString stringWithCString:Constants::SwizzledPrefix.c_str()+selectorStr encoding:NSUTF8StringEncoding];
+//            NSString * swizzledMethodSelectorStr = [NSString stringWithUTF8String: (Constants::SwizzledPrefix + std::string(sel_getName(selector))).c_str()];
+//            SEL swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
+            
+            // SLOW:
+//            NSString* selectorStr = NSStringFromSelector(selector);
+//            NSString* swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
+//            SEL swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
+//            if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
+//                selector = swizzledMethodSelector;
+//            }
+            
+            // EXPERIMENTS
+//            NSString* selectorStr = NSStringFromSelector(selector);
+//            static NSString* stringPrefix = [NSString stringWithUTF8String:Constants::SwizzledPrefix.c_str()];
+//                        NSString* swizzledMethodSelectorStr = [NSString stringWithFormat:@"%@%@", stringPrefix, selectorStr];
+//            NSString* swizzledMethodSelectorStr = [NSString stringWithUTF8String: (Constants::SwizzledPrefix + std::string( [selectorStr cStringUsingEncoding:NSUTF8StringEncoding])).c_str()];
+//            SEL swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
+//            if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
+//               selector = swizzledMethodSelector;
+//            }
+            
+            // BETTER (eduardo)
+//            SEL swizzledMethodSelector = sel_registerName((Constants::SwizzledPrefix + std::string(sel_getName(selector))).c_str());
+//            if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
+//                selector = swizzledMethodSelector;
+//            }
+
+            // Not bad (osei)
+//            std::string some1(Constants::SwizzledPrefix);
+//            std::string some2(sel_getName(selector));
+//            auto cat = std::string(some1.c_str()) + std::string(some1.c_str());
+//            SEL swizzledMethodSelector = sel_registerName(cat.c_str());
+            
+            // FASTEST (eduardo)
+            char buffer[256];
+            auto length = Constants::SwizzledPrefix.length();
+            memcpy(buffer, Constants::SwizzledPrefix.c_str(), length);
+            strcpy(buffer + length, sel_getName(selector));
+            SEL swizzledMethodSelector = sel_registerName(buffer);
+
             if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
                 selector = swizzledMethodSelector;
             }
-
+            
             if (methodCall.callSuper_) {
                 sup.receiver = methodCall.target_;
                 sup.super_class = class_getSuperclass(object_getClass(methodCall.target_));
