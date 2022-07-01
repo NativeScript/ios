@@ -336,19 +336,7 @@ std::vector<Local<Value>> tns::ArgsToVector(const FunctionCallbackInfo<Value>& i
     }
     return args;
 }
-//
-//bool tns::IsString(const Local<Value>& value) {
-//    return !value.IsEmpty() && (value->IsString() || value->IsStringObject());
-//}
-//
-//bool tns::IsNumber(const Local<Value>& value) {
-//    return !value.IsEmpty() && (value->IsNumber() || value->IsNumberObject());
-//}
-//
-//bool tns::IsBool(const Local<Value>& value) {
-//    return !value.IsEmpty() && (value->IsBoolean() || value->IsBooleanObject());
-//}
-//
+
 bool tns::IsArrayOrArrayLike(Isolate* isolate, const Local<Value>& value) {
     if (value->IsArray()) {
         return true;

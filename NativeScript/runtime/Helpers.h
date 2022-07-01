@@ -37,10 +37,6 @@ BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val)
 void DeleteValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 std::vector<v8::Local<v8::Value>> ArgsToVector(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-//bool IsString(const v8::Local<v8::Value>& value);
-//bool IsNumber(const v8::Local<v8::Value>& value);
-//bool IsBool(const v8::Local<v8::Value>& value);
-
 inline bool IsString(const v8::Local<v8::Value>& value) {
     return !value.IsEmpty() && (value->IsString() || value->IsStringObject());
 }
