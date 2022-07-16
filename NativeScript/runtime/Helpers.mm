@@ -682,3 +682,7 @@ void tns::Assert(bool condition, Isolate* isolate, std::string const &reason) {
     Log(@"%s", stack.c_str());
     assert(false);
 }
+
+void tns::StopExecutionAndLogStackTrace(v8::Isolate* isolate) {
+    Assert(false, isolate);
+}

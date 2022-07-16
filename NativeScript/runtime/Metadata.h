@@ -563,6 +563,31 @@ public:
         return (MetaType)(this->_flags & MetaTypeMask);
     }
 
+    const char* typeName() const {
+        switch (type()) {
+            case Undefined:
+                return "Undefined";
+            case Struct:
+                return "Struct";
+            case Union:
+                return "Union";
+            case Function:
+                return "Function";
+            case JsCode:
+                return "JsCode";
+            case Var:
+                return "Var";
+            case Interface:
+                return "Interface";
+            case ProtocolType:
+                return "ProtocolType";
+            case Vector:
+                return "Vector";
+            default:
+                return "Unknwon";
+        }
+    }
+    
     const ModuleMeta* topLevelModule() const {
         return this->_topLevelModule.valuePtr();
     }
