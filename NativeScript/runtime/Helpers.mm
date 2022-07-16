@@ -337,19 +337,7 @@ std::vector<Local<Value>> tns::ArgsToVector(const FunctionCallbackInfo<Value>& i
     return args;
 }
 
-bool tns::IsString(Local<Value> value) {
-    return !value.IsEmpty() && (value->IsString() || value->IsStringObject());
-}
-
-bool tns::IsNumber(Local<Value> value) {
-    return !value.IsEmpty() && (value->IsNumber() || value->IsNumberObject());
-}
-
-bool tns::IsBool(Local<Value> value) {
-    return !value.IsEmpty() && (value->IsBoolean() || value->IsBooleanObject());
-}
-
-bool tns::IsArrayOrArrayLike(Isolate* isolate, Local<Value> value) {
+bool tns::IsArrayOrArrayLike(Isolate* isolate, const Local<Value>& value) {
     if (value->IsArray()) {
         return true;
     }
@@ -365,7 +353,7 @@ bool tns::IsArrayOrArrayLike(Isolate* isolate, Local<Value> value) {
     return obj->Has(context, ToV8String(isolate, "length")).FromMaybe(false);
 }
 
-void* tns::TryGetBufferFromArrayBuffer(v8::Local<v8::Value> value, bool& isArrayBuffer) {
+void* tns::TryGetBufferFromArrayBuffer(const v8::Local<v8::Value>& value, bool& isArrayBuffer) {
     isArrayBuffer = false;
 
     if (value.IsEmpty() || (!value->IsArrayBuffer() && !value->IsArrayBufferView())) {

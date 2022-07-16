@@ -18,6 +18,7 @@
 #include "SymbolIterator.h"
 #include "UnmanagedType.h"
 #include "OneByteStringResource.h"
+#include "robin_hood.h"
 
 using namespace v8;
 
@@ -1366,6 +1367,26 @@ Local<v8::Array> Interop::ToArray(Local<Object> object) {
     return result.As<v8::Array>();
 }
 
+SEL Interop::GetSwizzledMethodSelector(SEL selector) {
+    static robin_hood::unordered_map<SEL, SEL> *swizzledMethodSelectorCache = new robin_hood::unordered_map<SEL, SEL>();
+
+    SEL swizzledMethodSelector = NULL;
+    
+    try {
+        swizzledMethodSelector = swizzledMethodSelectorCache->at(selector);
+    } catch(const std::out_of_range&) {
+        // ignore...
+    }
+
+    if(!swizzledMethodSelector) {
+        swizzledMethodSelector = sel_registerName((Constants::SwizzledPrefix + std::string(sel_getName(selector))).c_str());
+        // save to cache
+        swizzledMethodSelectorCache->emplace(selector, swizzledMethodSelector);
+    }
+    
+    return swizzledMethodSelector;
+}
+
 Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     int initialParameterIndex = methodCall.isPrimitiveFunction_ ? 0 : 2;
 
@@ -1401,9 +1422,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
         SEL selector = methodCall.selector_;
         if (isInstanceMethod) {
-            NSString* selectorStr = NSStringFromSelector(selector);
-            NSString* swizzledMethodSelectorStr = [NSString stringWithFormat:@"%s%@", Constants::SwizzledPrefix.c_str(), selectorStr];
-            SEL swizzledMethodSelector = NSSelectorFromString(swizzledMethodSelectorStr);
+            SEL swizzledMethodSelector = Interop::GetSwizzledMethodSelector(selector);
             if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
                 selector = swizzledMethodSelector;
             }
