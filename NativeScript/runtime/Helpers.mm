@@ -657,7 +657,7 @@ bool tns::LiveSync(Isolate* isolate) {
     return true;
 }
 
-void tns::Assert(bool condition, Isolate* isolate) {
+void tns::Assert(bool condition, Isolate* isolate, std::string const &reason) {
     if (!RuntimeConfig.IsDebug) {
         assert(condition);
         return;
@@ -676,6 +676,9 @@ void tns::Assert(bool condition, Isolate* isolate) {
 
     if (isolate == nullptr) {
         Log(@"====== Assertion failed ======");
+        if(!reason.empty()) {
+            Log(@"Reason: %s", reason.c_str());
+        }
         Log(@"Native stack trace:");
         LogBacktrace();
         assert(false);
