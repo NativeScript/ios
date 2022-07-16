@@ -1487,9 +1487,6 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 // MARK: - Debug Messages for the runtime
 
 void ExecuteWriteValueValidationsAndStopExecutionAndLogStackTrace(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
-    if (!RuntimeConfig.IsDebug) {
-        return;
-    }
     Isolate* isolate = context->GetIsolate();
     std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
     Local<Value> originArg = arg;
@@ -1524,9 +1521,6 @@ bool IsTypeEncondingHandldedByDebugMessages(const TypeEncoding* typeEncoding) {
 }
 
 void LogWriteValueTraceMessage(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
-    if (!RuntimeConfig.IsDebug) {
-        return;
-    }
     Isolate* isolate = context->GetIsolate();
     std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
     std::string originName = tns::ToString(isolate, arg);
@@ -1534,22 +1528,28 @@ void LogWriteValueTraceMessage(Local<Context> context, const TypeEncoding* typeE
         // empty string
         originName = "\"\"";
     }
+    // NOTE: stringWithFormat is slow, perhaps use different c string concatenation?
     NSString* message = [NSString stringWithFormat:@"Interop::WriteValue: from {%s} to {%s}", originName.c_str(), destName.c_str()];
     Log(@"%@", message);
 }
 
 void Interop::ExecuteWriteValueDebugValidationsIfInDebug(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
+
     if (!RuntimeConfig.IsDebug) {
         return;
     }
-    if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
-        return;
+    id value = Runtime::GetAppConfigValue("logRuntimeDetail");
+    bool logRuntimeDetail = value ? [value boolValue] : false;
+    if (logRuntimeDetail) {
+        if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
+            return;
+        }
+        if (IsTypeEncondingHandldedByDebugMessages(typeEncoding)) {
+            return;
+        }
+        LogWriteValueTraceMessage(context, typeEncoding, dest, arg);
+        ExecuteWriteValueValidationsAndStopExecutionAndLogStackTrace(context, typeEncoding, dest, arg);
     }
-    if (IsTypeEncondingHandldedByDebugMessages(typeEncoding)) {
-        return;
-    }
-    LogWriteValueTraceMessage(context, typeEncoding, dest, arg);
-    ExecuteWriteValueValidationsAndStopExecutionAndLogStackTrace(context, typeEncoding, dest, arg);
 }
     
 }
