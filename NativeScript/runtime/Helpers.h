@@ -75,7 +75,7 @@ const std::string GetCurrentScriptUrl(v8::Isolate* isolate);
 
 bool LiveSync(v8::Isolate* isolate);
 
-void Assert(bool condition, v8::Isolate* isolate = nullptr);
+void Assert(bool condition, v8::Isolate* isolate = nullptr, std::string const &reason = std::string());
 
 void StopExecutionAndLogStackTrace(v8::Isolate* isolate);
 
