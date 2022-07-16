@@ -37,11 +37,21 @@ BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val)
 void DeleteValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 std::vector<v8::Local<v8::Value>> ArgsToVector(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-bool IsString(v8::Local<v8::Value> value);
-bool IsNumber(v8::Local<v8::Value> value);
-bool IsBool(v8::Local<v8::Value> value);
-bool IsArrayOrArrayLike(v8::Isolate* isolate, v8::Local<v8::Value> value);
-void* TryGetBufferFromArrayBuffer(v8::Local<v8::Value> value, bool& isArrayBuffer);
+inline bool IsString(const v8::Local<v8::Value>& value) {
+    return !value.IsEmpty() && (value->IsString() || value->IsStringObject());
+}
+
+inline bool IsNumber(const v8::Local<v8::Value>& value) {
+    return !value.IsEmpty() && (value->IsNumber() || value->IsNumberObject());
+}
+
+inline bool IsBool(const v8::Local<v8::Value>& value) {
+    return !value.IsEmpty() && (value->IsBoolean() || value->IsBooleanObject());
+}
+
+
+bool IsArrayOrArrayLike(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
+void* TryGetBufferFromArrayBuffer(const v8::Local<v8::Value>& value, bool& isArrayBuffer);
 
 void ExecuteOnMainThread(std::function<void ()> func, bool async = true);
 
