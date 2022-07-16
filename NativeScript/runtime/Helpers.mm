@@ -679,3 +679,7 @@ void tns::Assert(bool condition, Isolate* isolate) {
     Log(@"%s", stack.c_str());
     assert(false);
 }
+
+void tns::StopExecutionAndLogStackTrace(v8::Isolate* isolate) {
+    Assert(false, isolate);
+}
