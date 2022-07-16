@@ -35,6 +35,7 @@ void Console::Init(Local<Context> context) {
 }
 
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
+    // TODO: implement 'forceLog' override option like android has, to force logs in prod if desired
     if (!RuntimeConfig.LogToSystemConsole) {
         return;
     }
@@ -59,8 +60,8 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
 
     std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
     v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
-    std::string msgWithVerbosity = "CONSOLE " + verbosityLevelUpper + ": " + msgToLog;
-    Log("%s", msgWithVerbosity.c_str());
+    // std::string msgWithVerbosity = "CONSOLE " + verbosityLevelUpper + ": " + msgToLog;
+    Log("%s", msgToLog.c_str());
 }
 
 void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
