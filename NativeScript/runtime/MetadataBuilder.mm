@@ -11,6 +11,7 @@
 #include "Worker.h"
 #include "Caches.h"
 #include "Tasks.h"
+#include "Runtime.h"
 #include "RuntimeConfig.h"
 
 using namespace v8;
@@ -812,13 +813,18 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
     // TODO: Find out if the isMethodCallback property can be determined based on a UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
 
     if (RuntimeConfig.IsDebug) {
-        NSString* message = [NSString stringWithFormat:@"MetadataBuilder::InvokeMethod class {%s}, selector {%s}, isInitializer {%s}, type {%s}, lib {%s}",
-                             containingClass.c_str(),
-                             meta->selectorAsString(),
-                             meta->isInitializer() ? "true":"false",
-                             meta->typeName(),
-                             meta->topLevelModule()->getName()];
-        Log(@"%@", message);
+        id value = Runtime::GetAppConfigValue("logRuntimeDetail");
+        bool logRuntimeDetail = value ? [value boolValue] : false;
+        if (logRuntimeDetail) {
+            // NOTE: stringWithFormat is slow, perhaps use different c string concatenation?
+            NSString* message = [NSString stringWithFormat:@"MetadataBuilder::InvokeMethod: class {%s}, selector {%s}, isInitializer {%s}, type {%s}, lib {%s}",
+                                containingClass.c_str(),
+                                meta->selectorAsString(),
+                                meta->isInitializer() ? "true":"false",
+                                meta->typeName(),
+                                meta->topLevelModule()->getName()];
+            Log(@"%@", message);
+        }
     }
     
     try {
