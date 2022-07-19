@@ -812,7 +812,7 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
     Class klass = objc_getClass(containingClass.c_str());
     // TODO: Find out if the isMethodCallback property can be determined based on a UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
 
-    if (RuntimeConfig.IsDebug) {
+    #ifdef DEBUG
         id value = Runtime::GetAppConfigValue("logRuntimeDetail");
         bool logRuntimeDetail = value ? [value boolValue] : false;
         if (logRuntimeDetail) {
@@ -825,7 +825,7 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
                                 meta->topLevelModule()->getName()];
             Log(@"%@", message);
         }
-    }
+    #endif
     
     try {
         return ArgConverter::Invoke(context, klass, receiver, args, meta, isMethodCallback);
