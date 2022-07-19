@@ -1535,9 +1535,7 @@ void LogWriteValueTraceMessage(Local<Context> context, const TypeEncoding* typeE
 
 void Interop::ExecuteWriteValueDebugValidationsIfInDebug(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
 
-    if (!RuntimeConfig.IsDebug) {
-        return;
-    }
+    #ifdef DEBUG
     id value = Runtime::GetAppConfigValue("logRuntimeDetail");
     bool logRuntimeDetail = value ? [value boolValue] : false;
     if (logRuntimeDetail) {
@@ -1550,6 +1548,7 @@ void Interop::ExecuteWriteValueDebugValidationsIfInDebug(Local<Context> context,
         LogWriteValueTraceMessage(context, typeEncoding, dest, arg);
         ExecuteWriteValueValidationsAndStopExecutionAndLogStackTrace(context, typeEncoding, dest, arg);
     }
+    #endif
 }
     
 }
