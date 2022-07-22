@@ -341,7 +341,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
         tns::SetValue(isolate, thiz, wrapper);
         std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
         cache->Instances.emplace(result, poThiz);
-        [result retain];
+        // [result retain];
     }
 }
 
