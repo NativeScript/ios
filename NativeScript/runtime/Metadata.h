@@ -584,7 +584,7 @@ public:
             case Vector:
                 return "Vector";
             default:
-                return "Unknwon";
+                return "Unknown";
         }
     }
     
