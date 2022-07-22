@@ -1,3 +1,27 @@
+## [8.3.1](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.3.0...v8.3.1) (2022-07-22)
+
+
+### Bug Fixes
+
+* memory leak on ArgConverter::ConstructObject ([1129d15](https://github.com/NativeScript/ns-v8ios-runtime/commit/1129d15fb47d1ae78bf42826ec118c9e76cdd4f7))
+* memory leak on ArrayAdapter, DictionaryAdapter and NSDataAdapter ([#170](https://github.com/NativeScript/ns-v8ios-runtime/issues/170)) ([1e1abe2](https://github.com/NativeScript/ns-v8ios-runtime/commit/1e1abe24e78c35f59e85a4cf06c57d832be0c9dc))
+* misspelling on MetaType ([f6e0500](https://github.com/NativeScript/ns-v8ios-runtime/commit/f6e05002f4ca9f6e9007b77278f55a3940a8640c))
+* xcode14 build phase files ([#169](https://github.com/NativeScript/ns-v8ios-runtime/issues/169)) ([3b1eafc](https://github.com/NativeScript/ns-v8ios-runtime/commit/3b1eafc4da502404ab8c50854016ff059ae8eff8))
+
+
+### Features
+
+* add debug runtime detail log handling ([cfe59d4](https://github.com/NativeScript/ns-v8ios-runtime/commit/cfe59d4024bdadde6aa39aaad814883853f89403))
+* add support for reasons on assertion failure ([#172](https://github.com/NativeScript/ns-v8ios-runtime/issues/172)) ([e185014](https://github.com/NativeScript/ns-v8ios-runtime/commit/e185014b6a6bec47b49d75486c73dc8ed748c998))
+* improve crash report details ([#142](https://github.com/NativeScript/ns-v8ios-runtime/issues/142)) ([f0a49c0](https://github.com/NativeScript/ns-v8ios-runtime/commit/f0a49c043d5d298cf13e79f108cac4f18e95cd27))
+
+
+### Performance Improvements
+
+* cache swizzled selector construction ([#173](https://github.com/NativeScript/ns-v8ios-runtime/issues/173)) ([de6506b](https://github.com/NativeScript/ns-v8ios-runtime/commit/de6506b8fa9b7fc6e1c5cabd7874ebd6a9f0574c))
+
+
+
 ## [8.2.3](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.2.2...v8.2.3) (2022-03-30)
 
 
