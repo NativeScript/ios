@@ -61,7 +61,7 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
     v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
     std::string msgWithVerbosity = "CONSOLE " + verbosityLevelUpper + ": " + msgToLog;
-    Log("%s", msgToLog.c_str());
+    Log("%s", msgWithVerbosity.c_str());
 }
 
 void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
