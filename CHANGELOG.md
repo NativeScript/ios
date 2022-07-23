@@ -1,3 +1,12 @@
+## [8.3.2](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.3.1...v8.3.2) (2022-07-23)
+
+
+### Bug Fixes
+
+* console prefix missing ([#175](https://github.com/NativeScript/ns-v8ios-runtime/issues/175)) ([3f4abd1](https://github.com/NativeScript/ns-v8ios-runtime/commit/3f4abd1e8187d783b10377f9380f46c43135f824))
+
+
+
 ## [8.3.1](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.3.0...v8.3.1) (2022-07-22)
 
 
