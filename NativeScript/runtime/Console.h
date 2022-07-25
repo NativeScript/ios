@@ -15,6 +15,7 @@ private:
     using ConsoleAPIType = v8_inspector::ConsoleAPIType;
 
     static void AttachLogFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> console, const std::string name, v8::FunctionCallback callback = Console::LogCallback);
+    static void SplitAndLogInChunks(std::string message);
     static void LogCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void AssertCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void DirCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
