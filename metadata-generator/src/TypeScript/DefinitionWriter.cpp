@@ -654,6 +654,11 @@ std::string DefinitionWriter::writeProperty(PropertyMeta* meta, BaseClassMeta* o
         return std::string();
     }
 
+    // prevent writing out empty property names
+    if (meta->jsName.length() == 0) {
+        return std::string();
+    }
+
     output << meta->jsName;
     if (owner->is(MetaType::Protocol) && clang::dyn_cast<clang::ObjCPropertyDecl>(meta->declaration)->getPropertyImplementation() == clang::ObjCPropertyDecl::PropertyControl::Optional) {
         output << "?";
@@ -751,6 +756,13 @@ void DefinitionWriter::writeMembers(const std::vector<RecordField>& fields, std:
         if (i < fieldsComments.size()) {
             _buffer << fieldsComments[i].toString("\t");
         }
+
+        // prevent writing empty field names,
+        // fixes issue with structs containing emtpy bitfields (ie. __darwin_fp_control)
+        if(fields[i].name.length() == 0) {
+            continue;
+        }
+
         _buffer << "\t" << fields[i].name << ": " << tsifyType(*fields[i].encoding) << ";" << std::endl;
     }
 }
