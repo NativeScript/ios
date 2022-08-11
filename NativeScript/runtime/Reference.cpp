@@ -295,9 +295,9 @@ void Reference::RegisterToStringMethod(Local<Context> context, Local<Object> pro
 
         char buffer[100];
         if (value == nullptr) {
-            sprintf(buffer, "<Reference: %p>", reinterpret_cast<void*>(0));
+            snprintf(buffer, 100, "<Reference: %p>", reinterpret_cast<void*>(0));
         } else {
-            sprintf(buffer, "<Reference: %p>", value);
+            snprintf(buffer, 100, "<Reference: %p>", value);
         }
 
         Local<v8::String> result = tns::ToV8String(isolate, buffer);

@@ -179,7 +179,7 @@ void Pointer::RegisterToStringMethod(Local<Context> context, Local<Object> proto
         void* value = wrapper->Data();
 
         char buffer[100];
-        sprintf(buffer, "<Pointer: %p>", value);
+        snprintf(buffer, 100, "<Pointer: %p>", value);
 
         Local<v8::String> result = tns::ToV8String(isolate, buffer);
         info.GetReturnValue().Set(result);
@@ -200,7 +200,7 @@ void Pointer::RegisterToHexStringMethod(Local<Context> context, Local<Object> pr
         const void* value = wrapper->Data();
 
         char buffer[100];
-        sprintf(buffer, "%p", value);
+        snprintf(buffer, 100, "%p", value);
 
         Local<v8::String> result = tns::ToV8String(isolate, buffer);
         info.GetReturnValue().Set(result);
@@ -222,7 +222,7 @@ void Pointer::RegisterToDecimalStringMethod(Local<Context> context, Local<Object
         intptr_t ptr = static_cast<intptr_t>(reinterpret_cast<size_t>(value));
 
         char buffer[100];
-        sprintf(buffer, "%ld", ptr);
+        snprintf(buffer, 100, "%ld", ptr);
 
         Local<v8::String> result = tns::ToV8String(isolate, buffer);
         info.GetReturnValue().Set(result);

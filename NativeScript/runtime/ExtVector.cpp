@@ -80,7 +80,7 @@ void ExtVector::RegisterToStringMethod(Isolate* isolate, Local<ObjectTemplate> p
         void* value = wrapper->Data();
 
         char buffer[100];
-        sprintf(buffer, "<Vector: %p>", value);
+        snprintf(buffer, 100, "<Vector: %p>", value);
 
         Local<v8::String> result = tns::ToV8String(isolate, buffer);
         info.GetReturnValue().Set(result);

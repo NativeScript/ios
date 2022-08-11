@@ -76,7 +76,12 @@ bool MethodMeta::isImplementedInClass(Class klass, bool isStatic) const {
 
         auto it = sampleInstances.find(klass);
         if (it == sampleInstances.end()) {
-            it = sampleInstances.emplace(klass, [klass alloc]).first;
+            @try {
+                it = sampleInstances.emplace(klass, [klass alloc]).first;
+            }
+            @catch(id err) {
+                return false;
+            }
         }
         id sampleInstance = it->second;
         return [sampleInstance respondsToSelector:this->selector()];
