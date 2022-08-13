@@ -1,3 +1,13 @@
+## [8.3.3](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.3.2...v8.3.3) (2022-08-13)
+
+
+### Bug Fixes
+
+* **ios16-beta5:** errors and crash ([#179](https://github.com/NativeScript/ns-v8ios-runtime/issues/179)) ([e36106c](https://github.com/NativeScript/ns-v8ios-runtime/commit/e36106c2ce4ad9bf232b89682699aaea19718f35))
+* **metadata-generator:** skip empty bitfields ([#178](https://github.com/NativeScript/ns-v8ios-runtime/issues/178)) ([3720b2b](https://github.com/NativeScript/ns-v8ios-runtime/commit/3720b2b3c219fa17151f85ffe0ba227cdce0d692))
+
+
+
 ## [8.3.2](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.3.1...v8.3.2) (2022-07-23)
 
 
