@@ -41,7 +41,7 @@ void ExtVector::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbac
     ffi_type* ffiType = extVectorWrapper->FFIType();
     if (offset >= ffiType->size) {
         // Trying to access an element outside of the vector size
-        info.GetReturnValue().Set(v8::Undefined(isolate));
+        info.GetReturnValue().SetUndefined();
         return;
     }
 

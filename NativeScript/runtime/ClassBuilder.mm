@@ -301,7 +301,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         });
         class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
 
-        info.GetReturnValue().Set(v8::Undefined(isolate));
+        info.GetReturnValue().SetUndefined();
     }).ToLocalChecked();
 
     PropertyAttribute flags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete);

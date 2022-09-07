@@ -207,7 +207,7 @@ void Interop::RegisterFreeFunction(Local<Context> context, Local<Object> interop
             std::free(pw->Data());
         }
 
-        info.GetReturnValue().Set(v8::Undefined(isolate));
+        info.GetReturnValue().SetUndefined();
     }).ToLocal(&func);
 
     Isolate* isolate = context->GetIsolate();
@@ -294,7 +294,7 @@ void Interop::RegisterSizeOfFunction(Local<Context> context, Local<Object> inter
             if (size == 0) {
                 throw NativeScriptException("Unknown type");
             } else {
-                info.GetReturnValue().Set(Number::New(isolate, size));
+                info.GetReturnValue().Set((double)size);
             }
         } catch (NativeScriptException& ex) {
             ex.ReThrowToV8(isolate);

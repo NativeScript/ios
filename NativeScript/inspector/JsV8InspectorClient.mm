@@ -330,10 +330,8 @@ void JsV8InspectorClient::registerDomainDispatcherCallback(const FunctionCallbac
 }
 
 void JsV8InspectorClient::inspectorTimestampCallback(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate = args.GetIsolate();
     double timestamp = std::chrono::seconds(std::chrono::seconds(std::time(NULL))).count();
-    Local<Number> result = Number::New(isolate, timestamp);
-    args.GetReturnValue().Set(result);
+    args.GetReturnValue().Set(timestamp);
 }
 
 int JsV8InspectorClient::contextGroupId = 1;

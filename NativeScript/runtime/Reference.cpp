@@ -127,7 +127,7 @@ void Reference::GetValueCallback(Local<v8::Name> name, const PropertyCallbackInf
     Local<Context> context = isolate->GetCurrentContext();
     Local<Value> result = Reference::GetReferredValue(context, info.This());
     if (result.IsEmpty()) {
-        info.GetReturnValue().Set(v8::Undefined(isolate));
+        info.GetReturnValue().SetUndefined();
     } else {
         info.GetReturnValue().Set(result);
     }

@@ -825,12 +825,12 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index, const PropertyC
     }
 
     if (obj == nil || obj == [NSNull null]) {
-        args.GetReturnValue().Set(Null(isolate));
+        args.GetReturnValue().SetNull();
         return;
     }
 
     if ([obj isKindOfClass:[@YES class]]) {
-        args.GetReturnValue().Set(v8::Boolean::New(isolate, [obj boolValue]));
+        args.GetReturnValue().Set([obj boolValue]);
         return;
     }
 
@@ -859,7 +859,7 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index, const PropertyC
 
     if ([obj isKindOfClass:[NSNumber class]] && ![obj isKindOfClass:[NSDecimalNumber class]]) {
         double value = [obj doubleValue];
-        args.GetReturnValue().Set(Number::New(isolate, value));
+        args.GetReturnValue().Set(value);
         return;
     }
 
