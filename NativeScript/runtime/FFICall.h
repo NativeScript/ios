@@ -20,12 +20,12 @@ public:
     ~BaseCall() {
     }
 
-    void* ResultBuffer() {
+    inline void* ResultBuffer() {
         return this->buffer_ + this->returnOffset_;
     }
 
     template <typename T>
-    T& GetResult() {
+    inline T& GetResult() {
         return *static_cast<T*>(this->ResultBuffer());
     }
 protected:
@@ -72,7 +72,12 @@ class FFICall: public BaseCall {
 public:
     FFICall(ParametrizedCall* parametrizedCall): BaseCall(nullptr) {
         this->returnOffset_ = parametrizedCall->ReturnOffset;
-        this->buffer_ = reinterpret_cast<uint8_t*>(malloc(parametrizedCall->StackSize));
+        this->useDynamicBuffer_ = parametrizedCall->StackSize > 512;
+        if(this->useDynamicBuffer_) {
+            this->buffer_ = reinterpret_cast<uint8_t*>(malloc(parametrizedCall->StackSize));
+        } else {
+            this->buffer_ = reinterpret_cast<uint8_t*>(this->staticBuffer);
+        }
 
         this->argsArray_ = reinterpret_cast<void**>(this->buffer_);
         for (size_t i = 0; i < parametrizedCall->Cif->nargs; i++) {
@@ -81,23 +86,27 @@ public:
     }
 
     ~FFICall() {
-        free(this->buffer_);
+        if(this->useDynamicBuffer_) {
+          free(this->buffer_);
+        }
     }
 
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding, bool isStructMember = false);
     static StructInfo GetStructInfo(const StructMeta* structMeta, std::string structName = "");
     static StructInfo GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldEncoding, const String* fieldNames, std::string structName = "");
 
-    void* ArgumentBuffer(unsigned index) {
+    inline void* ArgumentBuffer(unsigned index) {
         return this->argsArray_[index];
     }
 
-    void** ArgsArray() {
+    inline void** ArgsArray() {
         return this->argsArray_;
     }
 private:
     static robin_hood::unordered_map<std::string, StructInfo> structInfosCache_;
     void** argsArray_;
+    bool useDynamicBuffer_;
+    uint8_t staticBuffer[512];
 };
 
 }

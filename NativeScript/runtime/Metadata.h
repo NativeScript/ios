@@ -4,6 +4,8 @@
 #include <stack>
 #include <string>
 #include <type_traits>
+#include <thread>
+#include <mutex>
 #include "robin_hood.h"
 #include <map>
 #include <set>
@@ -356,29 +358,29 @@ template <typename T>
 struct PtrTo {
     int32_t offset;
 
-    bool isNull() const {
+    inline bool isNull() const {
         return offset == 0;
     }
-    PtrTo<T> operator+(int value) const {
+    inline PtrTo<T> operator+(int value) const {
         return add(value);
     }
-    const T* operator->() const {
+    inline const T* operator->() const {
         return valuePtr();
     }
-    PtrTo<T> add(int value) const {
+    inline PtrTo<T> add(int value) const {
         return PtrTo<T>{ .offset = this->offset + value * sizeof(T) };
     }
-    PtrTo<T> addBytes(int bytes) const {
+    inline PtrTo<T> addBytes(int bytes) const {
         return PtrTo<T>{ .offset = this->offset + bytes };
     }
     template <typename V>
-    PtrTo<V>& castTo() const {
+    inline PtrTo<V>& castTo() const {
         return reinterpret_cast<PtrTo<V>>(this);
     }
-    const T* valuePtr() const {
+    inline const T* valuePtr() const {
         return isNull() ? nullptr : reinterpret_cast<const T*>(tns::offset(MetaFile::instance()->heap(), this->offset));
     }
-    const T& value() const {
+    inline const T& value() const {
         return *valuePtr();
     }
 };
@@ -559,7 +561,7 @@ private:
     uint8_t _introduced;
 
 public:
-    MetaType type() const {
+    inline MetaType type() const {
         return (MetaType)(this->_flags & MetaTypeMask);
     }
 
@@ -588,38 +590,38 @@ public:
         }
     }
     
-    const ModuleMeta* topLevelModule() const {
+    inline const ModuleMeta* topLevelModule() const {
         return this->_topLevelModule.valuePtr();
     }
 
-    bool hasName() const {
+    inline bool hasName() const {
         return this->flag(MetaFlags::HasName);
     }
 
-    bool hasDemangledName() const {
+    inline bool hasDemangledName() const {
         return this->flag(MetaFlags::HasDemangledName);
     }
 
-    bool flag(int index) const {
+    inline bool flag(int index) const {
         return (this->_flags & (1 << index)) > 0;
     }
 
-    const char* jsName() const {
+    inline const char* jsName() const {
         return this->getNameByIndex(JsName);
     }
 
-    const char* name() const {
+    inline const char* name() const {
         return this->getNameByIndex(Name);
     }
 
-    const char* demangledName() const {
+    inline const char* demangledName() const {
         return this->getNameByIndex(DemangledName);
     }
 
     /**
      * \brief The version number in which this entity was introduced.
      */
-    uint8_t introducedIn() const {
+    inline uint8_t introducedIn() const {
         return this->_introduced;
     }
 
@@ -634,7 +636,7 @@ public:
     bool isAvailable() const;
 
 private:
-    const char* getNameByIndex(enum NameIndex index) const {
+    inline const char* getNameByIndex(enum NameIndex index) const {
         int i = index;
         if (!this->hasName() && !this->hasDemangledName()) {
             return this->_names.name.valuePtr();
@@ -659,15 +661,15 @@ private:
     PtrTo<TypeEncodingsList<ArrayCount>> _fieldsEncodings;
 
 public:
-    const Array<String>& fieldNames() const {
+    inline const Array<String>& fieldNames() const {
         return _fieldsNames.value();
     }
 
-    size_t fieldsCount() const {
+    inline size_t fieldsCount() const {
         return fieldNames().count;
     }
 
-    const TypeEncodingsList<ArrayCount>* fieldsEncodings() const {
+    inline const TypeEncodingsList<ArrayCount>* fieldsEncodings() const {
         return _fieldsEncodings.valuePtr();
     }
 };
@@ -707,7 +709,7 @@ private:
     String _jsCode;
 
 public:
-    const char* jsCode() const {
+    inline const char* jsCode() const {
         return _jsCode.valuePtr();
     }
 };
@@ -718,13 +720,13 @@ private:
     PtrTo<TypeEncoding> _encoding;
 
 public:
-    const TypeEncoding* encoding() const {
+    inline const TypeEncoding* encoding() const {
         return _encoding.valuePtr();
     }
 };
 
 struct MemberMeta : Meta {
-    bool isOptional() const {
+    inline bool isOptional() const {
         return this->flag(MetaFlags::MemberIsOptional);
     }
 };
@@ -736,48 +738,61 @@ private:
     String _constructorTokens;
 
 public:
-    bool isVariadic() const {
+    inline bool isVariadic() const {
         return this->flag(MetaFlags::MethodIsVariadic);
     }
 
-    bool isVariadicNullTerminated() const {
+    inline bool isVariadicNullTerminated() const {
         return this->flag(MetaFlags::MethodIsNullTerminatedVariadic);
     }
 
-    bool hasErrorOutParameter() const {
+    inline bool hasErrorOutParameter() const {
         return this->flag(MetaFlags::MethodHasErrorOutParameter);
     }
 
-    bool isInitializer() const {
+    inline bool isInitializer() const {
         return this->flag(MetaFlags::MethodIsInitializer);
     }
 
-    bool ownsReturnedCocoaObject() const {
+    inline bool ownsReturnedCocoaObject() const {
         return this->flag(MetaFlags::MethodOwnsReturnedCocoaObject);
     }
 
-    SEL selector() const {
-        return sel_registerName(this->selectorAsString());
+    inline SEL selector() const {
+        static robin_hood::unordered_map<const MethodMeta*, SEL> methodMetaSelectorCache;
+        static std::mutex mutex;
+        std::lock_guard<std::mutex> lock(mutex);
+        SEL ret = nullptr;
+        auto it = methodMetaSelectorCache.find(this);
+        if(it != methodMetaSelectorCache.end()) {
+            return it->second;
+        }
+        auto selectorAsStr = this->selectorAsString();
+        ret = sel_registerName(selectorAsStr);
+        // save to cache
+        methodMetaSelectorCache.emplace(this, ret);
+        
+        return ret;
     }
 
     // just a more convenient way to get the selector of method
-    const char* selectorAsString() const {
+    inline const char* selectorAsString() const {
         return this->name();
     }
 
-    const TypeEncodingsList<ArrayCount>* encodings() const {
+    inline const TypeEncodingsList<ArrayCount>* encodings() const {
         return this->_encodings.valuePtr();
     }
 
-    const char* constructorTokens() const {
+    inline const char* constructorTokens() const {
         return this->_constructorTokens.valuePtr();
     }
 
     bool isImplementedInClass(Class klass, bool isStatic) const;
-    bool isAvailableInClass(Class klass, bool isStatic) const {
+    inline bool isAvailableInClass(Class klass, bool isStatic) const {
         return this->isAvailable() && this->isImplementedInClass(klass, isStatic);
     }
-    bool isAvailableInClasses(KnownUnknownClassPair klasses, bool isStatic) const {
+    inline bool isAvailableInClasses(KnownUnknownClassPair klasses, bool isStatic) const {
         return this->isAvailableInClass(klasses.known, isStatic) || (klasses.unknown != nullptr && this->isAvailableInClass(klasses.unknown, isStatic));
     }
 };
@@ -791,33 +806,33 @@ struct PropertyMeta : MemberMeta {
     PtrTo<MethodMeta> method2;
 
 public:
-    bool hasGetter() const {
+    inline bool hasGetter() const {
         return this->flag(MetaFlags::PropertyHasGetter);
     }
 
-    bool hasSetter() const {
+    inline bool hasSetter() const {
         return this->flag(MetaFlags::PropertyHasSetter);
     }
 
-    const MethodMeta* getter() const {
+    inline const MethodMeta* getter() const {
         return this->hasGetter() ? method1.valuePtr() : nullptr;
     }
 
-    const MethodMeta* setter() const {
+    inline const MethodMeta* setter() const {
         return (this->hasSetter()) ? (this->hasGetter() ? method2.valuePtr() : method1.valuePtr()) : nullptr;
     }
 
-    bool isImplementedInClass(Class klass, bool isStatic) const {
+    inline bool isImplementedInClass(Class klass, bool isStatic) const {
         bool getterAvailable = this->hasGetter() && this->getter()->isImplementedInClass(klass, isStatic);
         bool setterAvailable = this->hasSetter() && this->setter()->isImplementedInClass(klass, isStatic);
         return getterAvailable || setterAvailable;
     }
 
-    bool isAvailableInClass(Class klass, bool isStatic) const {
+    inline bool isAvailableInClass(Class klass, bool isStatic) const {
         return this->isAvailable() && this->isImplementedInClass(klass, isStatic);
     }
 
-    bool isAvailableInClasses(KnownUnknownClassPair klasses, bool isStatic) const {
+    inline bool isAvailableInClasses(KnownUnknownClassPair klasses, bool isStatic) const {
         return this->isAvailableInClass(klasses.known, isStatic) || (klasses.unknown != nullptr && this->isAvailableInClass(klasses.unknown, isStatic));
     }
 };
