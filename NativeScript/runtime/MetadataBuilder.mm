@@ -757,7 +757,7 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property, con
     std::vector<StructField> fields = structInfo.Fields();
     auto it = std::find_if(fields.begin(), fields.end(), [&propertyName](StructField &f) { return f.Name() == propertyName; });
     if (it == fields.end()) {
-        info.GetReturnValue().Set(v8::Undefined(isolate));
+        info.GetReturnValue().SetUndefined();
         return;
     }
 
