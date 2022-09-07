@@ -52,7 +52,15 @@ public:
     static std::shared_ptr<ConcurrentMap<std::string, const Meta*>> Metadata;
     static std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> Workers;
 
-    static std::shared_ptr<Caches> Get(v8::Isolate* isolate);
+    inline static std::shared_ptr<Caches> Get(v8::Isolate* isolate) {
+        std::shared_ptr<Caches> cache = perIsolateCaches_->Get(isolate);
+        if (cache == nullptr) {
+            cache = std::make_shared<Caches>(isolate);
+            Caches::perIsolateCaches_->Insert(isolate, cache);
+        }
+
+        return cache;
+    }
     static void Remove(v8::Isolate* isolate);
 
     void SetContext(v8::Local<v8::Context> context);

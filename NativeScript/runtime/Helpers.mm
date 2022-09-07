@@ -22,75 +22,12 @@ namespace {
     uint8_t* BinBuffer = new uint8_t[BUFFER_SIZE];
 }
 
-Local<String> tns::ToV8String(Isolate* isolate, std::string value) {
-    return v8::String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal, (int)value.length()).ToLocalChecked();
-}
-
-std::string tns::ToString(Isolate* isolate, const Local<Value>& value) {
-    if (value.IsEmpty()) {
-        return std::string();
-    }
-
-    if (value->IsStringObject()) {
-        Local<v8::String> obj = value.As<StringObject>()->ValueOf();
-        return tns::ToString(isolate, obj);
-    }
-
-    v8::String::Utf8Value result(isolate, value);
-
-    const char* val = *result;
-    if (val == nullptr) {
-        return std::string();
-    }
-
-    return std::string(*result);
-}
-
 std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
     std::string valueStr = tns::ToString(isolate, value);
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
     std::u16string value16 = convert.from_bytes(valueStr);
 
     return value16;
-}
-
-double tns::ToNumber(Isolate* isolate, const Local<Value>& value) {
-    double result = NAN;
-
-    if (value.IsEmpty()) {
-        return result;
-    }
-
-    if (value->IsNumberObject()) {
-        result = value.As<NumberObject>()->ValueOf();
-    } else if (value->IsNumber()) {
-        result = value.As<Number>()->Value();
-    } else {
-        Local<Number> number;
-        Local<Context> context = isolate->GetCurrentContext();
-        bool success = value->ToNumber(context).ToLocal(&number);
-        if (success) {
-            result = number->Value();
-        }
-    }
-
-    return result;
-}
-
-bool tns::ToBool(const Local<Value>& value) {
-    bool result = false;
-
-    if (value.IsEmpty()) {
-        return result;
-    }
-
-    if (value->IsBooleanObject()) {
-        result = value.As<BooleanObject>()->ValueOf();
-    } else if (value->IsBoolean()) {
-        result = value.As<v8::Boolean>()->Value();
-    }
-
-    return result;
 }
 
 std::vector<uint16_t> tns::ToVector(const std::string& value) {

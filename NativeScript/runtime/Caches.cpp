@@ -23,16 +23,6 @@ Caches::~Caches() {
     this->PointerInstances.clear();
 }
 
-std::shared_ptr<Caches> Caches::Get(Isolate* isolate) {
-    std::shared_ptr<Caches> cache = perIsolateCaches_->Get(isolate);
-    if (cache == nullptr) {
-        cache = std::make_shared<Caches>(isolate);
-        Caches::perIsolateCaches_->Insert(isolate, cache);
-    }
-
-    return cache;
-}
-
 void Caches::Remove(v8::Isolate* isolate) {
     Caches::perIsolateCaches_->Remove(isolate);
 }
