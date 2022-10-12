@@ -249,7 +249,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
         if (type == BinaryTypeEncodingType::IdEncoding ||
             type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             std::string strValue = tns::ToString(isolate, value);
-            id data = [NSString stringWithUTF8String:strValue.c_str()];
+            id data = [[NSString alloc] initWithBytes:strValue.c_str() length:strValue.length() encoding:NSUTF8StringEncoding];
             *(CFTypeRef*)retValue = CFBridgingRetain(data);
             return;
         }
