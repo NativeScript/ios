@@ -163,7 +163,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
             void* errorParam = argValues[errorParamIndex];
             NSError*__strong** outPtr = static_cast<NSError*__strong**>(errorParam);
             if (outPtr && *outPtr) {
-                NSError* error = [NSError errorWithDomain:@"TNSErrorDomain" code:164 userInfo:@{ @"TNSJavaScriptError": [NSString stringWithUTF8String:message.c_str()] }];
+                NSError* error = [NSError errorWithDomain:@"TNSErrorDomain" code:164 userInfo:@{ @"TNSJavaScriptError": tns::ToNSString(message) }];
                 **static_cast<NSError*__strong**>(outPtr) = error;
             }
         }
@@ -248,8 +248,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
     } else if (value->IsString()) {
         if (type == BinaryTypeEncodingType::IdEncoding ||
             type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-            std::string strValue = tns::ToString(isolate, value);
-            id data = [[NSString alloc] initWithBytes:strValue.c_str() length:strValue.length() encoding:NSUTF8StringEncoding];
+            id data = tns::ToNSString(isolate, value);
             *(CFTypeRef*)retValue = CFBridgingRetain(data);
             return;
         }

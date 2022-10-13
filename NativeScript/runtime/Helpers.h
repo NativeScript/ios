@@ -15,9 +15,38 @@ extern "C" void NSLog(CFStringRef format, ...);
 
 namespace tns {
 
-inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, std::string value) {
+inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,const std::string& value) {
     return v8::String::NewFromUtf8(isolate, value.c_str(), v8::NewStringType::kNormal, (int)value.length()).ToLocalChecked();
 }
+#ifdef __OBJC__
+inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,const NSString* value) {
+    /*
+     // TODO: profile if this is faster
+     // maybe have multiple conversion
+     if([value fastestEncoding] == NSUTF16StringEncoding) {
+        uint16_t static_buffer[256];
+        uint16_t* targetBuffer = static_buffer;
+        bool isDynamic = false;
+        auto length = [value maximumLengthOfBytesUsingEncoding:NSUTF16StringEncoding];
+        auto numberOfBytes = length * sizeof(uint16_t);
+        if (length > 256) {
+            targetBuffer = (uint16_t*)malloc(numberOfBytes);
+            isDynamic = true;
+        }
+        NSUInteger usedLength = 0;
+        NSRange range = NSMakeRange(0, [value length]);
+        [value getBytes:targetBuffer maxLength:numberOfBytes usedLength:&usedLength encoding:NSUTF16StringEncoding options:0 range:range remainingRange:NULL];
+        
+        auto result = v8::String::NewFromTwoByte(isolate, targetBuffer, v8::NewStringType::kNormal, (int)[value length]).ToLocalChecked();
+        if (isDynamic) {
+            free(targetBuffer);
+        }
+        return result;
+    }
+     */
+    return v8::String::NewFromUtf8(isolate, [value UTF8String], v8::NewStringType::kNormal, (int)[value lengthOfBytesUsingEncoding:NSUTF8StringEncoding]).ToLocalChecked();
+}
+#endif
 inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
     if (value.IsEmpty()) {
         return std::string();
@@ -35,8 +64,34 @@ inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& va
         return std::string();
     }
 
-    return std::string(*result);
+    return std::string(*result, result.length());
 }
+
+#ifdef __OBJC__
+inline NSString* ToNSString(const std::string& v) {
+    return [[NSString alloc] initWithBytes:v.c_str() length:v.length() encoding:NSUTF8StringEncoding];
+}
+// this method is a copy of ToString to avoid needless std::string<->NSString conversions
+inline NSString* ToNSString(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
+    if (value.IsEmpty()) {
+        return @"";
+    }
+
+    if (value->IsStringObject()) {
+        v8::Local<v8::String> obj = value.As<v8::StringObject>()->ValueOf();
+        return ToNSString(isolate, obj);
+    }
+
+    v8::String::Utf8Value result(isolate, value);
+
+    const char* val = *result;
+    if (val == nullptr) {
+        return @"";
+    }
+
+    return [[NSString alloc] initWithBytes:*result length:result.length() encoding:NSUTF8StringEncoding];
+}
+#endif
 std::u16string ToUtf16String(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
 inline double ToNumber(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
     double result = NAN;

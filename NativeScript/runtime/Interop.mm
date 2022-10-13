@@ -265,8 +265,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         unichar c = (vector.size() == 0) ? 0 : vector[0];
         Interop::SetValue(dest, c);
     } else if (argHelper.isString() && (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference || typeEncoding->type == BinaryTypeEncodingType::IdEncoding)) {
-        std::string str = tns::ToString(isolate, arg);
-        NSString* result = [NSString stringWithUTF8String:str.c_str()];
+        NSString* result = tns::ToNSString(isolate, arg);
         Interop::SetValue(dest, result);
     } else if (Interop::IsNumbericType(typeEncoding->type) || tns::IsNumber(arg)) {
         double value = tns::ToNumber(isolate, arg);
@@ -603,8 +602,7 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
     if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
         return nil;
     } else if (tns::IsString(arg)) {
-        std::string value = tns::ToString(isolate, arg);
-        NSString* result = [NSString stringWithUTF8String:value.c_str()];
+        NSString* result = tns::ToNSString(isolate, arg);
         return result;
     } else if (tns::IsNumber(arg)) {
         double value = tns::ToNumber(isolate, arg);
@@ -1092,8 +1090,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
             if (marshalToPrimitive) {
                 // Convert NSString instances to javascript strings for all instance method calls
-                const char* str = [result UTF8String];
-                return tns::ToV8String(isolate, str);
+                return tns::ToV8String(isolate, result);
             }
         }
 
