@@ -17,6 +17,27 @@ describe(module.id, function () {
         var str = NSString.alloc().initWithString('hello hello');
         expect(str.isKindOfClass(NSString)).toBe(true);
     });
+    
+    it("Marshals NSString with null character", function() {
+        var JSObject = NSObject.extend({
+            'x': function () {
+                return this._x;
+            }, 'setX:': function (x) {
+                this._x = x;
+            }
+        }, {
+            exposedMethods: {
+                x: { returns: NSString },
+                'setX:': { returns: interop.types.void, params: [NSString] }
+            }
+        });
+
+        const data = 'null coming up: ' + String.fromCharCode(0) + ' and extra';
+
+        var instance = JSObject.alloc().init();
+        instance.setValueForKey(data, 'x');
+        expect(instance.valueForKey('x')).toBe(data);
+    });
 
     it("String", function () {
         var str = NSString.string();
