@@ -46,8 +46,7 @@ using namespace tns;
         bool success = array->Get(context, self->index_).ToLocal(&key);
         tns::Assert(success, isolate);
         self->index_ += 2;
-        std::string keyStr = tns::ToString(self->isolate_, key);
-        NSString* result = [NSString stringWithUTF8String:keyStr.c_str()];
+        NSString* result = tns::ToNSString(self->isolate_, key);
         return result;
     }
 
