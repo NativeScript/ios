@@ -79,7 +79,7 @@ Isolate* Runtime::CreateIsolate() {
 }
 
 void Runtime::Init(Isolate* isolate) {
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    std::shared_ptr<Caches> cache = Caches::Init(isolate);
     cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
     cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
 
