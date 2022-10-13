@@ -52,14 +52,20 @@ public:
     static std::shared_ptr<ConcurrentMap<std::string, const Meta*>> Metadata;
     static std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> Workers;
 
-    inline static std::shared_ptr<Caches> Get(v8::Isolate* isolate) {
-        std::shared_ptr<Caches> cache = perIsolateCaches_->Get(isolate);
-        if (cache == nullptr) {
-            cache = std::make_shared<Caches>(isolate);
-            Caches::perIsolateCaches_->Insert(isolate, cache);
-        }
-
+    inline static std::shared_ptr<Caches> Init(v8::Isolate* isolate) {
+        auto cache = std::make_shared<Caches>(isolate);
+        // create a new shared_ptr that will live until Remove is called
+        isolate->SetData(0, static_cast<void*>(new std::shared_ptr<Caches>(cache)));
         return cache;
+    }
+    inline static std::shared_ptr<Caches> Get(v8::Isolate* isolate) {
+        auto cache = isolate->GetData(0);
+        if (cache != nullptr) {
+            return *reinterpret_cast<std::shared_ptr<Caches>*>(cache);
+        }
+        // this should only happen when an isolate is accessed after disposal
+        // so we return a dummy cache
+        return std::make_shared<Caches>(isolate);
     }
     static void Remove(v8::Isolate* isolate);
 
@@ -96,7 +102,6 @@ public:
     std::unique_ptr<v8::Persistent<v8::Function>> FunctionReferenceCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
     std::unique_ptr<v8::Persistent<v8::Function>> UnmanagedTypeCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 private:
-    static std::shared_ptr<ConcurrentMap<v8::Isolate*, std::shared_ptr<Caches>>> perIsolateCaches_;
     v8::Isolate* isolate_;
     std::shared_ptr<v8::Persistent<v8::Context>> context_;
 };
