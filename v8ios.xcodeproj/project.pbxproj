@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
+		3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CEF9CCC28F896B70056BA45 /* SpinLock.h */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
 		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C20525A82577D86600C12A5C /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
@@ -541,6 +542,7 @@
 /* Begin PBXFileReference section */
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
+		3CEF9CCC28F896B70056BA45 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SpinLock.h; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
 		C20525A72577D86600C12A5C /* TNSWidgets.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = TNSWidgets.xcframework; sourceTree = "<group>"; };
 		C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OneByteStringResource.cpp; sourceTree = "<group>"; };
@@ -1933,6 +1935,7 @@
 				C2D215FE248AAAD900EDC646 /* Constants.cpp */,
 				C275F476253B37AB00A997D5 /* UnmanagedType.h */,
 				C275F475253B37AB00A997D5 /* UnmanagedType.mm */,
+				3CEF9CCC28F896B70056BA45 /* SpinLock.h */,
 			);
 			path = runtime;
 			sourceTree = "<group>";
@@ -2065,6 +2068,7 @@
 				C247C3AA22F828E3001D2CA2 /* once.h in Headers */,
 				C247C3A822F828E3001D2CA2 /* lazy-instance.h in Headers */,
 				C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */,
+				3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */,
 				C247C36922F828E3001D2CA2 /* Security.h in Headers */,
 				C247C33822F828E3001D2CA2 /* v8.h in Headers */,
 				C247C3A722F828E3001D2CA2 /* atomicops.h in Headers */,

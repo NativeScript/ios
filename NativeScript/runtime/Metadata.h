@@ -11,6 +11,7 @@
 #include <set>
 #include <vector>
 #include "KnownUnknownClassPair.h"
+#include "SpinLock.h"
 
 namespace tns {
 
@@ -760,8 +761,11 @@ public:
 
     inline SEL selector() const {
         static robin_hood::unordered_map<const MethodMeta*, SEL> methodMetaSelectorCache;
-        static std::mutex mutex;
-        std::lock_guard<std::mutex> lock(mutex);
+        // this method takes a few ns to run and is almost never called by another thread
+        // this means that locking a mutex is almost always unecessary so we use a spinlock
+        // that will most likely never spin
+        static SpinMutex p;
+        SpinLock lock(p);
         SEL ret = nullptr;
         auto it = methodMetaSelectorCache.find(this);
         if(it != methodMetaSelectorCache.end()) {
