@@ -1411,22 +1411,18 @@ Local<v8::Array> Interop::ToArray(Local<Object> object) {
 
 SEL Interop::GetSwizzledMethodSelector(SEL selector) {
     static robin_hood::unordered_map<SEL, SEL> swizzledMethodSelectorCache;
-    static std::mutex mutex;
-    std::lock_guard<std::mutex> lock(mutex);
-
-    SEL swizzledMethodSelector = NULL;
+    static SpinMutex p;
+    SpinLock lock(p);
     
-    try {
-        swizzledMethodSelector = swizzledMethodSelectorCache.at(selector);
-    } catch(const std::out_of_range&) {
-        // ignore...
+    auto it = swizzledMethodSelectorCache.find(selector);
+    if (it != swizzledMethodSelectorCache.end()) {
+        return it->second;
     }
+    SEL swizzledMethodSelector = NULL;
 
-    if(!swizzledMethodSelector) {
-        swizzledMethodSelector = sel_registerName((Constants::SwizzledPrefix + std::string(sel_getName(selector))).c_str());
-        // save to cache
-        swizzledMethodSelectorCache.emplace(selector, swizzledMethodSelector);
-    }
+    swizzledMethodSelector = sel_registerName((Constants::SwizzledPrefix + std::string(sel_getName(selector))).c_str());
+    // save to cache
+    swizzledMethodSelectorCache.emplace(selector, swizzledMethodSelector);
     
     return swizzledMethodSelector;
 }
