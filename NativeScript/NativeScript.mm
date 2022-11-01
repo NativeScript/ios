@@ -1,6 +1,5 @@
 #include <Foundation/Foundation.h>
 #include "NativeScript.h"
-#include "inspector/JsV8InspectorClient.h"
 #include "runtime/RuntimeConfig.h"
 #include "runtime/Helpers.h"
 #include "runtime/Runtime.h"
@@ -44,15 +43,6 @@ std::unique_ptr<Runtime> runtime_;
         std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
         printf("Runtime initialization took %llims\n", duration);
-
-        if (config.IsDebug) {
-            Isolate::Scope isolate_scope(isolate);
-            HandleScope handle_scope(isolate);
-            v8_inspector::JsV8InspectorClient* inspectorClient = new v8_inspector::JsV8InspectorClient(runtime_.get());
-            inspectorClient->init();
-            inspectorClient->registerModules();
-            inspectorClient->connect([config ArgumentsCount], [config Arguments]);
-        }
     }
     
     return self;

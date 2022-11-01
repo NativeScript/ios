@@ -4,7 +4,7 @@
 #include <iomanip>
 #include "Helpers.h"
 #include "RuntimeConfig.h"
-#include "v8-log-agent-impl.h"
+#include <sstream>
 
 using namespace v8;
 
@@ -59,7 +59,6 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     std::string msgToLog = ss.str();
 
     std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
-    v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
     std::string msgWithVerbosity = "CONSOLE " + verbosityLevelUpper + ": " + msgToLog;
     Log("%s", msgWithVerbosity.c_str());
 }
@@ -85,7 +84,6 @@ void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
         }
 
         std::string log = ss.str();
-        v8_inspector::V8LogAgentImpl::EntryAdded(log, "error", "", 0);
         Log("%s", log.c_str());
     }
 }
@@ -160,7 +158,6 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
     Local<v8::String> data = args.Data().As<v8::String>();
     std::string verbosityLevel = tns::ToString(isolate, data);
     std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
-    v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
     Log("%s", msgToLog.c_str());
 }
 
@@ -224,7 +221,6 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
     std::string verbosityLevel = tns::ToString(isolate, data);
     std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
     std::string msgToLog = ss.str();
-    v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
     Log("%s", msgToLog.c_str());
 }
 
