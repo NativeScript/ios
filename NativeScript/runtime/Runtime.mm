@@ -15,6 +15,7 @@
 #include "TSHelpers.h"
 #include "WeakRef.h"
 #include "Worker.h"
+#include "SnapshotBlob.h"
 // #include "SetTimeout.h"
 
 #define STRINGIZE(x) #x
@@ -22,8 +23,6 @@
 
 using namespace v8;
 using namespace std;
-
-#include "v8-inspector-platform.h"
 
 namespace tns {
 
@@ -57,9 +56,11 @@ Runtime::~Runtime() {
 
 Isolate* Runtime::CreateIsolate() {
     if (!mainThreadInitialized_) {
-        Runtime::platform_ = RuntimeConfig.IsDebug
-            ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
-            : platform::NewDefaultPlatform();
+        // Runtime::platform_ = RuntimeConfig.IsDebug
+        //     ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
+        //     : platform::NewDefaultPlatform();
+        
+        Runtime::platform_ = platform::NewDefaultPlatform();
 
         V8::InitializePlatform(Runtime::platform_.get());
         V8::Initialize();
@@ -68,9 +69,15 @@ Isolate* Runtime::CreateIsolate() {
             : "--expose_gc --jitless --no-lazy";
         V8::SetFlagsFromString(flags.c_str(), flags.size());
     }
+    
+    // auto version = v8::V8::GetVersion();
 
     Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = &allocator_;
+    StartupData* sd = new StartupData();
+    sd->data = reinterpret_cast<const char*>(&snapshot_blob_bin[0]);
+    sd->raw_size = snapshot_blob_bin_len;
+    create_params.snapshot_blob = sd;
     Isolate* isolate = Isolate::New(create_params);
 
     Runtime::isolates_.emplace_back(isolate);
