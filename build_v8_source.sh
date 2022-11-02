@@ -13,7 +13,7 @@ do
     TARGET_ENV=${ARCH_PARTS[1]}
     echo "Building for $OUTFOLDER ($TARGET_ENV)"
     ARCH=${ARCH_PARTS[0]}
-    gn gen $OUTFOLDER --args="v8_enable_webassembly=false treat_warnings_as_errors=false v8_enable_pointer_compression=false is_official_build=true use_custom_libcxx=false is_component_build=false symbol_level=0 v8_enable_v8_checks=false v8_enable_debugging_features=false is_debug=false v8_use_external_startup_data=false use_xcode_clang=true enable_ios_bitcode=true v8_enable_i18n_support=false target_environment=\"$TARGET_ENV\" target_cpu=\"$ARCH\" v8_target_cpu=\"$ARCH\" target_os=\"ios\" ios_deployment_target=\"9.0\""
+    gn gen $OUTFOLDER --args="v8_enable_webassembly=false treat_warnings_as_errors=false v8_enable_pointer_compression=false is_official_build=true use_custom_libcxx=false is_component_build=false symbol_level=0 v8_enable_v8_checks=false v8_enable_debugging_features=false is_debug=false v8_use_external_startup_data=false use_xcode_clang=true enable_ios_bitcode=true v8_enable_i18n_support=false target_environment=\"$TARGET_ENV\" target_cpu=\"$ARCH\" v8_target_cpu=\"$ARCH\" target_os=\"ios\" ios_deployment_target=\"13.0\""
     ninja -C $OUTFOLDER ${MODULES[@]} inspector
 
     for MODULE in ${MODULES[@]}
