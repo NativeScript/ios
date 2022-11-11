@@ -23,8 +23,6 @@
 using namespace v8;
 using namespace std;
 
-#include "v8-inspector-platform.h"
-
 namespace tns {
 
 SimpleAllocator allocator_;
@@ -57,9 +55,11 @@ Runtime::~Runtime() {
 
 Isolate* Runtime::CreateIsolate() {
     if (!mainThreadInitialized_) {
-        Runtime::platform_ = RuntimeConfig.IsDebug
-            ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
-            : platform::NewDefaultPlatform();
+        // Runtime::platform_ = RuntimeConfig.IsDebug
+        //     ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
+        //     : platform::NewDefaultPlatform();
+        
+        Runtime::platform_ = platform::NewDefaultPlatform();
 
         V8::InitializePlatform(Runtime::platform_.get());
         V8::Initialize();
@@ -68,6 +68,8 @@ Isolate* Runtime::CreateIsolate() {
             : "--expose_gc --jitless --no-lazy";
         V8::SetFlagsFromString(flags.c_str(), flags.size());
     }
+    
+    // auto version = v8::V8::GetVersion();
 
     Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = &allocator_;
