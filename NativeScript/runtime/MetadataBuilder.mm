@@ -346,6 +346,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     Local<v8::Function> ctorFunc;
     bool success = ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc);
     tns::Assert(success, isolate);
+    
+    cache->CtorFuncTemplates.emplace(meta, std::make_unique<Persistent<FunctionTemplate>>(isolate, ctorFuncTemplate));
 
     if (meta->type() == MetaType::ProtocolType) {
         const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
@@ -362,7 +364,9 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     }
 
     Local<Object> global = context->Global();
-    success = global->Set(context, tns::ToV8String(isolate, meta->jsName()), ctorFunc).FromMaybe(false);
+    auto jsNameV8String = tns::ToV8String(isolate, meta->jsName());
+    auto maybeSet = global->Set(context, jsNameV8String, ctorFunc);
+    success = maybeSet.FromMaybe(false);
     tns::Assert(success, isolate);
 
     if (!baseCtorFunc.IsEmpty()) {
@@ -375,8 +379,6 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     MetadataBuilder::RegisterStaticMethods(context, ctorFunc, meta, pair, staticMembers);
     MetadataBuilder::RegisterStaticProperties(context, ctorFunc, meta, meta->name(), pair, staticMembers);
     MetadataBuilder::RegisterStaticProtocols(context, ctorFunc, meta, meta->name(), pair, staticMembers);
-
-    cache->CtorFuncTemplates.emplace(meta, std::make_unique<Persistent<FunctionTemplate>>(isolate, ctorFuncTemplate));
 
     Local<Value> prototypeValue;
     success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
