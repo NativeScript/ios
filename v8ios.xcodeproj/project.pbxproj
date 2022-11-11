@@ -34,6 +34,7 @@
 		6573B9EA291FE2A700B0ED7C /* jsilib.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9E1291FE2A700B0ED7C /* jsilib.h */; };
 		6573B9ED291FE5B700B0ED7C /* JSIRuntime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9EB291FE5B700B0ED7C /* JSIRuntime.h */; };
 		6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9EC291FE5B700B0ED7C /* JSIRuntime.m */; };
+		9160C065291ED41F000641C0 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 9160C064291ED41F000641C0 /* SpinLock.h */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
 		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C20525A82577D86600C12A5C /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
@@ -433,6 +434,7 @@
 		6573B9E1291FE2A700B0ED7C /* jsilib.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = jsilib.h; sourceTree = "<group>"; };
 		6573B9EB291FE5B700B0ED7C /* JSIRuntime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JSIRuntime.h; sourceTree = "<group>"; };
 		6573B9EC291FE5B700B0ED7C /* JSIRuntime.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; path = JSIRuntime.m; sourceTree = "<group>"; };
+		9160C064291ED41F000641C0 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SpinLock.h; path = NativeScript/runtime/SpinLock.h; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
 		C20525A72577D86600C12A5C /* TNSWidgets.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = TNSWidgets.xcframework; sourceTree = "<group>"; };
 		C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OneByteStringResource.cpp; sourceTree = "<group>"; };
@@ -971,6 +973,7 @@
 		C27E277722202663009C10A3 = {
 			isa = PBXGroup;
 			children = (
+				9160C064291ED41F000641C0 /* SpinLock.h */,
 				C2DDEB33229EAB3B00345BFE /* NativeScript */,
 				C2DDEB17229EA89000345BFE /* TestRunner */,
 				C23992C8236C2D6E00D2F720 /* TestRunnerTests */,
@@ -1420,6 +1423,8 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
+				9160C065291ED41F000641C0 /* SpinLock.h in Headers */,
 				C2A5DEC82327DCF600A91A76 /* NativeScript.h in Headers */,
 				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
