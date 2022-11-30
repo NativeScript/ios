@@ -1,3 +1,25 @@
+# [8.4.0](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.3.3...v8.4.0) (2022-11-30)
+
+
+### Bug Fixes
+
+* **string:** initWithBytes instead of UTF8 string ([b72dcf6](https://github.com/NativeScript/ns-v8ios-runtime/commit/b72dcf626333a1dcdf21d092b5422b78953a7817))
+* support null characters on NSString marshalling ([705346f](https://github.com/NativeScript/ns-v8ios-runtime/commit/705346fb0a8c770cc2f59bf73d10342a8e2cacbb))
+
+
+### Features
+
+* drop perIsolateCaches_ in favor of v8 data slots ([44daeb3](https://github.com/NativeScript/ns-v8ios-runtime/commit/44daeb3c21ea0d7f678197a2c2444f972585e6cf))
+* inline frequently used methods, add caches, thread safety, and use static allocation when possible ([44e60d0](https://github.com/NativeScript/ns-v8ios-runtime/commit/44e60d00b86d5fe61f716b099a58d0fea36e2018))
+* use spinlocks for selector maps ([c5a8863](https://github.com/NativeScript/ns-v8ios-runtime/commit/c5a886332b13ab6dae798880b82b256a0339351c))
+
+
+### Performance Improvements
+
+* use fast primitive setters ([#181](https://github.com/NativeScript/ns-v8ios-runtime/issues/181)) ([47c63b0](https://github.com/NativeScript/ns-v8ios-runtime/commit/47c63b03360dde6e8040b1890f7e49055466d695))
+
+
+
 ## [8.3.3](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.3.2...v8.3.3) (2022-08-13)
 
 
