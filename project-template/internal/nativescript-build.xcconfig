@@ -22,6 +22,5 @@ LDPLUSPLUS = $SRCROOT/internal/nsld.sh
 EXCLUDED_ARCHS_x86_64 = arm64 arm64e
 EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386 armv6 armv7 armv7s armv8 $(EXCLUDED_ARCHS_$(NATIVE_ARCH_64_BIT))
 EXCLUDED_ARCHS[sdk=iphoneos*] = i386 armv6 armv7 armv7s armv8 x86_64
+EXCLUDED_ARCHS[sdk=macosx*] = i386 armv6 armv7 armv7s armv8
 VALIDATE_WORKSPACE = YES
-
-VALID_ARCHS[sdk=macosx*] = arm64
