@@ -56,11 +56,16 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
         Local<v8::String> messageV8String = message->Get();
         std::string messageString = tns::ToString(isolate, messageV8String);
         NSString* name = [NSString stringWithFormat:@"NativeScript encountered a fatal error: %s\n at \n%s", messageString.c_str(), stackTrace.c_str()];
-        NSException* objcException = [NSException exceptionWithName:name reason:nil userInfo:@{ @"sender": @"onUncaughtError" }];
+        // we throw the exception on main thread
+        // otherwise it seems that when getting NSException info from NSSetUncaughtExceptionHandler
+        // we are missing almost all data. No explanation for why yet
+        dispatch_async(dispatch_get_main_queue(), ^(void) {
+          NSException* objcException = [NSException exceptionWithName:name reason:nil userInfo:@{ @"sender": @"onUncaughtError" }];
 
-        NSLog(@"***** Fatal JavaScript exception - application has been terminated. *****\n");
-        NSLog(@"%@", [objcException description]);
-        @throw objcException;
+          NSLog(@"***** Fatal JavaScript exception - application has been terminated. *****\n");
+          NSLog(@"%@", [objcException description]);
+          @throw objcException;
+        });
     } else {
         NSLog(@"NativeScript discarding uncaught JS exception!");
     }
