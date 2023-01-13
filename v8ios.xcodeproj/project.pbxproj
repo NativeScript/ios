@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
+		3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CBFF7432971C1C200C5DE36 /* ArcMacro.h */; };
 		3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CEF9CCC28F896B70056BA45 /* SpinLock.h */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
 		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -542,6 +543,7 @@
 /* Begin PBXFileReference section */
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
+		3CBFF7432971C1C200C5DE36 /* ArcMacro.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArcMacro.h; sourceTree = "<group>"; };
 		3CEF9CCC28F896B70056BA45 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SpinLock.h; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
 		C20525A72577D86600C12A5C /* TNSWidgets.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = TNSWidgets.xcframework; sourceTree = "<group>"; };
@@ -1852,6 +1854,7 @@
 			isa = PBXGroup;
 			children = (
 				C2DDEB66229EAC8100345BFE /* ArgConverter.h */,
+				3CBFF7432971C1C200C5DE36 /* ArcMacro.h */,
 				C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */,
 				C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */,
 				C2DDEB7A229EAC8200345BFE /* ArrayAdapter.mm */,
@@ -2104,6 +2107,7 @@
 				C247C33A22F828E3001D2CA2 /* conversions.h in Headers */,
 				C247C39C22F828E3001D2CA2 /* build_config.h in Headers */,
 				C247C34322F828E3001D2CA2 /* remote-object-id.h in Headers */,
+				3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */,
 				C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */,
 				C247C39822F828E3001D2CA2 /* vector.h in Headers */,
 				C247C37522F828E3001D2CA2 /* CSS.h in Headers */,

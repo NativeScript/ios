@@ -5,6 +5,7 @@
 #include <string>
 #include "Common.h"
 #include "DataWrapper.h"
+#include "ArcMacro.h"
 
 #ifdef __OBJC__
 #include <Foundation/Foundation.h>
@@ -69,7 +70,7 @@ inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& va
 
 #ifdef __OBJC__
 inline NSString* ToNSString(const std::string& v) {
-    return [[NSString alloc] initWithBytes:v.c_str() length:v.length() encoding:NSUTF8StringEncoding];
+    return [[[NSString alloc] initWithBytes:v.c_str() length:v.length() encoding:NSUTF8StringEncoding] S_AUTORELEASE];
 }
 // this method is a copy of ToString to avoid needless std::string<->NSString conversions
 inline NSString* ToNSString(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
@@ -89,7 +90,8 @@ inline NSString* ToNSString(v8::Isolate* isolate, const v8::Local<v8::Value>& va
         return @"";
     }
 
-    return [[NSString alloc] initWithBytes:*result length:result.length() encoding:NSUTF8StringEncoding];
+    return [[[NSString alloc] initWithBytes:*result length:result.length() encoding:NSUTF8StringEncoding] S_AUTORELEASE];
+    
 }
 #endif
 std::u16string ToUtf16String(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
