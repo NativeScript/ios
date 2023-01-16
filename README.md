@@ -1,6 +1,6 @@
 # Getting Started
 
-To start diving into the v8 iOS runtime make sure you have XCode and [Homebrew](https://brew.sh/) installed, and then run the following
+To start diving into the v8 iOS runtime make sure you have Xcode and [Homebrew](https://brew.sh/) installed, and then run the following
 ```bash
 # Install CMake
 brew install cmake
@@ -19,7 +19,7 @@ git submodule update --init
 # Ensure that you have the required llvm binaries for building the metadata generator
 ./download_llvm.sh
 
-# Open the runtime in XCode
+# Open the runtime in Xcode
 open v8ios.xcodeproj
 ```
 
@@ -39,20 +39,34 @@ If all tests pass, everything is good! At this point you can make changes to the
 
 # Attaching the runtime to a NativeScript app
 
-In the existing app, we need to prepare the XCode project using `ns prepare ios`. This should create a folder named `platforms/ios` and in there a `<appname>.xcworkspace` (if there is no `.xcworkspace` use the `.xcodeproj` instead). Open it in XCode and then drag the `v8ios.xcodeproj` from the `ns-v8ios-runtime` folder under the `<appname>` in the XCode sidebar.
+In the existing app, we need to prepare the Xcode project using `ns prepare ios`. This will create a folder named `platforms/ios` and in there a `<appname>.xcworkspace` (or .xcodeproject but note the following...).
+
+**IMPORTANT**: You can only attach the runtime to a `.xcworkspace` project (not a `.xcodeproj` project). If your app's platforms/ios folder does not contain a .xcworkspace file yet, you can do the following:
+
+Add a new file `App_Resources/iOS/Podfile` with the following contents: 
+
+```
+pod 'IQKeyboardManager'
+```
+
+Now `ns clean` and prepare again with `ns prepare ios`.
+This will make sure when the iOS project is generated that you end up with a .xcworkspace file so attaching the v8 runtime source works properly.
+
+You can now open the `platforms/ios/{project-name}.xcworkspace` file in Xcode and then drag the `v8ios.xcodeproj` from the root of this repo under the `<appname>` in the Xcode sidebar.
 
 <img width="941" alt="Screenshot 2020-09-09 at 18 46 18" src="https://user-images.githubusercontent.com/879060/92628228-c294c000-f2cc-11ea-8822-58df689d3cd3.png">
 
-Remove the `NativeScript.xcframework` from the General tab, as we will no longer be using the framework from node_modules and instead will use the source directly:
+Remove the `NativeScript.xcframework` and `TNSLiveSync.xcframework` from the General tab, as we will no longer be using the framework from node_modules and instead will use the source directly:
 
 <img width="693" alt="Screenshot 2020-09-09 at 18 47 23" src="https://user-images.githubusercontent.com/879060/92628311-e6f09c80-f2cc-11ea-8977-201517badc3b.png">
 
-Add the `Nativescript.framework` from the v8ios workspace (only required when running on a physical device):
+Hitting Run in Xcode should start the app in the simulator, and we can now add breakpoints to the runtime and step through it with the debugger. To apply changes to the javascript, make sure you run `ns prepare ios` to re-bundle it into the `platforms/ios` folder.
+
+## Only required when running on a physical device
+
+Add the `Nativescript.framework` from the v8ios workspace:
 
 <img width="402" alt="Screen Shot 2021-04-12 at 11 49 10 AM" src="https://user-images.githubusercontent.com/2379994/114423589-51c8c580-9b85-11eb-9d30-eb1cbf73454a.png">
-
-
-Hitting Run in XCode should start the app in the simulator, and we can now add breakpoints to the runtime and step through it with the debugger. To apply changes to the javascript, make sure you run `ns prepare ios` to re-bundle it into the `platforms/ios` folder.
 
 ## Troubleshooting
 
