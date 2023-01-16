@@ -1,3 +1,13 @@
+## [8.4.1](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.4.0...v8.4.1) (2023-01-16)
+
+
+### Bug Fixes
+
+* memory leak on new string handling ([#190](https://github.com/NativeScript/ns-v8ios-runtime/issues/190)) ([6868a7a](https://github.com/NativeScript/ns-v8ios-runtime/commit/6868a7a4c4db7d9447cd1cc457a112b88e6b2458))
+* throw NSException on main thread ([#188](https://github.com/NativeScript/ns-v8ios-runtime/issues/188)) ([d3ba48b](https://github.com/NativeScript/ns-v8ios-runtime/commit/d3ba48bec5f7b47fca4ff999fb6502640e195d27))
+
+
+
 # [8.4.0](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.3.3...v8.4.0) (2022-11-30)
 
 
