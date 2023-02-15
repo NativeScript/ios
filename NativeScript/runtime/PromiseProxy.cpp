@@ -16,21 +16,40 @@ void PromiseProxy::Init(v8::Local<v8::Context> context) {
                     let runloop = CFRunLoopGetCurrent();
 
                     let promise = new target(function(resolve, reject) {
+                        function isFulfilled() {
+                            return !resolve;
+                        }
+                        function markFulfilled() {
+                            runloop = null;
+                            origFunc = null;
+                            resolve = null;
+                            reject = null;
+                        }
                         origFunc(value => {
+                            if (isFulfilled()) {
+                                return;
+                            }
                             const resolveCall = resolve.bind(this, value);
                             if (runloop === CFRunLoopGetCurrent()) {
+                                markFulfilled();
                                 resolveCall();
                             } else {
                                 CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, resolveCall);
                                 CFRunLoopWakeUp(runloop);
+                                markFulfilled();
                             }
                         }, reason => {
+                            if (isFulfilled()) {
+                                return;
+                            }
                             const rejectCall = reject.bind(this, reason);
                             if (runloop === CFRunLoopGetCurrent()) {
+                                markFulfilled();
                                 rejectCall();
                             } else {
                                 CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, rejectCall);
                                 CFRunLoopWakeUp(runloop);
+                                markFulfilled();
                             }
                         });
                     });
