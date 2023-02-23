@@ -44,15 +44,15 @@ Runtime::Runtime() {
 }
 
 Runtime::~Runtime() {
-    auto wrapper = static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
-    auto workerIsolate = wrapper->GetWorkerIsolate();
-    Caches::Workers->ForEach([workerIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
-        auto wrapper2 = static_cast<WorkerWrapper*>(value->UserData());
-        if(wrapper2->GetMainIsolate() == workerIsolate) {
-            wrapper2->Terminate();
+    auto currentIsolate = this->isolate_;
+    Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
+        auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
+        if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
+            childWorkerWrapper->Terminate();
         }
         return false;
     });
+    
     this->isolate_->TerminateExecution();
 
     if (![NSThread isMainThread]) {
