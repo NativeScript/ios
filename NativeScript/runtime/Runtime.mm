@@ -55,21 +55,17 @@ Runtime::~Runtime() {
     });
     
     this->isolate_->TerminateExecution();
-
-    if (![NSThread isMainThread]) {
+    if (IsRuntimeWorker()) {
         Caches::Workers->Remove(this->workerId_);
-        Caches::Remove(this->isolate_);
     }
+    Caches::Remove(this->isolate_);
 
     {
         SpinLock lock(isolatesMutex_);
         Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
     }
-    
 
-    if (![NSThread isMainThread]) {
-        this->isolate_->Dispose();
-    }
+    this->isolate_->Dispose();
     
     currentRuntime_ = nullptr;
 }
