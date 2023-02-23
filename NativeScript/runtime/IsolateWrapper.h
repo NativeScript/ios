@@ -17,10 +17,10 @@ namespace tns {
 
 class IsolateWrapper {
 public:
-    inline bool IsValid() {
+    inline bool IsValid() const {
         return isolate_->GetData(tns::Constants::CACHES_ISOLATE_SLOT) != nullptr && GetCache()->getIsolateId() == isolateId_;
     }
-    inline std::shared_ptr<tns::Caches> GetCache() {
+    inline std::shared_ptr<tns::Caches> GetCache() const {
         return tns::Caches::Get(isolate_);
     }
     inline v8::Isolate* Isolate() {

@@ -164,6 +164,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
 
     Local<v8::Function> extendsFunc = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
+        IsolateWrapper isolateWrapper(isolate);
         tns::Assert(info.Length() == 2, isolate);
         Local<Context> context = isolate->GetCurrentContext();
 
@@ -276,7 +277,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
 
         void (*release)(id, SEL) = (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
         IMP newRelease = imp_implementationWithBlock(^(id self) {
-            if (!Runtime::IsAlive(isolate)) {
+            if (!Runtime::IsAlive(isolate) || isolateWrapper.IsValid()) {
                 return;
             }
 
