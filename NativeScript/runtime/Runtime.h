@@ -5,6 +5,7 @@
 #include "Common.h"
 #include "ModuleInternal.h"
 #include "MetadataBuilder.h"
+#include "SpinLock.h"
 
 namespace tns {
 
@@ -55,6 +56,7 @@ private:
     static thread_local Runtime* currentRuntime_;
     static std::shared_ptr<v8::Platform> platform_;
     static std::vector<v8::Isolate*> isolates_;
+    static SpinMutex isolatesMutex_;
     static bool mainThreadInitialized_;
     static std::atomic<int> nextIsolateId;
 

@@ -16,6 +16,7 @@
 #include "WeakRef.h"
 #include "Worker.h"
 #include "Constants.h"
+#include "SpinLock.h"
 // #include "SetTimeout.h"
 
 #include "IsolateWrapper.h"
@@ -60,7 +61,11 @@ Runtime::~Runtime() {
         Caches::Remove(this->isolate_);
     }
 
-    Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
+    {
+        SpinLock lock(isolatesMutex_);
+        Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
+    }
+    
 
     if (![NSThread isMainThread]) {
         this->isolate_->Dispose();
@@ -89,7 +94,10 @@ Isolate* Runtime::CreateIsolate() {
     runtimeLoop_ = CFRunLoopGetCurrent();
     isolate->SetData(Constants::RUNTIME_SLOT, this);
 
-    Runtime::isolates_.emplace_back(isolate);
+    {
+        SpinLock lock(isolatesMutex_);
+        Runtime::isolates_.emplace_back(isolate);
+    }
 
     return isolate;
 }
@@ -255,6 +263,7 @@ void Runtime::DefineDrainMicrotaskMethod(v8::Isolate* isolate, v8::Local<v8::Obj
 }
 
 bool Runtime::IsAlive(Isolate* isolate) {
+    SpinLock lock(isolatesMutex_);
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
 }
 
@@ -262,5 +271,6 @@ std::shared_ptr<Platform> Runtime::platform_;
 std::vector<Isolate*> Runtime::isolates_;
 bool Runtime::mainThreadInitialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;
+SpinMutex Runtime::isolatesMutex_;
 
 }
