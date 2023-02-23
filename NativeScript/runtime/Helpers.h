@@ -165,6 +165,8 @@ inline bool IsBool(const v8::Local<v8::Value>& value) {
 bool IsArrayOrArrayLike(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
 void* TryGetBufferFromArrayBuffer(const v8::Local<v8::Value>& value, bool& isArrayBuffer);
 
+void ExecuteOnRunLoop(CFRunLoopRef queue, std::function<void ()> func, bool async = true);
+void ExecuteOnDispatchQueue(dispatch_queue_t queue, std::function<void ()> func, bool async = true);
 void ExecuteOnMainThread(std::function<void ()> func, bool async = true);
 
 void LogError(v8::Isolate* isolate, v8::TryCatch& tc);

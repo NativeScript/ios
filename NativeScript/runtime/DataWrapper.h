@@ -649,16 +649,22 @@ public:
     const bool IsRunning();
     const bool IsClosing();
     const int WorkerId();
+    const inline v8::Isolate* GetMainIsolate() {
+        return mainIsolate_;
+    }
+    const inline v8::Isolate* GetWorkerIsolate() {
+        return workerIsolate_;
+    }
 private:
     v8::Isolate* mainIsolate_;
     v8::Isolate* workerIsolate_;
     bool isRunning_;
     bool isClosing_;
-    bool isTerminating_;
+    std::atomic<bool> isTerminating_;
     std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
     std::shared_ptr<v8::Persistent<v8::Value>> poWorker_;
     ConcurrentQueue queue_;
-    static int nextId_;
+    static std::atomic<int> nextId_;
     int workerId_;
 
     void BackgroundLooper(std::function<v8::Isolate* ()> func);

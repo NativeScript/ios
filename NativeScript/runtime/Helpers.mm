@@ -314,6 +314,50 @@ void* tns::TryGetBufferFromArrayBuffer(const v8::Local<v8::Value>& value, bool& 
     return data;
 }
 
+struct LockAndCV {
+    std::mutex m;
+    std::condition_variable cv;
+};
+
+void tns::ExecuteOnRunLoop(CFRunLoopRef queue, std::function<void ()> func, bool async) {
+    if(!async) {
+        bool __block finished = false;
+        auto v = new LockAndCV;
+        std::unique_lock<std::mutex> lock(v->m);
+        CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, ^(void) {
+            func();
+            {
+                std::unique_lock lk(v->m);
+                finished = true;
+            }
+            v->cv.notify_all();
+        });
+        CFRunLoopWakeUp(queue);
+        while(!finished) {
+            v->cv.wait(lock);
+        }
+        delete v;
+    } else {
+        CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, ^(void) {
+            func();
+        });
+        CFRunLoopWakeUp(queue);
+    }
+    
+}
+
+void tns::ExecuteOnDispatchQueue(dispatch_queue_t queue, std::function<void ()> func, bool async) {
+    if (async) {
+        dispatch_async(queue, ^(void) {
+            func();
+        });
+    } else {
+        dispatch_sync(queue, ^(void) {
+            func();
+        });
+    }
+}
+
 void tns::ExecuteOnMainThread(std::function<void ()> func, bool async) {
     if (async) {
         dispatch_async(dispatch_get_main_queue(), ^(void) {

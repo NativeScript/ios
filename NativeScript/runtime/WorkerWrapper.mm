@@ -3,6 +3,7 @@
 #include "Helpers.h"
 #include "Runtime.h"
 #include "Caches.h"
+#include "Constants.h"
 
 using namespace v8;
 
@@ -53,8 +54,7 @@ void WorkerWrapper::PostMessage(std::string message) {
 
 void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker, std::function<Isolate* ()> func) {
     this->poWorker_ = poWorker;
-    nextId_++;
-    this->workerId_ = nextId_;
+    this->workerId_ = nextId_.fetch_add(1, std::memory_order_relaxed) + 1;
 
     [workers_ addOperationWithBlock:^{
         this->BackgroundLooper(func);
@@ -82,17 +82,22 @@ void WorkerWrapper::DrainPendingTasks() {
 }
 
 void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
-    CFRunLoopRef runLoop = CFRunLoopGetCurrent();
-    this->queue_.Initialize(runLoop, [](void* info) {
-        WorkerWrapper* w = static_cast<WorkerWrapper*>(info);
-        w->DrainPendingTasks();
-    }, this);
-
-    this->workerIsolate_ = func();
-
-    this->DrainPendingTasks();
-
-    CFRunLoopRun();
+    if (!this->isTerminating_) {
+        CFRunLoopRef runLoop = CFRunLoopGetCurrent();
+        this->queue_.Initialize(runLoop, [](void* info) {
+            WorkerWrapper* w = static_cast<WorkerWrapper*>(info);
+            w->DrainPendingTasks();
+        }, this);
+        
+        this->workerIsolate_ = func();
+        
+        this->DrainPendingTasks();
+        
+        // check again as it could terminate before this
+        if (!this->isTerminating_) {
+            CFRunLoopRun();
+        }
+    }
 
     Runtime* runtime = Runtime::GetCurrentRuntime();
     delete runtime;
@@ -103,9 +108,10 @@ void WorkerWrapper::Close() {
 }
 
 void WorkerWrapper::Terminate() {
-    if (!this->isTerminating_) {
+    // set terminating to true atomically
+    bool wasTerminating = this->isTerminating_.exchange(true);
+    if (!wasTerminating) {
         this->queue_.Terminate();
-        this->isTerminating_ = true;
         this->isRunning_ = false;
     }
 }
@@ -163,7 +169,11 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context
         }
     }
 
-    tns::ExecuteOnMainThread([this, message, src, stackTrace, lineNumber]() {
+    auto runtime = static_cast<Runtime*>(mainIsolate_->GetData(Constants::RUNTIME_SLOT));
+    if (runtime == nullptr) {
+        return;
+    }
+    tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [this, message, src, stackTrace, lineNumber]() {
         v8::Locker locker(this->mainIsolate_);
         Isolate::Scope isolate_scope(this->mainIsolate_);
         HandleScope handle_scope(this->mainIsolate_);
@@ -205,6 +215,6 @@ Local<Object> WorkerWrapper::ConstructErrorObject(Local<Context> context, std::s
     return obj;
 }
 
-int WorkerWrapper::nextId_ = 0;
+std::atomic<int> WorkerWrapper::nextId_(0);
 
 }

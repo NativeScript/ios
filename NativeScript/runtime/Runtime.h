@@ -20,6 +20,13 @@ public:
     const int WorkerId();
 
     void SetWorkerId(int workerId);
+    inline bool IsRuntimeWorker() {
+        return workerId_ > 0;
+    }
+    
+    inline CFRunLoopRef RuntimeLoop() {
+        return runtimeLoop_;
+    }
 
     void RunModule(const std::string moduleName);
 
@@ -34,7 +41,7 @@ public:
             return false;
         }
 
-        return currentRuntime_->WorkerId() > 0;
+        return currentRuntime_->IsRuntimeWorker();
     }
 
     static std::shared_ptr<v8::Platform> GetPlatform() {
@@ -49,6 +56,7 @@ private:
     static std::shared_ptr<v8::Platform> platform_;
     static std::vector<v8::Isolate*> isolates_;
     static bool mainThreadInitialized_;
+    static std::atomic<int> nextIsolateId;
 
     void DefineGlobalObject(v8::Local<v8::Context> context);
     void DefineCollectFunction(v8::Local<v8::Context> context);
@@ -60,6 +68,7 @@ private:
     v8::Isolate* isolate_;
     std::unique_ptr<ModuleInternal> moduleInternal_;
     int workerId_;
+    CFRunLoopRef runtimeLoop_;
 };
 
 }

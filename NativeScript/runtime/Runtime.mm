@@ -15,7 +15,10 @@
 #include "TSHelpers.h"
 #include "WeakRef.h"
 #include "Worker.h"
+#include "Constants.h"
 // #include "SetTimeout.h"
+
+#include "IsolateWrapper.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -27,6 +30,7 @@ using namespace std;
 
 namespace tns {
 
+std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
 
@@ -36,9 +40,19 @@ void Runtime::Initialize() {
 
 Runtime::Runtime() {
     currentRuntime_ = this;
+    workerId_ = -1;
 }
 
 Runtime::~Runtime() {
+    auto wrapper = static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
+    auto workerIsolate = wrapper->GetWorkerIsolate();
+    Caches::Workers->ForEach([workerIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
+        auto wrapper2 = static_cast<WorkerWrapper*>(value->UserData());
+        if(wrapper2->GetMainIsolate() == workerIsolate) {
+            wrapper2->Terminate();
+        }
+        return false;
+    });
     this->isolate_->TerminateExecution();
 
     if (![NSThread isMainThread]) {
@@ -58,20 +72,22 @@ Runtime::~Runtime() {
 Isolate* Runtime::CreateIsolate() {
     if (!mainThreadInitialized_) {
         Runtime::platform_ = RuntimeConfig.IsDebug
-            ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
-            : platform::NewDefaultPlatform();
-
+        ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
+        : platform::NewDefaultPlatform();
+        
         V8::InitializePlatform(Runtime::platform_.get());
         V8::Initialize();
         std::string flags = RuntimeConfig.IsDebug
-            ? "--expose_gc --jitless"
-            : "--expose_gc --jitless --no-lazy";
+        ? "--expose_gc --jitless"
+        : "--expose_gc --jitless --no-lazy";
         V8::SetFlagsFromString(flags.c_str(), flags.size());
     }
-
+    
     Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = &allocator_;
     Isolate* isolate = Isolate::New(create_params);
+    runtimeLoop_ = CFRunLoopGetCurrent();
+    isolate->SetData(Constants::RUNTIME_SLOT, this);
 
     Runtime::isolates_.emplace_back(isolate);
 
@@ -79,7 +95,7 @@ Isolate* Runtime::CreateIsolate() {
 }
 
 void Runtime::Init(Isolate* isolate) {
-    std::shared_ptr<Caches> cache = Caches::Init(isolate);
+    std::shared_ptr<Caches> cache = Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
     cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
     cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
 

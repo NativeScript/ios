@@ -24,9 +24,9 @@ public:
     class WorkerState {
     public:
         WorkerState(v8::Isolate* isolate, std::shared_ptr<v8::Persistent<v8::Value>> poWorker, void* userData)
-            : isolate_(isolate),
-              poWorker_(poWorker),
-              userData_(userData) {
+        : isolate_(isolate),
+        poWorker_(poWorker),
+        userData_(userData) {
         }
 
         v8::Isolate* GetIsolate() {
@@ -46,14 +46,14 @@ public:
         void* userData_;
     };
 
-    Caches(v8::Isolate* isolate);
+    Caches(v8::Isolate* isolate, const int& isolateId_ = -1);
     ~Caches();
 
     static std::shared_ptr<ConcurrentMap<std::string, const Meta*>> Metadata;
     static std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> Workers;
 
-    inline static std::shared_ptr<Caches> Init(v8::Isolate* isolate) {
-        auto cache = std::make_shared<Caches>(isolate);
+    inline static std::shared_ptr<Caches> Init(v8::Isolate* isolate, const int& isolateId) {
+        auto cache = std::make_shared<Caches>(isolate, isolateId);
         // create a new shared_ptr that will live until Remove is called
         isolate->SetData(0, static_cast<void*>(new std::shared_ptr<Caches>(cache)));
         return cache;
@@ -68,6 +68,10 @@ public:
         return std::make_shared<Caches>(isolate);
     }
     static void Remove(v8::Isolate* isolate);
+    
+    inline int getIsolateId() {
+        return isolateId_;
+    }
 
     void SetContext(v8::Local<v8::Context> context);
     v8::Local<v8::Context> GetContext();
@@ -104,6 +108,7 @@ public:
 private:
     v8::Isolate* isolate_;
     std::shared_ptr<v8::Persistent<v8::Context>> context_;
+    int isolateId_;
 };
 
 }

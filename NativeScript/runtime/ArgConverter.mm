@@ -91,9 +91,9 @@ Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapp
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
     MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
 
-    Isolate* isolate = data->isolate_;
+    Isolate* isolate = data->isolateWrapper_.Isolate();
 
-    if (!Runtime::IsAlive(isolate)) {
+    if (!data->isolateWrapper_.IsValid() || !Runtime::IsAlive(isolate)) {
         memset(retValue, 0, cif->rtype->size);
         return;
     }
@@ -138,7 +138,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         id self_ = *static_cast<const id*>(argValues[0]);
         auto it = cache->Instances.find(self_);
         if (it != cache->Instances.end()) {
-            thiz = it->second->Get(data->isolate_).As<Object>();
+            thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
         } else {
             ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
             thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();

@@ -4,8 +4,8 @@ using namespace v8;
 
 namespace tns {
 
-Caches::Caches(Isolate* isolate)
-    : isolate_(isolate) {
+Caches::Caches(Isolate* isolate, const int& isolateId)
+    : isolate_(isolate), isolateId_(isolateId) {
 }
 
 Caches::~Caches() {
