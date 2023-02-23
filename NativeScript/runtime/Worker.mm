@@ -74,7 +74,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
             tns::Runtime* runtime = new tns::Runtime();
             Isolate* isolate = runtime->CreateIsolate();
             v8::Locker locker(isolate);
-            runtime->Init(isolate);
+            runtime->Init(isolate, true);
             runtime->SetWorkerId(worker->WorkerId());
             int workerId = worker->WorkerId();
             Worker::SetWorkerId(isolate, workerId);

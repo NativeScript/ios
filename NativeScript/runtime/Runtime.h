@@ -14,7 +14,7 @@ public:
     Runtime();
     ~Runtime();
     v8::Isolate* CreateIsolate();
-    void Init(v8::Isolate* isolate);
+    void Init(v8::Isolate* isolate, bool isWorker = false);
     void RunMainScript();
     v8::Isolate* GetIsolate();
 
@@ -57,10 +57,10 @@ private:
     static std::shared_ptr<v8::Platform> platform_;
     static std::vector<v8::Isolate*> isolates_;
     static SpinMutex isolatesMutex_;
-    static bool mainThreadInitialized_;
+    static bool v8Initialized_;
     static std::atomic<int> nextIsolateId;
 
-    void DefineGlobalObject(v8::Local<v8::Context> context);
+    void DefineGlobalObject(v8::Local<v8::Context> context, bool isWorker);
     void DefineCollectFunction(v8::Local<v8::Context> context);
     void DefineNativeScriptVersion(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     void DefinePerformanceObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);

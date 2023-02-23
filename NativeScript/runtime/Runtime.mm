@@ -71,7 +71,7 @@ Runtime::~Runtime() {
 }
 
 Isolate* Runtime::CreateIsolate() {
-    if (!mainThreadInitialized_) {
+    if (!v8Initialized_) {
         Runtime::platform_ = RuntimeConfig.IsDebug
         ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
         : platform::NewDefaultPlatform();
@@ -82,6 +82,7 @@ Isolate* Runtime::CreateIsolate() {
         ? "--expose_gc --jitless"
         : "--expose_gc --jitless --no-lazy";
         V8::SetFlagsFromString(flags.c_str(), flags.size());
+        v8Initialized_ = true;
     }
     
     Isolate::CreateParams create_params;
@@ -98,7 +99,7 @@ Isolate* Runtime::CreateIsolate() {
     return isolate;
 }
 
-void Runtime::Init(Isolate* isolate) {
+void Runtime::Init(Isolate* isolate, bool isWorker) {
     std::shared_ptr<Caches> cache = Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
     cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
     cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
@@ -110,13 +111,13 @@ void Runtime::Init(Isolate* isolate) {
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
     DefineNativeScriptVersion(isolate, globalTemplate);
 
-    Worker::Init(isolate, globalTemplate, mainThreadInitialized_);
+    Worker::Init(isolate, globalTemplate, isWorker);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
     DefineDrainMicrotaskMethod(isolate, globalTemplate);
     ObjectManager::Init(isolate, globalTemplate);
 //    SetTimeout::Init(isolate, globalTemplate);
-    MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
+    MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
@@ -124,7 +125,7 @@ void Runtime::Init(Isolate* isolate) {
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
 
-    DefineGlobalObject(context);
+    DefineGlobalObject(context, isWorker);
     DefineCollectFunction(context);
     PromiseProxy::Init(context);
     Console::Init(context);
@@ -142,8 +143,6 @@ void Runtime::Init(Isolate* isolate) {
     InlineFunctions::Init(context);
 
     cache->SetContext(context);
-
-    mainThreadInitialized_ = true;
 
     this->isolate_ = isolate;
 }
@@ -190,7 +189,7 @@ id Runtime::GetAppConfigValue(std::string key) {
     return result;
 }
 
-void Runtime::DefineGlobalObject(Local<Context> context) {
+void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
     Isolate* isolate = context->GetIsolate();
     Local<Object> global = context->Global();
     const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -198,7 +197,7 @@ void Runtime::DefineGlobalObject(Local<Context> context) {
         tns::Assert(false, isolate);
     }
 
-    if (mainThreadInitialized_ && !global->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "self"), global, readOnlyFlags).FromMaybe(false)) {
+    if (isWorker && !global->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "self"), global, readOnlyFlags).FromMaybe(false)) {
         tns::Assert(false, isolate);
     }
 }
@@ -265,7 +264,7 @@ bool Runtime::IsAlive(Isolate* isolate) {
 
 std::shared_ptr<Platform> Runtime::platform_;
 std::vector<Isolate*> Runtime::isolates_;
-bool Runtime::mainThreadInitialized_ = false;
+bool Runtime::v8Initialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;
 SpinMutex Runtime::isolatesMutex_;
 
