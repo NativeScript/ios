@@ -796,6 +796,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         uint8_t* data = call->GetResult<uint8_t*>();
         UnmanagedTypeWrapper* wrapper = new UnmanagedTypeWrapper(data, typeEncoding);
         Local<Value> result = UnmanagedType::Create(context, wrapper);
+        ObjectManager::Register(context, result);
         return result;
     }
 
@@ -964,6 +965,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         tns::Assert(success, isolate);
 
         tns::SetValue(isolate, callback, blockWrapper);
+        ObjectManager::Register(context, callback);
 
         return callback;
     }

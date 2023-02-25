@@ -36,6 +36,8 @@ public:
     static Runtime* GetCurrentRuntime() {
         return currentRuntime_;
     }
+    
+    static Runtime* GetRuntime(v8::Isolate* isolate);
 
     static bool IsWorker() {
         if (currentRuntime_ == nullptr) {

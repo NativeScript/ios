@@ -105,6 +105,22 @@ public:
     std::unique_ptr<v8::Persistent<v8::Function>> PointerCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
     std::unique_ptr<v8::Persistent<v8::Function>> FunctionReferenceCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
     std::unique_ptr<v8::Persistent<v8::Function>> UnmanagedTypeCtorFunc = std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+    
+    
+    using unique_void_ptr = std::unique_ptr<void, void(*)(void const*)>;
+    template<typename T>
+    auto unique_void(T * ptr) -> unique_void_ptr
+    {
+        return unique_void_ptr(ptr, [](void const * data) {
+             T const * p = static_cast<T const*>(data);
+             delete p;
+        });
+    }
+    std::vector<unique_void_ptr> cacheBoundObjects_;
+    template<typename T>
+    void registerCacheBoundObject(T *ptr) {
+        this->cacheBoundObjects_.push_back(unique_void(ptr));
+    }
 private:
     v8::Isolate* isolate_;
     std::shared_ptr<v8::Persistent<v8::Context>> context_;

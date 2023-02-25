@@ -20,6 +20,7 @@
 // #include "SetTimeout.h"
 
 #include "IsolateWrapper.h"
+#include "DisposerPHV.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -46,6 +47,9 @@ Runtime::Runtime() {
 
 Runtime::~Runtime() {
     auto currentIsolate = this->isolate_;
+    this->isolate_->TerminateExecution();
+    
+    // TODO: fix race condition on workers where a queue can leak (maybe calling Terminate before Initialize?)
     Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
         auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
         if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
@@ -53,21 +57,31 @@ Runtime::~Runtime() {
         }
         return false;
     });
-    
-    this->isolate_->TerminateExecution();
-    if (IsRuntimeWorker()) {
-        Caches::Workers->Remove(this->workerId_);
-    }
-    Caches::Remove(this->isolate_);
 
     {
-        SpinLock lock(isolatesMutex_);
-        Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
+        v8::Locker lock(isolate_);
+        DisposerPHV phv(isolate_);
+        isolate_->VisitHandlesWithClassIds( &phv );
+        
+        if (IsRuntimeWorker()) {
+            Caches::Workers->Remove(this->workerId_);
+        }
+        Caches::Remove(this->isolate_);
+        
+        {
+            SpinLock lock(isolatesMutex_);
+            Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
+        }
+        this->isolate_->SetData(Constants::RUNTIME_SLOT, nullptr);
     }
 
     this->isolate_->Dispose();
     
     currentRuntime_ = nullptr;
+}
+
+Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
+    return  static_cast<Runtime*>(isolate->GetData(Constants::RUNTIME_SLOT));
 }
 
 Isolate* Runtime::CreateIsolate() {

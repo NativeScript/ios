@@ -4,6 +4,7 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Caches.h"
+#include "Constants.h"
 
 using namespace v8;
 using namespace std;
@@ -19,6 +20,7 @@ void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate)
 std::shared_ptr<Persistent<Value>> ObjectManager::Register(Local<Context> context, const Local<Value> obj) {
     Isolate* isolate = context->GetIsolate();
     std::shared_ptr<Persistent<Value>> objectHandle = std::make_shared<Persistent<Value>>(isolate, obj);
+    objectHandle->SetWrapperClassId(Constants::ClassTypes::ObjectManagedValue);
     ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
     objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
     return objectHandle;

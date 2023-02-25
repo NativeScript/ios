@@ -1,4 +1,5 @@
 #include "Caches.h"
+#include "Constants.h"
 
 using namespace v8;
 
@@ -21,11 +22,12 @@ Caches::~Caches() {
     this->Instances.clear();
     this->StructInstances.clear();
     this->PointerInstances.clear();
+    this->cacheBoundObjects_.clear();
 }
 
 void Caches::Remove(v8::Isolate* isolate) {
-    auto cache = isolate->GetData(0);
-    isolate->SetData(0, nullptr);
+    auto cache = isolate->GetData(Constants::CACHES_ISOLATE_SLOT);
+    isolate->SetData(Constants::CACHES_ISOLATE_SLOT, nullptr);
     if (cache != nullptr) {
         delete reinterpret_cast<std::shared_ptr<Caches>*>(cache);
     }
