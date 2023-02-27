@@ -101,6 +101,10 @@ void Interop::RegisterInteropType(Local<Context> context, Local<Object> types, s
             persistentObj->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
         }
         cache->PrimitiveInteropTypes.emplace(type, std::move(persistentObj));
+    } else if (autoDelete) {
+        // TODO: review this. We send the void encoding multiple times so this is just a dirty fallback
+        // maybe we should have another method on the ObjectManager for cleaning up these
+        cache->registerCacheBoundObject(wrapper);
     }
 
     tns::Assert(success, isolate);
