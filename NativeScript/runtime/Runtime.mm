@@ -47,6 +47,13 @@ Runtime::Runtime() {
 
 Runtime::~Runtime() {
     auto currentIsolate = this->isolate_;
+    {
+        // make sure we remove the isolate from the list of active isolates first
+        // this will make sure isAlive(isolate) will return false and prevent locking of the v8 isolate after
+        // it terminates execution
+        SpinLock lock(isolatesMutex_);
+        Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
+    }
     this->isolate_->TerminateExecution();
     
     // TODO: fix race condition on workers where a queue can leak (maybe calling Terminate before Initialize?)
@@ -64,14 +71,15 @@ Runtime::~Runtime() {
         isolate_->VisitHandlesWithClassIds( &phv );
         
         if (IsRuntimeWorker()) {
+            auto currentWorker = static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
             Caches::Workers->Remove(this->workerId_);
+            // if the parent isolate is dead then deleting the wrapper is our responsibility
+            if (currentWorker->IsWeak()) {
+                delete currentWorker;
+            }
         }
         Caches::Remove(this->isolate_);
-        
-        {
-            SpinLock lock(isolatesMutex_);
-            Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
-        }
+
         this->isolate_->SetData(Constants::RUNTIME_SLOT, nullptr);
     }
 
@@ -271,7 +279,7 @@ void Runtime::DefineDrainMicrotaskMethod(v8::Isolate* isolate, v8::Local<v8::Obj
     globalTemplate->Set(ToV8String(isolate, "__drainMicrotaskQueue"), drainMicrotaskTemplate);
 }
 
-bool Runtime::IsAlive(Isolate* isolate) {
+bool Runtime::IsAlive(const Isolate* isolate) {
     SpinLock lock(isolatesMutex_);
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
 }

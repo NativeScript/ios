@@ -653,6 +653,9 @@ public:
 
     const WrapperType Type();
     const int Id();
+    const inline bool isDisposed() {
+        return isDisposed_;
+    }
     const bool IsRunning();
     const bool IsClosing();
     const int WorkerId();
@@ -662,12 +665,20 @@ public:
     const inline v8::Isolate* GetWorkerIsolate() {
         return workerIsolate_;
     }
+    const inline void MakeWeak() {
+        isWeak_ = true;
+    }
+    const inline bool IsWeak() {
+        return isWeak_;
+    }
 private:
     v8::Isolate* mainIsolate_;
     v8::Isolate* workerIsolate_;
     bool isRunning_;
     bool isClosing_;
     std::atomic<bool> isTerminating_;
+    bool isDisposed_;
+    bool isWeak_;
     std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
     std::shared_ptr<v8::Persistent<v8::Value>> poWorker_;
     ConcurrentQueue queue_;

@@ -41,7 +41,7 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
     }
 }
 
-bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
+bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFinalDisposal) {
     if (value.IsEmpty() || value->IsNullOrUndefined() || !value->IsObject()) {
         return true;
     }
@@ -152,9 +152,14 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         }
         case WrapperType::Worker: {
             WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
-            if (worker->IsRunning()) {
+            if (!worker->isDisposed()) {
+                // during final disposal, inform the worker it should delete itself
+                if (isFinalDisposal) {
+                    worker->MakeWeak();
+                }
                 return false;
             } else {
+                delete worker;
                 return true;
             }
         }

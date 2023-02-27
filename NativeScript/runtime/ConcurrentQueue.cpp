@@ -55,6 +55,7 @@ void ConcurrentQueue::Terminate() {
     if (this->runLoopTasksSource_) {
         CFRunLoopRemoveSource(this->runLoop_, this->runLoopTasksSource_, kCFRunLoopCommonModes);
         CFRunLoopSourceInvalidate(this->runLoopTasksSource_);
+        CFRelease(this->runLoopTasksSource_);
     }
 }
 

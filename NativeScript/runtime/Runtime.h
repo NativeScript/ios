@@ -53,7 +53,7 @@ public:
 
     static id GetAppConfigValue(std::string key);
 
-    static bool IsAlive(v8::Isolate* isolate);
+    static bool IsAlive(const v8::Isolate* isolate);
 private:
     static thread_local Runtime* currentRuntime_;
     static std::shared_ptr<v8::Platform> platform_;

@@ -23,6 +23,8 @@ WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::I
       isRunning_(false),
       isClosing_(false),
       isTerminating_(false),
+      isDisposed_(false),
+      isWeak_(false),
       onMessage_(onMessage) {
 }
 
@@ -99,6 +101,7 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
         }
     }
 
+    this->isDisposed_ = true;
     Runtime* runtime = Runtime::GetCurrentRuntime();
     delete runtime;
 }
@@ -113,6 +116,7 @@ void WorkerWrapper::Terminate() {
     if (!wasTerminating) {
         this->queue_.Terminate();
         this->isRunning_ = false;
+        this->workerIsolate_->TerminateExecution();
     }
 }
 
