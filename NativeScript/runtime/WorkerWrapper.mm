@@ -114,9 +114,11 @@ void WorkerWrapper::Terminate() {
     // set terminating to true atomically
     bool wasTerminating = this->isTerminating_.exchange(true);
     if (!wasTerminating) {
+        if (this->workerIsolate_ != nullptr) {
+            this->workerIsolate_->TerminateExecution();
+        }
         this->queue_.Terminate();
         this->isRunning_ = false;
-        this->workerIsolate_->TerminateExecution();
     }
 }
 
