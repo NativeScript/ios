@@ -142,6 +142,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         } else {
             ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
             thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();
+            tns::DeleteWrapperIfUnused(isolate, thiz, wrapper);
         }
     }
 

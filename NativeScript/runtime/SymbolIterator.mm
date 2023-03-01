@@ -79,7 +79,9 @@ void SymbolIterator::NextCallback(const v8::FunctionCallbackInfo<v8::Value>& arg
         } else if ([item isKindOfClass:[NSString class]]) {
             val = tns::ToV8String(isolate, [item UTF8String]);
         } else {
-            val = ArgConverter::CreateJsWrapper(context, new ObjCDataWrapper(item), Local<Object>());
+            auto wrapper = new ObjCDataWrapper(item);
+            val = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>());
+            tns::DeleteWrapperIfUnused(isolate, val, wrapper);
         }
 
         bool success = obj->Set(context, tns::ToV8String(isolate, "done"), v8::Boolean::New(isolate, false)).FromMaybe(false);
