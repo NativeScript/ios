@@ -796,8 +796,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         uint8_t* data = call->GetResult<uint8_t*>();
         UnmanagedTypeWrapper* wrapper = new UnmanagedTypeWrapper(data, typeEncoding);
         Local<Value> result = UnmanagedType::Create(context, wrapper);
-        // TODO:: see why when adding this, some wrappers are released by something other than the ObjectManager
-        //ObjectManager::Register(context, result);
+        ObjectManager::Register(context, result);
         return result;
     }
 

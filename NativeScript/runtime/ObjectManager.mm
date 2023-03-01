@@ -56,6 +56,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
     }
 
     BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+    //NSLog(@"dispose %p", wrapper);
     if (wrapper == nullptr) {
         tns::SetValue(isolate, obj, nullptr);
         return true;
@@ -96,13 +97,6 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
             if (target != nil) {
                 cache->Instances.erase(target);
                 [target release];
-            }
-            break;
-        }
-        case WrapperType::UnmanagedType: {
-            UnmanagedTypeWrapper* unmanagedTypeWrapper = static_cast<UnmanagedTypeWrapper*>(wrapper);
-            if (unmanagedTypeWrapper != nullptr) {
-                delete unmanagedTypeWrapper;
             }
             break;
         }
@@ -158,10 +152,8 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
                     worker->MakeWeak();
                 }
                 return false;
-            } else {
-                delete worker;
-                return true;
             }
+            break;
         }
 
         default:
