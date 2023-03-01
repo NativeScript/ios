@@ -197,6 +197,7 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
         std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, result);
         std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
         cache->StructInstances.emplace(key, poResult);
+        tns::DeleteWrapperIfUnused(isolate, result, wrapper);
 
         info.GetReturnValue().Set(result);
     } catch (NativeScriptException& ex) {

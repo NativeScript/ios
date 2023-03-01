@@ -202,6 +202,14 @@ Local<Value> tns::GetPrivateValue(const Local<Object>& obj, const Local<v8::Stri
     return result;
 }
 
+bool tns::DeleteWrapperIfUnused(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* value) {
+    if (GetValue(isolate, obj) != value) {
+        delete value;
+        return true;
+    }
+    return false;
+}
+
 void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* value) {
     if (obj.IsEmpty() || obj->IsNullOrUndefined()) {
         return;

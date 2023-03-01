@@ -47,7 +47,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
     }
 
     Local<Object> obj = value.As<Object>();
-    if (obj->InternalFieldCount() > 1) {
+    if (obj->InternalFieldCount() > 1 && !isFinalDisposal) {
         Local<Value> superValue = obj->GetInternalField(1);
         if (!superValue.IsEmpty() && superValue->IsString()) {
             // Do not dispose the ObjCWrapper contained in a "super" instance
@@ -61,7 +61,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
         return true;
     }
 
-    if (wrapper->IsGcProtected()) {
+    if (wrapper->IsGcProtected() && !isFinalDisposal) {
         return false;
     }
 
