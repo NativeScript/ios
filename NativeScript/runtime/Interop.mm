@@ -1108,7 +1108,6 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         const TypeEncoding* te = [result isProxy] ? typeEncoding : nullptr;
 
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
-        NSLog(@"wrapperId= %p", wrapper);
         std::vector<std::string> additionalProtocols = Interop::GetAdditionalProtocols(typeEncoding);
         Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper, false, additionalProtocols);
 
