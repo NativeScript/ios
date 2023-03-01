@@ -107,7 +107,9 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass, true);
         tns::SetValue(isolate, extendClassCtorFunc, wrapper);
 
-        cache->CtorFuncs.emplace(extendedClassName, std::make_unique<Persistent<v8::Function>>(isolate, extendClassCtorFunc));
+        auto extendedPersistent = std::make_unique<Persistent<v8::Function>>(isolate, extendClassCtorFunc);
+        extendedPersistent->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
+        cache->CtorFuncs.emplace(extendedClassName, std::move(extendedPersistent));
         cache->ClassPrototypes.emplace(extendedClassName, std::make_unique<Persistent<Object>>(isolate, extendFuncPrototype));
 
         info.GetReturnValue().Set(extendClassCtorFunc);
