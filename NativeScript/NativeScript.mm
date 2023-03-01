@@ -59,6 +59,19 @@ std::unique_ptr<Runtime> runtime_;
     
 }
 
+- (void)runScriptString: (NSString*) script runLoop: (BOOL) runLoop {
+
+    std::string cppString = std::string([script UTF8String]);
+    runtime_->RunScript(cppString);
+    
+    if (runLoop) {
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+    }
+
+    tns::Tasks::Drain();
+
+}
+
 - (void)runMainApplication {
     runtime_->RunMainScript();
 

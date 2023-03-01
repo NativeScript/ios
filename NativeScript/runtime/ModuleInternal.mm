@@ -63,6 +63,26 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
     return success;
 }
 
+void ModuleInternal::RunScript(Isolate* isolate, std::string script) {
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    Local<Context> context = cache->GetContext();
+    Local<Object> globalObject = context->Global();
+    Local<Value> requireObj;
+    bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
+    tns::Assert(success && requireObj->IsFunction(), isolate);
+    Local<Value> result;
+    this->RunScriptString(isolate, context, script);
+}
+
+MaybeLocal<Value> ModuleInternal::RunScriptString(Isolate* isolate, Local<Context> context, const std::string scriptString) {
+    ScriptCompiler::CompileOptions options = ScriptCompiler::kNoCompileOptions;
+    ScriptCompiler::Source source(tns::ToV8String(isolate, scriptString));
+    TryCatch tc(isolate);
+    Local<Script> script = ScriptCompiler::Compile(context, &source, options).ToLocalChecked();
+    MaybeLocal<Value> result = script->Run(context);
+    return result;
+}
+
 Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const std::string& dirName) {
     Local<v8::Function> requireFuncFactory = requireFactoryFunction_->Get(isolate);
     Local<Context> context = isolate->GetCurrentContext();
