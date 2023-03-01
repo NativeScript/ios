@@ -74,6 +74,9 @@ void WorkerWrapper::DrainPendingTasks() {
     Local<Object> global = context->Global();
 
     for (std::string message: messages) {
+        if (this->isTerminating_) {
+            break;
+        }
         TryCatch tc(this->workerIsolate_);
         this->onMessage_(this->workerIsolate_, global, message);
 
@@ -123,6 +126,9 @@ void WorkerWrapper::Terminate() {
 }
 
 void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
+    if (this->isTerminating_) {
+        return;
+    }
     Local<Context> context = Caches::Get(this->workerIsolate_)->GetContext();
     Local<Object> global = context->Global();
 
