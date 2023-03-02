@@ -4,6 +4,10 @@
 namespace tns {
 
 void ConcurrentQueue::Initialize(CFRunLoopRef runLoop, void (*performWork)(void*), void* info) {
+    std::unique_lock<std::mutex> lock(initializationMutex_);
+    if (terminated) {
+        return;
+    }
     this->runLoop_ = runLoop;
     CFRunLoopSourceContext sourceContext = { 0, info, 0, 0, 0, 0, 0, 0, 0, performWork };
     this->runLoopTasksSource_ = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &sourceContext);
@@ -48,6 +52,8 @@ void ConcurrentQueue::SignalAndWakeUp() {
 }
 
 void ConcurrentQueue::Terminate() {
+    std::unique_lock<std::mutex> lock(initializationMutex_);
+    terminated = true;
     if (this->runLoop_) {
         CFRunLoopStop(this->runLoop_);
     }
