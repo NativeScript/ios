@@ -250,7 +250,11 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
         if (type == BinaryTypeEncodingType::IdEncoding ||
             type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
             id data = tns::ToNSString(isolate, value);
-            *(CFTypeRef*)retValue = CFBridgingRetain(data);
+            // this feels wrong but follows the other CFBridgingRetain calls
+            // and also solves a leak
+            auto ref = CFBridgingRetain(data);
+            *(CFTypeRef*)retValue = ref;
+            CFRelease(ref);
             return;
         }
     } else if (value->IsObject()) {

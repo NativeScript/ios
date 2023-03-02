@@ -5,6 +5,7 @@
 #include "Helpers.h"
 #include "Caches.h"
 #include "Constants.h"
+#include "FFICall.h"
 
 using namespace v8;
 using namespace std;
@@ -139,10 +140,12 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
         }
         case WrapperType::ExtVector: {
             ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
+            FFICall::DisposeFFIType(extVectorWrapper->FFIType(), extVectorWrapper->TypeEncoding());
             void* data = extVectorWrapper->Data();
             if (data) {
                 std::free(data);
             }
+            break;
         }
         case WrapperType::Worker: {
             WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);

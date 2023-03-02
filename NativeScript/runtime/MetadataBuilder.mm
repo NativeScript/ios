@@ -243,6 +243,14 @@ void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& in
 
     int result = memcmp(arg1Data, arg2Data, ffiType1->size);
     bool areEqual = result == 0;
+    
+    // these were created by GetStructData
+    if (arg1->InternalFieldCount() < 1) {
+        free(arg1Data);
+    }
+    if (arg2->InternalFieldCount() < 1) {
+        free(arg2Data);
+    }
 
     info.GetReturnValue().Set(areEqual);
 }

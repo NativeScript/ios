@@ -613,10 +613,11 @@ private:
 
 class ExtVectorWrapper: public BaseDataWrapper {
 public:
-    ExtVectorWrapper(void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding)
+    ExtVectorWrapper(void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding, const TypeEncoding* typeEncoding)
         : data_(data),
           ffiType_(ffiType),
-          innerTypeEncoding_(innerTypeEncoding) {
+          innerTypeEncoding_(innerTypeEncoding),
+          typeEncoding_(typeEncoding) {
     }
 
     const WrapperType Type() {
@@ -634,10 +635,14 @@ public:
     const TypeEncoding* InnerTypeEncoding() {
         return this->innerTypeEncoding_;
     }
+    const TypeEncoding* TypeEncoding() {
+        return this->typeEncoding_;
+    }
 private:
     void* data_;
     ffi_type* ffiType_;
-    const TypeEncoding* innerTypeEncoding_;
+    const struct TypeEncoding* innerTypeEncoding_;
+    const struct TypeEncoding* typeEncoding_;
 };
 
 class WorkerWrapper: public BaseDataWrapper {
