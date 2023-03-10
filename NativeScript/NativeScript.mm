@@ -20,6 +20,9 @@ using namespace tns;
 
 @implementation NativeScript
 
+extern char defaultStartOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
+
+
 std::unique_ptr<Runtime> runtime_;
 
 - (instancetype)initWithConfig:(Config*)config {
@@ -31,7 +34,12 @@ std::unique_ptr<Runtime> runtime_;
         } else {
             RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
         }
-        RuntimeConfig.MetadataPtr = [config MetadataPtr];
+        if (config.MetadataPtr != nil) {
+            RuntimeConfig.MetadataPtr = [config MetadataPtr];
+        } else {
+            RuntimeConfig.MetadataPtr = &defaultStartOfMetadataSection;
+
+        }
         RuntimeConfig.IsDebug = [config IsDebug];
         RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
 

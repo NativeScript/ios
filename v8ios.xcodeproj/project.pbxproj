@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
+		2BD4BB6229B09B6E0087459A /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BD4BB5F29B09B6E0087459A /* metadata-arm64.bin */; };
+		2BD4BB6429B09B6E0087459A /* metadata-x86_64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BD4BB6129B09B6E0087459A /* metadata-x86_64.bin */; };
 		3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CBFF7432971C1C200C5DE36 /* ArcMacro.h */; };
 		3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CEF9CCC28F896B70056BA45 /* SpinLock.h */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
@@ -543,6 +545,8 @@
 /* Begin PBXFileReference section */
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
+		2BD4BB5F29B09B6E0087459A /* metadata-arm64.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = "metadata-arm64.bin"; sourceTree = "<group>"; };
+		2BD4BB6129B09B6E0087459A /* metadata-x86_64.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = "metadata-x86_64.bin"; sourceTree = "<group>"; };
 		3CBFF7432971C1C200C5DE36 /* ArcMacro.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArcMacro.h; sourceTree = "<group>"; };
 		3CEF9CCC28F896B70056BA45 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SpinLock.h; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
@@ -1102,6 +1106,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2BD4BB5E29B09B6E0087459A /* metadata */ = {
+			isa = PBXGroup;
+			children = (
+				2BD4BB5F29B09B6E0087459A /* metadata-arm64.bin */,
+				2BD4BB6129B09B6E0087459A /* metadata-x86_64.bin */,
+			);
+			path = metadata;
+			sourceTree = "<group>";
+		};
 		C22536AF241A318900192740 /* arm64 */ = {
 			isa = PBXGroup;
 			children = (
@@ -1839,6 +1852,7 @@
 		C2DDEB33229EAB3B00345BFE /* NativeScript */ = {
 			isa = PBXGroup;
 			children = (
+				2BD4BB5E29B09B6E0087459A /* metadata */,
 				C247C14C22F82842001D2CA2 /* include */,
 				C2DDEB3B229EAB8600345BFE /* runtime */,
 				C247C29522F828E2001D2CA2 /* inspector */,
@@ -2381,6 +2395,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2BD4BB6229B09B6E0087459A /* metadata-arm64.bin in Resources */,
+				2BD4BB6429B09B6E0087459A /* metadata-x86_64.bin in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3273,6 +3289,10 @@
 					"-lv8_libbase",
 					"-lv8_libplatform",
 					"-lv8_bigint",
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"$(SRCROOT)/NativeScript/metadata/metadata-x86_64.bin",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -3341,6 +3361,10 @@
 					"-lv8_libbase",
 					"-lv8_libplatform",
 					"-lv8_bigint",
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"$(SRCROOT)/NativeScript/metadata/metadata-x86_64.bin",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
