@@ -139,8 +139,7 @@ void JsV8InspectorClient::init() {
 
     inspector_->contextCreated(v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, v8_inspector::StringView()));
 
-    Persistent<Context> persistentContext(context->GetIsolate(), JsV8InspectorClient::PersistentToLocal(isolate, context_));
-    context_.Reset(isolate, persistentContext);
+    context_.Reset(isolate, context);
 
     this->createInspectorSession();
 }
