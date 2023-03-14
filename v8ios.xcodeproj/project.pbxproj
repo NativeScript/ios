@@ -1622,6 +1622,7 @@
 				C2DDEB2F229EAB3B00345BFE /* Frameworks */,
 				C2DDEB30229EAB3B00345BFE /* Resources */,
 				65A6D684291F63A30074DF31 /* ShellScript */,
+				2BD4BB6829C0E4720087459A /* Include default metadata */,
 			);
 			buildRules = (
 			);
@@ -1751,6 +1752,24 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		2BD4BB6829C0E4720087459A /* Include default metadata */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Include default metadata";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"Checking flags to determine whether to copy default metadata\"\nif [ \"$INCLUDE_DEFAULT_METADATA\" = true ] ; then\necho \"Copying ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-arm64.bin directory to ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework\"\ncp ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-arm64.bin ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework/metadata-arm64.bin\necho \"metadata-arm64.bin has been copied.\"\necho \"Copying ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-x86_64.bin directory to ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework\"\ncp ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-x86_64.bin ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework/metadata-x86_64.bin\necho \"metadata-x86_64.bin has been copied.\"\nelse\necho \"Skipped copying metadata binaries.\"\nfi\n\n";
+		};
 		65A6D684291F63A30074DF31 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
