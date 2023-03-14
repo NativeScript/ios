@@ -4,7 +4,7 @@
 #include "JsV8InspectorClient.h"
 #include "InspectorServer.h"
 #include "include/libplatform/libplatform.h"
-#include "src/inspector/v8-log-agent-impl.h"
+//#include "src/inspector/v8-log-agent-impl.h"
 #include "Helpers.h"
 #include "utils.h"
 
