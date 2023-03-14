@@ -137,7 +137,7 @@ void JsV8InspectorClient::init() {
 
     inspector_ = V8Inspector::create(isolate, this);
 
-    inspector_->contextCreated(v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, v8_inspector::StringView()));
+    inspector_->contextCreated(v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, {}));
 
     context_.Reset(isolate, context);
 
@@ -150,7 +150,7 @@ void JsV8InspectorClient::connect(int argc, char** argv) {
 }
 
 void JsV8InspectorClient::createInspectorSession() {
-    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, v8_inspector::StringView());
+    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, {});
 }
 
 void JsV8InspectorClient::disconnect() {
@@ -282,7 +282,7 @@ void JsV8InspectorClient::scheduleBreak() {
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
-    this->session_->schedulePauseOnNextStatement(StringView(), StringView());
+    this->session_->schedulePauseOnNextStatement({}, {});
 }
 
 void JsV8InspectorClient::registerModules() {
