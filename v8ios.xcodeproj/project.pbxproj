@@ -308,6 +308,13 @@
 		C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F64E8222E870A300EDB057 /* NativeScript.mm */; };
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
 		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
+		F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */; };
+		F6191AAF29C0FCE8003F588F /* JsV8InspectorClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */; };
+		F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA929C0FCE7003F588F /* InspectorServer.h */; };
+		F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AAA29C0FCE7003F588F /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		F6191AB629C0FF87003F588F /* utils.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AB429C0FF86003F588F /* utils.h */; };
+		F6191AB729C0FF87003F588F /* utils.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AB529C0FF86003F588F /* utils.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -775,6 +782,13 @@
 		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		C2FF301C2252062A00933782 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		C2FF301F2252065E00933782 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JsV8InspectorClient.h; sourceTree = "<group>"; };
+		F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JsV8InspectorClient.cpp; sourceTree = "<group>"; };
+		F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = JsV8InspectorClient.mm; sourceTree = "<group>"; };
+		F6191AA929C0FCE7003F588F /* InspectorServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
+		F6191AAA29C0FCE7003F588F /* InspectorServer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorServer.mm; sourceTree = "<group>"; };
+		F6191AB429C0FF86003F588F /* utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
+		F6191AB529C0FF86003F588F /* utils.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = utils.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1281,6 +1295,7 @@
 		C2DDEB33229EAB3B00345BFE /* NativeScript */ = {
 			isa = PBXGroup;
 			children = (
+				F6191AA529C0FCE7003F588F /* inspector */,
 				6573B9D8291FE2A700B0ED7C /* jsi */,
 				6573B9C1291FE29F00B0ED7C /* v8runtime */,
 				C247C14C22F82842001D2CA2 /* include */,
@@ -1408,6 +1423,20 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		F6191AA529C0FCE7003F588F /* inspector */ = {
+			isa = PBXGroup;
+			children = (
+				F6191AB429C0FF86003F588F /* utils.h */,
+				F6191AB529C0FF86003F588F /* utils.mm */,
+				F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */,
+				F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */,
+				F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */,
+				F6191AA929C0FCE7003F588F /* InspectorServer.h */,
+				F6191AAA29C0FCE7003F588F /* InspectorServer.mm */,
+			);
+			path = inspector;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -1423,41 +1452,27 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F6191AB629C0FF87003F588F /* utils.h in Headers */,
 				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
 				9160C065291ED41F000641C0 /* SpinLock.h in Headers */,
 				C2A5DEC82327DCF600A91A76 /* NativeScript.h in Headers */,
 				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
-				C247C33822F828E3001D2CA2 /* v8.h in Headers */,
+				F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */,
 				C247C16722F82842001D2CA2 /* libplatform.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
 				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
-				C2D116B225666C460020BF3E /* maybe.h in Headers */,
 				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
-				C2EDE27726AB0D1100CCF95B /* immediate-crash.h in Headers */,
 				C247C17122F82842001D2CA2 /* v8config.h in Headers */,
-				C247C36022F828E3001D2CA2 /* Console.h in Headers */,
-				C247C3AB22F828E3001D2CA2 /* memory.h in Headers */,
 				6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */,
-				C247C33522F828E3001D2CA2 /* v8-inspector-platform.h in Headers */,
-				C247C34E22F828E3001D2CA2 /* inspected-context.h in Headers */,
 				C22536B5241A318900192740 /* ffitarget.h in Headers */,
-				C2D7E9CF23F4294800DB289C /* export-template.h in Headers */,
+				F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */,
 				6573B9D0291FE29F00B0ED7C /* JSIV8ValueConverter.h in Headers */,
 				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C20AB5E726E1015300E2B41D /* OneByteStringResource.h in Headers */,
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
-				C247C32E22F828E3001D2CA2 /* base64.h in Headers */,
 				6573B9E7291FE2A700B0ED7C /* jsi.h in Headers */,
-				C247C35322F828E3001D2CA2 /* v8-runtime-agent-impl.h in Headers */,
-				C2D116B025666C460020BF3E /* protocol_core.h in Headers */,
-				C247C35222F828E3001D2CA2 /* v8-stack-trace-impl.h in Headers */,
 				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
-				C263B4CC23D0A87E00D5B872 /* bits.h in Headers */,
-				C247C39E22F828E3001D2CA2 /* base-export.h in Headers */,
-				C247C33122F828E3001D2CA2 /* JsV8InspectorClient.h in Headers */,
-				C2B30FDA238418CA009D6A46 /* export.h in Headers */,
-				C247C16E22F82842001D2CA2 /* Debugger.h in Headers */,
 				6573B9E2291FE2A700B0ED7C /* jsi-inl.h in Headers */,
 				C2D21601248AAAD900EDC646 /* Constants.h in Headers */,
 				C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */,
@@ -1483,39 +1498,20 @@
 				C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */,
 				C2DDEBA2229EAC8300345BFE /* Console.h in Headers */,
 				C22C092322CA3F370080D176 /* Worker.h in Headers */,
-				C247C33C22F828E3001D2CA2 /* v8-log-agent-impl.h in Headers */,
-				C247C3A122F828E3001D2CA2 /* mutex.h in Headers */,
-				C247C39522F828E3001D2CA2 /* v8-heap-profiler-agent-impl.h in Headers */,
-				C247C34522F828E3001D2CA2 /* v8-debugger.h in Headers */,
-				C247C34422F828E3001D2CA2 /* v8-console.h in Headers */,
-				C247C35822F828E3001D2CA2 /* v8-inspector-session-impl.h in Headers */,
 				6573B9E6291FE2A700B0ED7C /* instrumentation.h in Headers */,
 				C2DDEBA2229EAC8300345BFE /* Console.h in Headers */,
-				C247C3B022F828E3001D2CA2 /* interface-types.h in Headers */,
 				6573B9EA291FE2A700B0ED7C /* jsilib.h in Headers */,
-				C247C3AF22F828E3001D2CA2 /* atomicops_internals_atomicword_compat.h in Headers */,
 				C22C092322CA3F370080D176 /* Worker.h in Headers */,
-				C247C37022F828E3001D2CA2 /* Network.h in Headers */,
 				6573B9D1291FE29F00B0ED7C /* V8PointerValue.h in Headers */,
 				C247C16622F82842001D2CA2 /* v8-version.h in Headers */,
 				C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */,
-				C2B07AFA23C38FDA00E245BE /* serializer_traits.h in Headers */,
-				C2D116AF25666C460020BF3E /* frontend_channel.h in Headers */,
-				C247C38022F828E3001D2CA2 /* v8-schema-agent-impl.h in Headers */,
-				C247C39A22F828E3001D2CA2 /* globals.h in Headers */,
 				6573B9D2291FE29F00B0ED7C /* V8RuntimeConfig.h in Headers */,
-				C247C33722F828E3001D2CA2 /* trace_event_common.h in Headers */,
 				2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */,
 				C275F478253B37AB00A997D5 /* UnmanagedType.h in Headers */,
 				C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */,
 				C247C16722F82842001D2CA2 /* libplatform.h in Headers */,
 				C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */,
 				3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */,
-				C247C3AA22F828E3001D2CA2 /* once.h in Headers */,
-				C247C3A822F828E3001D2CA2 /* lazy-instance.h in Headers */,
-				C247C36922F828E3001D2CA2 /* Security.h in Headers */,
-				C247C3A722F828E3001D2CA2 /* atomicops.h in Headers */,
-				C247C3A222F828E3001D2CA2 /* platform.h in Headers */,
 				C247C16922F82842001D2CA2 /* v8-tracing.h in Headers */,
 				6573B9E9291FE2A700B0ED7C /* threadsafe.h in Headers */,
 				C22536B7241A318900192740 /* ffitarget.h in Headers */,
@@ -1525,51 +1521,27 @@
 				C266569822AFFFB000EE15CC /* Reference.h in Headers */,
 				C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
-				C2229977235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.h in Headers */,
-				C247C16C22F82842001D2CA2 /* Schema.h in Headers */,
-				C2FAAE2B26A99E7400538598 /* v8-debugger-id.h in Headers */,
-				C247C38422F828E3001D2CA2 /* v8-network-agent-impl.h in Headers */,
-				C247C38A22F828E3001D2CA2 /* v8-console-message.h in Headers */,
 				C2F4D0CB2334A6E70008A2EB /* RuntimeConfig.h in Headers */,
 				C247C16B22F82842001D2CA2 /* v8.h in Headers */,
 				C22536B6241A318900192740 /* ffi.h in Headers */,
 				C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */,
 				3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */,
 				C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */,
-				C247C39822F828E3001D2CA2 /* vector.h in Headers */,
 				6573B9D6291FE2A000B0ED7C /* V8RuntimeFactory.h in Headers */,
-				C247C37522F828E3001D2CA2 /* CSS.h in Headers */,
-				C247C36322F828E3001D2CA2 /* Page.h in Headers */,
-				C247C35A22F828E3001D2CA2 /* injected-script.h in Headers */,
 				C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */,
 				C247C16822F82842001D2CA2 /* libplatform-export.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
-				C247C3AE22F828E3001D2CA2 /* compiler-specific.h in Headers */,
-				C247C38922F828E3001D2CA2 /* v8-debugger-script.h in Headers */,
 				6573B9ED291FE5B700B0ED7C /* JSIRuntime.h in Headers */,
-				C2AEC02E24695D1000342025 /* default-platform.h in Headers */,
-				C247C37C22F828E3001D2CA2 /* string-util.h in Headers */,
-				C247C37722F828E3001D2CA2 /* Profiler.h in Headers */,
-				C247C39222F828E3001D2CA2 /* v8-console-agent-impl.h in Headers */,
 				C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */,
 				C2DDEB9B229EAC8300345BFE /* DataWrapper.h in Headers */,
 				C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */,
 				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
 				C266569422AFFF7E00EE15CC /* Pointer.h in Headers */,
 				C247C17222F82842001D2CA2 /* v8-inspector.h in Headers */,
-				C2D7E9CD23F4024200DB289C /* error_support.h in Headers */,
-				C247C37122F828E3001D2CA2 /* Log.h in Headers */,
-				C247C37922F828E3001D2CA2 /* v8-value-utils.h in Headers */,
-				C247C3A522F828E3001D2CA2 /* safe_conversions.h in Headers */,
 				C266569422AFFF7E00EE15CC /* Pointer.h in Headers */,
 				C247C17222F82842001D2CA2 /* v8-inspector.h in Headers */,
-				C263B4D023D0AF0900D5B872 /* v8-time.h in Headers */,
 				6573B9D5291FE29F00B0ED7C /* HostProxy.h in Headers */,
-				C247C3A322F828E3001D2CA2 /* v8-fallthrough.h in Headers */,
-				C2B30FDC238418CA009D6A46 /* cbor.h in Headers */,
-				C2B30FDD238418CA009D6A46 /* glue.h in Headers */,
 				6573B9E8291FE2A700B0ED7C /* decorator.h in Headers */,
-				C247C37422F828E3001D2CA2 /* Debugger.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2085,13 +2057,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */,
-				C247C36422F828E3001D2CA2 /* Log.cpp in Sources */,
-				C247C34922F828E3001D2CA2 /* v8-string-conversions.cc in Sources */,
-				C247C38C22F828E3001D2CA2 /* v8-network-agent-impl.cpp in Sources */,
 				6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */,
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
+				F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
 				C266569322AFFF7E00EE15CC /* Pointer.cpp in Sources */,
 				C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */,
@@ -2104,25 +2074,20 @@
 				C2DDEB99229EAC8300345BFE /* Metadata.mm in Sources */,
 				6573B9D4291FE29F00B0ED7C /* V8RuntimeFactory.cpp in Sources */,
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
+				F6191AAF29C0FCE8003F588F /* JsV8InspectorClient.cpp in Sources */,
 				C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
-				C247C34722F828E3001D2CA2 /* injected-script.cc in Sources */,
 				6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
-				C247C32F22F828E3001D2CA2 /* utils.mm in Sources */,
+				F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */,
 				6573B9D3291FE29F00B0ED7C /* HostProxy.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
-				C247C39122F828E3001D2CA2 /* remote-object-id.cc in Sources */,
-				C247C38222F828E3001D2CA2 /* v8-inspector-impl.cc in Sources */,
-				C247C38822F828E3001D2CA2 /* v8-overlay-agent-impl.cpp in Sources */,
-				C247C35F22F828E3001D2CA2 /* Network.cpp in Sources */,
 				6573B9E5291FE2A700B0ED7C /* jsi.cpp in Sources */,
-				C247C36522F828E3001D2CA2 /* Overlay.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
 				C2F4D0CD2334B1BC0008A2EB /* RuntimeConfig.cpp in Sources */,
 				C23E8F7622CDE88D0078FD4C /* WorkerWrapper.mm in Sources */,
@@ -2132,10 +2097,8 @@
 				C2F4D0AD232F85E20008A2EB /* SymbolIterator.mm in Sources */,
 				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
 				6573B9CF291FE29F00B0ED7C /* V8Runtime.cpp in Sources */,
-				C2229978235492EC00C1DFD6 /* v8-ns-debugger-agent-impl.cpp in Sources */,
 				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
 				6573B9E3291FE2A700B0ED7C /* jsilib-posix.cpp in Sources */,
-				C247C36622F828E3001D2CA2 /* Schema.cpp in Sources */,
 				C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */,
 				C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */,
 				C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */,
@@ -2144,12 +2107,10 @@
 				C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */,
 				C275F477253B37AB00A997D5 /* UnmanagedType.mm in Sources */,
 				C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */,
+				F6191AB729C0FF87003F588F /* utils.mm in Sources */,
 				6573B9D7291FE2A000B0ED7C /* V8PointerValue.cpp in Sources */,
-				C247C36222F828E3001D2CA2 /* Page.cpp in Sources */,
-				C2229973235449B400C1DFD6 /* InspectorServer.mm in Sources */,
 				C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */,
 				C27E5D8522F2FDDB00498ED0 /* KnownUnknownClassPair.cpp in Sources */,
-				C247C37D22F828E3001D2CA2 /* v8-schema-agent-impl.cc in Sources */,
 				6573B9E4291FE2A700B0ED7C /* jsilib-windows.cpp in Sources */,
 				C2DDEBB5229EAC8300345BFE /* Tasks.cpp in Sources */,
 				C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */,
