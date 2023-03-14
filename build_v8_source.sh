@@ -67,6 +67,9 @@ do
 
     ar r $OUTFOLDER/obj/v8_cppgc_shared/libv8_cppgc_shared.a $OUTFOLDER/obj/v8_cppgc_shared/*.o
     cp "$OUTFOLDER/obj/v8_cppgc_shared/libv8_cppgc_shared.a" "$DIST/$CURRENT_ARCH"
+
+    cp "$OUTFOLDER/obj/src/inspector/libinspector.a" "$DIST/$CURRENT_ARCH"
+    cp "$OUTFOLDER/obj/src/inspector/libinspector_string_conversions.a" "$DIST/$CURRENT_ARCH"
 done
 
 popd
