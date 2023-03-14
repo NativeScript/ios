@@ -242,8 +242,7 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
 
 Local<Context> JsV8InspectorClient::ensureDefaultContextInGroup(int contextGroupId) {
     Isolate* isolate = runtime_->GetIsolate();
-    Local<Context> context = PersistentToLocal(isolate, context_);
-    return context;
+    return context_.Get(isolate);
 }
 
 std::string JsV8InspectorClient::PumpMessage() {
@@ -256,25 +255,6 @@ std::string JsV8InspectorClient::PumpMessage() {
     });
 
     return result;
-}
-
-template<class TypeName>
-inline Local<TypeName> StrongPersistentToLocal(const Persistent<TypeName>& persistent) {
-    return *reinterpret_cast<Local<TypeName> *>(const_cast<Persistent<TypeName> *>(&persistent));
-}
-
-template<class TypeName>
-inline Local<TypeName> WeakPersistentToLocal(Isolate* isolate, const Persistent<TypeName>& persistent) {
-    return Local<TypeName>::New(isolate, persistent);
-}
-
-template<class TypeName>
-inline Local<TypeName> JsV8InspectorClient::PersistentToLocal(Isolate* isolate, const Persistent<TypeName>& persistent) {
-    if (persistent.IsWeak()) {
-        return WeakPersistentToLocal(isolate, persistent);
-    } else {
-        return StrongPersistentToLocal(persistent);
-    }
 }
 
 void JsV8InspectorClient::scheduleBreak() {

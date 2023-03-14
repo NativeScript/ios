@@ -58,8 +58,6 @@ private:
     void notify(std::unique_ptr<StringBuffer> message);
     void onFrontendConnected(std::function<void (std::string)> sender);
     void onFrontendMessageReceived(std::string message);
-    template <class TypeName>
-    static v8::Local<TypeName> PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent);
     std::string PumpMessage();
     static void registerDomainDispatcherCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void inspectorSendEventCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
