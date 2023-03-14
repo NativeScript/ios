@@ -333,7 +333,6 @@ void JsV8InspectorClient::inspectorTimestampCallback(const FunctionCallbackInfo<
     args.GetReturnValue().Set(timestamp);
 }
 
-int JsV8InspectorClient::contextGroupId = 1;
 std::map<std::string, Persistent<Object>*> JsV8InspectorClient::Domains;
 
 }

@@ -17,24 +17,25 @@ public:
     JsV8InspectorClient(tns::Runtime* runtime);
     void init();
     void connect(int argc, char** argv);
-    void createInspectorSession();
     void disconnect();
     void dispatchMessage(const std::string& message);
 
+    // Overrides of V8Inspector::Channel
     void sendResponse(int callId, std::unique_ptr<StringBuffer> message) override;
     void sendNotification(std::unique_ptr<StringBuffer> message) override;
     void flushProtocolNotifications() override;
 
+    // Overrides of V8InspectorClient
     void runMessageLoopOnPause(int contextGroupId) override;
     void quitMessageLoopOnPause() override;
-    v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
 
     void scheduleBreak();
     void registerModules();
 
     static std::map<std::string, v8::Persistent<v8::Object>*> Domains;
 private:
-    static int contextGroupId;
+    static constexpr int contextGroupId = 1;
+
     bool isConnected_;
     std::unique_ptr<V8Inspector> inspector_;
     v8::Persistent<v8::Context> context_;
@@ -49,7 +50,11 @@ private:
     std::function<void (std::string)> sender_;
     bool isWaitingForDebugger_;
 
+    // Override of V8InspectorClient
+    v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
+
     void enableInspector(int argc, char** argv);
+    void createInspectorSession();
     void notify(std::unique_ptr<StringBuffer> message);
     void onFrontendConnected(std::function<void (std::string)> sender);
     void onFrontendMessageReceived(std::string message);
