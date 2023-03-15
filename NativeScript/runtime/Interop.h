@@ -132,7 +132,7 @@ private:
     template <typename T>
     static void SetStructValue(v8::Local<v8::Value> value, void* destBuffer, ptrdiff_t position);
     static void InitializeStruct(v8::Local<v8::Context> context, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer, ptrdiff_t& position);
-    static void RegisterInteropType(v8::Local<v8::Context> context, v8::Local<v8::Object> types, std::string name, PrimitiveDataWrapper* wrapper);
+    static void RegisterInteropType(v8::Local<v8::Context> context, v8::Local<v8::Object> types, std::string name, PrimitiveDataWrapper* wrapper, bool autoDelete = true);
     static void RegisterBufferFromDataFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
     static void RegisterHandleOfFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
     static void RegisterAllocFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);

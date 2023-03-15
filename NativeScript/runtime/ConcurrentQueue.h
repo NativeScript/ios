@@ -19,7 +19,9 @@ private:
     std::queue<std::string> messagesQueue_;
     CFRunLoopSourceRef runLoopTasksSource_ = nullptr;
     CFRunLoopRef runLoop_ = nullptr;
+    bool terminated = false;
     std::mutex mutex_;
+    std::mutex initializationMutex_;
     void SignalAndWakeUp();
 };
 

@@ -2,6 +2,7 @@
 #include "Caches.h"
 #include "ObjectManager.h"
 #include "Helpers.h"
+#include "Constants.h"
 
 using namespace v8;
 
@@ -35,6 +36,7 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Local<Contex
     tns::SetValue(isolate, ctorFunc, new FunctionReferenceTypeWrapper());
 
     cache->FunctionReferenceCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
+    cache->FunctionReferenceCtorFunc->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
 
     return ctorFunc;
 }

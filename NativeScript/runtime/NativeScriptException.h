@@ -10,6 +10,7 @@ class NativeScriptException {
 public:
     NativeScriptException(const std::string& message);
     NativeScriptException(v8::Isolate* isolate, v8::TryCatch& tc, const std::string& message);
+    ~NativeScriptException();
     void ReThrowToV8(v8::Isolate* isolate);
     static void OnUncaughtError(v8::Local<v8::Message> message, v8::Local<v8::Value> error);
 private:

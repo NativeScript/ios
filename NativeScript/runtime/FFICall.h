@@ -91,7 +91,11 @@ public:
         }
     }
 
+    /**
+     When calling this, always make another call to DisposeFFIType with the same parameters
+     */
     static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding, bool isStructMember = false);
+    static void DisposeFFIType(ffi_type* type, const TypeEncoding* typeEncoding);
     static StructInfo GetStructInfo(const StructMeta* structMeta, std::string structName = "");
     static StructInfo GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldEncoding, const String* fieldNames, std::string structName = "");
 

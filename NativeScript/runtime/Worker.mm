@@ -5,6 +5,7 @@
 #include "Caches.h"
 #include "Helpers.h"
 #include "Runtime.h"
+#include "Constants.h"
 
 using namespace v8;
 
@@ -23,22 +24,22 @@ void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool i
 
         Local<FunctionTemplate> closeTemplate = FunctionTemplate::New(isolate, Worker::CloseWorkerCallback);
         globalTemplate->Set(tns::ToV8String(isolate, "close"), closeTemplate);
-    } else {
-        // Register functions in the main thread
-        Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback);
-        workerFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-        Local<v8::String> workerFuncName = ToV8String(isolate, "Worker");
-        workerFuncTemplate->SetClassName(workerFuncName);
-
-        Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
-        Local<FunctionTemplate> postMessageFuncTemplate = FunctionTemplate::New(isolate, PostMessageCallback);
-        Local<FunctionTemplate> terminateWorkerFuncTemplate = FunctionTemplate::New(isolate, TerminateCallback);
-
-        prototype->Set(ToV8String(isolate, "postMessage"), postMessageFuncTemplate);
-        prototype->Set(ToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
-
-        globalTemplate->Set(workerFuncName, workerFuncTemplate);
     }
+    // Register functions in the main thread
+    Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback);
+    workerFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    Local<v8::String> workerFuncName = ToV8String(isolate, "Worker");
+    workerFuncTemplate->SetClassName(workerFuncName);
+
+    Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
+    Local<FunctionTemplate> postMessageFuncTemplate = FunctionTemplate::New(isolate, PostMessageCallback);
+    Local<FunctionTemplate> terminateWorkerFuncTemplate = FunctionTemplate::New(isolate, TerminateCallback);
+
+    prototype->Set(ToV8String(isolate, "postMessage"), postMessageFuncTemplate);
+    prototype->Set(ToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
+
+    globalTemplate->Set(workerFuncName, workerFuncTemplate);
+
 }
 
 void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
@@ -73,7 +74,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
             tns::Runtime* runtime = new tns::Runtime();
             Isolate* isolate = runtime->CreateIsolate();
             v8::Locker locker(isolate);
-            runtime->Init(isolate);
+            runtime->Init(isolate, true);
             runtime->SetWorkerId(worker->WorkerId());
             int workerId = worker->WorkerId();
             Worker::SetWorkerId(isolate, workerId);
@@ -109,11 +110,11 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
         if (info.Length() < 1) {
             throw NativeScriptException("Not enough arguments.");
         }
-
+        
         if (info.Length() > 1) {
             throw NativeScriptException("Too many arguments passed.");
         }
-
+        
         int workerId = Worker::GetWorkerId(isolate, info.This());
         std::shared_ptr<Caches::WorkerState> state = Caches::Workers->Get(workerId);
         tns::Assert(state != nullptr, isolate);
@@ -121,17 +122,21 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
         if (!worker->IsRunning()) {
             return;
         }
-
+        
         Local<Value> error;
         Local<Value> result = Worker::Serialize(isolate, info[0], error);
         if (result.IsEmpty()) {
             isolate->ThrowException(error);
             return;
         }
-
+        
         std::string message = tns::ToString(isolate, result);
-
-        tns::ExecuteOnMainThread([state, message]() {
+        
+        auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
+        if (runtime == nullptr) {
+            return;
+        }
+        tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [state, message]() {
             Isolate* isolate = state->GetIsolate();
             v8::Locker locker(isolate);
             Isolate::Scope isolate_scope(isolate);
