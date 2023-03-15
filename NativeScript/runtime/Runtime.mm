@@ -28,8 +28,6 @@
 using namespace v8;
 using namespace std;
 
-#include "v8-inspector-platform.h"
-
 namespace tns {
 
 std::atomic<int> Runtime::nextIsolateId{0};
@@ -94,10 +92,12 @@ Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
 
 Isolate* Runtime::CreateIsolate() {
     if (!v8Initialized_) {
-        Runtime::platform_ = RuntimeConfig.IsDebug
-        ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
-        : platform::NewDefaultPlatform();
-        
+        // Runtime::platform_ = RuntimeConfig.IsDebug
+    //     ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
+    //     : platform::NewDefaultPlatform();
+
+        Runtime::platform_ = platform::NewDefaultPlatform();
+
         V8::InitializePlatform(Runtime::platform_.get());
         V8::Initialize();
         std::string flags = RuntimeConfig.IsDebug
@@ -107,6 +107,8 @@ Isolate* Runtime::CreateIsolate() {
         v8Initialized_ = true;
     }
     
+    // auto version = v8::V8::GetVersion();
+
     Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = &allocator_;
     Isolate* isolate = Isolate::New(create_params);
