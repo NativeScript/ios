@@ -8,6 +8,8 @@
 #include <map>
 
 #include "include/v8-inspector.h"
+#include "src/inspector/v8-console-message.h"
+
 #include "runtime/Runtime.h"
 
 namespace v8_inspector {
@@ -32,6 +34,9 @@ public:
     void scheduleBreak();
     void registerModules();
 
+    void consoleLog(v8::Isolate* isolate, ConsoleAPIType method,
+                    const std::vector<v8::Local<v8::Value>>& args);
+    
     static std::map<std::string, v8::Persistent<v8::Object>*> Domains;
 private:
     static constexpr int contextGroupId = 1;

@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include "NativeScript.h"
 #include "inspector/JsV8InspectorClient.h"
+#include "runtime/Console.h"
 #include "runtime/RuntimeConfig.h"
 #include "runtime/Helpers.h"
 #include "runtime/Runtime.h"
@@ -52,6 +53,7 @@ std::unique_ptr<Runtime> runtime_;
             inspectorClient->init();
             inspectorClient->registerModules();
             inspectorClient->connect([config ArgumentsCount], [config Arguments]);
+            Console::AttachInspectorClient(inspectorClient);
         }
     }
     

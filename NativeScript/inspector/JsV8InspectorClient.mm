@@ -1,10 +1,16 @@
 #include <Foundation/Foundation.h>
 #include <notify.h>
 #include <chrono>
+
+#include "src/inspector/v8-console-message.h"
+#include "src/inspector/v8-inspector-impl.h"
+#include "src/inspector/v8-inspector-session-impl.h"
+#include "src/inspector/v8-runtime-agent-impl.h"
+#include "src/inspector/v8-stack-trace-impl.h"
+
 #include "JsV8InspectorClient.h"
 #include "InspectorServer.h"
 #include "include/libplatform/libplatform.h"
-//#include "src/inspector/v8-log-agent-impl.h"
 #include "Helpers.h"
 #include "utils.h"
 
@@ -287,6 +293,8 @@ void JsV8InspectorClient::registerModules() {
         v8::Locker locker(isolate);
         TryCatch tc(isolate);
         runtime_->RunModule("inspector_modules");
+        // FIXME: This triggers some DCHECK failures, due to the entered v8::Context in
+        // Runtime::init().
     }
 }
 
@@ -311,6 +319,31 @@ void JsV8InspectorClient::registerDomainDispatcherCallback(const FunctionCallbac
 void JsV8InspectorClient::inspectorTimestampCallback(const FunctionCallbackInfo<Value>& args) {
     double timestamp = std::chrono::seconds(std::chrono::seconds(std::time(NULL))).count();
     args.GetReturnValue().Set(timestamp);
+}
+
+void JsV8InspectorClient::consoleLog(v8::Isolate* isolate, ConsoleAPIType method,
+                                     const std::vector<v8::Local<v8::Value>>& args) {
+    if (!isConnected_) {
+        return;
+    }
+
+    // Note, here we access private API
+    auto* impl = reinterpret_cast<v8_inspector::V8InspectorImpl*>(inspector_.get());
+    auto* session = reinterpret_cast<v8_inspector::V8InspectorSessionImpl*>(session_.get());
+    
+    v8::Local<v8::StackTrace> stack = v8::StackTrace::CurrentStackTrace(
+        isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
+    std::unique_ptr<V8StackTraceImpl> stackImpl = impl->debugger()->createStackTrace(stack);
+    
+    v8::Local<v8::Context> context = context_.Get(isolate);
+    const int contextId = V8ContextInfo::executionContextId(context);
+    
+    std::unique_ptr<v8_inspector::V8ConsoleMessage> msg =
+            v8_inspector::V8ConsoleMessage::createForConsoleAPI(
+                context, contextId, contextGroupId, impl, currentTimeMS(),
+                method, args, String16{}, std::move(stackImpl));
+    
+    session->runtimeAgent()->messageAdded(msg.get());
 }
 
 std::map<std::string, Persistent<Object>*> JsV8InspectorClient::Domains;
