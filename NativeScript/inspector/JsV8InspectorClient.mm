@@ -105,7 +105,6 @@ void JsV8InspectorClient::onFrontendConnected(std::function<void (std::string)> 
     }
 
     this->sender_ = sender;
-    this->disconnect();
 }
 
 void JsV8InspectorClient::onFrontendMessageReceived(std::string message) {
