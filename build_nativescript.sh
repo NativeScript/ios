@@ -2,6 +2,50 @@
 set -e
 source "$(dirname "$0")/build_utils.sh"
 
+function to_bool() {
+  local arg="$1"
+  case "$(echo "$arg" | tr '[:upper:]' '[:lower:]')" in
+    [0-9]+)
+      if [ $arg -eq 0 ]; then
+        echo false
+      else
+        echo true
+      fi
+      ;;
+    n|no|f|false) echo false ;;
+    y|yes|t|true) echo true ;;
+    * )
+      if [ -n "$arg" ]; then
+        echo "warning: invalid boolean argument ('$arg'). Expected true or false" >&2
+      fi
+      echo false
+      ;;
+  esac;
+}
+
+BUILD_CATALYST=$(to_bool ${BUILD_CATALYST:=true})
+BUILD_IPHONE=$(to_bool ${BUILD_IPHONE:=true})
+BUILD_SIMULATOR=$(to_bool ${BUILD_SIMULATOR:=true})
+VERBOSE=$(to_bool ${VERBOSE:=false})
+
+for arg in $@; do
+  case $arg in
+    --catalyst|--maccatalyst) BUILD_CATALYST=true ;;
+    --no-catalyst|--no-maccatalyst) BUILD_CATALYST=false ;;
+    --sim|--simulator) BUILD_SIMULATOR=true ;;
+    --no-sim|--no-simulator) BUILD_SIMULATOR=false ;;
+    --iphone|--device) BUILD_IPHONE=true ;;
+    --no-iphone|--no-device) BUILD_IPHONE=false ;;
+    --verbose|-v) VERBOSE=true ;;
+    *) ;;
+  esac
+done
+
+QUIET=
+if ! $VERBOSE; then
+  QUIET=-quiet
+fi
+
 DEV_TEAM=${DEVELOPMENT_TEAM:-}
 DIST=$(PWD)/dist
 mkdir -p $DIST
@@ -12,24 +56,29 @@ checkpoint "Cleanup NativeScript"
 xcodebuild -project v8ios.xcodeproj \
            -target "NativeScript" \
            -configuration Release clean \
-           -quiet
+           $QUIET
 
+
+if $BUILD_CATALYST; then
 checkpoint "Building NativeScript for Mac Catalyst"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
                    -destination "platform=macOS,variant=Mac Catalyst" \
-                   -quiet \
+                   $QUIET \
+                   EXCLUDED_ARCHS="x86_64" \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/intermediates/NativeScript.maccatalyst.xcarchive
+fi
 
+if $BUILD_SIMULATOR; then
 # checkpoint "Building for x86_64 iphone simulator"
 # xcodebuild archive -project v8ios.xcodeproj \
 #                    -scheme "NativeScript" \
 #                    -configuration Release \
 #                    -arch x86_64 \
 #                    -sdk iphonesimulator \
-#                    -quiet \
+#                    $QUIET \
 #                    DEVELOPMENT_TEAM=$DEV_TEAM \
 #                    SKIP_INSTALL=NO \
 #                    -archivePath $DIST/NativeScript.x86_64-iphonesimulator.xcarchive
@@ -40,7 +89,7 @@ xcodebuild archive -project v8ios.xcodeproj \
 #                    -configuration Release \
 #                    -arch arm64 \
 #                    -sdk iphonesimulator \
-#                    -quiet \
+#                    $QUIET \
 #                    DEVELOPMENT_TEAM=$DEV_TEAM \
 #                    SKIP_INSTALL=NO \
 #                    -archivePath $DIST/NativeScript.arm64-iphonesimulator.xcarchive
@@ -51,19 +100,21 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -configuration Release \
                    -destination "generic/platform=iOS Simulator" \
                    -sdk iphonesimulator \
-                   -quiet \
+                   $QUIET \
                    EXCLUDED_ARCHS="i386" \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/intermediates/NativeScript.iphonesimulator.xcarchive
+fi
 
+if $BUILD_IPHONE; then
 checkpoint "Building NativeScript for ARM64 device"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
                    -destination "generic/platform=iOS" \
                    -sdk iphoneos \
-                   -quiet \
+                   $QUIET \
                    EXCLUDED_ARCHS="armv7" \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
@@ -83,18 +134,28 @@ xcodebuild archive -project v8ios.xcodeproj \
 #     "$DIST/NativeScript.arm64-iphonesimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework/NativeScript" \
 #     -output \
 #     "$DIST/NativeScript.iphonesimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework/NativeScript"
+fi
+
+XCFRAMEWORKS=()
+if $BUILD_CATALYST; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.maccatalyst.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.maccatalyst.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+fi
+
+if $BUILD_SIMULATOR; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+fi
+
+if $BUILD_IPHONE; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.iphoneos.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.iphoneos.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+fi
 
 checkpoint "Creating NativeScript.xcframework"
 OUTPUT_DIR="$DIST/NativeScript.xcframework"
 rm -rf $OUTPUT_DIR
-xcodebuild -create-xcframework \
-           -framework "$DIST/intermediates/NativeScript.maccatalyst.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
-           -debug-symbols "$DIST/intermediates/NativeScript.maccatalyst.xcarchive/dSYMs/NativeScript.framework.dSYM" \
-           -framework "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
-           -debug-symbols "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" \
-           -framework "$DIST/intermediates/NativeScript.iphoneos.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
-           -debug-symbols "$DIST/intermediates/NativeScript.iphoneos.xcarchive/dSYMs/NativeScript.framework.dSYM" \
-           -output "$OUTPUT_DIR"
+xcodebuild -create-xcframework ${XCFRAMEWORKS[@]} -output "$OUTPUT_DIR"
 
 rm -rf "$DIST/intermediates"
 
