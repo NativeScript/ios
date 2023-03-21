@@ -4,7 +4,7 @@ set -e
 pushd v8
 
 ARCH_ARR=(x64-simulator arm64-simulator arm64-device)
-MODULES=(v8_base_without_compiler v8_compiler v8_libplatform v8_libbase v8_bigint v8_snapshot torque_generated_initializers torque_generated_definitions)
+MODULES=(v8_base_without_compiler v8_compiler v8_libplatform v8_libbase v8_bigint v8_snapshot v8_heap_base v8_heap_base_headers torque_generated_initializers torque_generated_definitions)
 
 for CURRENT_ARCH in ${ARCH_ARR[@]}
 do
@@ -67,6 +67,9 @@ do
 
     ar r $OUTFOLDER/obj/v8_cppgc_shared/libv8_cppgc_shared.a $OUTFOLDER/obj/v8_cppgc_shared/*.o
     cp "$OUTFOLDER/obj/v8_cppgc_shared/libv8_cppgc_shared.a" "$DIST/$CURRENT_ARCH"
+
+    cp "$OUTFOLDER/obj/src/inspector/libinspector.a" "$DIST/$CURRENT_ARCH"
+    cp "$OUTFOLDER/obj/src/inspector/libinspector_string_conversions.a" "$DIST/$CURRENT_ARCH"
 done
 
 popd

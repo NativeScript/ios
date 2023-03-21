@@ -35,6 +35,10 @@ void Console::Init(Local<Context> context) {
     }
 }
 
+void Console::AttachInspectorClient(v8_inspector::JsV8InspectorClient* aInspector) {
+    inspector = aInspector;
+}
+
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     // TODO: implement 'forceLog' override option like android has, to force logs in prod if desired
     if (!RuntimeConfig.LogToSystemConsole) {
@@ -59,8 +63,8 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
 
     std::string msgToLog = ss.str();
 
-    std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
-    // v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
+    ConsoleAPIType method = VerbosityToInspectorMethod(verbosityLevel);
+    SendToDevToolsFrontEnd(method, args);
     std::string msgWithVerbosity = "CONSOLE " + verbosityLevelUpper + ": " + msgToLog;
     Log("%s", msgWithVerbosity.c_str());
 }
@@ -86,7 +90,8 @@ void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
         }
 
         std::string log = ss.str();
-        // v8_inspector::V8LogAgentImpl::EntryAdded(log, "error", "", 0);
+        
+        SendToDevToolsFrontEnd(ConsoleAPIType::kAssert, args);
         Log("%s", log.c_str());
     }
 }
@@ -157,11 +162,7 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
     }
 
     std::string msgToLog = ss.str();
-
-    Local<v8::String> data = args.Data().As<v8::String>();
-    std::string verbosityLevel = tns::ToString(isolate, data);
-    std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
-    // v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
+    SendToDevToolsFrontEnd(ConsoleAPIType::kDir, args);
     Log("%s", msgToLog.c_str());
 }
 
@@ -221,11 +222,8 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
     std::stringstream ss;
     ss << "CONSOLE INFO " << label << ": " << std::fixed << std::setprecision(3) << diffMilliseconds << "ms" ;
 
-    Local<v8::String> data = args.Data().As<v8::String>();
-    std::string verbosityLevel = tns::ToString(isolate, data);
-    std::string level = VerbosityToInspectorVerbosity(verbosityLevel);
     std::string msgToLog = ss.str();
-    // v8_inspector::V8LogAgentImpl::EntryAdded(msgToLog, level, "", 0);
+    SendToDevToolsFrontEnd(isolate, ConsoleAPIType::kTimeEnd, msgToLog);
     Log("%s", msgToLog.c_str());
 }
 
@@ -346,14 +344,47 @@ const Local<v8::String> Console::TransformJSObject(Local<Object> object) {
     return resultString;
 }
 
-const std::string Console::VerbosityToInspectorVerbosity(const std::string level) {
+v8_inspector::ConsoleAPIType Console::VerbosityToInspectorMethod(const std::string level) {
     if (level == "error") {
-        return "error";
+        return ConsoleAPIType::kError;
     } else if (level == "warn") {
-        return "warning";
+        return ConsoleAPIType::kWarning;
+    } else if (level == "info") {
+        return ConsoleAPIType::kInfo;
+    } else if (level == "trace") {
+        return ConsoleAPIType::kTrace;
+    }
+    
+    assert(level == "log");
+    return ConsoleAPIType::kLog;
+}
+
+void Console::SendToDevToolsFrontEnd(ConsoleAPIType method,
+                                     const v8::FunctionCallbackInfo<v8::Value>& args) {
+    if (!inspector) {
+        return;
+    }
+    
+    std::vector<v8::Local<v8::Value>> arg_vector;
+    unsigned nargs = args.Length();
+    arg_vector.reserve(nargs);
+    for (unsigned ix = 0; ix < nargs; ix++)
+        arg_vector.push_back(args[ix]);
+
+    inspector->consoleLog(args.GetIsolate(), method, arg_vector);
+}
+
+void Console::SendToDevToolsFrontEnd(v8::Isolate* isolate, ConsoleAPIType method, const std::string& msg) {
+    if (!inspector) {
+        return;
     }
 
-    return "info";
+    v8::Local<v8::String> v8str = v8::String::NewFromUtf8(
+        isolate, msg.c_str(), v8::NewStringType::kNormal, -1).ToLocalChecked();
+    std::vector<v8::Local<v8::Value>> args{v8str};
+    inspector->consoleLog(isolate, method, args);
 }
+
+v8_inspector::JsV8InspectorClient* Console::inspector = nullptr;
 
 }
