@@ -9,7 +9,7 @@ using namespace v8;
 
 namespace tns {
 
-Local<Value> ExtVector::NewInstance(Isolate* isolate, void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding) {
+Local<Value> ExtVector::NewInstance(Isolate* isolate, void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding, const TypeEncoding* typeEncoding) {
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate);
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
     ctorFuncTemplate->InstanceTemplate()->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetCallback, IndexedPropertySetCallback));
@@ -22,7 +22,7 @@ Local<Value> ExtVector::NewInstance(Isolate* isolate, void* data, ffi_type* ffiT
     tns::Assert(success, isolate);
 
     // TODO: Validate that the inner type is supported (float, double)
-    ExtVectorWrapper* wrapper = new ExtVectorWrapper(data, ffiType, innerTypeEncoding);
+    ExtVectorWrapper* wrapper = new ExtVectorWrapper(data, ffiType, innerTypeEncoding, typeEncoding);
     tns::SetValue(isolate, result.As<Object>(), wrapper);
 
     return result;
@@ -37,6 +37,7 @@ void ExtVector::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbac
     const TypeEncoding* innerTypeEncoding = extVectorWrapper->InnerTypeEncoding();
     ffi_type* innerFFIType = FFICall::GetArgumentType(innerTypeEncoding);
     size_t offset = index * innerFFIType->size;
+    FFICall::DisposeFFIType(innerFFIType, innerTypeEncoding);
 
     ffi_type* ffiType = extVectorWrapper->FFIType();
     if (offset >= ffiType->size) {
@@ -61,6 +62,7 @@ void ExtVector::IndexedPropertySetCallback(uint32_t index, Local<Value> value, c
     const TypeEncoding* innerTypeEncoding = extVectorWrapper->InnerTypeEncoding();
     ffi_type* innerFFIType = FFICall::GetArgumentType(innerTypeEncoding);
     size_t offset = index * innerFFIType->size;
+    FFICall::DisposeFFIType(innerFFIType, innerTypeEncoding);
 
     ffi_type* ffiType = extVectorWrapper->FFIType();
     if (offset >= ffiType->size) {

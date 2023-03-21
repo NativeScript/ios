@@ -6,6 +6,7 @@
 #include "Common.h"
 #include "Caches.h"
 #include "DataWrapper.h"
+#include "IsolateWrapper.h"
 
 namespace tns {
 
@@ -14,13 +15,13 @@ class ArgConverter;
 struct MethodCallbackWrapper {
 public:
     MethodCallbackWrapper(v8::Isolate* isolate, std::shared_ptr<v8::Persistent<v8::Value>> callback, const uint8_t initialParamIndex, const uint8_t paramsCount, const TypeEncoding* typeEncoding)
-        : isolate_(isolate),
+        : isolateWrapper_(isolate),
           callback_(callback),
           initialParamIndex_(initialParamIndex),
           paramsCount_(paramsCount),
           typeEncoding_(typeEncoding) {
     }
-    v8::Isolate* isolate_;
+    IsolateWrapper isolateWrapper_;
     std::shared_ptr<v8::Persistent<v8::Value>> callback_;
     const uint8_t initialParamIndex_;
     const uint8_t paramsCount_;

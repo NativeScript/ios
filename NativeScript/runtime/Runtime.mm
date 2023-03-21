@@ -15,7 +15,12 @@
 #include "TSHelpers.h"
 #include "WeakRef.h"
 #include "Worker.h"
+#include "Constants.h"
+#include "SpinLock.h"
 // #include "SetTimeout.h"
+
+#include "IsolateWrapper.h"
+#include "DisposerPHV.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -25,6 +30,7 @@ using namespace std;
 
 namespace tns {
 
+std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
 
@@ -34,35 +40,71 @@ void Runtime::Initialize() {
 
 Runtime::Runtime() {
     currentRuntime_ = this;
+    workerId_ = -1;
 }
 
 Runtime::~Runtime() {
+    auto currentIsolate = this->isolate_;
+    {
+        // make sure we remove the isolate from the list of active isolates first
+        // this will make sure isAlive(isolate) will return false and prevent locking of the v8 isolate after
+        // it terminates execution
+        SpinLock lock(isolatesMutex_);
+        Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
+    }
     this->isolate_->TerminateExecution();
+    
+    // TODO: fix race condition on workers where a queue can leak (maybe calling Terminate before Initialize?)
+    Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
+        auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
+        if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
+            childWorkerWrapper->Terminate();
+        }
+        return false;
+    });
 
-    if (![NSThread isMainThread]) {
-        Caches::Workers->Remove(this->workerId_);
+    {
+        v8::Locker lock(isolate_);
+        DisposerPHV phv(isolate_);
+        isolate_->VisitHandlesWithClassIds( &phv );
+        
+        if (IsRuntimeWorker()) {
+            auto currentWorker = static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
+            Caches::Workers->Remove(this->workerId_);
+            // if the parent isolate is dead then deleting the wrapper is our responsibility
+            if (currentWorker->IsWeak()) {
+                delete currentWorker;
+            }
+        }
         Caches::Remove(this->isolate_);
+
+        this->isolate_->SetData(Constants::RUNTIME_SLOT, nullptr);
     }
 
-    Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
-
-    if (![NSThread isMainThread]) {
-        this->isolate_->Dispose();
-    }
+    this->isolate_->Dispose();
     
     currentRuntime_ = nullptr;
 }
 
+Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
+    return  static_cast<Runtime*>(isolate->GetData(Constants::RUNTIME_SLOT));
+}
+
 Isolate* Runtime::CreateIsolate() {
-    if (!mainThreadInitialized_) {
+    if (!v8Initialized_) {
+        // Runtime::platform_ = RuntimeConfig.IsDebug
+    //     ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
+    //     : platform::NewDefaultPlatform();
+
         Runtime::platform_ = platform::NewDefaultPlatform();
 
         V8::InitializePlatform(Runtime::platform_.get());
         V8::Initialize();
         std::string flags = RuntimeConfig.IsDebug
-            ? "--expose_gc --jitless"
-            : "--expose_gc --jitless --no-lazy";
+        ? "--expose_gc --jitless"
+        : "--expose_gc --jitless --no-lazy";
         V8::SetFlagsFromString(flags.c_str(), flags.size());
+        v8Initialized_ = true;
     }
     
     // auto version = v8::V8::GetVersion();
@@ -70,14 +112,19 @@ Isolate* Runtime::CreateIsolate() {
     Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = &allocator_;
     Isolate* isolate = Isolate::New(create_params);
+    runtimeLoop_ = CFRunLoopGetCurrent();
+    isolate->SetData(Constants::RUNTIME_SLOT, this);
 
-    Runtime::isolates_.emplace_back(isolate);
+    {
+        SpinLock lock(isolatesMutex_);
+        Runtime::isolates_.emplace_back(isolate);
+    }
 
     return isolate;
 }
 
-void Runtime::Init(Isolate* isolate) {
-    std::shared_ptr<Caches> cache = Caches::Init(isolate);
+void Runtime::Init(Isolate* isolate, bool isWorker) {
+    std::shared_ptr<Caches> cache = Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
     cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
     cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
 
@@ -88,13 +135,13 @@ void Runtime::Init(Isolate* isolate) {
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
     DefineNativeScriptVersion(isolate, globalTemplate);
 
-    Worker::Init(isolate, globalTemplate, mainThreadInitialized_);
+    Worker::Init(isolate, globalTemplate, isWorker);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
     DefineDrainMicrotaskMethod(isolate, globalTemplate);
     ObjectManager::Init(isolate, globalTemplate);
 //    SetTimeout::Init(isolate, globalTemplate);
-    MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, mainThreadInitialized_);
+    MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
@@ -102,7 +149,7 @@ void Runtime::Init(Isolate* isolate) {
     Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
     context->Enter();
 
-    DefineGlobalObject(context);
+    DefineGlobalObject(context, isWorker);
     DefineCollectFunction(context);
     PromiseProxy::Init(context);
     Console::Init(context);
@@ -120,8 +167,6 @@ void Runtime::Init(Isolate* isolate) {
     InlineFunctions::Init(context);
 
     cache->SetContext(context);
-
-    mainThreadInitialized_ = true;
 
     this->isolate_ = isolate;
 }
@@ -168,7 +213,7 @@ id Runtime::GetAppConfigValue(std::string key) {
     return result;
 }
 
-void Runtime::DefineGlobalObject(Local<Context> context) {
+void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
     Isolate* isolate = context->GetIsolate();
     Local<Object> global = context->Global();
     const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -176,7 +221,7 @@ void Runtime::DefineGlobalObject(Local<Context> context) {
         tns::Assert(false, isolate);
     }
 
-    if (mainThreadInitialized_ && !global->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "self"), global, readOnlyFlags).FromMaybe(false)) {
+    if (isWorker && !global->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "self"), global, readOnlyFlags).FromMaybe(false)) {
         tns::Assert(false, isolate);
     }
 }
@@ -236,13 +281,15 @@ void Runtime::DefineDrainMicrotaskMethod(v8::Isolate* isolate, v8::Local<v8::Obj
     globalTemplate->Set(ToV8String(isolate, "__drainMicrotaskQueue"), drainMicrotaskTemplate);
 }
 
-bool Runtime::IsAlive(Isolate* isolate) {
+bool Runtime::IsAlive(const Isolate* isolate) {
+    SpinLock lock(isolatesMutex_);
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
 }
 
 std::shared_ptr<Platform> Runtime::platform_;
 std::vector<Isolate*> Runtime::isolates_;
-bool Runtime::mainThreadInitialized_ = false;
+bool Runtime::v8Initialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;
+SpinMutex Runtime::isolatesMutex_;
 
 }

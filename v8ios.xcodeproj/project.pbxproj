@@ -9,7 +9,10 @@
 /* Begin PBXBuildFile section */
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
+		3CA6E53529A78C6000D30F8B /* IsolateWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */; };
 		3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CBFF7432971C1C200C5DE36 /* ArcMacro.h */; };
+		3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */; };
+		3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */; };
 		3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CEF9CCC28F896B70056BA45 /* SpinLock.h */; };
 		2C998AC1290FB501002BBFA9 /* SnapshotBlob.h in Headers */ = {isa = PBXBuildFile; fileRef = 2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */; };
 		6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9C2291FE29F00B0ED7C /* V8Runtime.h */; };
@@ -416,7 +419,10 @@
 /* Begin PBXFileReference section */
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
+		3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IsolateWrapper.h; sourceTree = "<group>"; };
 		3CBFF7432971C1C200C5DE36 /* ArcMacro.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArcMacro.h; sourceTree = "<group>"; };
+		3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DisposerPHV.mm; sourceTree = "<group>"; };
+		3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DisposerPHV.h; sourceTree = "<group>"; };
 		3CEF9CCC28F896B70056BA45 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SpinLock.h; sourceTree = "<group>"; };
 		2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SnapshotBlob.h; sourceTree = "<group>"; };
 		6573B9C2291FE29F00B0ED7C /* V8Runtime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = V8Runtime.h; sourceTree = "<group>"; };
@@ -1391,6 +1397,8 @@
 				C298C025233C9AEA000DDF54 /* TSHelpers.cpp */,
 				C2DDEB82229EAC8200345BFE /* WeakRef.h */,
 				C2DDEB69229EAC8100345BFE /* WeakRef.cpp */,
+				3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */,
+				3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */,
 				C22C092122CA3F370080D176 /* Worker.h */,
 				C22C092022CA3F370080D176 /* Worker.mm */,
 				C23E8F7422CDE88D0078FD4C /* WorkerWrapper.mm */,
@@ -1399,6 +1407,7 @@
 				C275F476253B37AB00A997D5 /* UnmanagedType.h */,
 				C275F475253B37AB00A997D5 /* UnmanagedType.mm */,
 				3CEF9CCC28F896B70056BA45 /* SpinLock.h */,
+				3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */,
 				2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */,
 			);
 			path = runtime;
@@ -1514,6 +1523,7 @@
 				3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */,
 				C247C16922F82842001D2CA2 /* v8-tracing.h in Headers */,
 				6573B9E9291FE2A700B0ED7C /* threadsafe.h in Headers */,
+				3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */,
 				C22536B7241A318900192740 /* ffitarget.h in Headers */,
 				C2DDEBAB229EAC8300345BFE /* WeakRef.h in Headers */,
 				C2DDEBA8229EAC8300345BFE /* SymbolLoader.h in Headers */,
@@ -1528,6 +1538,10 @@
 				3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */,
 				C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */,
 				6573B9D6291FE2A000B0ED7C /* V8RuntimeFactory.h in Headers */,
+				C247C37522F828E3001D2CA2 /* CSS.h in Headers */,
+				C247C36322F828E3001D2CA2 /* Page.h in Headers */,
+				3CA6E53529A78C6000D30F8B /* IsolateWrapper.h in Headers */,
+				C247C35A22F828E3001D2CA2 /* injected-script.h in Headers */,
 				C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */,
 				C247C16822F82842001D2CA2 /* libplatform-export.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
@@ -2092,6 +2106,7 @@
 				C2F4D0CD2334B1BC0008A2EB /* RuntimeConfig.cpp in Sources */,
 				C23E8F7622CDE88D0078FD4C /* WorkerWrapper.mm in Sources */,
 				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,
+				3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */,
 				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,
 				C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */,
 				C2F4D0AD232F85E20008A2EB /* SymbolIterator.mm in Sources */,

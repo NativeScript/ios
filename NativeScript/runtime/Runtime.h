@@ -5,6 +5,7 @@
 #include "Common.h"
 #include "ModuleInternal.h"
 #include "MetadataBuilder.h"
+#include "SpinLock.h"
 
 namespace tns {
 
@@ -13,13 +14,20 @@ public:
     Runtime();
     ~Runtime();
     v8::Isolate* CreateIsolate();
-    void Init(v8::Isolate* isolate);
+    void Init(v8::Isolate* isolate, bool isWorker = false);
     void RunMainScript();
     v8::Isolate* GetIsolate();
 
     const int WorkerId();
 
     void SetWorkerId(int workerId);
+    inline bool IsRuntimeWorker() {
+        return workerId_ > 0;
+    }
+    
+    inline CFRunLoopRef RuntimeLoop() {
+        return runtimeLoop_;
+    }
 
     void RunModule(const std::string moduleName);
 
@@ -28,13 +36,15 @@ public:
     static Runtime* GetCurrentRuntime() {
         return currentRuntime_;
     }
+    
+    static Runtime* GetRuntime(v8::Isolate* isolate);
 
     static bool IsWorker() {
         if (currentRuntime_ == nullptr) {
             return false;
         }
 
-        return currentRuntime_->WorkerId() > 0;
+        return currentRuntime_->IsRuntimeWorker();
     }
 
     static std::shared_ptr<v8::Platform> GetPlatform() {
@@ -43,14 +53,16 @@ public:
 
     static id GetAppConfigValue(std::string key);
 
-    static bool IsAlive(v8::Isolate* isolate);
+    static bool IsAlive(const v8::Isolate* isolate);
 private:
     static thread_local Runtime* currentRuntime_;
     static std::shared_ptr<v8::Platform> platform_;
     static std::vector<v8::Isolate*> isolates_;
-    static bool mainThreadInitialized_;
+    static SpinMutex isolatesMutex_;
+    static bool v8Initialized_;
+    static std::atomic<int> nextIsolateId;
 
-    void DefineGlobalObject(v8::Local<v8::Context> context);
+    void DefineGlobalObject(v8::Local<v8::Context> context, bool isWorker);
     void DefineCollectFunction(v8::Local<v8::Context> context);
     void DefineNativeScriptVersion(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     void DefinePerformanceObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
@@ -60,6 +72,7 @@ private:
     v8::Isolate* isolate_;
     std::unique_ptr<ModuleInternal> moduleInternal_;
     int workerId_;
+    CFRunLoopRef runtimeLoop_;
 };
 
 }

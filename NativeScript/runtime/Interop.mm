@@ -37,18 +37,13 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .dispose = [](JSBlock* block) {
         if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
-            Runtime* runtime = Runtime::GetCurrentRuntime();
-            if (runtime != nullptr) {
-                Isolate* runtimeIsolate = runtime->GetIsolate();
-                v8::Locker locker(runtimeIsolate);
-                Isolate::Scope isolate_scope(runtimeIsolate);
-                HandleScope handle_scope(runtimeIsolate);
-                Local<Value> callback = wrapper->callback_->Get(runtimeIsolate);
-                Isolate* isolate = wrapper->isolate_;
-                if (Runtime::IsAlive(isolate) && !callback.IsEmpty() && callback->IsObject()) {
-                    v8::Locker locker(isolate);
-                    Isolate::Scope isolate_scope(isolate);
-                    HandleScope handle_scope(isolate);
+            if (wrapper->isolateWrapper_.IsValid()) {
+                Isolate* isolate = wrapper->isolateWrapper_.Isolate();
+                v8::Locker locker(isolate);
+                Isolate::Scope isolate_scope(isolate);
+                HandleScope handle_scope(isolate);
+                Local<Value> callback = wrapper->callback_->Get(isolate);
+                if (!callback.IsEmpty() && callback->IsObject()) {
                     BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(tns::GetValue(isolate, callback));
                     tns::DeleteValue(isolate, callback);
                     wrapper->callback_->Reset();
@@ -191,6 +186,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
         ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, true);
         size_t size = ffiType->size;
+        FFICall::DisposeFFIType(ffiType, typeEncoding);
         memset(dest, 0, size);
     } else if (argHelper.isBool()) {
         if(typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference && isRefTypeEqual(typeEncoding, "NSNumber")) {
@@ -340,6 +336,15 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                 tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
                 const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
                 StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+                // TODO: How to free this?
+                // this is used when you have js obj and wants to pass the data as a struct ponter (MyStruct*)
+                // we create a new MyStruct with a snapshot of the jsObject and pass that in
+                // but when should we delete it?
+                // currently it's up to the function called to delete it
+                // we could delete after the function call, but if the fuction stores that then it's a memory leak
+                // we could also just store it as a wrapper in the object, binding it to the object lifecycle
+                // but that also means refactoring a lot of "if(wrapper == nullptr)" because essentially the wrapper
+                // should be treated as a nullptr, except when deating with StructDeclarationReference
                 data = malloc(structInfo.FFIType()->size);
                 Interop::InitializeStruct(context, data, structInfo.Fields(), arg);
             } else {
@@ -362,6 +367,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                     Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
                     ffi_type* ffiType = FFICall::GetArgumentType(innerType);
                     data = calloc(1, ffiType->size);
+                    FFICall::DisposeFFIType(ffiType, innerType);
 
                     referenceWrapper->SetData(data, true);
                     referenceWrapper->SetEncoding(innerType);
@@ -444,6 +450,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                 tns::Assert(data != nullptr, isolate);
                 ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
                 size_t size = ffiType->size;
+                FFICall::DisposeFFIType(ffiType, typeEncoding);
                 memcpy(dest, data, size);
             } else {
                 tns::Assert(false, isolate);
@@ -524,6 +531,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                 void* ptr = (uint8_t*)dest + i * ffiType->size;
                 Interop::WriteValue(context, innerType, ptr, element);
             }
+            FFICall::DisposeFFIType(ffiType, innerType);
         } else {
             void* data = Reference::GetWrappedPointer(context, arg, typeEncoding);
             Interop::SetValue(dest, data);
@@ -749,6 +757,7 @@ void Interop::InitializeStruct(Local<Context> context, void* destBuffer, std::ve
                     memcpy(dst, data, length * ffiType->size);
                 }
             }
+            FFICall::DisposeFFIType(ffiType, innerType);
         } else if (type == BinaryTypeEncodingType::FunctionPointerEncoding) {
             Interop::WriteValue(context, field.Encoding(), destBuffer, value);
         } else if (type == BinaryTypeEncodingType::PointerEncoding) {
@@ -801,6 +810,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         uint8_t* data = call->GetResult<uint8_t*>();
         UnmanagedTypeWrapper* wrapper = new UnmanagedTypeWrapper(data, typeEncoding);
         Local<Value> result = UnmanagedType::Create(context, wrapper);
+        ObjectManager::Register(context, result);
         return result;
     }
 
@@ -810,7 +820,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         void* buffer = call->ResultBuffer();
         void* data = malloc(ffiType->size);
         memcpy(data, buffer, ffiType->size);
-        Local<Value> value = ExtVector::NewInstance(isolate, data, ffiType, innerTypeEncoding);
+        Local<Value> value = ExtVector::NewInstance(isolate, data, ffiType, innerTypeEncoding, typeEncoding);
+        ObjectManager::Register(context, value);
         return value;
     }
 
@@ -850,6 +861,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             bool success = array->Set(context, i, element).FromMaybe(false);
             tns::Assert(success, isolate);
         }
+        FFICall::DisposeFFIType(innerFFIType, innerType);
         return array;
     }
 
@@ -969,6 +981,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         tns::Assert(success, isolate);
 
         tns::SetValue(isolate, callback, blockWrapper);
+        ObjectManager::Register(context, callback);
 
         return callback;
     }
@@ -1122,6 +1135,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             // attach Symbol.iterator to the instance
             SymbolIterator::Set(context, jsResult);
         }
+        
+        tns::DeleteWrapperIfUnused(isolate, jsResult, wrapper);
 
         return jsResult;
     }

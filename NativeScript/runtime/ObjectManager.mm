@@ -4,6 +4,8 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Caches.h"
+#include "Constants.h"
+#include "FFICall.h"
 
 using namespace v8;
 using namespace std;
@@ -19,6 +21,7 @@ void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate)
 std::shared_ptr<Persistent<Value>> ObjectManager::Register(Local<Context> context, const Local<Value> obj) {
     Isolate* isolate = context->GetIsolate();
     std::shared_ptr<Persistent<Value>> objectHandle = std::make_shared<Persistent<Value>>(isolate, obj);
+    objectHandle->SetWrapperClassId(Constants::ClassTypes::ObjectManagedValue);
     ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
     objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
     return objectHandle;
@@ -39,13 +42,13 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
     }
 }
 
-bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
+bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFinalDisposal) {
     if (value.IsEmpty() || value->IsNullOrUndefined() || !value->IsObject()) {
         return true;
     }
 
     Local<Object> obj = value.As<Object>();
-    if (obj->InternalFieldCount() > 1) {
+    if (obj->InternalFieldCount() > 1 && !isFinalDisposal) {
         Local<Value> superValue = obj->GetInternalField(1);
         if (!superValue.IsEmpty() && superValue->IsString()) {
             // Do not dispose the ObjCWrapper contained in a "super" instance
@@ -54,12 +57,13 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
     }
 
     BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+    //NSLog(@"dispose %p", wrapper);
     if (wrapper == nullptr) {
         tns::SetValue(isolate, obj, nullptr);
         return true;
     }
 
-    if (wrapper->IsGcProtected()) {
+    if (wrapper->IsGcProtected() && !isFinalDisposal) {
         return false;
     }
 
@@ -94,13 +98,6 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
             if (target != nil) {
                 cache->Instances.erase(target);
                 [target release];
-            }
-            break;
-        }
-        case WrapperType::UnmanagedType: {
-            UnmanagedTypeWrapper* unmanagedTypeWrapper = static_cast<UnmanagedTypeWrapper*>(wrapper);
-            if (unmanagedTypeWrapper != nullptr) {
-                delete unmanagedTypeWrapper;
             }
             break;
         }
@@ -143,18 +140,23 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value) {
         }
         case WrapperType::ExtVector: {
             ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
+            FFICall::DisposeFFIType(extVectorWrapper->FFIType(), extVectorWrapper->TypeEncoding());
             void* data = extVectorWrapper->Data();
             if (data) {
                 std::free(data);
             }
+            break;
         }
         case WrapperType::Worker: {
             WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
-            if (worker->IsRunning()) {
+            if (!worker->isDisposed()) {
+                // during final disposal, inform the worker it should delete itself
+                if (isFinalDisposal) {
+                    worker->MakeWeak();
+                }
                 return false;
-            } else {
-                return true;
             }
+            break;
         }
 
         default:
