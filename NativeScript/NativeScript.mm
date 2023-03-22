@@ -47,6 +47,7 @@ std::unique_ptr<Runtime> runtime_;
         std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
         printf("Runtime initialization took %llims\n", duration);
+        printf("Runtime V8 Version %s\n", V8::GetVersion());
 
         if (config.IsDebug) {
             Isolate::Scope isolate_scope(isolate);
