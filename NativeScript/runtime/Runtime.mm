@@ -41,6 +41,7 @@ void Runtime::Initialize() {
 Runtime::Runtime() {
     currentRuntime_ = this;
     workerId_ = -1;
+    workerCache_ = Caches::Workers;
 }
 
 Runtime::~Runtime() {
