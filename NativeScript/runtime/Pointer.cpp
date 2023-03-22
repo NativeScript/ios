@@ -19,7 +19,7 @@ Local<Value> Pointer::NewInstance(Local<Context> context, void* handle) {
     Isolate* isolate = context->GetIsolate();
     intptr_t ptr = static_cast<intptr_t>(reinterpret_cast<size_t>(handle));
 
-    Local<Value> arg = Number::New(isolate, ptr);
+    Local<Value> arg = BigInt::NewFromUnsigned(isolate, ptr);
     Local<Value> args[1] { arg };
     Local<Value> result;
     Local<v8::Function> ctorFunc = Pointer::GetPointerCtorFunc(context);
@@ -60,6 +60,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Local<Context> context) {
     Pointer::RegisterToHexStringMethod(context, prototype);
     Pointer::RegisterToDecimalStringMethod(context, prototype);
     Pointer::RegisterToNumberMethod(context, prototype);
+    Pointer::RegisterToBigIntMethod(context, prototype);
 
     cache->PointerCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
 
@@ -73,11 +74,11 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
         void* ptr = nullptr;
 
         if (info.Length() == 1) {
-            if (!tns::IsNumber(info[0])) {
+            bool isBigInt = tns::IsBigInt(info[0]);
+            bool isNumber = !isBigInt && tns::IsNumber(info[0]);
+            if (!isBigInt && !isNumber) {
                 throw NativeScriptException("Pointer constructor's first arg must be an integer.");
             }
-
-            Local<Number> arg = info[0].As<Number>();
 
     #if __SIZEOF_POINTER__ == 8
             // JSC stores 64-bit integers as doubles in JSValue.
@@ -87,12 +88,28 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
             // so we're safe at the time being.
             // See https://en.wikipedia.org/wiki/X86-64#Virtual_address_space_details
             // and https://en.wikipedia.org/wiki/ARM_architecture#ARMv8-A
+            
+            // The future is here, and turns out the OS is using more than 54 bits.
+            // as a result,
             int64_t value;
-            tns::Assert(arg->IntegerValue(context).To(&value), isolate);
+            if (isBigInt) {
+                value = info[0].As<BigInt>()->Int64Value();
+            } else {
+// TODO: Maybe log this?
+//#ifdef DEBUG
+//                syslog(LOG_WARNING, "Using JS Number to represent a pointer. Result might be wrong.");
+//#endif
+                tns::Assert(info[0].As<Number>()->IntegerValue(context).To(&value), isolate);
+            }
+
             ptr = reinterpret_cast<void*>(value);
     #else
             int32_t value;
-            tns::Assert(arg->Int32Value(context).To(&value), isolate);
+            if (isBigInt) {
+                value = (int32_t)info[0].As<BigInt>()->Int64Value();
+            } else {
+                tns::Assert(info[0].As<Number>()->Int32Value    (context).To(&value), isolate);
+            }
             ptr = reinterpret_cast<void*>(value);
     #endif
         }
@@ -250,6 +267,24 @@ void Pointer::RegisterToNumberMethod(Local<Context> context, Local<Object> proto
     tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
 
     bool success = prototype->Set(context, tns::ToV8String(isolate, "toNumber"), func).FromMaybe(false);
+    tns::Assert(success, isolate);
+}
+
+void Pointer::RegisterToBigIntMethod(Local<Context> context, Local<Object> prototype) {
+    Isolate* isolate = context->GetIsolate();
+    Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        const void* value = wrapper->Data();
+        size_t number = reinterpret_cast<size_t>(value);
+        Local<BigInt> result = BigInt::NewFromUnsigned(isolate, number);
+        info.GetReturnValue().Set(result);
+    });
+
+    Local<v8::Function> func;
+    tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
+
+    bool success = prototype->Set(context, tns::ToV8String(isolate, "toBigInt"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
