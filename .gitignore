@@ -42,11 +42,11 @@ node_modules/
 package-lock.json
 *.pyc
 v8
+v8_build
 .npmrc
 
 llvm/
 
 # v8 build files...
-.gclient_entries
-.gclient
+.gclient*
 .cipd/
