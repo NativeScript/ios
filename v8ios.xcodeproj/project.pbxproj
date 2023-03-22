@@ -9,12 +9,12 @@
 /* Begin PBXBuildFile section */
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
+		2C998AC1290FB501002BBFA9 /* SnapshotBlob.h in Headers */ = {isa = PBXBuildFile; fileRef = 2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */; };
 		3CA6E53529A78C6000D30F8B /* IsolateWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */; };
 		3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CBFF7432971C1C200C5DE36 /* ArcMacro.h */; };
 		3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */; };
 		3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */; };
 		3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CEF9CCC28F896B70056BA45 /* SpinLock.h */; };
-		2C998AC1290FB501002BBFA9 /* SnapshotBlob.h in Headers */ = {isa = PBXBuildFile; fileRef = 2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */; };
 		6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9C2291FE29F00B0ED7C /* V8Runtime.h */; };
 		6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */; };
 		6573B9CF291FE29F00B0ED7C /* V8Runtime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C4291FE29F00B0ED7C /* V8Runtime.cpp */; };
@@ -419,12 +419,12 @@
 /* Begin PBXFileReference section */
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
+		2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SnapshotBlob.h; sourceTree = "<group>"; };
 		3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IsolateWrapper.h; sourceTree = "<group>"; };
 		3CBFF7432971C1C200C5DE36 /* ArcMacro.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArcMacro.h; sourceTree = "<group>"; };
 		3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DisposerPHV.mm; sourceTree = "<group>"; };
 		3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DisposerPHV.h; sourceTree = "<group>"; };
 		3CEF9CCC28F896B70056BA45 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SpinLock.h; sourceTree = "<group>"; };
-		2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SnapshotBlob.h; sourceTree = "<group>"; };
 		6573B9C2291FE29F00B0ED7C /* V8Runtime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = V8Runtime.h; sourceTree = "<group>"; };
 		6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JSIV8ValueConverter.cpp; sourceTree = "<group>"; };
 		6573B9C4291FE29F00B0ED7C /* V8Runtime.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = V8Runtime.cpp; sourceTree = "<group>"; };
@@ -1538,10 +1538,7 @@
 				3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */,
 				C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */,
 				6573B9D6291FE2A000B0ED7C /* V8RuntimeFactory.h in Headers */,
-				C247C37522F828E3001D2CA2 /* CSS.h in Headers */,
-				C247C36322F828E3001D2CA2 /* Page.h in Headers */,
 				3CA6E53529A78C6000D30F8B /* IsolateWrapper.h in Headers */,
-				C247C35A22F828E3001D2CA2 /* injected-script.h in Headers */,
 				C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */,
 				C247C16822F82842001D2CA2 /* libplatform-export.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
@@ -2535,7 +2532,7 @@
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 8V7T28DG39;
+				DEVELOPMENT_TEAM = CS838V553Y;
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -2686,7 +2683,8 @@
 					"-ltorque_generated_definitions",
 					"-lv8_heap_base",
 					"-lv8_heap_base_headers",
-					"-linspector_protocol",
+					"-lcrdtp",
+					"-lcrdtp_platform",
 					"-linspector",
 					"-linspector_string_conversions",
 				);
@@ -2765,7 +2763,8 @@
 					"-ltorque_generated_definitions",
 					"-lv8_heap_base",
 					"-lv8_heap_base_headers",
-					"-linspector_protocol",
+					"-lcrdtp",
+					"-lcrdtp_platform",
 					"-linspector",
 					"-linspector_string_conversions",
 				);
