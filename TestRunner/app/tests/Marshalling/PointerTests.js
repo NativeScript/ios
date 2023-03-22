@@ -18,6 +18,27 @@ describe(module.id, function () {
         expect(pointer.toString()).toBe(`<Pointer: ${hexMinusOneForCurrentBitness}>`);
     });
 
+    it("Pointer from a BigInt", function () {
+        const number = 0x12abcdef;
+        var pointer = new interop.Pointer(BigInt(number));
+        expect(pointer instanceof interop.Pointer).toBe(true);
+        expect(pointer.toNumber()).toBe(number);
+        expect(pointer.toString()).toBe(`<Pointer: 0x${number.toString(16)}>`);
+        expect(pointer.toDecimalString()).toBe(number.toString());
+        expect(pointer.toBigInt()).toBe(BigInt(number));
+    });
+
+    it("Pointer from a really big BigInt", function () {
+        const number = BigInt("0x1fffffffffffffff");
+        var pointer = new interop.Pointer(number);
+        expect(pointer instanceof interop.Pointer).toBe(true);
+        // toNumber is no longer accurate
+        expect(pointer.toNumber()).toBeGreaterThan(Number.MAX_SAFE_INTEGER);
+        expect(pointer.toString()).toBe(`<Pointer: 0x${number.toString(16)}>`);
+        expect(pointer.toDecimalString()).toBe(number.toString());
+        expect(pointer.toBigInt()).toBe(BigInt(number));
+    });
+
     it("Pointer from a wrapped Number", function () {
         const number = 0x12abcdef;
         var pointer = new interop.Pointer(new Number(number));
