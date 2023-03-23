@@ -2,6 +2,7 @@
 #include "JsV8InspectorClient.h"
 //#include "src/inspector/v8-inspector-session-impl.h"
 #include "Helpers.h"
+#include "Caches.h"
 
 using namespace v8;
 
@@ -13,7 +14,15 @@ void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<
     Isolate* isolate = args.GetIsolate();
     Local<v8::String> arg = args[0].As<v8::String>();
     std::string message = tns::ToString(isolate, arg);
-
+    
+//    if (message.find("\"Page.") != std::string::npos) {
+        std::vector<uint16_t> vector = tns::ToVector(message);
+        StringView messageView(vector.data(), vector.size());
+        auto msg = StringBuffer::create(messageView);
+        client->sendNotification(std::move(msg));
+//        return;
+//    }
+//
 //    if (message.find("\"Network.") != std::string::npos) {
 //        // The Network domain is handled directly by the corresponding backend
 //        V8InspectorSessionImpl* session = (V8InspectorSessionImpl*)client->session_.get();
@@ -28,7 +37,7 @@ void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<
 //        return;
 //    }
 
-    client->dispatchMessage(message);
+//    client->dispatchMessage(message);
 }
 
 }

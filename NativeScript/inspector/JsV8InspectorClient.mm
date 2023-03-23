@@ -13,6 +13,7 @@
 #include "include/libplatform/libplatform.h"
 #include "Helpers.h"
 #include "utils.h"
+#include "Caches.h"
 
 using namespace v8;
 
@@ -242,6 +243,69 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     StringView messageView(vector.data(), vector.size());
     Isolate* isolate = this->runtime_->GetIsolate();
     v8::Locker locker(isolate);
+    Local<Context> context = tns::Caches::Get(isolate)->GetContext();
+    
+    Local<Value> arg;
+    bool success = v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&arg);
+    tns::Assert(success, isolate);
+    
+    if(arg->IsObject()) {
+        auto obj = arg.As<Object>();
+        auto method = obj->Get(context, tns::ToV8String(isolate, "method")).ToLocalChecked();
+        auto methodString = tns::ToString(isolate, method);
+        auto domainSeparatorIndex = methodString.find(".");
+        auto domain = methodString.substr(0, domainSeparatorIndex);
+        auto domainMethod = methodString.substr(domainSeparatorIndex + 1, methodString.size());
+        
+        if(domain.size() > 0) {
+            Local<Object> domainDebugger;
+            Local<v8::Function> domainMethodFunc = v8_inspector::GetDebuggerFunction(context, domain, domainMethod, domainDebugger);
+            
+            if(!domainMethodFunc.IsEmpty() && domainMethodFunc->IsFunction()) {
+                Local<Value> result;
+                Local<Value> args[1] = { arg };
+                success = domainMethodFunc->Call(context, domainDebugger, 1, args).ToLocal(&result);
+                if(!result.IsEmpty() && result->IsObject()) {
+                    Local<Value> sendEventFn;
+                    success = context->Global()->Get(context, tns::ToV8String(isolate, "__inspectorSendEvent")).ToLocal(&sendEventFn);
+                    tns::Assert(success, isolate);
+                    if (!sendEventFn.IsEmpty() && sendEventFn->IsFunction()) {
+                        Local<v8::Function> sendEventFn_ = sendEventFn.As<v8::Function>();
+                        Local<Value> stringified;
+                        success = JSON::Stringify(context, result).ToLocal(&stringified);
+                        if(success) {
+                            Local<Value> args[1] = { stringified  };
+                            success = sendEventFn_->Call(context, v8::Undefined(isolate), 1, args).ToLocal(&result);
+                        }
+                    }
+                    //FunctionCallbackInfo<Value> resArgs = {};
+//                    JsV8InspectorClient::inspectorSendEventCallback(resArgs)
+                }
+                return;
+            }
+        }
+        //
+    }
+    
+    
+//    if (
+//        message.find("\"Page.") != std::string::npos
+//        || message.find("\"Emulation.") != std::string::npos
+//        || message.find("\"Input.") != std::string::npos
+//    ) {
+//        Local<Value> testFn;
+//        success = context->Global()->Get(context, tns::ToV8String(isolate, "__test")).ToLocal(&testFn);
+//        tns::Assert(success, isolate);
+//        if (!testFn.IsEmpty() && testFn->IsFunction()) {
+//            Local<v8::Function> testFnn = testFn.As<v8::Function>();
+//            Local<Value> result;
+//            Local<Value> args[1] = { arg };
+//            success = testFnn->Call(context, v8::Undefined(isolate), 1, args).ToLocal(&result);
+//        }
+//
+//        return;
+//    }
+    
     this->session_->dispatchProtocolMessage(messageView);
 }
 
