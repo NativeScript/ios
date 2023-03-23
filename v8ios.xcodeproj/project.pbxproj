@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 52;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -14,7 +14,6 @@
 		3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CBFF7432971C1C200C5DE36 /* ArcMacro.h */; };
 		3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */; };
 		3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */; };
-		3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CEF9CCC28F896B70056BA45 /* SpinLock.h */; };
 		6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9C2291FE29F00B0ED7C /* V8Runtime.h */; };
 		6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */; };
 		6573B9CF291FE29F00B0ED7C /* V8Runtime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C4291FE29F00B0ED7C /* V8Runtime.cpp */; };
@@ -1471,17 +1470,14 @@
 				C247C16722F82842001D2CA2 /* libplatform.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
 				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
-				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
 				C247C17122F82842001D2CA2 /* v8config.h in Headers */,
 				6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */,
 				C22536B5241A318900192740 /* ffitarget.h in Headers */,
 				F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */,
 				6573B9D0291FE29F00B0ED7C /* JSIV8ValueConverter.h in Headers */,
-				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C20AB5E726E1015300E2B41D /* OneByteStringResource.h in Headers */,
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
 				6573B9E7291FE2A700B0ED7C /* jsi.h in Headers */,
-				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
 				6573B9E2291FE2A700B0ED7C /* jsi-inl.h in Headers */,
 				C2D21601248AAAD900EDC646 /* Constants.h in Headers */,
 				C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */,
@@ -1508,9 +1504,7 @@
 				C2DDEBA2229EAC8300345BFE /* Console.h in Headers */,
 				C22C092322CA3F370080D176 /* Worker.h in Headers */,
 				6573B9E6291FE2A700B0ED7C /* instrumentation.h in Headers */,
-				C2DDEBA2229EAC8300345BFE /* Console.h in Headers */,
 				6573B9EA291FE2A700B0ED7C /* jsilib.h in Headers */,
-				C22C092322CA3F370080D176 /* Worker.h in Headers */,
 				6573B9D1291FE29F00B0ED7C /* V8PointerValue.h in Headers */,
 				C247C16622F82842001D2CA2 /* v8-version.h in Headers */,
 				C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */,
@@ -1518,9 +1512,7 @@
 				2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */,
 				C275F478253B37AB00A997D5 /* UnmanagedType.h in Headers */,
 				C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */,
-				C247C16722F82842001D2CA2 /* libplatform.h in Headers */,
 				C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */,
-				3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */,
 				C247C16922F82842001D2CA2 /* v8-tracing.h in Headers */,
 				6573B9E9291FE2A700B0ED7C /* threadsafe.h in Headers */,
 				3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */,
@@ -1530,7 +1522,6 @@
 				C247C17322F82842001D2CA2 /* v8-internal.h in Headers */,
 				C266569822AFFFB000EE15CC /* Reference.h in Headers */,
 				C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */,
-				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
 				C2F4D0CB2334A6E70008A2EB /* RuntimeConfig.h in Headers */,
 				C247C16B22F82842001D2CA2 /* v8.h in Headers */,
 				C22536B6241A318900192740 /* ffi.h in Headers */,
@@ -1546,9 +1537,6 @@
 				C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */,
 				C2DDEB9B229EAC8300345BFE /* DataWrapper.h in Headers */,
 				C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */,
-				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
-				C266569422AFFF7E00EE15CC /* Pointer.h in Headers */,
-				C247C17222F82842001D2CA2 /* v8-inspector.h in Headers */,
 				C266569422AFFF7E00EE15CC /* Pointer.h in Headers */,
 				C247C17222F82842001D2CA2 /* v8-inspector.h in Headers */,
 				6573B9D5291FE29F00B0ED7C /* HostProxy.h in Headers */,
@@ -1700,7 +1688,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1110;
-				LastUpgradeCheck = 1030;
+				LastUpgradeCheck = 1420;
 				ORGANIZATIONNAME = Progress;
 				TargetAttributes = {
 					C2253781241A41C500192740 = {
@@ -1830,6 +1818,7 @@
 		};
 		C2F4CBBA22C60C0F0036B56F /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -1848,6 +1837,7 @@
 		};
 		C2F4CBBD22C61D480036B56F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -1861,7 +1851,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n\n# create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis\nfor arch in $VALID_ARCHS\ndo :\n    touch \"$CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\ndone\n";
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n\n# create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis\nfor arch in $VALID_ARCHS\ndo :\n    echo \"creating empty $CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\n    touch \"$CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -2092,12 +2082,8 @@
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */,
-				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */,
 				6573B9D3291FE29F00B0ED7C /* HostProxy.cpp in Sources */,
-				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
-				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
-				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				6573B9E5291FE2A700B0ED7C /* jsi.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
 				C2F4D0CD2334B1BC0008A2EB /* RuntimeConfig.cpp in Sources */,
@@ -2109,7 +2095,6 @@
 				C2F4D0AD232F85E20008A2EB /* SymbolIterator.mm in Sources */,
 				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
 				6573B9CF291FE29F00B0ED7C /* V8Runtime.cpp in Sources */,
-				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
 				6573B9E3291FE2A700B0ED7C /* jsilib-posix.cpp in Sources */,
 				C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */,
 				C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */,
@@ -2196,7 +2181,7 @@
 				);
 				INFOPLIST_FILE = TKLiveSync/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2229,7 +2214,7 @@
 				GCC_PREPROCESSOR_DEFINITIONS = "HAVE_CONFIG_H=1";
 				INFOPLIST_FILE = TKLiveSync/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2260,7 +2245,7 @@
 					"$(PROJECT_DIR)",
 				);
 				INFOPLIST_FILE = TestRunnerTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2286,7 +2271,7 @@
 					"$(PROJECT_DIR)",
 				);
 				INFOPLIST_FILE = TestRunnerTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2327,6 +2312,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -2353,7 +2339,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2389,6 +2375,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -2409,11 +2396,12 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				OTHER_CFLAGS = "";
 				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 				VALID_ARCHS = "$(ARCHS_STANDARD)";
 			};
@@ -2433,7 +2421,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
 				INFOPLIST_FILE = AppWithModules/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2468,7 +2456,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
 				INFOPLIST_FILE = AppWithModules/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2497,7 +2485,7 @@
 				DEFINES_MODULE = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2515,7 +2503,7 @@
 				ENABLE_NS_ASSERTIONS = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2541,7 +2529,7 @@
 					"$(SRCROOT)/TestFixtures",
 				);
 				INFOPLIST_FILE = TestRunner/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2590,7 +2578,7 @@
 					"$(SRCROOT)/TestFixtures",
 				);
 				INFOPLIST_FILE = TestRunner/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2642,7 +2630,7 @@
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				"LD_MAP_FILE_PATH[arch=*]" = "$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_VARIANT)-$(CURRENT_ARCH).txt";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2723,7 +2711,7 @@
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@loader_path/Frameworks",
@@ -2790,7 +2778,8 @@
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
-				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				VALID_ARCHS = x86_64;
@@ -2803,7 +2792,8 @@
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
-				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				VALID_ARCHS = x86_64;
