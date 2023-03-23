@@ -28,11 +28,13 @@ std::unique_ptr<Runtime> runtime_;
 - (instancetype)initWithConfig:(Config*)config {
     
     if (self = [super init]) {
-        RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
-        if (config.ApplicationPath != nil) {
-            RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:config.ApplicationPath] UTF8String];
-        } else {
-            RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
+        if (config.BaseDir != nil) {
+            RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
+            if (config.ApplicationPath != nil) {
+                RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:config.ApplicationPath] UTF8String];
+            } else {
+                RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
+            }
         }
         if (config.MetadataPtr != nil) {
             RuntimeConfig.MetadataPtr = [config MetadataPtr];
