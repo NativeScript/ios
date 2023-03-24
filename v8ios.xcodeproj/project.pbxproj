@@ -3,15 +3,17 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 52;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
 		2C998AC1290FB501002BBFA9 /* SnapshotBlob.h in Headers */ = {isa = PBXBuildFile; fileRef = 2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */; };
+		3CA6E53529A78C6000D30F8B /* IsolateWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */; };
 		3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CBFF7432971C1C200C5DE36 /* ArcMacro.h */; };
-		3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CEF9CCC28F896B70056BA45 /* SpinLock.h */; };
+		3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */; };
+		3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */; };
 		6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9C2291FE29F00B0ED7C /* V8Runtime.h */; };
 		6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */; };
 		6573B9CF291FE29F00B0ED7C /* V8Runtime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C4291FE29F00B0ED7C /* V8Runtime.cpp */; };
@@ -308,6 +310,13 @@
 		C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F64E8222E870A300EDB057 /* NativeScript.mm */; };
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
 		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
+		F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */; };
+		F6191AAF29C0FCE8003F588F /* JsV8InspectorClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */; };
+		F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA929C0FCE7003F588F /* InspectorServer.h */; };
+		F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AAA29C0FCE7003F588F /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		F6191AB629C0FF87003F588F /* utils.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AB429C0FF86003F588F /* utils.h */; };
+		F6191AB729C0FF87003F588F /* utils.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AB529C0FF86003F588F /* utils.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -410,7 +419,10 @@
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
 		2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SnapshotBlob.h; sourceTree = "<group>"; };
+		3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IsolateWrapper.h; sourceTree = "<group>"; };
 		3CBFF7432971C1C200C5DE36 /* ArcMacro.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArcMacro.h; sourceTree = "<group>"; };
+		3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DisposerPHV.mm; sourceTree = "<group>"; };
+		3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DisposerPHV.h; sourceTree = "<group>"; };
 		3CEF9CCC28F896B70056BA45 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SpinLock.h; sourceTree = "<group>"; };
 		6573B9C2291FE29F00B0ED7C /* V8Runtime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = V8Runtime.h; sourceTree = "<group>"; };
 		6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JSIV8ValueConverter.cpp; sourceTree = "<group>"; };
@@ -775,6 +787,13 @@
 		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		C2FF301C2252062A00933782 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		C2FF301F2252065E00933782 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JsV8InspectorClient.h; sourceTree = "<group>"; };
+		F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JsV8InspectorClient.cpp; sourceTree = "<group>"; };
+		F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = JsV8InspectorClient.mm; sourceTree = "<group>"; };
+		F6191AA929C0FCE7003F588F /* InspectorServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
+		F6191AAA29C0FCE7003F588F /* InspectorServer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorServer.mm; sourceTree = "<group>"; };
+		F6191AB429C0FF86003F588F /* utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
+		F6191AB529C0FF86003F588F /* utils.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = utils.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1281,6 +1300,7 @@
 		C2DDEB33229EAB3B00345BFE /* NativeScript */ = {
 			isa = PBXGroup;
 			children = (
+				F6191AA529C0FCE7003F588F /* inspector */,
 				6573B9D8291FE2A700B0ED7C /* jsi */,
 				6573B9C1291FE29F00B0ED7C /* v8runtime */,
 				C247C14C22F82842001D2CA2 /* include */,
@@ -1376,6 +1396,8 @@
 				C298C025233C9AEA000DDF54 /* TSHelpers.cpp */,
 				C2DDEB82229EAC8200345BFE /* WeakRef.h */,
 				C2DDEB69229EAC8100345BFE /* WeakRef.cpp */,
+				3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */,
+				3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */,
 				C22C092122CA3F370080D176 /* Worker.h */,
 				C22C092022CA3F370080D176 /* Worker.mm */,
 				C23E8F7422CDE88D0078FD4C /* WorkerWrapper.mm */,
@@ -1384,6 +1406,7 @@
 				C275F476253B37AB00A997D5 /* UnmanagedType.h */,
 				C275F475253B37AB00A997D5 /* UnmanagedType.mm */,
 				3CEF9CCC28F896B70056BA45 /* SpinLock.h */,
+				3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */,
 				2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */,
 			);
 			path = runtime;
@@ -1408,6 +1431,20 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		F6191AA529C0FCE7003F588F /* inspector */ = {
+			isa = PBXGroup;
+			children = (
+				F6191AB429C0FF86003F588F /* utils.h */,
+				F6191AB529C0FF86003F588F /* utils.mm */,
+				F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */,
+				F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */,
+				F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */,
+				F6191AA929C0FCE7003F588F /* InspectorServer.h */,
+				F6191AAA29C0FCE7003F588F /* InspectorServer.mm */,
+			);
+			path = inspector;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -1423,24 +1460,24 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F6191AB629C0FF87003F588F /* utils.h in Headers */,
 				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
 				9160C065291ED41F000641C0 /* SpinLock.h in Headers */,
 				C2A5DEC82327DCF600A91A76 /* NativeScript.h in Headers */,
 				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
+				F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */,
 				C247C16722F82842001D2CA2 /* libplatform.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
 				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
-				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
 				C247C17122F82842001D2CA2 /* v8config.h in Headers */,
 				6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */,
 				C22536B5241A318900192740 /* ffitarget.h in Headers */,
+				F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */,
 				6573B9D0291FE29F00B0ED7C /* JSIV8ValueConverter.h in Headers */,
-				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C20AB5E726E1015300E2B41D /* OneByteStringResource.h in Headers */,
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
 				6573B9E7291FE2A700B0ED7C /* jsi.h in Headers */,
-				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
 				6573B9E2291FE2A700B0ED7C /* jsi-inl.h in Headers */,
 				C2D21601248AAAD900EDC646 /* Constants.h in Headers */,
 				C2CC8EEB22BBA01E00B78928 /* FastEnumerationAdapter.h in Headers */,
@@ -1467,9 +1504,7 @@
 				C2DDEBA2229EAC8300345BFE /* Console.h in Headers */,
 				C22C092322CA3F370080D176 /* Worker.h in Headers */,
 				6573B9E6291FE2A700B0ED7C /* instrumentation.h in Headers */,
-				C2DDEBA2229EAC8300345BFE /* Console.h in Headers */,
 				6573B9EA291FE2A700B0ED7C /* jsilib.h in Headers */,
-				C22C092322CA3F370080D176 /* Worker.h in Headers */,
 				6573B9D1291FE29F00B0ED7C /* V8PointerValue.h in Headers */,
 				C247C16622F82842001D2CA2 /* v8-version.h in Headers */,
 				C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */,
@@ -1477,18 +1512,16 @@
 				2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */,
 				C275F478253B37AB00A997D5 /* UnmanagedType.h in Headers */,
 				C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */,
-				C247C16722F82842001D2CA2 /* libplatform.h in Headers */,
 				C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */,
-				3CEF9CCD28F896BC0056BA45 /* SpinLock.h in Headers */,
 				C247C16922F82842001D2CA2 /* v8-tracing.h in Headers */,
 				6573B9E9291FE2A700B0ED7C /* threadsafe.h in Headers */,
+				3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */,
 				C22536B7241A318900192740 /* ffitarget.h in Headers */,
 				C2DDEBAB229EAC8300345BFE /* WeakRef.h in Headers */,
 				C2DDEBA8229EAC8300345BFE /* SymbolLoader.h in Headers */,
 				C247C17322F82842001D2CA2 /* v8-internal.h in Headers */,
 				C266569822AFFFB000EE15CC /* Reference.h in Headers */,
 				C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */,
-				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
 				C2F4D0CB2334A6E70008A2EB /* RuntimeConfig.h in Headers */,
 				C247C16B22F82842001D2CA2 /* v8.h in Headers */,
 				C22536B6241A318900192740 /* ffi.h in Headers */,
@@ -1496,6 +1529,7 @@
 				3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */,
 				C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */,
 				6573B9D6291FE2A000B0ED7C /* V8RuntimeFactory.h in Headers */,
+				3CA6E53529A78C6000D30F8B /* IsolateWrapper.h in Headers */,
 				C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */,
 				C247C16822F82842001D2CA2 /* libplatform-export.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
@@ -1503,9 +1537,6 @@
 				C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */,
 				C2DDEB9B229EAC8300345BFE /* DataWrapper.h in Headers */,
 				C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */,
-				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
-				C266569422AFFF7E00EE15CC /* Pointer.h in Headers */,
-				C247C17222F82842001D2CA2 /* v8-inspector.h in Headers */,
 				C266569422AFFF7E00EE15CC /* Pointer.h in Headers */,
 				C247C17222F82842001D2CA2 /* v8-inspector.h in Headers */,
 				6573B9D5291FE29F00B0ED7C /* HostProxy.h in Headers */,
@@ -1658,7 +1689,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1110;
-				LastUpgradeCheck = 1030;
+				LastUpgradeCheck = 1420;
 				ORGANIZATIONNAME = Progress;
 				TargetAttributes = {
 					C2253781241A41C500192740 = {
@@ -1806,6 +1837,7 @@
 		};
 		C2F4CBBA22C60C0F0036B56F /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -1824,6 +1856,7 @@
 		};
 		C2F4CBBD22C61D480036B56F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -1837,7 +1870,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n";
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n\n# create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis\nfor arch in $VALID_ARCHS\ndo :\n    echo \"creating empty $CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\n    touch \"$CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -2048,6 +2081,7 @@
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
+				F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
 				C266569322AFFF7E00EE15CC /* Pointer.cpp in Sources */,
 				C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */,
@@ -2060,28 +2094,26 @@
 				C2DDEB99229EAC8300345BFE /* Metadata.mm in Sources */,
 				6573B9D4291FE29F00B0ED7C /* V8RuntimeFactory.cpp in Sources */,
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
+				F6191AAF29C0FCE8003F588F /* JsV8InspectorClient.cpp in Sources */,
 				C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */,
-				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
+				F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */,
 				6573B9D3291FE29F00B0ED7C /* HostProxy.cpp in Sources */,
-				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
-				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
-				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				6573B9E5291FE2A700B0ED7C /* jsi.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
 				C2F4D0CD2334B1BC0008A2EB /* RuntimeConfig.cpp in Sources */,
 				C23E8F7622CDE88D0078FD4C /* WorkerWrapper.mm in Sources */,
 				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,
+				3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */,
 				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,
 				C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */,
 				C2F4D0AD232F85E20008A2EB /* SymbolIterator.mm in Sources */,
 				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
 				6573B9CF291FE29F00B0ED7C /* V8Runtime.cpp in Sources */,
-				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
 				6573B9E3291FE2A700B0ED7C /* jsilib-posix.cpp in Sources */,
 				C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */,
 				C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */,
@@ -2091,6 +2123,7 @@
 				C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */,
 				C275F477253B37AB00A997D5 /* UnmanagedType.mm in Sources */,
 				C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */,
+				F6191AB729C0FF87003F588F /* utils.mm in Sources */,
 				6573B9D7291FE2A000B0ED7C /* V8PointerValue.cpp in Sources */,
 				C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */,
 				C27E5D8522F2FDDB00498ED0 /* KnownUnknownClassPair.cpp in Sources */,
@@ -2167,7 +2200,7 @@
 				);
 				INFOPLIST_FILE = TKLiveSync/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2200,7 +2233,7 @@
 				GCC_PREPROCESSOR_DEFINITIONS = "HAVE_CONFIG_H=1";
 				INFOPLIST_FILE = TKLiveSync/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2231,7 +2264,7 @@
 					"$(PROJECT_DIR)",
 				);
 				INFOPLIST_FILE = TestRunnerTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2257,7 +2290,7 @@
 					"$(PROJECT_DIR)",
 				);
 				INFOPLIST_FILE = TestRunnerTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2298,6 +2331,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -2324,7 +2358,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2360,6 +2394,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -2380,11 +2415,12 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				OTHER_CFLAGS = "";
 				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 				VALID_ARCHS = "$(ARCHS_STANDARD)";
 			};
@@ -2404,7 +2440,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
 				INFOPLIST_FILE = AppWithModules/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2439,7 +2475,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
 				INFOPLIST_FILE = AppWithModules/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2468,7 +2504,7 @@
 				DEFINES_MODULE = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2486,7 +2522,7 @@
 				ENABLE_NS_ASSERTIONS = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2503,7 +2539,7 @@
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 8V7T28DG39;
+				DEVELOPMENT_TEAM = CS838V553Y;
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -2512,7 +2548,7 @@
 					"$(SRCROOT)/TestFixtures",
 				);
 				INFOPLIST_FILE = TestRunner/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2561,7 +2597,7 @@
 					"$(SRCROOT)/TestFixtures",
 				);
 				INFOPLIST_FILE = TestRunner/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2613,7 +2649,7 @@
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				"LD_MAP_FILE_PATH[arch=*]" = "$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_VARIANT)-$(CURRENT_ARCH).txt";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2657,6 +2693,10 @@
 					"-ltorque_generated_initializers",
 					"-ltorque_generated_definitions",
 					"-lv8_heap_base",
+					"-lcrdtp",
+					"-lcrdtp_platform",
+					"-linspector",
+					"-linspector_string_conversions",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -2693,7 +2733,7 @@
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@loader_path/Frameworks",
@@ -2736,6 +2776,10 @@
 					"-ltorque_generated_initializers",
 					"-ltorque_generated_definitions",
 					"-lv8_heap_base",
+					"-lcrdtp",
+					"-lcrdtp_platform",
+					"-linspector",
+					"-linspector_string_conversions",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -2759,7 +2803,8 @@
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
-				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				VALID_ARCHS = x86_64;
@@ -2772,7 +2817,8 @@
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
-				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				DEAD_CODE_STRIPPING = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				VALID_ARCHS = x86_64;

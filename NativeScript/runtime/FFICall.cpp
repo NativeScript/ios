@@ -92,8 +92,8 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
             ffi_type* type = new ffi_type({ .size = size * innerFFIType->size, .alignment = innerFFIType->alignment, .type = FFI_TYPE_EXT_VECTOR });
             type->elements = new ffi_type*[size + 1];
 
-            for (size_t i = 0; i < size; i++) {
-                type->elements[i] = innerFFIType;
+            if (size > 0) {
+                std::fill(type->elements, type->elements + size, innerFFIType);
             }
 
             type->elements[size] = nullptr;
@@ -115,8 +115,8 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
                 int32_t size = typeEncoding->details.constantArray.size;
                 ffi_type* ffiType = new ffi_type({ .size = size * innerFFIType->size, .alignment = innerFFIType->alignment, .type = FFI_TYPE_STRUCT });
                 ffiType->elements = new ffi_type*[size + 1];
-                for (int32_t i = 0; i < size; i++) {
-                    ffiType->elements[i] = innerFFIType;
+                if (size > 0) {
+                    std::fill(ffiType->elements, ffiType->elements + size, innerFFIType);
                 }
                 ffiType->elements[size] = nullptr;
                 return ffiType;
@@ -139,6 +139,38 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
     // TODO: implement all the possible encoding types
     tns::Assert(false);
     return nullptr;
+}
+    
+void FFICall::DisposeFFIType(ffi_type* type, const TypeEncoding* typeEncoding) {
+    if (type == nullptr) {
+        return;
+    }
+    
+    switch (typeEncoding->type) {
+        case BinaryTypeEncodingType::ExtVectorEncoding: {
+            // dispose innerFFIType
+            if(type->elements[0] != nullptr) {
+                DisposeFFIType(type->elements[0], typeEncoding->details.extVector.getInnerType());
+            }
+            delete[] type->elements;
+            delete type;
+            break;
+        }
+        case BinaryTypeEncodingType::ConstantArrayEncoding: {
+            if(type == &ffi_type_pointer) {
+                break;
+            }
+            if(type->elements[0] != nullptr) {
+                DisposeFFIType(type->elements[0], typeEncoding->details.constantArray.getInnerType());
+            }
+            delete[] type->elements;
+            delete type;
+            break;
+        }
+        default:
+            break;
+    }
+    
 }
 
 StructInfo FFICall::GetStructInfo(const StructMeta* structMeta, std::string structName) {

@@ -318,9 +318,15 @@ private:
 
 class PrimitiveDataWrapper: public BaseDataWrapper {
 public:
-    PrimitiveDataWrapper(size_t size, const TypeEncoding* typeEncoding)
+    PrimitiveDataWrapper(size_t size,const TypeEncoding* typeEncoding, bool autoDeleteEncoding)
         : size_(size),
-          typeEncoding_(typeEncoding) {
+          typeEncoding_(typeEncoding),
+          autoDeleteEncoding_(autoDeleteEncoding) {
+    }
+    ~PrimitiveDataWrapper() {
+        if (autoDeleteEncoding_) {
+            std::free((struct TypeEncoding*)typeEncoding_);
+        }
     }
 
     const WrapperType Type() {
@@ -337,6 +343,7 @@ public:
 private:
     size_t size_;
     const struct TypeEncoding* typeEncoding_;
+    bool autoDeleteEncoding_;
 };
 
 class StructTypeWrapper: public BaseDataWrapper {
@@ -606,10 +613,11 @@ private:
 
 class ExtVectorWrapper: public BaseDataWrapper {
 public:
-    ExtVectorWrapper(void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding)
+    ExtVectorWrapper(void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding, const TypeEncoding* typeEncoding)
         : data_(data),
           ffiType_(ffiType),
-          innerTypeEncoding_(innerTypeEncoding) {
+          innerTypeEncoding_(innerTypeEncoding),
+          typeEncoding_(typeEncoding) {
     }
 
     const WrapperType Type() {
@@ -627,10 +635,14 @@ public:
     const TypeEncoding* InnerTypeEncoding() {
         return this->innerTypeEncoding_;
     }
+    const TypeEncoding* TypeEncoding() {
+        return this->typeEncoding_;
+    }
 private:
     void* data_;
     ffi_type* ffiType_;
-    const TypeEncoding* innerTypeEncoding_;
+    const struct TypeEncoding* innerTypeEncoding_;
+    const struct TypeEncoding* typeEncoding_;
 };
 
 class WorkerWrapper: public BaseDataWrapper {
@@ -646,19 +658,36 @@ public:
 
     const WrapperType Type();
     const int Id();
+    const inline bool isDisposed() {
+        return isDisposed_;
+    }
     const bool IsRunning();
     const bool IsClosing();
     const int WorkerId();
+    const inline v8::Isolate* GetMainIsolate() {
+        return mainIsolate_;
+    }
+    const inline v8::Isolate* GetWorkerIsolate() {
+        return workerIsolate_;
+    }
+    const inline void MakeWeak() {
+        isWeak_ = true;
+    }
+    const inline bool IsWeak() {
+        return isWeak_;
+    }
 private:
     v8::Isolate* mainIsolate_;
     v8::Isolate* workerIsolate_;
     bool isRunning_;
     bool isClosing_;
-    bool isTerminating_;
+    std::atomic<bool> isTerminating_;
+    bool isDisposed_;
+    bool isWeak_;
     std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
     std::shared_ptr<v8::Persistent<v8::Value>> poWorker_;
     ConcurrentQueue queue_;
-    static int nextId_;
+    static std::atomic<int> nextId_;
     int workerId_;
 
     void BackgroundLooper(std::function<v8::Isolate* ()> func);

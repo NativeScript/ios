@@ -18,6 +18,7 @@ namespace tns {
 
 Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate, const InterfaceMeta* interfaceMeta) {
     CacheItem* item = new CacheItem(interfaceMeta, nullptr);
+    Caches::Get(isolate)->registerCacheBoundObject(item);
     Local<External> ext = External::New(isolate, item);
     return FunctionTemplate::New(isolate, ClassBuilder::ExtendCallback, ext);
 }
@@ -68,6 +69,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         Local<v8::Function> baseCtorFunc = cache->CtorFuncs.find(item->meta_->name())->second->Get(isolate);
 
         CacheItem* cacheItem = new CacheItem(nullptr, extendedClass);
+        Caches::Get(isolate)->registerCacheBoundObject(cacheItem);
         Local<External> ext = External::New(isolate, cacheItem);
         Local<FunctionTemplate> extendedClassCtorFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
         extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
@@ -105,7 +107,9 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass, true);
         tns::SetValue(isolate, extendClassCtorFunc, wrapper);
 
-        cache->CtorFuncs.emplace(extendedClassName, std::make_unique<Persistent<v8::Function>>(isolate, extendClassCtorFunc));
+        auto extendedPersistent = std::make_unique<Persistent<v8::Function>>(isolate, extendClassCtorFunc);
+        extendedPersistent->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
+        cache->CtorFuncs.emplace(extendedClassName, std::move(extendedPersistent));
         cache->ClassPrototypes.emplace(extendedClassName, std::make_unique<Persistent<Object>>(isolate, extendFuncPrototype));
 
         info.GetReturnValue().Set(extendClassCtorFunc);
@@ -164,6 +168,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
 
     Local<v8::Function> extendsFunc = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
+        IsolateWrapper isolateWrapper(isolate);
         tns::Assert(info.Length() == 2, isolate);
         Local<Context> context = isolate->GetCurrentContext();
 
@@ -217,6 +222,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         cache->ClassPrototypes.emplace(extendedClassName, std::make_unique<Persistent<Object>>(isolate, extendedClassCtorFuncPrototype));
 
         Persistent<v8::Function>* poExtendedClassCtorFunc = new Persistent<v8::Function>(isolate, extendedClassCtorFunc);
+        poExtendedClassCtorFunc->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
 
         cache->CtorFuncs.emplace(extendedClassName, poExtendedClassCtorFunc);
 
@@ -276,7 +282,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
 
         void (*release)(id, SEL) = (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
         IMP newRelease = imp_implementationWithBlock(^(id self) {
-            if (!Runtime::IsAlive(isolate)) {
+            if (!Runtime::IsAlive(isolate) || isolateWrapper.IsValid()) {
                 return;
             }
 
@@ -547,6 +553,9 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
             std::string methodNameStr = tns::ToString(isolate, methodName);
             SEL selector = sel_registerName(methodNameStr.c_str());
 
+            // TODO: Investigate and maybe find a way to free this
+            // Currently this is added to the meta cache by the Interop::CreateMethod
+            // but when the isolate dies we might need to free it? Or maybe this is cached throughout all isolates
             TypeEncoding* typeEncoding = reinterpret_cast<TypeEncoding*>(calloc((argsCount + 1), sizeof(TypeEncoding)));
             typeEncoding->type = returnType;
 

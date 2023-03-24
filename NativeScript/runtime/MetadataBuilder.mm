@@ -20,6 +20,7 @@ namespace tns {
 
 void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool isWorkerThread) {
     GlobalHandlerContext* handlerContext = new GlobalHandlerContext(isWorkerThread);
+    Caches::Get(isolate)->registerCacheBoundObject(handlerContext);
     Local<External> ext = External::New(isolate, handlerContext);
 
     NamedPropertyHandlerConfiguration config(MetadataBuilder::GlobalPropertyGetter, nullptr, nullptr, nullptr, nullptr, ext, PropertyHandlerFlags::kNonMasking);
@@ -87,6 +88,7 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property, const Prope
         }
 
         CacheItem<FunctionMeta>* item = new CacheItem<FunctionMeta>(funcMeta, std::string(), functionPointer);
+        Caches::Get(isolate)->registerCacheBoundObject(item);
         Local<External> ext = External::New(isolate, item);
         Local<v8::Function> func;
         bool success = v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func);
@@ -195,6 +197,7 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
         std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, result);
         std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
         cache->StructInstances.emplace(key, poResult);
+        tns::DeleteWrapperIfUnused(isolate, result, wrapper);
 
         info.GetReturnValue().Set(result);
     } catch (NativeScriptException& ex) {
@@ -240,6 +243,14 @@ void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& in
 
     int result = memcmp(arg1Data, arg2Data, ffiType1->size);
     bool areEqual = result == 0;
+    
+    // these were created by GetStructData
+    if (arg1->InternalFieldCount() < 1) {
+        free(arg1Data);
+    }
+    if (arg2->InternalFieldCount() < 1) {
+        free(arg2Data);
+    }
 
     info.GetReturnValue().Set(areEqual);
 }
@@ -288,6 +299,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
     std::string className;
     CacheItem<BaseClassMeta>* item = new CacheItem<BaseClassMeta>(meta, className);
+    Caches::Get(isolate)->registerCacheBoundObject(item);
     Local<External> ext = External::New(isolate, item);
 
     ctorFuncTemplate = FunctionTemplate::New(isolate, ClassConstructorCallback, ext);
@@ -362,6 +374,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
         tns::SetValue(isolate, ctorFunc, new ObjCClassWrapper(klass));
         cache->CtorFuncs.emplace(meta->name(), std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc));
     }
+    ObjectManager::Register(context, ctorFunc);
 
     Local<Object> global = context->Global();
     auto jsNameV8String = tns::ToV8String(isolate, meta->jsName());
@@ -416,6 +429,7 @@ void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>
 void MetadataBuilder::RegisterAllocMethod(Isolate* isolate, Local<FunctionTemplate> ctorFuncTemplate, const InterfaceMeta* interfaceMeta) {
     std::string className;
     CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, className);
+    Caches::Get(isolate)->registerCacheBoundObject(item);
     Local<External> ext = External::New(isolate, item);
     Local<FunctionTemplate> allocFuncTemplate = FunctionTemplate::New(isolate, AllocCallback, ext);
     ctorFuncTemplate->Set(tns::ToV8String(isolate, "alloc"), allocFuncTemplate);
@@ -435,6 +449,7 @@ void MetadataBuilder::RegisterInstanceMethods(Local<Context> context, Local<Func
         auto methodsIt = names.find(methodName);
         if (methodsIt == names.end()) {
             CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name());
+            Caches::Get(isolate)->registerCacheBoundObject(item);
             Local<External> ext = External::New(isolate, item);
             Local<FunctionTemplate> instanceMethodTemplate = FunctionTemplate::New(isolate, MethodCallback, ext);
             proto->Set(tns::ToV8String(isolate, methodMeta->jsName()), instanceMethodTemplate);
@@ -465,6 +480,7 @@ void MetadataBuilder::RegisterInstanceProperties(Local<Context> context, Local<F
         auto propertiesIt = names.find(propertyName);
         if (accessors > 0 && (propertiesIt == names.end() || propertiesIt->second < accessors)) {
             CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className);
+            Caches::Get(isolate)->registerCacheBoundObject(item);
             Local<External> ext = External::New(isolate, item);
             Local<FunctionTemplate> getter = FunctionTemplate::New(isolate, PropertyGetterCallback, ext);
             Local<FunctionTemplate> setter = FunctionTemplate::New(isolate, PropertySetterCallback, ext);
@@ -521,6 +537,7 @@ void MetadataBuilder::RegisterStaticMethods(Local<Context> context, Local<v8::Fu
         auto methodsIt = names.find(methodName);
         if (methodsIt == names.end()) {
             CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name());
+            Caches::Get(isolate)->registerCacheBoundObject(item);
             Local<External> ext = External::New(isolate, item);
             Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate, MethodCallback, ext);
             Local<v8::Function> staticMethod;
@@ -563,6 +580,7 @@ void MetadataBuilder::RegisterStaticProperties(Local<Context> context, Local<v8:
         auto propertiesIt = names.find(propertyName);
         if (accessors > 0 && (propertiesIt == names.end() || propertiesIt->second < accessors)) {
             CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className);
+            Caches::Get(isolate)->registerCacheBoundObject(item);
             Local<External> ext = External::New(isolate, item);
 
             Local<v8::String> propName = tns::ToV8String(isolate, propMeta->jsName());
@@ -959,9 +977,13 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const P
             auto it = cache->Instances.find(thiz);
 
             Local<Context> v8Context = Caches::Get(context->isolate_)->GetContext();
+            ObjCDataWrapper* wrapper = nullptr;
             Local<Object> self_ = it != cache->Instances.end()
                 ? it->second->Get(context->isolate_).As<Object>()
-                : ArgConverter::CreateJsWrapper(v8Context, new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
+                : ArgConverter::CreateJsWrapper(v8Context, wrapper = new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
+            if (wrapper != nullptr) {
+                tns::DeleteWrapperIfUnused(context->isolate_, self_, wrapper);
+            }
             tns::Assert(getterFunc->Call(v8Context, self_, 0, nullptr).ToLocal(&res), context->isolate_);
 
             const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();

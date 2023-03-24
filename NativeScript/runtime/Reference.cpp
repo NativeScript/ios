@@ -4,6 +4,7 @@
 #include "ObjectManager.h"
 #include "Helpers.h"
 #include "Interop.h"
+#include "Constants.h"
 
 using namespace v8;
 
@@ -59,6 +60,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Local<Context> contex
     Reference::RegisterToStringMethod(context, prototype);
 
     cache->InteropReferenceCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
+    cache->InteropReferenceCtorFunc->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
 
     return ctorFunc;
 }
