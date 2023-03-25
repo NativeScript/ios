@@ -307,6 +307,8 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
 //    }
     
     this->session_->dispatchProtocolMessage(messageView);
+    // TODO: check why this is needed (it should trigger automatically when script depth is 0)
+    isolate->PerformMicrotaskCheckpoint();
 }
 
 Local<Context> JsV8InspectorClient::ensureDefaultContextInGroup(int contextGroupId) {

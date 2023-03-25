@@ -158,6 +158,10 @@ inline bool IsNumber(const v8::Local<v8::Value>& value) {
     return !value.IsEmpty() && (value->IsNumber() || value->IsNumberObject());
 }
 
+inline bool IsBigInt(const v8::Local<v8::Value>& value) {
+    return !value.IsEmpty() && (value->IsBigInt() || value->IsBigIntObject());
+}
+
 inline bool IsBool(const v8::Local<v8::Value>& value) {
     return !value.IsEmpty() && (value->IsBoolean() || value->IsBooleanObject());
 }

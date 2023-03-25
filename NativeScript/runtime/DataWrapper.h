@@ -556,11 +556,12 @@ private:
 
 class BlockWrapper: public BaseDataWrapper {
 public:
-    BlockWrapper(void* block, const TypeEncoding* typeEncoding)
+    BlockWrapper(void* block, const TypeEncoding* typeEncoding, bool ownsBlock)
         : block_(block),
-          typeEncoding_(typeEncoding) {
+          typeEncoding_(typeEncoding),
+          ownsBlock_(ownsBlock) {
     }
-
+    
     const WrapperType Type() {
         return WrapperType::Block;
     }
@@ -568,13 +569,19 @@ public:
     void* Block() {
         return this->block_;
     }
-
+    
     const TypeEncoding* Encodings() {
         return this->typeEncoding_;
     }
+    
+    bool OwnsBlock() {
+        return this->ownsBlock_;
+    }
+
 private:
     void* block_;
     const TypeEncoding* typeEncoding_;
+    bool ownsBlock_;
 };
 
 class FunctionReferenceTypeWrapper: public BaseDataWrapper {

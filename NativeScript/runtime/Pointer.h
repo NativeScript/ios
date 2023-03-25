@@ -19,6 +19,7 @@ private:
     static void RegisterToHexStringMethod(v8::Local<v8::Context> context, v8::Local<v8::Object> prototype);
     static void RegisterToDecimalStringMethod(v8::Local<v8::Context> context, v8::Local<v8::Object> prototype);
     static void RegisterToNumberMethod(v8::Local<v8::Context> context, v8::Local<v8::Object> prototype);
+    static void RegisterToBigIntMethod(v8::Local<v8::Context> context, v8::Local<v8::Object> prototype);
 };
 
 }

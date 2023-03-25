@@ -431,7 +431,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
             blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
 
-            BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding);
+            BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding, false);
             tns::SetValue(isolate, arg.As<v8::Function>(), wrapper);
         }
 
@@ -947,7 +947,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             return callback;
         }
 
-        BlockWrapper* blockWrapper = new BlockWrapper(block, typeEncoding);
+        BlockWrapper* blockWrapper = new BlockWrapper(block, typeEncoding, true);
         Local<External> ext = External::New(isolate, blockWrapper);
         Local<v8::Function> callback;
 

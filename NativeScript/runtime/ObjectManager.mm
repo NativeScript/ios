@@ -103,7 +103,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
         }
         case WrapperType::Block: {
             BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
-            std::free(blockWrapper->Block());
+            if(!blockWrapper->OwnsBlock()) {
+                std::free(blockWrapper->Block());
+            }
             break;
         }
         case WrapperType::Reference: {

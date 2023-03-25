@@ -282,7 +282,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
 
         void (*release)(id, SEL) = (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
         IMP newRelease = imp_implementationWithBlock(^(id self) {
-            if (!Runtime::IsAlive(isolate) || isolateWrapper.IsValid()) {
+            if (!Runtime::IsAlive(isolate) || !isolateWrapper.IsValid()) {
                 return;
             }
 

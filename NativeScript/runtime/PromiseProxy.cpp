@@ -20,7 +20,6 @@ void PromiseProxy::Init(v8::Local<v8::Context> context) {
                             return !resolve;
                         }
                         function markFulfilled() {
-                            runloop = null;
                             origFunc = null;
                             resolve = null;
                             reject = null;
