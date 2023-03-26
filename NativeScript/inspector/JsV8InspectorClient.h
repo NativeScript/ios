@@ -48,7 +48,7 @@ private:
     tns::Runtime* runtime_;
     v8::Isolate* isolate_;
     bool terminated_;
-    std::vector<std::string> messages_;
+    std::queue<std::string> messages_;
     bool runningNestedLoops_;
     dispatch_queue_t messagesQueue_;
     dispatch_queue_t messageLoopQueue_;

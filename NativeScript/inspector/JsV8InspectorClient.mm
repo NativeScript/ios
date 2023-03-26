@@ -112,7 +112,7 @@ void JsV8InspectorClient::onFrontendConnected(std::function<void (std::string)> 
 
 void JsV8InspectorClient::onFrontendMessageReceived(std::string message) {
     dispatch_sync(this->messagesQueue_, ^{
-        this->messages_.push_back(message);
+        this->messages_.push(message);
         dispatch_semaphore_signal(messageArrived_);
     });
 
@@ -336,8 +336,8 @@ std::string JsV8InspectorClient::PumpMessage() {
     __block std::string result;
     dispatch_sync(this->messagesQueue_, ^{
         if (this->messages_.size() > 0) {
-            result = this->messages_.back();
-            this->messages_.pop_back();
+            result = this->messages_.front();
+            this->messages_.pop();
         }
     });
 
