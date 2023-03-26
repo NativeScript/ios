@@ -6,6 +6,7 @@
 #include "RuntimeConfig.h"
 #include "Caches.h"
 #include "Helpers.h"
+#include "src/inspector/v8-debugger.h"
 
 using namespace v8;
 
@@ -16,6 +17,7 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
         "(function() { "
         "    function require_factory(requireInternal, dirName) { "
         "        return function require(modulePath) { "
+        "            if(__pauseOnNextRequire) {  debugger; __pauseOnNextRequire = false; }"
         "            return requireInternal(modulePath, dirName); "
         "        } "
         "    } "

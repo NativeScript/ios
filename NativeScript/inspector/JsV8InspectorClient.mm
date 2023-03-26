@@ -245,6 +245,8 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     StringView messageView(vector.data(), vector.size());
     Isolate* isolate = isolate_;
     v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    v8::HandleScope handle_scope(isolate);
     Local<Context> context = tns::Caches::Get(isolate)->GetContext();
     
     Local<Value> arg;
@@ -349,7 +351,16 @@ void JsV8InspectorClient::scheduleBreak() {
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
+    auto context = isolate->GetCurrentContext();
+    Context::Scope context_scope(context);
+    
+    // hack: force a debugger; statement in ModuleInternal to actually break before loading the next (main) script...
+    // FIXME: find a proper fix to not need to resort to this hack.
+    context->Global()->Set(context, tns::ToV8String(isolate, "__pauseOnNextRequire"), v8::Boolean::New(isolate, true)).ToChecked();
+
     this->session_->schedulePauseOnNextStatement({}, {});
+    
+    // v8::debug::SetBreakOnNextFunctionCall(isolate);
 }
 
 void JsV8InspectorClient::registerModules() {
