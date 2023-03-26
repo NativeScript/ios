@@ -17,6 +17,7 @@
 #include "Worker.h"
 #include "Constants.h"
 #include "SpinLock.h"
+#include "Profiler.h"
 // #include "SetTimeout.h"
 
 #include "IsolateWrapper.h"
@@ -141,6 +142,9 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     DefineDrainMicrotaskMethod(isolate, globalTemplate);
     ObjectManager::Init(isolate, globalTemplate);
 //    SetTimeout::Init(isolate, globalTemplate);
+    auto profiler = new Profiler();
+    profiler->Init(isolate, globalTemplate, "App", RuntimeConfig.ApplicationPath);
+    
     MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);

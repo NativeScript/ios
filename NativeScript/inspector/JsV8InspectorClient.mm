@@ -7,6 +7,7 @@
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-runtime-agent-impl.h"
 #include "src/inspector/v8-stack-trace-impl.h"
+#include "v8-profiler.h"
 
 #include "JsV8InspectorClient.h"
 #include "InspectorServer.h"
