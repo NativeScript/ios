@@ -26,6 +26,16 @@ namespace v8_inspector {
 
 #define LOG_DEBUGGER_PORT(port) NSLog(@"NativeScript debugger has opened inspector socket on port %d for %@.", port, [[NSBundle mainBundle] bundleIdentifier])
 
+JsV8InspectorClient::JsV8InspectorClient(tns::Runtime* runtime)
+    : runtime_(runtime),
+      isolate_(runtime_->GetIsolate()),
+      messages_(),
+      runningNestedLoops_(false) {
+     this->messagesQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_queue", DISPATCH_QUEUE_SERIAL);
+     this->messageLoopQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_loop_queue", DISPATCH_QUEUE_SERIAL);
+     this->messageArrived_ = dispatch_semaphore_create(0);
+}
+
 void JsV8InspectorClient::enableInspector(int argc, char** argv) {
     int waitForDebuggerSubscription;
     notify_register_dispatch(NOTIFICATION("WaitForDebugger"), &waitForDebuggerSubscription, dispatch_get_main_queue(), ^(int token) {
@@ -86,15 +96,6 @@ void JsV8InspectorClient::enableInspector(int argc, char** argv) {
     notify_cancel(waitForDebuggerSubscription);
 }
 
-JsV8InspectorClient::JsV8InspectorClient(tns::Runtime* runtime)
-    : runtime_(runtime),
-      messages_(),
-      runningNestedLoops_(false) {
-     this->messagesQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_queue", DISPATCH_QUEUE_SERIAL);
-     this->messageLoopQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_loop_queue", DISPATCH_QUEUE_SERIAL);
-     this->messageArrived_ = dispatch_semaphore_create(0);
-}
-
 void JsV8InspectorClient::onFrontendConnected(std::function<void (std::string)> sender) {
     if (this->isWaitingForDebugger_) {
         this->isWaitingForDebugger_ = NO;
@@ -138,7 +139,7 @@ void JsV8InspectorClient::init() {
         return;
     }
 
-    Isolate* isolate = runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
 
     Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
 
@@ -161,7 +162,7 @@ void JsV8InspectorClient::createInspectorSession() {
 }
 
 void JsV8InspectorClient::disconnect() {
-    Isolate* isolate = runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
@@ -200,7 +201,7 @@ void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
         }
 
         std::shared_ptr<Platform> platform = tns::Runtime::GetPlatform();
-        Isolate* isolate = runtime_->GetIsolate();
+        Isolate* isolate = isolate_;
         platform::PumpMessageLoop(platform.get(), isolate, platform::MessageLoopBehavior::kDoNotWait);
         if(shouldWait && !terminated_) {
             dispatch_semaphore_wait(messageArrived_, dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_MSEC)); // 1ms
@@ -242,7 +243,7 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     std::vector<uint16_t> vector = tns::ToVector(message);
     StringView messageView(vector.data(), vector.size());
-    Isolate* isolate = this->runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
     v8::Locker locker(isolate);
     Local<Context> context = tns::Caches::Get(isolate)->GetContext();
     
@@ -277,6 +278,11 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
                 if (tc.HasCaught()) {
                     std::string error = tns::ToString(isolate, tc.Message()->Get());
                     NSLog(@"Error during inspector dispatch: %s", error.c_str());
+                    
+                    // echo back the message for now i guess...
+                    auto msg = StringBuffer::create(messageView);
+                    this->sendNotification(std::move(msg));
+                    return;
                 }
                 
                 if(!result.IsEmpty() && result->IsObject()) {
@@ -323,8 +329,7 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
 }
 
 Local<Context> JsV8InspectorClient::ensureDefaultContextInGroup(int contextGroupId) {
-    Isolate* isolate = runtime_->GetIsolate();
-    return context_.Get(isolate);
+    return context_.Get(isolate_);
 }
 
 std::string JsV8InspectorClient::PumpMessage() {
@@ -340,7 +345,7 @@ std::string JsV8InspectorClient::PumpMessage() {
 }
 
 void JsV8InspectorClient::scheduleBreak() {
-    Isolate* isolate = runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
@@ -348,7 +353,7 @@ void JsV8InspectorClient::scheduleBreak() {
 }
 
 void JsV8InspectorClient::registerModules() {
-    Isolate* isolate = runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
     Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
     Local<Object> global = context->Global();
     Local<Object> inspectorObject = Object::New(isolate);

@@ -46,6 +46,7 @@ private:
     v8::Persistent<v8::Context> context_;
     std::unique_ptr<V8InspectorSession> session_;
     tns::Runtime* runtime_;
+    v8::Isolate* isolate_;
     bool terminated_;
     std::vector<std::string> messages_;
     bool runningNestedLoops_;
