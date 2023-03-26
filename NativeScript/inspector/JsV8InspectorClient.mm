@@ -262,50 +262,60 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
             Local<v8::Function> domainMethodFunc = v8_inspector::GetDebuggerFunction(context, domain, domainMethod, domainDebugger);
             
             if(!domainMethodFunc.IsEmpty() && domainMethodFunc->IsFunction()) {
+                TryCatch tc(isolate);
+                
+                auto params = arg.As<Object>()->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked();
                 Local<Value> result;
-                Local<Value> args[1] = { arg };
+                Local<Value> args[1] = { params };
+                
+                auto debug = v8::JSON::Stringify(context, params).ToLocalChecked();
+                auto debugStr = tns::ToString(isolate, debug);
+                
                 success = domainMethodFunc->Call(context, domainDebugger, 1, args).ToLocal(&result);
+                
+                if (tc.HasCaught()) {
+                    std::string error = tns::ToString(isolate, tc.Message()->Get());
+                    NSLog(@"Error during inspector dispatch: %s", error.c_str());
+                }
+                
                 if(!result.IsEmpty() && result->IsObject()) {
                     Local<Value> sendEventFn;
                     success = context->Global()->Get(context, tns::ToV8String(isolate, "__inspectorSendEvent")).ToLocal(&sendEventFn);
                     tns::Assert(success, isolate);
                     if (!sendEventFn.IsEmpty() && sendEventFn->IsFunction()) {
                         Local<v8::Function> sendEventFn_ = sendEventFn.As<v8::Function>();
+                        Local<Object> resObject = result.As<v8::Object>();
+                        bool hasResultKey = resObject->Has(context, tns::ToV8String(isolate, "result")).ToChecked();
                         Local<Value> stringified;
-                        success = JSON::Stringify(context, result).ToLocal(&stringified);
+                        if(hasResultKey) {
+                            success = JSON::Stringify(context, result).ToLocal(&stringified);
+                        } else {
+                            // backwards compatibility - we wrap the response in a new object with the { id, result } keys
+                            // since the returned response only contained the result part.
+                            Context::Scope context_scope(context);
+                            
+                            auto idKey = tns::ToV8String(isolate, "id");
+                            auto requestId = arg.As<Object>()->Get(context, idKey).ToLocalChecked();
+                            Local<Object> newResObject = v8::Object::New(isolate);
+                            newResObject->Set(context, idKey, requestId).ToChecked();
+                            newResObject->Set(context, tns::ToV8String(isolate, "result"), resObject).ToChecked();
+                            
+                            success = JSON::Stringify(context, newResObject).ToLocal(&stringified);
+                        }
+                        
+                        
                         if(success) {
                             Local<Value> args[1] = { stringified  };
                             success = sendEventFn_->Call(context, v8::Undefined(isolate), 1, args).ToLocal(&result);
                         }
                     }
-                    //FunctionCallbackInfo<Value> resArgs = {};
-//                    JsV8InspectorClient::inspectorSendEventCallback(resArgs)
                 }
                 return;
             }
         }
         //
     }
-    
-    
-//    if (
-//        message.find("\"Page.") != std::string::npos
-//        || message.find("\"Emulation.") != std::string::npos
-//        || message.find("\"Input.") != std::string::npos
-//    ) {
-//        Local<Value> testFn;
-//        success = context->Global()->Get(context, tns::ToV8String(isolate, "__test")).ToLocal(&testFn);
-//        tns::Assert(success, isolate);
-//        if (!testFn.IsEmpty() && testFn->IsFunction()) {
-//            Local<v8::Function> testFnn = testFn.As<v8::Function>();
-//            Local<Value> result;
-//            Local<Value> args[1] = { arg };
-//            success = testFnn->Call(context, v8::Undefined(isolate), 1, args).ToLocal(&result);
-//        }
-//
-//        return;
-//    }
-    
+
     this->session_->dispatchProtocolMessage(messageView);
     // TODO: check why this is needed (it should trigger automatically when script depth is 0)
     isolate->PerformMicrotaskCheckpoint();
@@ -379,6 +389,20 @@ void JsV8InspectorClient::registerDomainDispatcherCallback(const FunctionCallbac
         Persistent<Object>* poDomainObj = new Persistent<Object>(isolate, domainObj);
         Domains.emplace(domain, poDomainObj);
     }
+}
+
+void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<Value>& args) {
+    Local<External> data = args.Data().As<External>();
+    v8_inspector::JsV8InspectorClient* client = static_cast<v8_inspector::JsV8InspectorClient*>(data->Value());
+    Isolate* isolate = args.GetIsolate();
+    Local<v8::String> arg = args[0].As<v8::String>();
+    std::string message = tns::ToString(isolate, arg);
+    
+
+    std::vector<uint16_t> vector = tns::ToVector(message);
+    StringView messageView(vector.data(), vector.size());
+    auto msg = StringBuffer::create(messageView);
+    client->sendNotification(std::move(msg));
 }
 
 void JsV8InspectorClient::inspectorTimestampCallback(const FunctionCallbackInfo<Value>& args) {

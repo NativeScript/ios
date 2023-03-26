@@ -311,7 +311,6 @@
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
 		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
 		F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */; };
-		F6191AAF29C0FCE8003F588F /* JsV8InspectorClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */; };
 		F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA929C0FCE7003F588F /* InspectorServer.h */; };
 		F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AAA29C0FCE7003F588F /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
@@ -788,7 +787,6 @@
 		C2FF301C2252062A00933782 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		C2FF301F2252065E00933782 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JsV8InspectorClient.h; sourceTree = "<group>"; };
-		F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JsV8InspectorClient.cpp; sourceTree = "<group>"; };
 		F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = JsV8InspectorClient.mm; sourceTree = "<group>"; };
 		F6191AA929C0FCE7003F588F /* InspectorServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
 		F6191AAA29C0FCE7003F588F /* InspectorServer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorServer.mm; sourceTree = "<group>"; };
@@ -1437,7 +1435,6 @@
 				F6191AB429C0FF86003F588F /* utils.h */,
 				F6191AB529C0FF86003F588F /* utils.mm */,
 				F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */,
-				F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */,
 				F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */,
 				F6191AA929C0FCE7003F588F /* InspectorServer.h */,
 				F6191AAA29C0FCE7003F588F /* InspectorServer.mm */,
@@ -2075,7 +2072,6 @@
 				C2DDEB99229EAC8300345BFE /* Metadata.mm in Sources */,
 				6573B9D4291FE29F00B0ED7C /* V8RuntimeFactory.cpp in Sources */,
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
-				F6191AAF29C0FCE8003F588F /* JsV8InspectorClient.cpp in Sources */,
 				C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
