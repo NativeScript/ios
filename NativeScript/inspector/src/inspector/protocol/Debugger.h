@@ -339,6 +339,10 @@ public:
     protocol::Runtime::RemoteObject* getReturnValue(protocol::Runtime::RemoteObject* defaultValue) { return m_returnValue.isJust() ? m_returnValue.fromJust() : defaultValue; }
     void setReturnValue(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_returnValue = std::move(value); }
 
+    bool hasCanBeRestarted() { return m_canBeRestarted.isJust(); }
+    bool getCanBeRestarted(bool defaultValue) { return m_canBeRestarted.isJust() ? m_canBeRestarted.fromJust() : defaultValue; }
+    void setCanBeRestarted(bool value) { m_canBeRestarted = value; }
+
     template<int STATE>
     class CallFrameBuilder {
     public:
@@ -407,6 +411,12 @@ public:
             return *this;
         }
 
+        CallFrameBuilder<STATE>& setCanBeRestarted(bool value)
+        {
+            m_result->setCanBeRestarted(value);
+            return *this;
+        }
+
         std::unique_ptr<CallFrame> build()
         {
             static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
@@ -445,6 +455,7 @@ private:
     std::unique_ptr<protocol::Array<protocol::Debugger::Scope>> m_scopeChain;
     std::unique_ptr<protocol::Runtime::RemoteObject> m_this;
     Maybe<protocol::Runtime::RemoteObject> m_returnValue;
+    Maybe<bool> m_canBeRestarted;
 };
 
 

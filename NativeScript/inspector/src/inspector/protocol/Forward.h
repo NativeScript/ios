@@ -9,11 +9,8 @@
 
 #include "src/inspector/string-util.h"
 
-#include <cstddef>
 #include <memory>
 #include <vector>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "third_party/inspector_protocol/crdtp/error_support.h"
 #include "third_party/inspector_protocol/crdtp/dispatch.h"

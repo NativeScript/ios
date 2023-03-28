@@ -9,10 +9,15 @@
 #include <vector>
 
 #include "include/v8-inspector.h"
-#include "include/v8.h"
+#include "include/v8-local-handle.h"
 #include "src/base/macros.h"
 #include "src/inspector/protocol/Runtime.h"
 #include "src/inspector/string-16.h"
+
+namespace v8 {
+class StackFrame;
+class StackTrace;
+}  // namespace v8
 
 namespace v8_inspector {
 
@@ -22,7 +27,8 @@ struct V8StackTraceId;
 
 class StackFrame {
  public:
-  explicit StackFrame(v8::Isolate* isolate, v8::Local<v8::StackFrame> frame);
+  StackFrame(String16&& functionName, int scriptId, String16&& sourceURL,
+             int lineNumber, int columnNumber, bool hasSourceURLComment);
   ~StackFrame() = default;
 
   const String16& functionName() const;
@@ -45,15 +51,12 @@ class StackFrame {
 
 class V8StackTraceImpl : public V8StackTrace {
  public:
-  static void setCaptureStackTraceForUncaughtExceptions(v8::Isolate*,
-                                                        bool capture);
-  static int maxCallStackSizeToCapture;
+  static constexpr int kDefaultMaxCallStackSizeToCapture = 200;
+
   static std::unique_ptr<V8StackTraceImpl> create(V8Debugger*,
-                                                  int contextGroupId,
                                                   v8::Local<v8::StackTrace>,
                                                   int maxStackSize);
   static std::unique_ptr<V8StackTraceImpl> capture(V8Debugger*,
-                                                   int contextGroupId,
                                                    int maxStackSize);
 
   ~V8StackTraceImpl() override;
@@ -75,8 +78,6 @@ class V8StackTraceImpl : public V8StackTrace {
   int topColumnNumber() const override;  // 1-based.
   int topScriptId() const override;
   StringView topFunctionName() const override;
-  std::unique_ptr<protocol::Runtime::API::StackTrace> buildInspectorObject()
-      const override;
   std::unique_ptr<protocol::Runtime::API::StackTrace> buildInspectorObject(
       int maxAsyncDepth) const override;
   std::unique_ptr<StringBuffer> toString() const override;
@@ -114,26 +115,14 @@ class AsyncStackTrace {
   AsyncStackTrace(const AsyncStackTrace&) = delete;
   AsyncStackTrace& operator=(const AsyncStackTrace&) = delete;
   static std::shared_ptr<AsyncStackTrace> capture(V8Debugger*,
-                                                  int contextGroupId,
                                                   const String16& description,
-                                                  int maxStackSize);
+                                                  bool skipTopFrame = false);
   static uintptr_t store(V8Debugger* debugger,
                          std::shared_ptr<AsyncStackTrace> stack);
 
   std::unique_ptr<protocol::Runtime::StackTrace> buildInspectorObject(
       V8Debugger* debugger, int maxAsyncDepth) const;
 
-  // If async stack has suspended task id, it means that at moment when we
-  // capture current stack trace we suspended corresponded asynchronous
-  // execution flow and it is possible to request pause for a momemnt when
-  // that flow is resumed.
-  // E.g. every time when we suspend async function we mark corresponded async
-  // stack as suspended and every time when this function is resumed we remove
-  // suspendedTaskId.
-  void setSuspendedTaskId(void* task);
-  void* suspendedTaskId() const;
-
-  int contextGroupId() const;
   const String16& description() const;
   std::weak_ptr<AsyncStackTrace> parent() const;
   bool isEmpty() const;
@@ -144,14 +133,12 @@ class AsyncStackTrace {
   }
 
  private:
-  AsyncStackTrace(int contextGroupId, const String16& description,
+  AsyncStackTrace(const String16& description,
                   std::vector<std::shared_ptr<StackFrame>> frames,
                   std::shared_ptr<AsyncStackTrace> asyncParent,
                   const V8StackTraceId& externalParent);
 
-  int m_contextGroupId;
   uintptr_t m_id;
-  void* m_suspendedTaskId;
   String16 m_description;
 
   std::vector<std::shared_ptr<StackFrame>> m_frames;

@@ -10,6 +10,11 @@
 //#include "Allocator.h"
 //#include "Forward.h"
 
+#include <memory>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "src/inspector/protocol/Forward.h"
 
 namespace v8_inspector {
@@ -164,7 +169,9 @@ public:
 
     static std::unique_ptr<DictionaryValue> cast(std::unique_ptr<Value> value)
     {
-        return std::unique_ptr<DictionaryValue>(DictionaryValue::cast(value.release()));
+        DictionaryValue* dictionaryValue = cast(value.get());
+        if (dictionaryValue) value.release();
+        return std::unique_ptr<DictionaryValue>(dictionaryValue);
     }
 
     void AppendSerialized(std::vector<uint8_t>* bytes) const override;
@@ -230,7 +237,9 @@ public:
 
     static std::unique_ptr<ListValue> cast(std::unique_ptr<Value> value)
     {
-        return std::unique_ptr<ListValue>(ListValue::cast(value.release()));
+        ListValue* listValue = cast(value.get());
+        if (listValue) value.release();
+        return std::unique_ptr<ListValue>(listValue);
     }
 
     ~ListValue() override;

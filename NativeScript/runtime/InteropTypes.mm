@@ -8,6 +8,7 @@
 #include "FunctionReference.h"
 #include "Reference.h"
 #include "Pointer.h"
+#include "Constants.h"
 
 using namespace v8;
 
@@ -30,28 +31,28 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
     RegisterAdoptFunction(context, interop);
     RegisterSizeOfFunction(context, interop);
 
-    RegisterInteropType(context, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(context, types, "void", new PrimitiveDataWrapper(0, CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(context, types, "bool", new PrimitiveDataWrapper(sizeof(bool), CreateEncoding(BinaryTypeEncodingType::BoolEncoding)));
-    RegisterInteropType(context, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, CreateEncoding(BinaryTypeEncodingType::UCharEncoding)));
-    RegisterInteropType(context, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, CreateEncoding(BinaryTypeEncodingType::CharEncoding)));
-    RegisterInteropType(context, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, CreateEncoding(BinaryTypeEncodingType::UShortEncoding)));
-    RegisterInteropType(context, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, CreateEncoding(BinaryTypeEncodingType::ShortEncoding)));
-    RegisterInteropType(context, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, CreateEncoding(BinaryTypeEncodingType::UIntEncoding)));
-    RegisterInteropType(context, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, CreateEncoding(BinaryTypeEncodingType::IntEncoding)));
-    RegisterInteropType(context, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, CreateEncoding(BinaryTypeEncodingType::ULongEncoding)));
-    RegisterInteropType(context, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, CreateEncoding(BinaryTypeEncodingType::LongEncoding)));
-    RegisterInteropType(context, types, "ulong", new PrimitiveDataWrapper(ffi_type_ulong.size, CreateEncoding(BinaryTypeEncodingType::ULongLongEncoding)));
-    RegisterInteropType(context, types, "slong", new PrimitiveDataWrapper(ffi_type_slong.size, CreateEncoding(BinaryTypeEncodingType::LongLongEncoding)));
-    RegisterInteropType(context, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, CreateEncoding(BinaryTypeEncodingType::FloatEncoding)));
-    RegisterInteropType(context, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, CreateEncoding(BinaryTypeEncodingType::DoubleEncoding)));
+    RegisterInteropType(context, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, CreateEncoding(BinaryTypeEncodingType::VoidEncoding), true));
+    RegisterInteropType(context, types, "void", new PrimitiveDataWrapper(0, CreateEncoding(BinaryTypeEncodingType::VoidEncoding), true));
+    RegisterInteropType(context, types, "bool", new PrimitiveDataWrapper(sizeof(bool), CreateEncoding(BinaryTypeEncodingType::BoolEncoding), true));
+    RegisterInteropType(context, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, CreateEncoding(BinaryTypeEncodingType::UCharEncoding), true));
+    RegisterInteropType(context, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, CreateEncoding(BinaryTypeEncodingType::CharEncoding), true));
+    RegisterInteropType(context, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, CreateEncoding(BinaryTypeEncodingType::UShortEncoding), true));
+    RegisterInteropType(context, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, CreateEncoding(BinaryTypeEncodingType::ShortEncoding), true));
+    RegisterInteropType(context, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, CreateEncoding(BinaryTypeEncodingType::UIntEncoding), true));
+    RegisterInteropType(context, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, CreateEncoding(BinaryTypeEncodingType::IntEncoding), true));
+    RegisterInteropType(context, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, CreateEncoding(BinaryTypeEncodingType::ULongEncoding), true));
+    RegisterInteropType(context, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, CreateEncoding(BinaryTypeEncodingType::LongEncoding), true));
+    RegisterInteropType(context, types, "ulong", new PrimitiveDataWrapper(ffi_type_ulong.size, CreateEncoding(BinaryTypeEncodingType::ULongLongEncoding), true));
+    RegisterInteropType(context, types, "slong", new PrimitiveDataWrapper(ffi_type_slong.size, CreateEncoding(BinaryTypeEncodingType::LongLongEncoding), true));
+    RegisterInteropType(context, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, CreateEncoding(BinaryTypeEncodingType::FloatEncoding), true));
+    RegisterInteropType(context, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, CreateEncoding(BinaryTypeEncodingType::DoubleEncoding), true));
 
-    RegisterInteropType(context, types, "id", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::IdEncoding)));
+    RegisterInteropType(context, types, "id", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::IdEncoding), true));
 //    RegisterInteropType(context, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(context, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, CreateEncoding(BinaryTypeEncodingType::UnicharEncoding)));
-    RegisterInteropType(context, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ProtocolEncoding)));
-    RegisterInteropType(context, types, "class", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ClassEncoding)));
-    RegisterInteropType(context, types, "selector", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::SelectorEncoding)));
+    RegisterInteropType(context, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, CreateEncoding(BinaryTypeEncodingType::UnicharEncoding), true));
+    RegisterInteropType(context, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ProtocolEncoding), true));
+    RegisterInteropType(context, types, "class", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ClassEncoding), true));
+    RegisterInteropType(context, types, "selector", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::SelectorEncoding), true));
 
     bool success = interop->Set(context, tns::ToV8String(isolate, "types"), types).FromMaybe(false);
     tns::Assert(success, isolate);
@@ -71,7 +72,7 @@ Local<Object> Interop::GetInteropType(Local<Context> context, BinaryTypeEncoding
     return Local<Object>();
 }
 
-void Interop::RegisterInteropType(Local<Context> context, Local<Object> types, std::string name, PrimitiveDataWrapper* wrapper) {
+void Interop::RegisterInteropType(Local<Context> context, Local<Object> types, std::string name, PrimitiveDataWrapper* wrapper, bool autoDelete) {
     Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
     ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, name));
@@ -95,7 +96,15 @@ void Interop::RegisterInteropType(Local<Context> context, Local<Object> types, s
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto it = cache->PrimitiveInteropTypes.find(type);
     if (it == cache->PrimitiveInteropTypes.end()) {
-        cache->PrimitiveInteropTypes.emplace(type, std::make_unique<Persistent<Object>>(isolate, result));
+        auto persistentObj = std::make_unique<Persistent<Object>>(isolate, result);
+        if (autoDelete) {
+            persistentObj->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
+        }
+        cache->PrimitiveInteropTypes.emplace(type, std::move(persistentObj));
+    } else if (autoDelete) {
+        // TODO: review this. We send the void encoding multiple times so this is just a dirty fallback
+        // maybe we should have another method on the ObjectManager for cleaning up these
+        cache->registerCacheBoundObject(wrapper);
     }
 
     tns::Assert(success, isolate);

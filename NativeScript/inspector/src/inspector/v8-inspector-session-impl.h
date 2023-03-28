@@ -13,13 +13,6 @@
 #include "src/inspector/protocol/Runtime.h"
 #include "src/inspector/protocol/Schema.h"
 
-#include "src/inspector/v8-css-agent-impl.h"
-#include "src/inspector/v8-dom-agent-impl.h"
-#include "src/inspector/v8-log-agent-impl.h"
-#include "src/inspector/v8-network-agent-impl.h"
-#include "src/inspector/v8-overlay-agent-impl.h"
-#include "src/inspector/v8-page-agent-impl.h"
-
 #include "include/v8-inspector.h"
 
 namespace v8_inspector {
@@ -54,8 +47,6 @@ class V8InspectorSessionImpl : public V8InspectorSession,
   V8SchemaAgentImpl* schemaAgent() { return m_schemaAgent.get(); }
   V8ProfilerAgentImpl* profilerAgent() { return m_profilerAgent.get(); }
   V8RuntimeAgentImpl* runtimeAgent() { return m_runtimeAgent.get(); }
-  V8NetworkAgentImpl* networkArgent() { return m_networkAgent.get(); }
-  V8DOMAgentImpl* domArgent() { return m_domAgent.get(); }
   int contextGroupId() const { return m_contextGroupId; }
   int sessionId() const { return m_sessionId; }
 
@@ -107,7 +98,7 @@ class V8InspectorSessionImpl : public V8InspectorSession,
   V8InspectorSession::Inspectable* inspectedObject(unsigned num);
   static const unsigned kInspectedObjectBufferSize = 5;
 
-  void triggerPreciseCoverageDeltaUpdate(StringView occassion) override;
+  void triggerPreciseCoverageDeltaUpdate(StringView occasion) override;
 
  private:
   V8InspectorSessionImpl(V8InspectorImpl*, int contextGroupId, int sessionId,
@@ -140,12 +131,6 @@ class V8InspectorSessionImpl : public V8InspectorSession,
   std::unique_ptr<V8ProfilerAgentImpl> m_profilerAgent;
   std::unique_ptr<V8ConsoleAgentImpl> m_consoleAgent;
   std::unique_ptr<V8SchemaAgentImpl> m_schemaAgent;
-  std::unique_ptr<V8PageAgentImpl> m_pageAgent;
-  std::unique_ptr<V8NetworkAgentImpl> m_networkAgent;
-  std::unique_ptr<V8DOMAgentImpl> m_domAgent;
-  std::unique_ptr<V8CSSAgentImpl> m_cssAgent;
-  std::unique_ptr<V8OverlayAgentImpl> m_overlayAgent;
-  std::unique_ptr<V8LogAgentImpl> m_logAgent;
   std::vector<std::unique_ptr<V8InspectorSession::Inspectable>>
       m_inspectedObjects;
   bool use_binary_protocol_ = false;

@@ -3,6 +3,7 @@
 #include "Helpers.h"
 #include "Runtime.h"
 #include "Caches.h"
+#include "Constants.h"
 
 using namespace v8;
 
@@ -22,6 +23,8 @@ WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::I
       isRunning_(false),
       isClosing_(false),
       isTerminating_(false),
+      isDisposed_(false),
+      isWeak_(false),
       onMessage_(onMessage) {
 }
 
@@ -53,8 +56,7 @@ void WorkerWrapper::PostMessage(std::string message) {
 
 void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker, std::function<Isolate* ()> func) {
     this->poWorker_ = poWorker;
-    nextId_++;
-    this->workerId_ = nextId_;
+    this->workerId_ = nextId_.fetch_add(1, std::memory_order_relaxed) + 1;
 
     [workers_ addOperationWithBlock:^{
         this->BackgroundLooper(func);
@@ -72,6 +74,9 @@ void WorkerWrapper::DrainPendingTasks() {
     Local<Object> global = context->Global();
 
     for (std::string message: messages) {
+        if (this->isTerminating_) {
+            break;
+        }
         TryCatch tc(this->workerIsolate_);
         this->onMessage_(this->workerIsolate_, global, message);
 
@@ -82,18 +87,24 @@ void WorkerWrapper::DrainPendingTasks() {
 }
 
 void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
-    CFRunLoopRef runLoop = CFRunLoopGetCurrent();
-    this->queue_.Initialize(runLoop, [](void* info) {
-        WorkerWrapper* w = static_cast<WorkerWrapper*>(info);
-        w->DrainPendingTasks();
-    }, this);
+    if (!this->isTerminating_) {
+        CFRunLoopRef runLoop = CFRunLoopGetCurrent();
+        this->queue_.Initialize(runLoop, [](void* info) {
+            WorkerWrapper* w = static_cast<WorkerWrapper*>(info);
+            w->DrainPendingTasks();
+        }, this);
+        
+        this->workerIsolate_ = func();
+        
+        this->DrainPendingTasks();
+        
+        // check again as it could terminate before this
+        if (!this->isTerminating_) {
+            CFRunLoopRun();
+        }
+    }
 
-    this->workerIsolate_ = func();
-
-    this->DrainPendingTasks();
-
-    CFRunLoopRun();
-
+    this->isDisposed_ = true;
     Runtime* runtime = Runtime::GetCurrentRuntime();
     delete runtime;
 }
@@ -103,14 +114,21 @@ void WorkerWrapper::Close() {
 }
 
 void WorkerWrapper::Terminate() {
-    if (!this->isTerminating_) {
+    // set terminating to true atomically
+    bool wasTerminating = this->isTerminating_.exchange(true);
+    if (!wasTerminating) {
+        if (this->workerIsolate_ != nullptr) {
+            this->workerIsolate_->TerminateExecution();
+        }
         this->queue_.Terminate();
-        this->isTerminating_ = true;
         this->isRunning_ = false;
     }
 }
 
 void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
+    if (this->isTerminating_) {
+        return;
+    }
     Local<Context> context = Caches::Get(this->workerIsolate_)->GetContext();
     Local<Object> global = context->Global();
 
@@ -163,7 +181,11 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context
         }
     }
 
-    tns::ExecuteOnMainThread([this, message, src, stackTrace, lineNumber]() {
+    auto runtime = static_cast<Runtime*>(mainIsolate_->GetData(Constants::RUNTIME_SLOT));
+    if (runtime == nullptr) {
+        return;
+    }
+    tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [this, message, src, stackTrace, lineNumber]() {
         v8::Locker locker(this->mainIsolate_);
         Isolate::Scope isolate_scope(this->mainIsolate_);
         HandleScope handle_scope(this->mainIsolate_);
@@ -205,6 +227,6 @@ Local<Object> WorkerWrapper::ConstructErrorObject(Local<Context> context, std::s
     return obj;
 }
 
-int WorkerWrapper::nextId_ = 0;
+std::atomic<int> WorkerWrapper::nextId_(0);
 
 }

@@ -43,6 +43,10 @@ if effective_platform_name == "-macosx":
     docset_platform = "OSX"
     default_deployment_target_flag_name = "-mmacosx-version-min"
     default_deployment_target_clang_env_name = "MACOSX_DEPLOYMENT_TARGET"
+elif effective_platform_name == "-maccatalyst":
+    docset_platform = "maccatalyst"
+    default_deployment_target_flag_name = "-mmaccatalyst-version-min"
+    default_deployment_target_clang_env_name = "MACCATALYST_DEPLOYMENT_TARGET"
 elif effective_platform_name == "-watchos":
     docset_platform = "watchOS"
     default_deployment_target_flag_name = "-mwatchos-version-min"

@@ -9,7 +9,7 @@ namespace tns {
 
 class ExtVector {
 public:
-    static v8::Local<v8::Value> NewInstance(v8::Isolate* isolate, void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding);
+    static v8::Local<v8::Value> NewInstance(v8::Isolate* isolate, void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding, const TypeEncoding* typeEncoding);
 private:
     static void RegisterToStringMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> prototypeTemplate);
     static void IndexedPropertyGetCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info);

@@ -3,6 +3,7 @@
 #include "Helpers.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
+#include "Constants.h"
 
 using namespace v8;
 
@@ -63,6 +64,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Local<Context> context) {
     Pointer::RegisterToBigIntMethod(context, prototype);
 
     cache->PointerCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
+    cache->PointerCtorFunc->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
 
     return ctorFunc;
 }

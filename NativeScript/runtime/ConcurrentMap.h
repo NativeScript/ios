@@ -40,6 +40,15 @@ public:
         this->container_.erase(key);
     }
 
+    inline void ForEach(const std::function<bool(TKey&, TValue&)>& func) {
+        std::lock_guard<std::mutex> writerLock(this->containerMutex_);
+        for(auto i : this->container_) {
+            if(func(i.first, i.second)) {
+                break;
+            }
+        }
+    }
+
     ConcurrentMap() = default;
     ConcurrentMap(const ConcurrentMap&) = delete;
     ConcurrentMap& operator=(const ConcurrentMap&) = delete;

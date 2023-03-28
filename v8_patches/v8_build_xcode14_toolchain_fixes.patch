@@ -1,0 +1,22 @@
+diff --git a/build/config/ios/BUILD.gn b/build/config/ios/BUILD.gn
+index 52e2e4a56..ea5aed948 100644
+--- a/build/config/ios/BUILD.gn
++++ b/build/config/ios/BUILD.gn
+@@ -131,6 +131,8 @@ config("runtime_library") {
+       _xcode_clang_version = "13.0.0"
+     } else if (xcode_version_int == 1330) {
+       _xcode_clang_version = "13.1.6"
++    } else if (xcode_version_int >= 1400) {
++      _xcode_clang_version = "14.0.0"
+     } else {
+       assert(false)
+     }
+@@ -151,6 +153,8 @@ config("runtime_library") {
+       _xcode_clang_version = "13.0.0"
+     } else if (xcode_version_int == 1330) {
+       _xcode_clang_version = "13.1.6"
++    } else if (xcode_version_int >= 1400) {
++      _xcode_clang_version = "14.0.0"
+     } else {
+       assert(false)
+     }

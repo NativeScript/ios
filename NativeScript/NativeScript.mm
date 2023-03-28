@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include "NativeScript.h"
 #include "inspector/JsV8InspectorClient.h"
+#include "runtime/Console.h"
 #include "runtime/RuntimeConfig.h"
 #include "runtime/Helpers.h"
 #include "runtime/Runtime.h"
@@ -36,14 +37,17 @@ std::unique_ptr<Runtime> runtime_;
         RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
 
         Runtime::Initialize();
+        runtime_ = nullptr;
         runtime_ = std::make_unique<Runtime>();
 
         std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
         Isolate* isolate = runtime_->CreateIsolate();
+        v8::Locker l(isolate);
         runtime_->Init(isolate);
         std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
         printf("Runtime initialization took %llims\n", duration);
+        printf("Runtime V8 Version %s\n", V8::GetVersion());
 
         if (config.IsDebug) {
             Isolate::Scope isolate_scope(isolate);
@@ -52,6 +56,7 @@ std::unique_ptr<Runtime> runtime_;
             inspectorClient->init();
             inspectorClient->registerModules();
             inspectorClient->connect([config ArgumentsCount], [config Arguments]);
+            Console::AttachInspectorClient(inspectorClient);
         }
     }
     

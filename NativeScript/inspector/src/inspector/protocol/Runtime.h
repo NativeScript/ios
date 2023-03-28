@@ -16,6 +16,7 @@ namespace v8_inspector {
 namespace protocol {
 namespace Runtime {
 using ScriptId = String;
+class WebDriverValue;
 using RemoteObjectId = String;
 using UnserializableValue = String;
 class RemoteObject;
@@ -63,6 +64,111 @@ namespace TypeEnum {
 } // ConsoleAPICalled
 
 // ------------- Type and builder declarations.
+
+class  WebDriverValue : public ::v8_crdtp::ProtocolObject<WebDriverValue> {
+public:
+    ~WebDriverValue() override { }
+
+    struct  TypeEnum {
+        static const char* Undefined;
+        static const char* Null;
+        static const char* String;
+        static const char* Number;
+        static const char* Boolean;
+        static const char* Bigint;
+        static const char* Regexp;
+        static const char* Date;
+        static const char* Symbol;
+        static const char* Array;
+        static const char* Object;
+        static const char* Function;
+        static const char* Map;
+        static const char* Set;
+        static const char* Weakmap;
+        static const char* Weakset;
+        static const char* Error;
+        static const char* Proxy;
+        static const char* Promise;
+        static const char* Typedarray;
+        static const char* Arraybuffer;
+        static const char* Node;
+        static const char* Window;
+    }; // TypeEnum
+
+    String getType() { return m_type; }
+    void setType(const String& value) { m_type = value; }
+
+    bool hasValue() { return m_value.isJust(); }
+    protocol::Value* getValue(protocol::Value* defaultValue) { return m_value.isJust() ? m_value.fromJust() : defaultValue; }
+    void setValue(std::unique_ptr<protocol::Value> value) { m_value = std::move(value); }
+
+    bool hasObjectId() { return m_objectId.isJust(); }
+    String getObjectId(const String& defaultValue) { return m_objectId.isJust() ? m_objectId.fromJust() : defaultValue; }
+    void setObjectId(const String& value) { m_objectId = value; }
+
+    template<int STATE>
+    class WebDriverValueBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            TypeSet = 1 << 1,
+            AllFieldsSet = (TypeSet | 0)};
+
+
+        WebDriverValueBuilder<STATE | TypeSet>& setType(const String& value)
+        {
+            static_assert(!(STATE & TypeSet), "property type should not be set yet");
+            m_result->setType(value);
+            return castState<TypeSet>();
+        }
+
+        WebDriverValueBuilder<STATE>& setValue(std::unique_ptr<protocol::Value> value)
+        {
+            m_result->setValue(std::move(value));
+            return *this;
+        }
+
+        WebDriverValueBuilder<STATE>& setObjectId(const String& value)
+        {
+            m_result->setObjectId(value);
+            return *this;
+        }
+
+        std::unique_ptr<WebDriverValue> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class WebDriverValue;
+        WebDriverValueBuilder() : m_result(new WebDriverValue()) { }
+
+        template<int STEP> WebDriverValueBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<WebDriverValueBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Runtime::WebDriverValue> m_result;
+    };
+
+    static WebDriverValueBuilder<0> create()
+    {
+        return WebDriverValueBuilder<0>();
+    }
+
+private:
+    DECLARE_SERIALIZATION_SUPPORT();
+
+    WebDriverValue()
+    {
+    }
+
+    String m_type;
+    Maybe<protocol::Value> m_value;
+    Maybe<String> m_objectId;
+};
+
 
 class  RemoteObject : public ::v8_crdtp::ProtocolObject<RemoteObject>,
     public API::RemoteObject {
@@ -125,6 +231,10 @@ public:
     String getDescription(const String& defaultValue) { return m_description.isJust() ? m_description.fromJust() : defaultValue; }
     void setDescription(const String& value) { m_description = value; }
 
+    bool hasWebDriverValue() { return m_webDriverValue.isJust(); }
+    protocol::Runtime::WebDriverValue* getWebDriverValue(protocol::Runtime::WebDriverValue* defaultValue) { return m_webDriverValue.isJust() ? m_webDriverValue.fromJust() : defaultValue; }
+    void setWebDriverValue(std::unique_ptr<protocol::Runtime::WebDriverValue> value) { m_webDriverValue = std::move(value); }
+
     bool hasObjectId() { return m_objectId.isJust(); }
     String getObjectId(const String& defaultValue) { return m_objectId.isJust() ? m_objectId.fromJust() : defaultValue; }
     void setObjectId(const String& value) { m_objectId = value; }
@@ -183,6 +293,12 @@ public:
             return *this;
         }
 
+        RemoteObjectBuilder<STATE>& setWebDriverValue(std::unique_ptr<protocol::Runtime::WebDriverValue> value)
+        {
+            m_result->setWebDriverValue(std::move(value));
+            return *this;
+        }
+
         RemoteObjectBuilder<STATE>& setObjectId(const String& value)
         {
             m_result->setObjectId(value);
@@ -237,6 +353,7 @@ private:
     Maybe<protocol::Value> m_value;
     Maybe<String> m_unserializableValue;
     Maybe<String> m_description;
+    Maybe<protocol::Runtime::WebDriverValue> m_webDriverValue;
     Maybe<String> m_objectId;
     Maybe<protocol::Runtime::ObjectPreview> m_preview;
     Maybe<protocol::Runtime::CustomPreview> m_customPreview;
@@ -1200,6 +1317,10 @@ public:
     int getExecutionContextId(int defaultValue) { return m_executionContextId.isJust() ? m_executionContextId.fromJust() : defaultValue; }
     void setExecutionContextId(int value) { m_executionContextId = value; }
 
+    bool hasExceptionMetaData() { return m_exceptionMetaData.isJust(); }
+    protocol::DictionaryValue* getExceptionMetaData(protocol::DictionaryValue* defaultValue) { return m_exceptionMetaData.isJust() ? m_exceptionMetaData.fromJust() : defaultValue; }
+    void setExceptionMetaData(std::unique_ptr<protocol::DictionaryValue> value) { m_exceptionMetaData = std::move(value); }
+
     template<int STATE>
     class ExceptionDetailsBuilder {
     public:
@@ -1270,6 +1391,12 @@ public:
             return *this;
         }
 
+        ExceptionDetailsBuilder<STATE>& setExceptionMetaData(std::unique_ptr<protocol::DictionaryValue> value)
+        {
+            m_result->setExceptionMetaData(std::move(value));
+            return *this;
+        }
+
         std::unique_ptr<ExceptionDetails> build()
         {
             static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
@@ -1312,6 +1439,7 @@ private:
     Maybe<protocol::Runtime::StackTrace> m_stackTrace;
     Maybe<protocol::Runtime::RemoteObject> m_exception;
     Maybe<int> m_executionContextId;
+    Maybe<protocol::DictionaryValue> m_exceptionMetaData;
 };
 
 
@@ -1603,7 +1731,7 @@ public:
         virtual void fallThrough() = 0;
         virtual ~CallFunctionOnCallback() { }
     };
-    virtual void callFunctionOn(const String& in_functionDeclaration, Maybe<String> in_objectId, Maybe<protocol::Array<protocol::Runtime::CallArgument>> in_arguments, Maybe<bool> in_silent, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<int> in_executionContextId, Maybe<String> in_objectGroup, std::unique_ptr<CallFunctionOnCallback> callback) = 0;
+    virtual void callFunctionOn(const String& in_functionDeclaration, Maybe<String> in_objectId, Maybe<protocol::Array<protocol::Runtime::CallArgument>> in_arguments, Maybe<bool> in_silent, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<int> in_executionContextId, Maybe<String> in_objectGroup, Maybe<bool> in_throwOnSideEffect, Maybe<bool> in_generateWebDriverValue, std::unique_ptr<CallFunctionOnCallback> callback) = 0;
     virtual DispatchResponse compileScript(const String& in_expression, const String& in_sourceURL, bool in_persistScript, Maybe<int> in_executionContextId, Maybe<String>* out_scriptId, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
     virtual DispatchResponse disable() = 0;
     virtual DispatchResponse discardConsoleEntries() = 0;
@@ -1615,10 +1743,10 @@ public:
         virtual void fallThrough() = 0;
         virtual ~EvaluateCallback() { }
     };
-    virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, Maybe<bool> in_disableBreaks, Maybe<bool> in_replMode, Maybe<bool> in_allowUnsafeEvalBlockedByCSP, Maybe<String> in_uniqueContextId, std::unique_ptr<EvaluateCallback> callback) = 0;
+    virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, Maybe<bool> in_disableBreaks, Maybe<bool> in_replMode, Maybe<bool> in_allowUnsafeEvalBlockedByCSP, Maybe<String> in_uniqueContextId, Maybe<bool> in_generateWebDriverValue, std::unique_ptr<EvaluateCallback> callback) = 0;
     virtual DispatchResponse getIsolateId(String* out_id) = 0;
     virtual DispatchResponse getHeapUsage(double* out_usedSize, double* out_totalSize) = 0;
-    virtual DispatchResponse getProperties(const String& in_objectId, Maybe<bool> in_ownProperties, Maybe<bool> in_accessorPropertiesOnly, Maybe<bool> in_generatePreview, std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>* out_result, Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>* out_internalProperties, Maybe<protocol::Array<protocol::Runtime::PrivatePropertyDescriptor>>* out_privateProperties, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
+    virtual DispatchResponse getProperties(const String& in_objectId, Maybe<bool> in_ownProperties, Maybe<bool> in_accessorPropertiesOnly, Maybe<bool> in_generatePreview, Maybe<bool> in_nonIndexedPropertiesOnly, std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>* out_result, Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>* out_internalProperties, Maybe<protocol::Array<protocol::Runtime::PrivatePropertyDescriptor>>* out_privateProperties, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
     virtual DispatchResponse globalLexicalScopeNames(Maybe<int> in_executionContextId, std::unique_ptr<protocol::Array<String>>* out_names) = 0;
     virtual DispatchResponse queryObjects(const String& in_prototypeObjectId, Maybe<String> in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_objects) = 0;
     virtual DispatchResponse releaseObject(const String& in_objectId) = 0;
@@ -1644,6 +1772,7 @@ public:
     virtual void terminateExecution(std::unique_ptr<TerminateExecutionCallback> callback) = 0;
     virtual DispatchResponse addBinding(const String& in_name, Maybe<int> in_executionContextId, Maybe<String> in_executionContextName) = 0;
     virtual DispatchResponse removeBinding(const String& in_name) = 0;
+    virtual DispatchResponse getExceptionDetails(const String& in_errorObjectId, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
 
 };
 
@@ -1659,7 +1788,7 @@ public:
     void executionContextCreated(std::unique_ptr<protocol::Runtime::ExecutionContextDescription> context);
     void executionContextDestroyed(int executionContextId);
     void executionContextsCleared();
-    void inspectRequested(std::unique_ptr<protocol::Runtime::RemoteObject> object, std::unique_ptr<protocol::DictionaryValue> hints);
+    void inspectRequested(std::unique_ptr<protocol::Runtime::RemoteObject> object, std::unique_ptr<protocol::DictionaryValue> hints, Maybe<int> executionContextId = Maybe<int>());
 
   void flush();
   void sendRawNotification(std::unique_ptr<Serializable>);

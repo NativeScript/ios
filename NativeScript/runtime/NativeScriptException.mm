@@ -21,6 +21,9 @@ NativeScriptException::NativeScriptException(Isolate* isolate, TryCatch& tc, con
     this->fullMessage_ = GetFullMessage(isolate, tc, this->message_);
     tc.Reset();
 }
+NativeScriptException::~NativeScriptException() {
+    delete this->javascriptException_;
+}
 
 void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value> error) {
     Isolate* isolate = message->GetIsolate();
