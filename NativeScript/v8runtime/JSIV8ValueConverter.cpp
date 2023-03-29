@@ -39,6 +39,10 @@ jsi::Value JSIV8ValueConverter::ToJSIValue(
   if (value->IsObject()) {
     return V8Runtime::make<jsi::Object>(new V8PointerValue(isolate, value));
   }
+   
+    if (value->IsBigInt()) {
+        return V8Runtime::make<jsi::BigInt>(new V8PointerValue(isolate, value));
+    }
 
   return jsi::Value::undefined();
 }
@@ -65,6 +69,9 @@ v8::Local<v8::Value> JSIV8ValueConverter::ToV8Value(
   } else if (value.isObject()) {
     return scopedHandle.Escape(ToV8Object(
         runtime, std::move(value.getObject(const_cast<V8Runtime &>(runtime)))));
+  }else if(value.isBigInt()){
+      return scopedHandle.Escape(ToV8BigInt(
+              runtime, std::move(value.getBigInt(const_cast<V8Runtime &>(runtime)))));
   } else {
     // What are you?
     std::abort();
@@ -131,6 +138,19 @@ v8::Local<v8::Object> JSIV8ValueConverter::ToV8Object(
   return scopedHandle.Escape(
       v8::Local<v8::Object>::Cast(v8PointerValue->Get(runtime.isolate_)));
 }
+
+// static
+v8::Local<v8::BigInt> JSIV8ValueConverter::ToV8BigInt(
+                                                      const V8Runtime &runtime,
+                                                      const jsi::BigInt &bigInt) {
+    v8::EscapableHandleScope scopedHandle(runtime.isolate_);
+    const auto *v8PointerValue =
+    static_cast<const V8PointerValue *>(runtime.getPointerValue(bigInt));
+    assert(v8PointerValue->Get(runtime.isolate_)->IsBigInt());
+    return scopedHandle.Escape(
+                               v8::Local<v8::BigInt>::Cast(v8PointerValue->Get(runtime.isolate_)));
+}
+
 
 // static
 v8::Local<v8::Array> JSIV8ValueConverter::ToV8Array(

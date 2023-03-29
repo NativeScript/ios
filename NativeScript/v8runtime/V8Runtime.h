@@ -104,6 +104,10 @@ class V8Runtime : public facebook::jsi::Runtime {
   facebook::jsi::Object createObject() override;
   facebook::jsi::Object createObject(
       std::shared_ptr<facebook::jsi::HostObject> hostObject) override;
+    
+  facebook::jsi::ArrayBuffer createArrayBuffer(
+      std::shared_ptr<facebook::jsi::MutableBuffer> buffer) override;
+    
   std::shared_ptr<facebook::jsi::HostObject> getHostObject(
       const facebook::jsi::Object &) override;
   facebook::jsi::HostFunctionType &getHostFunction(
@@ -132,6 +136,20 @@ class V8Runtime : public facebook::jsi::Runtime {
 
   bool isArray(const facebook::jsi::Object &) const override;
   bool isArrayBuffer(const facebook::jsi::Object &) const override;
+    bool isArrayBufferView(const facebook::jsi::Object &) const override;
+      bool isTypedArray(const facebook::jsi::Object &) const override;
+      bool isInt8Array(const facebook::jsi::Object &) const override;
+      bool isUint8Array(const facebook::jsi::Object &) const override;
+      bool isUint8ClampedArray(const facebook::jsi::Object &) const override;
+      bool isInt16Array(const facebook::jsi::Object &) const override;
+      bool isUint16Array(const facebook::jsi::Object &) const override;
+      bool isInt32Array(const facebook::jsi::Object &) const override;
+      bool isUint32Array(const facebook::jsi::Object &) const override;
+      bool isFloat32Array(const facebook::jsi::Object &) const override;
+      bool isBigInt64Array(const facebook::jsi::Object &) const override;
+      bool isBigUint64Array(const facebook::jsi::Object &) const override;
+      bool isFloat64Array(const facebook::jsi::Object &) const override;
+      
   bool isFunction(const facebook::jsi::Object &) const override;
   bool isHostObject(const facebook::jsi::Object &) const override;
   bool isHostFunction(const facebook::jsi::Function &) const override;
@@ -144,7 +162,10 @@ class V8Runtime : public facebook::jsi::Runtime {
   facebook::jsi::Array createArray(size_t length) override;
   size_t size(const facebook::jsi::Array &) override;
   size_t size(const facebook::jsi::ArrayBuffer &) override;
+  size_t size(const facebook::jsi::TypedArray &) override;
+  size_t offset(const facebook::jsi::TypedArray &) override;
   uint8_t *data(const facebook::jsi::ArrayBuffer &) override;
+  uint8_t *data(const facebook::jsi::TypedArray &) override;
   facebook::jsi::Value getValueAtIndex(const facebook::jsi::Array &, size_t i)
       override;
   void setValueAtIndexImpl(
@@ -184,6 +205,10 @@ class V8Runtime : public facebook::jsi::Runtime {
   bool instanceOf(
       const facebook::jsi::Object &o,
       const facebook::jsi::Function &f) override;
+    
+    uint64_t uint64Value(const facebook::jsi::BigInt&, bool* lossless = nullptr) const override;
+
+       int64_t int64Value(const facebook::jsi::BigInt&, bool* lossless = nullptr) const override;
 
  private:
   friend class V8PointerValue;
