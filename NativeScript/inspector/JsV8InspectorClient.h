@@ -69,6 +69,14 @@ private:
     static void registerDomainDispatcherCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void inspectorSendEventCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void inspectorTimestampCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+    
+    // {N} specific helpers
+    bool CallDomainHandlerFunction(v8::Local<v8::Context> context,
+                              v8::Local<v8::Function> domainMethodFunc,
+                              const v8::Local<v8::Object>& arg,
+                              v8::Local<v8::Object>& domainDebugger,
+                              v8::Local<v8::Value>& result);
+    std::string GetReturnMessageFromDomainHandlerResult(const v8::Local<v8::Value>& result, const v8::Local<v8::Value>& requestId);
 };
 
 }

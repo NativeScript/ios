@@ -241,6 +241,16 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
 }
 
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
+    bool success;
+    // livesync uses the inspector socket for HMR/LiveSync...
+    if(message.find("Page.reload") != std::string::npos) {
+        success = tns::LiveSync(this->isolate_);
+        if (!success) {
+            NSLog(@"LiveSync failed");
+        }
+        // todo: should we return here, or is it OK to pass onto a possible Page.reload domain handler?
+    }
+    
     std::vector<uint16_t> vector = tns::ToVector(message);
     StringView messageView(vector.data(), vector.size());
     Isolate* isolate = isolate_;
@@ -248,84 +258,42 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handle_scope(isolate);
     Local<Context> context = tns::Caches::Get(isolate)->GetContext();
-    
     Local<Value> arg;
-    bool success = v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&arg);
-    tns::Assert(success, isolate);
+    success = v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&arg);
     
-    if(arg->IsObject()) {
-        auto obj = arg.As<Object>();
-        auto method = obj->Get(context, tns::ToV8String(isolate, "method")).ToLocalChecked();
-        auto methodString = tns::ToString(isolate, method);
-        auto domainSeparatorIndex = methodString.find(".");
-        auto domain = methodString.substr(0, domainSeparatorIndex);
-        auto domainMethod = methodString.substr(domainSeparatorIndex + 1, methodString.size());
+    // stop processing invalid messages
+    if(!success) {
+        NSLog(@"Inspector failed to parse incoming message: %s", message.c_str());
+        // ignore failures to parse.
+        return;
+    }
+    
+    // Pass incoming message to a registerd domain handler if any
+    if(!arg.IsEmpty() && arg->IsObject()) {
+        Local<Object> domainDebugger;
+        Local<Object> argObject = arg.As<Object>();
+        Local<v8::Function> domainMethodFunc = v8_inspector::GetDebuggerFunctionFromObject(context, argObject, domainDebugger);
         
-        if(domain.size() > 0) {
-            Local<Object> domainDebugger;
-            Local<v8::Function> domainMethodFunc = v8_inspector::GetDebuggerFunction(context, domain, domainMethod, domainDebugger);
-            
-            if(!domainMethodFunc.IsEmpty() && domainMethodFunc->IsFunction()) {
-                TryCatch tc(isolate);
-                
-                auto params = arg.As<Object>()->Get(context, tns::ToV8String(isolate, "params")).ToLocalChecked();
-                Local<Value> result;
-                Local<Value> args[1] = { params };
-                
-                auto debug = v8::JSON::Stringify(context, params).ToLocalChecked();
-                auto debugStr = tns::ToString(isolate, debug);
-                
-                success = domainMethodFunc->Call(context, domainDebugger, 1, args).ToLocal(&result);
-                
-                if (tc.HasCaught()) {
-                    std::string error = tns::ToString(isolate, tc.Message()->Get());
-                    NSLog(@"Error during inspector dispatch: %s", error.c_str());
-                    
-                    // echo back the message for now i guess...
-                    auto msg = StringBuffer::create(messageView);
-                    this->sendNotification(std::move(msg));
-                    return;
-                }
-                
-                if(!result.IsEmpty() && result->IsObject()) {
-                    Local<Value> sendEventFn;
-                    success = context->Global()->Get(context, tns::ToV8String(isolate, "__inspectorSendEvent")).ToLocal(&sendEventFn);
-                    tns::Assert(success, isolate);
-                    if (!sendEventFn.IsEmpty() && sendEventFn->IsFunction()) {
-                        Local<v8::Function> sendEventFn_ = sendEventFn.As<v8::Function>();
-                        Local<Object> resObject = result.As<v8::Object>();
-                        bool hasResultKey = resObject->Has(context, tns::ToV8String(isolate, "result")).ToChecked();
-                        Local<Value> stringified;
-                        if(hasResultKey) {
-                            success = JSON::Stringify(context, result).ToLocal(&stringified);
-                        } else {
-                            // backwards compatibility - we wrap the response in a new object with the { id, result } keys
-                            // since the returned response only contained the result part.
-                            Context::Scope context_scope(context);
-                            
-                            auto idKey = tns::ToV8String(isolate, "id");
-                            auto requestId = arg.As<Object>()->Get(context, idKey).ToLocalChecked();
-                            Local<Object> newResObject = v8::Object::New(isolate);
-                            newResObject->Set(context, idKey, requestId).ToChecked();
-                            newResObject->Set(context, tns::ToV8String(isolate, "result"), resObject).ToChecked();
-                            
-                            success = JSON::Stringify(context, newResObject).ToLocal(&stringified);
-                        }
-                        
-                        
-                        if(success) {
-                            Local<Value> args[1] = { stringified  };
-                            success = sendEventFn_->Call(context, v8::Undefined(isolate), 1, args).ToLocal(&result);
-                        }
-                    }
-                }
-                return;
+        Local<Value> result;
+        success = this->CallDomainHandlerFunction(context, domainMethodFunc, argObject, domainDebugger, result);
+        
+        if(success) {
+            auto requestId = arg.As<Object>()->Get(context, tns::ToV8String(isolate, "id")).ToLocalChecked();
+            auto returnString = GetReturnMessageFromDomainHandlerResult(result, requestId);
+
+            if(returnString.size() > 0) {
+                std::vector<uint16_t> vector = tns::ToVector(returnString);
+                StringView messageView(vector.data(), vector.size());
+                auto msg = StringBuffer::create(messageView);
+                this->sendNotification(std::move(msg));
             }
+            return;
         }
-        //
     }
 
+    // if no handler handled the message successfully, fall-through to the default V8 implementation
     this->session_->dispatchProtocolMessage(messageView);
+    
     // TODO: check why this is needed (it should trigger automatically when script depth is 0)
     isolate->PerformMicrotaskCheckpoint();
 }
@@ -453,6 +421,87 @@ void JsV8InspectorClient::consoleLog(v8::Isolate* isolate, ConsoleAPIType method
                 method, args, String16{}, std::move(stackImpl));
     
     session->runtimeAgent()->messageAdded(msg.get());
+}
+
+bool JsV8InspectorClient::CallDomainHandlerFunction(Local<Context> context, Local<Function> domainMethodFunc, const Local<Object>& arg, Local<Object>& domainDebugger, Local<Value>& result) {
+    if(domainMethodFunc.IsEmpty() || !domainMethodFunc->IsFunction()) {
+        return false;
+    }
+    
+    bool success;
+    Isolate* isolate = this->isolate_;
+    TryCatch tc(isolate);
+    
+    Local<Value> params;
+    success = arg.As<Object>()->Get(context, tns::ToV8String(isolate, "params")).ToLocal(&params);
+    
+    if(!success) {
+        return false;
+    }
+    
+    Local<Value> args[1] = { params };
+    success = domainMethodFunc->Call(context, domainDebugger, 1, args).ToLocal(&result);
+    
+    if (tc.HasCaught()) {
+        std::string error = tns::ToString(isolate, tc.Message()->Get());
+
+        // backwards compatibility
+        if(error.find("may be enabled at a time") != std::string::npos) {
+            // not returning false here because we are catching bogus errors from core...
+            // Uncaught Error: One XXX may be enabled at a time...
+            result = v8::Boolean::New(isolate, true);
+            return true;
+        }
+        
+        // log any other errors - they are caught, but still make them visible to the user.
+        tns::LogError(isolate, tc);
+        
+        return false;
+    }
+    
+    return success;
+}
+
+std::string JsV8InspectorClient::GetReturnMessageFromDomainHandlerResult(const Local<Value>& result, const Local<Value>& requestId) {
+    if(result.IsEmpty() || !(result->IsBoolean() || result->IsObject() || result->IsNullOrUndefined())) {
+        return "";
+    }
+    
+    Isolate* isolate = this->isolate_;
+    
+    if(!result->IsObject()) {
+        // if there return value is a "true" boolean or undefined/null we send back an "ack" response with an empty result object
+        if(result->IsNullOrUndefined() || result->BooleanValue(isolate_)) {
+            return "{ \"id\":" + tns::ToString(isolate, requestId) + ", \"result\": {} }";
+        }
+        
+        return "";
+    }
+    
+    Local<Context> context = tns::Caches::Get(isolate)->GetContext();
+    Local<Object> resObject = result.As<v8::Object>();
+    Local<Value> stringified;
+    
+    bool success = true;
+    // already a { result: ... } object
+    if(resObject->Has(context, tns::ToV8String(isolate, "result")).ToChecked()) {
+        success = JSON::Stringify(context, result).ToLocal(&stringified);
+    } else {
+        // backwards compatibility - we wrap the response in a new object with the { id, result } keys
+        // since the returned response only contained the result part.
+        Context::Scope context_scope(context);
+
+        Local<Object> newResObject = v8::Object::New(isolate);
+        success = success && newResObject->Set(context, tns::ToV8String(isolate, "id"), requestId).ToChecked();
+        success = success && newResObject->Set(context, tns::ToV8String(isolate, "result"), resObject).ToChecked();
+        success = success && JSON::Stringify(context, newResObject).ToLocal(&stringified);
+    }
+    
+    if(!success) {
+        return "";
+    }
+    
+    return tns::ToString(isolate, stringified);
 }
 
 std::map<std::string, Persistent<Object>*> JsV8InspectorClient::Domains;
