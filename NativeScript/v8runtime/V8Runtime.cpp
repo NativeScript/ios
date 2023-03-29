@@ -634,6 +634,57 @@ void V8Runtime::setPropertyValue(
   }
 }
 
+
+
+facebook::jsi::ArrayBuffer V8Runtime::createArrayBuffer(
+                                                        std::shared_ptr<facebook::jsi::MutableBuffer> buffer) {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    auto size = buffer->size();
+    auto *data = buffer->data();
+    auto *ctx = new std::shared_ptr<jsi::MutableBuffer>(std::move(buffer));
+    auto finalize = [](void *, size_t, void *ctx) {
+        delete static_cast<std::shared_ptr<jsi::MutableBuffer> *>(ctx);
+    };
+    
+    std::unique_ptr<v8::BackingStore> store = v8::ArrayBuffer::NewBackingStore(data, size,
+                                                                               finalize, ctx);
+    auto arrayBuffer = v8::ArrayBuffer::New(isolate_, std::move(store));
+    
+    
+    return make<jsi::Object>(new V8PointerValue(isolate_, arrayBuffer))
+        .getArrayBuffer(*this);
+}
+
+
+uint64_t V8Runtime::uint64Value(const jsi::BigInt &bigInt, bool *lossless) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::TryCatch tryCatch(isolate_);
+    auto v8ObjectA = JSIV8ValueConverter::ToV8BigInt(*this, bigInt);
+    
+    return v8ObjectA->Uint64Value(lossless);
+}
+
+int64_t V8Runtime::int64Value(const jsi::BigInt &bigInt, bool *lossless) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::TryCatch tryCatch(isolate_);
+    auto v8ObjectA = JSIV8ValueConverter::ToV8BigInt(*this, bigInt);
+    
+    return v8ObjectA->Int64Value(lossless);
+}
+
+
 bool V8Runtime::isArray(const jsi::Object &object) const {
   v8::Locker locker(isolate_);
   v8::Isolate::Scope scopedIsolate(isolate_);
@@ -655,6 +706,152 @@ bool V8Runtime::isArrayBuffer(const jsi::Object &object) const {
       JSIV8ValueConverter::ToV8Object(*this, object);
   return v8Object->IsArrayBuffer();
 }
+
+
+bool V8Runtime::isArrayBufferView(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsArrayBufferView();
+}
+
+bool V8Runtime::isTypedArray(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    
+    return v8Object->IsTypedArray();
+}
+
+bool V8Runtime::isUint8Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsUint8Array();
+}
+
+bool V8Runtime::isUint8ClampedArray(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsUint8ClampedArray();
+}
+
+bool V8Runtime::isInt8Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsInt8Array();
+}
+
+bool V8Runtime::isUint16Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsUint16Array();
+}
+
+bool V8Runtime::isInt16Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsInt16Array();
+}
+
+bool V8Runtime::isUint32Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsUint32Array();
+}
+
+bool V8Runtime::isInt32Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsInt32Array();
+}
+
+bool V8Runtime::isFloat32Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsFloat32Array();
+}
+
+bool V8Runtime::isBigUint64Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsBigUint64Array();
+}
+
+bool V8Runtime::isBigInt64Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsBigInt64Array();
+}
+
+bool V8Runtime::isFloat64Array(const jsi::Object &object) const {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, object);
+    return v8Object->IsFloat64Array();
+}
+
 
 bool V8Runtime::isFunction(const jsi::Object &object) const {
   v8::Locker locker(isolate_);
@@ -783,6 +980,33 @@ size_t V8Runtime::size(const jsi::ArrayBuffer &arrayBuffer) {
   return v8ArrayBuffer->ByteLength();
 }
 
+
+size_t V8Runtime::size(const jsi::TypedArray &typedArray) {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, typedArray);
+    assert(v8Object->IsTypedArray());
+    v8::TypedArray *array = v8::TypedArray::Cast(*v8Object);
+    return array->ByteLength();
+}
+
+size_t V8Runtime::offset(const jsi::TypedArray &typedArray) {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, typedArray);
+    assert(v8Object->IsTypedArray());
+    auto array = v8Object.As<v8::TypedArray>();
+    return array->ByteOffset();
+}
+
 uint8_t *V8Runtime::data(const jsi::ArrayBuffer &arrayBuffer) {
   v8::Locker locker(isolate_);
   v8::Isolate::Scope scopedIsolate(isolate_);
@@ -794,6 +1018,19 @@ uint8_t *V8Runtime::data(const jsi::ArrayBuffer &arrayBuffer) {
   assert(v8Object->IsArrayBuffer());
   v8::ArrayBuffer *v8ArrayBuffer = v8::ArrayBuffer::Cast(*v8Object);
   return reinterpret_cast<uint8_t *>(v8ArrayBuffer->GetBackingStore()->Data());
+}
+
+uint8_t *V8Runtime::data(const jsi::TypedArray &typedArray) {
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope scopedIsolate(isolate_);
+    v8::HandleScope scopedHandle(isolate_);
+    v8::Context::Scope scopedContext(context_.Get(isolate_));
+    
+    v8::Local<v8::Object> v8Object =
+    JSIV8ValueConverter::ToV8Object(*this, typedArray);
+    assert(v8Object->IsTypedArray());
+    auto array = v8Object.As<v8::TypedArray>();
+    return reinterpret_cast<uint8_t *>(array->Buffer()->GetBackingStore()->Data());
 }
 
 jsi::Value V8Runtime::getValueAtIndex(const jsi::Array &array, size_t i) {
