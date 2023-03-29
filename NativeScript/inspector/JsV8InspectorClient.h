@@ -55,6 +55,7 @@ private:
     dispatch_semaphore_t messageArrived_;
     std::function<void (std::string)> sender_;
     bool isWaitingForDebugger_;
+    bool hasScheduledDebugBreak_;
 
     // Override of V8InspectorClient
     v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;

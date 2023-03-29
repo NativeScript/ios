@@ -354,10 +354,13 @@ void JsV8InspectorClient::scheduleBreak() {
     auto context = isolate->GetCurrentContext();
     Context::Scope context_scope(context);
     
-    // hack: force a debugger; statement in ModuleInternal to actually break before loading the next (main) script...
-    // FIXME: find a proper fix to not need to resort to this hack.
-    context->Global()->Set(context, tns::ToV8String(isolate, "__pauseOnNextRequire"), v8::Boolean::New(isolate, true)).ToChecked();
-
+    if(!this->hasScheduledDebugBreak_) {
+        this->hasScheduledDebugBreak_ = true;
+        // hack: force a debugger; statement in ModuleInternal to actually break before loading the next (main) script...
+        // FIXME: find a proper fix to not need to resort to this hack.
+        context->Global()->Set(context, tns::ToV8String(isolate, "__pauseOnNextRequire"), v8::Boolean::New(isolate, true)).ToChecked();
+    }
+    
     this->session_->schedulePauseOnNextStatement({}, {});
     
     // v8::debug::SetBreakOnNextFunctionCall(isolate);
