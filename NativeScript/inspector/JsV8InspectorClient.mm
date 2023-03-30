@@ -163,7 +163,8 @@ void JsV8InspectorClient::connect(int argc, char** argv) {
 }
 
 void JsV8InspectorClient::createInspectorSession() {
-    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, {});
+    // FIXME: Consider a more restrictive default approach, or perhaps implement a blacklist of untrusted connections?
+    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, {}, V8Inspector::kFullyTrusted);
 }
 
 void JsV8InspectorClient::disconnect() {
