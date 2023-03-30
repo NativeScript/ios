@@ -443,8 +443,8 @@ bool JsV8InspectorClient::CallDomainHandlerFunction(Local<Context> context, Loca
         return false;
     }
     
-    Local<Value> args[1] = { params };
-    success = domainMethodFunc->Call(context, domainDebugger, 1, args).ToLocal(&result);
+    Local<Value> args[2] = { params, arg };
+    success = domainMethodFunc->Call(context, domainDebugger, 2, args).ToLocal(&result);
     
     if (tc.HasCaught()) {
         std::string error = tns::ToString(isolate, tc.Message()->Get());
