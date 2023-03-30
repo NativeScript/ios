@@ -12,6 +12,16 @@ describe(module.id, function () {
         expect(object.hash).toBe(3);
     });
 
+    it("NSArray from native (uncached) array access", function () {
+        const res = TNSObjCTypes.new().getNSArrayOfNSURLs();
+        console.log(res);
+        expect(res).toBeDefined();
+        expect(res.count > 0).toBe(true);
+        expect(res[0]).toEqual(res.objectAtIndex(0));
+        expect(res[1]).toEqual(res.objectAtIndex(1));
+        expect(res[0].constructor.name).toEqual("NSURL");
+    });
+
     it("MethodCalledInDealloc", function () {
         expect(function () {
             (function () {

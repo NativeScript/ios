@@ -34,4 +34,5 @@ typedef int (^NumberReturner)(int, int, int);
 - (NSDecimalNumber*)methodWithNSDecimalNumber:(NSDecimalNumber*)number;
 - (NSNumber*)methodWithNSCFBool;
 - (NSNull*)methodWithNSNull;
+- (NSArray*)getNSArrayOfNSURLs;
 @end
