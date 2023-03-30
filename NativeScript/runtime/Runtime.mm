@@ -83,7 +83,7 @@ Runtime::~Runtime() {
     {
         v8::Locker lock(isolate_);
         DisposerPHV phv(isolate_);
-        isolate_->VisitHandlesWithClassIds( &phv );
+        // isolate_->VisitHandlesWithClassIds( &phv );
         
         if (IsRuntimeWorker()) {
             auto currentWorker = static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
