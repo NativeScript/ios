@@ -45,6 +45,10 @@ GN_ARGS_BASE="
     v8_enable_pointer_compression=false
     v8_enable_v8_checks=false
     v8_enable_webassembly=false
+
+    # Avoid linker errors relating to missing glibc_sin/cos
+    v8_use_libm_trig_functions=false
+
 "
 # is_official_build=true
 # clang_base_path=\"/Applications/Xcode-14.2.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr\"
