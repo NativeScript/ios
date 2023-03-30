@@ -108,6 +108,10 @@ void JsV8InspectorClient::onFrontendConnected(std::function<void (std::string)> 
     }
 
     this->sender_ = sender;
+
+    // this triggers a reconnection from the devtools so Debugger.scriptParsed etc. are all fired again
+    this->disconnect();
+    this->isConnected_ = true;
 }
 
 void JsV8InspectorClient::onFrontendMessageReceived(std::string message) {
