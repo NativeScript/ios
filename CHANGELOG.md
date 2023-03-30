@@ -1,3 +1,12 @@
+## [8.5.1](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.5.0...v8.5.1) (2023-03-30)
+
+
+### Bug Fixes
+
+* incorrect wrapper in indexed array access ([#206](https://github.com/NativeScript/ns-v8ios-runtime/issues/206)) ([b689434](https://github.com/NativeScript/ns-v8ios-runtime/commit/b6894346b273b289bfda713a8f0c7055911c945a))
+
+
+
 # [8.5.0](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.4.1...v8.5.0) (2023-03-28)
 
 
