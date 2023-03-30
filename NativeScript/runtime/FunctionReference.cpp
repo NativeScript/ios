@@ -33,7 +33,7 @@ Local<v8::Function> FunctionReference::GetFunctionReferenceCtorFunc(Local<Contex
         tns::Assert(false, isolate);
     }
 
-    tns::SetValue(isolate, ctorFunc, new FunctionReferenceTypeWrapper());
+    tns::SetValue(isolate, ctorFunc, MakeGarbageCollected<FunctionReferenceTypeWrapper>(isolate));
 
     cache->FunctionReferenceCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
     cache->FunctionReferenceCtorFunc->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
@@ -50,7 +50,7 @@ void FunctionReference::FunctionReferenceConstructorCallback(const FunctionCallb
 
     Local<v8::Function> arg = info[0].As<v8::Function>();
     std::shared_ptr<Persistent<v8::Value>> poArg = ObjectManager::Register(context, arg);
-    FunctionReferenceWrapper* wrapper = new FunctionReferenceWrapper(poArg);
+    FunctionReferenceWrapper* wrapper = MakeGarbageCollected<FunctionReferenceWrapper>(isolate, poArg);
     tns::SetValue(isolate, arg, wrapper);
     info.GetReturnValue().Set(arg);
 }

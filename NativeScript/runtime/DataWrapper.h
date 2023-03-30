@@ -160,7 +160,7 @@ private:
     std::vector<StructField> fields_;
 };
 
-class BaseDataWrapper {
+class BaseDataWrapper : public cppgc::GarbageCollected<BaseDataWrapper> {
 public:
     BaseDataWrapper()
         : gcProtected_(false) {
@@ -183,6 +183,9 @@ public:
     void GcUnprotect() {
         this->gcProtected_ = false;
     }
+
+    virtual void Trace(cppgc::Visitor*) const {}
+
 private:
     bool gcProtected_;
 };

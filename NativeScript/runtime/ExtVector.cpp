@@ -22,7 +22,7 @@ Local<Value> ExtVector::NewInstance(Isolate* isolate, void* data, ffi_type* ffiT
     tns::Assert(success, isolate);
 
     // TODO: Validate that the inner type is supported (float, double)
-    ExtVectorWrapper* wrapper = new ExtVectorWrapper(data, ffiType, innerTypeEncoding, typeEncoding);
+    ExtVectorWrapper* wrapper = MakeGarbageCollected<ExtVectorWrapper>(isolate, data, ffiType, innerTypeEncoding, typeEncoding);
     tns::SetValue(isolate, result.As<Object>(), wrapper);
 
     return result;
