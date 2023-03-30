@@ -34,6 +34,9 @@ class DebugStackTraceIterator final : public debug::StackTraceIterator {
 
   v8::MaybeLocal<v8::Value> Evaluate(v8::Local<v8::String> source,
                                      bool throw_on_side_effect) override;
+  void PrepareRestart();
+
+  Handle<SharedFunctionInfo> GetSharedFunctionInfo() const;
 
  private:
   void UpdateInlineFrameIndexAndResumableFnOnStack();
