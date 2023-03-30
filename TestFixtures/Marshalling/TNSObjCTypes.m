@@ -118,4 +118,12 @@ CFTypeRef TNSFunctionWithCreateCFTypeRefReturn() {
     return [NSNull null];
 }
 
+- (NSArray*)getNSArrayOfNSURLs {
+    NSURL* url1 = [NSURL URLWithString:(@"dummy://url1")];
+    NSURL* url2 = [NSURL URLWithString:(@"dummy://url2")];
+    NSArray *urlArray = @[url1, url2];
+    
+    return urlArray;
+}
+
 @end

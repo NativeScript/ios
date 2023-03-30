@@ -869,7 +869,7 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index, const PropertyC
 
     Local<Context> context = isolate->GetCurrentContext();
     auto newWrapper = new ObjCDataWrapper(obj);
-    Local<Value> result = ArgConverter::ConvertArgument(context, wrapper);
+    Local<Value> result = ArgConverter::ConvertArgument(context, newWrapper);
     tns::DeleteWrapperIfUnused(isolate, result, newWrapper);
     args.GetReturnValue().Set(result);
 }
