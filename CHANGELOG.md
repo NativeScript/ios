@@ -1,3 +1,44 @@
+## [8.5.1](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.5.0...v8.5.1) (2023-03-30)
+
+
+### Bug Fixes
+
+* incorrect wrapper in indexed array access ([#206](https://github.com/NativeScript/ns-v8ios-runtime/issues/206)) ([b689434](https://github.com/NativeScript/ns-v8ios-runtime/commit/b6894346b273b289bfda713a8f0c7055911c945a))
+
+
+
+# [8.5.0](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.4.1...v8.5.0) (2023-03-28)
+
+
+### Bug Fixes
+
+* block isolate validation condition ([17a7299](https://github.com/NativeScript/ns-v8ios-runtime/commit/17a729953c913f4b4e7a254c962fe2e8ff11f63b))
+* Build and link to v8_heap_base and v8_heap_base_headers ([3ebd066](https://github.com/NativeScript/ns-v8ios-runtime/commit/3ebd066974db59b3d2400232908a8e70531aa649))
+* Correctly initialize context in inspector client init() ([92b38ea](https://github.com/NativeScript/ns-v8ios-runtime/commit/92b38eaa7fba3f23f8b128123b7eaec192eb2734))
+* create empty metadata-bin files to satisfy XCode dep checks ([0e349fc](https://github.com/NativeScript/ns-v8ios-runtime/commit/0e349fcec9df3ad7ff8b61d27b3f424f5d49f957))
+* Don't disconnect inspector when frontend connects ([d2d3b65](https://github.com/NativeScript/ns-v8ios-runtime/commit/d2d3b659fd5fc032b10f8bfdca12063510297271))
+* don't null runloop on Promise proxy ([826a395](https://github.com/NativeScript/ns-v8ios-runtime/commit/826a395822b816882d4ac5e82e0995a27769a673))
+* don't try to free blocks that not owned by the BlockWrapper ([d4e9b08](https://github.com/NativeScript/ns-v8ios-runtime/commit/d4e9b08e7f58d83dbbb8ab1674b46490b0b491ed))
+* drain the microtask queue after devtools message ([de77365](https://github.com/NativeScript/ns-v8ios-runtime/commit/de773650903e80d25420d98649364cbadc64c09d))
+* Implement console.log inspector with Runtime protocol ([eaa8dd7](https://github.com/NativeScript/ns-v8ios-runtime/commit/eaa8dd7b6449348a7f966f244eeec93853115164))
+* Mac Catalyst build ([#189](https://github.com/NativeScript/ns-v8ios-runtime/issues/189)) ([8980c0f](https://github.com/NativeScript/ns-v8ios-runtime/commit/8980c0f189d9b8dd175dd27cdbb31cba13bf7b9f))
+* Re-enable inspector code ([14faf01](https://github.com/NativeScript/ns-v8ios-runtime/commit/14faf01f75053d9a9903baa55b190cdbd3c248b0))
+* resolve PromiseProxy context memory leak ([#193](https://github.com/NativeScript/ns-v8ios-runtime/issues/193)) ([21de81d](https://github.com/NativeScript/ns-v8ios-runtime/commit/21de81de5466e3bc1c39f8cbf9135c6a560b2045))
+* set metadata-generator deployment target to 11.0 ([#198](https://github.com/NativeScript/ns-v8ios-runtime/issues/198)) ([75cf79f](https://github.com/NativeScript/ns-v8ios-runtime/commit/75cf79f89020f98b55ea08b4dd8ab6e3581ba456))
+* use BigInt for pointers ([#199](https://github.com/NativeScript/ns-v8ios-runtime/issues/199)) ([6db3184](https://github.com/NativeScript/ns-v8ios-runtime/commit/6db318438ab5c3de918be9e6b204bddbc399e78d))
+
+
+### Features
+
+* jsi ([6a3c0e7](https://github.com/NativeScript/ns-v8ios-runtime/commit/6a3c0e7dade509aa677c7d67aeb1206e62e6f7cd))
+* print v8 version on start ([be64e3f](https://github.com/NativeScript/ns-v8ios-runtime/commit/be64e3fd4da8da9c9855c080f080848e713074e9))
+* Re-add NativeScript inspector sources ([241bba4](https://github.com/NativeScript/ns-v8ios-runtime/commit/241bba48e03b5accc29da1fd2fdd6fe52de8758a))
+* Re-add V8 inspector sources ([cfc7adf](https://github.com/NativeScript/ns-v8ios-runtime/commit/cfc7adff27f49dc37a8f99ff4ddba57fb0a8ca4d))
+* support fully independent isolates ([#194](https://github.com/NativeScript/ns-v8ios-runtime/issues/194)) ([fa44007](https://github.com/NativeScript/ns-v8ios-runtime/commit/fa44007f9aab12b277836f4388861066837ef14c))
+* v8_static 10.3.22 ([32e90c4](https://github.com/NativeScript/ns-v8ios-runtime/commit/32e90c4768d52ca83261b3c2613d38b205852739))
+
+
+
 ## [8.4.1](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.4.0...v8.4.1) (2023-01-16)
 
 
