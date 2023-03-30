@@ -431,7 +431,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
             blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
 
-            BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding, false);
+            BlockWrapper* wrapper = MakeGarbageCollected<BlockWrapper>(isolate, (void*)blockPtr, blockTypeEncoding, false);
             tns::SetValue(isolate, arg.As<v8::Function>(), wrapper);
         }
 
@@ -671,7 +671,7 @@ Local<Value> Interop::StructToValue(Local<Context> context, void* result, Struct
         void* dest = malloc(ffiType->size);
         memcpy(dest, result, ffiType->size);
 
-        wrapper = new StructWrapper(structInfo, dest, nullptr);
+        wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, dest, nullptr);
     } else {
         Local<Value> parent = parentStruct->Get(isolate);
         BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parent);
@@ -679,7 +679,7 @@ Local<Value> Interop::StructToValue(Local<Context> context, void* result, Struct
             StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
             parentStructWrapper->IncrementChildren();
         }
-        wrapper = new StructWrapper(structInfo, result, parentStruct);
+        wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, result, parentStruct);
     }
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
@@ -808,7 +808,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
     if (returnsUnmanaged) {
         uint8_t* data = call->GetResult<uint8_t*>();
-        UnmanagedTypeWrapper* wrapper = new UnmanagedTypeWrapper(data, typeEncoding);
+        UnmanagedTypeWrapper* wrapper = MakeGarbageCollected<UnmanagedTypeWrapper>(isolate, data, typeEncoding);
         Local<Value> result = UnmanagedType::Create(context, wrapper);
         ObjectManager::Register(context, result);
         return result;
@@ -947,7 +947,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             return callback;
         }
 
-        BlockWrapper* blockWrapper = new BlockWrapper(block, typeEncoding, true);
+        BlockWrapper* blockWrapper = MakeGarbageCollected<BlockWrapper>(isolate, block, typeEncoding, true);
         Local<External> ext = External::New(isolate, blockWrapper);
         Local<v8::Function> callback;
 
@@ -994,7 +994,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
         const TypeEncoding* parametersEncoding = typeEncoding->details.functionPointer.signature.first();
         size_t parametersCount = typeEncoding->details.functionPointer.signature.count;
-        AnonymousFunctionWrapper* wrapper = new AnonymousFunctionWrapper(functionPointer, parametersEncoding, parametersCount);
+        AnonymousFunctionWrapper* wrapper = MakeGarbageCollected<AnonymousFunctionWrapper>(isolate, functionPointer, parametersEncoding, parametersCount);
         Local<External> ext = External::New(isolate, wrapper);
 
         Local<v8::Function> func;
@@ -1123,7 +1123,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         // because class_getSuperclass will directly return NSProxy and thus missing to attach all instance members
         const TypeEncoding* te = [result isProxy] ? typeEncoding : nullptr;
 
-        ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
+        ObjCDataWrapper* wrapper = MakeGarbageCollected<ObjCDataWrapper>(isolate, result, te);
         std::vector<std::string> additionalProtocols = Interop::GetAdditionalProtocols(typeEncoding);
         Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper, false, additionalProtocols);
 

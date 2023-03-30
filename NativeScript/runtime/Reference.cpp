@@ -52,7 +52,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Local<Context> contex
         tns::Assert(false, isolate);
     }
 
-    tns::SetValue(isolate, ctorFunc, new ReferenceTypeWrapper());
+    tns::SetValue(isolate, ctorFunc, MakeGarbageCollected<ReferenceTypeWrapper>(isolate));
     Local<Value> prototypeValue;
     bool success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
     tns::Assert(success && prototypeValue->IsObject(), isolate);
@@ -87,7 +87,7 @@ void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& 
         val->SetWeak();
     }
 
-    ReferenceWrapper* wrapper = new ReferenceWrapper(typeWrapper, val);
+    ReferenceWrapper* wrapper = MakeGarbageCollected<ReferenceWrapper>(isolate, typeWrapper, val);
     Local<Object> thiz = info.This();
     tns::SetValue(isolate, thiz, wrapper);
 

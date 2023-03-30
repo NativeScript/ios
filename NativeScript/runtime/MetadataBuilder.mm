@@ -94,7 +94,7 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property, const Prope
         bool success = v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func);
         tns::Assert(success, isolate);
 
-        tns::SetValue(isolate, func, new FunctionWrapper(funcMeta));
+        tns::SetValue(isolate, func, MakeGarbageCollected<FunctionWrapper>(isolate, funcMeta));
         MetadataBuilder::DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
 
         auto uniquePersistent = std::make_unique<Persistent<v8::Function>>(isolate, func);
@@ -144,7 +144,7 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context
         return it->second->Get(isolate);
     }
 
-    StructTypeWrapper* wrapper = new StructTypeWrapper(structInfo);
+    StructTypeWrapper* wrapper = MakeGarbageCollected<StructTypeWrapper>(isolate, structInfo);
     Local<External> ext = External::New(isolate, wrapper);
     Local<v8::Function> structCtorFunc;
     bool success = v8::Function::New(context, StructConstructorCallback, ext).ToLocal(&structCtorFunc);
@@ -191,7 +191,7 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
             dest = pw->Data();
         }
 
-        StructWrapper* wrapper = new StructWrapper(structInfo, dest, nullptr);
+        StructWrapper* wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, dest, nullptr);
         Local<Context> context = isolate->GetCurrentContext();
         Local<Value> result = ArgConverter::ConvertArgument(context, wrapper);
 
@@ -365,7 +365,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
     if (meta->type() == MetaType::ProtocolType) {
         const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
-        tns::SetValue(isolate, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name()), protoMeta));
+        tns::SetValue(isolate, ctorFunc, MakeGarbageCollected<ObjCProtocolWrapper>(isolate, objc_getProtocol(meta->name()), protoMeta));
         cache->ProtocolCtorFuncs.emplace(meta->name(), new Persistent<v8::Function>(isolate, ctorFunc));
     } else {
         Class klass = objc_getClass(meta->name());
@@ -373,7 +373,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
             SymbolLoader::instance().ensureModule(meta->topLevelModule());
             klass = objc_getClass(meta->name());
         }
-        tns::SetValue(isolate, ctorFunc, new ObjCClassWrapper(klass));
+        tns::SetValue(isolate, ctorFunc, MakeGarbageCollected<ObjCClassWrapper>(isolate, klass));
         cache->CtorFuncs.emplace(meta->name(), std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc));
     }
     ObjectManager::Register(context, ctorFunc);
@@ -646,7 +646,7 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
         }
 
         Local<Context> context = isolate->GetCurrentContext();
-        ObjCAllocDataWrapper* allocWrapper = new ObjCAllocDataWrapper(klass);
+        ObjCAllocDataWrapper* allocWrapper = MakeGarbageCollected<ObjCAllocDataWrapper>(isolate, klass);
         Local<Value> result = ArgConverter::CreateJsWrapper(context, allocWrapper, Local<Object>());
         info.GetReturnValue().Set(result);
     } catch (NativeScriptException& ex) {
@@ -982,7 +982,7 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const P
             ObjCDataWrapper* wrapper = nullptr;
             Local<Object> self_ = it != cache->Instances.end()
                 ? it->second->Get(context->isolate_).As<Object>()
-                : ArgConverter::CreateJsWrapper(v8Context, wrapper = new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
+                : ArgConverter::CreateJsWrapper(v8Context, wrapper = MakeGarbageCollected<ObjCDataWrapper>(context->isolate_, thiz), Local<Object>()).As<Object>();
             if (wrapper != nullptr) {
                 tns::DeleteWrapperIfUnused(context->isolate_, self_, wrapper);
             }
@@ -1021,7 +1021,7 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const P
             auto it = cache->Instances.find(thiz);
             Local<Object> self_ = it != cache->Instances.end()
                 ? it->second->Get(context->isolate_).As<Object>()
-                : ArgConverter::CreateJsWrapper(v8Context, new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
+                : ArgConverter::CreateJsWrapper(v8Context, MakeGarbageCollected<ObjCDataWrapper>(context->isolate_, thiz), Local<Object>()).As<Object>();
 
             uint8_t* argBuffer = (uint8_t*)argValues[2];
             const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();

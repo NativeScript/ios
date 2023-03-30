@@ -49,7 +49,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Local<Context> context) {
         tns::Assert(false, isolate);
     }
 
-    tns::SetValue(isolate, ctorFunc, new PointerTypeWrapper());
+    tns::SetValue(isolate, ctorFunc, MakeGarbageCollected<PointerTypeWrapper>(isolate));
 
     Local<Value> prototypeValue;
     bool success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
@@ -123,7 +123,7 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
             return;
         }
 
-        PointerWrapper* wrapper = new PointerWrapper(ptr);
+        PointerWrapper* wrapper = MakeGarbageCollected<PointerWrapper>(isolate, ptr);
         tns::SetValue(isolate, info.This(), wrapper);
 
         ObjectManager::Register(context, info.This());

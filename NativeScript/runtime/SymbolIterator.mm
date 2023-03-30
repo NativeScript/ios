@@ -79,7 +79,7 @@ void SymbolIterator::NextCallback(const v8::FunctionCallbackInfo<v8::Value>& arg
         } else if ([item isKindOfClass:[NSString class]]) {
             val = tns::ToV8String(isolate, [item UTF8String]);
         } else {
-            auto wrapper = new ObjCDataWrapper(item);
+            auto wrapper = MakeGarbageCollected<ObjCDataWrapper>(isolate, item);
             val = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>());
             tns::DeleteWrapperIfUnused(isolate, val, wrapper);
         }
