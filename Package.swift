@@ -18,9 +18,9 @@ let package = Package(
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
-        .target(
+        .binaryTarget(
             name: "NativeScript",
-            dependencies: [],
-            path: "./NativeScript")
+            url: "https://github.com/NativeScript/ios-v8-pod/releases/download/spm-test/NativeScript.xcframework.zip",
+            checksum: "5c6a41ec023b26408ffb6474c6c748bc447958da6a08c9da68138d4841bfb5fe")
     ]
 )

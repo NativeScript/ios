@@ -416,7 +416,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2B0A2A5829DC0342009A246A /* Package.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
 		2C998AC0290FB500002BBFA9 /* SnapshotBlob.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SnapshotBlob.h; sourceTree = "<group>"; };
@@ -993,7 +992,6 @@
 		C27E277722202663009C10A3 = {
 			isa = PBXGroup;
 			children = (
-				2B0A2A5829DC0342009A246A /* Package.swift */,
 				9160C064291ED41F000641C0 /* SpinLock.h */,
 				C2DDEB33229EAB3B00345BFE /* NativeScript */,
 				C2DDEB17229EA89000345BFE /* TestRunner */,
