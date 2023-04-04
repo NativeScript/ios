@@ -21,18 +21,28 @@ using namespace tns;
 
 @implementation NativeScript
 
+extern char defaultStartOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
+
+
 std::unique_ptr<Runtime> runtime_;
 
 - (instancetype)initWithConfig:(Config*)config {
     
     if (self = [super init]) {
-        RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
-        if (config.ApplicationPath != nil) {
-            RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:config.ApplicationPath] UTF8String];
-        } else {
-            RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
+        if (config.BaseDir != nil) {
+            RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
+            if (config.ApplicationPath != nil) {
+                RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:config.ApplicationPath] UTF8String];
+            } else {
+                RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
+            }
         }
-        RuntimeConfig.MetadataPtr = [config MetadataPtr];
+        if (config.MetadataPtr != nil) {
+            RuntimeConfig.MetadataPtr = [config MetadataPtr];
+        } else {
+            RuntimeConfig.MetadataPtr = &defaultStartOfMetadataSection;
+
+        }
         RuntimeConfig.IsDebug = [config IsDebug];
         RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
 
@@ -62,6 +72,19 @@ std::unique_ptr<Runtime> runtime_;
     
     return self;
     
+}
+
+- (void)runScriptString: (NSString*) script runLoop: (BOOL) runLoop {
+
+    std::string cppString = std::string([script UTF8String]);
+    runtime_->RunScript(cppString);
+    
+    if (runLoop) {
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+    }
+
+    tns::Tasks::Drain();
+
 }
 
 - (void)runMainApplication {

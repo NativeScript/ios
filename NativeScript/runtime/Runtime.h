@@ -30,6 +30,8 @@ public:
     }
 
     void RunModule(const std::string moduleName);
+    
+    void RunScript(const std::string script);
 
     static void Initialize();
 

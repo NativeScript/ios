@@ -68,6 +68,7 @@ xcodebuild archive -project v8ios.xcodeproj \
                    $QUIET \
                    EXCLUDED_ARCHS="x86_64" \
                    SKIP_INSTALL=NO \
+                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.maccatalyst.xcarchive
 fi
 
@@ -104,6 +105,7 @@ xcodebuild archive -project v8ios.xcodeproj \
                    EXCLUDED_ARCHS="i386" \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
+                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.iphonesimulator.xcarchive
 fi
 
@@ -118,6 +120,7 @@ xcodebuild archive -project v8ios.xcodeproj \
                    EXCLUDED_ARCHS="armv7" \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
+                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.iphoneos.xcarchive
 
 #Create fat library for simulator
