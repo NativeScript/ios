@@ -321,15 +321,11 @@ private:
 
 class PrimitiveDataWrapper: public BaseDataWrapper {
 public:
-    PrimitiveDataWrapper(size_t size,const TypeEncoding* typeEncoding, bool autoDeleteEncoding)
-        : size_(size),
-          typeEncoding_(typeEncoding),
-          autoDeleteEncoding_(autoDeleteEncoding) {
+    PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType type)
+        : size_(size)
+        , typeEncoding_({ type, {} }) {
     }
     ~PrimitiveDataWrapper() {
-        if (autoDeleteEncoding_) {
-            std::free((struct TypeEncoding*)typeEncoding_);
-        }
     }
 
     const WrapperType Type() {
@@ -341,12 +337,11 @@ public:
     }
 
     const TypeEncoding* TypeEncoding() {
-        return this->typeEncoding_;
+        return &this->typeEncoding_;
     }
 private:
     size_t size_;
-    const struct TypeEncoding* typeEncoding_;
-    bool autoDeleteEncoding_;
+    struct TypeEncoding typeEncoding_;
 };
 
 class StructTypeWrapper: public BaseDataWrapper {
