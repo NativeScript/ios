@@ -412,6 +412,11 @@ void JsV8InspectorClient::consoleLog(v8::Isolate* isolate, ConsoleAPIType method
     auto* impl = reinterpret_cast<v8_inspector::V8InspectorImpl*>(inspector_.get());
     auto* session = reinterpret_cast<v8_inspector::V8InspectorSessionImpl*>(session_.get());
     
+    if(impl->isolate() != isolate) {
+        // we don't currently support logging from a worker thread/isolate
+        return;
+    }
+
     v8::Local<v8::StackTrace> stack = v8::StackTrace::CurrentStackTrace(
         isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
     std::unique_ptr<V8StackTraceImpl> stackImpl = impl->debugger()->createStackTrace(stack);
