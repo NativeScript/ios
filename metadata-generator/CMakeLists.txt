@@ -1,5 +1,6 @@
 project(MetadataGenerator)
 cmake_minimum_required(VERSION 3.20)
+include(CheckCCompilerFlag)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -26,6 +27,13 @@ set(LLVM_LIBDIR "${LLVM_ROOT}/lib_${METADATA_BINARY_ARCH}")
 set(LLVM_LINKER_FLAGS "-L${LLVM_LIBDIR} -Wl,-search_paths_first -Wl,-headerpad_max_install_names")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -target ${METADATA_BINARY_ARCH}-apple-darwin -std=c++17 -fno-rtti ${LLVM_PREPROCESSOR_FLAGS}")
+
+# Disable unused-but-set-variable error because it's triggered by LLVM code
+check_c_compiler_flag(-Wno-unused-but-set-variable HAS_UNUSED_BUT_SET_VARIABLE)
+if (HAS_UNUSED_BUT_SET_VARIABLE)
+    add_compile_options(-Wno-unused-but-set-variable)
+endif()
+
 set(LLVM_LINKER_FLAGS "${LLVM_LINKER_FLAGS} ${LLVM_SYSTEM_LIBS} ${LLVM_LIBS}")
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/lib)
