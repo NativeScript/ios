@@ -1,3 +1,4 @@
+#pragma GCC diagnostic ignored "-Wunused"
 #include <Foundation/Foundation.h>
 #include <notify.h>
 #include <chrono>
@@ -154,6 +155,8 @@ void JsV8InspectorClient::init() {
     context_.Reset(isolate, context);
 
     this->createInspectorSession();
+    
+    tracing_agent_.reset(new tns::inspector::TracingAgentImpl());
 }
 
 void JsV8InspectorClient::connect(int argc, char** argv) {
@@ -245,7 +248,10 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
 }
 
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
+    std::vector<uint16_t> vector = tns::ToVector(message);
+    StringView messageView(vector.data(), vector.size());
     bool success;
+
     // livesync uses the inspector socket for HMR/LiveSync...
     if(message.find("Page.reload") != std::string::npos) {
         success = tns::LiveSync(this->isolate_);
@@ -254,15 +260,31 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
         }
         // todo: should we return here, or is it OK to pass onto a possible Page.reload domain handler?
     }
+
+    if(message.find("Tracing.start") != std::string::npos) {
+        tracing_agent_->start();
+        
+        // echo back the request to notify frontend the action was a success
+        // todo: send an empty response for the incoming message id instead.
+        this->sendNotification(StringBuffer::create(messageView));
+        return;
+    }
     
-    std::vector<uint16_t> vector = tns::ToVector(message);
-    StringView messageView(vector.data(), vector.size());
+    if(message.find("Tracing.end") != std::string::npos) {
+        tracing_agent_->end();
+        std::string res = tracing_agent_->getLastTrace();
+        tracing_agent_->SendToDevtools(context, res);
+        return;
+    }
+
     Isolate* isolate = isolate_;
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handle_scope(isolate);
     Local<Context> context = tns::Caches::Get(isolate)->GetContext();
     Local<Value> arg;
+
+    // parse incoming message as JSON
     success = v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&arg);
     
     // stop processing invalid messages

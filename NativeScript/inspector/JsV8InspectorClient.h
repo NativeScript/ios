@@ -10,6 +10,7 @@
 #include "include/v8-inspector.h"
 #include "src/inspector/v8-console-message.h"
 
+#include "ns-v8-tracing-agent-impl.h"
 #include "runtime/Runtime.h"
 
 namespace v8_inspector {
@@ -56,6 +57,8 @@ private:
     std::function<void (std::string)> sender_;
     bool isWaitingForDebugger_;
     bool hasScheduledDebugBreak_;
+    
+    std::unique_ptr<tns::inspector::TracingAgentImpl> tracing_agent_;
 
     // Override of V8InspectorClient
     v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
