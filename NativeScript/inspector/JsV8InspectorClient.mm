@@ -1,4 +1,3 @@
-#pragma GCC diagnostic ignored "-Wunused"
 #include <Foundation/Foundation.h>
 #include <notify.h>
 #include <chrono>
@@ -355,8 +354,6 @@ void JsV8InspectorClient::scheduleBreak() {
     }
     
     this->session_->schedulePauseOnNextStatement({}, {});
-    
-    // v8::debug::SetBreakOnNextFunctionCall(isolate);
 }
 
 void JsV8InspectorClient::registerModules() {

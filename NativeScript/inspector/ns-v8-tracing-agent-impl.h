@@ -24,7 +24,6 @@ using v8::platform::tracing::TraceObject;
 using v8::platform::tracing::TracingController;
 using v8::platform::tracing::TraceConfig;
 
-
 class NSInMemoryTraceWriter: public TraceWriter {
 public:
     NSInMemoryTraceWriter(): stream_() {};

@@ -6,7 +6,6 @@
 #include "RuntimeConfig.h"
 #include "Caches.h"
 #include "Helpers.h"
-#include "src/inspector/v8-debugger.h"
 
 using namespace v8;
 

@@ -1,4 +1,3 @@
-#pragma GCC diagnostic ignored "-Wunused"
 //
 //  Profiler.cpp
 //  NativeScript
@@ -31,15 +30,6 @@ void Profiler::Init(Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTempla
     globalTemplate->Set(tns::ToV8String(isolate, "__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData));
     globalTemplate->Set(tns::ToV8String(isolate, "__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData));
     globalTemplate->Set(tns::ToV8String(isolate, "__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData));
-    
-//    Local<Context> context = isolate->GetCurrentContext();
-//    bool success;
-//    success = globalObj->Set(context, tns::ToV8String(isolate, "__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction(context).ToLocalChecked()).ToChecked();
-//    tns::Assert(success);
-//    success = globalObj->Set(context, tns::ToV8String(isolate, "__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction(context).ToLocalChecked()).ToChecked();
-//    tns::Assert(success);
-//    success = globalObj->Set(context, tns::ToV8String(isolate, "__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData)->GetFunction(context).ToLocalChecked()).ToChecked();
-//    tns::Assert(success);
 }
 
 void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {

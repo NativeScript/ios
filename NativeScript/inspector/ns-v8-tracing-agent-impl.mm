@@ -26,7 +26,6 @@ using v8::platform::tracing::TracingController;
 using v8::platform::tracing::TraceConfig;
 using v8::platform::tracing::TraceRecordMode;
 
-
 void NSInMemoryTraceWriter::AppendTraceEvent(TraceObject *trace_event) {
     if(total_traces_ == 0) {
         // create a v8 JSON trace writer

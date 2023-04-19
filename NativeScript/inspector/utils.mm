@@ -45,6 +45,8 @@ std::string v8_inspector::ToStdString(const StringView& value) {
 
     std::u16string value16(buffer.begin(), buffer.end());
 
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    // FIXME: std::codecvt_utf8_utf16 is deprecated
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
     std::string result = convert.to_bytes(value16);
 
@@ -80,6 +82,6 @@ Local<v8::Function> v8_inspector::GetDebuggerFunctionFromObject(Local<Context> c
     if(domain.size() > 0) {
         return v8_inspector::GetDebuggerFunction(context, domain, domainMethod, domainDebugger);
     }
-    
+
     return Local<v8::Function>();
 }
