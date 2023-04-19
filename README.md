@@ -19,6 +19,9 @@ git submodule update --init
 # Ensure that you have the required llvm binaries for building the metadata generator
 ./download_llvm.sh
 
+sudo gem install xcodeproj
+sudo gem install cocoapods
+
 # Open the runtime in Xcode
 open v8ios.xcodeproj
 ```
