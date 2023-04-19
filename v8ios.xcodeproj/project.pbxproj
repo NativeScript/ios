@@ -39,7 +39,6 @@
 		9160C065291ED41F000641C0 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 9160C064291ED41F000641C0 /* SpinLock.h */; };
 		91B25A0A29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */; };
 		91B25A0B29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = 91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */; };
-		91EE1AFF29CF9D16002CC9EC /* Profiler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 91EE1AFE29CF9D16002CC9EC /* Profiler.cpp */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
 		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C20525A82577D86600C12A5C /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
@@ -451,8 +450,6 @@
 		9160C064291ED41F000641C0 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SpinLock.h; path = NativeScript/runtime/SpinLock.h; sourceTree = "<group>"; };
 		91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = "ns-v8-tracing-agent-impl.mm"; sourceTree = "<group>"; };
 		91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ns-v8-tracing-agent-impl.h"; sourceTree = "<group>"; };
-		91EE1AFD29CF9CE1002CC9EC /* Profiler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Profiler.h; sourceTree = "<group>"; };
-		91EE1AFE29CF9D16002CC9EC /* Profiler.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Profiler.cpp; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
 		C20525A72577D86600C12A5C /* TNSWidgets.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = TNSWidgets.xcframework; sourceTree = "<group>"; };
 		C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OneByteStringResource.cpp; sourceTree = "<group>"; };
@@ -1445,8 +1442,6 @@
 				F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */,
 				F6191AA929C0FCE7003F588F /* InspectorServer.h */,
 				F6191AAA29C0FCE7003F588F /* InspectorServer.mm */,
-				91EE1AFD29CF9CE1002CC9EC /* Profiler.h */,
-				91EE1AFE29CF9D16002CC9EC /* Profiler.cpp */,
 				91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */,
 				91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */,
 			);
@@ -2097,7 +2092,6 @@
 				C2F4D0CD2334B1BC0008A2EB /* RuntimeConfig.cpp in Sources */,
 				C23E8F7622CDE88D0078FD4C /* WorkerWrapper.mm in Sources */,
 				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,
-				91EE1AFF29CF9D16002CC9EC /* Profiler.cpp in Sources */,
 				3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */,
 				91B25A0A29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm in Sources */,
 				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,
