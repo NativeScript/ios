@@ -250,6 +250,11 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     std::vector<uint16_t> vector = tns::ToVector(message);
     StringView messageView(vector.data(), vector.size());
+    Isolate* isolate = isolate_;
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    v8::HandleScope handle_scope(isolate);
+    Local<Context> context = tns::Caches::Get(isolate)->GetContext();
     bool success;
 
     // livesync uses the inspector socket for HMR/LiveSync...
@@ -277,14 +282,8 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
         return;
     }
 
-    Isolate* isolate = isolate_;
-    v8::Locker locker(isolate);
-    Isolate::Scope isolate_scope(isolate);
-    v8::HandleScope handle_scope(isolate);
-    Local<Context> context = tns::Caches::Get(isolate)->GetContext();
-    Local<Value> arg;
-
     // parse incoming message as JSON
+    Local<Value> arg;
     success = v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&arg);
     
     // stop processing invalid messages

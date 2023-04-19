@@ -107,10 +107,15 @@ void TracingAgentImpl::SendToDevtools(v8::Local<v8::Context> context, std::strin
     std::string source = R"(
         (() => {
           function processTraceData(traceJSON) {
+           
             try {
+              // handle empty traces (e.g. when the user cancels the trace immediately)
+              if(!traceJSON || traceJSON.trim().length === 0) {
+                traceJSON = "{}";
+              }
               const data = JSON.parse(traceJSON);
 
-              for (let i = 0; i < data.traceEvents.length; i = i + 20) {
+              for (let i = 0; i < data.traceEvents?.length; i = i + 20) {
                 const chunk = data.traceEvents.slice(i, i + 20);
 
                 __inspectorSendEvent(
@@ -132,7 +137,7 @@ void TracingAgentImpl::SendToDevtools(v8::Local<v8::Context> context, std::strin
                 })
               );
             } catch (err) {
-              console.log(err);
+              console.log("[Inspector] Failed to parse trace data", err, traceJSON);
             }
           }
           return processTraceData;
@@ -140,6 +145,9 @@ void TracingAgentImpl::SendToDevtools(v8::Local<v8::Context> context, std::strin
     )";
     
     v8::Isolate* isolate = context->GetIsolate();
+    v8::Locker locker(isolate);
+    v8::Isolate::Scope isolate_scope(isolate);
+    v8::HandleScope handle_scope(isolate);
 
     v8::Local<v8::Script> script;
     bool success = v8::Script::Compile(context, tns::ToV8String(isolate, source)).ToLocal(&script);
