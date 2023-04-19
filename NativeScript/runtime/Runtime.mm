@@ -140,8 +140,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     DefineTimeMethod(isolate, globalTemplate);
     DefineDrainMicrotaskMethod(isolate, globalTemplate);
     ObjectManager::Init(isolate, globalTemplate);
-//    SetTimeout::Init(isolate, globalTemplate);
-    
+//    SetTimeout::Init(isolate, globalTemplate);    
     MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
     isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
