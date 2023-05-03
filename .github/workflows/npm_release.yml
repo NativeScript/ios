@@ -1,0 +1,27 @@
+on:
+  push:
+    branches:
+      - wip/ci-test
+
+jobs:
+  build:
+    runs-on: macos-12
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3' 
+      - name: Install Dependencies
+        run: |
+          python3 -m pip install --upgrade pip six
+          brew install cmake
+          ln -s /usr/local/bin/cmake $(which cmake)
+      - name: Setup
+        run: npm run setup
+      - name: Build
+        run: npm run build
+  
