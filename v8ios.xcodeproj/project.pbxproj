@@ -1848,6 +1848,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
