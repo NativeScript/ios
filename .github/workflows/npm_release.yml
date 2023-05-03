@@ -4,7 +4,7 @@ on:
       - wip/ci-test
 
 env:
-  NPM_TAG: 'next'
+  NPM_TAG: "next"
 
 jobs:
   build:
@@ -22,7 +22,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3' 
+          python-version: "3"
       - name: Install Dependencies
         run: |
           python3 -m pip install --upgrade pip six
@@ -43,13 +43,11 @@ jobs:
         run: npm run build
       - name: Test
         run: |
-          xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -resultBundleVersion 3 -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test | xcpretty
-          xcparse attachments $HOME/test_results.xcresult $HOME/test-out
-          find $HOME/test-out -name "*junit*.xml" -maxdepth 1 -exec npx junit-cli-report-viewer {} \;
+          set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -resultBundleVersion 3 -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test | xcpretty
+          set -e && xcparse attachments $HOME/test_results.xcresult $HOME/test-out
+          set -e && find $HOME/test-out -name "*junit*.xml" -maxdepth 1 -exec npx junit-cli-report-viewer {} \;
       - name: Archive production artifacts
         uses: actions/upload-artifact@v3
         with:
           name: npm-release
           path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
-
-  
