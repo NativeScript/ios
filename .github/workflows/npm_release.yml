@@ -34,7 +34,7 @@ jobs:
       - name: Bump version for dev release
         if: ${{ github.event_name == 'push' && !contains(github.ref, 'refs/tags/') }}
         run: |
-          NPM_VERSION=$(node -e "console.log(require('./package.json').version);")
+          NPM_VERSION=$NPM_VERSION-$NPM_TAG-$(date +"%Y-%m-%d")-$GITHUB_RUN_ID
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
           npm version $NPM_VERSION
       - name: Build
