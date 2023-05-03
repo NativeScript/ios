@@ -50,6 +50,6 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: npm-release
-          path: dist/nativescript-ios-$NPM_VERSION.tgz
+          path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
 
   
