@@ -19,7 +19,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip six
           brew install cmake
-          ln -s /usr/local/bin/cmake $(which cmake)
+          [ -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
       - name: Setup
         run: npm run setup
       - name: Build
