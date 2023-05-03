@@ -28,6 +28,8 @@ jobs:
           python3 -m pip install --upgrade pip six
           brew install cmake
           [ -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+          - brew install chargepoint/xcparse/xcparse
+          - npm install -g junit-cli-report-viewer
       - name: Get Current Version
         run: |
           echo NPM_VERSION=$(node -e "console.log(require('./package.json').version);") >> $GITHUB_ENV
@@ -39,6 +41,11 @@ jobs:
           npm version $NPM_VERSION
       - name: Build
         run: npm run build
+      - name: Test
+        run: |
+          xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -resultBundleVersion 3 -destination platform\=iOS\ Simulator,OS\=15.2,name\=iPhone\ 11\ Pro\ Max build test | xcpretty
+          xcparse attachments $HOME/test_results.xcresult $HOME/test-out
+          find $HOME/test-out -name "*junit*.xml" -maxdepth 1 -exec npx junit-cli-report-viewer {} \;
       - name: Archive production artifacts
         uses: actions/upload-artifact@v3
         with:
