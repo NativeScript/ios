@@ -47,8 +47,4 @@ if (!nextVersion) {
   throw new Error("Invalid next version");
 }
 
-console.log("current version (package.json) is ", currentVersion);
-console.log("last version tagged is ", lastTagVersion);
-console.log("version will become ", nextVersion.format());
-
 console.log(nextVersion.format());
