@@ -30,7 +30,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip six
           brew install cmake
-          [ !-f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+          [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
       - name: Get Current Version
         run: |
           echo NPM_VERSION=$(node -e "console.log(require('./package.json').version);") >> $GITHUB_ENV
@@ -77,7 +77,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip six
           brew install cmake
-          [ !-f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+          [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
           brew install chargepoint/xcparse/xcparse
           npm install -g @edusperoni/junit-cli-report-viewer verify-junit-xml
       - name: Prepare
