@@ -8,7 +8,10 @@ env:
 
 jobs:
   build:
+    name: Build and Test
     runs-on: macos-12
+    outputs:
+      npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
     steps:
       - uses: actions/checkout@v3
       - name: LLVM cache
@@ -38,7 +41,10 @@ jobs:
         run: |
           NPM_VERSION=$NPM_VERSION-$NPM_TAG-$(date +"%Y-%m-%d")-$GITHUB_RUN_ID
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
-          npm version $NPM_VERSION
+          npm version $NPM_VERSION --no-git-tag-version
+      - name: Output NPM Version
+        id: npm_version_output
+        run: echo NPM_VERSION=$NPM_VERSION >> $GITHUB_OUTPUT
       - name: Build
         run: npm run build
       - name: Test
@@ -52,8 +58,21 @@ jobs:
         with:
           name: npm-release
           path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      NPM_VERSION: ${{needs.build.outputs.npm_version}}
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - uses: actions/download-artifact@v3
+        with:
+          name: npm-release
+          path: dist
       - name: Publish package
         run: |
           echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG..."
           npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag NPM_TAG --provenance --dry-run
-        
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
