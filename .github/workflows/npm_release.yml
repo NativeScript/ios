@@ -52,3 +52,8 @@ jobs:
         with:
           name: npm-release
           path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
+      - name: Publish package
+        run: |
+          echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG..."
+          npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag NPM_TAG --provenance --dry-run
+        
