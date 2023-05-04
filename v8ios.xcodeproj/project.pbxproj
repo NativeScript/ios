@@ -37,6 +37,8 @@
 		6573B9ED291FE5B700B0ED7C /* JSIRuntime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9EB291FE5B700B0ED7C /* JSIRuntime.h */; };
 		6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9EC291FE5B700B0ED7C /* JSIRuntime.m */; };
 		9160C065291ED41F000641C0 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 9160C064291ED41F000641C0 /* SpinLock.h */; };
+		91B25A0A29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */; };
+		91B25A0B29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = 91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
 		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C20525A82577D86600C12A5C /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
@@ -311,7 +313,6 @@
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
 		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
 		F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */; };
-		F6191AAF29C0FCE8003F588F /* JsV8InspectorClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */; };
 		F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA929C0FCE7003F588F /* InspectorServer.h */; };
 		F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AAA29C0FCE7003F588F /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
@@ -447,6 +448,8 @@
 		6573B9EB291FE5B700B0ED7C /* JSIRuntime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JSIRuntime.h; sourceTree = "<group>"; };
 		6573B9EC291FE5B700B0ED7C /* JSIRuntime.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; path = JSIRuntime.m; sourceTree = "<group>"; };
 		9160C064291ED41F000641C0 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SpinLock.h; path = NativeScript/runtime/SpinLock.h; sourceTree = "<group>"; };
+		91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = "ns-v8-tracing-agent-impl.mm"; sourceTree = "<group>"; };
+		91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ns-v8-tracing-agent-impl.h"; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
 		C20525A72577D86600C12A5C /* TNSWidgets.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = TNSWidgets.xcframework; sourceTree = "<group>"; };
 		C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OneByteStringResource.cpp; sourceTree = "<group>"; };
@@ -788,7 +791,6 @@
 		C2FF301C2252062A00933782 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		C2FF301F2252065E00933782 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JsV8InspectorClient.h; sourceTree = "<group>"; };
-		F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JsV8InspectorClient.cpp; sourceTree = "<group>"; };
 		F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = JsV8InspectorClient.mm; sourceTree = "<group>"; };
 		F6191AA929C0FCE7003F588F /* InspectorServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
 		F6191AAA29C0FCE7003F588F /* InspectorServer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorServer.mm; sourceTree = "<group>"; };
@@ -1437,10 +1439,11 @@
 				F6191AB429C0FF86003F588F /* utils.h */,
 				F6191AB529C0FF86003F588F /* utils.mm */,
 				F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */,
-				F6191AA729C0FCE7003F588F /* JsV8InspectorClient.cpp */,
 				F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */,
 				F6191AA929C0FCE7003F588F /* InspectorServer.h */,
 				F6191AAA29C0FCE7003F588F /* InspectorServer.mm */,
+				91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */,
+				91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */,
 			);
 			path = inspector;
 			sourceTree = "<group>";
@@ -1514,6 +1517,7 @@
 				C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */,
 				C27E5D8622F2FDDB00498ED0 /* KnownUnknownClassPair.h in Headers */,
 				C247C16922F82842001D2CA2 /* v8-tracing.h in Headers */,
+				91B25A0B29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h in Headers */,
 				6573B9E9291FE2A700B0ED7C /* threadsafe.h in Headers */,
 				3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */,
 				C22536B7241A318900192740 /* ffitarget.h in Headers */,
@@ -2075,7 +2079,6 @@
 				C2DDEB99229EAC8300345BFE /* Metadata.mm in Sources */,
 				6573B9D4291FE29F00B0ED7C /* V8RuntimeFactory.cpp in Sources */,
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
-				F6191AAF29C0FCE8003F588F /* JsV8InspectorClient.cpp in Sources */,
 				C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
@@ -2090,6 +2093,7 @@
 				C23E8F7622CDE88D0078FD4C /* WorkerWrapper.mm in Sources */,
 				C266567B22AA630F00EE15CC /* NSDataAdapter.mm in Sources */,
 				3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */,
+				91B25A0A29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm in Sources */,
 				C2DDEBA6229EAC8300345BFE /* Helpers.mm in Sources */,
 				C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */,
 				C2F4D0AD232F85E20008A2EB /* SymbolIterator.mm in Sources */,

@@ -24,6 +24,8 @@ namespace {
 
 std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
     std::string valueStr = tns::ToString(isolate, value);
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    // FIXME: std::codecvt_utf8_utf16 is deprecated
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
     std::u16string value16 = convert.from_bytes(valueStr);
 
@@ -31,6 +33,8 @@ std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
 }
 
 std::vector<uint16_t> tns::ToVector(const std::string& value) {
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    // FIXME: std::codecvt_utf8_utf16 is deprecated
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
     std::u16string value16 = convert.from_bytes(value);
 
