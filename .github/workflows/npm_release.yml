@@ -1,9 +1,10 @@
 on:
   push:
     branches:
-      - main
-    tags:
-      - 'v*'
+      - wip/ci-test
+    #   - main
+    # tags:
+    #   - 'v*'
 
 env:
   NPM_TAG: "next"
@@ -37,9 +38,9 @@ jobs:
         run: |
           echo NPM_VERSION=$(node -e "console.log(require('./package.json').version);") >> $GITHUB_ENV
       - name: Bump version for dev release
-        if: ${{ github.event_name == 'push' && !contains(github.ref, 'refs/tags/') }}
+        if: ${{ !contains(github.ref, 'refs/tags/') }}
         run: |
-          NPM_VERSION=$NPM_VERSION-$NPM_TAG-$(date +"%Y-%m-%d")-$GITHUB_RUN_ID
+          NPM_VERSION=$(node ./scripts/get-next-version.js)
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
           npm version $NPM_VERSION --no-git-tag-version
       - name: Output NPM Version
@@ -105,10 +106,12 @@ jobs:
         with:
           name: npm-package
           path: dist
+      - name: Determine npm tag
+        run: echo NPM_TAG=$(node ./scripts/get-npm-tag.js) >> $GITHUB_ENV
       - name: Publish package
         run: |
           echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG..."
-          npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
+          npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance --dry-run
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
   github-release:
