@@ -205,7 +205,6 @@ class V8Runtime : public facebook::jsi::Runtime {
 
  private:
   std::unique_ptr<v8::ArrayBuffer::Allocator> arrayBufferAllocator_;
-  std::unique_ptr<v8::StartupData> snapshotBlob_;
   v8::Isolate *isolate_;
   v8::Global<v8::Context> context_;
   bool isSharedRuntime_ = false;
