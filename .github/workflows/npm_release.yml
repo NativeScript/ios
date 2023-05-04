@@ -31,6 +31,7 @@ jobs:
           python-version: "3"
       - name: Install Dependencies
         run: |
+          npm install
           python3 -m pip install --upgrade pip six
           brew install cmake
           [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
@@ -78,6 +79,7 @@ jobs:
           python-version: "3"
       - name: Install Dependencies
         run: |
+          npm install
           python3 -m pip install --upgrade pip six
           brew install cmake
           [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
