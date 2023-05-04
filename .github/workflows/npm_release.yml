@@ -45,11 +45,16 @@ jobs:
         run: echo NPM_VERSION=$NPM_VERSION >> $GITHUB_OUTPUT
       - name: Build
         run: npm run build
-      - name: Archive production artifacts
+      - name: Upload npm package artifact
         uses: actions/upload-artifact@v3
         with:
           name: npm-release
           path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
+      - name: Upload dSYMs artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: NativeScript-dSYMs
+          path: dist/dSYMs
   test:
     name: Test
     runs-on: macos-12
@@ -104,3 +109,36 @@ jobs:
           npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance --dry-run
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+  github-release:
+    runs-on: ubuntu-latest
+    # only runs on tagged commits
+    if: ${{ contains(github.ref, 'refs/tags/') }}
+    # TODO: add when in prod
+    # permissions:
+    #   contents: write
+    needs:
+      - build
+      - test
+    env:
+      NPM_VERSION: ${{needs.build.outputs.npm_version}}
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Setup
+        run: npm install
+      - uses: actions/download-artifact@v3
+        with:
+          name: npm-release
+          path: dist
+      - uses: actions/download-artifact@v3
+        with:
+          name: NativeScript-dSYMs
+          path: dist
+      - name: Partial Changelog
+        run: npx conventional-changelog -p angular -r2 > body.md
+      # TODO: add when in prod
+      # - uses: ncipollo/release-action@v1
+      #   with:
+      #     artifacts: "dist/nativescript-ios-*.tgz,dist/dSYMs/*"
+      #     bodyFile: "body.md"
