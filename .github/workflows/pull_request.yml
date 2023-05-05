@@ -2,7 +2,7 @@ on:
   pull_request:
 
 env:
-  NPM_TAG: "next"
+  NPM_TAG: "pr"
 
 jobs:
   build:
@@ -24,16 +24,16 @@ jobs:
           python-version: "3"
       - name: Install Dependencies
         run: |
+          npm install
           python3 -m pip install --upgrade pip six
           brew install cmake
           [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
       - name: Get Current Version
         run: |
           echo NPM_VERSION=$(node -e "console.log(require('./package.json').version);") >> $GITHUB_ENV
-      - name: Bump version for dev release
-        if: ${{ github.event_name == 'push' && !contains(github.ref, 'refs/tags/') }}
+      - name: Bump version for PR release
         run: |
-          NPM_VERSION=$NPM_VERSION-$NPM_TAG-$(date +"%Y-%m-%d")-$GITHUB_RUN_ID
+          NPM_VERSION=$(node ./scripts/get-next-version.js)
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
           npm version $NPM_VERSION --no-git-tag-version
       - name: Build
@@ -68,16 +68,24 @@ jobs:
           python-version: "3"
       - name: Install Dependencies
         run: |
+          npm install
           python3 -m pip install --upgrade pip six
           brew install cmake
           [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
           brew install chargepoint/xcparse/xcparse
           npm install -g @edusperoni/junit-cli-report-viewer verify-junit-xml
-      - name: Prepare
-        run: npm run setup-ci
-      - name: Test
+      - name: Xcode Tests
+        uses: nick-fields/retry@v2
+        # try to run the tests with xcpretty. If it fails then try again without xcpretty twice for better log output
+        # the xcode tests are a bit flaky and they should never fail on this step, as this step only collects the JS test results as junit xml
+        with:
+          timeout_minutes: 20
+          max_attempts: 3
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test | xcpretty
+          on_retry_command: rm -rf $HOME/test_results*
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test
+      - name: Validate Test Results
         run: |
-          xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test
           xcparse attachments $HOME/test_results.xcresult $HOME/test-out
           find $HOME/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
           find $HOME/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml

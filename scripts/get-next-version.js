@@ -1,6 +1,7 @@
 const semver = require("semver");
 const child_process = require("child_process");
 const dayjs = require("dayjs");
+const fs = require("fs");
 
 const currentVersion =
   process.env.NPM_VERSION || require("../package.json").version;
@@ -11,7 +12,20 @@ if (!currentVersion) {
 const currentTag = process.env.NPM_TAG || "next";
 const runID = process.env.GITHUB_RUN_ID || 0;
 
-const preRelease = `${currentTag}.${dayjs().format("YYYY-MM-DD")}-${runID}`;
+let prPrerelease = "";
+
+if (currentTag === "pr" && process.env.GITHUB_EVENT_PATH) {
+  try {
+    const ev = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
+    const prNum = ev.pull_request.number;
+    // add extra PR number to version-pr.PRNUM-....
+    prPrerelease = `${prNum}-`;
+  } catch (e) {
+    // don't add pr prerelease
+  }
+}
+
+const preRelease = `${currentTag}.${prPrerelease}${dayjs().format("YYYY-MM-DD")}-${runID}`;
 
 let lastTagVersion = (
   process.env.LAST_TAGGED_VERSION ||
