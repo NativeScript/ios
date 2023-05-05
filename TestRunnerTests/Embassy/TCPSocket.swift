@@ -114,7 +114,7 @@ public final class TCPSocket {
         let size = socklen_t(MemoryLayout<sockaddr_in6>.size)
         // bind the address and port on socket
         guard withUnsafePointer(to: &address, { pointer in
-            return pointer.withMemoryRebound(to: sockaddr.self, capacity: Int(size)) { pointer in
+            return UnsafeRawPointer(pointer).withMemoryRebound(to: sockaddr.self, capacity: Int(size)) { pointer in
                 return SystemLibrary.bind(fileDescriptor, pointer, size) >= 0
             }
         }) else {
@@ -135,7 +135,7 @@ public final class TCPSocket {
         var address = sockaddr_in6()
         var size = socklen_t(MemoryLayout<sockaddr_in6>.size)
         let clientFileDescriptor = withUnsafeMutablePointer(to: &address) { pointer in
-            return pointer.withMemoryRebound(to: sockaddr.self, capacity: Int(size)) { pointer in
+            return UnsafeMutableRawPointer(pointer).withMemoryRebound(to: sockaddr.self, capacity: Int(size)) { pointer in
                 return SystemLibrary.accept(fileDescriptor, pointer, &size)
             }
         }
@@ -218,7 +218,8 @@ public final class TCPSocket {
     ) throws -> (String, Int) {
         var address = sockaddr_storage()
         var size = socklen_t(MemoryLayout<sockaddr_storage>.size)
-        return try withUnsafeMutablePointer(to: &address) { pointer in
+        return try withUnsafeMutablePointer(to: &address) { unsafePointer in
+            let pointer = UnsafeMutableRawPointer(unsafePointer)
             let result = pointer.withMemoryRebound(
                 to: sockaddr.self,
                 capacity: Int(size)
@@ -228,7 +229,7 @@ public final class TCPSocket {
             guard result >= 0 else {
                 throw OSError.lastIOError()
             }
-            switch Int32(pointer.pointee.ss_family) {
+            switch Int32(unsafePointer.pointee.ss_family) {
             case AF_INET:
                 return try pointer.withMemoryRebound(
                     to: sockaddr_in.self,

@@ -1,0 +1,93 @@
+on:
+  pull_request:
+
+env:
+  NPM_TAG: "pr"
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-12
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: LLVM cache
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+          key: ${{ hashFiles('download_llvm.sh') }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3"
+      - name: Install Dependencies
+        run: |
+          npm install
+          python3 -m pip install --upgrade pip six
+          brew install cmake
+          [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+      - name: Get Current Version
+        run: |
+          echo NPM_VERSION=$(node -e "console.log(require('./package.json').version);") >> $GITHUB_ENV
+      - name: Bump version for PR release
+        run: |
+          NPM_VERSION=$(node ./scripts/get-next-version.js)
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
+          npm version $NPM_VERSION --no-git-tag-version
+      - name: Build
+        run: npm run build
+      - name: Upload npm package artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-package
+          path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
+      - name: Upload dSYMs artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: NativeScript-dSYMs
+          path: dist/dSYMs
+  test:
+    name: Test
+    runs-on: macos-12
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+      - name: LLVM cache
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+          key: ${{ hashFiles('download_llvm.sh') }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3"
+      - name: Install Dependencies
+        run: |
+          npm install
+          python3 -m pip install --upgrade pip six
+          brew install cmake
+          [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+          brew install chargepoint/xcparse/xcparse
+          npm install -g @edusperoni/junit-cli-report-viewer verify-junit-xml
+      - name: Xcode Tests
+        uses: nick-fields/retry@v2
+        # try to run the tests with xcpretty. If it fails then try again without xcpretty twice for better log output
+        # the xcode tests are a bit flaky and they should never fail on this step, as this step only collects the JS test results as junit xml
+        with:
+          timeout_minutes: 20
+          max_attempts: 3
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test | xcpretty
+          on_retry_command: rm -rf $HOME/test_results*
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $HOME/test_results -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test
+      - name: Validate Test Results
+        run: |
+          xcparse attachments $HOME/test_results.xcresult $HOME/test-out
+          find $HOME/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
+          find $HOME/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml

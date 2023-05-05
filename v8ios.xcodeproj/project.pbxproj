@@ -1848,6 +1848,17 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(CONFIGURATION_BUILD_DIR)/metadata-m68k.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-i386.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-sparc.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-hppa.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-ppc7400.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-ppc970.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-ppc64.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-x86_64.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-armv6.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-armv7.bin",
+				"$(CONFIGURATION_BUILD_DIR)/metadata-arm64.bin",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
