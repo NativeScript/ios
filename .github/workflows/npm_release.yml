@@ -114,6 +114,9 @@ jobs:
     needs:
       - build
       - test
+    permissions:
+     contents: read
+     id-token: write
     env:
       NPM_VERSION: ${{needs.build.outputs.npm_version}}
       NPM_TAG: ${{needs.build.outputs.npm_tag}}
