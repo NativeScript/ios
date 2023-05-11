@@ -26,4 +26,4 @@ EXCLUDED_ARCHS[sdk=macosx*] = i386 armv6 armv7 armv7s armv8
 VALIDATE_WORKSPACE = YES
 
 // Default value (can be overriden by user's build.xcconfig)
-TARGETED_DEVICE_FAMILY = "1,2";
+TARGETED_DEVICE_FAMILY = 1,2
