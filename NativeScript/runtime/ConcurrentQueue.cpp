@@ -53,6 +53,9 @@ void ConcurrentQueue::SignalAndWakeUp() {
 
 void ConcurrentQueue::Terminate() {
     std::unique_lock<std::mutex> lock(initializationMutex_);
+    if (terminated) {
+        return;
+    }
     terminated = true;
     if (this->runLoop_) {
         CFRunLoopStop(this->runLoop_);

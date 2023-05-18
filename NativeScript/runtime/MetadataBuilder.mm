@@ -30,6 +30,9 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate, Local<Ob
 void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property, const PropertyCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
     std::string propName = tns::ToString(isolate, property);
+    if(propName == "NSObject") {
+        
+    }
 
     GlobalHandlerContext* ctx = static_cast<GlobalHandlerContext*>(info.Data().As<External>()->Value());
 
@@ -56,25 +59,23 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property, const Prope
 
         bool isInterface = meta->type() == MetaType::Interface;
         std::string name = meta->name();
-        std::shared_ptr<Caches> cache = Caches::Get(isolate);
         if (isInterface) {
-            auto it = cache->CtorFuncs.find(name);
-            if (it != cache->CtorFuncs.end()) {
+            auto it = Caches::Get(isolate)->CtorFuncs.find(name);
+            if (it != Caches::Get(isolate)->CtorFuncs.end()) {
                 Local<v8::Function> func = it->second->Get(isolate);
                 info.GetReturnValue().Set(func);
             }
         } else {
-            auto it = cache->ProtocolCtorFuncs.find(name);
-            if (it != cache->ProtocolCtorFuncs.end()) {
+            auto it = Caches::Get(isolate)->ProtocolCtorFuncs.find(name);
+            if (it != Caches::Get(isolate)->ProtocolCtorFuncs.end()) {
                 Local<v8::Function> func = it->second->Get(isolate);
                 info.GetReturnValue().Set(func);
             }
         }
     } else if (meta->type() == MetaType::Function) {
-        auto cache = Caches::Get(isolate);
         std::string funcName = meta->name();
-        auto it = cache->CFunctions.find(funcName);
-        if (it != cache->CFunctions.end()) {
+        auto it = Caches::Get(isolate)->CFunctions.find(funcName);
+        if (it != Caches::Get(isolate)->CFunctions.end()) {
             Local<v8::Function> func = it->second->Get(isolate);
             info.GetReturnValue().Set(func);
             return;
@@ -99,7 +100,7 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property, const Prope
 
         auto uniquePersistent = std::make_unique<Persistent<v8::Function>>(isolate, func);
         uniquePersistent->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
-        cache->CFunctions.emplace(funcName, std::move(uniquePersistent));
+        Caches::Get(isolate)->CFunctions.emplace(funcName, std::move(uniquePersistent));
 
         info.GetReturnValue().Set(func);
     } else if (meta->type() == MetaType::Var) {
@@ -138,9 +139,8 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property, const Prope
 
 Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context> context, StructInfo structInfo) {
     Isolate* isolate = context->GetIsolate();
-    auto cache = Caches::Get(isolate);
-    auto it = cache->StructConstructorFunctions.find(structInfo.Name());
-    if (it != cache->StructConstructorFunctions.end()) {
+    auto it = Caches::Get(isolate)->StructConstructorFunctions.find(structInfo.Name());
+    if (it != Caches::Get(isolate)->StructConstructorFunctions.end()) {
         return it->second->Get(isolate);
     }
 
@@ -159,7 +159,7 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context
     success = structCtorFunc->Set(context, tns::ToV8String(isolate, "equals"), equalsFunc).FromMaybe(false);
     tns::Assert(success, isolate);
 
-    cache->StructConstructorFunctions.emplace(structInfo.Name(), std::make_unique<Persistent<v8::Function>>(isolate, structCtorFunc));
+    Caches::Get(isolate)->StructConstructorFunctions.emplace(structInfo.Name(), std::make_unique<Persistent<v8::Function>>(isolate, structCtorFunc));
 
     return structCtorFunc;
 }
@@ -195,10 +195,10 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
         Local<Context> context = isolate->GetCurrentContext();
         Local<Value> result = ArgConverter::ConvertArgument(context, wrapper);
 
-        std::shared_ptr<Caches> cache = Caches::Get(isolate);
+        
         std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, result);
         std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
-        cache->StructInstances.emplace(key, poResult);
+        Caches::Get(isolate)->StructInstances.emplace(key, poResult);
         tns::DeleteWrapperIfUnused(isolate, result, wrapper);
 
         info.GetReturnValue().Set(result);
@@ -289,11 +289,11 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplate(
 Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(Local<Context> context, const BaseClassMeta* meta, KnownUnknownClassPair pair, robin_hood::unordered_map<std::string, uint8_t>& instanceMembers, robin_hood::unordered_map<std::string, uint8_t>& staticMembers, const std::vector<std::string>& additionalProtocols) {
     Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> ctorFuncTemplate;
-    auto cache = Caches::Get(isolate);
+    
 
     if (additionalProtocols.empty()) {
-        auto it = cache->CtorFuncTemplates.find(meta);
-        if (it != cache->CtorFuncTemplates.end()) {
+        auto it = Caches::Get(isolate)->CtorFuncTemplates.find(meta);
+        if (it != Caches::Get(isolate)->CtorFuncTemplates.end()) {
             ctorFuncTemplate = it->second->Get(isolate);
             return ctorFuncTemplate;
         }
@@ -331,8 +331,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
                 if (baseMeta != nullptr) {
                     Local<FunctionTemplate> baseCtorFuncTemplate = MetadataBuilder::GetOrCreateConstructorFunctionTemplateInternal(context, baseMeta, pair, instanceMembers, staticMembers);
                     ctorFuncTemplate->Inherit(baseCtorFuncTemplate);
-                    auto it = cache->CtorFuncs.find(baseMeta->name());
-                    if (it != cache->CtorFuncs.end()) {
+                    auto it = Caches::Get(isolate)->CtorFuncs.find(baseMeta->name());
+                    if (it != Caches::Get(isolate)->CtorFuncs.end()) {
                         baseCtorFunc = it->second->Get(isolate);
                     }
                 }
@@ -361,12 +361,12 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     bool success = ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc);
     tns::Assert(success, isolate);
     
-    cache->CtorFuncTemplates.emplace(meta, std::make_unique<Persistent<FunctionTemplate>>(isolate, ctorFuncTemplate));
+    Caches::Get(isolate)->CtorFuncTemplates.emplace(meta, std::make_unique<Persistent<FunctionTemplate>>(isolate, ctorFuncTemplate));
 
     if (meta->type() == MetaType::ProtocolType) {
         const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
         tns::SetValue(isolate, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name()), protoMeta));
-        cache->ProtocolCtorFuncs.emplace(meta->name(), new Persistent<v8::Function>(isolate, ctorFunc));
+        Caches::Get(isolate)->ProtocolCtorFuncs.emplace(meta->name(), new Persistent<v8::Function>(isolate, ctorFunc));
     } else {
         Class klass = objc_getClass(meta->name());
         if (klass == nil) {
@@ -374,7 +374,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
             klass = objc_getClass(meta->name());
         }
         tns::SetValue(isolate, ctorFunc, new ObjCClassWrapper(klass));
-        cache->CtorFuncs.emplace(meta->name(), std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc));
+        Caches::Get(isolate)->CtorFuncs.emplace(meta->name(), std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc));
     }
     ObjectManager::Register(context, ctorFunc);
 
@@ -401,7 +401,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     Local<Object> prototype = prototypeValue.As<Object>();
 
     Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
-    cache->Prototypes.emplace(meta, poPrototype);
+    Caches::Get(isolate)->Prototypes.emplace(meta, poPrototype);
 
     return ctorFuncTemplate;
 }
@@ -768,11 +768,11 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property, con
 
     StructInfo structInfo = wrapper->StructInfo();
 
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    
     std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
     std::shared_ptr<Persistent<Value>> parentStruct = nullptr;
-    auto x = cache->StructInstances.find(key);
-    if (x != cache->StructInstances.end()) {
+    auto x = Caches::Get(isolate)->StructInstances.find(key);
+    if (x != Caches::Get(isolate)->StructInstances.end()) {
         parentStruct = x->second;
     }
 
@@ -975,12 +975,11 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const P
             Local<Value> res;
 
             id thiz = *static_cast<const id*>(argValues[0]);
-            auto cache = Caches::Get(context->isolate_);
-            auto it = cache->Instances.find(thiz);
+            auto it = Caches::Get(context->isolate_)->Instances.find(thiz);
 
             Local<Context> v8Context = Caches::Get(context->isolate_)->GetContext();
             ObjCDataWrapper* wrapper = nullptr;
-            Local<Object> self_ = it != cache->Instances.end()
+            Local<Object> self_ = it != Caches::Get(context->isolate_)->Instances.end()
                 ? it->second->Get(context->isolate_).As<Object>()
                 : ArgConverter::CreateJsWrapper(v8Context, wrapper = new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
             if (wrapper != nullptr) {
@@ -1017,9 +1016,8 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const P
             Local<Context> v8Context = Caches::Get(context->isolate_)->GetContext();
 
             id thiz = *static_cast<const id*>(argValues[0]);
-            auto cache = Caches::Get(context->isolate_);
-            auto it = cache->Instances.find(thiz);
-            Local<Object> self_ = it != cache->Instances.end()
+            auto it = Caches::Get(context->isolate_)->Instances.find(thiz);
+            Local<Object> self_ = it != Caches::Get(context->isolate_)->Instances.end()
                 ? it->second->Get(context->isolate_).As<Object>()
                 : ArgConverter::CreateJsWrapper(v8Context, new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
 

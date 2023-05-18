@@ -68,35 +68,47 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
         WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
         tns::SetValue(isolate, thiz, worker);
-        std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(context, thiz);
+        // we keep the persistent for as long as the worker is alive
+        std::shared_ptr<Persistent<Value>> poWorker = std::make_shared<Persistent<Value>>(isolate, thiz);
+        // register for cleanup
+        ObjectManager::Register(context, thiz);
 
-        std::function<Isolate* ()> func([worker, workerPath]() {
+        std::function<Isolate* ()> func([]() {
             tns::Runtime* runtime = new tns::Runtime();
             Isolate* isolate = runtime->CreateIsolate();
+            Caches::workerIsolate = isolate;
+            return isolate;
+        });
+        
+        std::function<void (Isolate*)> mainFn([workerId = worker->WorkerId(), workerPath](Isolate* isolate) {
+            Runtime* runtime = Runtime::GetCurrentRuntime();
+            // should never happen
+            if (runtime == nullptr || runtime->GetIsolate() != isolate) {
+                runtime = Runtime::GetRuntime(isolate);
+            }
             v8::Locker locker(isolate);
             runtime->Init(isolate, true);
-            runtime->SetWorkerId(worker->WorkerId());
-            int workerId = worker->WorkerId();
+            runtime->SetWorkerId(workerId);
             Worker::SetWorkerId(isolate, workerId);
 
             TryCatch tc(isolate);
             runtime->RunModule(workerPath);
             if (tc.HasCaught()) {
                 Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                Local<Context> context = Caches::Get(isolate)->GetContext();
-                worker->PassUncaughtExceptionFromWorkerToMain(context, tc, false);
-                worker->Terminate();
+                HandleScope __unused handle_scope(isolate);
+//                Local<Context> context = Caches::Get(isolate)->GetContext();
+//                worker->PassUncaughtExceptionFromWorkerToMain(context, tc, false);
+//                worker->Terminate();
             }
-
-            return isolate;
         });
-
-        worker->Start(poWorker, func);
 
         std::shared_ptr<Caches::WorkerState> state = std::make_shared<Caches::WorkerState>(isolate, poWorker, worker);
         int workerId = worker->Id();
         Caches::Workers->Insert(workerId, state);
+        
+        worker->Start(poWorker, func, mainFn);
+
+        
     } catch (NativeScriptException& ex) {
         ex.ReThrowToV8(isolate);
     }
@@ -132,16 +144,18 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
         
         std::string message = tns::ToString(isolate, result);
         
-        auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
+        auto runtime = Runtime::GetRuntime(state->GetIsolate());
         if (runtime == nullptr) {
             return;
         }
-        tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [state, message]() {
-            Isolate* isolate = state->GetIsolate();
+        tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [isolate = state->GetIsolate(), poWorker = state->GetWorker(), message]() {
+            if (!Runtime::IsAlive(isolate)) {
+                return;
+            }
             v8::Locker locker(isolate);
             Isolate::Scope isolate_scope(isolate);
             HandleScope handle_scope(isolate);
-            Local<Value> workerInstance = state->GetWorker()->Get(isolate);
+            Local<Value> workerInstance = poWorker->Get(isolate);
             tns::Assert(!workerInstance.IsEmpty() && workerInstance->IsObject(), isolate);
             Worker::OnMessageCallback(isolate, workerInstance, message);
         });

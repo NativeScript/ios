@@ -51,8 +51,7 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
 }
 
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
-    Local<Context> context = cache->GetContext();
+    Local<Context> context = Caches::Get(isolate)->GetContext();
     Local<Object> globalObject = context->Global();
     Local<Value> requireObj;
     bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);

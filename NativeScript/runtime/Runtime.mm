@@ -128,6 +128,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     std::shared_ptr<Caches> cache = Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
     cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
     cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
+    tns::Caches::GetUseCount(isolate);
 
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);

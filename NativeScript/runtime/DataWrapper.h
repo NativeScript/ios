@@ -656,7 +656,7 @@ class WorkerWrapper: public BaseDataWrapper {
 public:
     WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage);
 
-    void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker, std::function<v8::Isolate* ()> func);
+    void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker, std::function<v8::Isolate* ()> isolateCreationFn, std::function<void(v8::Isolate*)> isolateMainFn);
     void CallOnErrorHandlers(v8::TryCatch& tc);
     void PassUncaughtExceptionFromWorkerToMain(v8::Local<v8::Context> context, v8::TryCatch& tc, bool async = true);
     void PostMessage(std::string message);
@@ -695,11 +695,12 @@ private:
     std::shared_ptr<v8::Persistent<v8::Value>> poWorker_;
     ConcurrentQueue queue_;
     static std::atomic<int> nextId_;
+    std::mutex workerMutex_;
     int workerId_;
 
-    void BackgroundLooper(std::function<v8::Isolate* ()> func);
+    void BackgroundLooper(std::function<v8::Isolate* ()> isolateCreationFn, std::function<void(v8::Isolate*)> isolateMainFn);
     void DrainPendingTasks();
-    v8::Local<v8::Object> ConstructErrorObject(v8::Local<v8::Context> context, std::string message, std::string source, std::string stackTrace, int lineNumber);
+    static v8::Local<v8::Object> ConstructErrorObject(v8::Local<v8::Context> context, std::string message, std::string source, std::string stackTrace, int lineNumber);
 };
 
 }

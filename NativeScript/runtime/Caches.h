@@ -7,6 +7,7 @@
 #include "robin_hood.h"
 #include "Common.h"
 #include "Metadata.h"
+#include "Constants.h"
 
 namespace tns {
 
@@ -51,6 +52,7 @@ public:
 
     static std::shared_ptr<ConcurrentMap<std::string, const Meta*>> Metadata;
     static std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> Workers;
+    static v8::Isolate* workerIsolate;
 
     inline static std::shared_ptr<Caches> Init(v8::Isolate* isolate, const int& isolateId) {
         auto cache = std::make_shared<Caches>(isolate, isolateId);
@@ -58,10 +60,23 @@ public:
         isolate->SetData(0, static_cast<void*>(new std::shared_ptr<Caches>(cache)));
         return cache;
     }
+    inline static long GetUseCount(v8::Isolate* isolate) {
+        if (isolate != nullptr) {
+            auto cache = reinterpret_cast<std::shared_ptr<Caches>*>(isolate->GetData(Constants::CACHES_ISOLATE_SLOT));
+            if (cache != nullptr) {
+                return cache->use_count();
+            }
+        }
+        return 0;
+    }
     inline static std::shared_ptr<Caches> Get(v8::Isolate* isolate) {
-        auto cache = isolate->GetData(0);
-        if (cache != nullptr) {
-            return *reinterpret_cast<std::shared_ptr<Caches>*>(cache);
+        if (isolate != nullptr) {
+            auto cache = reinterpret_cast<std::shared_ptr<Caches>*>(isolate->GetData(Constants::CACHES_ISOLATE_SLOT));
+            if (cache != nullptr) {
+                auto __unused vvv = cache->use_count();
+                auto __unused isolateId = (*cache)->getIsolateId();
+                return *cache;
+            }
         }
         // this should only happen when an isolate is accessed after disposal
         // so we return a dummy cache

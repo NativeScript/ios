@@ -25,7 +25,7 @@ WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::I
       isTerminating_(false),
       isDisposed_(false),
       isWeak_(false),
-      onMessage_(onMessage) {
+      onMessage_(onMessage), workerMutex_(){
 }
 
 const WrapperType WorkerWrapper::Type() {
@@ -54,12 +54,12 @@ void WorkerWrapper::PostMessage(std::string message) {
     }
 }
 
-void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker, std::function<Isolate* ()> func) {
+void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker, std::function<v8::Isolate* ()> isolateCreationFn, std::function<void(v8::Isolate*)> isolateMainFn) {
     this->poWorker_ = poWorker;
     this->workerId_ = nextId_.fetch_add(1, std::memory_order_relaxed) + 1;
 
     [workers_ addOperationWithBlock:^{
-        this->BackgroundLooper(func);
+        this->BackgroundLooper(isolateCreationFn, isolateMainFn);
     }];
 
     this->isRunning_ = true;
@@ -74,7 +74,7 @@ void WorkerWrapper::DrainPendingTasks() {
     Local<Object> global = context->Global();
 
     for (std::string message: messages) {
-        if (this->isTerminating_) {
+        if (this->isTerminating_ || this->isClosing_) {
             break;
         }
         TryCatch tc(this->workerIsolate_);
@@ -86,7 +86,7 @@ void WorkerWrapper::DrainPendingTasks() {
     }
 }
 
-void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
+void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> isolateCreationFn, std::function<void(v8::Isolate*)> isolateMainFn) {
     if (!this->isTerminating_) {
         CFRunLoopRef runLoop = CFRunLoopGetCurrent();
         this->queue_.Initialize(runLoop, [](void* info) {
@@ -94,26 +94,36 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate* ()> func) {
             w->DrainPendingTasks();
         }, this);
         
-        this->workerIsolate_ = func();
+        this->workerIsolate_ = isolateCreationFn();
+
+        // we split into 2 functions because we need this->workerIsolate populated in case
+        // the main function errors out and we need to use this->workerIsolate to call some callbacks
+        // relevant when calling `close()` on a worker main script
+        isolateMainFn(this->workerIsolate_);
         
         this->DrainPendingTasks();
         
         // check again as it could terminate before this
-        if (!this->isTerminating_) {
+        if (!this->isTerminating_ && !this->isClosing_) {
             CFRunLoopRun();
         }
     }
 
+    this->isRunning_ = false;
     this->isDisposed_ = true;
+    this->poWorker_.reset();
     Runtime* runtime = Runtime::GetCurrentRuntime();
     delete runtime;
 }
 
 void WorkerWrapper::Close() {
+    // std::lock_guard<std::mutex> l(workerMutex_);
     this->isClosing_ = true;
+    this->queue_.Terminate();
 }
 
 void WorkerWrapper::Terminate() {
+    // std::lock_guard<std::mutex> l(workerMutex_);
     // set terminating to true atomically
     bool wasTerminating = this->isTerminating_.exchange(true);
     if (!wasTerminating) {
@@ -181,32 +191,35 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context
         }
     }
 
-    auto runtime = static_cast<Runtime*>(mainIsolate_->GetData(Constants::RUNTIME_SLOT));
+    auto runtime = Runtime::GetRuntime(mainIsolate_);
     if (runtime == nullptr) {
         return;
     }
-    tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [this, message, src, stackTrace, lineNumber]() {
-        v8::Locker locker(this->mainIsolate_);
-        Isolate::Scope isolate_scope(this->mainIsolate_);
-        HandleScope handle_scope(this->mainIsolate_);
-        Local<Object> worker = this->poWorker_->Get(this->mainIsolate_).As<Object>();
-        Local<Context> context = Caches::Get(this->mainIsolate_)->GetContext();
+    tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [main_isolate = this->mainIsolate_, poWorker = this->poWorker_, message, src, stackTrace, lineNumber]() {
+        if (!Runtime::IsAlive(main_isolate)) {
+            return;
+        }
+        v8::Locker locker(main_isolate);
+        Isolate::Scope isolate_scope(main_isolate);
+        HandleScope handle_scope(main_isolate);
+        Local<Object> worker = poWorker->Get(main_isolate).As<Object>();
+        Local<Context> context = Caches::Get(main_isolate)->GetContext();
 
         Local<Value> onErrorVal;
-        bool success = worker->Get(context, tns::ToV8String(this->mainIsolate_, "onerror")).ToLocal(&onErrorVal);
-        tns::Assert(success, this->mainIsolate_);
+        bool success = worker->Get(context, tns::ToV8String(main_isolate, "onerror")).ToLocal(&onErrorVal);
+        tns::Assert(success, main_isolate);
 
         if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
             Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
-            Local<Object> arg = this->ConstructErrorObject(context, message, src, stackTrace, lineNumber);
+            Local<Object> arg = ConstructErrorObject(context, message, src, stackTrace, lineNumber);
             Local<Value> args[1] = { arg };
             Local<Value> result;
-            TryCatch tc(this->mainIsolate_);
-            bool success = onErrorFunc->Call(context, v8::Undefined(this->mainIsolate_), 1, args).ToLocal(&result);
+            TryCatch tc(main_isolate);
+            bool success = onErrorFunc->Call(context, v8::Undefined(main_isolate), 1, args).ToLocal(&result);
             if (!success && tc.HasCaught()) {
                 Local<Value> error = tc.Exception();
-                Log(@"%s", tns::ToString(this->mainIsolate_, error).c_str());
-                this->mainIsolate_->ThrowException(error);
+                Log(@"%s", tns::ToString(main_isolate, error).c_str());
+                main_isolate->ThrowException(error);
             }
         }
     }, async);

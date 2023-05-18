@@ -4,7 +4,7 @@
 using namespace v8;
 
 namespace tns {
-
+v8::Isolate* Caches::workerIsolate = nullptr;
 Caches::Caches(Isolate* isolate, const int& isolateId)
     : isolate_(isolate), isolateId_(isolateId) {
 }
@@ -26,10 +26,11 @@ Caches::~Caches() {
 }
 
 void Caches::Remove(v8::Isolate* isolate) {
-    auto cache = isolate->GetData(Constants::CACHES_ISOLATE_SLOT);
+    auto cache = reinterpret_cast<std::shared_ptr<Caches>*>(isolate->GetData(Constants::CACHES_ISOLATE_SLOT));
     isolate->SetData(Constants::CACHES_ISOLATE_SLOT, nullptr);
     if (cache != nullptr) {
-        delete reinterpret_cast<std::shared_ptr<Caches>*>(cache);
+        auto __unused vvv = cache->use_count();
+        delete cache;
     }
 }
 
