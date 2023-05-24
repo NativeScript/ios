@@ -163,9 +163,12 @@ jobs:
         with:
           name: NativeScript-dSYMs
           path: dist
+      - name: Zip dSYMs
+        working-directory: dist/dSYMs
+        run: find . -maxdepth 1 -name '*.dSYM' -print | xargs -I@ zip -r @.zip @
       - name: Partial Changelog
         run: npx conventional-changelog -p angular -r2 > body.md
       - uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/nativescript-ios-*.tgz,dist/dSYMs/*"
+          artifacts: "dist/nativescript-ios-*.tgz,dist/dSYMs/*.zip"
           bodyFile: "body.md"
