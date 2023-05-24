@@ -1,3 +1,21 @@
+## [8.5.2](https://github.com/NativeScript/ios/compare/v8.5.1...v8.5.2) (2023-05-24)
+
+
+### Bug Fixes
+
+* Cache shared_ptr leak ([8236cf3](https://github.com/NativeScript/ios/commit/8236cf3f191f8b5bd7098beeff92aef31c0fc6e7))
+* FunctionWrapper isolate-level leak ([0c4c017](https://github.com/NativeScript/ios/commit/0c4c017689a71433d567dde48c1464954f3af98b))
+* move TARGETED_DEVICE_FAMILY to xcconfig to allow override ([#211](https://github.com/NativeScript/ios/issues/211)) ([2e5f5f1](https://github.com/NativeScript/ios/commit/2e5f5f1e8c8b9551011e2566b8f134dd6cfb5378))
+* remove quotes for TARGETED_DEVICE_FAMILY ([157dda7](https://github.com/NativeScript/ios/commit/157dda704b6fbe7cd5077b4bb1ad9676a7c8d47e))
+* soif on runtime destruction ([7e24de8](https://github.com/NativeScript/ios/commit/7e24de8f1ace1d72318c0f0253759cd745307e5f))
+
+
+### Features
+
+* re-enabled inspector protocol handling ([#202](https://github.com/NativeScript/ios/issues/202)) ([c100f72](https://github.com/NativeScript/ios/commit/c100f725e48df5e61316281b82eed835d265b996))
+
+
+
 ## [8.5.1](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.5.0...v8.5.1) (2023-03-30)
 
 
