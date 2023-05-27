@@ -49,11 +49,6 @@ public:
         }
     }
 
-    inline void Clear() {
-        std::lock_guard<std::mutex> writerLock(this->containerMutex_);
-        container_.clear();
-    }
-
     ConcurrentMap() = default;
     ConcurrentMap(const ConcurrentMap&) = delete;
     ConcurrentMap& operator=(const ConcurrentMap&) = delete;
