@@ -378,10 +378,10 @@ Local<Value> Interop::HandleOf(Local<Context> context, Local<Value> value) {
                     }
                     case WrapperType::Reference: {
                         ReferenceWrapper* w = static_cast<ReferenceWrapper*>(wrapper);
-                        if (w->Value() != nullptr) {
-                            Local<Value> wrappedValue = w->Value()->Get(isolate);
+                        if (w->HasValue()) {
+                            Local<Value> wrappedValue = w->Value().Get(isolate);
                             if (tns::GetValue(isolate, wrappedValue) == nullptr) {
-                                return Pointer::NewInstance(context, w->Value());
+                                return Pointer::NewInstance(context, w->UnsafeValue());
                             }
                             return HandleOf(context, wrappedValue);
                         } else if (w->Data() != nullptr) {

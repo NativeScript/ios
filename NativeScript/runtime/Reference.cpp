@@ -42,7 +42,7 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Local<Context> contex
 
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, ReferenceConstructorCallback);
     ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "Reference"));
-    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(kMinGarbageCollectedEmbedderFields);
     ctorFuncTemplate->InstanceTemplate()->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetCallback, IndexedPropertySetCallback));
     Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
     proto->SetAccessor(tns::ToV8String(isolate, "value"), GetValueCallback, SetValueCallback);
@@ -67,31 +67,22 @@ Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Local<Context> contex
 
 void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    Persistent<Value>* val = nullptr;
+    TracedValue* value = nullptr;
     BaseDataWrapper* typeWrapper = nullptr;
     if (info.Length() == 1) {
         if (!info[0]->IsNullOrUndefined()) {
-            val = new Persistent<Value>(isolate, info[0]);
+            value = new TracedValue(isolate, info[0]);
         }
     } else if (info.Length() > 1) {
         if (!info[0]->IsNullOrUndefined() && !info[1]->IsNullOrUndefined()) {
             Local<Value> typeValue = info[0];
             typeWrapper = tns::GetValue(isolate, typeValue);
             tns::Assert(typeWrapper != nullptr, isolate);
-            val = new Persistent<Value>(isolate, info[1]);
+            value = new TracedValue(isolate, info[1]);
         }
     }
-    
-    if(val != nullptr) {
-        val->SetWeak();
-    }
 
-    ReferenceWrapper* wrapper = MakeGarbageCollected<ReferenceWrapper>(isolate, typeWrapper, val);
-    Local<Object> thiz = info.This();
-    tns::SetValue(isolate, thiz, wrapper);
-
-    ObjectManager::Register(context, thiz);
+    tns::SetValue(isolate, info.This(), MakeGarbageCollected<ReferenceWrapper>(isolate, typeWrapper, value));
 }
 
 void Reference::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbackInfo<Value>& info) {
@@ -140,11 +131,10 @@ void Reference::SetValueCallback(Local<v8::Name> name, Local<Value> value, const
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, info.This());
     tns::Assert(baseWrapper->Type() == WrapperType::Reference, isolate);
     ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
-    Persistent<Value>* poValue = new Persistent<Value>(isolate, value);
 
     wrapper->SetData(nullptr);
     wrapper->SetEncoding(nullptr);
-    wrapper->SetValue(poValue);
+    wrapper->SetValue(new TracedValue(ToTraced(isolate, value)));
 }
 
 Local<Value> Reference::GetReferredValue(Local<Context> context, Local<Value> value) {
@@ -161,27 +151,22 @@ Local<Value> Reference::GetReferredValue(Local<Context> context, Local<Value> va
 
         BaseCall call(data);
         Local<Value> jsResult = Interop::GetResult(context, encoding, &call, true);
-        if (wrapper->Value() != nullptr) {
-            wrapper->Value()->Reset(isolate, jsResult);
-        } else {
-            wrapper->SetValue(new Persistent<Value>(isolate, jsResult));
-        }
-
+        wrapper->SetValue(new TracedValue(ToTraced(isolate, jsResult)));
         wrapper->SetData(nullptr);
         wrapper->SetEncoding(nullptr);
         return jsResult;
     }
 
-    if (wrapper->Value() == nullptr) {
+    if (!wrapper->HasValue()) {
         return Local<Value>();
     }
 
-    Local<Value> innerValue = wrapper->Value()->Get(isolate);
+    Local<Value> innerValue = wrapper->Value().Get(isolate);
     baseWrapper = tns::GetValue(isolate, innerValue);
     if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Reference) {
         wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
-        if (wrapper->Value() != nullptr) {
-            return Reference::GetReferredValue(context, wrapper->Value()->Get(isolate));
+        if (!wrapper->Value().IsEmpty()) {
+            return Reference::GetReferredValue(context, wrapper->Value().Get(isolate));
         }
     }
 
@@ -212,7 +197,7 @@ void* Reference::GetWrappedPointer(Local<Context> context, Local<Value> referenc
         return refWrapper->Data();
     }
 
-    Local<Value> value = refWrapper->Value()->Get(isolate);
+    Local<Value> value = refWrapper->Value().Get(isolate);
     BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
 
     if (wrappedValue == nullptr) {
@@ -293,13 +278,16 @@ void Reference::RegisterToStringMethod(Local<Context> context, Local<Object> pro
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
         tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
         ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
-        Persistent<Value>* value = refWrapper->Value();
+        Local<Value> value = refWrapper->Value().Get(isolate);
 
         char buffer[100];
-        if (value == nullptr) {
+        if (value.IsEmpty()) {
             snprintf(buffer, 100, "<Reference: %p>", reinterpret_cast<void*>(0));
         } else {
-            snprintf(buffer, 100, "<Reference: %p>", value);
+            // FIXME: this is pretty goofy - but the assumption is that the Address* field is the first field of the
+            // Local<T> object, and the Address is a pointer to a pointer in the v8 Heap, so the value should be stable.
+            void* pointer = *reinterpret_cast<void**>(&value);
+            snprintf(buffer, 100, "<Reference: %p>", pointer);
         }
 
         Local<v8::String> result = tns::ToV8String(isolate, buffer);
@@ -336,7 +324,7 @@ Reference::DataPair Reference::GetTypeEncodingDataPair(Local<Object> obj) {
 
     PrimitiveDataWrapper* primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
 
-    Local<Value> value = refWrapper->Value()->Get(isolate);
+    Local<Value> value = refWrapper->Value().Get(isolate);
     BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
     if (wrappedValue != nullptr && wrappedValue->Type() == WrapperType::Pointer) {
         const TypeEncoding* typeEncoding = primitiveWrapper->TypeEncoding();
