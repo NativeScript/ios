@@ -162,6 +162,7 @@ private:
 
 class BaseDataWrapper : public cppgc::GarbageCollected<BaseDataWrapper> {
 public:
+    static constexpr const char* ClassName() { return "BaseDataWrapper"; }
     BaseDataWrapper()
         : gcProtected_(false) {
     }
@@ -192,6 +193,7 @@ private:
 
 class EnumDataWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "EnumDataWrapper"; }
     EnumDataWrapper(std::string jsCode)
         : jsCode_(jsCode) {
     }
@@ -209,6 +211,7 @@ private:
 
 class PointerTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "PointerTypeWrapper"; }
     const WrapperType Type() {
         return WrapperType::PointerType;
     }
@@ -216,6 +219,7 @@ public:
 
 class PointerWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "PointerWrapper"; }
     PointerWrapper(void* data)
         : data_(data),
           isAdopted_(false) {
@@ -247,6 +251,7 @@ private:
 
 class ReferenceTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ReferenceTypeWrapper"; }
     const WrapperType Type() {
         return WrapperType::ReferenceType;
     }
@@ -254,6 +259,7 @@ public:
 
 class ReferenceWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ReferenceWrapper"; }
     ReferenceWrapper(BaseDataWrapper* typeWrapper, v8::Persistent<v8::Value>* value)
         : typeWrapper_(typeWrapper),
           value_(value),
@@ -321,6 +327,7 @@ private:
 
 class PrimitiveDataWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ReferenceTypeWrapper"; }
     PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType type)
         : size_(size)
         , typeEncoding_({ type, {} }) {
@@ -346,6 +353,7 @@ private:
 
 class StructTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "StructTypeWrapper"; }
     StructTypeWrapper(StructInfo structInfo)
         : structInfo_(structInfo) {
     }
@@ -363,6 +371,7 @@ private:
 
 class StructWrapper: public StructTypeWrapper {
 public:
+    static constexpr const char* ClassName() { return "StructWrapper"; }
     StructWrapper(struct StructInfo structInfo, void* data, std::shared_ptr<v8::Persistent<v8::Value>> parent)
         : StructTypeWrapper(structInfo),
           data_(data),
@@ -401,6 +410,7 @@ private:
 
 class ObjCAllocDataWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ObjCAllocDataWrapper"; }
     ObjCAllocDataWrapper(Class klass)
         : klass_(klass) {
     }
@@ -418,6 +428,7 @@ private:
 
 class UnmanagedTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "UnmanagedTypeWrapper"; }
     UnmanagedTypeWrapper(uint8_t* data, const TypeEncoding* typeEncoding)
         : data_(data), typeEncoding_(typeEncoding), valueTaken_(false) {
     }
@@ -446,6 +457,7 @@ private:
 
 class ObjCDataWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ObjCDataWrapper"; }
     ObjCDataWrapper(id data, const TypeEncoding* typeEncoding = nullptr)
         : data_(data), typeEncoding_(typeEncoding) {
     }
@@ -468,6 +480,7 @@ private:
 
 class ObjCClassWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ObjCClassWrapper"; }
     ObjCClassWrapper(Class klazz, bool extendedClass = false)
         : klass_(klazz),
           extendedClass_(extendedClass) {
@@ -491,6 +504,7 @@ private:
 
 class ObjCProtocolWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ObjCProtocolWrapper"; }
     ObjCProtocolWrapper(Protocol* proto, const ProtocolMeta* protoMeta)
         : proto_(proto),
           protoMeta_(protoMeta) {
@@ -514,6 +528,7 @@ private:
 
 class FunctionWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "FunctionWrapper"; }
     FunctionWrapper(const FunctionMeta* meta)
         : meta_(meta) {
     }
@@ -531,6 +546,7 @@ private:
 
 class AnonymousFunctionWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "AnonymousFunctionWrapper"; }
     AnonymousFunctionWrapper(void* functionPointer, const TypeEncoding* parametersEncoding, size_t parametersCount)
         : data_(functionPointer),
           parametersEncoding_(parametersEncoding) {
@@ -554,6 +570,7 @@ private:
 
 class BlockWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "BlockWrapper"; }
     BlockWrapper(void* block, const TypeEncoding* typeEncoding, bool ownsBlock)
         : block_(block),
           typeEncoding_(typeEncoding),
@@ -584,6 +601,7 @@ private:
 
 class FunctionReferenceTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "FunctionReferenceTypeWrapper"; }
     const WrapperType Type() {
         return WrapperType::FunctionReferenceType;
     }
@@ -591,6 +609,7 @@ public:
 
 class FunctionReferenceWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "FunctionReferenceWrapper"; }
     FunctionReferenceWrapper(std::shared_ptr<v8::Persistent<v8::Value>> function)
         : function_(function),
           data_(nullptr) {
@@ -618,6 +637,7 @@ private:
 
 class ExtVectorWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ExtVectorWrapper"; }
     ExtVectorWrapper(void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding, const TypeEncoding* typeEncoding)
         : data_(data),
           ffiType_(ffiType),
