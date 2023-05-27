@@ -22,7 +22,11 @@ namespace {
     uint8_t* BinBuffer = new uint8_t[BUFFER_SIZE];
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
+
     std::string valueStr = tns::ToString(isolate, value);
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     // FIXME: std::codecvt_utf8_utf16 is deprecated
@@ -43,6 +47,8 @@ std::vector<uint16_t> tns::ToVector(const std::string& value) {
     std::vector<uint16_t> vector(begin, end);
     return vector;
 }
+
+#pragma clang diagnostic pop
 
 bool tns::Exists(const char* fullPath) {
     struct stat statbuf;
