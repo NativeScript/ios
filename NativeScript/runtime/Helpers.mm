@@ -228,6 +228,25 @@ void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* 
     }
 }
 
+void tns::SetValue(Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::Value>& value) {
+    if (obj.IsEmpty() || obj->IsNullOrUndefined())
+        return;
+
+    v8::Local<v8::Value> v(value);
+    if (v.IsEmpty())
+        v = v8::Undefined(isolate);
+
+    if (IsGarbageCollectedWrapper(obj)) {
+        if (BaseDataWrapper* wrapper = ExtractWrapper<BaseDataWrapper>(value)) {
+            if (AttachGarbageCollectedWrapper(obj, wrapper))
+                return;
+        } else
+            return DetachGarbageCollectedWrapper(obj);
+    }
+
+    tns::SetPrivateValue(obj, tns::ToV8String(isolate, "metadata"), v);
+}
+
 tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
     if (val.IsEmpty() || val->IsNullOrUndefined() || !val->IsObject()) {
         return nullptr;
