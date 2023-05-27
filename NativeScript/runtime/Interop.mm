@@ -240,8 +240,8 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                 Interop::SetValue(dest, data);
             } else if (wrapper->Type() == WrapperType::Reference) {
                 ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
-                tns::Assert(refWrapper->Value() != nullptr, isolate);
-                Local<Value> value = refWrapper->Value()->Get(isolate);
+                tns::Assert(refWrapper->HasValue(), isolate);
+                Local<Value> value = refWrapper->Value().Get(isolate);
                 wrapper = tns::GetValue(isolate, value);
                 tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Pointer, isolate);
                 PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
@@ -364,7 +364,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                     data = pointerWrapper->Data();
                 } else if (wrapper->Type() == WrapperType::Reference) {
                     ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
-                    Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
+                    Local<Value> value = referenceWrapper->Value().Get(isolate);
                     ffi_type* ffiType = FFICall::GetArgumentType(innerType);
                     data = calloc(1, ffiType->size);
                     FFICall::DisposeFFIType(ffiType, innerType);

@@ -260,7 +260,7 @@ public:
 class ReferenceWrapper: public BaseDataWrapper {
 public:
     static constexpr const char* ClassName() { return "ReferenceWrapper"; }
-    ReferenceWrapper(BaseDataWrapper* typeWrapper, v8::Persistent<v8::Value>* value)
+    ReferenceWrapper(BaseDataWrapper* typeWrapper, TracedValue* value)
         : typeWrapper_(typeWrapper),
           value_(value),
           encoding_(nullptr),
@@ -273,8 +273,7 @@ public:
             value_->Reset();
             delete value_;
         }
-        
-        if (this->data_ != nullptr) {
+        if (this->data_ != nullptr && disposeData_) {
             std::free(this->data_);
         }
     }
@@ -287,14 +286,23 @@ public:
         return this->typeWrapper_;
     }
 
-    v8::Persistent<v8::Value>* Value() {
-        return this->value_;
+    bool HasValue() const {
+        return value_ != nullptr && !value_->IsEmpty();
     }
 
-    void SetValue(v8::Persistent<v8::Value>* value) {
-        if (this->value_ != nullptr) {
+    TracedValue Value() {
+        if (value_ != nullptr)
+            return *value_;
+        return TracedValue();
+    }
+
+    TracedValue* UnsafeValue() {
+        return value_;
+    }
+
+    void SetValue(TracedValue* value) {
+        if (this->value_ != nullptr)
             this->value_->Reset();
-        }
         this->value_ = value;
     }
 
@@ -317,9 +325,18 @@ public:
         this->data_ = data;
         this->disposeData_ = disposeData;
     }
+
+    void Trace(cppgc::Visitor* visitor) const {
+        // ASSERT: visitor is a JSVisitor
+        if (this->typeWrapper_)
+            visitor->Trace(*typeWrapper_);
+        if (this->value_ != nullptr)
+            static_cast<v8::JSVisitor*>(visitor)->Trace(*value_);
+    }
+
 private:
     BaseDataWrapper* typeWrapper_;
-    v8::Persistent<v8::Value>* value_;
+    TracedValue* value_;
     const TypeEncoding* encoding_;
     void* data_;
     bool disposeData_;
