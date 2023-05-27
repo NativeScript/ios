@@ -829,8 +829,9 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<v8::Name> property, const P
     Local<Object> superValue = poValue->Get(isolate).As<Object>();
 
     superValue->SetPrototype(context, thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype()).ToChecked();
-    superValue->SetInternalField(0, thiz->GetInternalField(0));
-    superValue->SetInternalField(1, tns::ToV8String(isolate, "super"));
+
+    ObjCDataWrapper* wrapper = ExtractWrapper<ObjCDataWrapper>(thiz);
+    AttachGarbageCollectedWrapper(superValue, wrapper);
 
     info.GetReturnValue().Set(superValue);
 }
