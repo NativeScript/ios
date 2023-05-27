@@ -22,6 +22,9 @@
 #include "IsolateWrapper.h"
 #include "DisposerPHV.h"
 
+#include "cppgc/default-platform.h"
+#include "cppgc/heap.h"
+
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
@@ -116,11 +119,11 @@ Isolate* Runtime::CreateIsolate() {
         Runtime::platform_ = platform::NewDefaultPlatform();
 
         V8::InitializePlatform(Runtime::platform_.get());
-        V8::Initialize();
         std::string flags = RuntimeConfig.IsDebug
-        ? "--expose_gc --jitless"
-        : "--expose_gc --jitless --no-lazy";
+        ? "--expose_gc --jitless --no-freeze_flags_after_init"
+        : "--expose_gc --jitless --no-lazy --freeze_flags_after_init=false";
         V8::SetFlagsFromString(flags.c_str(), flags.size());
+        V8::Initialize();
         v8Initialized_ = true;
     }
     
