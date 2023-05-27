@@ -16,6 +16,26 @@
 #include <iostream>
 namespace tns {
 
+// FIXME(caitp): Move me to a new file
+static constexpr uint32_t kExternalDataHeader = 0x45585400;
+enum class ExternalDataType {
+    ClassBuilder,
+};
+class ExternalData {
+public:
+    ExternalData(ExternalDataType type)
+    : header(kExternalDataHeader)
+    , type_(type) {}
+    virtual ~ExternalData() = default;
+    bool IsExternalData() const { return header == kExternalDataHeader; }
+    bool IsClassBuilderData() const { assert(IsExternalData()); return type_ == ExternalDataType::ClassBuilder; }
+
+private:
+    uint32_t header;
+    ExternalDataType type_;
+};
+
+
 #define ALLOCATION_HANDLE_FOR_ISOLATE(isolate) (isolate->GetCppHeap()->GetAllocationHandle())
 
 template <typename T>
