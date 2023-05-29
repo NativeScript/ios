@@ -948,14 +948,13 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         }
 
         BlockWrapper* blockWrapper = MakeGarbageCollected<BlockWrapper>(isolate, block, typeEncoding, true);
-        Local<External> ext = External::New(isolate, blockWrapper);
+        auto ext = CreateWrapperFor(isolate, blockWrapper);
         Local<v8::Function> callback;
 
         CFRetain(block);
 
         bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
-            Local<External> ext = info.Data().As<External>();
-            BlockWrapper* wrapper = static_cast<BlockWrapper*>(ext->Value());
+            BlockWrapper* wrapper = ExtractWrapper<BlockWrapper>(info.Data());
 
             JSBlock* block = static_cast<JSBlock*>(wrapper->Block());
 
@@ -974,13 +973,13 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
             ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(), call.ArgsArray());
 
-            Local<Value> result = Interop::GetResult(context, enc, &call, true, nullptr);
+            Local<Value> result = Interop::GetResult(context, enc, &call, true, Local<Value>());
 
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&callback);
         tns::Assert(success, isolate);
 
-        tns::SetValue(isolate, callback, blockWrapper);
+        tns::SetValue(isolate, callback, ext);
         ObjectManager::Register(context, callback);
 
         return callback;
@@ -995,12 +994,12 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         const TypeEncoding* parametersEncoding = typeEncoding->details.functionPointer.signature.first();
         size_t parametersCount = typeEncoding->details.functionPointer.signature.count;
         AnonymousFunctionWrapper* wrapper = MakeGarbageCollected<AnonymousFunctionWrapper>(isolate, functionPointer, parametersEncoding, parametersCount);
-        Local<External> ext = External::New(isolate, wrapper);
+        auto ext = CreateWrapperFor(isolate, wrapper);
 
         Local<v8::Function> func;
         bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
             Isolate* isolate = info.GetIsolate();
-            AnonymousFunctionWrapper* wrapper = static_cast<AnonymousFunctionWrapper*>(info.Data().As<External>()->Value());
+            AnonymousFunctionWrapper* wrapper = ExtractWrapper<AnonymousFunctionWrapper>(info.Data());
             tns::Assert(wrapper != nullptr, isolate);
 
             V8FunctionCallbackArgs args(info);
@@ -1015,7 +1014,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         }, ext).ToLocal(&func);
         tns::Assert(success, isolate);
 
-        tns::SetValue(isolate, func, wrapper);
+        tns::SetValue(isolate, func, ext);
         ObjectManager::Register(context, func);
 
         return func;
