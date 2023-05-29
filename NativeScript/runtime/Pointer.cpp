@@ -41,7 +41,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Local<Context> context) {
 
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, PointerConstructorCallback);
 
-    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(kMinGarbageCollectedEmbedderFields);
     ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "Pointer"));
 
     Local<v8::Function> ctorFunc;
@@ -110,7 +110,7 @@ void Pointer::PointerConstructorCallback(const FunctionCallbackInfo<Value>& info
             if (isBigInt) {
                 value = (int32_t)info[0].As<BigInt>()->Int64Value();
             } else {
-                tns::Assert(info[0].As<Number>()->Int32Value    (context).To(&value), isolate);
+                tns::Assert(info[0].As<Number>()->Int32Value(context).To(&value), isolate);
             }
             ptr = reinterpret_cast<void*>(value);
     #endif
@@ -141,7 +141,7 @@ void Pointer::RegisterAddMethod(Local<Context> context, Local<Object> prototype)
         Local<Context> context = isolate->GetCurrentContext();
         tns::Assert(info.Length() == 1 && tns::IsNumber(info[0]), isolate);
 
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        PointerWrapper* wrapper = ExtractWrapper<PointerWrapper>(info.This());
         void* value = wrapper->Data();
         int32_t offset;
         tns::Assert(info[0].As<Number>()->Int32Value(context).To(&offset), isolate);
@@ -165,7 +165,7 @@ void Pointer::RegisterSubtractMethod(Local<Context> context, Local<Object> proto
         Local<Context> context = isolate->GetCurrentContext();
         tns::Assert(info.Length() == 1 && tns::IsNumber(info[0]), isolate);
 
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        PointerWrapper* wrapper = ExtractWrapper<PointerWrapper>(info.This());
         void* value = wrapper->Data();
         int32_t offset;
         tns::Assert(info[0].As<Number>()->Int32Value(context).To(&offset), isolate);
@@ -194,7 +194,7 @@ void Pointer::RegisterToStringMethod(Local<Context> context, Local<Object> proto
     Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        PointerWrapper* wrapper = ExtractWrapper<PointerWrapper>(info.This());
         void* value = wrapper->Data();
 
         char buffer[100];
@@ -215,7 +215,7 @@ void Pointer::RegisterToHexStringMethod(Local<Context> context, Local<Object> pr
     Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        PointerWrapper* wrapper = ExtractWrapper<PointerWrapper>(info.This());
         const void* value = wrapper->Data();
 
         char buffer[100];
@@ -236,7 +236,7 @@ void Pointer::RegisterToDecimalStringMethod(Local<Context> context, Local<Object
     Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        PointerWrapper* wrapper = ExtractWrapper<PointerWrapper>(info.This());
         const void* value = wrapper->Data();
         intptr_t ptr = static_cast<intptr_t>(reinterpret_cast<size_t>(value));
 
@@ -258,7 +258,7 @@ void Pointer::RegisterToNumberMethod(Local<Context> context, Local<Object> proto
     Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        PointerWrapper* wrapper = ExtractWrapper<PointerWrapper>(info.This());
         const void* value = wrapper->Data();
         size_t number = reinterpret_cast<size_t>(value);
         Local<Number> result = Number::New(isolate, number);
@@ -276,7 +276,7 @@ void Pointer::RegisterToBigIntMethod(Local<Context> context, Local<Object> proto
     Isolate* isolate = context->GetIsolate();
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        PointerWrapper* wrapper = ExtractWrapper<PointerWrapper>(info.This());
         const void* value = wrapper->Data();
         size_t number = reinterpret_cast<size_t>(value);
         Local<BigInt> result = BigInt::NewFromUnsigned(isolate, number);
