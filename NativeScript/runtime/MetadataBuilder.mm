@@ -145,12 +145,13 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context
     }
 
     StructTypeWrapper* wrapper = MakeGarbageCollected<StructTypeWrapper>(isolate, structInfo);
-    Local<External> ext = External::New(isolate, wrapper);
+    auto ext = CreateWrapperFor(isolate, wrapper);
+
     Local<v8::Function> structCtorFunc;
     bool success = v8::Function::New(context, StructConstructorCallback, ext).ToLocal(&structCtorFunc);
     tns::Assert(success, isolate);
 
-    tns::SetValue(isolate, structCtorFunc, wrapper);
+    tns::SetValue(isolate, structCtorFunc, ext);
 
     Local<v8::Function> equalsFunc;
     success = v8::Function::New(context, StructEqualsCallback).ToLocal(&equalsFunc);
@@ -168,7 +169,7 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
     Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     try {
-        StructTypeWrapper* typeWrapper = static_cast<StructTypeWrapper*>(info.Data().As<External>()->Value());
+        StructTypeWrapper* typeWrapper = ExtractWrapper<StructTypeWrapper>(info.Data());
 
         StructInfo structInfo = typeWrapper->StructInfo();
 
@@ -191,14 +192,14 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
             dest = pw->Data();
         }
 
-        StructWrapper* wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, dest, nullptr);
+        StructWrapper* wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, dest);
         Local<Context> context = isolate->GetCurrentContext();
         Local<Value> result = ArgConverter::ConvertArgument(context, wrapper);
 
         std::shared_ptr<Caches> cache = Caches::Get(isolate);
         std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, result);
         std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
-        cache->StructInstances.emplace(key, poResult);
+        cache->StructInstances.emplace(key, std::make_shared<Persistent<Value>>(isolate, result));
         tns::DeleteWrapperIfUnused(isolate, result, wrapper);
 
         info.GetReturnValue().Set(result);
@@ -261,16 +262,14 @@ std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Local<Context> contex
     ffi_type* ffiType = nullptr;
     void* data = nullptr;
 
-    if (initializer->InternalFieldCount() < 1) {
+    if (!IsGarbageCollectedWrapper(initializer)) {
         ffiType = structInfo.FFIType();
         data = malloc(ffiType->size);
         Interop::InitializeStruct(context, data, structInfo.Fields(), initializer);
     } else {
-        Local<External> ext = initializer->GetInternalField(0).As<External>();
-        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-        if (wrapper->Type() != WrapperType::Struct) {
+        BaseDataWrapper* wrapper = ExtractWrapper<BaseDataWrapper>(initializer);
+        if (wrapper->Type() != WrapperType::Struct)
             return std::make_pair(ffiType, data);
-        }
 
         StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
         data = structWrapper->Data();
@@ -770,10 +769,10 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property, con
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
-    std::shared_ptr<Persistent<Value>> parentStruct = nullptr;
+    Local<Value> parentStruct;
     auto x = cache->StructInstances.find(key);
     if (x != cache->StructInstances.end()) {
-        parentStruct = x->second;
+        parentStruct = x->second->Get(isolate);
     }
 
     std::vector<StructField> fields = structInfo.Fields();
@@ -807,9 +806,7 @@ void MetadataBuilder::StructPropertySetterCallback(Local<v8::Name> property, Loc
         return;
     }
 
-    Local<External> ext = thiz->GetInternalField(0).As<External>();
-    StructWrapper* wrapper = static_cast<StructWrapper*>(ext->Value());
-
+    StructWrapper* wrapper = ExtractWrapper<StructWrapper>(thiz);
     StructInfo structInfo = wrapper->StructInfo();
     std::vector<StructField> fields = structInfo.Fields();
 

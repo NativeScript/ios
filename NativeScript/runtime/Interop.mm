@@ -663,18 +663,17 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
     return nil;
 }
 
-Local<Value> Interop::StructToValue(Local<Context> context, void* result, StructInfo structInfo, std::shared_ptr<Persistent<Value>> parentStruct) {
+Local<Value> Interop::StructToValue(Local<Context> context, void* result, StructInfo structInfo, Local<Value> parentStruct) {
     Isolate* isolate = context->GetIsolate();
     StructWrapper* wrapper = nullptr;
-    if (parentStruct == nullptr) {
+    if (parentStruct.IsEmpty()) {
         ffi_type* ffiType = structInfo.FFIType();
         void* dest = malloc(ffiType->size);
         memcpy(dest, result, ffiType->size);
 
-        wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, dest, nullptr);
+        wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, dest);
     } else {
-        Local<Value> parent = parentStruct->Get(isolate);
-        BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parent);
+        BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parentStruct);
         if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
             StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
             parentStructWrapper->IncrementChildren();
@@ -690,7 +689,7 @@ Local<Value> Interop::StructToValue(Local<Context> context, void* result, Struct
     }
 
     Local<Value> res = ArgConverter::ConvertArgument(context, wrapper);
-    if (parentStruct == nullptr) {
+    if (parentStruct.IsEmpty()) {
         std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, res);
         cache->StructInstances.emplace(key, poResult);
     }
@@ -803,7 +802,7 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
 }
 
-Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged, bool isInitializer) {
+Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, Local<Value> parentStruct, bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged, bool isInitializer) {
     Isolate* isolate = context->GetIsolate();
 
     if (returnsUnmanaged) {
@@ -1301,9 +1300,7 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
     const TypeEncoding* fieldEncoding = field.Encoding();
     switch (fieldEncoding->type) {
         case BinaryTypeEncodingType::StructDeclarationReference: {
-            Local<Object> obj = value.As<Object>();
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            StructWrapper* targetStruct = static_cast<StructWrapper*>(ext->Value());
+            StructWrapper* targetStruct = ExtractWrapper<StructWrapper>(value);
 
             void* sourceBuffer = targetStruct->Data();
             size_t fieldSize = field.FFIType()->size;
@@ -1528,7 +1525,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
         methodCall.typeEncoding_,
         &call,
         marshalToPrimitive,
-        nullptr,
+        Local<Value>(), /* parentStruct */
         false,
         methodCall.ownsReturnedObject_,
         methodCall.returnsUnmanaged_,
