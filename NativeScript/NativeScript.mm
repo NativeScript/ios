@@ -7,8 +7,6 @@
 #include "runtime/Runtime.h"
 #include "runtime/Tasks.h"
 
-#include <memory>
-
 using namespace v8;
 using namespace tns;
 

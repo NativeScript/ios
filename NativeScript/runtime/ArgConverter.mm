@@ -3,6 +3,7 @@
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "DictionaryAdapter.h"
+#include "ObjectManager.h"
 #include "Interop.h"
 #include "Helpers.h"
 #include "Runtime.h"
