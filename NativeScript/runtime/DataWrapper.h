@@ -667,7 +667,7 @@ private:
 class ExtVectorWrapper: public BaseDataWrapper {
 public:
     static constexpr const char* ClassName() { return "ExtVectorWrapper"; }
-    ExtVectorWrapper(void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding, const TypeEncoding* typeEncoding)
+    ExtVectorWrapper(v8::Isolate* isolate, void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding, const TypeEncoding* typeEncoding)
         : data_(data),
           ffiType_(ffiType),
           innerTypeEncoding_(innerTypeEncoding),
