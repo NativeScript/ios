@@ -10,6 +10,9 @@
 
 namespace tns {
 
+static constexpr int NSDataWrapperTypeIndex = 0;
+static constexpr int NSDataWrapperObjectIndex = 1;
+
 class PrimitiveDataWrapper;
 
 enum class WrapperType {
@@ -166,7 +169,6 @@ public:
     BaseDataWrapper()
         : gcProtected_(false) {
     }
-
     virtual ~BaseDataWrapper() = default;
 
     const virtual WrapperType Type() {
@@ -411,15 +413,20 @@ public:
     }
 
     bool HasParent() const {
+        //return this->parent_ != nullptr;
         return !parent_.IsEmpty();
     }
+    //std::shared_ptr<v8::Persistent<v8::Value>> Parent() {
+        //return this->parent_;
+    //}
+
 
     void IncrementChildren() {
-        this->childCount_++;
+        //this->childCount_++;
     }
 
     void DecrementChildren() {
-        this->childCount_--;
+        //this->childCount_--;
     }
 
     int ChildCount() {
@@ -434,6 +441,7 @@ public:
 private:
     void* data_;
     int childCount_;
+    //std::shared_ptr<v8::Persistent<v8::Value>> parent_;
     v8::TracedReference<v8::Value> parent_;
 };
 
@@ -604,6 +612,10 @@ public:
         : block_(block),
           typeEncoding_(typeEncoding),
           ownsBlock_(ownsBlock) {
+    }
+
+    ~BlockWrapper() {
+        return;
     }
     
     const WrapperType Type() {
