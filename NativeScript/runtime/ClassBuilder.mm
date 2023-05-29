@@ -68,6 +68,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         auto cache = Caches::Get(isolate);
         Local<v8::Function> baseCtorFunc = cache->CtorFuncs.find(item->meta_->name())->second->Get(isolate);
 
+        // Previously extended class constructors stored their CacheItem in a single InternalField, and the CacheItem
+        // was retained by the Caches collection for the Isolate. This has changed
         CacheItem* cacheItem = new CacheItem(nullptr, extendedClass);
         Caches::Get(isolate)->registerCacheBoundObject(cacheItem);
         Local<External> ext = External::New(isolate, cacheItem);

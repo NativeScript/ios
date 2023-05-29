@@ -53,7 +53,7 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
     RegisterInteropType(context, types, "protocol", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, sizeof(void*), BinaryTypeEncodingType::ProtocolEncoding));
     RegisterInteropType(context, types, "class", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, sizeof(void*), BinaryTypeEncodingType::ClassEncoding));
     RegisterInteropType(context, types, "selector", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, sizeof(void*), BinaryTypeEncodingType::SelectorEncoding));
-
+    
     bool success = interop->Set(context, tns::ToV8String(isolate, "types"), types).FromMaybe(false);
     tns::Assert(success, isolate);
 

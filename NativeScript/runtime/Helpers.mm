@@ -221,9 +221,8 @@ bool tns::DeleteWrapperIfUnused(Isolate* isolate, const Local<Value>& obj, BaseD
 }
 
 void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* value) {
-    if (obj.IsEmpty() || obj->IsNullOrUndefined()) {
+    if (obj.IsEmpty() || obj->IsNullOrUndefined())
         return;
-    }
 
     if (!AttachGarbageCollectedWrapper(obj, value))
         tns::SetPrivateValue(obj, tns::ToV8String(isolate, "metadata"), CreateWrapperFor(isolate, value));
