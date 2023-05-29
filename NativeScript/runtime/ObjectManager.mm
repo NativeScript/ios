@@ -22,202 +22,202 @@ std::shared_ptr<Persistent<Value>> ObjectManager::Register(Local<Context> contex
     Isolate* isolate = context->GetIsolate();
     std::shared_ptr<Persistent<Value>> objectHandle = std::make_shared<Persistent<Value>>(isolate, obj);
     objectHandle->SetWrapperClassId(Constants::ClassTypes::ObjectManagedValue);
-    ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
-    objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+//    ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
+//    objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
     return objectHandle;
 }
 
 void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackState>& data) {
-    ObjectWeakCallbackState* state = data.GetParameter();
-    Isolate* isolate = data.GetIsolate();
-    Local<Value> value = state->target_->Get(isolate);
-    bool disposed = ObjectManager::DisposeValue(isolate, value);
-
-    if (disposed) {
-        state->target_->Reset();
-        delete state;
-    } else {
-        state->target_->ClearWeak();
-        state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
-    }
+//    ObjectWeakCallbackState* state = data.GetParameter();
+//    Isolate* isolate = data.GetIsolate();
+//    Local<Value> value = state->target_->Get(isolate);
+//    bool disposed = ObjectManager::DisposeValue(isolate, value);
+//
+//    if (disposed) {
+//        state->target_->Reset();
+//        delete state;
+//    } else {
+//        state->target_->ClearWeak();
+//        state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+//    }
 }
 
 bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFinalDisposal) {
-    if (value.IsEmpty() || value->IsNullOrUndefined() || !value->IsObject()) {
-        return true;
-    }
-
-    Local<Object> obj = value.As<Object>();
-    if (obj->InternalFieldCount() > 1 && !isFinalDisposal) {
-        Local<Value> superValue = obj->GetInternalField(1);
-        if (!superValue.IsEmpty() && superValue->IsString()) {
-            // Do not dispose the ObjCWrapper contained in a "super" instance
-            return true;
-        }
-    }
-
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-    //NSLog(@"dispose %p", wrapper);
-    if (wrapper == nullptr) {
-        tns::SetValue(isolate, obj, nullptr);
-        return true;
-    }
-
-    if (wrapper->IsGcProtected() && !isFinalDisposal) {
-        return false;
-    }
-
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
-    switch (wrapper->Type()) {
-        case WrapperType::Struct: {
-            StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
-            void* data = structWrapper->Data();
-
-            std::shared_ptr<Persistent<Value>> poParentStruct = structWrapper->Parent();
-            if (poParentStruct != nullptr) {
-                Local<Value> parentStruct = poParentStruct->Get(isolate);
-                BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parentStruct);
-                if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
-                    StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
-                    parentStructWrapper->DecrementChildren();
-                }
-            } else {
-                if (structWrapper->ChildCount() == 0) {
-                    std::pair<void*, std::string> key = std::make_pair(data, structWrapper->StructInfo().Name());
-                    cache->StructInstances.erase(key);
-                    std::free(data);
-                } else {
-                    return false;
-                }
-            }
-            break;
-        }
-        case WrapperType::ObjCObject: {
-            ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-            id target = objCObjectWrapper->Data();
-            if (target != nil) {
-                cache->Instances.erase(target);
-                [target release];
-            }
-            break;
-        }
-        case WrapperType::Block: {
-            BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
-            if(!blockWrapper->OwnsBlock()) {
-                std::free(blockWrapper->Block());
-            }
-            break;
-        }
-        case WrapperType::Reference: {
-            ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
-            if (referenceWrapper->Data() != nullptr) {
-                referenceWrapper->SetData(nullptr);
-                referenceWrapper->SetEncoding(nullptr);
-            }
-
-            break;
-        }
-        case WrapperType::Pointer: {
-            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
-            if (pointerWrapper->Data() != nullptr) {
-                cache->PointerInstances.erase(pointerWrapper->Data());
-
-                if (pointerWrapper->IsAdopted()) {
-                    std::free(pointerWrapper->Data());
-                    pointerWrapper->SetData(nullptr);
-                }
-            }
-            break;
-        }
-        case WrapperType::FunctionReference: {
-            FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
-            std::shared_ptr<Persistent<Value>> func = funcWrapper->Function();
-            if (func != nullptr) {
-                func->Reset();
-            }
-            break;
-        }
-        case WrapperType::AnonymousFunction: {
-            break;
-        }
-        case WrapperType::ExtVector: {
-            ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
-            FFICall::DisposeFFIType(extVectorWrapper->FFIType(), extVectorWrapper->TypeEncoding());
-            void* data = extVectorWrapper->Data();
-            if (data) {
-                std::free(data);
-            }
-            break;
-        }
-        case WrapperType::Worker: {
-            WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
-            if (!worker->isDisposed()) {
-                // during final disposal, inform the worker it should delete itself
-                if (isFinalDisposal) {
-                    worker->MakeWeak();
-                }
-                return false;
-            }
-            break;
-        }
-
-        default:
-            break;
-    }
-
-    delete wrapper;
-    wrapper = nullptr;
-    tns::DeleteValue(isolate, obj);
+//    if (value.IsEmpty() || value->IsNullOrUndefined() || !value->IsObject()) {
+//        return true;
+//    }
+//
+//    Local<Object> obj = value.As<Object>();
+//    if (obj->InternalFieldCount() > 1 && !isFinalDisposal) {
+//        Local<Value> superValue = obj->GetInternalField(1);
+//        if (!superValue.IsEmpty() && superValue->IsString()) {
+//            // Do not dispose the ObjCWrapper contained in a "super" instance
+//            return true;
+//        }
+//    }
+//
+//    BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+//    //NSLog(@"dispose %p", wrapper);
+//    if (wrapper == nullptr) {
+//        tns::SetValue(isolate, obj, nullptr);
+//        return true;
+//    }
+//
+//    if (wrapper->IsGcProtected() && !isFinalDisposal) {
+//        return false;
+//    }
+//
+//    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+//    switch (wrapper->Type()) {
+//        case WrapperType::Struct: {
+//            StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
+//            void* data = structWrapper->Data();
+//
+//            std::shared_ptr<Persistent<Value>> poParentStruct = structWrapper->Parent();
+//            if (poParentStruct != nullptr) {
+//                Local<Value> parentStruct = poParentStruct->Get(isolate);
+//                BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parentStruct);
+//                if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
+//                    StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
+//                    parentStructWrapper->DecrementChildren();
+//                }
+//            } else {
+//                if (structWrapper->ChildCount() == 0) {
+//                    std::pair<void*, std::string> key = std::make_pair(data, structWrapper->StructInfo().Name());
+//                    cache->StructInstances.erase(key);
+//                    std::free(data);
+//                } else {
+//                    return false;
+//                }
+//            }
+//            break;
+//        }
+//        case WrapperType::ObjCObject: {
+//            ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+//            id target = objCObjectWrapper->Data();
+//            if (target != nil) {
+//                cache->Instances.erase(target);
+//                [target release];
+//            }
+//            break;
+//        }
+//        case WrapperType::Block: {
+//            BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
+//            if(!blockWrapper->OwnsBlock()) {
+//                std::free(blockWrapper->Block());
+//            }
+//            break;
+//        }
+//        case WrapperType::Reference: {
+//            ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
+//            if (referenceWrapper->Data() != nullptr) {
+//                referenceWrapper->SetData(nullptr);
+//                referenceWrapper->SetEncoding(nullptr);
+//            }
+//
+//            break;
+//        }
+//        case WrapperType::Pointer: {
+//            PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+//            if (pointerWrapper->Data() != nullptr) {
+//                cache->PointerInstances.erase(pointerWrapper->Data());
+//
+//                if (pointerWrapper->IsAdopted()) {
+//                    std::free(pointerWrapper->Data());
+//                    pointerWrapper->SetData(nullptr);
+//                }
+//            }
+//            break;
+//        }
+//        case WrapperType::FunctionReference: {
+//            FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
+//            std::shared_ptr<Persistent<Value>> func = funcWrapper->Function();
+//            if (func != nullptr) {
+//                func->Reset();
+//            }
+//            break;
+//        }
+//        case WrapperType::AnonymousFunction: {
+//            break;
+//        }
+//        case WrapperType::ExtVector: {
+//            ExtVectorWrapper* extVectorWrapper = static_cast<ExtVectorWrapper*>(wrapper);
+//            FFICall::DisposeFFIType(extVectorWrapper->FFIType(), extVectorWrapper->TypeEncoding());
+//            void* data = extVectorWrapper->Data();
+//            if (data) {
+//                std::free(data);
+//            }
+//            break;
+//        }
+//        case WrapperType::Worker: {
+//            WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
+//            if (!worker->isDisposed()) {
+//                // during final disposal, inform the worker it should delete itself
+//                if (isFinalDisposal) {
+//                    worker->MakeWeak();
+//                }
+//                return false;
+//            }
+//            break;
+//        }
+//
+//        default:
+//            break;
+//    }
+//
+//    delete wrapper;
+//    wrapper = nullptr;
+//    tns::DeleteValue(isolate, obj);
     return true;
 }
 
 void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<Value>& info) {
-    Isolate* isolate = info.GetIsolate();
+   Isolate* isolate = info.GetIsolate();
 
-    if (info.Length() != 1) {
-        std::ostringstream errorStream;
-        errorStream << "Actual arguments count: \"" << info.Length() << "\". Expected: \"1\".";
-        std::string errorMessage = errorStream.str();
-        Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
-        isolate->ThrowException(error);
-        return;
-    }
+   if (info.Length() != 1) {
+       std::ostringstream errorStream;
+       errorStream << "Actual arguments count: \"" << info.Length() << "\". Expected: \"1\".";
+       std::string errorMessage = errorStream.str();
+       Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
+       isolate->ThrowException(error);
+       return;
+   }
 
-    Local<Value> value = info[0];
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+   Local<Value> value = info[0];
+   BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
 
-    if (wrapper == nullptr) {
-        std::string arg0 = tns::ToString(isolate, info[0]);
-        std::ostringstream errorStream;
-        errorStream << arg0 << " is an object which is not a native wrapper.";
-        std::string errorMessage = errorStream.str();
-        Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
-        isolate->ThrowException(error);
-        return;
-    }
+   if (wrapper == nullptr) {
+       std::string arg0 = tns::ToString(isolate, info[0]);
+       std::ostringstream errorStream;
+       errorStream << arg0 << " is an object which is not a native wrapper.";
+       std::string errorMessage = errorStream.str();
+       Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
+       isolate->ThrowException(error);
+       return;
+   }
 
-    if (wrapper->Type() != WrapperType::ObjCObject) {
-        return;
-    }
+   if (wrapper->Type() != WrapperType::ObjCObject) {
+       return;
+   }
 
-    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-    id data = objcWrapper->Data();
-    if (data != nil) {
-        std::shared_ptr<Caches> cache = Caches::Get(isolate);
-        auto it = cache->Instances.find(data);
-        if (it != cache->Instances.end()) {
-            ObjectWeakCallbackState* state = it->second->ClearWeak<ObjectWeakCallbackState>();
-            if (state != nullptr) {
-                delete state;
-            }
-            cache->Instances.erase(it);
-        }
+   ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+   id data = objcWrapper->Data();
+   if (data != nil) {
+       std::shared_ptr<Caches> cache = Caches::Get(isolate);
+       auto it = cache->Instances.find(data);
+       if (it != cache->Instances.end()) {
+           ObjectWeakCallbackState* state = it->second->ClearWeak<ObjectWeakCallbackState>();
+           if (state != nullptr) {
+               delete state;
+           }
+           cache->Instances.erase(it);
+       }
 
-        [data dealloc];
+       [data dealloc];
 
-        delete wrapper;
-        tns::SetValue(isolate, value.As<Object>(), nullptr);
-    }
+       delete wrapper;
+       tns::SetValue(isolate, value.As<Object>(), nullptr);
+   }
 }
 
 bool ObjectManager::IsInstanceOf(id obj, Class clazz) {
