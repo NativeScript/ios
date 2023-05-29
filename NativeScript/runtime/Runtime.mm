@@ -1,6 +1,5 @@
 #include <string>
 #include <chrono>
-#include <memory>
 #include "Runtime.h"
 #include "Caches.h"
 #include "Console.h"
@@ -77,12 +76,12 @@ Runtime::~Runtime() {
     
     // TODO: fix race condition on workers where a queue can leak (maybe calling Terminate before Initialize?)
     Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
-            auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
-            if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
-                childWorkerWrapper->Terminate();
-            }
-            return false;
-        });
+        auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
+        if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
+            childWorkerWrapper->Terminate();
+        }
+        return false;
+    });
 
     {
         v8::Locker lock(isolate_);
@@ -90,12 +89,12 @@ Runtime::~Runtime() {
         // isolate_->VisitHandlesWithClassIds( &phv );
         
         if (IsRuntimeWorker()) {
-            //auto currentWorker = static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
+            auto currentWorker = static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
             Caches::Workers->Remove(this->workerId_);
             // if the parent isolate is dead then deleting the wrapper is our responsibility
-            //if (currentWorker->IsWeak()) {
-                //delete currentWorker;
-            //}
+            if (currentWorker->IsWeak()) {
+                delete currentWorker;
+            }
         }
         Caches::Remove(this->isolate_);
 

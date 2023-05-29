@@ -8,8 +8,6 @@
 #include "Common.h"
 #include "Metadata.h"
 
-#include <DataWrapper.h>
-
 namespace tns {
 
 struct StructInfo;
@@ -47,7 +45,6 @@ public:
         std::shared_ptr<v8::Persistent<v8::Value>> poWorker_;
         void* userData_;
     };
-
 
     Caches(v8::Isolate* isolate, const int& isolateId_ = -1);
     ~Caches();

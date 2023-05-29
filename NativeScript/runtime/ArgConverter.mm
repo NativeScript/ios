@@ -1,4 +1,3 @@
-#include <typeinfo>
 #include <Foundation/Foundation.h>
 #include <sstream>
 #include "ArgConverter.h"

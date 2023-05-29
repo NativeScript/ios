@@ -163,9 +163,7 @@ using namespace tns;
         self->cache_ = Caches::Get(isolate);
         self->object_ = std::make_shared<Persistent<Value>>(isolate, jsObject);
         self->cache_->Instances.emplace(self, self->object_);
-        auto p = MakeGarbageCollected<ObjCDataWrapper>(isolate, self);
-        tns::SetValue(isolate, jsObject, p);
-        return self;
+        tns::SetValue(isolate, jsObject, MakeGarbageCollected<ObjCDataWrapper>(isolate, self));
     }
 
     return self;
