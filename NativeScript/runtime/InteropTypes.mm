@@ -116,10 +116,9 @@ void Interop::RegisterBufferFromDataFunction(Local<Context> context, Local<Objec
         Isolate* isolate = info.GetIsolate();
         tns::Assert(info.Length() == 1 && info[0]->IsObject(), isolate);
         Local<Object> arg = info[0].As<Object>();
-        tns::Assert(arg->InternalFieldCount() > 0 && arg->GetInternalField(0)->IsExternal(), isolate);
+        tns::Assert(IsGarbageCollectedWrapper(arg), isolate);
 
-        Local<External> ext = arg->GetInternalField(0).As<External>();
-        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+        ObjCDataWrapper* wrapper = ExtractWrapper<ObjCDataWrapper>(arg);
 
         id obj = wrapper->Data();
         tns::Assert([obj isKindOfClass:[NSData class]], isolate);
