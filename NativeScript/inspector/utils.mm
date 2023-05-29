@@ -33,6 +33,8 @@ std::string v8_inspector::GetMIMEType(std::string filePath) {
     return result;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 std::string v8_inspector::ToStdString(const StringView& value) {
     std::vector<uint16_t> buffer(value.length());
     for (size_t i = 0; i < value.length(); i++) {
@@ -52,6 +54,7 @@ std::string v8_inspector::ToStdString(const StringView& value) {
 
     return result;
 }
+#pragma clang diagnostic pop
 
 Local<v8::Function> v8_inspector::GetDebuggerFunction(Local<Context> context, std::string domain, std::string functionName, Local<Object>& domainDebugger) {
     auto it = JsV8InspectorClient::Domains.find(domain);
