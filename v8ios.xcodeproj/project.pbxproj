@@ -13,6 +13,7 @@
 		3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CBFF7432971C1C200C5DE36 /* ArcMacro.h */; };
 		3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */; };
 		3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */; };
+		5B90913E2A0D52B70092E1F1 /* Common.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5B90913D2A0D52B70092E1F1 /* Common.mm */; };
 		6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9C2291FE29F00B0ED7C /* V8Runtime.h */; };
 		6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */; };
 		6573B9CF291FE29F00B0ED7C /* V8Runtime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C4291FE29F00B0ED7C /* V8Runtime.cpp */; };
@@ -423,6 +424,7 @@
 		3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DisposerPHV.mm; sourceTree = "<group>"; };
 		3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DisposerPHV.h; sourceTree = "<group>"; };
 		3CEF9CCC28F896B70056BA45 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SpinLock.h; sourceTree = "<group>"; };
+		5B90913D2A0D52B70092E1F1 /* Common.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Common.mm; sourceTree = "<group>"; };
 		6573B9C2291FE29F00B0ED7C /* V8Runtime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = V8Runtime.h; sourceTree = "<group>"; };
 		6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JSIV8ValueConverter.cpp; sourceTree = "<group>"; };
 		6573B9C4291FE29F00B0ED7C /* V8Runtime.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = V8Runtime.cpp; sourceTree = "<group>"; };
@@ -1407,6 +1409,7 @@
 				C275F475253B37AB00A997D5 /* UnmanagedType.mm */,
 				3CEF9CCC28F896B70056BA45 /* SpinLock.h */,
 				3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */,
+				5B90913D2A0D52B70092E1F1 /* Common.mm */,
 			);
 			path = runtime;
 			sourceTree = "<group>";
@@ -2087,6 +2090,7 @@
 				6573B9D4291FE29F00B0ED7C /* V8RuntimeFactory.cpp in Sources */,
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
 				C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */,
+				5B90913E2A0D52B70092E1F1 /* Common.mm in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
