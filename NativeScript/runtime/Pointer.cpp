@@ -40,7 +40,7 @@ Local<v8::Function> Pointer::GetPointerCtorFunc(Local<Context> context) {
     }
 
     Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, PointerConstructorCallback);
-    
+
     ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(kMinGarbageCollectedEmbedderFields);
     ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "Pointer"));
 

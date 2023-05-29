@@ -2,7 +2,6 @@
 #define Common_h
 
 #include <type_traits>
-#include <typeinfo>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
@@ -30,7 +29,7 @@ public:
     virtual ~ExternalData() = default;
     bool IsExternalData() const { return header == kExternalDataHeader; }
     bool IsClassBuilderData() const { assert(IsExternalData()); return type_ == ExternalDataType::ClassBuilder; }
-    
+
 private:
     uint32_t header;
     ExternalDataType type_;
