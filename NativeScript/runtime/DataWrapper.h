@@ -389,11 +389,17 @@ private:
 class StructWrapper: public StructTypeWrapper {
 public:
     static constexpr const char* ClassName() { return "StructWrapper"; }
-    StructWrapper(struct StructInfo structInfo, void* data, std::shared_ptr<v8::Persistent<v8::Value>> parent)
+    StructWrapper(v8::Isolate* isolate, struct StructInfo structInfo, void* data, v8::Local<v8::Value> parent = {})
         : StructTypeWrapper(structInfo),
           data_(data),
-          childCount_(0),
-          parent_(parent) {
+          childCount_(0) {
+        if (!parent.IsEmpty())
+            parent_.Reset(isolate, parent);
+    }
+
+    ~StructWrapper() {
+        parent_.Reset();
+        if (data_) free(data_);
     }
 
     const WrapperType Type() {
@@ -404,8 +410,8 @@ public:
         return this->data_;
     }
 
-    std::shared_ptr<v8::Persistent<v8::Value>> Parent() {
-        return this->parent_;
+    bool HasParent() const {
+        return !parent_.IsEmpty();
     }
 
     void IncrementChildren() {
@@ -419,10 +425,16 @@ public:
     int ChildCount() {
         return this->childCount_;
     }
+
+    void Trace(cppgc::Visitor* visitor) const {
+        // ASSERT: visitor is a JSVisitor
+        static_cast<v8::JSVisitor*>(visitor)->Trace(parent_);
+    }
+
 private:
     void* data_;
     int childCount_;
-    std::shared_ptr<v8::Persistent<v8::Value>> parent_;
+    v8::TracedReference<v8::Value> parent_;
 };
 
 class ObjCAllocDataWrapper: public BaseDataWrapper {
