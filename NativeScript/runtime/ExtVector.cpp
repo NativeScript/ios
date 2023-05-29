@@ -78,7 +78,7 @@ void ExtVector::IndexedPropertySetCallback(uint32_t index, Local<Value> value, c
 void ExtVector::RegisterToStringMethod(Isolate* isolate, Local<ObjectTemplate> prototypeTemplate) {
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        ExtVectorWrapper* wrapper = static_cast<ExtVectorWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        ExtVectorWrapper* wrapper = ExtractWrapper<ExtVectorWrapper>(info.This());
         void* value = wrapper->Data();
 
         char buffer[100];
