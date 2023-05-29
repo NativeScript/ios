@@ -184,7 +184,7 @@ void Interop::RegisterAllocFunction(Local<Context> context, Local<Object> intero
         void* data = calloc(1, size);
 
         Local<Value> pointerInstance = Pointer::NewInstance(context, data);
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(pointerInstance.As<Object>()->GetInternalField(0).As<External>()->Value());
+        PointerWrapper* wrapper = ExtractWrapper<PointerWrapper>(pointerInstance);
         wrapper->SetAdopted(true);
         info.GetReturnValue().Set(pointerInstance);
     }).ToLocal(&func);
