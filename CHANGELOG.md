@@ -6,12 +6,9 @@
 * delay isolate disposal when isolate is in use ([5a6c2ee](https://github.com/NativeScript/ios/commit/5a6c2ee5efa0c557c94ae56da0d3b3a31911d1b8))
 
 
-### Reverts
+### Features
 
-* Revert "Misc changes that might not be needed" ([f9dbcb1](https://github.com/NativeScript/ios/commit/f9dbcb18da6188e15a2ebc3546383fc883029307))
-* Revert "Garbage changes to revert" ([f658102](https://github.com/NativeScript/ios/commit/f658102d7f37f364f71827d312cc6cb68c761bf1))
-* Revert "Add Clear() method to ConcurrentMap" ([97ef913](https://github.com/NativeScript/ios/commit/97ef9132956e0901aebc95512fc77fc474ad4eeb))
-
+* Support v8 11.1.277.17 ([20be18a](https://github.com/NativeScript/ios/pull/218/commits/20be18ac6fe44a4cc517ccdb776f249f98a31b27))
 
 
 ## [8.5.2](https://github.com/NativeScript/ios/compare/v8.5.1...v8.5.2) (2023-05-24)
