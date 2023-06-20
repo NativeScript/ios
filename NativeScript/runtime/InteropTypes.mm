@@ -31,28 +31,28 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
     RegisterAdoptFunction(context, interop);
     RegisterSizeOfFunction(context, interop);
 
-    RegisterInteropType(context, types, "noop", new PrimitiveDataWrapper(ffi_type_pointer.size, CreateEncoding(BinaryTypeEncodingType::VoidEncoding), true));
-    RegisterInteropType(context, types, "void", new PrimitiveDataWrapper(0, CreateEncoding(BinaryTypeEncodingType::VoidEncoding), true));
-    RegisterInteropType(context, types, "bool", new PrimitiveDataWrapper(sizeof(bool), CreateEncoding(BinaryTypeEncodingType::BoolEncoding), true));
-    RegisterInteropType(context, types, "uint8", new PrimitiveDataWrapper(ffi_type_uint8.size, CreateEncoding(BinaryTypeEncodingType::UCharEncoding), true));
-    RegisterInteropType(context, types, "int8", new PrimitiveDataWrapper(ffi_type_sint8.size, CreateEncoding(BinaryTypeEncodingType::CharEncoding), true));
-    RegisterInteropType(context, types, "uint16", new PrimitiveDataWrapper(ffi_type_uint16.size, CreateEncoding(BinaryTypeEncodingType::UShortEncoding), true));
-    RegisterInteropType(context, types, "int16", new PrimitiveDataWrapper(ffi_type_sint16.size, CreateEncoding(BinaryTypeEncodingType::ShortEncoding), true));
-    RegisterInteropType(context, types, "uint32", new PrimitiveDataWrapper(ffi_type_uint32.size, CreateEncoding(BinaryTypeEncodingType::UIntEncoding), true));
-    RegisterInteropType(context, types, "int32", new PrimitiveDataWrapper(ffi_type_sint32.size, CreateEncoding(BinaryTypeEncodingType::IntEncoding), true));
-    RegisterInteropType(context, types, "uint64", new PrimitiveDataWrapper(ffi_type_uint64.size, CreateEncoding(BinaryTypeEncodingType::ULongEncoding), true));
-    RegisterInteropType(context, types, "int64", new PrimitiveDataWrapper(ffi_type_sint64.size, CreateEncoding(BinaryTypeEncodingType::LongEncoding), true));
-    RegisterInteropType(context, types, "ulong", new PrimitiveDataWrapper(ffi_type_ulong.size, CreateEncoding(BinaryTypeEncodingType::ULongLongEncoding), true));
-    RegisterInteropType(context, types, "slong", new PrimitiveDataWrapper(ffi_type_slong.size, CreateEncoding(BinaryTypeEncodingType::LongLongEncoding), true));
-    RegisterInteropType(context, types, "float", new PrimitiveDataWrapper(ffi_type_float.size, CreateEncoding(BinaryTypeEncodingType::FloatEncoding), true));
-    RegisterInteropType(context, types, "double", new PrimitiveDataWrapper(ffi_type_double.size, CreateEncoding(BinaryTypeEncodingType::DoubleEncoding), true));
+    RegisterInteropType(context, types, "noop", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_pointer.size, BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(context, types, "void", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, 0, BinaryTypeEncodingType::VoidEncoding));
+    RegisterInteropType(context, types, "bool", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, sizeof(bool), BinaryTypeEncodingType::BoolEncoding));
+    RegisterInteropType(context, types, "uint8", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_uint8.size, BinaryTypeEncodingType::UCharEncoding));
+    RegisterInteropType(context, types, "int8", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_sint8.size, BinaryTypeEncodingType::CharEncoding));
+    RegisterInteropType(context, types, "uint16", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_uint16.size, BinaryTypeEncodingType::UShortEncoding));
+    RegisterInteropType(context, types, "int16", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_sint16.size, BinaryTypeEncodingType::ShortEncoding));
+    RegisterInteropType(context, types, "uint32", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_uint32.size, BinaryTypeEncodingType::UIntEncoding));
+    RegisterInteropType(context, types, "int32", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_sint32.size, BinaryTypeEncodingType::IntEncoding));
+    RegisterInteropType(context, types, "uint64", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_uint64.size, BinaryTypeEncodingType::ULongEncoding));
+    RegisterInteropType(context, types, "int64", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_sint64.size, BinaryTypeEncodingType::LongEncoding));
+    RegisterInteropType(context, types, "ulong", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_ulong.size, BinaryTypeEncodingType::ULongLongEncoding));
+    RegisterInteropType(context, types, "slong", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_slong.size, BinaryTypeEncodingType::LongLongEncoding));
+    RegisterInteropType(context, types, "float", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_float.size, BinaryTypeEncodingType::FloatEncoding));
+    RegisterInteropType(context, types, "double", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_double.size, BinaryTypeEncodingType::DoubleEncoding));
 
-    RegisterInteropType(context, types, "id", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::IdEncoding), true));
-//    RegisterInteropType(context, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::VoidEncoding)));
-    RegisterInteropType(context, types, "unichar", new PrimitiveDataWrapper(ffi_type_ushort.size, CreateEncoding(BinaryTypeEncodingType::UnicharEncoding), true));
-    RegisterInteropType(context, types, "protocol", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ProtocolEncoding), true));
-    RegisterInteropType(context, types, "class", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::ClassEncoding), true));
-    RegisterInteropType(context, types, "selector", new PrimitiveDataWrapper(sizeof(void*), CreateEncoding(BinaryTypeEncodingType::SelectorEncoding), true));
+    RegisterInteropType(context, types, "id", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, sizeof(void*), BinaryTypeEncodingType::IdEncoding));
+//    RegisterInteropType(context, types, "UTF8CString", new PrimitiveDataWrapper(sizeof(void*), BinaryTypeEncodingType::VoidEncoding)));
+    RegisterInteropType(context, types, "unichar", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, ffi_type_ushort.size, BinaryTypeEncodingType::UnicharEncoding));
+    RegisterInteropType(context, types, "protocol", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, sizeof(void*), BinaryTypeEncodingType::ProtocolEncoding));
+    RegisterInteropType(context, types, "class", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, sizeof(void*), BinaryTypeEncodingType::ClassEncoding));
+    RegisterInteropType(context, types, "selector", MakeGarbageCollected<PrimitiveDataWrapper>(isolate, sizeof(void*), BinaryTypeEncodingType::SelectorEncoding));
 
     bool success = interop->Set(context, tns::ToV8String(isolate, "types"), types).FromMaybe(false);
     tns::Assert(success, isolate);
@@ -116,10 +116,9 @@ void Interop::RegisterBufferFromDataFunction(Local<Context> context, Local<Objec
         Isolate* isolate = info.GetIsolate();
         tns::Assert(info.Length() == 1 && info[0]->IsObject(), isolate);
         Local<Object> arg = info[0].As<Object>();
-        tns::Assert(arg->InternalFieldCount() > 0 && arg->GetInternalField(0)->IsExternal(), isolate);
+        tns::Assert(IsGarbageCollectedWrapper(arg), isolate);
 
-        Local<External> ext = arg->GetInternalField(0).As<External>();
-        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+        ObjCDataWrapper* wrapper = ExtractWrapper<ObjCDataWrapper>(arg);
 
         id obj = wrapper->Data();
         tns::Assert([obj isKindOfClass:[NSData class]], isolate);
@@ -184,7 +183,7 @@ void Interop::RegisterAllocFunction(Local<Context> context, Local<Object> intero
         void* data = calloc(1, size);
 
         Local<Value> pointerInstance = Pointer::NewInstance(context, data);
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(pointerInstance.As<Object>()->GetInternalField(0).As<External>()->Value());
+        PointerWrapper* wrapper = ExtractWrapper<PointerWrapper>(pointerInstance);
         wrapper->SetAdopted(true);
         info.GetReturnValue().Set(pointerInstance);
     }).ToLocal(&func);
@@ -378,10 +377,10 @@ Local<Value> Interop::HandleOf(Local<Context> context, Local<Value> value) {
                     }
                     case WrapperType::Reference: {
                         ReferenceWrapper* w = static_cast<ReferenceWrapper*>(wrapper);
-                        if (w->Value() != nullptr) {
-                            Local<Value> wrappedValue = w->Value()->Get(isolate);
+                        if (w->HasValue()) {
+                            Local<Value> wrappedValue = w->Value().Get(isolate);
                             if (tns::GetValue(isolate, wrappedValue) == nullptr) {
-                                return Pointer::NewInstance(context, w->Value());
+                                return Pointer::NewInstance(context, w->UnsafeValue());
                             }
                             return HandleOf(context, wrappedValue);
                         } else if (w->Data() != nullptr) {

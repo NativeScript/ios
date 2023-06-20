@@ -66,7 +66,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         std::string workerPath = ToString(isolate, info[0]);
         // TODO: Validate worker path and call worker.onerror if the script does not exist
 
-        WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
+        WorkerWrapper* worker = MakeGarbageCollected<WorkerWrapper>(isolate, isolate, Worker::OnMessageCallback);
         tns::SetValue(isolate, thiz, worker);
         std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(context, thiz);
 

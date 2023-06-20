@@ -94,7 +94,7 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property, const Prope
         bool success = v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func);
         tns::Assert(success, isolate);
 
-        tns::SetValue(isolate, func, new FunctionWrapper(funcMeta));
+        tns::SetValue(isolate, func, MakeGarbageCollected<FunctionWrapper>(isolate, funcMeta));
         MetadataBuilder::DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
 
         auto uniquePersistent = std::make_unique<Persistent<v8::Function>>(isolate, func);
@@ -144,13 +144,14 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context
         return it->second->Get(isolate);
     }
 
-    StructTypeWrapper* wrapper = new StructTypeWrapper(structInfo);
-    Local<External> ext = External::New(isolate, wrapper);
+    StructTypeWrapper* wrapper = MakeGarbageCollected<StructTypeWrapper>(isolate, structInfo);
+    auto ext = CreateWrapperFor(isolate, wrapper);
+
     Local<v8::Function> structCtorFunc;
     bool success = v8::Function::New(context, StructConstructorCallback, ext).ToLocal(&structCtorFunc);
     tns::Assert(success, isolate);
 
-    tns::SetValue(isolate, structCtorFunc, wrapper);
+    tns::SetValue(isolate, structCtorFunc, ext);
 
     Local<v8::Function> equalsFunc;
     success = v8::Function::New(context, StructEqualsCallback).ToLocal(&equalsFunc);
@@ -168,7 +169,7 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
     Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     try {
-        StructTypeWrapper* typeWrapper = static_cast<StructTypeWrapper*>(info.Data().As<External>()->Value());
+        StructTypeWrapper* typeWrapper = ExtractWrapper<StructTypeWrapper>(info.Data());
 
         StructInfo structInfo = typeWrapper->StructInfo();
 
@@ -191,14 +192,14 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
             dest = pw->Data();
         }
 
-        StructWrapper* wrapper = new StructWrapper(structInfo, dest, nullptr);
+        StructWrapper* wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, dest);
         Local<Context> context = isolate->GetCurrentContext();
         Local<Value> result = ArgConverter::ConvertArgument(context, wrapper);
 
         std::shared_ptr<Caches> cache = Caches::Get(isolate);
         std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, result);
         std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
-        cache->StructInstances.emplace(key, poResult);
+        cache->StructInstances.emplace(key, std::make_shared<Persistent<Value>>(isolate, result));
         tns::DeleteWrapperIfUnused(isolate, result, wrapper);
 
         info.GetReturnValue().Set(result);
@@ -261,16 +262,14 @@ std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Local<Context> contex
     ffi_type* ffiType = nullptr;
     void* data = nullptr;
 
-    if (initializer->InternalFieldCount() < 1) {
+    if (!IsGarbageCollectedWrapper(initializer)) {
         ffiType = structInfo.FFIType();
         data = malloc(ffiType->size);
         Interop::InitializeStruct(context, data, structInfo.Fields(), initializer);
     } else {
-        Local<External> ext = initializer->GetInternalField(0).As<External>();
-        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
-        if (wrapper->Type() != WrapperType::Struct) {
+        BaseDataWrapper* wrapper = ExtractWrapper<BaseDataWrapper>(initializer);
+        if (wrapper->Type() != WrapperType::Struct)
             return std::make_pair(ffiType, data);
-        }
 
         StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
         data = structWrapper->Data();
@@ -365,7 +364,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
     if (meta->type() == MetaType::ProtocolType) {
         const ProtocolMeta* protoMeta = static_cast<const ProtocolMeta*>(meta);
-        tns::SetValue(isolate, ctorFunc, new ObjCProtocolWrapper(objc_getProtocol(meta->name()), protoMeta));
+        tns::SetValue(isolate, ctorFunc, MakeGarbageCollected<ObjCProtocolWrapper>(isolate, objc_getProtocol(meta->name()), protoMeta));
         cache->ProtocolCtorFuncs.emplace(meta->name(), new Persistent<v8::Function>(isolate, ctorFunc));
     } else {
         Class klass = objc_getClass(meta->name());
@@ -373,7 +372,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
             SymbolLoader::instance().ensureModule(meta->topLevelModule());
             klass = objc_getClass(meta->name());
         }
-        tns::SetValue(isolate, ctorFunc, new ObjCClassWrapper(klass));
+        tns::SetValue(isolate, ctorFunc, MakeGarbageCollected<ObjCClassWrapper>(isolate, klass));
         cache->CtorFuncs.emplace(meta->name(), std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc));
     }
     ObjectManager::Register(context, ctorFunc);
@@ -646,7 +645,7 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
         }
 
         Local<Context> context = isolate->GetCurrentContext();
-        ObjCAllocDataWrapper* allocWrapper = new ObjCAllocDataWrapper(klass);
+        ObjCAllocDataWrapper* allocWrapper = MakeGarbageCollected<ObjCAllocDataWrapper>(isolate, klass);
         Local<Value> result = ArgConverter::CreateJsWrapper(context, allocWrapper, Local<Object>());
         info.GetReturnValue().Set(result);
     } catch (NativeScriptException& ex) {
@@ -770,10 +769,10 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property, con
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
-    std::shared_ptr<Persistent<Value>> parentStruct = nullptr;
+    Local<Value> parentStruct;
     auto x = cache->StructInstances.find(key);
     if (x != cache->StructInstances.end()) {
-        parentStruct = x->second;
+        parentStruct = x->second->Get(isolate);
     }
 
     std::vector<StructField> fields = structInfo.Fields();
@@ -807,9 +806,7 @@ void MetadataBuilder::StructPropertySetterCallback(Local<v8::Name> property, Loc
         return;
     }
 
-    Local<External> ext = thiz->GetInternalField(0).As<External>();
-    StructWrapper* wrapper = static_cast<StructWrapper*>(ext->Value());
-
+    StructWrapper* wrapper = ExtractWrapper<StructWrapper>(thiz);
     StructInfo structInfo = wrapper->StructInfo();
     std::vector<StructField> fields = structInfo.Fields();
 
@@ -982,7 +979,7 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const P
             ObjCDataWrapper* wrapper = nullptr;
             Local<Object> self_ = it != cache->Instances.end()
                 ? it->second->Get(context->isolate_).As<Object>()
-                : ArgConverter::CreateJsWrapper(v8Context, wrapper = new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
+                : ArgConverter::CreateJsWrapper(v8Context, wrapper = MakeGarbageCollected<ObjCDataWrapper>(context->isolate_, thiz), Local<Object>()).As<Object>();
             if (wrapper != nullptr) {
                 tns::DeleteWrapperIfUnused(context->isolate_, self_, wrapper);
             }
@@ -1021,7 +1018,7 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property, const P
             auto it = cache->Instances.find(thiz);
             Local<Object> self_ = it != cache->Instances.end()
                 ? it->second->Get(context->isolate_).As<Object>()
-                : ArgConverter::CreateJsWrapper(v8Context, new ObjCDataWrapper(thiz), Local<Object>()).As<Object>();
+                : ArgConverter::CreateJsWrapper(v8Context, MakeGarbageCollected<ObjCDataWrapper>(context->isolate_, thiz), Local<Object>()).As<Object>();
 
             uint8_t* argBuffer = (uint8_t*)argValues[2];
             const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();

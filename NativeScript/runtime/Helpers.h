@@ -145,6 +145,8 @@ void SetPrivateValue(const v8::Local<v8::Object>& obj, const v8::Local<v8::Strin
 v8::Local<v8::Value> GetPrivateValue(const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName);
 
 void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
+void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::Value>& value);
+
 BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 void DeleteValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 bool DeleteWrapperIfUnused(v8::Isolate* isolate, const v8::Local<v8::Value>& obj, BaseDataWrapper* value);

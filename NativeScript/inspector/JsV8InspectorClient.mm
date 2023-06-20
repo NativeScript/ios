@@ -163,7 +163,8 @@ void JsV8InspectorClient::connect(int argc, char** argv) {
 }
 
 void JsV8InspectorClient::createInspectorSession() {
-    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, {});
+    // FIXME: Consider a more restrictive default approach, or perhaps implement a blacklist of untrusted connections?
+    this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, {}, V8Inspector::kFullyTrusted);
 }
 
 void JsV8InspectorClient::disconnect() {
@@ -205,9 +206,9 @@ void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
             shouldWait = true;
         }
 
-        std::shared_ptr<Platform> platform = tns::Runtime::GetPlatform();
+        v8::Platform* platform = tns::Runtime::GetPlatform();
         Isolate* isolate = isolate_;
-        platform::PumpMessageLoop(platform.get(), isolate, platform::MessageLoopBehavior::kDoNotWait);
+        platform::PumpMessageLoop(platform, isolate, platform::MessageLoopBehavior::kDoNotWait);
         if(shouldWait && !terminated_) {
             dispatch_semaphore_wait(messageArrived_, dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_MSEC)); // 1ms
         }

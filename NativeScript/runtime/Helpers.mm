@@ -22,7 +22,11 @@ namespace {
     uint8_t* BinBuffer = new uint8_t[BUFFER_SIZE];
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
+
     std::string valueStr = tns::ToString(isolate, value);
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     // FIXME: std::codecvt_utf8_utf16 is deprecated
@@ -43,6 +47,8 @@ std::vector<uint16_t> tns::ToVector(const std::string& value) {
     std::vector<uint16_t> vector(begin, end);
     return vector;
 }
+
+#pragma clang diagnostic pop
 
 bool tns::Exists(const char* fullPath) {
     struct stat statbuf;
@@ -219,13 +225,27 @@ void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* 
         return;
     }
 
-    Local<External> ext = External::New(isolate, value);
+    if (!AttachGarbageCollectedWrapper(obj, value))
+        tns::SetPrivateValue(obj, tns::ToV8String(isolate, "metadata"), CreateWrapperFor(isolate, value));
+}
 
-    if (obj->InternalFieldCount() > 0) {
-        obj->SetInternalField(0, ext);
-    } else {
-        tns::SetPrivateValue(obj, tns::ToV8String(isolate, "metadata"), ext);
+void tns::SetValue(Isolate* isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::Value>& value) {
+    if (obj.IsEmpty() || obj->IsNullOrUndefined())
+        return;
+
+    v8::Local<v8::Value> v(value);
+    if (v.IsEmpty())
+        v = v8::Undefined(isolate);
+
+    if (IsGarbageCollectedWrapper(obj)) {
+        if (BaseDataWrapper* wrapper = ExtractWrapper<BaseDataWrapper>(value)) {
+            if (AttachGarbageCollectedWrapper(obj, wrapper))
+                return;
+        } else
+            return DetachGarbageCollectedWrapper(obj);
     }
+
+    tns::SetPrivateValue(obj, tns::ToV8String(isolate, "metadata"), v);
 }
 
 tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
@@ -234,21 +254,12 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
     }
 
     Local<Object> obj = val.As<Object>();
-    if (obj->InternalFieldCount() > 0) {
-        Local<Value> field = obj->GetInternalField(0);
-        if (field.IsEmpty() || field->IsNullOrUndefined() || !field->IsExternal()) {
-            return nullptr;
-        }
-
-        return static_cast<BaseDataWrapper*>(field.As<External>()->Value());
-    }
+    auto result = ExtractWrapper<BaseDataWrapper>(obj);
+    if (result)
+        return result;
 
     Local<Value> metadataProp = tns::GetPrivateValue(obj, tns::ToV8String(isolate, "metadata"));
-    if (metadataProp.IsEmpty() || metadataProp->IsNullOrUndefined() || !metadataProp->IsExternal()) {
-        return nullptr;
-    }
-
-    return static_cast<BaseDataWrapper*>(metadataProp.As<External>()->Value());
+    return ExtractWrapper<BaseDataWrapper>(metadataProp);
 }
 
 void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
@@ -257,7 +268,9 @@ void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
     }
 
     Local<Object> obj = val.As<Object>();
-    if (obj->InternalFieldCount() > 0) {
+    if (IsGarbageCollectedWrapper(obj)) {
+        DetachGarbageCollectedWrapper(obj);
+    } else if (obj->InternalFieldCount() > 0) {
         obj->SetInternalField(0, v8::Undefined(isolate));
         return;
     }

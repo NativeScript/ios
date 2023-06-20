@@ -140,7 +140,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         if (it != cache->Instances.end()) {
             thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
         } else {
-            ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
+            ObjCDataWrapper* wrapper = MakeGarbageCollected<ObjCDataWrapper>(isolate, self_);
             thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();
             tns::DeleteWrapperIfUnused(isolate, thiz, wrapper);
         }
@@ -339,7 +339,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
         Local<Value> obj = it->second->Get(isolate);
         info.GetReturnValue().Set(obj);
     } else {
-        ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
+        ObjCDataWrapper* wrapper = MakeGarbageCollected<ObjCDataWrapper>(isolate, result);
         Local<Object> thiz = info.This();
         Local<Context> context = cache->GetContext();
         tns::SetValue(isolate, thiz, wrapper);
@@ -656,7 +656,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     Class metaClass = object_getClass(target);
     if (class_isMetaClass(metaClass)) {
         if (tns::GetValue(isolate, receiver) == nullptr) {
-            ObjCClassWrapper* wrapper = new ObjCClassWrapper(klass);
+            ObjCClassWrapper* wrapper = MakeGarbageCollected<ObjCClassWrapper>(isolate, klass);
             tns::SetValue(isolate, receiver, wrapper);
         }
     }
@@ -868,7 +868,7 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index, const PropertyC
     }
 
     Local<Context> context = isolate->GetCurrentContext();
-    auto newWrapper = new ObjCDataWrapper(obj);
+    auto newWrapper = MakeGarbageCollected<ObjCDataWrapper>(isolate, obj);
     Local<Value> result = ArgConverter::ConvertArgument(context, newWrapper);
     tns::DeleteWrapperIfUnused(isolate, result, newWrapper);
     args.GetReturnValue().Set(result);

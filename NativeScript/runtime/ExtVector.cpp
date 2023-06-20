@@ -22,7 +22,7 @@ Local<Value> ExtVector::NewInstance(Isolate* isolate, void* data, ffi_type* ffiT
     tns::Assert(success, isolate);
 
     // TODO: Validate that the inner type is supported (float, double)
-    ExtVectorWrapper* wrapper = new ExtVectorWrapper(data, ffiType, innerTypeEncoding, typeEncoding);
+    ExtVectorWrapper* wrapper = MakeGarbageCollected<ExtVectorWrapper>(isolate, data, ffiType, innerTypeEncoding, typeEncoding);
     tns::SetValue(isolate, result.As<Object>(), wrapper);
 
     return result;
@@ -78,7 +78,7 @@ void ExtVector::IndexedPropertySetCallback(uint32_t index, Local<Value> value, c
 void ExtVector::RegisterToStringMethod(Isolate* isolate, Local<ObjectTemplate> prototypeTemplate) {
     Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        ExtVectorWrapper* wrapper = static_cast<ExtVectorWrapper*>(info.This()->GetInternalField(0).As<External>()->Value());
+        ExtVectorWrapper* wrapper = ExtractWrapper<ExtVectorWrapper>(info.This());
         void* value = wrapper->Data();
 
         char buffer[100];

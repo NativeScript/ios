@@ -104,7 +104,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         }
 
         std::string extendedClassName = class_getName(extendedClass);
-        ObjCClassWrapper* wrapper = new ObjCClassWrapper(extendedClass, true);
+        ObjCClassWrapper* wrapper = MakeGarbageCollected<ObjCClassWrapper>(isolate, extendedClass, true);
         tns::SetValue(isolate, extendClassCtorFunc, wrapper);
 
         auto extendedPersistent = std::make_unique<Persistent<v8::Function>>(isolate, extendClassCtorFunc);
@@ -197,7 +197,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
 
         extendedClassName = class_getName(extendedClass);
 
-        tns::SetValue(isolate, extendedClassCtorFunc, new ObjCClassWrapper(extendedClass, true));
+        tns::SetValue(isolate, extendedClassCtorFunc, MakeGarbageCollected<ObjCClassWrapper>(isolate, extendedClass, true));
 
         const Meta* baseMeta = ArgConverter::FindMeta(baseClass);
         const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(baseMeta);
@@ -829,8 +829,9 @@ void ClassBuilder::SuperAccessorGetterCallback(Local<v8::Name> property, const P
     Local<Object> superValue = poValue->Get(isolate).As<Object>();
 
     superValue->SetPrototype(context, thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype()).ToChecked();
-    superValue->SetInternalField(0, thiz->GetInternalField(0));
-    superValue->SetInternalField(1, tns::ToV8String(isolate, "super"));
+
+    ObjCDataWrapper* wrapper = ExtractWrapper<ObjCDataWrapper>(thiz);
+    AttachGarbageCollectedWrapper(superValue, wrapper);
 
     info.GetReturnValue().Set(superValue);
 }

@@ -22,12 +22,12 @@ void DisposerPHV::VisitPersistentHandle(
         case Constants::ClassTypes::DataWrapper: {
             v8::HandleScope scope(isolate_);
             // use ObjectManager anyway, as it handles a bigger variety of wrappers
-            ObjectManager::DisposeValue(isolate_, value->Get(isolate_), true);
+            //ObjectManager::DisposeValue(isolate_, value->Get(isolate_), true);
             break;
         }
         case Constants::ClassTypes::ObjectManagedValue: {
             v8::HandleScope scope(isolate_);
-            ObjectManager::DisposeValue(isolate_, value->Get(isolate_), true);
+            //ObjectManager::DisposeValue(isolate_, value->Get(isolate_), true);
             if (value->IsWeak()) {
                 ObjectWeakCallbackState* state = value->ClearWeak<ObjectWeakCallbackState>();
                 state->target_->Reset();

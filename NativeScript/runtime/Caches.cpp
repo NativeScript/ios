@@ -7,6 +7,11 @@ namespace tns {
 
 Caches::Caches(Isolate* isolate, const int& isolateId)
     : isolate_(isolate), isolateId_(isolateId) {
+    // Set up wrapper object. This replaces v8::Externals held in a few places, and is traced by the unified heap in v8.
+    HandleScope scope(isolate);
+    Local<ObjectTemplate> templ = ObjectTemplate::New(isolate);
+    templ->SetInternalFieldCount(2);
+    WrapperObjectTemplate.Reset(isolate, templ);
 }
 
 Caches::~Caches() {

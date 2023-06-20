@@ -45,10 +45,10 @@ private:
     static IMP FindNotOverridenMethod(Class klass, SEL method);
 
 
-    struct CacheItem {
+    struct CacheItem : public ExternalData {
     public:
         CacheItem(const InterfaceMeta* meta, id data)
-            : meta_(meta),
+            : ExternalData(ExternalDataType::ClassBuilder), meta_(meta),
               data_(data) {
         }
         const InterfaceMeta* meta_;

@@ -160,8 +160,9 @@ private:
     std::vector<StructField> fields_;
 };
 
-class BaseDataWrapper {
+class BaseDataWrapper : public cppgc::GarbageCollected<BaseDataWrapper> {
 public:
+    static constexpr const char* ClassName() { return "BaseDataWrapper"; }
     BaseDataWrapper()
         : gcProtected_(false) {
     }
@@ -183,12 +184,16 @@ public:
     void GcUnprotect() {
         this->gcProtected_ = false;
     }
+
+    virtual void Trace(cppgc::Visitor*) const {}
+
 private:
     bool gcProtected_;
 };
 
 class EnumDataWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "EnumDataWrapper"; }
     EnumDataWrapper(std::string jsCode)
         : jsCode_(jsCode) {
     }
@@ -206,6 +211,7 @@ private:
 
 class PointerTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "PointerTypeWrapper"; }
     const WrapperType Type() {
         return WrapperType::PointerType;
     }
@@ -213,6 +219,7 @@ public:
 
 class PointerWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "PointerWrapper"; }
     PointerWrapper(void* data)
         : data_(data),
           isAdopted_(false) {
@@ -244,6 +251,7 @@ private:
 
 class ReferenceTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ReferenceTypeWrapper"; }
     const WrapperType Type() {
         return WrapperType::ReferenceType;
     }
@@ -251,7 +259,8 @@ public:
 
 class ReferenceWrapper: public BaseDataWrapper {
 public:
-    ReferenceWrapper(BaseDataWrapper* typeWrapper, v8::Persistent<v8::Value>* value)
+    static constexpr const char* ClassName() { return "ReferenceWrapper"; }
+    ReferenceWrapper(BaseDataWrapper* typeWrapper, TracedValue* value)
         : typeWrapper_(typeWrapper),
           value_(value),
           encoding_(nullptr),
@@ -264,8 +273,7 @@ public:
             value_->Reset();
             delete value_;
         }
-        
-        if (this->data_ != nullptr) {
+        if (this->data_ != nullptr && disposeData_) {
             std::free(this->data_);
         }
     }
@@ -278,14 +286,23 @@ public:
         return this->typeWrapper_;
     }
 
-    v8::Persistent<v8::Value>* Value() {
-        return this->value_;
+    bool HasValue() const {
+        return value_ != nullptr && !value_->IsEmpty();
     }
 
-    void SetValue(v8::Persistent<v8::Value>* value) {
-        if (this->value_ != nullptr) {
+    TracedValue Value() {
+        if (value_ != nullptr)
+            return *value_;
+        return TracedValue();
+    }
+
+    TracedValue* UnsafeValue() {
+        return value_;
+    }
+
+    void SetValue(TracedValue* value) {
+        if (this->value_ != nullptr)
             this->value_->Reset();
-        }
         this->value_ = value;
     }
 
@@ -308,9 +325,18 @@ public:
         this->data_ = data;
         this->disposeData_ = disposeData;
     }
+
+    void Trace(cppgc::Visitor* visitor) const {
+        // ASSERT: visitor is a JSVisitor
+        if (this->typeWrapper_)
+            visitor->Trace(*typeWrapper_);
+        if (this->value_ != nullptr)
+            static_cast<v8::JSVisitor*>(visitor)->Trace(*value_);
+    }
+
 private:
     BaseDataWrapper* typeWrapper_;
-    v8::Persistent<v8::Value>* value_;
+    TracedValue* value_;
     const TypeEncoding* encoding_;
     void* data_;
     bool disposeData_;
@@ -318,15 +344,12 @@ private:
 
 class PrimitiveDataWrapper: public BaseDataWrapper {
 public:
-    PrimitiveDataWrapper(size_t size,const TypeEncoding* typeEncoding, bool autoDeleteEncoding)
-        : size_(size),
-          typeEncoding_(typeEncoding),
-          autoDeleteEncoding_(autoDeleteEncoding) {
+    static constexpr const char* ClassName() { return "ReferenceTypeWrapper"; }
+    PrimitiveDataWrapper(size_t size, BinaryTypeEncodingType type)
+        : size_(size)
+        , typeEncoding_({ type, {} }) {
     }
     ~PrimitiveDataWrapper() {
-        if (autoDeleteEncoding_) {
-            std::free((struct TypeEncoding*)typeEncoding_);
-        }
     }
 
     const WrapperType Type() {
@@ -338,16 +361,16 @@ public:
     }
 
     const TypeEncoding* TypeEncoding() {
-        return this->typeEncoding_;
+        return &this->typeEncoding_;
     }
 private:
     size_t size_;
-    const struct TypeEncoding* typeEncoding_;
-    bool autoDeleteEncoding_;
+    struct TypeEncoding typeEncoding_;
 };
 
 class StructTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "StructTypeWrapper"; }
     StructTypeWrapper(StructInfo structInfo)
         : structInfo_(structInfo) {
     }
@@ -365,11 +388,18 @@ private:
 
 class StructWrapper: public StructTypeWrapper {
 public:
-    StructWrapper(struct StructInfo structInfo, void* data, std::shared_ptr<v8::Persistent<v8::Value>> parent)
+    static constexpr const char* ClassName() { return "StructWrapper"; }
+    StructWrapper(v8::Isolate* isolate, struct StructInfo structInfo, void* data, v8::Local<v8::Value> parent = {})
         : StructTypeWrapper(structInfo),
           data_(data),
-          childCount_(0),
-          parent_(parent) {
+          childCount_(0) {
+        if (!parent.IsEmpty())
+            parent_.Reset(isolate, parent);
+    }
+
+    ~StructWrapper() {
+        parent_.Reset();
+        if (data_) free(data_);
     }
 
     const WrapperType Type() {
@@ -380,8 +410,8 @@ public:
         return this->data_;
     }
 
-    std::shared_ptr<v8::Persistent<v8::Value>> Parent() {
-        return this->parent_;
+    bool HasParent() const {
+        return !parent_.IsEmpty();
     }
 
     void IncrementChildren() {
@@ -395,14 +425,21 @@ public:
     int ChildCount() {
         return this->childCount_;
     }
+
+    void Trace(cppgc::Visitor* visitor) const {
+        // ASSERT: visitor is a JSVisitor
+        static_cast<v8::JSVisitor*>(visitor)->Trace(parent_);
+    }
+
 private:
     void* data_;
     int childCount_;
-    std::shared_ptr<v8::Persistent<v8::Value>> parent_;
+    v8::TracedReference<v8::Value> parent_;
 };
 
 class ObjCAllocDataWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ObjCAllocDataWrapper"; }
     ObjCAllocDataWrapper(Class klass)
         : klass_(klass) {
     }
@@ -420,6 +457,7 @@ private:
 
 class UnmanagedTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "UnmanagedTypeWrapper"; }
     UnmanagedTypeWrapper(uint8_t* data, const TypeEncoding* typeEncoding)
         : data_(data), typeEncoding_(typeEncoding), valueTaken_(false) {
     }
@@ -448,6 +486,7 @@ private:
 
 class ObjCDataWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ObjCDataWrapper"; }
     ObjCDataWrapper(id data, const TypeEncoding* typeEncoding = nullptr)
         : data_(data), typeEncoding_(typeEncoding) {
     }
@@ -470,6 +509,7 @@ private:
 
 class ObjCClassWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ObjCClassWrapper"; }
     ObjCClassWrapper(Class klazz, bool extendedClass = false)
         : klass_(klazz),
           extendedClass_(extendedClass) {
@@ -493,6 +533,7 @@ private:
 
 class ObjCProtocolWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "ObjCProtocolWrapper"; }
     ObjCProtocolWrapper(Protocol* proto, const ProtocolMeta* protoMeta)
         : proto_(proto),
           protoMeta_(protoMeta) {
@@ -516,6 +557,7 @@ private:
 
 class FunctionWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "FunctionWrapper"; }
     FunctionWrapper(const FunctionMeta* meta)
         : meta_(meta) {
     }
@@ -533,6 +575,7 @@ private:
 
 class AnonymousFunctionWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "AnonymousFunctionWrapper"; }
     AnonymousFunctionWrapper(void* functionPointer, const TypeEncoding* parametersEncoding, size_t parametersCount)
         : data_(functionPointer),
           parametersEncoding_(parametersEncoding) {
@@ -556,12 +599,13 @@ private:
 
 class BlockWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "BlockWrapper"; }
     BlockWrapper(void* block, const TypeEncoding* typeEncoding, bool ownsBlock)
         : block_(block),
           typeEncoding_(typeEncoding),
           ownsBlock_(ownsBlock) {
     }
-    
+
     const WrapperType Type() {
         return WrapperType::Block;
     }
@@ -586,6 +630,7 @@ private:
 
 class FunctionReferenceTypeWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "FunctionReferenceTypeWrapper"; }
     const WrapperType Type() {
         return WrapperType::FunctionReferenceType;
     }
@@ -593,6 +638,7 @@ public:
 
 class FunctionReferenceWrapper: public BaseDataWrapper {
 public:
+    static constexpr const char* ClassName() { return "FunctionReferenceWrapper"; }
     FunctionReferenceWrapper(std::shared_ptr<v8::Persistent<v8::Value>> function)
         : function_(function),
           data_(nullptr) {
@@ -620,7 +666,8 @@ private:
 
 class ExtVectorWrapper: public BaseDataWrapper {
 public:
-    ExtVectorWrapper(void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding, const TypeEncoding* typeEncoding)
+    static constexpr const char* ClassName() { return "ExtVectorWrapper"; }
+    ExtVectorWrapper(v8::Isolate* isolate, void* data, ffi_type* ffiType, const TypeEncoding* innerTypeEncoding, const TypeEncoding* typeEncoding)
         : data_(data),
           ffiType_(ffiType),
           innerTypeEncoding_(innerTypeEncoding),

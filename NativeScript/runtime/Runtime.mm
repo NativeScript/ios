@@ -22,6 +22,9 @@
 #include "IsolateWrapper.h"
 #include "DisposerPHV.h"
 
+#include "cppgc/default-platform.h"
+#include "cppgc/heap.h"
+
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
@@ -83,7 +86,7 @@ Runtime::~Runtime() {
     {
         v8::Locker lock(isolate_);
         DisposerPHV phv(isolate_);
-        isolate_->VisitHandlesWithClassIds( &phv );
+        // isolate_->VisitHandlesWithClassIds( &phv );
         
         if (IsRuntimeWorker()) {
             auto currentWorker = static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
@@ -113,14 +116,17 @@ Isolate* Runtime::CreateIsolate() {
     //     ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
     //     : platform::NewDefaultPlatform();
 
-        Runtime::platform_ = platform::NewDefaultPlatform();
+        //Runtime::platform_ = platform::NewDefaultPlatform();
+        Runtime::platform_ = std::make_shared<cppgc::DefaultPlatform>();
 
-        V8::InitializePlatform(Runtime::platform_.get());
-        V8::Initialize();
+        V8::InitializePlatform(Runtime::GetPlatform());
+        cppgc::InitializeProcess(Runtime::platform_->GetPageAllocator());
+
         std::string flags = RuntimeConfig.IsDebug
-        ? "--expose_gc --jitless"
-        : "--expose_gc --jitless --no-lazy";
+        ? "--expose_gc --jitless --no-freeze_flags_after_init"
+        : "--expose_gc --jitless --no-lazy --freeze_flags_after_init=false";
         V8::SetFlagsFromString(flags.c_str(), flags.size());
+        V8::Initialize();
         v8Initialized_ = true;
     }
     
@@ -128,7 +134,15 @@ Isolate* Runtime::CreateIsolate() {
 
     Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = &allocator_;
+
+    std::unique_ptr<v8::CppHeap> cpp_heap = v8::CppHeap::Create(Runtime::GetPlatform(), {
+        /* std::vector<std::unique_ptr<cppgc::CustomSpaceBase>> custom_spaces */
+        {},
+        /* WrapperDescriptor wrapper_descriptor */
+        kGarbageCollectedWrapperDescriptor,
+    });
     Isolate* isolate = Isolate::New(create_params);
+    isolate->AttachCppHeap(cpp_heap.release());
     runtimeLoop_ = CFRunLoopGetCurrent();
     isolate->SetData(Constants::RUNTIME_SLOT, this);
 
@@ -303,7 +317,7 @@ bool Runtime::IsAlive(const Isolate* isolate) {
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
 }
 
-std::shared_ptr<Platform> Runtime::platform_;
+std::shared_ptr<cppgc::DefaultPlatform> Runtime::platform_;
 std::vector<Isolate*> Runtime::isolates_;
 bool Runtime::v8Initialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;

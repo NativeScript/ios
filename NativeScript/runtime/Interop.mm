@@ -240,8 +240,8 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                 Interop::SetValue(dest, data);
             } else if (wrapper->Type() == WrapperType::Reference) {
                 ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
-                tns::Assert(refWrapper->Value() != nullptr, isolate);
-                Local<Value> value = refWrapper->Value()->Get(isolate);
+                tns::Assert(refWrapper->HasValue(), isolate);
+                Local<Value> value = refWrapper->Value().Get(isolate);
                 wrapper = tns::GetValue(isolate, value);
                 tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Pointer, isolate);
                 PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
@@ -364,7 +364,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                     data = pointerWrapper->Data();
                 } else if (wrapper->Type() == WrapperType::Reference) {
                     ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
-                    Local<Value> value = referenceWrapper->Value() != nullptr ? referenceWrapper->Value()->Get(isolate) : Local<Value>();
+                    Local<Value> value = referenceWrapper->Value().Get(isolate);
                     ffi_type* ffiType = FFICall::GetArgumentType(innerType);
                     data = calloc(1, ffiType->size);
                     FFICall::DisposeFFIType(ffiType, innerType);
@@ -431,7 +431,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
             MethodCallbackWrapper* userData = new MethodCallbackWrapper(isolate, poCallback, 1, argsCount, blockTypeEncoding);
             blockPtr = Interop::CreateBlock(1, argsCount, blockTypeEncoding, ArgConverter::MethodCallback, userData);
 
-            BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding, false);
+            BlockWrapper* wrapper = MakeGarbageCollected<BlockWrapper>(isolate, (void*)blockPtr, blockTypeEncoding, false);
             tns::SetValue(isolate, arg.As<v8::Function>(), wrapper);
         }
 
@@ -663,23 +663,22 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
     return nil;
 }
 
-Local<Value> Interop::StructToValue(Local<Context> context, void* result, StructInfo structInfo, std::shared_ptr<Persistent<Value>> parentStruct) {
+Local<Value> Interop::StructToValue(Local<Context> context, void* result, StructInfo structInfo, Local<Value> parentStruct) {
     Isolate* isolate = context->GetIsolate();
     StructWrapper* wrapper = nullptr;
-    if (parentStruct == nullptr) {
+    if (parentStruct.IsEmpty()) {
         ffi_type* ffiType = structInfo.FFIType();
         void* dest = malloc(ffiType->size);
         memcpy(dest, result, ffiType->size);
 
-        wrapper = new StructWrapper(structInfo, dest, nullptr);
+        wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, dest);
     } else {
-        Local<Value> parent = parentStruct->Get(isolate);
-        BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parent);
+        BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parentStruct);
         if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
             StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
             parentStructWrapper->IncrementChildren();
         }
-        wrapper = new StructWrapper(structInfo, result, parentStruct);
+        wrapper = MakeGarbageCollected<StructWrapper>(isolate, structInfo, result, parentStruct);
     }
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
@@ -690,7 +689,7 @@ Local<Value> Interop::StructToValue(Local<Context> context, void* result, Struct
     }
 
     Local<Value> res = ArgConverter::ConvertArgument(context, wrapper);
-    if (parentStruct == nullptr) {
+    if (parentStruct.IsEmpty()) {
         std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, res);
         cache->StructInstances.emplace(key, poResult);
     }
@@ -803,12 +802,12 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
 }
 
-Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged, bool isInitializer) {
+Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, Local<Value> parentStruct, bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged, bool isInitializer) {
     Isolate* isolate = context->GetIsolate();
 
     if (returnsUnmanaged) {
         uint8_t* data = call->GetResult<uint8_t*>();
-        UnmanagedTypeWrapper* wrapper = new UnmanagedTypeWrapper(data, typeEncoding);
+        UnmanagedTypeWrapper* wrapper = MakeGarbageCollected<UnmanagedTypeWrapper>(isolate, data, typeEncoding);
         Local<Value> result = UnmanagedType::Create(context, wrapper);
         ObjectManager::Register(context, result);
         return result;
@@ -947,15 +946,14 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             return callback;
         }
 
-        BlockWrapper* blockWrapper = new BlockWrapper(block, typeEncoding, true);
-        Local<External> ext = External::New(isolate, blockWrapper);
+        BlockWrapper* blockWrapper = MakeGarbageCollected<BlockWrapper>(isolate, block, typeEncoding, true);
+        auto ext = CreateWrapperFor(isolate, blockWrapper);
         Local<v8::Function> callback;
 
         CFRetain(block);
 
         bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
-            Local<External> ext = info.Data().As<External>();
-            BlockWrapper* wrapper = static_cast<BlockWrapper*>(ext->Value());
+            BlockWrapper* wrapper = ExtractWrapper<BlockWrapper>(info.Data());
 
             JSBlock* block = static_cast<JSBlock*>(wrapper->Block());
 
@@ -974,13 +972,13 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
             ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(), call.ArgsArray());
 
-            Local<Value> result = Interop::GetResult(context, enc, &call, true, nullptr);
+            Local<Value> result = Interop::GetResult(context, enc, &call, true, Local<Value>());
 
             info.GetReturnValue().Set(result);
         }, ext).ToLocal(&callback);
         tns::Assert(success, isolate);
 
-        tns::SetValue(isolate, callback, blockWrapper);
+        tns::SetValue(isolate, callback, ext);
         ObjectManager::Register(context, callback);
 
         return callback;
@@ -994,13 +992,13 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
         const TypeEncoding* parametersEncoding = typeEncoding->details.functionPointer.signature.first();
         size_t parametersCount = typeEncoding->details.functionPointer.signature.count;
-        AnonymousFunctionWrapper* wrapper = new AnonymousFunctionWrapper(functionPointer, parametersEncoding, parametersCount);
-        Local<External> ext = External::New(isolate, wrapper);
+        AnonymousFunctionWrapper* wrapper = MakeGarbageCollected<AnonymousFunctionWrapper>(isolate, functionPointer, parametersEncoding, parametersCount);
+        auto ext = CreateWrapperFor(isolate, wrapper);
 
         Local<v8::Function> func;
         bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
             Isolate* isolate = info.GetIsolate();
-            AnonymousFunctionWrapper* wrapper = static_cast<AnonymousFunctionWrapper*>(info.Data().As<External>()->Value());
+            AnonymousFunctionWrapper* wrapper = ExtractWrapper<AnonymousFunctionWrapper>(info.Data());
             tns::Assert(wrapper != nullptr, isolate);
 
             V8FunctionCallbackArgs args(info);
@@ -1015,7 +1013,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         }, ext).ToLocal(&func);
         tns::Assert(success, isolate);
 
-        tns::SetValue(isolate, func, wrapper);
+        tns::SetValue(isolate, func, ext);
         ObjectManager::Register(context, func);
 
         return func;
@@ -1123,7 +1121,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         // because class_getSuperclass will directly return NSProxy and thus missing to attach all instance members
         const TypeEncoding* te = [result isProxy] ? typeEncoding : nullptr;
 
-        ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
+        ObjCDataWrapper* wrapper = MakeGarbageCollected<ObjCDataWrapper>(isolate, result, te);
         std::vector<std::string> additionalProtocols = Interop::GetAdditionalProtocols(typeEncoding);
         Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper, false, additionalProtocols);
 
@@ -1302,9 +1300,7 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
     const TypeEncoding* fieldEncoding = field.Encoding();
     switch (fieldEncoding->type) {
         case BinaryTypeEncodingType::StructDeclarationReference: {
-            Local<Object> obj = value.As<Object>();
-            Local<External> ext = obj->GetInternalField(0).As<External>();
-            StructWrapper* targetStruct = static_cast<StructWrapper*>(ext->Value());
+            StructWrapper* targetStruct = ExtractWrapper<StructWrapper>(value);
 
             void* sourceBuffer = targetStruct->Data();
             size_t fieldSize = field.FFIType()->size;
@@ -1529,7 +1525,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
         methodCall.typeEncoding_,
         &call,
         marshalToPrimitive,
-        nullptr,
+        Local<Value>(), /* parentStruct */
         false,
         methodCall.ownsReturnedObject_,
         methodCall.returnsUnmanaged_,
