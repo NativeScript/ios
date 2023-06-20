@@ -1,3 +1,19 @@
+# [8.6.0-alpha.1](https://github.com/NativeScript/ios/compare/v8.5.2...v8.6.0-alpha.1) (2023-06-20)
+
+
+### Bug Fixes
+
+* delay isolate disposal when isolate is in use ([5a6c2ee](https://github.com/NativeScript/ios/commit/5a6c2ee5efa0c557c94ae56da0d3b3a31911d1b8))
+
+
+### Reverts
+
+* Revert "Misc changes that might not be needed" ([ad9670b](https://github.com/NativeScript/ios/commit/ad9670b9c7fb347b5d59698adbadbf40c31fe86c))
+* Revert "Garbage changes to revert" ([3b0e697](https://github.com/NativeScript/ios/commit/3b0e697b2ec9f4d5fc14f2c218fe25b16159f32f))
+* Revert "Add Clear() method to ConcurrentMap" ([bfbd301](https://github.com/NativeScript/ios/commit/bfbd30198510d7526c7eef1e6949408a0aad992e))
+
+
+
 # [8.6.0-alpha.0](https://github.com/NativeScript/ios/compare/v8.5.2...v8.6.0-alpha.0) (2023-06-20)
 
 
