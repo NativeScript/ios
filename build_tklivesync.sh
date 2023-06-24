@@ -54,6 +54,16 @@ xcodebuild archive -project v8ios.xcodeproj \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/intermediates/TKLiveSync.iphonesimulator.xcarchive
 
+checkpoint "Building TKLiveSync for visionOS"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme TKLiveSync \
+                   -configuration Release \
+                   -destination "generic/platform=visionOS" \
+                   -sdk visionOS \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   -archivePath $DIST/intermediates/TKLiveSync.visionos.xcarchive
+
 #generates library for device target
 checkpoint "Building TKLiveSync for ARM64 device"
 xcodebuild archive -project v8ios.xcodeproj \
@@ -93,6 +103,8 @@ xcodebuild -create-xcframework \
            -debug-symbols "$DIST/intermediates/TKLiveSync.iphonesimulator.xcarchive/dSYMs/TKLiveSync.framework.dSYM" \
            -framework "$DIST/intermediates/TKLiveSync.iphoneos.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
            -debug-symbols "$DIST/intermediates/TKLiveSync.iphoneos.xcarchive/dSYMs/TKLiveSync.framework.dSYM" \
+           -framework "$DIST/intermediates/TKLiveSync.visionos.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
+           -debug-symbols "$DIST/intermediates/TKLiveSync.visionos.xcarchive/dSYMs/TKLiveSync.framework.dSYM" \
            -output "$OUTPUT_DIR"
 
 rm -rf "$DIST/intermediates"

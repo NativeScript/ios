@@ -105,6 +105,18 @@ xcodebuild archive -project v8ios.xcodeproj \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/intermediates/NativeScript.iphonesimulator.xcarchive
+
+checkpoint "Building NativeScript for visionOS"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "NativeScript" \
+                   -configuration Release \
+                   -destination "generic/platform=visionOS" \
+                   -sdk visionOS \
+                   $QUIET \
+                   EXCLUDED_ARCHS="i386" \
+                   DEVELOPMENT_TEAM=$DEV_TEAM \
+                   SKIP_INSTALL=NO \
+                   -archivePath $DIST/intermediates/NativeScript.visionos.xcarchive
 fi
 
 if $BUILD_IPHONE; then
@@ -145,6 +157,9 @@ fi
 if $BUILD_SIMULATOR; then
   XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
                   -debug-symbols "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.visionos.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.visionos.xcarchive/dSYMs/NativeScript.framework.dSYM" )
 fi
 
 if $BUILD_IPHONE; then
