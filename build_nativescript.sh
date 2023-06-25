@@ -110,13 +110,13 @@ checkpoint "Building NativeScript for visionOS"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
-                   -destination "generic/platform=visionOS" \
-                   -sdk visionOS \
+                   -destination "generic/platform=xrsimulator" \
+                   -sdk xrsimulator \
                    $QUIET \
                    EXCLUDED_ARCHS="i386" \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
-                   -archivePath $DIST/intermediates/NativeScript.visionos.xcarchive
+                   -archivePath $DIST/intermediates/NativeScript.xrsimulator.xcarchive
 fi
 
 if $BUILD_IPHONE; then
@@ -158,8 +158,8 @@ if $BUILD_SIMULATOR; then
   XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
                   -debug-symbols "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
 
-  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.visionos.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
-                  -debug-symbols "$DIST/intermediates/NativeScript.visionos.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
 fi
 
 if $BUILD_IPHONE; then
