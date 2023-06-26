@@ -113,7 +113,7 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -destination "generic/platform=xrsimulator" \
                    -sdk xrsimulator \
                    $QUIET \
-                   EXCLUDED_ARCHS="i386" \
+                   EXCLUDED_ARCHS="i386 x86_64" \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/intermediates/NativeScript.xrsimulator.xcarchive
