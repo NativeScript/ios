@@ -20,19 +20,19 @@ void LogMetadataUnavailable(const char* identifierString, uint8_t majorVersion, 
 /**
  * \brief Gets the system version of the current device.
  */
-static UInt8 getSystemVersion() {
-    static UInt8 iosVersion;
-    if (iosVersion != 0) {
-        return iosVersion;
-    }
-
-    NSString* version = [[UIDevice currentDevice] systemVersion];
-    NSArray* versionTokens = [version componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"."]];
-    UInt8 majorVersion = (UInt8)[versionTokens[0] intValue];
-    UInt8 minorVersion = (UInt8)[versionTokens[1] intValue];
-
-    return iosVersion = encodeVersion(majorVersion, minorVersion);
-}
+//static UInt8 getSystemVersion() {
+//    static UInt8 iosVersion;
+//    if (iosVersion != 0) {
+//        return iosVersion;
+//    }
+//
+//    NSString* version = [[UIDevice currentDevice] systemVersion];
+//    NSArray* versionTokens = [version componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"."]];
+//    UInt8 majorVersion = (UInt8)[versionTokens[0] intValue];
+//    UInt8 minorVersion = (UInt8)[versionTokens[1] intValue];
+//
+//    return iosVersion = encodeVersion(majorVersion, minorVersion);
+//}
 robin_hood::unordered_map<std::string, MembersCollection> getMetasByJSNames(MembersCollection members) {
     robin_hood::unordered_map<std::string, MembersCollection> result;
     for (auto member : members) {
@@ -43,9 +43,10 @@ robin_hood::unordered_map<std::string, MembersCollection> getMetasByJSNames(Memb
 
 // Meta
 bool Meta::isAvailable() const {
-    UInt8 introducedIn = this->introducedIn();
-    UInt8 systemVersion = getSystemVersion();
-    return introducedIn == 0 || introducedIn <= systemVersion;
+//    UInt8 introducedIn = this->introducedIn();
+//    UInt8 systemVersion = getSystemVersion();
+    // Note: visionOS is 1.0 and this comparison can be improved
+    return true;//introducedIn == 0 || introducedIn <= systemVersion;
 }
 
 // MethodMeta class
