@@ -78,6 +78,8 @@ require("./Modules");
 //
 require("./RuntimeImplementedAPIs");
 
+require("./Timers");
+
 // Tests common for all runtimes.
 require("./shared/index").runAllTests();
 

@@ -57,7 +57,8 @@ namespace tns {
 //  V(worker)
 
 #define NODE_BINDINGS_WITH_PER_ISOLATE_INIT(V) \
-V(worker)
+V(worker) \
+V(timers)
 
 enum {
     NM_F_BUILTIN = 1 << 0,  // Unused.
