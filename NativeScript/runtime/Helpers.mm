@@ -685,13 +685,14 @@ namespace tns {
 Local<v8::FunctionTemplate> NewFunctionTemplate(
                                                 v8::Isolate* isolate,
                                                 v8::FunctionCallback callback,
+                                                Local<v8::Value> data,
                                                 Local<v8::Signature> signature,
                                                 v8::ConstructorBehavior behavior,
                                                 v8::SideEffectType side_effect_type,
                                                 const v8::CFunction* c_function) {
     return v8::FunctionTemplate::New(isolate,
                                      callback,
-                                     Local<v8::Value>(),
+                                     data,
                                      signature,
                                      0,
                                      behavior,
@@ -701,11 +702,13 @@ Local<v8::FunctionTemplate> NewFunctionTemplate(
 void SetMethod(Local<v8::Context> context,
                Local<v8::Object> that,
                const char* name,
-               v8::FunctionCallback callback) {
+               v8::FunctionCallback callback,
+               Local<v8::Value> data) {
     Isolate* isolate = context->GetIsolate();
     Local<v8::Function> function =
     NewFunctionTemplate(isolate,
                         callback,
+                        data,
                         Local<v8::Signature>(),
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasSideEffect)
@@ -721,10 +724,12 @@ void SetMethod(Local<v8::Context> context,
 void SetMethod(v8::Isolate* isolate,
                v8::Local<v8::Template> that,
                const char* name,
-               v8::FunctionCallback callback) {
+               v8::FunctionCallback callback,
+               Local<v8::Value> data) {
     Local<v8::FunctionTemplate> t =
     NewFunctionTemplate(isolate,
                         callback,
+                        data,
                         Local<v8::Signature>(),
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasSideEffect);
@@ -738,10 +743,12 @@ void SetFastMethod(Isolate* isolate,
                    Local<Template> that,
                    const char* name,
                    v8::FunctionCallback slow_callback,
-                   const v8::CFunction* c_function) {
+                   const v8::CFunction* c_function,
+                   Local<v8::Value> data) {
     Local<v8::FunctionTemplate> t =
     NewFunctionTemplate(isolate,
                         slow_callback,
+                        data,
                         Local<v8::Signature>(),
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasSideEffect,
@@ -756,11 +763,13 @@ void SetFastMethod(Local<v8::Context> context,
                    Local<v8::Object> that,
                    const char* name,
                    v8::FunctionCallback slow_callback,
-                   const v8::CFunction* c_function) {
+                   const v8::CFunction* c_function,
+                   Local<v8::Value> data) {
     Isolate* isolate = context->GetIsolate();
     Local<v8::Function> function =
     NewFunctionTemplate(isolate,
                         slow_callback,
+                        data,
                         Local<v8::Signature>(),
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasSideEffect,
@@ -776,11 +785,13 @@ void SetFastMethodNoSideEffect(Local<v8::Context> context,
                                Local<v8::Object> that,
                                const char* name,
                                v8::FunctionCallback slow_callback,
-                               const v8::CFunction* c_function) {
+                               const v8::CFunction* c_function,
+                               Local<v8::Value> data) {
     Isolate* isolate = context->GetIsolate();
     Local<v8::Function> function =
     NewFunctionTemplate(isolate,
                         slow_callback,
+                        data,
                         Local<v8::Signature>(),
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasNoSideEffect,
@@ -796,10 +807,12 @@ void SetFastMethodNoSideEffect(Isolate* isolate,
                                Local<Template> that,
                                const char* name,
                                v8::FunctionCallback slow_callback,
-                               const v8::CFunction* c_function) {
+                               const v8::CFunction* c_function,
+                               Local<v8::Value> data) {
     Local<v8::FunctionTemplate> t =
     NewFunctionTemplate(isolate,
                         slow_callback,
+                        data,
                         Local<v8::Signature>(),
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasNoSideEffect,
@@ -813,11 +826,13 @@ void SetFastMethodNoSideEffect(Isolate* isolate,
 void SetMethodNoSideEffect(Local<v8::Context> context,
                            Local<v8::Object> that,
                            const char* name,
-                           v8::FunctionCallback callback) {
+                           v8::FunctionCallback callback,
+                           Local<v8::Value> data) {
     Isolate* isolate = context->GetIsolate();
     Local<v8::Function> function =
     NewFunctionTemplate(isolate,
                         callback,
+                        data,
                         Local<v8::Signature>(),
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasNoSideEffect)
@@ -833,10 +848,12 @@ void SetMethodNoSideEffect(Local<v8::Context> context,
 void SetMethodNoSideEffect(Isolate* isolate,
                            Local<v8::Template> that,
                            const char* name,
-                           v8::FunctionCallback callback) {
+                           v8::FunctionCallback callback,
+                           Local<v8::Value> data) {
     Local<v8::FunctionTemplate> t =
     NewFunctionTemplate(isolate,
                         callback,
+                        data,
                         Local<v8::Signature>(),
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasNoSideEffect);
@@ -849,11 +866,13 @@ void SetMethodNoSideEffect(Isolate* isolate,
 void SetProtoMethod(v8::Isolate* isolate,
                     Local<v8::FunctionTemplate> that,
                     const char* name,
-                    v8::FunctionCallback callback) {
+                    v8::FunctionCallback callback,
+                    Local<v8::Value> data) {
     Local<v8::Signature> signature = v8::Signature::New(isolate, that);
     Local<v8::FunctionTemplate> t =
     NewFunctionTemplate(isolate,
                         callback,
+                        data,
                         signature,
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasSideEffect);
@@ -867,11 +886,13 @@ void SetProtoMethod(v8::Isolate* isolate,
 void SetProtoMethodNoSideEffect(v8::Isolate* isolate,
                                 Local<v8::FunctionTemplate> that,
                                 const char* name,
-                                v8::FunctionCallback callback) {
+                                v8::FunctionCallback callback,
+                                Local<v8::Value> data) {
     Local<v8::Signature> signature = v8::Signature::New(isolate, that);
     Local<v8::FunctionTemplate> t =
     NewFunctionTemplate(isolate,
                         callback,
+                        data,
                         signature,
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasNoSideEffect);
@@ -885,11 +906,13 @@ void SetProtoMethodNoSideEffect(v8::Isolate* isolate,
 void SetInstanceMethod(v8::Isolate* isolate,
                        Local<v8::FunctionTemplate> that,
                        const char* name,
-                       v8::FunctionCallback callback) {
+                       v8::FunctionCallback callback,
+                       Local<v8::Value> data) {
     Local<v8::Signature> signature = v8::Signature::New(isolate, that);
     Local<v8::FunctionTemplate> t =
     NewFunctionTemplate(isolate,
                         callback,
+                        data,
                         signature,
                         v8::ConstructorBehavior::kThrow,
                         v8::SideEffectType::kHasSideEffect);

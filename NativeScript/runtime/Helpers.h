@@ -243,6 +243,7 @@ inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate,
 v8::Local<v8::FunctionTemplate> NewFunctionTemplate(
                                                     v8::Isolate* isolate,
                                                     v8::FunctionCallback callback,
+                                                    v8::Local<v8::Value> data = v8::Local<v8::Value>(),
                                                     v8::Local<v8::Signature> signature = v8::Local<v8::Signature>(),
                                                     v8::ConstructorBehavior behavior = v8::ConstructorBehavior::kAllow,
                                                     v8::SideEffectType side_effect = v8::SideEffectType::kHasSideEffect,
@@ -251,53 +252,64 @@ v8::Local<v8::FunctionTemplate> NewFunctionTemplate(
 void SetMethod(v8::Local<v8::Context> context,
                v8::Local<v8::Object> that,
                const char* name,
-               v8::FunctionCallback callback);
+               v8::FunctionCallback callback,
+               v8::Local<v8::Value> data = v8::Local<v8::Value>());
 // Similar to SetProtoMethod but without receiver signature checks.
 void SetMethod(v8::Isolate* isolate,
                v8::Local<v8::Template> that,
                const char* name,
-               v8::FunctionCallback callback);
+               v8::FunctionCallback callback,
+               v8::Local<v8::Value> data = v8::Local<v8::Value>());
 void SetFastMethod(v8::Isolate* isolate,
                    v8::Local<v8::Template> that,
                    const char* name,
                    v8::FunctionCallback slow_callback,
-                   const v8::CFunction* c_function);
+                   const v8::CFunction* c_function,
+                   v8::Local<v8::Value> data = v8::Local<v8::Value>());
 void SetFastMethod(v8::Local<v8::Context> context,
                    v8::Local<v8::Object> that,
                    const char* name,
                    v8::FunctionCallback slow_callback,
-                   const v8::CFunction* c_function);
+                   const v8::CFunction* c_function,
+                   v8::Local<v8::Value> data = v8::Local<v8::Value>());
 void SetFastMethodNoSideEffect(v8::Isolate* isolate,
                                v8::Local<v8::Template> that,
                                const char* name,
                                v8::FunctionCallback slow_callback,
-                               const v8::CFunction* c_function);
+                               const v8::CFunction* c_function,
+                               v8::Local<v8::Value> data = v8::Local<v8::Value>());
 void SetFastMethodNoSideEffect(v8::Local<v8::Context> context,
                                v8::Local<v8::Object> that,
                                const char* name,
                                v8::FunctionCallback slow_callback,
-                               const v8::CFunction* c_function);
+                               const v8::CFunction* c_function,
+                               v8::Local<v8::Value> data = v8::Local<v8::Value>());
 void SetProtoMethod(v8::Isolate* isolate,
                     v8::Local<v8::FunctionTemplate> that,
                     const char* name,
-                    v8::FunctionCallback callback);
+                    v8::FunctionCallback callback,
+                    v8::Local<v8::Value> data = v8::Local<v8::Value>());
 void SetInstanceMethod(v8::Isolate* isolate,
                        v8::Local<v8::FunctionTemplate> that,
                        const char* name,
-                       v8::FunctionCallback callback);
+                       v8::FunctionCallback callback,
+                       v8::Local<v8::Value> data = v8::Local<v8::Value>());
 // Safe variants denote the function has no side effects.
 void SetMethodNoSideEffect(v8::Local<v8::Context> context,
                            v8::Local<v8::Object> that,
                            const char* name,
-                           v8::FunctionCallback callback);
+                           v8::FunctionCallback callback,
+                           v8::Local<v8::Value> data = v8::Local<v8::Value>());
 void SetProtoMethodNoSideEffect(v8::Isolate* isolate,
                                 v8::Local<v8::FunctionTemplate> that,
                                 const char* name,
-                                v8::FunctionCallback callback);
+                                v8::FunctionCallback callback,
+                                v8::Local<v8::Value> data = v8::Local<v8::Value>());
 void SetMethodNoSideEffect(v8::Isolate* isolate,
                            v8::Local<v8::Template> that,
                            const char* name,
-                           v8::FunctionCallback callback);
+                           v8::FunctionCallback callback,
+                           v8::Local<v8::Value> data = v8::Local<v8::Value>());
 enum class SetConstructorFunctionFlag {
     NONE,
     SET_CLASS_NAME,
