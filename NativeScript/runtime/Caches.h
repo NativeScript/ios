@@ -48,6 +48,8 @@ public:
 
     Caches(v8::Isolate* isolate, const int& isolateId_ = -1);
     ~Caches();
+    
+    bool isWorker = false;
 
     static std::shared_ptr<ConcurrentMap<std::string, const Meta*>> Metadata;
     static std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> Workers;

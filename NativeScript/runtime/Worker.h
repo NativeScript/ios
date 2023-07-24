@@ -8,6 +8,7 @@ namespace tns {
 class Worker {
 public:
     static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate, bool isWorkerThread);
+    static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     static std::vector<std::string> GlobalFunctions;
 private:
     static void ConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
