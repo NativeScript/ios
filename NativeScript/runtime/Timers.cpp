@@ -210,6 +210,7 @@ void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value>& args, bool repe
         }
         
         auto task = std::make_shared<TimerTask>(isolate, handler, timeout, repeatable, argArray, id, now_ms());
+        task->repeats_ = repeatable;
         
         CFRunLoopTimerContext timerContext = {0, NULL, NULL, NULL, NULL};
         auto timerData = new TimerContext();
@@ -223,8 +224,8 @@ void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value>& args, bool repe
         // so if by our manual release the retain is 0 then we need to cleanup the TimerContext
         TimerContext::TimerRetain(timerData);
         
-        
-        auto timeoutInSeconds = timeout / 1000.f;
+        // timeout should be bigger than 0 if it's repeatable and 0
+        auto timeoutInSeconds = repeatable && timeout == 0 ? 0.0000001f : timeout / 1000.f;
         auto timer = CFRunLoopTimerCreate(kCFAllocatorDefault,
                                           CFAbsoluteTimeGetCurrent() + timeoutInSeconds,
                                           repeatable ? timeoutInSeconds : 0,
