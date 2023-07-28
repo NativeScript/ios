@@ -206,10 +206,16 @@ void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value>& args, bool repe
                                                                                          otherArgLength);
             for (int i = 0; i < otherArgLength; i++) {
                 (*argArray)[i] = std::make_shared<Persistent<Value>>(isolate, args[i + 2]);
+#ifdef DEBUG
+                (*argArray)[i]->AnnotateStrongRetainer("timer_argument");
+#endif
             }
         }
         
         auto task = std::make_shared<TimerTask>(isolate, handler, timeout, repeatable, argArray, id, now_ms());
+#ifdef DEBUG
+        task->callback_.AnnotateStrongRetainer("timer");
+#endif
         task->repeats_ = repeatable;
         
         CFRunLoopTimerContext timerContext = {0, NULL, NULL, NULL, NULL};
