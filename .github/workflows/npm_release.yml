@@ -3,7 +3,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
 
 env:
   NPM_TAG: "next"
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
       - name: Install Python
         uses: actions/setup-python@v4
         with:
@@ -60,7 +60,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: npm-package
-          path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
+          path: dist/nativescript-ios-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
       - name: Upload dSYMs artifact
         uses: actions/upload-artifact@v3
         with:
@@ -115,8 +115,8 @@ jobs:
       - build
       - test
     permissions:
-     contents: read
-     id-token: write
+      contents: read
+      id-token: write
     env:
       NPM_VERSION: ${{needs.build.outputs.npm_version}}
       NPM_TAG: ${{needs.build.outputs.npm_tag}}
@@ -124,7 +124,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
       - uses: actions/download-artifact@v3
         with:
           name: npm-package
@@ -172,3 +172,4 @@ jobs:
         with:
           artifacts: "dist/nativescript-ios-*.tgz,dist/dSYMs/*.zip"
           bodyFile: "body.md"
+          prerelease: ${{needs.build.outputs.npm_tag != 'latest'}}
