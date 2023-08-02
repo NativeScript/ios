@@ -1,3 +1,22 @@
+## [8.5.3-dev.0](https://github.com/NativeScript/ios/compare/v8.5.2...v8.5.3-dev.0) (2023-08-02)
+
+
+### Bug Fixes
+
+* delay isolate disposal when isolate is in use ([5a6c2ee](https://github.com/NativeScript/ios/commit/5a6c2ee5efa0c557c94ae56da0d3b3a31911d1b8))
+* fix setInterval not repeating correctly ([022893f](https://github.com/NativeScript/ios/commit/022893f1dcd9a7649db73e9735ff12e9246b3585))
+* prevent JS function to native block leak ([0304f25](https://github.com/NativeScript/ios/commit/0304f254ad84a400c158ce97e8dfc19f5b21abeb))
+* validate if isolate is alive ([a8a9b4f](https://github.com/NativeScript/ios/commit/a8a9b4ffd2b5d2a2148e385f0d479f986780c143))
+
+
+### Features
+
+* add native timers ([#221](https://github.com/NativeScript/ios/issues/221)) ([119470f](https://github.com/NativeScript/ios/commit/119470f249c5aa85c4c2d0b1c9b5b691003c1ec7))
+* add timer strong retainer annotation ([efef961](https://github.com/NativeScript/ios/commit/efef961a67519aed881637ac0291894f3325b111))
+* use node logic for globals and modules ([#215](https://github.com/NativeScript/ios/issues/215)) ([a66cc42](https://github.com/NativeScript/ios/commit/a66cc42c768ee7712d1c1f441b8c4e8e88a19eca))
+
+
+
 ## [8.5.2](https://github.com/NativeScript/ios/compare/v8.5.1...v8.5.2) (2023-05-24)
 
 
