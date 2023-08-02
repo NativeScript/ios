@@ -96,4 +96,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: test-results
-          path: $HOME/test_results.xcresult
+          path: ${{env.HOME}}/test_results.xcresult
