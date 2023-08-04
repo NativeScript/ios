@@ -1,3 +1,13 @@
+## [8.5.3-dev.1](https://github.com/NativeScript/ios/compare/v8.5.3-dev.0...v8.5.3-dev.1) (2023-08-04)
+
+
+### Bug Fixes
+
+* bridge release adapters ([b68f454](https://github.com/NativeScript/ios/commit/b68f454b861a5dc51a9d6ce1eac8af1a394c7787))
+* don't suppress timer exceptions ([0c4b819](https://github.com/NativeScript/ios/commit/0c4b819941b0327e572772018298cf9cf181436e))
+
+
+
 ## [8.5.3-dev.0](https://github.com/NativeScript/ios/compare/v8.5.2...v8.5.3-dev.0) (2023-08-02)
 
 
