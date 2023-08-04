@@ -172,7 +172,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: NativeScript-dSYMs
-          path: dist
+          path: dist/dSYMs
       - name: Zip dSYMs
         working-directory: dist/dSYMs
         run: find . -maxdepth 1 -name '*.dSYM' -print | xargs -I@ zip -r @.zip @
