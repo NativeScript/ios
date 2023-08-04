@@ -161,7 +161,6 @@ void TimerCallback(CFRunLoopTimerRef timer, void *info) {
     v8::Local<v8::Function> cb = task->callback_.Get(isolate);
     v8::Local<v8::Context> context = cb->GetCreationContextChecked();
     Context::Scope context_scope(context);
-    TryCatch tc(isolate);
     auto argc = task->args_.get() == nullptr ? 0 : task->args_->size();
     if (argc > 0) {
         Local<Value> argv[argc];
@@ -172,11 +171,11 @@ void TimerCallback(CFRunLoopTimerRef timer, void *info) {
     } else {
         (void)cb->Call(context, context->Global(), 0, nullptr);
     }
-    tc.ReThrow();
     
     if (!task->repeats_) {
         data->state->removeTask(task);
     }
+    
 }
 
 void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value>& args, bool repeatable) {
