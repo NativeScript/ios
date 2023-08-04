@@ -591,16 +591,16 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         if ((obj->IsArrayBuffer() || obj->IsArrayBufferView()) && !isNSArray) {
             Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
             NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
-            Interop::SetValue(dest, adapter);
+            Interop::SetValue(dest, CFBridgingRelease(adapter));
             // CFAutorelease(adapter);
         } else if (tns::IsArrayOrArrayLike(isolate, obj)) {
             Local<v8::Array> array = Interop::ToArray(obj);
             ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
-            Interop::SetValue(dest, adapter);
+            Interop::SetValue(dest, CFBridgingRelease(adapter));
             // CFAutorelease(adapter);
         } else {
             DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
-            Interop::SetValue(dest, adapter);
+            Interop::SetValue(dest, CFBridgingRelease(adapter));
             // CFAutorelease(adapter);
         }
     } else {
