@@ -1,3 +1,12 @@
+## [8.5.3-dev.2](https://github.com/NativeScript/ios/compare/v8.5.3-dev.1...v8.5.3-dev.2) (2023-08-07)
+
+
+### Bug Fixes
+
+* adapter cleanup and thread safety ([7560ef8](https://github.com/NativeScript/ios/commit/7560ef8c7afe97103a698f22b7372c4c43dbea11))
+
+
+
 ## [8.5.3-dev.1](https://github.com/NativeScript/ios/compare/v8.5.3-dev.0...v8.5.3-dev.1) (2023-08-04)
 
 
