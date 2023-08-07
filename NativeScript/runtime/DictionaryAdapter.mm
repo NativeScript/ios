@@ -4,6 +4,7 @@
 #include "Helpers.h"
 #include "Interop.h"
 #include "Caches.h"
+#include "IsolateWrapper.h"
 
 using namespace v8;
 using namespace tns;
@@ -15,30 +16,31 @@ using namespace tns;
 @end
 
 @implementation DictionaryAdapterMapKeysEnumerator {
-    Isolate* isolate_;
+    IsolateWrapper* wrapper_;
     uint32_t index_;
     std::shared_ptr<Persistent<Value>> map_;
-    std::shared_ptr<Caches> cache_;
 }
 
 - (instancetype)initWithMap:(std::shared_ptr<Persistent<Value>>)map isolate:(Isolate*)isolate cache:(std::shared_ptr<Caches>)cache {
     if (self) {
-        self->isolate_ = isolate;
+        self->wrapper_ = new IsolateWrapper(isolate);
         self->index_ = 0;
         self->map_ = map;
-        self->cache_ = cache;
     }
 
     return self;
 }
 
 - (id)nextObject {
-    Isolate* isolate = self->isolate_;
+    if (!wrapper_->IsValid()) {
+        return nil;
+    }
+    Isolate* isolate = wrapper_->Isolate();
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
-    Local<Context> context = self->cache_->GetContext();
+    Local<Context> context = wrapper_->GetCache()->GetContext();
     Local<v8::Array> array = self->map_->Get(isolate).As<Map>()->AsArray();
 
     if (self->index_ < array->Length() - 1) {
@@ -46,7 +48,7 @@ using namespace tns;
         bool success = array->Get(context, self->index_).ToLocal(&key);
         tns::Assert(success, isolate);
         self->index_ += 2;
-        NSString* result = tns::ToNSString(self->isolate_, key);
+        NSString* result = tns::ToNSString(isolate, key);
         return result;
     }
 
@@ -54,9 +56,8 @@ using namespace tns;
 }
 
 - (void)dealloc {
-    self->isolate_ = nullptr;
     self->map_ = nil;
-    self->cache_ = nil;
+    delete self->wrapper_;
     
     [super dealloc];
 }
@@ -71,49 +72,51 @@ using namespace tns;
 @end
 
 @implementation DictionaryAdapterObjectKeysEnumerator {
-    Isolate* isolate_;
+    IsolateWrapper* wrapper_;
     std::shared_ptr<Persistent<Value>> dictionary_;
     NSUInteger index_;
-    std::shared_ptr<Caches> cache_;
 }
 
 - (instancetype)initWithProperties:(std::shared_ptr<Persistent<Value>>)dictionary isolate:(Isolate*)isolate cache:(std::shared_ptr<Caches>)cache {
     if (self) {
-        self->isolate_ = isolate;
+        self->wrapper_ = new IsolateWrapper(isolate);
         self->dictionary_ = dictionary;
         self->index_ = 0;
-        self->cache_ = cache;
     }
 
     return self;
 }
 
 - (Local<v8::Array>)getProperties {
-    v8::Locker locker(self->isolate_);
-    Isolate::Scope isolate_scope(self->isolate_);
-    EscapableHandleScope handle_scope(self->isolate_);
+    Isolate* isolate = wrapper_->Isolate();
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    EscapableHandleScope handle_scope(isolate);
 
-    Local<Context> context = self->cache_->GetContext();
+    Local<Context> context = wrapper_->GetCache()->GetContext();
     Local<v8::Array> properties;
-    Local<Object> dictionary = self->dictionary_->Get(self->isolate_).As<Object>();
-    tns::Assert(dictionary->GetOwnPropertyNames(context).ToLocal(&properties), self->isolate_);
+    Local<Object> dictionary = self->dictionary_->Get(isolate).As<Object>();
+    tns::Assert(dictionary->GetOwnPropertyNames(context).ToLocal(&properties), isolate);
     return handle_scope.Escape(properties);
 }
 
 - (id)nextObject {
-    Isolate* isolate = self->isolate_;
+    if (!wrapper_->IsValid()) {
+        return nil;
+    }
+    Isolate* isolate = wrapper_->Isolate();
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
-    Local<Context> context = self->cache_->GetContext();
+    Local<Context> context = wrapper_->GetCache()->GetContext();
     Local<v8::Array> properties = [self getProperties];
     if (self->index_ < properties->Length()) {
         Local<Value> value;
         bool success = properties->Get(context, (uint)self->index_).ToLocal(&value);
         tns::Assert(success, isolate);
         self->index_++;
-        std::string result = tns::ToString(self->isolate_, value);
+        std::string result = tns::ToString(isolate, value);
         return [NSString stringWithUTF8String:result.c_str()];
     }
 
@@ -121,19 +124,22 @@ using namespace tns;
 }
 
 - (NSArray*)allObjects {
-    Isolate* isolate = self->isolate_;
+    if (!wrapper_->IsValid()) {
+        return nil;
+    }
+    Isolate* isolate = wrapper_->Isolate();
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
-    Local<Context> context = self->cache_->GetContext();
+    Local<Context> context = wrapper_->GetCache()->GetContext();
     NSMutableArray* array = [NSMutableArray array];
     Local<v8::Array> properties = [self getProperties];
     for (int i = 0; i < properties->Length(); i++) {
         Local<Value> value;
         bool success = properties->Get(context, i).ToLocal(&value);
         tns::Assert(success, isolate);
-        std::string result = tns::ToString(self->isolate_, value);
+        std::string result = tns::ToString(isolate, value);
         [array addObject:[NSString stringWithUTF8String:result.c_str()]];
     }
 
@@ -141,9 +147,8 @@ using namespace tns;
 }
 
 - (void)dealloc {
-    self->isolate_ = nullptr;
     self->dictionary_ = nil;
-    self->cache_ = nil;
+    delete self->wrapper_;
     
     [super dealloc];
 }
@@ -151,18 +156,15 @@ using namespace tns;
 @end
 
 @implementation DictionaryAdapter {
-    Isolate* isolate_;
+    IsolateWrapper* wrapper_;
     std::shared_ptr<Persistent<Value>> object_;
-    std::shared_ptr<Caches> cache_;
-    NSEnumerator* enumerator_;
 }
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
     if (self) {
-        self->isolate_ = isolate;
-        self->cache_ = Caches::Get(isolate);
+        self->wrapper_ = new IsolateWrapper(isolate);
         self->object_ = std::make_shared<Persistent<Value>>(isolate, jsObject);
-        self->cache_->Instances.emplace(self, self->object_);
+        self->wrapper_->GetCache()->Instances.emplace(self, self->object_);
         tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
     }
 
@@ -170,19 +172,23 @@ using namespace tns;
 }
 
 - (NSUInteger)count {
-    v8::Locker locker(self->isolate_);
-    Isolate::Scope isolate_scope(self->isolate_);
-    HandleScope handle_scope(self->isolate_);
+    if (!wrapper_->IsValid()) {
+        return 0;
+    }
+    Isolate* isolate = wrapper_->Isolate();
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
 
-    Local<Object> obj = self->object_->Get(self->isolate_).As<Object>();
+    Local<Object> obj = self->object_->Get(isolate).As<Object>();
 
     if (obj->IsMap()) {
         return obj.As<Map>()->Size();
     }
 
-    Local<Context> context = self->cache_->GetContext();
+    Local<Context> context = wrapper_->GetCache()->GetContext();
     Local<v8::Array> properties;
-    tns::Assert(obj->GetOwnPropertyNames(context).ToLocal(&properties), self->isolate_);
+    tns::Assert(obj->GetOwnPropertyNames(context).ToLocal(&properties), isolate);
 
     uint32_t length = properties->Length();
 
@@ -190,13 +196,16 @@ using namespace tns;
 }
 
 - (id)objectForKey:(id)aKey {
-    Isolate* isolate = self->isolate_;
+    if (!wrapper_->IsValid()) {
+        return nil;
+    }
+    Isolate* isolate = wrapper_->Isolate();
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
-    Local<Context> context = self->cache_->GetContext();
-    Local<Object> obj = self->object_->Get(self->isolate_).As<Object>();
+    Local<Context> context = wrapper_->GetCache()->GetContext();
+    Local<Object> obj = self->object_->Get(isolate).As<Object>();
 
     Local<Value> value;
     if ([aKey isKindOfClass:[NSNumber class]]) {
@@ -226,42 +235,37 @@ using namespace tns;
 }
 
 - (NSEnumerator*)keyEnumerator {
-    v8::Locker locker(self->isolate_);
-    Isolate::Scope isolate_scope(self->isolate_);
-    HandleScope handle_scope(self->isolate_);
+    if (!wrapper_->IsValid()) {
+        return nil;
+    }
+    Isolate* isolate = wrapper_->Isolate();
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
 
-    Local<Value> obj = self->object_->Get(self->isolate_);
+    Local<Value> obj = self->object_->Get(isolate);
 
     if (obj->IsMap()) {
-        self->enumerator_ = [[[DictionaryAdapterMapKeysEnumerator alloc] initWithMap:self->object_ isolate:self->isolate_ cache:self->cache_] autorelease];
-        
-        return self->enumerator_;
+        return [[[DictionaryAdapterMapKeysEnumerator alloc] initWithMap:self->object_ isolate:isolate cache:wrapper_->GetCache()] autorelease];
     }
-
-    self->enumerator_ = [[[DictionaryAdapterObjectKeysEnumerator alloc] initWithProperties:self->object_ isolate:self->isolate_ cache:self->cache_] autorelease];
     
-    return self->enumerator_;
+    return [[[DictionaryAdapterObjectKeysEnumerator alloc] initWithProperties:self->object_ isolate:isolate cache:wrapper_->GetCache()] autorelease];
 }
 
 - (void)dealloc {
-    self->cache_->Instances.erase(self);
-    Local<Value> value = self->object_->Get(self->isolate_);
-    BaseDataWrapper* wrapper = tns::GetValue(self->isolate_, value);
-    if (wrapper != nullptr) {
-        tns::DeleteValue(self->isolate_, value);
-        delete wrapper;
+    if(wrapper_->IsValid()) {
+        Isolate* isolate = wrapper_->Isolate();
+        wrapper_->GetCache()->Instances.erase(self);
+        Local<Value> value = self->object_->Get(isolate);
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+        if (wrapper != nullptr) {
+            tns::DeleteValue(isolate, value);
+            delete wrapper;
+        }
     }
-    self->object_->Reset();
-    self->isolate_ = nullptr;
-    self->cache_ = nil;
     self->object_ = nil;
-    
-    if (self->enumerator_ != nullptr) {
-        // CFAutorelease(self->enumerator_);
-        self->enumerator_ = nullptr;
-    }
-    self->cache_ = nullptr;
     self->object_ = nullptr;
+    delete self->wrapper_;
     
     [super dealloc];
 }

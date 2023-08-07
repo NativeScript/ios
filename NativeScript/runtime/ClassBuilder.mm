@@ -227,7 +227,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         cache->CtorFuncs.emplace(extendedClassName, poExtendedClassCtorFunc);
 
         IMP newInitialize = imp_implementationWithBlock(^(id self) {
-            if (!Runtime::IsAlive(isolate) || !isolateWrapper.IsValid()) {
+            if (!isolateWrapper.IsValid()) {
                 return;
             }
             v8::Locker locker(isolate);
@@ -264,7 +264,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         /// in order to make both of them destroyable/GC-able. When the JavaScript object is GC-ed we release the native counterpart as well.
         void (*retain)(id, SEL) = (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
         IMP newRetain = imp_implementationWithBlock(^(id self) {
-            if (!Runtime::IsAlive(isolate) || !isolateWrapper.IsValid()) {
+            if (!isolateWrapper.IsValid()) {
                 return retain(self, @selector(retain));
             }
             if ([self retainCount] == 1) {
@@ -289,7 +289,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
 
         void (*release)(id, SEL) = (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
         IMP newRelease = imp_implementationWithBlock(^(id self) {
-            if (!Runtime::IsAlive(isolate) || !isolateWrapper.IsValid()) {
+            if (!isolateWrapper.IsValid()) {
                 release(self, @selector(release));
                 return;
             }
