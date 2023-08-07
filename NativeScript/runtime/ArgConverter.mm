@@ -93,7 +93,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
     Isolate* isolate = data->isolateWrapper_.Isolate();
 
-    if (!Runtime::IsAlive(isolate) || !data->isolateWrapper_.IsValid()) {
+    if (!data->isolateWrapper_.IsValid()) {
         memset(retValue, 0, cif->rtype->size);
         return;
     }

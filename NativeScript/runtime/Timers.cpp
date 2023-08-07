@@ -145,7 +145,7 @@ void TimerCallback(CFRunLoopTimerRef timer, void *info) {
     // we check for this first so we can be 100% sure that this task is still alive
     // since we're always dealing with the runtime's runloop, it should always work
     // if we even support firing the timers in a another runloop, then this is useful as it'll avoid use-after-free issues
-    if (!task->queued_ || !Runtime::IsAlive(task->isolate_) || !task->wrapper.IsValid()) {
+    if (!task->queued_ || !task->wrapper.IsValid()) {
         return;
     }
     auto isolate = task->isolate_;
