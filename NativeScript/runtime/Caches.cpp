@@ -1,5 +1,6 @@
 #include "Caches.h"
 #include "Constants.h"
+#include "DataWrapper.h"
 
 using namespace v8;
 
@@ -48,5 +49,17 @@ Local<Context> Caches::GetContext() {
 
 std::shared_ptr<ConcurrentMap<std::string, const Meta*>> Caches::Metadata = std::make_shared<ConcurrentMap<std::string, const Meta*>>();
 std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> Caches::Workers = std::make_shared<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>>();
+
+void Caches::TraceGCProtectedWrappers(cppgc::Visitor* visitor) {
+    // It may make sense to have a separate collection of GcProtected objects.
+    for (auto pair : Instances) {
+        Local<Value> value = pair.second->Get(isolate_);
+        auto* wrapper = ExtractWrapper<BaseDataWrapper>(value);
+        if (wrapper && wrapper->IsGcProtected()) {
+            auto ref = ToTraced<Object>(isolate_, value.As<Object>());
+            static_cast<JSVisitor*>(visitor)->Trace(ref);
+        }
+    }
+}
 
 }

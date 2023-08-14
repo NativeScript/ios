@@ -13,6 +13,8 @@
 		3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CBFF7432971C1C200C5DE36 /* ArcMacro.h */; };
 		3CD1D9C129AA2C14004C1C21 /* DisposerPHV.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */; };
 		3CD1D9C229AA2C14004C1C21 /* DisposerPHV.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */; };
+		5B10CB942A83F42E00F8CBB7 /* GCProtectedSet.h in Headers */ = {isa = PBXBuildFile; fileRef = 5B10CB922A83F42E00F8CBB7 /* GCProtectedSet.h */; };
+		5B10CB952A83F42E00F8CBB7 /* GCProtectedSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5B10CB932A83F42E00F8CBB7 /* GCProtectedSet.cpp */; };
 		5B90913E2A0D52B70092E1F1 /* Common.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5B90913D2A0D52B70092E1F1 /* Common.mm */; };
 		6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9C2291FE29F00B0ED7C /* V8Runtime.h */; };
 		6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */; };
@@ -424,6 +426,8 @@
 		3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DisposerPHV.mm; sourceTree = "<group>"; };
 		3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DisposerPHV.h; sourceTree = "<group>"; };
 		3CEF9CCC28F896B70056BA45 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SpinLock.h; sourceTree = "<group>"; };
+		5B10CB922A83F42E00F8CBB7 /* GCProtectedSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GCProtectedSet.h; sourceTree = "<group>"; };
+		5B10CB932A83F42E00F8CBB7 /* GCProtectedSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GCProtectedSet.cpp; sourceTree = "<group>"; };
 		5B90913D2A0D52B70092E1F1 /* Common.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Common.mm; sourceTree = "<group>"; };
 		6573B9C2291FE29F00B0ED7C /* V8Runtime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = V8Runtime.h; sourceTree = "<group>"; };
 		6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JSIV8ValueConverter.cpp; sourceTree = "<group>"; };
@@ -1320,6 +1324,8 @@
 		C2DDEB3B229EAB8600345BFE /* runtime */ = {
 			isa = PBXGroup;
 			children = (
+				5B10CB932A83F42E00F8CBB7 /* GCProtectedSet.cpp */,
+				5B10CB922A83F42E00F8CBB7 /* GCProtectedSet.h */,
 				C2DDEB66229EAC8100345BFE /* ArgConverter.h */,
 				3CBFF7432971C1C200C5DE36 /* ArcMacro.h */,
 				C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */,
@@ -1507,6 +1513,7 @@
 				C22C092322CA3F370080D176 /* Worker.h in Headers */,
 				6573B9E6291FE2A700B0ED7C /* instrumentation.h in Headers */,
 				6573B9EA291FE2A700B0ED7C /* jsilib.h in Headers */,
+				5B10CB942A83F42E00F8CBB7 /* GCProtectedSet.h in Headers */,
 				6573B9D1291FE29F00B0ED7C /* V8PointerValue.h in Headers */,
 				C247C16622F82842001D2CA2 /* v8-version.h in Headers */,
 				C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */,
@@ -2086,6 +2093,7 @@
 				C2D21600248AAAD900EDC646 /* Constants.cpp in Sources */,
 				C2DDEB9E229EAC8300345BFE /* SymbolLoader.mm in Sources */,
 				C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */,
+				5B10CB952A83F42E00F8CBB7 /* GCProtectedSet.cpp in Sources */,
 				C2DDEB99229EAC8300345BFE /* Metadata.mm in Sources */,
 				6573B9D4291FE29F00B0ED7C /* V8RuntimeFactory.cpp in Sources */,
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
