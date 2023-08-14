@@ -4,6 +4,7 @@
 #include "Caches.h"
 #include "Console.h"
 #include "ArgConverter.h"
+#include "GCProtectedSet.h"
 #include "Interop.h"
 #include "NativeScriptException.h"
 #include "InlineFunctions.h"
@@ -196,6 +197,8 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     TSHelpers::Init(context);
 
     InlineFunctions::Init(context);
+
+    GCProtectedSet::Init(context);
 
     cache->SetContext(context);
 

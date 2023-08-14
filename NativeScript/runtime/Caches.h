@@ -123,6 +123,8 @@ public:
     void registerCacheBoundObject(T *ptr) {
         this->cacheBoundObjects_.push_back(unique_void(ptr));
     }
+
+    void TraceGCProtectedWrappers(cppgc::Visitor* visitor);
 private:
     v8::Isolate* isolate_;
     std::shared_ptr<v8::Persistent<v8::Context>> context_;
