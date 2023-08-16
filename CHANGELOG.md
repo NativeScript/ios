@@ -1,3 +1,12 @@
+## [8.5.3-dev.3](https://github.com/NativeScript/ios/compare/v8.5.3-dev.2...v8.5.3-dev.3) (2023-08-16)
+
+
+### Bug Fixes
+
+* safeguards on dictionary adapter dealloc ([03895a0](https://github.com/NativeScript/ios/commit/03895a039688182ab1f5d9b87304b71c9daf405e))
+
+
+
 ## [8.5.3-dev.2](https://github.com/NativeScript/ios/compare/v8.5.3-dev.1...v8.5.3-dev.2) (2023-08-07)
 
 
