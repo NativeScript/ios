@@ -134,6 +134,7 @@ private:
     static void InitializeStruct(v8::Local<v8::Context> context, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer, ptrdiff_t& position);
     static void RegisterInteropType(v8::Local<v8::Context> context, v8::Local<v8::Object> types, std::string name, PrimitiveDataWrapper* wrapper, bool autoDelete = true);
     static void RegisterBufferFromDataFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
+    static void RegisterStringFromCString(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
     static void RegisterHandleOfFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
     static void RegisterAllocFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
     static void RegisterFreeFunction(v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
