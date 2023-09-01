@@ -303,6 +303,12 @@ void Runtime::DefineDrainMicrotaskMethod(v8::Isolate* isolate, v8::Local<v8::Obj
 }
 
 bool Runtime::IsAlive(const Isolate* isolate) {
+    // speedup lookup by avoiding locking if thread locals match
+    // note: this can be a problem when the Runtime is deleted in a different thread that it was created
+    // which could happen under some specific embedding scenarios
+    if (Isolate::TryGetCurrent() == isolate || (currentRuntime_ != nullptr && currentRuntime_->GetIsolate() == isolate)) {
+        return true;
+    }
     SpinLock lock(isolatesMutex_);
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
 }
