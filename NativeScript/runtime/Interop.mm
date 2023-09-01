@@ -37,7 +37,7 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .dispose = [](JSBlock* block) {
         if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
-            if (Runtime::IsAlive(wrapper->isolateWrapper_.Isolate()) && wrapper->isolateWrapper_.IsValid()) {
+            if (wrapper->isolateWrapper_.IsValid()) {
                 Isolate* isolate = wrapper->isolateWrapper_.Isolate();
                 v8::Locker locker(isolate);
                 Isolate::Scope isolate_scope(isolate);
