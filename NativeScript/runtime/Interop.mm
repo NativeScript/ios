@@ -37,7 +37,7 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .dispose = [](JSBlock* block) {
         if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
-            if (wrapper->isolateWrapper_.IsValid()) {
+            if (Runtime::IsAlive(wrapper->isolateWrapper_.Isolate()) && wrapper->isolateWrapper_.IsValid()) {
                 Isolate* isolate = wrapper->isolateWrapper_.Isolate();
                 v8::Locker locker(isolate);
                 Isolate::Scope isolate_scope(isolate);
@@ -80,6 +80,8 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
 
     *blockPointer = {
         .isa = nullptr,
+        // this block is created with a refcount of 1
+        // this means we "own" it and need to free it
         .flags = JSBlock::BLOCK_HAS_COPY_DISPOSE | JSBlock::BLOCK_NEEDS_FREE | (1 /* ref count */ << 1),
         .reserved = 0,
         .invoke = (void*)result.first,
@@ -90,7 +92,8 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
 
     object_setClass((__bridge id)blockPointer, objc_getClass("__NSMallocBlock__"));
 
-    return blockPointer;
+    // transfer ownership back to ARC (see refcount comment above)
+    return CFBridgingRelease(blockPointer);
 }
 
 Local<Value> Interop::CallFunction(CMethodCall& methodCall) {
