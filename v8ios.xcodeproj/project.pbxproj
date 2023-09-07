@@ -16,6 +16,7 @@
 		5B10CB942A83F42E00F8CBB7 /* GCProtectedSet.h in Headers */ = {isa = PBXBuildFile; fileRef = 5B10CB922A83F42E00F8CBB7 /* GCProtectedSet.h */; };
 		5B10CB952A83F42E00F8CBB7 /* GCProtectedSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5B10CB932A83F42E00F8CBB7 /* GCProtectedSet.cpp */; };
 		5B90913E2A0D52B70092E1F1 /* Common.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5B90913D2A0D52B70092E1F1 /* Common.mm */; };
+		5B9D7C4A2A97E19000146C4C /* DataWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5B9D7C492A97E19000146C4C /* DataWrapper.mm */; };
 		6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9C2291FE29F00B0ED7C /* V8Runtime.h */; };
 		6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */; };
 		6573B9CF291FE29F00B0ED7C /* V8Runtime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9C4291FE29F00B0ED7C /* V8Runtime.cpp */; };
@@ -429,6 +430,7 @@
 		5B10CB922A83F42E00F8CBB7 /* GCProtectedSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GCProtectedSet.h; sourceTree = "<group>"; };
 		5B10CB932A83F42E00F8CBB7 /* GCProtectedSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GCProtectedSet.cpp; sourceTree = "<group>"; };
 		5B90913D2A0D52B70092E1F1 /* Common.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Common.mm; sourceTree = "<group>"; };
+		5B9D7C492A97E19000146C4C /* DataWrapper.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = DataWrapper.mm; sourceTree = "<group>"; };
 		6573B9C2291FE29F00B0ED7C /* V8Runtime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = V8Runtime.h; sourceTree = "<group>"; };
 		6573B9C3291FE29F00B0ED7C /* JSIV8ValueConverter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JSIV8ValueConverter.cpp; sourceTree = "<group>"; };
 		6573B9C4291FE29F00B0ED7C /* V8Runtime.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = V8Runtime.cpp; sourceTree = "<group>"; };
@@ -1324,6 +1326,7 @@
 		C2DDEB3B229EAB8600345BFE /* runtime */ = {
 			isa = PBXGroup;
 			children = (
+				5B9D7C492A97E19000146C4C /* DataWrapper.mm */,
 				5B10CB932A83F42E00F8CBB7 /* GCProtectedSet.cpp */,
 				5B10CB922A83F42E00F8CBB7 /* GCProtectedSet.h */,
 				C2DDEB66229EAC8100345BFE /* ArgConverter.h */,
@@ -2105,6 +2108,7 @@
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */,
 				F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */,
+				5B9D7C4A2A97E19000146C4C /* DataWrapper.mm in Sources */,
 				6573B9D3291FE29F00B0ED7C /* HostProxy.cpp in Sources */,
 				6573B9E5291FE2A700B0ED7C /* jsi.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,

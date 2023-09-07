@@ -203,19 +203,8 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
    id data = objcWrapper->Data();
    if (data != nil) {
-       std::shared_ptr<Caches> cache = Caches::Get(isolate);
-       auto it = cache->Instances.find(data);
-       if (it != cache->Instances.end()) {
-           ObjectWeakCallbackState* state = it->second->ClearWeak<ObjectWeakCallbackState>();
-           if (state != nullptr) {
-               delete state;
-           }
-           cache->Instances.erase(it);
-       }
+       objcWrapper->ReleaseNativeCounterpart();
 
-       [data dealloc];
-
-       delete wrapper;
        tns::SetValue(isolate, value.As<Object>(), nullptr);
    }
 }

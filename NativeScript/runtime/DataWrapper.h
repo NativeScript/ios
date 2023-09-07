@@ -224,6 +224,7 @@ public:
         : data_(data),
           isAdopted_(false) {
     }
+    ~PointerWrapper();
 
     const WrapperType Type() {
         return WrapperType::Pointer;
@@ -267,16 +268,7 @@ public:
           data_(nullptr),
           disposeData_(false) {
     }
-
-    ~ReferenceWrapper() {
-        if(this->value_ != nullptr) {
-            value_->Reset();
-            delete value_;
-        }
-        if (this->data_ != nullptr && disposeData_) {
-            std::free(this->data_);
-        }
-    }
+    ~ReferenceWrapper();
 
     const WrapperType Type() {
         return WrapperType::Reference;
@@ -397,10 +389,7 @@ public:
             parent_.Reset(isolate, parent);
     }
 
-    ~StructWrapper() {
-        parent_.Reset();
-        if (data_) free(data_);
-    }
+    ~StructWrapper();
 
     const WrapperType Type() {
         return WrapperType::Struct;
@@ -490,6 +479,11 @@ public:
     ObjCDataWrapper(id data, const TypeEncoding* typeEncoding = nullptr)
         : data_(data), typeEncoding_(typeEncoding) {
     }
+    ~ObjCDataWrapper() {
+        ReleaseNativeCounterpart();
+    }
+
+    void ReleaseNativeCounterpart();
 
     const WrapperType Type() {
         return WrapperType::ObjCObject;
@@ -605,6 +599,7 @@ public:
           typeEncoding_(typeEncoding),
           ownsBlock_(ownsBlock) {
     }
+    ~BlockWrapper();
 
     const WrapperType Type() {
         return WrapperType::Block;
@@ -644,6 +639,14 @@ public:
           data_(nullptr) {
     }
 
+    ~FunctionReferenceWrapper() {
+        // FIXME: Does this make sense? Shouldn't we sanitize the reference count
+        // before clobbering the shared pointer's contents?
+        if (function_ != nullptr) {
+           function_->Reset();
+        }
+    }
+
     const WrapperType Type() {
         return WrapperType::FunctionReference;
     }
@@ -673,6 +676,7 @@ public:
           innerTypeEncoding_(innerTypeEncoding),
           typeEncoding_(typeEncoding) {
     }
+    ~ExtVectorWrapper();
 
     const WrapperType Type() {
         return WrapperType::ExtVector;
@@ -702,6 +706,7 @@ private:
 class WorkerWrapper: public BaseDataWrapper {
 public:
     WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage);
+    ~WorkerWrapper();
 
     void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker, std::function<v8::Isolate* ()> func);
     void CallOnErrorHandlers(v8::TryCatch& tc);
