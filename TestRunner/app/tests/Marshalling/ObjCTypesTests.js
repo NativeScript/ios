@@ -65,6 +65,51 @@ describe(module.id, function () {
         expect(actual).toBe("simple block called");
     });
 
+    it("Block releases after call", function (done) {
+        const functionRef = new WeakRef(function () {
+            TNSLog('simple block called');
+        });
+        TNSObjCTypes.alloc().init().methodWithSimpleBlock(functionRef.deref());
+
+        var actual = TNSGetOutput();
+        expect(actual).toBe("simple block called");
+        gc();
+        setTimeout(() => {
+            gc();
+            expect(!!functionRef.deref()).toBe(false);
+            done();
+        });
+    });
+
+    it("Block retains and releases", function (done) {
+        const functionRef = new WeakRef(function () {
+            TNSLog('simple block called');
+        });
+        const instance = TNSObjCTypes.alloc().init();
+        instance.methodRetainingBlock(functionRef.deref());
+        function verifyBlockCall() {
+            instance.methodCallRetainingBlock();
+            var actual = TNSGetOutput();
+            expect(actual).toBe("simple block called");
+            TNSClearOutput();
+        }
+        verifyBlockCall();
+
+        gc();
+        setTimeout(() => {
+            gc();
+            expect(!!functionRef.deref()).toBe(true);
+            verifyBlockCall();
+            instance.methodReleaseRetainingBlock();
+            gc();
+            setTimeout(() => {
+                gc();
+                expect(!!functionRef.deref()).toBe(false);
+                done();    
+            })
+        });
+    });
+
     it("InstanceComplexBlock", function () {
         function block(i, id, sel, obj, str) {
             expect(i).toBe(1);

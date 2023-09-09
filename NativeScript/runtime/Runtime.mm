@@ -22,6 +22,8 @@
 #include "IsolateWrapper.h"
 #include "DisposerPHV.h"
 
+#include "ModuleBinding.hpp"
+
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
@@ -142,6 +144,7 @@ Isolate* Runtime::CreateIsolate() {
 
 void Runtime::Init(Isolate* isolate, bool isWorker) {
     std::shared_ptr<Caches> cache = Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
+    cache->isWorker = isWorker;
     cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
     cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
 
@@ -149,10 +152,11 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     HandleScope handle_scope(isolate);
     Local<FunctionTemplate> globalTemplateFunction = FunctionTemplate::New(isolate);
     globalTemplateFunction->SetClassName(tns::ToV8String(isolate, "NativeScriptGlobalObject"));
+    tns::binding::CreateInternalBindingTemplates(isolate, globalTemplateFunction);
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
     DefineNativeScriptVersion(isolate, globalTemplate);
 
-    Worker::Init(isolate, globalTemplate, isWorker);
+    //Worker::Init(isolate, globalTemplate, isWorker);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
     DefineDrainMicrotaskMethod(isolate, globalTemplate);
@@ -299,6 +303,12 @@ void Runtime::DefineDrainMicrotaskMethod(v8::Isolate* isolate, v8::Local<v8::Obj
 }
 
 bool Runtime::IsAlive(const Isolate* isolate) {
+    // speedup lookup by avoiding locking if thread locals match
+    // note: this can be a problem when the Runtime is deleted in a different thread that it was created
+    // which could happen under some specific embedding scenarios
+    if (Isolate::TryGetCurrent() == isolate || (currentRuntime_ != nullptr && currentRuntime_->GetIsolate() == isolate)) {
+        return true;
+    }
     SpinLock lock(isolatesMutex_);
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
 }

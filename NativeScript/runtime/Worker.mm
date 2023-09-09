@@ -6,6 +6,7 @@
 #include "Helpers.h"
 #include "Runtime.h"
 #include "Constants.h"
+#include "ModuleBinding.hpp"
 
 using namespace v8;
 
@@ -15,6 +16,10 @@ std::vector<std::string> Worker::GlobalFunctions = {
     "postMessage",
     "close"
 };
+
+void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+    Worker::Init(isolate, globalTemplate, Caches::Get(isolate)->isWorker);
+}
 
 void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool isWorkerThread) {
     if (isWorkerThread) {
@@ -290,3 +295,5 @@ int Worker::GetWorkerId(Isolate* isolate, Local<Object> global) {
 }
 
 }
+
+NODE_BINDING_PER_ISOLATE_INIT_OBJ(worker, tns::Worker::Init)

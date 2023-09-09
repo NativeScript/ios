@@ -80,6 +80,8 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
 
     *blockPointer = {
         .isa = nullptr,
+        // this block is created with a refcount of 1
+        // this means we "own" it and need to free it
         .flags = JSBlock::BLOCK_HAS_COPY_DISPOSE | JSBlock::BLOCK_NEEDS_FREE | (1 /* ref count */ << 1),
         .reserved = 0,
         .invoke = (void*)result.first,
@@ -90,7 +92,8 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
 
     object_setClass((__bridge id)blockPointer, objc_getClass("__NSMallocBlock__"));
 
-    return blockPointer;
+    // transfer ownership back to ARC (see refcount comment above)
+    return CFBridgingRelease(blockPointer);
 }
 
 Local<Value> Interop::CallFunction(CMethodCall& methodCall) {
@@ -588,16 +591,16 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         if ((obj->IsArrayBuffer() || obj->IsArrayBufferView()) && !isNSArray) {
             Local<ArrayBuffer> buffer = arg.As<ArrayBuffer>();
             NSDataAdapter* adapter = [[NSDataAdapter alloc] initWithJSObject:buffer isolate:isolate];
-            Interop::SetValue(dest, adapter);
+            Interop::SetValue(dest, CFBridgingRelease(adapter));
             // CFAutorelease(adapter);
         } else if (tns::IsArrayOrArrayLike(isolate, obj)) {
             Local<v8::Array> array = Interop::ToArray(obj);
             ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
-            Interop::SetValue(dest, adapter);
+            Interop::SetValue(dest, CFBridgingRelease(adapter));
             // CFAutorelease(adapter);
         } else {
             DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
-            Interop::SetValue(dest, adapter);
+            Interop::SetValue(dest, CFBridgingRelease(adapter));
             // CFAutorelease(adapter);
         }
     } else {
