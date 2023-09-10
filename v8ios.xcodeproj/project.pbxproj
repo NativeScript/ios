@@ -2705,6 +2705,7 @@
 					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
+					"-ld_classic",
 					"-Wl,-dead_strip",
 					"-Wl,-search_paths_first",
 					"-fno-builtin-stpcpy",
@@ -2788,6 +2789,7 @@
 					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
+					"-ld_classic",
 					"-Wl,-dead_strip",
 					"-Wl,-search_paths_first",
 					"-fno-builtin-stpcpy",
