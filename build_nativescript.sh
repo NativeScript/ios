@@ -26,6 +26,7 @@ function to_bool() {
 BUILD_CATALYST=$(to_bool ${BUILD_CATALYST:=true})
 BUILD_IPHONE=$(to_bool ${BUILD_IPHONE:=true})
 BUILD_SIMULATOR=$(to_bool ${BUILD_SIMULATOR:=true})
+BUILD_VISION=$(to_bool ${BUILD_VISION:=true})
 VERBOSE=$(to_bool ${VERBOSE:=false})
 
 for arg in $@; do
@@ -36,6 +37,8 @@ for arg in $@; do
     --no-sim|--no-simulator) BUILD_SIMULATOR=false ;;
     --iphone|--device) BUILD_IPHONE=true ;;
     --no-iphone|--no-device) BUILD_IPHONE=false ;;
+    --xr|--vision) BUILD_VISION=true ;;
+    --no-xr|--no-vision) BUILD_VISION=false ;;
     --verbose|-v) VERBOSE=true ;;
     *) ;;
   esac
@@ -105,7 +108,9 @@ xcodebuild archive -project v8ios.xcodeproj \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
                    -archivePath $DIST/intermediates/NativeScript.iphonesimulator.xcarchive
+fi
 
+if $BUILD_VISION; then
 checkpoint "Building NativeScript for visionOS"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
@@ -157,14 +162,16 @@ fi
 if $BUILD_SIMULATOR; then
   XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
                   -debug-symbols "$DIST/intermediates/NativeScript.iphonesimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
-
-  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
-                  -debug-symbols "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
 fi
 
 if $BUILD_IPHONE; then
   XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.iphoneos.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
                   -debug-symbols "$DIST/intermediates/NativeScript.iphoneos.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+fi
+
+if $BUILD_VISION; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
 fi
 
 checkpoint "Creating NativeScript.xcframework"

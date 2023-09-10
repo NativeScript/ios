@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
+source "$(dirname "$0")/build_utils.sh"
 
+checkpoint "Preparing npm package..."
 OUTPUT_DIR="dist/npm"
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
@@ -29,3 +31,5 @@ pushd "$OUTPUT_DIR"
 npm pack
 mv *.tgz ../
 popd
+
+checkpoint "npm package created."
