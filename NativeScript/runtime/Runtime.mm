@@ -207,6 +207,15 @@ void Runtime::RunModule(const std::string moduleName) {
     this->moduleInternal_->RunModule(isolate, moduleName);
 }
 
+void Runtime::RunScript(const std::string script) {
+    Isolate* isolate = this->GetIsolate();
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+    this->moduleInternal_->RunScript(isolate, script);
+}
+
+
 Isolate* Runtime::GetIsolate() {
     return this->isolate_;
 }
