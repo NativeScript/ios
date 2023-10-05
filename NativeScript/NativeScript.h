@@ -16,6 +16,8 @@
 
 - (instancetype)initWithConfig:(Config*)config;
 - (void)runScriptString: (NSString*) script runLoop: (BOOL) runLoop;
+- (void)restartWithConfig:(Config*)config;
+- (void)shutdownRuntime;
 
 /**
  WARNING: this method does not return in most applications. (UIApplicationMain)

@@ -1,0 +1,4 @@
+module NativeScriptSDK {
+    umbrella header "NativeScriptSDK.h"
+    export *
+}

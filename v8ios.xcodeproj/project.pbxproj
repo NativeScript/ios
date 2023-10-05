@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
-		2BFE21EE2AC1AC3100307752 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */; };
+		2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE22052AC1C93100307752 /* metadata-arm64.bin */; };
 		3C1850542A6DCB2D002ACC81 /* Timers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C1850522A6DCB2D002ACC81 /* Timers.cpp */; };
 		3C1850552A6DCB2D002ACC81 /* Timers.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C1850532A6DCB2D002ACC81 /* Timers.hpp */; };
 		3C78BA5C2A0D600100C20A88 /* ModuleBinding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C78BA5A2A0D600100C20A88 /* ModuleBinding.cpp */; };
@@ -424,7 +424,15 @@
 /* Begin PBXFileReference section */
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
-		2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = "metadata-arm64.bin"; sourceTree = "<group>"; };
+		2BFE21F22AC1B7D500307752 /* UIView+NativeScript.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIView+NativeScript.h"; sourceTree = "<group>"; };
+		2BFE21F32AC1B7D500307752 /* UIView+NativeScript.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UIView+NativeScript.m"; sourceTree = "<group>"; };
+		2BFE21F42AC1B7D500307752 /* NativeScriptUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptUtils.h; sourceTree = "<group>"; };
+		2BFE21F52AC1B7D500307752 /* NativeScriptUtils.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NativeScriptUtils.m; sourceTree = "<group>"; };
+		2BFE21F62AC1B7D600307752 /* NativeScriptEmbedder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptEmbedder.h; sourceTree = "<group>"; };
+		2BFE21F72AC1B7D600307752 /* NativeScriptEmbedder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NativeScriptEmbedder.m; sourceTree = "<group>"; };
+		2BFE21F82AC1B7D600307752 /* NativeScriptSDK.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptSDK.h; sourceTree = "<group>"; };
+		2BFE22002AC1C65B00307752 /* module.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.modulemap; sourceTree = "<group>"; };
+		2BFE22052AC1C93100307752 /* metadata-arm64.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = "metadata-arm64.bin"; sourceTree = "<group>"; };
 		3C1850522A6DCB2D002ACC81 /* Timers.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Timers.cpp; sourceTree = "<group>"; };
 		3C1850532A6DCB2D002ACC81 /* Timers.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Timers.hpp; sourceTree = "<group>"; };
 		3C78BA5A2A0D600100C20A88 /* ModuleBinding.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ModuleBinding.cpp; sourceTree = "<group>"; };
@@ -865,6 +873,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2BFE21F12AC1B79F00307752 /* embedding */ = {
+			isa = PBXGroup;
+			children = (
+				2BFE21F62AC1B7D600307752 /* NativeScriptEmbedder.h */,
+				2BFE21F72AC1B7D600307752 /* NativeScriptEmbedder.m */,
+				2BFE21F82AC1B7D600307752 /* NativeScriptSDK.h */,
+				2BFE21F42AC1B7D500307752 /* NativeScriptUtils.h */,
+				2BFE21F52AC1B7D500307752 /* NativeScriptUtils.m */,
+				2BFE21F22AC1B7D500307752 /* UIView+NativeScript.h */,
+				2BFE21F32AC1B7D500307752 /* UIView+NativeScript.m */,
+				2BFE22002AC1C65B00307752 /* module.modulemap */,
+			);
+			path = embedding;
+			sourceTree = "<group>";
+		};
 		6573B9C1291FE29F00B0ED7C /* v8runtime */ = {
 			isa = PBXGroup;
 			children = (
@@ -1312,7 +1335,8 @@
 		C2DDEB33229EAB3B00345BFE /* NativeScript */ = {
 			isa = PBXGroup;
 			children = (
-				2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */,
+				2BFE22052AC1C93100307752 /* metadata-arm64.bin */,
+				2BFE21F12AC1B79F00307752 /* embedding */,
 				F6191AA529C0FCE7003F588F /* inspector */,
 				6573B9D8291FE2A700B0ED7C /* jsi */,
 				6573B9C1291FE29F00B0ED7C /* v8runtime */,
@@ -1673,6 +1697,7 @@
 				C2DDEB2F229EAB3B00345BFE /* Frameworks */,
 				C2DDEB30229EAB3B00345BFE /* Resources */,
 				65A6D684291F63A30074DF31 /* ShellScript */,
+				2BFE21F02AC1B28000307752 /* Add default metadata */,
 			);
 			buildRules = (
 			);
@@ -1796,13 +1821,31 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2BFE21EE2AC1AC3100307752 /* metadata-arm64.bin in Resources */,
+				2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		2BFE21F02AC1B28000307752 /* Add default metadata */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Add default metadata";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"Checking flags to determine whether to copy default metadata\"\nif [ \"$INCLUDE_DEFAULT_METADATA\" = true ] ; then\necho \"Copying ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-arm64.bin directory to ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework\"\ncp ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-arm64.bin ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework/metadata-arm64.bin\necho \"metadata-arm64.bin has been copied.\"\necho \"Copying ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-x86_64.bin directory to ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework\"\ncp ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-x86_64.bin ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework/metadata-x86_64.bin\necho \"metadata-x86_64.bin has been copied.\"\nelse\necho \"Skipped copying metadata binaries.\"\nfi\n\n";
+		};
 		65A6D684291F63A30074DF31 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -2454,13 +2497,17 @@
 					"$(PROJECT_DIR)/AppWithModules/Frameworks",
 				);
 				GCC_C_LANGUAGE_STANDARD = gnu99;
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/NativeScript",
+					"$(SRCROOT)/NativeScript/embedding/",
+				);
 				INFOPLIST_FILE = AppWithModules/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				NS_DEBUG_METADATA_PATH = "/Users/teodordermendzhiev/workspace/ns-v8ios-runtime/yaml";
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
 					"-ObjC",
@@ -2489,13 +2536,17 @@
 					"$(PROJECT_DIR)/AppWithModules/Frameworks",
 				);
 				GCC_C_LANGUAGE_STANDARD = gnu99;
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/NativeScript",
+					"$(SRCROOT)/NativeScript/embedding/",
+				);
 				INFOPLIST_FILE = AppWithModules/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				NS_DEBUG_METADATA_PATH = "/Users/teodordermendzhiev/workspace/ns-v8ios-runtime/yaml";
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
 					"-ObjC",
@@ -2651,10 +2702,10 @@
 				ALLOW_TARGET_PLATFORM_SPECIALIZATION = NO;
 				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
-				CLANG_ENABLE_MODULES = NO;
+				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = NO;
 				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = NO;
+				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
@@ -2736,10 +2787,10 @@
 				ALLOW_TARGET_PLATFORM_SPECIALIZATION = NO;
 				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
-				CLANG_ENABLE_MODULES = NO;
+				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = NO;
 				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = NO;
+				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
