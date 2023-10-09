@@ -30,7 +30,7 @@ const InterfaceMeta* GlobalTable<TYPE>::findInterfaceMeta(const char* identifier
 
     // Meta should be an interface, but it could also be a protocol in case of a
     // private interface having the same name as a public protocol
-    assert(meta->type() == MetaType::Interface || (meta->type() == MetaType::ProtocolType && objc_getClass(meta->name()) != nullptr && objc_getProtocol(meta->name()) != nullptr));
+    ASSERT(meta->type() == MetaType::Interface || (meta->type() == MetaType::ProtocolType && objc_getClass(meta->name()) != nullptr && objc_getProtocol(meta->name()) != nullptr));
 
     if (meta->type() != MetaType::Interface) {
         return nullptr;

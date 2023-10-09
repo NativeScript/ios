@@ -1,3 +1,25 @@
+## [8.6.0](https://github.com/NativeScript/ios/compare/v8.5.2...v8.6.1) (2023-10-09)
+
+
+### Bug Fixes
+
+* bridge release adapters ([#224](https://github.com/NativeScript/ios/issues/224)) ([70b1802](https://github.com/NativeScript/ios/commit/70b180202dc0752d01ae5b9249cbaabae65f53cc))
+* delay isolate disposal when isolate is in use ([5a6c2ee](https://github.com/NativeScript/ios/commit/5a6c2ee5efa0c557c94ae56da0d3b3a31911d1b8))
+* don't suppress timer exceptions ([0c4b819](https://github.com/NativeScript/ios/commit/0c4b819941b0327e572772018298cf9cf181436e))
+* fix setInterval not repeating correctly ([022893f](https://github.com/NativeScript/ios/commit/022893f1dcd9a7649db73e9735ff12e9246b3585))
+* prevent JS function to native block leak ([#223](https://github.com/NativeScript/ios/issues/223)) ([a6d7332](https://github.com/NativeScript/ios/commit/a6d73323718a1de12c5a9f4865a6abfe06fd6e03))
+
+
+### Features
+
+* add interop.stringFromCString ([#228](https://github.com/NativeScript/ios/issues/228)) ([185c12d](https://github.com/NativeScript/ios/commit/185c12dc85e86747f266867fb208c71caf5fc6b3))
+* add native timers ([#221](https://github.com/NativeScript/ios/issues/221)) ([119470f](https://github.com/NativeScript/ios/commit/119470f249c5aa85c4c2d0b1c9b5b691003c1ec7))
+* add timer strong retainer annotation ([efef961](https://github.com/NativeScript/ios/commit/efef961a67519aed881637ac0291894f3325b111))
+* log the fullMessage with more details about the error ([#229](https://github.com/NativeScript/ios/issues/229)) ([d67588c](https://github.com/NativeScript/ios/commit/d67588cb3866212ccd86b105edf1207fddde2db9))
+* use node logic for globals and modules ([#215](https://github.com/NativeScript/ios/issues/215)) ([a66cc42](https://github.com/NativeScript/ios/commit/a66cc42c768ee7712d1c1f441b8c4e8e88a19eca))
+
+
+
 ## [8.5.2](https://github.com/NativeScript/ios/compare/v8.5.1...v8.5.2) (2023-05-24)
 
 
