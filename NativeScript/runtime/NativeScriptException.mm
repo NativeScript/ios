@@ -37,6 +37,20 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
     bool success = global->Get(context, tns::ToV8String(isolate, cbName)).ToLocal(&handler);
 
     std::string stackTrace = GetErrorStackTrace(isolate, message->GetStackTrace());
+    std::string fullMessage;
+    
+    auto errObject = error.As<Object>();
+    auto fullMessageString = tns::ToV8String(isolate, "fullMessage");
+    if(errObject->HasOwnProperty(context, fullMessageString).ToChecked()) {
+        // check if we have a "fullMessage" on the error, and log that instead - since it includes more info about the exception.
+        auto fullMessage_ = errObject->Get(context, fullMessageString).ToLocalChecked();
+        fullMessage = tns::ToString(isolate, fullMessage_);
+    } else {
+        Local<v8::String> messageV8String = message->Get();
+        std::string messageString = tns::ToString(isolate, messageV8String);
+        fullMessage = messageString + "\n at \n" + stackTrace;
+    }
+
     if (success && handler->IsFunction()) {
         if (error->IsObject()) {
             tns::Assert(error.As<Object>()->Set(context, tns::ToV8String(isolate, "stackTrace"), tns::ToV8String(isolate, stackTrace)).FromMaybe(false), isolate);
@@ -56,9 +70,7 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
     }
 
     if (!isDiscarded) {
-        Local<v8::String> messageV8String = message->Get();
-        std::string messageString = tns::ToString(isolate, messageV8String);
-        NSString* name = [NSString stringWithFormat:@"NativeScript encountered a fatal error: %s\n at \n%s", messageString.c_str(), stackTrace.c_str()];
+        NSString* name = [NSString stringWithFormat:@"NativeScript encountered a fatal error:\n\n%s", fullMessage.c_str()];
         // we throw the exception on main thread
         // otherwise it seems that when getting NSException info from NSSetUncaughtExceptionHandler
         // we are missing almost all data. No explanation for why yet
