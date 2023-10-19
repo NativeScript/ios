@@ -25,6 +25,7 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
     Pointer::Register(context, interop);
     FunctionReference::Register(context, interop);
     RegisterBufferFromDataFunction(context, interop);
+    RegisterStringFromCString(context, interop);
     RegisterHandleOfFunction(context, interop);
     RegisterAllocFunction(context, interop);
     RegisterFreeFunction(context, interop);
@@ -137,6 +138,60 @@ void Interop::RegisterBufferFromDataFunction(Local<Context> context, Local<Objec
     tns::Assert(success, isolate);
 
     success = interop->Set(context, tns::ToV8String(isolate, "bufferFromData"), func).FromMaybe(false);
+    tns::Assert(success, isolate);
+}
+
+void Interop::RegisterStringFromCString(Local<Context> context, Local<Object> interop) {
+    Local<v8::Function> func;
+    bool success = v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        tns::Assert(info.Length() >= 1 && info[0]->IsObject(), isolate);
+        Local<Object> arg = info[0].As<Object>();
+        int stringLength = -1;
+        if(info.Length() >= 2 && !info[1].IsEmpty() && !info[1]->IsNullOrUndefined()) {
+            auto desiredLength = ToNumber(isolate, info[1]);
+            if (desiredLength != NAN) {
+                stringLength = desiredLength;
+            }
+        }
+        tns::Assert(arg->InternalFieldCount() > 0 && arg->GetInternalField(0)->IsExternal(), isolate);
+
+        Local<External> ext = arg->GetInternalField(0).As<External>();
+        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+        tns::Assert(wrapper != nullptr);
+        char* data = nullptr;
+        switch (wrapper->Type()) {
+            case WrapperType::Pointer:
+                {
+                    PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
+                    data = static_cast<char*>(pointerWrapper->Data());
+                }
+                break;
+            case WrapperType::Reference:
+            {
+                ReferenceWrapper* referenceWrapper = static_cast<ReferenceWrapper*>(wrapper);
+                if (referenceWrapper->Data() != nullptr) {
+                    data = static_cast<char*>(referenceWrapper->Data());
+                    break;
+                }
+                auto wrappedValue = referenceWrapper->Value()->Get(isolate);
+                auto wrappedWrapper = tns::GetValue(isolate, wrappedValue);
+                tns::Assert(wrappedWrapper->Type() == WrapperType::Pointer);
+                data = static_cast<char*>((static_cast<PointerWrapper*>(wrappedWrapper))->Data());
+            }
+            default:
+                break;
+        }
+        tns::Assert(data != nullptr);
+
+        auto result = v8::String::NewFromUtf8(isolate, data, v8::NewStringType::kNormal, stringLength).ToLocalChecked();
+        info.GetReturnValue().Set(result);
+    }).ToLocal(&func);
+
+    Isolate* isolate = context->GetIsolate();
+    tns::Assert(success, isolate);
+
+    success = interop->Set(context, tns::ToV8String(isolate, "stringFromCString"), func).FromMaybe(false);
     tns::Assert(success, isolate);
 }
 
