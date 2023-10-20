@@ -21,10 +21,56 @@ using namespace tns;
 
 @implementation NativeScript
 
+extern char defaultStartOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
+
+- (void)runScriptString: (NSString*) script runLoop: (BOOL) runLoop {
+
+    std::string cppString = std::string([script UTF8String]);
+    runtime_->RunScript(cppString);
+    
+    if (runLoop) {
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+    }
+
+
+    tns::Tasks::Drain();
+
+}
+
 std::unique_ptr<Runtime> runtime_;
 
-- (instancetype)initWithConfig:(Config*)config {
-    
+- (void)runMainApplication {
+    runtime_->RunMainScript();
+
+    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+
+    tns::Tasks::Drain();
+}
+
+- (bool)liveSync {
+    if (runtime_ == nullptr) {
+        return false;
+    }
+
+    Isolate* isolate = runtime_->GetIsolate();
+    return tns::LiveSync(isolate);
+}
+
+- (void)shutdownRuntime {
+    if (runtime_ != nullptr) {
+        Isolate* isolate = runtime_->GetIsolate();
+        {
+            v8::Locker l(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::HandleScope handle_scope(isolate);
+            
+            isolate->Dispose();
+        }
+        runtime_ = nullptr;
+    }
+}
+
+- (void)initializeWithConfig:(Config*)config {
     if (self = [super init]) {
         RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
         if (config.ApplicationPath != nil) {
@@ -32,7 +78,11 @@ std::unique_ptr<Runtime> runtime_;
         } else {
             RuntimeConfig.ApplicationPath = [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
         }
-        RuntimeConfig.MetadataPtr = [config MetadataPtr];
+        if (config.MetadataPtr != nil) {
+            RuntimeConfig.MetadataPtr = [config MetadataPtr];
+        } else {
+            RuntimeConfig.MetadataPtr = &defaultStartOfMetadataSection;
+        }
         RuntimeConfig.IsDebug = [config IsDebug];
         RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
 
@@ -59,25 +109,20 @@ std::unique_ptr<Runtime> runtime_;
         }
     }
     
-    return self;
-    
 }
 
-- (void)runMainApplication {
-    runtime_->RunMainScript();
-
-    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
-
-    tns::Tasks::Drain();
-}
-
-- (bool)liveSync {
-    if (runtime_ == nullptr) {
-        return false;
+- (instancetype)initWithConfig:(Config*)config {
+    if (self = [super init]) {
+        [self initializeWithConfig:config];
     }
-
-    Isolate* isolate = runtime_->GetIsolate();
-    return tns::LiveSync(isolate);
+    return self;
 }
+
+- (void)restartWithConfig:(Config*)config {
+    [self shutdownRuntime];
+    [self initializeWithConfig:config];
+}
+
+
 
 @end
