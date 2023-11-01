@@ -1,3 +1,12 @@
+## [8.6.2](https://github.com/NativeScript/ios/compare/v8.6.1...v8.6.2) (2023-11-01)
+
+
+### Bug Fixes
+
+* only reset timer persistent if Isolate is valid ([4379583](https://github.com/NativeScript/ios/commit/4379583fc0b2fa3eacde50eb471086f55c1eec18))
+
+
+
 ## [8.6.0](https://github.com/NativeScript/ios/compare/v8.5.2...v8.6.1) (2023-10-09)
 
 
