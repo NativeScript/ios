@@ -70,6 +70,7 @@ Runtime::~Runtime() {
         // it terminates execution
         SpinLock lock(isolatesMutex_);
         Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
+        Caches::Get(isolate_)->InvalidateIsolate();
     }
     this->isolate_->TerminateExecution();
     
@@ -306,7 +307,8 @@ bool Runtime::IsAlive(const Isolate* isolate) {
     // speedup lookup by avoiding locking if thread locals match
     // note: this can be a problem when the Runtime is deleted in a different thread that it was created
     // which could happen under some specific embedding scenarios
-    if (Isolate::TryGetCurrent() == isolate || (currentRuntime_ != nullptr && currentRuntime_->GetIsolate() == isolate)) {
+    if ((Isolate::TryGetCurrent() == isolate || (currentRuntime_ != nullptr && currentRuntime_->GetIsolate() == isolate))
+        && Caches::Get((Isolate*)isolate)->IsValid()) {
         return true;
     }
     SpinLock lock(isolatesMutex_);

@@ -75,6 +75,14 @@ public:
         return isolateId_;
     }
 
+    inline void InvalidateIsolate() {
+        isolateId_ = -1;
+    }
+
+    inline bool IsValid() {
+        return isolateId_ != -1;
+    }
+
     void SetContext(v8::Local<v8::Context> context);
     v8::Local<v8::Context> GetContext();
 
