@@ -6,30 +6,27 @@
 namespace tns {
 
 struct KnownUnknownClassPair {
-    Class known;
-    Class unknown;
+  Class known;
+  Class unknown;
 
-    explicit KnownUnknownClassPair(Class known = nullptr, Class unknown = nullptr)
-        : known(known)
-        , unknown(unknown) {
-    }
+  explicit KnownUnknownClassPair(Class known = nullptr, Class unknown = nullptr)
+      : known(known), unknown(unknown) {}
 
-    Class realClass() const {
-        return unknown ? unknown : known;
-    }
+  Class realClass() const { return unknown ? unknown : known; }
 
-    bool operator<(const KnownUnknownClassPair& other) const {
-        return known < other.known || (known == other.known && unknown < other.unknown);
-    }
+  bool operator<(const KnownUnknownClassPair& other) const {
+    return known < other.known ||
+           (known == other.known && unknown < other.unknown);
+  }
 
-    bool operator==(const KnownUnknownClassPair& other) const {
-        return known == other.known && unknown == other.unknown;
-    }
+  bool operator==(const KnownUnknownClassPair& other) const {
+    return known == other.known && unknown == other.unknown;
+  }
 
-    static const KnownUnknownClassPair& EmptyValue();
-    static const KnownUnknownClassPair& DeletedValue();
+  static const KnownUnknownClassPair& EmptyValue();
+  static const KnownUnknownClassPair& DeletedValue();
 };
 
-} // namespace tns
+}  // namespace tns
 
 #endif /* KnownUnknownClassPair_h */

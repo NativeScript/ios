@@ -1,4 +1,5 @@
 #include "PromiseProxy.h"
+
 #include "Helpers.h"
 
 using namespace v8;
@@ -6,7 +7,7 @@ using namespace v8;
 namespace tns {
 
 void PromiseProxy::Init(v8::Local<v8::Context> context) {
-    std::string source = R"(
+  std::string source = R"(
         // Ensure that Promise callbacks are executed on the
         // same thread on which they were created
         (() => {
@@ -75,15 +76,16 @@ void PromiseProxy::Init(v8::Local<v8::Context> context) {
         })();
     )";
 
-    Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = context->GetIsolate();
 
-    Local<Script> script;
-    bool success = Script::Compile(context, tns::ToV8String(isolate, source)).ToLocal(&script);
-    tns::Assert(success && !script.IsEmpty(), isolate);
+  Local<Script> script;
+  bool success = Script::Compile(context, tns::ToV8String(isolate, source))
+                     .ToLocal(&script);
+  tns::Assert(success && !script.IsEmpty(), isolate);
 
-    Local<Value> result;
-    success = script->Run(context).ToLocal(&result);
-    tns::Assert(success, isolate);
+  Local<Value> result;
+  success = script->Run(context).ToLocal(&result);
+  tns::Assert(success, isolate);
 }
 
-}
+}  // namespace tns

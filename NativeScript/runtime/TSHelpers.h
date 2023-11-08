@@ -6,10 +6,10 @@
 namespace tns {
 
 class TSHelpers {
-public:
-    static void Init(v8::Local<v8::Context> context);
+ public:
+  static void Init(v8::Local<v8::Context> context);
 };
 
-}
+}  // namespace tns
 
 #endif /* TSHelpers_h */

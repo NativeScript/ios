@@ -7,7 +7,8 @@
  * in the same source code. This macro works for iOS and Mac OS X.
  *
  * This is a by-product of joint research by AIST and The University of Ryukyu.
- * HIRANO Satoshi (AIST), NAKAMURA Morikazu (U. Ryukyu) and GUAN Senlin (U. Ryukyu)
+ * HIRANO Satoshi (AIST), NAKAMURA Morikazu (U. Ryukyu) and GUAN Senlin (U.
+ * Ryukyu)
  *
  * Author: HIRANO Satoshi (AIST, Japan) on 2011/11/14
  * Copyright 2011-2012 National Institute of Advanced Industrial Science
@@ -21,20 +22,20 @@
  */
 
 #if __clang__
-    #if __has_feature(objc_arc)
-        #define S_RETAIN self
-        #define S_AUTORELEASE self
-        #define S_RELEASE self
-        #define S_DEALLOC self
-    #else
-        #define S_RETAIN retain
-        #define S_AUTORELEASE autorelease
-        #define S_RELEASE release
-        #define S_DEALLOC dealloc
-    #endif
+#if __has_feature(objc_arc)
+#define S_RETAIN self
+#define S_AUTORELEASE self
+#define S_RELEASE self
+#define S_DEALLOC self
 #else
-    #define S_RETAIN retain
-    #define S_AUTORELEASE autorelease
-    #define S_RELEASE release
-    #define S_DEALLOC dealloc
+#define S_RETAIN retain
+#define S_AUTORELEASE autorelease
+#define S_RELEASE release
+#define S_DEALLOC dealloc
+#endif
+#else
+#define S_RETAIN retain
+#define S_AUTORELEASE autorelease
+#define S_RELEASE release
+#define S_DEALLOC dealloc
 #endif

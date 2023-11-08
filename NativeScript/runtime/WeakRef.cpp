@@ -1,4 +1,5 @@
 #include "WeakRef.h"
+
 #include "Helpers.h"
 
 using namespace v8;
@@ -6,9 +7,9 @@ using namespace v8;
 namespace tns {
 
 void WeakRef::Init(Local<Context> context) {
-    Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = context->GetIsolate();
 
-    std::string source = R"(
+  std::string source = R"(
         global.WeakRef.prototype.get = global.WeakRef.prototype.deref;
         global.WeakRef.prototype.__hasWarnedAboutClear = false;
         global.WeakRef.prototype.clear = () => {
@@ -20,13 +21,14 @@ void WeakRef::Init(Local<Context> context) {
         }
     )";
 
-    Local<Script> script;
-    bool success = Script::Compile(context, tns::ToV8String(isolate, source)).ToLocal(&script);
-    tns::Assert(success && !script.IsEmpty(), isolate);
+  Local<Script> script;
+  bool success = Script::Compile(context, tns::ToV8String(isolate, source))
+                     .ToLocal(&script);
+  tns::Assert(success && !script.IsEmpty(), isolate);
 
-    Local<Value> result;
-    success = script->Run(context).ToLocal(&result);
-    tns::Assert(success, isolate);
+  Local<Value> result;
+  success = script->Run(context).ToLocal(&result);
+  tns::Assert(success, isolate);
 }
 
-}
+}  // namespace tns
