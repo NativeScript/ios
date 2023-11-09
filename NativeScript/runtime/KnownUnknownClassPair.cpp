@@ -3,12 +3,12 @@
 namespace tns {
 
 const KnownUnknownClassPair& KnownUnknownClassPair::EmptyValue() {
-    static const KnownUnknownClassPair emptyValue;
-    return emptyValue;
+  static const KnownUnknownClassPair emptyValue;
+  return emptyValue;
 }
 const KnownUnknownClassPair& KnownUnknownClassPair::DeletedValue() {
-    static const KnownUnknownClassPair deletedValue((Class)-1, (Class)-1);
-    return deletedValue;
+  static const KnownUnknownClassPair deletedValue((Class)-1, (Class)-1);
+  return deletedValue;
 }
 
-} // namespace tns
+}  // namespace tns

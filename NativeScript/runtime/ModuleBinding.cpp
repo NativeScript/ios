@@ -9,14 +9,11 @@
 #include "ModuleBinding.hpp"
 
 // TODO: add here
-//#define NSC_BUILTIN_STANDARD_BINDINGS(V)                                      \
-//V(fs)
+//#define NSC_BUILTIN_STANDARD_BINDINGS(V) \ V(fs)
 
 #define NSC_BUILTIN_STANDARD_BINDINGS(V)
 
-
-#define NSC_BUILTIN_BINDINGS(V)                                               \
-NSC_BUILTIN_STANDARD_BINDINGS(V)
+#define NSC_BUILTIN_BINDINGS(V) NSC_BUILTIN_STANDARD_BINDINGS(V)
 
 // This is used to load built-in bindings. Instead of using
 // __attribute__((constructor)), we call the _register_<modname>
@@ -28,16 +25,11 @@ NSC_BUILTIN_STANDARD_BINDINGS(V)
 NSC_BUILTIN_BINDINGS(V)
 #undef V
 
-
-
-
-#define V(modname)                                                             \
-  void _register_isolate_##modname(v8::Isolate* isolate,            \
+#define V(modname)                                       \
+  void _register_isolate_##modname(v8::Isolate* isolate, \
                                    v8::Local<v8::FunctionTemplate> target);
 NODE_BINDINGS_WITH_PER_ISOLATE_INIT(V)
 #undef V
-
-
 
 using v8::Context;
 using v8::EscapableHandleScope;
@@ -59,43 +51,43 @@ static thread_local ns_module* thread_local_modpending;
 bool node_is_initialized = false;
 
 extern "C" void nativescript_module_register(void* m) {
-    struct ns_module* mp = reinterpret_cast<struct ns_module*>(m);
-    
-    if (mp->nm_flags & NM_F_INTERNAL) {
-        mp->nm_link = modlist_internal;
-        modlist_internal = mp;
-    } else if (!node_is_initialized) {
-        // "Linked" modules are included as part of the node project.
-        // Like builtins they are registered *before* node::Init runs.
-        mp->nm_flags = NM_F_LINKED;
-        mp->nm_link = modlist_linked;
-        modlist_linked = mp;
-    } else {
-        thread_local_modpending = mp;
-    }
+  struct ns_module* mp = reinterpret_cast<struct ns_module*>(m);
+
+  if (mp->nm_flags & NM_F_INTERNAL) {
+    mp->nm_link = modlist_internal;
+    modlist_internal = mp;
+  } else if (!node_is_initialized) {
+    // "Linked" modules are included as part of the node project.
+    // Like builtins they are registered *before* node::Init runs.
+    mp->nm_flags = NM_F_LINKED;
+    mp->nm_link = modlist_linked;
+    modlist_linked = mp;
+  } else {
+    thread_local_modpending = mp;
+  }
 }
 
 namespace binding {
 
 void RegisterBuiltinBindings() {
 #define V(modname) _register_##modname();
-    NSC_BUILTIN_BINDINGS(V)
+  NSC_BUILTIN_BINDINGS(V)
 #undef V
 }
 
-void CreateInternalBindingTemplates(v8::Isolate* isolate, Local<FunctionTemplate> templ) {
-#define V(modname)                                                             \
-  do {                                                                         \
-    /*templ->InstanceTemplate()->SetInternalFieldCount(                          \
-        BaseObject::kInternalFieldCount);*/                                      \
-    _register_isolate_##modname(isolate, templ);                          \
-    /*isolate_data->set_##modname##_binding(templ);*/                              \
+void CreateInternalBindingTemplates(v8::Isolate* isolate,
+                                    Local<FunctionTemplate> templ) {
+#define V(modname)                                      \
+  do {                                                  \
+    /*templ->InstanceTemplate()->SetInternalFieldCount( \
+        BaseObject::kInternalFieldCount);*/             \
+    _register_isolate_##modname(isolate, templ);        \
+    /*isolate_data->set_##modname##_binding(templ);*/   \
   } while (0);
   NODE_BINDINGS_WITH_PER_ISOLATE_INIT(V)
 #undef V
 }
 
-};
+};  // namespace binding
 
-};
-
+};  // namespace tns

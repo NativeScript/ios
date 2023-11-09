@@ -7,12 +7,15 @@
 //
 
 #include "IsolateWrapper.h"
+
 #include "Runtime.h"
 
 namespace tns {
 
 bool IsolateWrapper::IsValid() const {
-    return Runtime::IsAlive(isolate_) && isolate_->GetData(tns::Constants::CACHES_ISOLATE_SLOT) != nullptr && GetCache()->getIsolateId() == isolateId_;
+  return Runtime::IsAlive(isolate_) &&
+         isolate_->GetData(tns::Constants::CACHES_ISOLATE_SLOT) != nullptr &&
+         GetCache()->getIsolateId() == isolateId_;
 }
 
-}
+}  // namespace tns

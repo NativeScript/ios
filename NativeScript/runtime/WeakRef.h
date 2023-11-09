@@ -6,10 +6,10 @@
 namespace tns {
 
 class WeakRef {
-public:
-    static void Init(v8::Local<v8::Context> context);
+ public:
+  static void Init(v8::Local<v8::Context> context);
 };
 
-}
+}  // namespace tns
 
 #endif /* WeakRef_h */

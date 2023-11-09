@@ -1,15 +1,17 @@
 #ifndef SpinLock_h
 #define SpinLock_h
 
-
 /**
  WARNING:
  Do NOT use this.
- More ofthen than not a normal mutex is better and this spinlock is really unfair in multi threading
- This is only supposed to be used in places where the function is very fast and the expected concurrency is very low
- If any of those things are false, this WILL be slower and worse than a mutex or a read write mutex
- 
- The only place this is currently used is for caching selectors, which take ns to run and are not locked to a specific isolate.
+ More ofthen than not a normal mutex is better and this spinlock is really
+ unfair in multi threading This is only supposed to be used in places where the
+ function is very fast and the expected concurrency is very low If any of those
+ things are false, this WILL be slower and worse than a mutex or a read write
+ mutex
+
+ The only place this is currently used is for caching selectors, which take ns
+ to run and are not locked to a specific isolate.
  */
 
 struct SpinMutex {
@@ -43,14 +45,9 @@ struct SpinMutex {
 };
 
 struct SpinLock {
-    SpinMutex& _mutex;
-    SpinLock(SpinMutex& m) : _mutex(m) {
-        _mutex.lock();
-    }
-    ~SpinLock() {
-        _mutex.unlock();
-    }
+  SpinMutex& _mutex;
+  SpinLock(SpinMutex& m) : _mutex(m) { _mutex.lock(); }
+  ~SpinLock() { _mutex.unlock(); }
 };
-
 
 #endif /* SpinLock_h */

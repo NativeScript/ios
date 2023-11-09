@@ -6,11 +6,11 @@
 namespace tns {
 
 class InlineFunctions {
-public:
-    static void Init(v8::Local<v8::Context> context);
-    static bool IsGlobalFunction(std::string name);
+ public:
+  static void Init(v8::Local<v8::Context> context);
+  static bool IsGlobalFunction(std::string name);
 };
 
-}
+}  // namespace tns
 
 #endif /* InlineFunctions_h */

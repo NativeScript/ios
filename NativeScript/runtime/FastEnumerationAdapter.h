@@ -6,7 +6,9 @@
 
 namespace tns {
 
-NSUInteger FastEnumerationAdapter(v8::Isolate* isolate, id self, NSFastEnumerationState* state, __unsafe_unretained id buffer[], NSUInteger length, v8::Persistent<v8::Function>* poIteratorFunc);
+NSUInteger FastEnumerationAdapter(v8::Isolate* isolate, id self, NSFastEnumerationState* state,
+                                  __unsafe_unretained id buffer[], NSUInteger length,
+                                  v8::Persistent<v8::Function>* poIteratorFunc);
 
 }
 

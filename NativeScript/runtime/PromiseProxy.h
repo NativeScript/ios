@@ -6,10 +6,10 @@
 namespace tns {
 
 class PromiseProxy {
-public:
-    static void Init(v8::Local<v8::Context> context);
+ public:
+  static void Init(v8::Local<v8::Context> context);
 };
 
-}
+}  // namespace tns
 
 #endif /* PromiseProxy_h */
