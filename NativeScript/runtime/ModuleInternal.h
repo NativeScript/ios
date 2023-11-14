@@ -23,6 +23,11 @@ private:
     v8::ScriptCompiler::CachedData* LoadScriptCache(const std::string& path);
     void SaveScriptCache(const v8::Local<v8::Script> script, const std::string& path);
     std::string GetCacheFileName(const std::string& path);
+    
+    static void cacheGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+    static void cacheSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
+    static void cacheDeleterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo< v8::Boolean > &info);
+    static void cacheEnumeratorCallback(const v8::PropertyCallbackInfo<v8::Array>& info);
 
     std::unique_ptr<v8::Persistent<v8::Function>> requireFunction_;
     std::unique_ptr<v8::Persistent<v8::Function>> requireFactoryFunction_;

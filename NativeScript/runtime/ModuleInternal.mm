@@ -64,6 +64,142 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
     return success;
 }
 
+void ModuleInternal::cacheGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    if(!property->IsString()) {
+        return;
+    }
+    try {
+        //ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(info.Data().As<External>()->Value());
+        ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(info.Data().As<v8::Array>()->Get(isolate->GetCurrentContext(), 0).ToLocalChecked().As<External>()->Value());
+        std::string moduleName = tns::ToString(isolate, property);
+        auto it = moduleInternal->loadedModules_.find(moduleName);
+        if (it != moduleInternal->loadedModules_.end()) {
+            info.GetReturnValue().Set(it->second->Get(isolate));
+            return;
+        }
+        std::string callingModuleDirName = tns::ToString(isolate, info.Data().As<v8::Array>()->Get(isolate->GetCurrentContext(), 1).ToLocalChecked()); //tns::ToString(isolate, info[1].As<v8::String>());
+
+        NSString* fullPath;
+        if (moduleName.length() > 0 && moduleName[0] != '/') {
+            if (moduleName[0] == '.') {
+                fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            } else if (moduleName[0] == '~') {
+                moduleName = moduleName.substr(2);
+                fullPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            } else {
+                NSString* tnsModulesPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:@"tns_modules"];
+                fullPath = [tnsModulesPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+
+                const char* path1 = [fullPath fileSystemRepresentation];
+                const char* path2 = [[fullPath stringByAppendingPathExtension:@"js"] fileSystemRepresentation];
+
+                if (!tns::Exists(path1) && !tns::Exists(path2)) {
+                    fullPath = [tnsModulesPath stringByAppendingPathComponent:@"tns-core-modules"];
+                    fullPath = [fullPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+                }
+            }
+        } else {
+            fullPath = [NSString stringWithUTF8String:moduleName.c_str()];
+        }
+        NSString* fileNameOnly = [fullPath lastPathComponent];
+        NSString* pathOnly = [fullPath stringByDeletingLastPathComponent];
+        std::string fileNameOnlyStr = [fileNameOnly UTF8String];
+        std::string pathOnlyStr = [pathOnly UTF8String];
+        size_t lastIndex = fileNameOnlyStr.find_last_of(".");
+        std::string moduleNameWithoutExtension = (lastIndex == std::string::npos) ? fileNameOnlyStr : fileNameOnlyStr.substr(0, lastIndex);
+        std::string cacheKey = pathOnlyStr + "*" + moduleNameWithoutExtension;
+        
+        it = moduleInternal->loadedModules_.find(cacheKey);
+
+        if (it != moduleInternal->loadedModules_.end()) {
+            info.GetReturnValue().Set(it->second->Get(isolate));
+        }
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
+    }
+    
+}
+void ModuleInternal::cacheSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info) {
+    // TODO: maybe implement?
+}
+void ModuleInternal::cacheDeleterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo< v8::Boolean > &info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    if(!property->IsString()) {
+        return;
+    }
+    try {
+        //ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(info.Data().As<External>()->Value());
+        ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(info.Data().As<v8::Array>()->Get(isolate->GetCurrentContext(), 0).ToLocalChecked().As<External>()->Value());
+        std::string moduleName = tns::ToString(isolate, property);
+        std::string callingModuleDirName = tns::ToString(isolate, info.Data().As<v8::Array>()->Get(isolate->GetCurrentContext(), 1).ToLocalChecked()); //tns::ToString(isolate, info[1].As<v8::String>());
+
+        NSString* fullPath;
+        if (moduleName.length() > 0 && moduleName[0] != '/') {
+            if (moduleName[0] == '.') {
+                fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            } else if (moduleName[0] == '~') {
+                moduleName = moduleName.substr(2);
+                fullPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            } else {
+                NSString* tnsModulesPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()] stringByAppendingPathComponent:@"tns_modules"];
+                fullPath = [tnsModulesPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+
+                const char* path1 = [fullPath fileSystemRepresentation];
+                const char* path2 = [[fullPath stringByAppendingPathExtension:@"js"] fileSystemRepresentation];
+
+                if (!tns::Exists(path1) && !tns::Exists(path2)) {
+                    fullPath = [tnsModulesPath stringByAppendingPathComponent:@"tns-core-modules"];
+                    fullPath = [fullPath stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+                }
+            }
+        } else {
+            fullPath = [NSString stringWithUTF8String:moduleName.c_str()];
+        }
+        NSString* fileNameOnly = [fullPath lastPathComponent];
+        NSString* pathOnly = [fullPath stringByDeletingLastPathComponent];
+        std::string fileNameOnlyStr = [fileNameOnly UTF8String];
+        std::string pathOnlyStr = [pathOnly UTF8String];
+        size_t lastIndex = fileNameOnlyStr.find_last_of(".");
+        std::string moduleNameWithoutExtension = (lastIndex == std::string::npos) ? fileNameOnlyStr : fileNameOnlyStr.substr(0, lastIndex);
+        std::string cacheKey = pathOnlyStr + "*" + moduleNameWithoutExtension;
+        // auto str = moduleInternal->ResolvePath(isolate, [pathOnly UTF8String], [fileNameOnly UTF8String]);
+        auto it = moduleInternal->loadedModules_.find(cacheKey);
+
+        if (it != moduleInternal->loadedModules_.end()) {
+            moduleInternal->loadedModules_.erase(it);
+            Local<Value> outStr;
+            bool success = it->second->Get(isolate)->Get(isolate->GetCurrentContext(), tns::ToV8String(isolate, "id")).ToLocal(&outStr);
+            if(success) {
+                it = moduleInternal->loadedModules_.find(tns::ToString(isolate, outStr));
+                if (it != moduleInternal->loadedModules_.end()) {
+                    moduleInternal->loadedModules_.erase(it);
+                }
+            }
+            info.GetReturnValue().Set(v8::Boolean::New(isolate, true));
+        }
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
+    }
+}
+void ModuleInternal::cacheEnumeratorCallback(const v8::PropertyCallbackInfo<v8::Array>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    try {
+        ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(info.Data().As<v8::Array>()->Get(isolate->GetCurrentContext(), 0).ToLocalChecked().As<External>()->Value());
+        v8::Local<v8::Array> result = v8::Array::New(isolate, (int)moduleInternal->loadedModules_.size());
+        int i = 0;
+        for(auto it = moduleInternal->loadedModules_.begin(); it != moduleInternal->loadedModules_.end(); ++it) {
+            bool success = result->Set(isolate->GetCurrentContext(), i++, tns::ToV8String(isolate, it->first)).FromMaybe(false);
+            tns::Assert(success, isolate);
+        }
+        info.GetReturnValue().Set(result);
+        
+    } catch (NativeScriptException& ex) {
+        ex.ReThrowToV8(isolate);
+    }
+    
+}
+
 Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const std::string& dirName) {
     Local<v8::Function> requireFuncFactory = requireFactoryFunction_->Get(isolate);
     Local<Context> context = isolate->GetCurrentContext();
@@ -76,6 +212,16 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const s
     Local<Object> thiz = Object::New(isolate);
     bool success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
     tns::Assert(success && !result.IsEmpty() && result->IsFunction(), isolate);
+    v8::Local<v8::ObjectTemplate> templ = ObjectTemplate::New(isolate);
+    Local<v8::Array> cacheArgs = v8::Array::New(isolate, 2);
+    success = cacheArgs->Set(context, 0, External::New(isolate, this)).FromMaybe(false);
+    tns::Assert(success, isolate);
+    success = cacheArgs->Set(context, 1, tns::ToV8String(isolate, dirName.c_str())).FromMaybe(false);
+    tns::Assert(success, isolate);
+    templ->SetHandler(v8::NamedPropertyHandlerConfiguration(cacheGetterCallback, cacheSetterCallback, nullptr, cacheDeleterCallback, cacheEnumeratorCallback, cacheArgs));
+    
+    success = result.As<v8::Function>()->DefineOwnProperty(context, tns::ToV8String(isolate, "cache"),  templ->NewInstance(context).ToLocalChecked()).FromMaybe(false);
+    tns::Assert(success, isolate);
 
     return result.As<v8::Function>();
 }
