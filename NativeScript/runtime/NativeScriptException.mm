@@ -11,6 +11,7 @@ namespace tns {
 NativeScriptException::NativeScriptException(const std::string& message) {
     this->javascriptException_ = nullptr;
     this->message_ = message;
+    this->name_ = "NativeScriptException";
 }
 
 NativeScriptException::NativeScriptException(Isolate* isolate, TryCatch& tc, const std::string& message) {
@@ -19,13 +20,25 @@ NativeScriptException::NativeScriptException(Isolate* isolate, TryCatch& tc, con
     this->message_ = GetErrorMessage(isolate, error, message);
     this->stackTrace_ = GetErrorStackTrace(isolate, tc.Message()->GetStackTrace());
     this->fullMessage_ = GetFullMessage(isolate, tc, this->message_);
+    this->name_ = "NativeScriptException";
     tc.Reset();
+}
+
+NativeScriptException::NativeScriptException(Isolate* isolate, const std::string& message, const std::string& name) {
+    this->name_ = name;
+    Local<Value> error = Exception::Error(tns::ToV8String(isolate, message));
+    auto context = Caches::Get(isolate)->GetContext();
+    error.As<Object>()->Set(context, ToV8String(isolate, "name"), ToV8String(isolate, this->name_)).FromMaybe(false);
+    this->javascriptException_ = new Persistent<Value>(isolate, error);
+    this->message_ = GetErrorMessage(isolate, error, message);
+    this->stackTrace_ = GetErrorStackTrace(isolate, Exception::GetStackTrace(error));
+    this->fullMessage_ = GetFullMessage(isolate, Exception::CreateMessage(isolate, error), this->message_);
 }
 NativeScriptException::~NativeScriptException() {
     delete this->javascriptException_;
 }
 
-void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value> error) {
+void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Value> error) {
     Isolate* isolate = message->GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = context->Global();
@@ -177,11 +190,18 @@ std::string NativeScriptException::GetErrorStackTrace(Isolate* isolate, const Lo
 
     return ss.str();
 }
-
 std::string NativeScriptException::GetFullMessage(Isolate* isolate, const TryCatch& tc, const std::string& jsExceptionMessage) {
-    Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
+    std::string loggedMessage = GetFullMessage(isolate, tc.Message(), jsExceptionMessage);
+    if (!tc.CanContinue()) {
+        std::stringstream errM;
+        errM << std::endl << "An uncaught error has occurred and V8's TryCatch block CAN'T be continued. ";
+        loggedMessage = errM.str() + loggedMessage;
+    }
+    return loggedMessage;
+}
 
-    Local<Message> message = tc.Message();
+std::string NativeScriptException::GetFullMessage(Isolate* isolate, Local<v8::Message> message, const std::string& jsExceptionMessage) {
+    Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
 
     std::stringstream ss;
     ss << jsExceptionMessage;
@@ -204,12 +224,6 @@ std::string NativeScriptException::GetFullMessage(Isolate* isolate, const TryCat
 
     // TODO: Log the error
     // tns::LogError(isolate, tc);
-
-    if (!tc.CanContinue()) {
-        std::stringstream errM;
-        errM << std::endl << "An uncaught error has occurred and V8's TryCatch block CAN'T be continued. ";
-        loggedMessage = errM.str() + loggedMessage;
-    }
 
     return loggedMessage;
 }
