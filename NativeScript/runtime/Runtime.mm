@@ -23,6 +23,8 @@
 #include "DisposerPHV.h"
 
 #include "ModuleBinding.hpp"
+#include "URLImpl.h"
+#include "URLSearchParamsImpl.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -313,6 +315,21 @@ bool Runtime::IsAlive(const Isolate* isolate) {
     }
     SpinLock lock(isolatesMutex_);
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
+}
+
+
+void Runtime::DefineURL(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+    auto URLTemplate = URLImpl::GetCtor(isolate);
+
+    Local<v8::String> urlPropertyName = ToV8String(isolate, "URLImpl");
+    globalTemplate->Set(urlPropertyName, URLTemplate);
+}
+
+void Runtime::DefineURLSearchParams(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+    auto URLSearchParamsTemplate = URLSearchParamsImpl::GetCtor(isolate);
+
+    Local<v8::String> urlSearchParamsPropertyName = ToV8String(isolate, "URLSearchParamsImpl");
+    globalTemplate->Set(urlSearchParamsPropertyName, URLSearchParamsTemplate);
 }
 
 std::shared_ptr<Platform> Runtime::platform_;
