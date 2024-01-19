@@ -8,7 +8,7 @@
 using namespace tns;
 using namespace ada;
 
-URLImpl::URLImpl(url url) : url_(url) {}
+URLImpl::URLImpl(url_aggregator url) : url_(url) {}
 
 URLImpl *URLImpl::GetPointer(v8::Local<v8::Object> object) {
     auto ptr = object->GetAlignedPointerFromInternalField(0);
@@ -18,7 +18,7 @@ URLImpl *URLImpl::GetPointer(v8::Local<v8::Object> object) {
     return static_cast<URLImpl *>(ptr);
 }
 
-url *URLImpl::GetURL() {
+url_aggregator *URLImpl::GetURL() {
     return &this->url_;
 }
 
@@ -92,7 +92,7 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
         return;
     }
 
-    url url;
+    url_aggregator url;
 
     auto url_string = tns::ToString(isolate, args[0].As<v8::String>());
 
@@ -106,9 +106,9 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
                         v8::Exception::TypeError(ToV8String(isolate, "")));
                 return;
             }
-            auto base_url = ada::parse<ada::url>(base_string_view, nullptr);
+            auto base_url = ada::parse<ada::url_aggregator>(base_string_view, nullptr);
 
-            auto result = ada::parse<ada::url>(url_string, &base_url.value());
+            auto result = ada::parse<ada::url_aggregator>(url_string, &base_url.value());
 
             if (result) {
                 url = result.value();
@@ -129,9 +129,9 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
             }
 
 
-            auto base_url = ada::parse<ada::url>(base_string_view, nullptr);
+            auto base_url = ada::parse<ada::url_aggregator>(base_string_view, nullptr);
 
-            auto result = ada::parse<ada::url>(url_string, &base_url.value());
+            auto result = ada::parse<ada::url_aggregator>(url_string, &base_url.value());
 
             if (result) {
                 url = result.value();
@@ -143,7 +143,7 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value> &args) {
         }
 
     } else {
-        auto result = ada::parse<ada::url>(url_string, nullptr);
+        auto result = ada::parse<ada::url_aggregator>(url_string, nullptr);
         if (result) {
             url = result.value();
         } else {
@@ -176,12 +176,8 @@ void URLImpl::GetHash(v8::Local<v8::String> property,
     }
     auto isolate = info.GetIsolate();
 
-    auto value = ptr->GetURL()->hash;
-    if (value) {
-        info.GetReturnValue().Set(ToV8String(isolate, value.value()));
-    } else {
-        info.GetReturnValue().SetEmptyString();
-    }
+    auto value = ptr->GetURL()->get_hash();
+    info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
 
 }
 
@@ -208,12 +204,9 @@ void URLImpl::GetHost(v8::Local<v8::String> property,
     }
     auto isolate = info.GetIsolate();
 
-    auto value = ptr->GetURL()->host;
-    if (value) {
-        info.GetReturnValue().Set(ToV8String(isolate, value.value()));
-    } else {
-        info.GetReturnValue().SetEmptyString();
-    }
+    auto value = ptr->GetURL()->get_host();
+    info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
+    
 }
 
 void URLImpl::SetHost(v8::Local<v8::String> property,
@@ -240,7 +233,7 @@ void URLImpl::GetHostName(v8::Local<v8::String> property,
     auto isolate = info.GetIsolate();
     auto value = ptr->GetURL()->get_hostname();
 
-    info.GetReturnValue().Set(ToV8String(isolate, value.c_str()));
+    info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
 
 }
 
@@ -269,7 +262,7 @@ void URLImpl::GetHref(v8::Local<v8::String> property,
 
     auto value = ptr->GetURL()->get_hostname();
 
-    info.GetReturnValue().Set(ToV8String(isolate, value.c_str()));
+    info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
 
 }
 
@@ -312,7 +305,7 @@ void URLImpl::GetPassword(v8::Local<v8::String> property,
 
     auto value = ptr->GetURL()->get_password();
 
-    info.GetReturnValue().Set(ToV8String(isolate, value.c_str()));
+    info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
 
 }
 
@@ -368,7 +361,7 @@ void URLImpl::GetPort(v8::Local<v8::String> property,
 
     auto value = ptr->GetURL()->get_port();
 
-    info.GetReturnValue().Set(ToV8String(isolate, value.c_str()));
+    info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
 
 }
 
@@ -396,7 +389,7 @@ void URLImpl::GetProtocol(v8::Local<v8::String> property,
 
     auto value = ptr->GetURL()->get_protocol();
 
-    info.GetReturnValue().Set(ToV8String(isolate, value.c_str()));
+    info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
 
 }
 
@@ -425,7 +418,7 @@ void URLImpl::GetSearch(v8::Local<v8::String> property,
 
     auto value = ptr->GetURL()->get_search();
 
-    info.GetReturnValue().Set(ToV8String(isolate, value.c_str()));
+    info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
 
 }
 
@@ -454,7 +447,7 @@ void URLImpl::GetUserName(v8::Local<v8::String> property,
 
     auto value = ptr->GetURL()->get_username();
 
-    info.GetReturnValue().Set(ToV8String(isolate, value.c_str()));
+    info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
 
 }
 

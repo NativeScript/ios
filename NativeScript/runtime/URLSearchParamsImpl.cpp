@@ -20,7 +20,7 @@ namespace tns {
 
     v8::Local<v8::FunctionTemplate> URLSearchParamsImpl::GetCtor(v8::Isolate *isolate) {
         v8::Local<v8::FunctionTemplate> ctorTmpl = v8::FunctionTemplate::New(isolate, Ctor);
-        ctorTmpl->SetClassName(ToV8String(isolate, "URLSearchParamsImpl"));
+        ctorTmpl->SetClassName(ToV8String(isolate, "URLSearchParams"));
 
         auto tmpl = ctorTmpl->InstanceTemplate();
         tmpl->SetInternalFieldCount(1);
