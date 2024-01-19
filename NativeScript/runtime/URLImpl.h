@@ -12,9 +12,9 @@ using namespace ada;
 namespace tns {
     class URLImpl {
     public:
-        URLImpl(url url);
+        URLImpl(url_aggregator url);
 
-        url *GetURL();
+        url_aggregator *GetURL();
 
         static URLImpl *GetPointer(v8::Local<v8::Object> object);
 
@@ -123,7 +123,7 @@ namespace tns {
         }
 
     private:
-        url url_;
+        url_aggregator url_;
         v8::Global<v8::Object> weakHandle_;
     };
 }
