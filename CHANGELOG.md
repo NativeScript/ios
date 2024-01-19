@@ -1,3 +1,21 @@
+## [8.6.3](https://github.com/NativeScript/ios/compare/v8.6.2...v8.6.3) (2023-11-08)
+
+
+### Bug Fixes
+
+* prevent crashes during isolate disposal ([3d70c11](https://github.com/NativeScript/ios/commit/3d70c110e1429a1d62c9b9e23020cf7044635511))
+
+
+
+## [8.6.2](https://github.com/NativeScript/ios/compare/v8.6.1...v8.6.2) (2023-11-01)
+
+
+### Bug Fixes
+
+* only reset timer persistent if Isolate is valid ([4379583](https://github.com/NativeScript/ios/commit/4379583fc0b2fa3eacde50eb471086f55c1eec18))
+
+
+
 ## [8.6.0](https://github.com/NativeScript/ios/compare/v8.5.2...v8.6.1) (2023-10-09)
 
 

@@ -36,7 +36,9 @@ public:
     }
     
     inline void Unschedule() {
-        callback_.Reset();
+        if (wrapper.IsValid()) {
+            callback_.Reset();
+        }
         args_.reset();
         isolate_ = nullptr;
         queued_ = false;
