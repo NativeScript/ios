@@ -15,10 +15,14 @@ namespace tns {
         URLImpl(url_aggregator url);
 
         url_aggregator *GetURL();
+        
+        static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+        
 
         static URLImpl *GetPointer(v8::Local<v8::Object> object);
 
         static v8::Local<v8::FunctionTemplate> GetCtor(v8::Isolate *isolate);
+        
 
         static void Ctor(const v8::FunctionCallbackInfo<v8::Value> &args);
 

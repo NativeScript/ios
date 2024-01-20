@@ -4,11 +4,19 @@
 
 #include "URLSearchParamsImpl.h"
 #include "Helpers.h"
+#include "ModuleBinding.hpp"
 
 using namespace ada;
 
 namespace tns {
     URLSearchParamsImpl::URLSearchParamsImpl(ada::url_search_params params) : params_(params) {}
+
+    void URLSearchParamsImpl::Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate) {
+        auto URLSearchParamsTemplate = URLSearchParamsImpl::GetCtor(isolate);
+
+        v8::Local<v8::String> urlSearchParamsPropertyName = ToV8String(isolate, "URLSearchParams");
+        globalTemplate->Set(urlSearchParamsPropertyName, URLSearchParamsTemplate);
+    }
 
     URLSearchParamsImpl *URLSearchParamsImpl::GetPointer(v8::Local<v8::Object> object) {
         auto ptr = object->GetAlignedPointerFromInternalField(0);
@@ -347,3 +355,6 @@ namespace tns {
     }
 
 } // tns
+
+
+NODE_BINDING_PER_ISOLATE_INIT_OBJ(urlsearchparams, tns::URLSearchParamsImpl::Init)

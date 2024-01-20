@@ -58,7 +58,9 @@ namespace tns {
 
 #define NODE_BINDINGS_WITH_PER_ISOLATE_INIT(V) \
 V(worker) \
-V(timers)
+V(timers) \
+V(url) \
+V(urlsearchparams)
 
 enum {
     NM_F_BUILTIN = 1 << 0,  // Unused.
