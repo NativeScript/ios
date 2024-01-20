@@ -10,7 +10,6 @@
 		39940D9122C4EF600050DDE1 /* NativeScript.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 39940D8C22C4EAAA0050DDE1 /* NativeScript.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		39940E1C22C5DFFF0050DDE1 /* TKLiveSync.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 39940E1B22C5DFFF0050DDE1 /* TKLiveSync.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		858B842D18CA22B800AB12DE /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 858B833A18CA111C00AB12DE /* InfoPlist.strings */; };
-		AA667DCD2B5B2FE200F836A0 /* NativeScriptMainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA667DCC2B5B2FE200F836A0 /* NativeScriptMainWindow.swift */; };
 		AA667DD02B5B305900F836A0 /* NativeScriptEmbedder.m in Sources */ = {isa = PBXBuildFile; fileRef = AA667DCE2B5B305900F836A0 /* NativeScriptEmbedder.m */; };
 		AAA0AADB2A54B96B00EE55A4 /* NativeScriptStart.m in Sources */ = {isa = PBXBuildFile; fileRef = AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */; };
 		CD45EE7C18DC2D5800FB50C0 /* app in Resources */ = {isa = PBXBuildFile; fileRef = CD45EE7A18DC2D5800FB50C0 /* app */; };
@@ -50,7 +49,7 @@
 		858B833F18CA111C00AB12DE /* __PROJECT_NAME__-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "__PROJECT_NAME__-Prefix.pch"; sourceTree = "<group>"; };
 		858B843318CA22B800AB12DE /* __PROJECT_NAME__.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = __PROJECT_NAME__.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		930F05DB22671AE300D269DC /* Swift-ObjC-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Swift-ObjC-Bridging-Header.h"; path = "internal/Swift-ObjC-Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
-		AA667DCC2B5B2FE200F836A0 /* NativeScriptMainWindow.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = NativeScriptMainWindow.swift; path = internal/NativeScriptMainWindow.swift; sourceTree = SOURCE_ROOT; };
+		AA5E89E22B5C318D008AFA28 /* macros.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = macros.h; path = internal/macros.h; sourceTree = SOURCE_ROOT; };
 		AA667DCE2B5B305900F836A0 /* NativeScriptEmbedder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = NativeScriptEmbedder.m; path = internal/NativeScriptEmbedder.m; sourceTree = SOURCE_ROOT; };
 		AA667DCF2B5B305900F836A0 /* NativeScriptEmbedder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NativeScriptEmbedder.h; path = internal/NativeScriptEmbedder.h; sourceTree = SOURCE_ROOT; };
 		AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = NativeScriptStart.m; path = internal/NativeScriptStart.m; sourceTree = SOURCE_ROOT; };
@@ -76,10 +75,10 @@
 		39940D8E22C4EBCC0050DDE1 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				AA5E89E22B5C318D008AFA28 /* macros.h */,
 				CD62955C1BB2678900AE3A93 /* main.m */,
 				AA667DCF2B5B305900F836A0 /* NativeScriptEmbedder.h */,
 				AA667DCE2B5B305900F836A0 /* NativeScriptEmbedder.m */,
-				AA667DCC2B5B2FE200F836A0 /* NativeScriptMainWindow.swift */,
 				AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */,
 				AAA0AADC2A54B97E00EE55A4 /* NativeScriptStart.h */,
 				858B833F18CA111C00AB12DE /* __PROJECT_NAME__-Prefix.pch */,
@@ -296,7 +295,6 @@
 				CD62955D1BB2678900AE3A93 /* main.m in Sources */,
 				AA667DD02B5B305900F836A0 /* NativeScriptEmbedder.m in Sources */,
 				AAA0AADB2A54B96B00EE55A4 /* NativeScriptStart.m in Sources */,
-				AA667DCD2B5B2FE200F836A0 /* NativeScriptMainWindow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -450,7 +448,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_NAME = __PROJECT_NAME__;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
@@ -484,7 +482,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_NAME = __PROJECT_NAME__;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;

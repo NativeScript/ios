@@ -14,8 +14,6 @@
 extern char startOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
 NativeScript* nativescript;
 
-#ifndef NS_DISABLE_MAIN_BOOT
-
 int main(int argc, char *argv[]) {
    @autoreleasepool {
        NSString* baseDir = [[NSBundle mainBundle] resourcePath];
@@ -62,5 +60,3 @@ int main(int argc, char *argv[]) {
        return 0;
    }
 }
-
-#endif

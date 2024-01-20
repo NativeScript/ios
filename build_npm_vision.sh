@@ -2,13 +2,14 @@
 set -e
 source "$(dirname "$0")/build_utils.sh"
 
-checkpoint "Preparing npm package..."
+checkpoint "Preparing npm package for visionOS..."
 OUTPUT_DIR="dist/npm"
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/framework"
 cp ./package.json "$OUTPUT_DIR"
-cp -r "./project-template/" "$OUTPUT_DIR/framework"
+
+cp -r "./project-template-vision/" "$OUTPUT_DIR/framework"
 
 cp -r "dist/NativeScript.xcframework" "$OUTPUT_DIR/framework/internal"
 cp -r "dist/TKLiveSync.xcframework" "$OUTPUT_DIR/framework/internal"

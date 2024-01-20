@@ -7,4 +7,4 @@ rm -rf ./dist
 ./build_nativescript.sh
 ./build_tklivesync.sh
 ./prepare_dSYMs.sh
-./build_npm.sh
+./build_npm_vision.sh
