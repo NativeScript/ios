@@ -7,16 +7,14 @@
 #ifdef DEBUG
 #include <notify.h>
 #include <TKLiveSync/TKLiveSync.h>
-
-#define NOTIFICATION(name)                                                      \
-   [[NSString stringWithFormat:@"%@:NativeScript.Debug.%s",                    \
-       [[NSBundle mainBundle] bundleIdentifier], name] UTF8String]
+#include "macros.h"
 #endif
 
-#ifdef USE_LEGACY_BOOT
 
 extern char startOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
 NativeScript* nativescript;
+
+#ifndef NS_DISABLE_MAIN_BOOT
 
 int main(int argc, char *argv[]) {
    @autoreleasepool {

@@ -10,6 +10,8 @@
 		39940D9122C4EF600050DDE1 /* NativeScript.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 39940D8C22C4EAAA0050DDE1 /* NativeScript.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		39940E1C22C5DFFF0050DDE1 /* TKLiveSync.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 39940E1B22C5DFFF0050DDE1 /* TKLiveSync.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		858B842D18CA22B800AB12DE /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 858B833A18CA111C00AB12DE /* InfoPlist.strings */; };
+		AA667DCD2B5B2FE200F836A0 /* NativeScriptMainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA667DCC2B5B2FE200F836A0 /* NativeScriptMainWindow.swift */; };
+		AA667DD02B5B305900F836A0 /* NativeScriptEmbedder.m in Sources */ = {isa = PBXBuildFile; fileRef = AA667DCE2B5B305900F836A0 /* NativeScriptEmbedder.m */; };
 		AAA0AADB2A54B96B00EE55A4 /* NativeScriptStart.m in Sources */ = {isa = PBXBuildFile; fileRef = AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */; };
 		CD45EE7C18DC2D5800FB50C0 /* app in Resources */ = {isa = PBXBuildFile; fileRef = CD45EE7A18DC2D5800FB50C0 /* app */; };
 		CD62955D1BB2678900AE3A93 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = CD62955C1BB2678900AE3A93 /* main.m */; };
@@ -48,6 +50,9 @@
 		858B833F18CA111C00AB12DE /* __PROJECT_NAME__-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "__PROJECT_NAME__-Prefix.pch"; sourceTree = "<group>"; };
 		858B843318CA22B800AB12DE /* __PROJECT_NAME__.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = __PROJECT_NAME__.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		930F05DB22671AE300D269DC /* Swift-ObjC-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Swift-ObjC-Bridging-Header.h"; path = "internal/Swift-ObjC-Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
+		AA667DCC2B5B2FE200F836A0 /* NativeScriptMainWindow.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = NativeScriptMainWindow.swift; path = internal/NativeScriptMainWindow.swift; sourceTree = SOURCE_ROOT; };
+		AA667DCE2B5B305900F836A0 /* NativeScriptEmbedder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = NativeScriptEmbedder.m; path = internal/NativeScriptEmbedder.m; sourceTree = SOURCE_ROOT; };
+		AA667DCF2B5B305900F836A0 /* NativeScriptEmbedder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NativeScriptEmbedder.h; path = internal/NativeScriptEmbedder.h; sourceTree = SOURCE_ROOT; };
 		AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = NativeScriptStart.m; path = internal/NativeScriptStart.m; sourceTree = SOURCE_ROOT; };
 		AAA0AADC2A54B97E00EE55A4 /* NativeScriptStart.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NativeScriptStart.h; path = internal/NativeScriptStart.h; sourceTree = SOURCE_ROOT; };
 		CD45EE7A18DC2D5800FB50C0 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
@@ -72,6 +77,9 @@
 			isa = PBXGroup;
 			children = (
 				CD62955C1BB2678900AE3A93 /* main.m */,
+				AA667DCF2B5B305900F836A0 /* NativeScriptEmbedder.h */,
+				AA667DCE2B5B305900F836A0 /* NativeScriptEmbedder.m */,
+				AA667DCC2B5B2FE200F836A0 /* NativeScriptMainWindow.swift */,
 				AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */,
 				AAA0AADC2A54B97E00EE55A4 /* NativeScriptStart.h */,
 				858B833F18CA111C00AB12DE /* __PROJECT_NAME__-Prefix.pch */,
@@ -190,6 +198,7 @@
 				ORGANIZATIONNAME = NativeScript;
 				TargetAttributes = {
 					858B83EF18CA22B800AB12DE = {
+						LastSwiftMigration = 1520;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -285,7 +294,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				CD62955D1BB2678900AE3A93 /* main.m in Sources */,
+				AA667DD02B5B305900F836A0 /* NativeScriptEmbedder.m in Sources */,
 				AAA0AADB2A54B96B00EE55A4 /* NativeScriptStart.m in Sources */,
+				AA667DCD2B5B2FE200F836A0 /* NativeScriptMainWindow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -350,7 +361,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SUPPORTS_UIKITFORMAC = YES;
@@ -403,7 +414,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				SDKROOT = iphoneos;
 				SUPPORTS_UIKITFORMAC = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "$SRCROOT/internal/Swift-ObjC-Bridging-Header.h";
@@ -417,6 +428,7 @@
 			baseConfigurationReference = CDD59A261BB43B5D00EC2671 /* build-debug.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = __PROJECT_NAME__/__PROJECT_NAME__.entitlements;
 				ENABLE_BITCODE = NO;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
@@ -432,16 +444,19 @@
 					"\"$(SRCROOT)/internal\"",
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/__PROJECT_NAME__/__PROJECT_NAME__-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_NAME = __PROJECT_NAME__;
-				SUPPORTED_PLATFORMS = "xros xrsimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
@@ -451,6 +466,7 @@
 			baseConfigurationReference = CDD59A271BB43B5D00EC2671 /* build-release.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = __PROJECT_NAME__/__PROJECT_NAME__.entitlements;
 				ENABLE_BITCODE = NO;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
@@ -462,16 +478,18 @@
 					"$(SRCROOT)/internal",
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/__PROJECT_NAME__/__PROJECT_NAME__-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_NAME = __PROJECT_NAME__;
-				SUPPORTED_PLATFORMS = "xros xrsimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;

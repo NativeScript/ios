@@ -12,3 +12,4 @@
 
 #import "NativeScript/NativeScript.h"
 #import "NativeScriptStart.h"
+#import "NativeScriptEmbedder.h"

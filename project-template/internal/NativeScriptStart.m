@@ -12,14 +12,11 @@
 #ifdef DEBUG
 #include <notify.h>
 #include <TKLiveSync/TKLiveSync.h>
-
-#define NOTIFICATION(name)                                                      \
-    [[NSString stringWithFormat:@"%@:NativeScript.Debug.%s",                    \
-        [[NSBundle mainBundle] bundleIdentifier], name] UTF8String]
+#include "macros.h"
 #endif
 
 extern char startOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
-NativeScript* nativescript;
+NativeScript* nativescriptStart;
 
 @implementation NativeScriptStart
 
@@ -31,7 +28,7 @@ NativeScript* nativescript;
              int refreshRequestSubscription;
              notify_register_dispatch(NOTIFICATION("RefreshRequest"), &refreshRequestSubscription, dispatch_get_main_queue(), ^(int token) {
                  notify_post(NOTIFICATION("AppRefreshStarted"));
-                 bool success = [nativescript liveSync];
+                 bool success = [nativescriptStart liveSync];
                  if (success) {
                      notify_post(NOTIFICATION("AppRefreshSucceeded"));
                  } else {
@@ -63,12 +60,14 @@ NativeScript* nativescript;
 //             config.ArgumentsCount = argc;
 //             config.Arguments = argv;
 
-             nativescript = [[NativeScript alloc] initWithConfig:config];
+            nativescriptStart = [[NativeScript alloc] initWithConfig:config];
 
          }
 
 }
 +(void)boot{
-    [nativescript runMainApplication];
+    [nativescriptStart runMainApplication];
 }
 @end
+
+
