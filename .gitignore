@@ -50,3 +50,7 @@ llvm/
 # v8 build files...
 .gclient*
 .cipd/
+
+# project template
+/project-template/.build_env_vars.sh
+/project-template/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
