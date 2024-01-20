@@ -4,11 +4,19 @@
 
 #include "URLImpl.h"
 #include "Helpers.h"
+#include "ModuleBinding.hpp"
 
 using namespace tns;
 using namespace ada;
 
 URLImpl::URLImpl(url_aggregator url) : url_(url) {}
+
+void URLImpl::Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate) {
+    auto URLTemplate = URLImpl::GetCtor(isolate);
+
+    v8::Local<v8::String> urlPropertyName = ToV8String(isolate, "URL");
+    globalTemplate->Set(urlPropertyName, URLTemplate);
+}
 
 URLImpl *URLImpl::GetPointer(v8::Local<v8::Object> object) {
     auto ptr = object->GetAlignedPointerFromInternalField(0);
@@ -474,9 +482,9 @@ void URLImpl::ToString(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
 
-    auto value = ptr->GetURL()->to_string();
+    auto value = ptr->GetURL()->get_href();
 
-    auto ret = ToV8String(isolate, value.c_str());
+    auto ret = ToV8String(isolate, value.data(), (int)value.length());
 
     args.GetReturnValue().Set(ret);
 }
@@ -499,3 +507,6 @@ void URLImpl::CanParse(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
     args.GetReturnValue().Set(value);
 }
+
+
+NODE_BINDING_PER_ISOLATE_INIT_OBJ(url, tns::URLImpl::Init)

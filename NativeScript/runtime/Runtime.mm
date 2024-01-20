@@ -185,7 +185,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     URL.createObjectURL = function (object, options = null) {
         try {
             if (object instanceof Blob || object instanceof File) {
-                const id = java.util.UUID.randomUUID().toString();
+                const id = NSUUID.UUID().UUIDString;
                 const ret = `blob:nativescript/${id}`;
                 BLOB_STORE.set(ret, {
                     blob: object,
@@ -251,11 +251,6 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
         done = script->Run(context).ToLocal(&outVal);
     }
       
-    
-    
-    
-    
-    
     
 
     this->moduleInternal_ = std::make_unique<ModuleInternal>(context);
@@ -394,21 +389,6 @@ bool Runtime::IsAlive(const Isolate* isolate) {
     }
     SpinLock lock(isolatesMutex_);
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
-}
-
-
-void Runtime::DefineURL(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
-    auto URLTemplate = URLImpl::GetCtor(isolate);
-
-    Local<v8::String> urlPropertyName = ToV8String(isolate, "URL");
-    globalTemplate->Set(urlPropertyName, URLTemplate);
-}
-
-void Runtime::DefineURLSearchParams(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
-    auto URLSearchParamsTemplate = URLSearchParamsImpl::GetCtor(isolate);
-
-    Local<v8::String> urlSearchParamsPropertyName = ToV8String(isolate, "URLSearchParams");
-    globalTemplate->Set(urlSearchParamsPropertyName, URLSearchParamsTemplate);
 }
 
 std::shared_ptr<Platform> Runtime::platform_;

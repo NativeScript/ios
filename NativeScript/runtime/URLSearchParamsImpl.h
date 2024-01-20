@@ -19,6 +19,8 @@ namespace tns {
 
         static v8::Local<v8::FunctionTemplate> GetCtor(v8::Isolate *isolate);
 
+        static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+        
         static void Ctor(const v8::FunctionCallbackInfo<v8::Value> &args);
 
         static void Append(const v8::FunctionCallbackInfo<v8::Value> &args);
