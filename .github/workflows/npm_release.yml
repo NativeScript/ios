@@ -11,7 +11,7 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: macos-12
+    runs-on: macos-13
     outputs:
       npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
@@ -26,7 +26,7 @@ jobs:
           key: ${{ hashFiles('download_llvm.sh') }}
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
           registry-url: "https://registry.npmjs.org"
       - name: Install Python
         uses: actions/setup-python@v4
@@ -68,7 +68,7 @@ jobs:
           path: dist/dSYMs
   test:
     name: Test
-    runs-on: macos-12
+    runs-on: macos-13
     needs: build
     steps:
       - uses: actions/checkout@v3
@@ -79,7 +79,7 @@ jobs:
           key: ${{ hashFiles('download_llvm.sh') }}
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
       - name: Install Python
         uses: actions/setup-python@v4
         with:
@@ -133,7 +133,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
           registry-url: "https://registry.npmjs.org"
       - uses: actions/download-artifact@v3
         with:
@@ -162,7 +162,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
       - name: Setup
         run: npm install
       - uses: actions/download-artifact@v3
