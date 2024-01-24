@@ -9,10 +9,9 @@ jobs:
     name: Build
     runs-on: macos-latest
     steps:
-    - uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: latest-stable
-    steps:
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -57,12 +56,11 @@ jobs:
   test:
     name: Test
     runs-on: macos-latest
-    steps:
-    - uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: latest-stable
     needs: build
     steps:
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - uses: actions/checkout@v3
       - name: LLVM cache
         uses: actions/cache@v3
