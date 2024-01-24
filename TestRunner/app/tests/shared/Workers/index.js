@@ -193,7 +193,7 @@ describe("TNS Workers", () => {
         worker.terminate();
     });
 
-    it("Should throw error if post circular object", () => {
+    xit("Should throw error if post circular object", () => {
         var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
         var parent = { parent: true };

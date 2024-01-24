@@ -6,17 +6,18 @@
 #include <string>
 #include <queue>
 #include <mutex>
+#include "Message.hpp"
 
 namespace tns {
 
 struct ConcurrentQueue {
 public:
     void Initialize(CFRunLoopRef runLoop, void (*performWork)(void*), void* info);
-    void Push(std::string message);
-    std::vector<std::string> PopAll();
+    void Push(std::shared_ptr<worker::Message> message);
+    std::vector<std::shared_ptr<worker::Message>> PopAll();
     void Terminate();
 private:
-    std::queue<std::string> messagesQueue_;
+    std::queue<std::shared_ptr<worker::Message>> messagesQueue_;
     CFRunLoopSourceRef runLoopTasksSource_ = nullptr;
     CFRunLoopRef runLoop_ = nullptr;
     bool terminated = false;

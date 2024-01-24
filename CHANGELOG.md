@@ -1,3 +1,12 @@
+## [8.6.4-alpha.0](https://github.com/NativeScript/ios/compare/v8.6.3...v8.6.4-alpha.0) (2023-12-08)
+
+
+### Features
+
+* use messaging object to pass message to workers ([7e5d128](https://github.com/NativeScript/ios/commit/7e5d1281be7193e55934043d4fac50b916e93836))
+
+
+
 ## [8.6.3](https://github.com/NativeScript/ios/compare/v8.6.2...v8.6.3) (2023-11-08)
 
 
