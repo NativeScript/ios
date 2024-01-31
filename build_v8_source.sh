@@ -29,7 +29,7 @@ GN_ARGS_BASE="
     is_debug=false
 
     enable_ios_bitcode=false
-    ios_deployment_target=12
+    ios_deployment_target=13
     ios_enable_code_signing=false
     target_os=\"ios\"
 

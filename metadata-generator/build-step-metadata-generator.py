@@ -178,5 +178,11 @@ def generate_metadata(arch):
 
 
 for arch in env("ARCHS").split():
+    # skip metadata generation for architectures different than the one specified in the command line
+    # in case the command line argument is not specified, generate metadata for all architectures
+    if len(sys.argv) >= 2 and sys.argv[1].lower() != arch.lower():
+        print("Skipping metadata generation for " + arch)
+        continue
+
     print("Generating metadata for " + arch)
     generate_metadata(arch)

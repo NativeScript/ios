@@ -44,17 +44,19 @@ function GEN_MODULEMAP() {
 }
 
 function GEN_METADATA() {
+    TARGET_ARCH=$1
     set -e
     cpu_arch=$(uname -m)
     pushd "$SRCROOT/internal/metadata-generator-${cpu_arch}/bin"
-    ./build-step-metadata-generator.py
+    ./build-step-metadata-generator.py $TARGET_ARCH
     popd
 }
 
 # Workaround for ARCH being set to `undefined_arch` here. Extract it from command line arguments.
-GEN_MODULEMAP $(getArch "$@")
+TARGET_ARCH=$(getArch "$@")
+GEN_MODULEMAP $TARGET_ARCH
 printf "Generating metadata..."
-GEN_METADATA
+GEN_METADATA $TARGET_ARCH
 DELETE_SWIFT_MODULES_DIR
 NS_LD="${NS_LD:-"$TOOLCHAIN_DIR/usr/bin/clang"}"
 $NS_LD "$@"
