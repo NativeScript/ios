@@ -110,9 +110,9 @@ jobs:
         # the xcode tests are a bit flaky and they should never fail on this step, as this step only collects the JS test results as junit xml
         with:
           timeout_minutes: 20
-          max_attempts: 3
+          max_attempts: 2
           command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test | xcpretty
-          on_retry_command: rm -rf $TEST_FOLDER/test_results*
+          on_retry_command: rm -rf $TEST_FOLDER/test_results* && xcrun simctl shutdown all
           new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test
       - name: Validate Test Results
         run: |
