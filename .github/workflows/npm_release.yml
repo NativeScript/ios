@@ -7,6 +7,7 @@ on:
 
 env:
   NPM_TAG: "next"
+  XCODE_VERSION: "^15.0"
 
 jobs:
   build:
@@ -18,7 +19,7 @@ jobs:
     steps:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "^15.0"
+          xcode-version: ${{env.XCODE_VERSION}}
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -71,12 +72,12 @@ jobs:
           path: dist/dSYMs
   test:
     name: Test
-    runs-on: macos-13
+    runs-on: macos-14
     needs: build
     steps:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "^15.0"
+          xcode-version: ${{env.XCODE_VERSION}}
       - uses: actions/checkout@v3
       - name: LLVM cache
         uses: actions/cache@v3
