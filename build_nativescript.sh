@@ -111,17 +111,32 @@ xcodebuild archive -project v8ios.xcodeproj \
 fi
 
 if $BUILD_VISION; then
-checkpoint "Building NativeScript for visionOS"
+checkpoint "Building NativeScript for visionOS Device"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
-                   -destination "generic/platform=xrsimulator" \
+                   -destination "generic/platform=visionOS" \
+                   -sdk xros \
+                   $QUIET \
+                   EXCLUDED_ARCHS="i386 x86_64" \
+                   DEVELOPMENT_TEAM=$DEV_TEAM \
+                   SKIP_INSTALL=NO \
+                   IPHONEOS_DEPLOYMENT_TARGET=13.0 \
+                   -archivePath $DIST/intermediates/NativeScript.xros.xcarchive
+                   
+checkpoint "Building NativeScript for visionOS Simulators"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "NativeScript" \
+                   -configuration Release \
+                   -destination "generic/platform=visionOS Simulator" \
                    -sdk xrsimulator \
                    $QUIET \
                    EXCLUDED_ARCHS="i386 x86_64" \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
+                   IPHONEOS_DEPLOYMENT_TARGET=13.0 \
                    -archivePath $DIST/intermediates/NativeScript.xrsimulator.xcarchive
+
 fi
 
 if $BUILD_IPHONE; then
@@ -170,6 +185,8 @@ if $BUILD_IPHONE; then
 fi
 
 if $BUILD_VISION; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.xros.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.xros.xcarchive/dSYMs/NativeScript.framework.dSYM" )
   XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
                   -debug-symbols "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
 fi
