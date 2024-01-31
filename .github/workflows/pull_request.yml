@@ -7,7 +7,7 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
