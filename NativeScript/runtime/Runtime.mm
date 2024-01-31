@@ -185,7 +185,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     URL.createObjectURL = function (object, options = null) {
         try {
             if (object instanceof Blob || object instanceof File) {
-                const id = NSUUID.UUID().UUIDString;
+                const id = NSUUID.UUID().UUIDString.toLowerCase();
                 const ret = `blob:nativescript/${id}`;
                 BLOB_STORE.set(ret, {
                     blob: object,
