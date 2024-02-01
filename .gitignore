@@ -52,5 +52,7 @@ llvm/
 .cipd/
 
 # project template
-/project-template/.build_env_vars.sh
-/project-template/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+/project-template-ios/.build_env_vars.sh
+/project-template-ios/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/
+/project-template-vision/.build_env_vars.sh
+/project-template-vision/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
