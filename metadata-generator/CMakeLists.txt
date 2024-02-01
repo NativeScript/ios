@@ -1,5 +1,5 @@
-project(MetadataGenerator)
 cmake_minimum_required(VERSION 3.20)
+project(MetadataGenerator)
 include(CheckCCompilerFlag)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
