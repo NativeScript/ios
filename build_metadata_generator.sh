@@ -30,6 +30,6 @@ otool -L  dist/x86_64/bin/objc-metadata-generator
 
 checkpoint "Building metadata generator for arm64 ..."
 build "arm64"
-rm -rf build
 otool -L  dist/arm64/bin/objc-metadata-generator
+rm -rf build
 popd
