@@ -56,37 +56,6 @@ xcodebuild -project v8ios.xcodeproj \
            -configuration Release clean \
            -quiet
 
-if $BUILD_CATALYST; then
-#generates library for Mac Catalyst target
-checkpoint "Building TKLiveSync for Mac Catalyst"
-xcodebuild archive -project v8ios.xcodeproj \
-                   -scheme TKLiveSync \
-                   -configuration Release \
-                   -destination "platform=macOS,variant=Mac Catalyst" \
-                   -quiet \
-                   SKIP_INSTALL=NO \
-                   -archivePath $DIST/intermediates/TKLiveSync.maccatalyst.xcarchive
-fi
-
-# #generates library for x86_64 simulator target
-# xcodebuild archive -project v8ios.xcodeproj \
-#                    -scheme TKLiveSync \
-#                    -configuration Release \
-#                    -sdk iphonesimulator \
-#                    -quiet \
-#                    SKIP_INSTALL=NO \
-#                    -archivePath $DIST/TKLiveSync.x86_64-iphonesimulator.xcarchive
-
-# #generates library for arm64 simulator target
-# xcodebuild archive -project v8ios.xcodeproj \
-#                    -scheme TKLiveSync \
-#                    -configuration Release \
-#                    -sdk iphonesimulator \
-#                    -arch arm64 \
-#                    -quiet \
-#                    SKIP_INSTALL=NO \
-#                    -archivePath $DIST/TKLiveSync.arm64-iphonesimulator.xcarchive
-
 if $BUILD_SIMULATOR; then
 # generates library for simulator targets (usually includes arm64, x86_64)
 checkpoint "Building TKLiveSync for iphone simulators (multi-arch)"
@@ -94,32 +63,10 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
                    -destination "generic/platform=iOS Simulator" \
-                   -sdk iphonesimulator \
                    -quiet \
                    SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
                    -archivePath $DIST/intermediates/TKLiveSync.iphonesimulator.xcarchive
-fi
-
-if $BUILD_VISION; then
-checkpoint "Building TKLiveSync for visionOS Device"
-xcodebuild archive -project v8ios.xcodeproj \
-                   -scheme "TKLiveSync" \
-                   -configuration Release \
-                   -destination "generic/platform=visionOS" \
-                   -sdk xros \
-                   -quiet \
-                   SKIP_INSTALL=NO \
-                   -archivePath $DIST/intermediates/TKLiveSync.xros.xcarchive
-                   
-checkpoint "Building TKLiveSync for visionOS Simulators"
-xcodebuild archive -project v8ios.xcodeproj \
-                   -scheme "TKLiveSync" \
-                   -configuration Release \
-                   -destination "generic/platform=visionOS Simulator" \
-                   -sdk xrsimulator \
-                   -quiet \
-                   SKIP_INSTALL=NO \
-                   -archivePath $DIST/intermediates/TKLiveSync.xrsimulator.xcarchive
 fi
 
 if $BUILD_IPHONE; then
@@ -129,10 +76,46 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
                    -destination "generic/platform=iOS" \
-                   -sdk iphoneos \
                    -quiet \
                    SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
                    -archivePath $DIST/intermediates/TKLiveSync.iphoneos.xcarchive
+fi
+
+if $BUILD_CATALYST; then
+#generates library for Mac Catalyst target
+checkpoint "Building TKLiveSync for Mac Catalyst"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme TKLiveSync \
+                   -configuration Release \
+                   -destination "generic/platform=macOS,variant=Mac Catalyst" \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/TKLiveSync.maccatalyst.xcarchive
+fi
+
+if $BUILD_VISION; then
+#generates library for visionOS targets
+checkpoint "Building TKLiveSync for visionOS Simulators"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "TKLiveSync" \
+                   -configuration Release \
+                   -destination "generic/platform=visionOS Simulator" \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/TKLiveSync.xrsimulator.xcarchive
+
+checkpoint "Building TKLiveSync for visionOS Device"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "TKLiveSync" \
+                   -configuration Release \
+                   -destination "generic/platform=visionOS" \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/TKLiveSync.xros.xcarchive
 fi
 
 #Creates directory for fat-library
@@ -181,6 +164,7 @@ fi
 checkpoint "Creating TKLiveSync.xcframework"
 OUTPUT_DIR="$DIST/TKLiveSync.xcframework"
 rm -rf $OUTPUT_DIR
+echo xcodebuild -create-xcframework ${XCFRAMEWORKS[@]} -output "$OUTPUT_DIR"
 xcodebuild -create-xcframework ${XCFRAMEWORKS[@]} -output "$OUTPUT_DIR"
 
 rm -rf "$DIST/intermediates"

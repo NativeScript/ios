@@ -2265,6 +2265,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TKLiveSync;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = YES;
@@ -2302,6 +2303,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TKLiveSync;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = YES;
@@ -2767,6 +2769,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = YES;
@@ -2851,6 +2854,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = YES;
