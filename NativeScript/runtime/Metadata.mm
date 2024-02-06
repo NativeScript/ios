@@ -18,9 +18,9 @@ void LogMetadataUnavailable(const char* identifierString, uint8_t majorVersion, 
 }
 
 // #ifndef TARGET_OS_VISION
-// /**
-//  * \brief Gets the system version of the current device.
-//  */
+/**
+ * \brief Gets the system version of the current device.
+ */
 // static UInt8 getSystemVersion() {
 //    static UInt8 iosVersion;
 //    if (iosVersion != 0) {

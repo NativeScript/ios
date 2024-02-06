@@ -1,7 +1,7 @@
 {
-  "name": "@nativescript/ios",
-  "description": "NativeScript Runtime for iOS",
-  "version": "9.0.0-dev.0",
+  "name": "@nativescript/visionos",
+  "description": "NativeScript Runtime for visionOS",
+  "version": "9.0.0-alpha.3",
   "keywords": [
     "NativeScript",
     "iOS",
