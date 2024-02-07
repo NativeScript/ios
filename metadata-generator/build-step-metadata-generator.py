@@ -51,6 +51,10 @@ elif effective_platform_name == "-xrsimulator":
     docset_platform = "xros"
     default_deployment_target_flag_name = "-mxrossimulator-version-min"
     default_deployment_target_clang_env_name = "XROS_DEPLOYMENT_TARGET"
+elif effective_platform_name == "-xros":
+    docset_platform = "xros"
+    default_deployment_target_flag_name = "-mxros-version-min"
+    default_deployment_target_clang_env_name = "XROS_DEPLOYMENT_TARGET"
 elif effective_platform_name == "-watchos":
     docset_platform = "watchOS"
     default_deployment_target_flag_name = "-mwatchos-version-min"
