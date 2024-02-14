@@ -426,7 +426,6 @@
 			baseConfigurationReference = CDD59A261BB43B5D00EC2671 /* build-debug.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
-				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_ENTITLEMENTS = __PROJECT_NAME__/__PROJECT_NAME__.entitlements;
 				ENABLE_BITCODE = NO;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
