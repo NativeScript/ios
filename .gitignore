@@ -45,7 +45,7 @@ v8
 v8_build
 .npmrc
 
-llvm/
+/llvm/
 
 # v8 build files...
 .gclient*
