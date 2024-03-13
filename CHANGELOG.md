@@ -1,3 +1,12 @@
+## [8.6.4](https://github.com/NativeScript/ios/compare/v8.6.3...v8.6.4) (2024-03-13)
+
+
+### Bug Fixes
+
+* Xcode 15.3+ not setting TARGET_OS_IPHONE correctly ([#242](https://github.com/NativeScript/ios/issues/242)) ([d2f4ee4](https://github.com/NativeScript/ios/commit/d2f4ee4074b36d43f31d41048a08233b3912a5a1))
+
+
+
 ## [8.6.3](https://github.com/NativeScript/ios/compare/v8.6.2...v8.6.3) (2023-11-08)
 
 
