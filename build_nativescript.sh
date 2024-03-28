@@ -104,19 +104,6 @@ fi
 
 if $BUILD_VISION; then
 
-checkpoint "Building NativeScript for visionOS Simulators"
-xcodebuild archive -project v8ios.xcodeproj \
-                   -scheme "NativeScript" \
-                   -configuration Release \
-                   -destination "generic/platform=visionOS Simulator" \
-                   $QUIET \
-                   EXCLUDED_ARCHS="i386 x86_64" \
-                   DEVELOPMENT_TEAM=$DEV_TEAM \
-                   SKIP_INSTALL=NO \
-                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
-                   IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-                   -archivePath $DIST/intermediates/NativeScript.xrsimulator.xcarchive
-
 checkpoint "Building NativeScript for visionOS Device"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
@@ -124,11 +111,24 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -destination "generic/platform=visionOS" \
                    $QUIET \
                    EXCLUDED_ARCHS="i386 x86_64" \
+                   VALID_ARCHS=arm64 \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
                    BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
-                   IPHONEOS_DEPLOYMENT_TARGET=13.0 \
                    -archivePath $DIST/intermediates/NativeScript.xros.xcarchive
+
+checkpoint "Building NativeScript for visionOS Simulators"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "NativeScript" \
+                   -configuration Release \
+                   -destination "generic/platform=visionOS Simulator" \
+                   $QUIET \
+                   EXCLUDED_ARCHS="i386 x86_64" \
+                   VALID_ARCHS=arm64 \
+                   DEVELOPMENT_TEAM=$DEV_TEAM \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/NativeScript.xrsimulator.xcarchive
 fi
 
 XCFRAMEWORKS=()
