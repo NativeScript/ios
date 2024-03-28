@@ -23,8 +23,13 @@ rm -rf dist
 mkdir dist
 checkpoint "Building metadata generator for x86_64 ..."
 build "x86_64"
+# make sure the binary is linked against the system libc++ instead of an @rpath one (which happens when compiling on arm64)
+# todo: perhaps there is a better way to do this with cmake?
+install_name_tool -change @rpath/libc++.1.dylib /usr/lib/libc++.1.dylib dist/x86_64/bin/objc-metadata-generator
+otool -L  dist/x86_64/bin/objc-metadata-generator
 
 checkpoint "Building metadata generator for arm64 ..."
 build "arm64"
+otool -L  dist/arm64/bin/objc-metadata-generator
 rm -rf build
 popd

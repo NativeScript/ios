@@ -225,6 +225,8 @@ static Counts& counts() {
 #    define ROBIN_HOOD_PRIVATE_DEFINITION_NODISCARD()
 #endif
 
+#pragma GCC diagnostic ignored "-Wdeprecated-builtins"
+
 namespace robin_hood {
 
 #if ROBIN_HOOD(CXX) >= ROBIN_HOOD(CXX14)

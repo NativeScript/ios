@@ -2,6 +2,48 @@
 set -e
 source "$(dirname "$0")/build_utils.sh"
 
+function to_bool() {
+  local arg="$1"
+  case "$(echo "$arg" | tr '[:upper:]' '[:lower:]')" in
+    [0-9]+)
+      if [ $arg -eq 0 ]; then
+        echo false
+      else
+        echo true
+      fi
+      ;;
+    n|no|f|false) echo false ;;
+    y|yes|t|true) echo true ;;
+    * )
+      if [ -n "$arg" ]; then
+        echo "warning: invalid boolean argument ('$arg'). Expected true or false" >&2
+      fi
+      echo false
+      ;;
+  esac;
+}
+
+BUILD_CATALYST=$(to_bool ${BUILD_CATALYST:=true})
+BUILD_IPHONE=$(to_bool ${BUILD_IPHONE:=true})
+BUILD_SIMULATOR=$(to_bool ${BUILD_SIMULATOR:=true})
+BUILD_VISION=$(to_bool ${BUILD_VISION:=true})
+VERBOSE=$(to_bool ${VERBOSE:=false})
+
+for arg in $@; do
+  case $arg in
+    --catalyst|--maccatalyst) BUILD_CATALYST=true ;;
+    --no-catalyst|--no-maccatalyst) BUILD_CATALYST=false ;;
+    --sim|--simulator) BUILD_SIMULATOR=true ;;
+    --no-sim|--no-simulator) BUILD_SIMULATOR=false ;;
+    --iphone|--device) BUILD_IPHONE=true ;;
+    --no-iphone|--no-device) BUILD_IPHONE=false ;;
+    --xr|--vision) BUILD_VISION=true ;;
+    --no-xr|--no-vision) BUILD_VISION=false ;;
+    --verbose|-v) VERBOSE=true ;;
+    *) ;;
+  esac
+done
+
 DIST=$(PWD)/dist
 mkdir -p $DIST
 
@@ -14,56 +56,67 @@ xcodebuild -project v8ios.xcodeproj \
            -configuration Release clean \
            -quiet
 
-#generates library for Mac Catalyst target
-checkpoint "Building TKLiveSync for Mac Catalyst"
-xcodebuild archive -project v8ios.xcodeproj \
-                   -scheme TKLiveSync \
-                   -configuration Release \
-                   -destination "platform=macOS,variant=Mac Catalyst" \
-                   -quiet \
-                   SKIP_INSTALL=NO \
-                   -archivePath $DIST/intermediates/TKLiveSync.maccatalyst.xcarchive
-
-# #generates library for x86_64 simulator target
-# xcodebuild archive -project v8ios.xcodeproj \
-#                    -scheme TKLiveSync \
-#                    -configuration Release \
-#                    -sdk iphonesimulator \
-#                    -quiet \
-#                    SKIP_INSTALL=NO \
-#                    -archivePath $DIST/TKLiveSync.x86_64-iphonesimulator.xcarchive
-
-# #generates library for arm64 simulator target
-# xcodebuild archive -project v8ios.xcodeproj \
-#                    -scheme TKLiveSync \
-#                    -configuration Release \
-#                    -sdk iphonesimulator \
-#                    -arch arm64 \
-#                    -quiet \
-#                    SKIP_INSTALL=NO \
-#                    -archivePath $DIST/TKLiveSync.arm64-iphonesimulator.xcarchive
-
+if $BUILD_SIMULATOR; then
 # generates library for simulator targets (usually includes arm64, x86_64)
 checkpoint "Building TKLiveSync for iphone simulators (multi-arch)"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
                    -destination "generic/platform=iOS Simulator" \
-                   -sdk iphonesimulator \
                    -quiet \
                    SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
                    -archivePath $DIST/intermediates/TKLiveSync.iphonesimulator.xcarchive
+fi
 
+if $BUILD_IPHONE; then
 #generates library for device target
 checkpoint "Building TKLiveSync for ARM64 device"
 xcodebuild archive -project v8ios.xcodeproj \
                    -scheme TKLiveSync \
                    -configuration Release \
                    -destination "generic/platform=iOS" \
-                   -sdk iphoneos \
                    -quiet \
                    SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
                    -archivePath $DIST/intermediates/TKLiveSync.iphoneos.xcarchive
+fi
+
+if $BUILD_CATALYST; then
+#generates library for Mac Catalyst target
+checkpoint "Building TKLiveSync for Mac Catalyst"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme TKLiveSync \
+                   -configuration Release \
+                   -destination "generic/platform=macOS,variant=Mac Catalyst" \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/TKLiveSync.maccatalyst.xcarchive
+fi
+
+if $BUILD_VISION; then
+#generates library for visionOS targets
+checkpoint "Building TKLiveSync for visionOS Simulators"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "TKLiveSync" \
+                   -configuration Release \
+                   -destination "generic/platform=visionOS Simulator" \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/TKLiveSync.xrsimulator.xcarchive
+
+checkpoint "Building TKLiveSync for visionOS Device"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "TKLiveSync" \
+                   -configuration Release \
+                   -destination "generic/platform=visionOS" \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/TKLiveSync.xros.xcarchive
+fi
 
 #Creates directory for fat-library
 OUTPUT_DIR="$DIST/TKLiveSync.xcframework"
@@ -85,15 +138,34 @@ rm -rf "${OUTPUT_PATH}"
 #     "$DIST/TKLiveSync.iphonesimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework/TKLiveSync"
 
 #Creates xcframework
+XCFRAMEWORKS=()
+if $BUILD_CATALYST; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/TKLiveSync.maccatalyst.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
+                  -debug-symbols "$DIST/intermediates/TKLiveSync.maccatalyst.xcarchive/dSYMs/TKLiveSync.framework.dSYM" )
+fi
+
+if $BUILD_SIMULATOR; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/TKLiveSync.iphonesimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
+                  -debug-symbols "$DIST/intermediates/TKLiveSync.iphonesimulator.xcarchive/dSYMs/TKLiveSync.framework.dSYM" )
+fi
+
+if $BUILD_IPHONE; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/TKLiveSync.iphoneos.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
+                  -debug-symbols "$DIST/intermediates/TKLiveSync.iphoneos.xcarchive/dSYMs/TKLiveSync.framework.dSYM" )
+fi
+
+if $BUILD_VISION; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/TKLiveSync.xros.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
+                  -debug-symbols "$DIST/intermediates/TKLiveSync.xros.xcarchive/dSYMs/TKLiveSync.framework.dSYM" )
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/TKLiveSync.xrsimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
+                  -debug-symbols "$DIST/intermediates/TKLiveSync.xrsimulator.xcarchive/dSYMs/TKLiveSync.framework.dSYM" )
+fi
+
 checkpoint "Creating TKLiveSync.xcframework"
-xcodebuild -create-xcframework \
-           -framework "$DIST/intermediates/TKLiveSync.maccatalyst.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
-           -debug-symbols "$DIST/intermediates/TKLiveSync.maccatalyst.xcarchive/dSYMs/TKLiveSync.framework.dSYM" \
-           -framework "$DIST/intermediates/TKLiveSync.iphonesimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
-           -debug-symbols "$DIST/intermediates/TKLiveSync.iphonesimulator.xcarchive/dSYMs/TKLiveSync.framework.dSYM" \
-           -framework "$DIST/intermediates/TKLiveSync.iphoneos.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
-           -debug-symbols "$DIST/intermediates/TKLiveSync.iphoneos.xcarchive/dSYMs/TKLiveSync.framework.dSYM" \
-           -output "$OUTPUT_DIR"
+OUTPUT_DIR="$DIST/TKLiveSync.xcframework"
+rm -rf $OUTPUT_DIR
+echo xcodebuild -create-xcframework ${XCFRAMEWORKS[@]} -output "$OUTPUT_DIR"
+xcodebuild -create-xcframework ${XCFRAMEWORKS[@]} -output "$OUTPUT_DIR"
 
 rm -rf "$DIST/intermediates"
 

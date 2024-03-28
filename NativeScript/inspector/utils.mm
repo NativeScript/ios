@@ -19,6 +19,7 @@ std::string v8_inspector::GetMIMEType(std::string filePath) {
     }
 
     NSString* fileExtension = [fullPath pathExtension];
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (__bridge CFStringRef)fileExtension, nil);
     if (uti == nil) {
         return std::string();

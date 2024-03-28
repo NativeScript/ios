@@ -50,3 +50,9 @@ v8_build
 # v8 build files...
 .gclient*
 .cipd/
+
+# project template
+/project-template-ios/.build_env_vars.sh
+/project-template-ios/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/
+/project-template-vision/.build_env_vars.sh
+/project-template-vision/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
