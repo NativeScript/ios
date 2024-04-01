@@ -10,6 +10,9 @@
 #include "macros.h"
 #endif
 
+#ifndef NS_SWIFTUI_BOOT
+// Users can disable Obj-C bootstrapping by defining MACROS = NS_SWIFTUI_BOOT in their project's build.xcconfig file
+// This requires a NativeScriptApp.swift to be setup in the project and embedding enabled in @nativescript/core bootstrap
 
 extern char startOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
 NativeScript* nativescript;
@@ -60,3 +63,5 @@ int main(int argc, char *argv[]) {
        return 0;
    }
 }
+
+#endif
