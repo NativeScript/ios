@@ -434,6 +434,7 @@
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
 					"DEBUG=1",
+					"NS_SWIFTUI_BOOT=$(NS_SWIFTUI_BOOT:default=0)",
 				);
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
@@ -460,6 +461,7 @@
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "__PROJECT_NAME__/__PROJECT_NAME__-Prefix.pch";
+				GCC_PREPROCESSOR_DEFINITIONS = "NS_SWIFTUI_BOOT=$(NS_SWIFTUI_BOOT:default=0)";
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$SRCROOT/internal/Swift-Modules",
