@@ -59,7 +59,7 @@ jobs:
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_OUTPUT
           echo NPM_TAG=$NPM_TAG >> $GITHUB_OUTPUT
       - name: Build
-        run: npm run build
+        run: npm run build-ios
       - name: Upload npm package artifact
         uses: actions/upload-artifact@v3
         with:
