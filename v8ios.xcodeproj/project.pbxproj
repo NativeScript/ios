@@ -2425,8 +2425,8 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = "";
-				SDKROOT = "";
-				XROS_DEPLOYMENT_TARGET = 1.0;
+				SDKROOT = iphoneos;
+				VALID_ARCHS = "$(ARCHS_STANDARD)";
 			};
 			name = Debug;
 		};
@@ -2481,10 +2481,10 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				OTHER_CFLAGS = "";
-				SDKROOT = "";
+				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
-				XROS_DEPLOYMENT_TARGET = 1.0;
+				VALID_ARCHS = "$(ARCHS_STANDARD)";
 			};
 			name = Release;
 		};
@@ -2602,6 +2602,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = CS838V553Y;
+				EXCLUDED_ARCHS = "";
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -2636,6 +2637,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = vm.org.nativescript.TestRunner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -2655,6 +2657,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 8V7T28DG39;
+				EXCLUDED_ARCHS = "";
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -2689,6 +2692,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = vm.org.nativescript.TestRunner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -2713,9 +2717,12 @@
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=xros*]" = x86_64;
+				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
 				GCC_C_LANGUAGE_STANDARD = c11;
 				GCC_PREFIX_HEADER = "NativeScript/NativeScript-Prefix.pch";
 				GCC_PREPROCESSOR_DEFINITIONS = "DEBUG=1";
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
@@ -2800,8 +2807,11 @@
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=xros*]" = x86_64;
+				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
 				GCC_C_LANGUAGE_STANDARD = c11;
 				GCC_PREFIX_HEADER = "NativeScript/NativeScript-Prefix.pch";
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
