@@ -317,6 +317,12 @@
 		C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F64E8222E870A300EDB057 /* NativeScript.mm */; };
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
 		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
+		F1F30E742B58FC74006A62C0 /* URLImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E702B58FC74006A62C0 /* URLImpl.cpp */; };
+		F1F30E752B58FC74006A62C0 /* URLSearchParamsImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E712B58FC74006A62C0 /* URLSearchParamsImpl.cpp */; };
+		F1F30E762B58FC74006A62C0 /* URLSearchParamsImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E722B58FC74006A62C0 /* URLSearchParamsImpl.h */; };
+		F1F30E772B58FC74006A62C0 /* URLImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E732B58FC74006A62C0 /* URLImpl.h */; };
+		F1F30E8B2B58FE28006A62C0 /* ada.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E872B58FE28006A62C0 /* ada.h */; };
+		F1F30E8C2B58FE28006A62C0 /* ada.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E882B58FE28006A62C0 /* ada.cpp */; };
 		F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */; };
 		F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */; };
 		F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA929C0FCE7003F588F /* InspectorServer.h */; };
@@ -808,6 +814,12 @@
 		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		C2FF301C2252062A00933782 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		C2FF301F2252065E00933782 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		F1F30E702B58FC74006A62C0 /* URLImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLImpl.cpp; sourceTree = "<group>"; };
+		F1F30E712B58FC74006A62C0 /* URLSearchParamsImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLSearchParamsImpl.cpp; sourceTree = "<group>"; };
+		F1F30E722B58FC74006A62C0 /* URLSearchParamsImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLSearchParamsImpl.h; sourceTree = "<group>"; };
+		F1F30E732B58FC74006A62C0 /* URLImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLImpl.h; sourceTree = "<group>"; };
+		F1F30E872B58FE28006A62C0 /* ada.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ada.h; sourceTree = "<group>"; };
+		F1F30E882B58FE28006A62C0 /* ada.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ada.cpp; sourceTree = "<group>"; };
 		F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JsV8InspectorClient.h; sourceTree = "<group>"; };
 		F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = JsV8InspectorClient.mm; sourceTree = "<group>"; };
 		F6191AA929C0FCE7003F588F /* InspectorServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
@@ -1337,6 +1349,7 @@
 			children = (
 				2BFE22052AC1C93100307752 /* metadata-arm64.bin */,
 				2BFE21F12AC1B79F00307752 /* embedding */,
+				F1F30E862B58FE28006A62C0 /* ada */,
 				F6191AA529C0FCE7003F588F /* inspector */,
 				6573B9D8291FE2A700B0ED7C /* jsi */,
 				6573B9C1291FE29F00B0ED7C /* v8runtime */,
@@ -1355,6 +1368,10 @@
 		C2DDEB3B229EAB8600345BFE /* runtime */ = {
 			isa = PBXGroup;
 			children = (
+				F1F30E702B58FC74006A62C0 /* URLImpl.cpp */,
+				F1F30E732B58FC74006A62C0 /* URLImpl.h */,
+				F1F30E712B58FC74006A62C0 /* URLSearchParamsImpl.cpp */,
+				F1F30E722B58FC74006A62C0 /* URLSearchParamsImpl.h */,
 				C2DDEB66229EAC8100345BFE /* ArgConverter.h */,
 				3CBFF7432971C1C200C5DE36 /* ArcMacro.h */,
 				C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */,
@@ -1472,6 +1489,15 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		F1F30E862B58FE28006A62C0 /* ada */ = {
+			isa = PBXGroup;
+			children = (
+				F1F30E872B58FE28006A62C0 /* ada.h */,
+				F1F30E882B58FE28006A62C0 /* ada.cpp */,
+			);
+			path = ada;
+			sourceTree = "<group>";
+		};
 		F6191AA529C0FCE7003F588F /* inspector */ = {
 			isa = PBXGroup;
 			children = (
@@ -1511,10 +1537,12 @@
 				F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */,
 				C247C16722F82842001D2CA2 /* libplatform.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
+				F1F30E8B2B58FE28006A62C0 /* ada.h in Headers */,
 				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
 				C247C17122F82842001D2CA2 /* v8config.h in Headers */,
 				6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */,
 				C22536B5241A318900192740 /* ffitarget.h in Headers */,
+				F1F30E772B58FC74006A62C0 /* URLImpl.h in Headers */,
 				F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */,
 				6573B9D0291FE29F00B0ED7C /* JSIV8ValueConverter.h in Headers */,
 				C20AB5E726E1015300E2B41D /* OneByteStringResource.h in Headers */,
@@ -1576,6 +1604,7 @@
 				3CA6E53529A78C6000D30F8B /* IsolateWrapper.h in Headers */,
 				C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */,
 				C247C16822F82842001D2CA2 /* libplatform-export.h in Headers */,
+				F1F30E762B58FC74006A62C0 /* URLSearchParamsImpl.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
 				6573B9ED291FE5B700B0ED7C /* JSIRuntime.h in Headers */,
 				C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */,
@@ -2132,6 +2161,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F1F30E8C2B58FE28006A62C0 /* ada.cpp in Sources */,
 				C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */,
 				6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */,
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
@@ -2175,6 +2205,8 @@
 				6573B9E3291FE2A700B0ED7C /* jsilib-posix.cpp in Sources */,
 				C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */,
 				C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */,
+				F1F30E752B58FC74006A62C0 /* URLSearchParamsImpl.cpp in Sources */,
+				F1F30E742B58FC74006A62C0 /* URLImpl.cpp in Sources */,
 				C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */,
 				C2C8EE7422CE3266001F8CEC /* ConcurrentQueue.cpp in Sources */,
 				C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */,
@@ -2259,7 +2291,7 @@
 				);
 				INFOPLIST_FILE = TKLiveSync/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2292,7 +2324,7 @@
 				GCC_PREPROCESSOR_DEFINITIONS = "HAVE_CONFIG_H=1";
 				INFOPLIST_FILE = TKLiveSync/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2323,7 +2355,7 @@
 					"$(PROJECT_DIR)",
 				);
 				INFOPLIST_FILE = TestRunnerTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2349,7 +2381,7 @@
 					"$(PROJECT_DIR)",
 				);
 				INFOPLIST_FILE = TestRunnerTests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2417,7 +2449,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -2474,7 +2506,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				OTHER_CFLAGS = "";
@@ -2502,7 +2534,7 @@
 					"$(SRCROOT)/NativeScript/embedding/",
 				);
 				INFOPLIST_FILE = AppWithModules/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2541,7 +2573,7 @@
 					"$(SRCROOT)/NativeScript/embedding/",
 				);
 				INFOPLIST_FILE = AppWithModules/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2571,7 +2603,7 @@
 				DEFINES_MODULE = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2589,7 +2621,7 @@
 				ENABLE_NS_ASSERTIONS = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2601,7 +2633,7 @@
 		C2DDEB2A229EA89200345BFE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_CXX_LIBRARY = "compiler-default";
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -2615,7 +2647,7 @@
 					"$(SRCROOT)/TestFixtures",
 				);
 				INFOPLIST_FILE = TestRunner/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2650,7 +2682,7 @@
 		C2DDEB2B229EA89200345BFE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_CXX_LIBRARY = "compiler-default";
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -2664,7 +2696,7 @@
 					"$(SRCROOT)/TestFixtures",
 				);
 				INFOPLIST_FILE = TestRunner/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -2716,7 +2748,7 @@
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				"LD_MAP_FILE_PATH[arch=*]" = "$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_VARIANT)-$(CURRENT_ARCH).txt";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2800,7 +2832,7 @@
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@loader_path/Frameworks",

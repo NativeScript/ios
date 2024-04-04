@@ -3,12 +3,16 @@ on:
 
 env:
   NPM_TAG: "pr"
+  XCODE_VERSION: "^15.0"
 
 jobs:
   build:
     name: Build
-    runs-on: macos-12
+    runs-on: macos-14
     steps:
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{env.XCODE_VERSION}}
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -19,7 +23,7 @@ jobs:
           key: ${{ hashFiles('download_llvm.sh') }}
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
       - name: Install Python
         uses: actions/setup-python@v4
         with:
@@ -52,9 +56,12 @@ jobs:
           path: dist/dSYMs
   test:
     name: Test
-    runs-on: macos-12
+    runs-on: macos-14
     needs: build
     steps:
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{env.XCODE_VERSION}}
       - uses: actions/checkout@v3
       - name: LLVM cache
         uses: actions/cache@v3
@@ -63,7 +70,7 @@ jobs:
           key: ${{ hashFiles('download_llvm.sh') }}
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
       - name: Install Python
         uses: actions/setup-python@v4
         with:
@@ -87,10 +94,10 @@ jobs:
         # the xcode tests are a bit flaky and they should never fail on this step, as this step only collects the JS test results as junit xml
         with:
           timeout_minutes: 20
-          max_attempts: 3
-          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test | xcpretty
-          on_retry_command: rm -rf $TEST_FOLDER/test_results*
-          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=16.2,name\=iPhone\ 14\ Pro\ Max build test
+          max_attempts: 2
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test | xcpretty
+          on_retry_command: rm -rf $TEST_FOLDER/test_results* && xcrun simctl shutdown all
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test
       - name: Validate Test Results
         run: |
           xcparse attachments $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test-out
