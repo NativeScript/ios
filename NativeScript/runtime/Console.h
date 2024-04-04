@@ -11,6 +11,7 @@ class Console {
 public:
     static void Init(v8::Local<v8::Context> context);
     static void AttachInspectorClient(v8_inspector::JsV8InspectorClient* inspector);
+    static void DetachInspectorClient();
 private:
     using ConsoleAPIType = v8_inspector::ConsoleAPIType;
 

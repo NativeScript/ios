@@ -43,7 +43,6 @@ std::unique_ptr<Runtime> runtime_;
     runtime_->RunMainScript();
 
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
-
     tns::Tasks::Drain();
 }
 
@@ -57,20 +56,16 @@ std::unique_ptr<Runtime> runtime_;
 }
 
 - (void)shutdownRuntime {
+    if (RuntimeConfig.IsDebug) {
+        Console::DetachInspectorClient();
+    }
+    tns::Tasks::ClearTasks();
     if (runtime_ != nullptr) {
-        Isolate* isolate = runtime_->GetIsolate();
-        {
-            v8::Locker l(isolate);
-            v8::Isolate::Scope isolate_scope(isolate);
-            v8::HandleScope handle_scope(isolate);
-            
-            isolate->Dispose();
-        }
         runtime_ = nullptr;
     }
 }
 
-- (void)initializeWithConfig:(Config*)config {
+- (instancetype)initializeWithConfig:(Config*)config {
     if (self = [super init]) {
         RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
         if (config.ApplicationPath != nil) {
@@ -108,14 +103,12 @@ std::unique_ptr<Runtime> runtime_;
             Console::AttachInspectorClient(inspectorClient);
         }
     }
+    return self;
     
 }
 
 - (instancetype)initWithConfig:(Config*)config {
-    if (self = [super init]) {
-        [self initializeWithConfig:config];
-    }
-    return self;
+    return [self initializeWithConfig:config];
 }
 
 - (void)restartWithConfig:(Config*)config {

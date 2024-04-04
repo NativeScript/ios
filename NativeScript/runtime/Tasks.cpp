@@ -16,6 +16,10 @@ void Tasks::Drain() {
     }
 }
 
+void Tasks::ClearTasks() {
+    tasks_.clear();
+}
+
 std::vector<std::function<void()>> Tasks::tasks_;
 
 }
