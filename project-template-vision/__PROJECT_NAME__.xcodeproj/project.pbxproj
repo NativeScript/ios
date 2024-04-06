@@ -10,7 +10,6 @@
 		39940D9122C4EF600050DDE1 /* NativeScript.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 39940D8C22C4EAAA0050DDE1 /* NativeScript.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		39940E1C22C5DFFF0050DDE1 /* TKLiveSync.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 39940E1B22C5DFFF0050DDE1 /* TKLiveSync.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		858B842D18CA22B800AB12DE /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 858B833A18CA111C00AB12DE /* InfoPlist.strings */; };
-		AA667DD02B5B305900F836A0 /* NativeScriptEmbedder.m in Sources */ = {isa = PBXBuildFile; fileRef = AA667DCE2B5B305900F836A0 /* NativeScriptEmbedder.m */; };
 		AAA0AADB2A54B96B00EE55A4 /* NativeScriptStart.m in Sources */ = {isa = PBXBuildFile; fileRef = AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */; };
 		CD45EE7C18DC2D5800FB50C0 /* app in Resources */ = {isa = PBXBuildFile; fileRef = CD45EE7A18DC2D5800FB50C0 /* app */; };
 /* End PBXBuildFile section */
@@ -49,8 +48,6 @@
 		858B843318CA22B800AB12DE /* __PROJECT_NAME__.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = __PROJECT_NAME__.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		930F05DB22671AE300D269DC /* Swift-ObjC-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Swift-ObjC-Bridging-Header.h"; path = "internal/Swift-ObjC-Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
 		AA5E89E32B5C3482008AFA28 /* macros.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = macros.h; path = internal/macros.h; sourceTree = SOURCE_ROOT; };
-		AA667DCE2B5B305900F836A0 /* NativeScriptEmbedder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = NativeScriptEmbedder.m; path = internal/NativeScriptEmbedder.m; sourceTree = SOURCE_ROOT; };
-		AA667DCF2B5B305900F836A0 /* NativeScriptEmbedder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = NativeScriptEmbedder.h; path = internal/NativeScriptEmbedder.h; sourceTree = SOURCE_ROOT; };
 		AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = NativeScriptStart.m; path = internal/NativeScriptStart.m; sourceTree = SOURCE_ROOT; };
 		AAA0AADC2A54B97E00EE55A4 /* NativeScriptStart.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NativeScriptStart.h; path = internal/NativeScriptStart.h; sourceTree = SOURCE_ROOT; };
 		CD45EE7A18DC2D5800FB50C0 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
@@ -74,8 +71,6 @@
 			isa = PBXGroup;
 			children = (
 				AA5E89E32B5C3482008AFA28 /* macros.h */,
-				AA667DCF2B5B305900F836A0 /* NativeScriptEmbedder.h */,
-				AA667DCE2B5B305900F836A0 /* NativeScriptEmbedder.m */,
 				AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */,
 				AAA0AADC2A54B97E00EE55A4 /* NativeScriptStart.h */,
 				858B833F18CA111C00AB12DE /* __PROJECT_NAME__-Prefix.pch */,
@@ -289,7 +284,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA667DD02B5B305900F836A0 /* NativeScriptEmbedder.m in Sources */,
 				AAA0AADB2A54B96B00EE55A4 /* NativeScriptStart.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
