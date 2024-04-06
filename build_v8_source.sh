@@ -4,7 +4,7 @@ source "$(dirname "$0")/build_utils.sh"
 
 pushd v8
 
-ARCH_ARR=(x64-simulator arm64-simulator arm64-device)
+ARCH_ARR=(x64-simulator arm64-simulator arm64-xrsimulator arm64-device)
 MODULES=(
     cppgc_base
     torque_generated_definitions

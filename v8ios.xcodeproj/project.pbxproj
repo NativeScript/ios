@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 55;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -52,8 +52,8 @@
 		C22536B6241A318900192740 /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B1241A318900192740 /* ffi.h */; };
 		C22536B7241A318900192740 /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B3241A318900192740 /* ffitarget.h */; };
 		C22536B8241A318900192740 /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B4241A318900192740 /* ffi.h */; };
-		C2253789241A41C500192740 /* TKLiveSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; };
-		C225378A241A41C500192740 /* TKLiveSync.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C2253789241A41C500192740 /* TKLiveSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; platformFilters = (ios, xros, ); };
+		C225378A241A41C500192740 /* TKLiveSync.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C2253790241A421E00192740 /* zip_fopen_index_encrypted.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E05A2328CA6F00A91A76 /* zip_fopen_index_encrypted.c */; };
 		C2253791241A422400192740 /* zip_get_num_entries.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0422328CA6F00A91A76 /* zip_get_num_entries.c */; };
 		C2253805241A5C3200192740 /* zip_get_encryption_implementation.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0302328CA6F00A91A76 /* zip_get_encryption_implementation.c */; };
@@ -256,8 +256,8 @@
 		C2A6EF3123745A0B00E8FBE7 /* MetadataInlines.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A6EF3023745A0B00E8FBE7 /* MetadataInlines.h */; };
 		C2C8EE7222CE323C001F8CEC /* ConcurrentMap.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7022CE323C001F8CEC /* ConcurrentMap.h */; };
 		C2C8EE7422CE3266001F8CEC /* ConcurrentQueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C8EE7322CE3266001F8CEC /* ConcurrentQueue.cpp */; };
-		C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
-		C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; platformFilters = (ios, xros, ); };
+		C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C2C8EE7A22CF64E4001F8CEC /* SimpleAllocator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */; };
 		C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */; };
 		C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */; };
@@ -2190,11 +2190,19 @@
 /* Begin PBXTargetDependency section */
 		C2253788241A41C500192740 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+				xros,
+			);
 			target = C2253781241A41C500192740 /* TKLiveSync */;
 			targetProxy = C2253787241A41C500192740 /* PBXContainerItemProxy */;
 		};
 		C22C091F22CA2E860080D176 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+				xros,
+			);
 			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
 			targetProxy = C22C091E22CA2E860080D176 /* PBXContainerItemProxy */;
 		};
@@ -2216,12 +2224,12 @@
 		};
 		C293752B229FC4740075CB16 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = C29374E1229FC0F60075CB16 /* TestFixtures */;
 			targetProxy = C293752A229FC4740075CB16 /* PBXContainerItemProxy */;
 		};
 		C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			platformFilter = ios;
 			target = C2F4CBB222C60BFD0036B56F /* metadata-generator */;
 			targetProxy = C2F4CBBB22C61CF20036B56F /* PBXContainerItemProxy */;
 		};
@@ -2257,8 +2265,13 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TKLiveSync;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
 				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
 			};
@@ -2290,8 +2303,13 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TKLiveSync;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
 				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
 			};
@@ -2584,6 +2602,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = CS838V553Y;
+				EXCLUDED_ARCHS = "";
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -2618,8 +2637,13 @@
 				PRODUCT_BUNDLE_IDENTIFIER = vm.org.nativescript.TestRunner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
-				TARGETED_DEVICE_FAMILY = 1;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,7";
 				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Debug;
@@ -2633,6 +2657,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 8V7T28DG39;
+				EXCLUDED_ARCHS = "";
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -2667,8 +2692,13 @@
 				PRODUCT_BUNDLE_IDENTIFIER = vm.org.nativescript.TestRunner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
-				TARGETED_DEVICE_FAMILY = 1;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,7";
 				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Release;
@@ -2687,9 +2717,12 @@
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=xros*]" = x86_64;
+				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
 				GCC_C_LANGUAGE_STANDARD = c11;
 				GCC_PREFIX_HEADER = "NativeScript/NativeScript-Prefix.pch";
 				GCC_PREPROCESSOR_DEFINITIONS = "DEBUG=1";
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
@@ -2711,6 +2744,7 @@
 					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
+					"-ld_classic",
 					"-Wl,-dead_strip",
 					"-Wl,-search_paths_first",
 					"-fno-builtin-stpcpy",
@@ -2740,8 +2774,13 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
 				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/NativeScript/include",
@@ -2768,8 +2807,11 @@
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=xros*]" = x86_64;
+				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
 				GCC_C_LANGUAGE_STANDARD = c11;
 				GCC_PREFIX_HEADER = "NativeScript/NativeScript-Prefix.pch";
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = NativeScript/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
@@ -2790,6 +2832,7 @@
 					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
+					"-ld_classic",
 					"-Wl,-dead_strip",
 					"-Wl,-search_paths_first",
 					"-fno-builtin-stpcpy",
@@ -2819,8 +2862,13 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
 				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/NativeScript",
 					"$(SRCROOT)/NativeScript/include",
