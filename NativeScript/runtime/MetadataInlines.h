@@ -3,6 +3,7 @@
 
 #include <objc/runtime.h>
 #include "StringHasher.h"
+#include <cassert>
 
 namespace tns {
 

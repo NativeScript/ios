@@ -1,7 +1,7 @@
 {
   "name": "@nativescript/ios",
   "description": "NativeScript Runtime for iOS",
-  "version": "8.7.0-alpha.0",
+  "version": "8.7.0",
   "keywords": [
     "NativeScript",
     "iOS",
@@ -23,7 +23,8 @@
     "apply-patches": "./apply_patches.sh",
     "build-v8-source": "./build_v8_source.sh",
     "build-v8-source-catalyst": "./build_v8_source_catalyst.sh",
-    "build": "./build_all.sh",
+    "build-ios": "node prepare-target ios && ./build_all_ios.sh",
+    "build-vision": "node prepare-target visionos && ./build_all_vision.sh",
     "setup-ci": "./build_metadata_generator.sh",
     "update-version": "./update_version.sh",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
