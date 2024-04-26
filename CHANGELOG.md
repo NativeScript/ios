@@ -1,3 +1,13 @@
+## [8.7.1](https://github.com/NativeScript/ios/compare/v8.7.0...v8.7.1) (2024-04-26)
+
+
+### Bug Fixes
+
+* url href ([#252](https://github.com/NativeScript/ios/issues/252)) ([4a6e9ad](https://github.com/NativeScript/ios/commit/4a6e9adde6950e09ac0c2fd2713e25aa919ad448))
+* Xcode 15.3+ not setting TARGET_OS_IOS correctly ([#248](https://github.com/NativeScript/ios/issues/248)) ([74e1444](https://github.com/NativeScript/ios/commit/74e144432bf17cc043d0e64affc9cb1703e80832))
+
+
+
 # [8.7.0](https://github.com/NativeScript/ios/compare/v8.6.3...v8.7.0) (2024-04-08)
 
 
