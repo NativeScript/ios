@@ -1,3 +1,12 @@
+## [8.7.2](https://github.com/NativeScript/ios/compare/v8.7.1...v8.7.2) (2024-05-16)
+
+
+### Bug Fixes
+
+* **ios:** watchOS embedded apps ([#250](https://github.com/NativeScript/ios/issues/250)) ([1df9ea2](https://github.com/NativeScript/ios/commit/1df9ea20b6bfde5163b0486e444e5471fb8343b2))
+
+
+
 ## [8.7.1](https://github.com/NativeScript/ios/compare/v8.7.0...v8.7.1) (2024-04-26)
 
 
