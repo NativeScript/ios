@@ -883,11 +883,9 @@ std::string DefinitionWriter::tsifyType(const Type& type, const bool isFuncParam
     case TypeSelector:
         return "string";
     case TypeCString: {
-        std::string res = "string";
-        if (isFuncParam) {
-            Type typeVoid(TypeVoid);
-            res += " | " + tsifyType(::Meta::PointerType(&typeVoid), isFuncParam);
-        }
+        std::string res = isFuncParam ? "string | " : "";
+        Type typeVoid(TypeVoid);
+        res += tsifyType(::Meta::PointerType(&typeVoid), isFuncParam);
         return res;
     }
     case TypeProtocol:
