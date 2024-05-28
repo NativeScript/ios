@@ -268,7 +268,7 @@ void URLImpl::GetHref(v8::Local<v8::String> property,
     }
     auto isolate = info.GetIsolate();
 
-    auto value = ptr->GetURL()->get_hostname();
+    auto value = ptr->GetURL()->get_href();
 
     info.GetReturnValue().Set(ToV8String(isolate, value.data(), (int)value.length()));
 
