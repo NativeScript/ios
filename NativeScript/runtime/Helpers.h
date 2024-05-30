@@ -19,6 +19,11 @@ namespace tns {
 inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,const std::string& value) {
     return v8::String::NewFromUtf8(isolate, value.c_str(), v8::NewStringType::kNormal, (int)value.length()).ToLocalChecked();
 }
+
+
+inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,const char* value, int length) {
+    return v8::String::NewFromUtf8(isolate, value, v8::NewStringType::kNormal, length).ToLocalChecked();
+}
 #ifdef __OBJC__
 inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,const NSString* value) {
     /*

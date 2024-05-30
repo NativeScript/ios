@@ -1,9 +1,36 @@
-## [8.6.4-alpha.0](https://github.com/NativeScript/ios/compare/v8.6.3...v8.6.4-alpha.0) (2023-12-08)
+## [8.7.2](https://github.com/NativeScript/ios/compare/v8.7.1...v8.7.2) (2024-05-16)
+
+
+### Bug Fixes
+
+* **ios:** watchOS embedded apps ([#250](https://github.com/NativeScript/ios/issues/250)) ([1df9ea2](https://github.com/NativeScript/ios/commit/1df9ea20b6bfde5163b0486e444e5471fb8343b2))
+
+
+
+## [8.7.1](https://github.com/NativeScript/ios/compare/v8.7.0...v8.7.1) (2024-04-26)
+
+
+### Bug Fixes
+
+* url href ([#252](https://github.com/NativeScript/ios/issues/252)) ([4a6e9ad](https://github.com/NativeScript/ios/commit/4a6e9adde6950e09ac0c2fd2713e25aa919ad448))
+* Xcode 15.3+ not setting TARGET_OS_IOS correctly ([#248](https://github.com/NativeScript/ios/issues/248)) ([74e1444](https://github.com/NativeScript/ios/commit/74e144432bf17cc043d0e64affc9cb1703e80832))
+
+
+
+# [8.7.0](https://github.com/NativeScript/ios/compare/v8.6.3...v8.7.0) (2024-04-08)
+
+
+### Bug Fixes
+
+* only generate metadata for the targeted arch ([#236](https://github.com/NativeScript/ios/issues/236)) ([17a5c5f](https://github.com/NativeScript/ios/commit/17a5c5ff118c2803c0385891224fb30168268ac8))
+* Xcode 15.3+ not setting TARGET_OS_IPHONE correctly ([#242](https://github.com/NativeScript/ios/issues/242)) ([0d52056](https://github.com/NativeScript/ios/commit/0d52056fdb102f40887abd47c9bc2af5f3cca94e))
 
 
 ### Features
 
-* use messaging object to pass message to workers ([7e5d128](https://github.com/NativeScript/ios/commit/7e5d1281be7193e55934043d4fac50b916e93836))
+* upgrade llvm to 15.0.7 ([#238](https://github.com/NativeScript/ios/issues/238)) ([6e9b51e](https://github.com/NativeScript/ios/commit/6e9b51e48c6b8ddf65c6669a035b97e5d935f202))
+* **visionos:** support for xros platform ([#235](https://github.com/NativeScript/ios/issues/235)) ([bb364f9](https://github.com/NativeScript/ios/commit/bb364f9558c336c43a9c43d3ded46ef1ad8e8bf3))
+* **WinterCG:** URL & URLSearchParams ([#234](https://github.com/NativeScript/ios/issues/234)) ([dc3c76f](https://github.com/NativeScript/ios/commit/dc3c76f1ff74bcd5b800df55210855871bb70563))
 
 
 

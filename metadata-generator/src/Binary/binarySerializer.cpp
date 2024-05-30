@@ -2,6 +2,7 @@
 #include "Meta/Utils.h"
 #include "binarySerializerPrivate.h"
 #include <clang/Basic/FileManager.h>
+#include <llvm/Object/Archive.h>
 #include <llvm/Object/Binary.h>
 #include <llvm/Object/MachO.h>
 #include <llvm/Object/MachOUniversal.h>
@@ -229,7 +230,7 @@ static llvm::ErrorOr<llvm::SmallString<128>> getFrameworkLib(clang::Module* fram
             return path;
         }
 
-        return errc::no_such_file_or_directory;
+        return llvm::errc::no_such_file_or_directory;
     }
 
     return path;
@@ -245,7 +246,7 @@ static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
 
     if(path.getError()) {
         if (framework->LinkLibraries.size() == 0) {
-            return errc::no_such_file_or_directory;
+            return llvm::errc::no_such_file_or_directory;
         }
 
         path = getFrameworkLib(framework, framework->LinkLibraries[0].Library);
@@ -294,7 +295,7 @@ static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
         }
     }
 
-    return errc::invalid_argument;
+    return llvm::errc::invalid_argument;
 }
 
 void binary::BinarySerializer::serializeModule(clang::Module* module, binary::ModuleMeta& binaryModule)

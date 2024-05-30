@@ -47,6 +47,14 @@ elif effective_platform_name == "-maccatalyst":
     docset_platform = "maccatalyst"
     default_deployment_target_flag_name = "-mmaccatalyst-version-min"
     default_deployment_target_clang_env_name = "MACCATALYST_DEPLOYMENT_TARGET"
+elif effective_platform_name == "-xrsimulator":
+    docset_platform = "xros"
+    default_deployment_target_flag_name = "-mxrossimulator-version-min"
+    default_deployment_target_clang_env_name = "XROS_DEPLOYMENT_TARGET"
+elif effective_platform_name == "-xros":
+    docset_platform = "xros"
+    default_deployment_target_flag_name = "-mxros-version-min"
+    default_deployment_target_clang_env_name = "XROS_DEPLOYMENT_TARGET"
 elif effective_platform_name == "-watchos":
     docset_platform = "watchOS"
     default_deployment_target_flag_name = "-mwatchos-version-min"
@@ -144,6 +152,11 @@ def generate_metadata(arch):
                              deployment_target_flag_name + "=" + deployment_target])
     else:
       generator_call.extend(["-target", "{}-{}-{}{}".format(arch, llvm_target_triple_vendor, llvm_target_triple_os_version, llvm_target_triple_suffix)])
+      # since iPhoneOS 17.4 sdk TARGET_OS_IPHONE and TARGET_OS_IOS is not defined for non-simulator builds
+      # this seems to be a bug on Apple's side
+      if effective_platform_name == "-iphoneos" and not llvm_target_triple_suffix:
+        generator_call.extend(["-DTARGET_OS_IPHONE=1"])
+        generator_call.extend(["-DTARGET_OS_IOS=1"])
 
     generator_call.extend(header_search_paths_parsed)  # HEADER_SEARCH_PATHS
     generator_call.extend(framework_search_paths_parsed)  # FRAMEWORK_SEARCH_PATHS
@@ -174,5 +187,11 @@ def generate_metadata(arch):
 
 
 for arch in env("ARCHS").split():
+    # skip metadata generation for architectures different than the one specified in the command line
+    # in case the command line argument is not specified, generate metadata for all architectures
+    if len(sys.argv) >= 2 and sys.argv[1].lower() != arch.lower():
+        print("Skipping metadata generation for " + arch)
+        continue
+
     print("Generating metadata for " + arch)
     generate_metadata(arch)
