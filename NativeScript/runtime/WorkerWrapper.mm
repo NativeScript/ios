@@ -17,7 +17,7 @@ void staticInitMethod() {
     workers_.maxConcurrentOperationCount = 100;
 }
 
-WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage)
+WorkerWrapper::WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::shared_ptr<worker::Message>)> onMessage)
     : mainIsolate_(mainIsolate),
       workerIsolate_(nullptr),
       isRunning_(false),
@@ -48,7 +48,7 @@ const int WorkerWrapper::WorkerId() {
     return this->workerId_;
 }
 
-void WorkerWrapper::PostMessage(std::string message) {
+void WorkerWrapper::PostMessage(std::shared_ptr<worker::Message> message) {
     if (!this->isTerminating_) {
         this->queue_.Push(message);
     }
@@ -66,14 +66,14 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker, std::func
 }
 
 void WorkerWrapper::DrainPendingTasks() {
-    std::vector<std::string> messages = this->queue_.PopAll();
+    std::vector<std::shared_ptr<worker::Message>> messages = this->queue_.PopAll();
     v8::Locker locker(this->workerIsolate_);
     Isolate::Scope isolate_scope(this->workerIsolate_);
     HandleScope handle_scope(this->workerIsolate_);
     Local<Context> context = Caches::Get(this->workerIsolate_)->GetContext();
     Local<Object> global = context->Global();
 
-    for (std::string message: messages) {
+    for (std::shared_ptr<worker::Message> message: messages) {
         if (this->isTerminating_) {
             break;
         }
