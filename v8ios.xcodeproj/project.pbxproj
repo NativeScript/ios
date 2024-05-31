@@ -2561,7 +2561,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				NS_DEBUG_METADATA_PATH = "/Users/teodordermendzhiev/workspace/ns-v8ios-runtime/yaml";
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
 					"-ObjC",
@@ -2600,7 +2599,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				NS_DEBUG_METADATA_PATH = "/Users/teodordermendzhiev/workspace/ns-v8ios-runtime/yaml";
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
 					"-ObjC",
