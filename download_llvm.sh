@@ -2,7 +2,7 @@
 set -e
 source "$(dirname "$0")/build_utils.sh"
 
-LLVM_VERSION="15.0.7"
+LLVM_VERSION="17.0.6"
 
 function download_llvm() {
     checkpoint "Downloading llvm (version $LLVM_VERSION)..."
