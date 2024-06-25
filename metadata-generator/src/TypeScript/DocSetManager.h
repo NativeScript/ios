@@ -21,6 +21,10 @@ struct TSComment {
      * \brief A brief description of the symbol.
      */
     std::string description;
+    
+    Meta::Version introducedIn = UNKNOWN_VERSION;
+    Meta::Version obsoletedIn = UNKNOWN_VERSION;
+    Meta::Version deprecatedIn = UNKNOWN_VERSION;
 
     /*
      * \brief An optional list of parameters. Useful in method and function comments.
