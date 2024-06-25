@@ -14,7 +14,7 @@ void ConcurrentQueue::Initialize(CFRunLoopRef runLoop, void (*performWork)(void*
     CFRunLoopAddSource(this->runLoop_, this->runLoopTasksSource_, kCFRunLoopCommonModes);
 }
 
-void ConcurrentQueue::Push(std::string message) {
+void ConcurrentQueue::Push(std::shared_ptr<worker::Message> message) {
     if (this->runLoopTasksSource_ != nullptr && !CFRunLoopSourceIsValid(this->runLoopTasksSource_)) {
         return;
     }
@@ -27,12 +27,12 @@ void ConcurrentQueue::Push(std::string message) {
     this->SignalAndWakeUp();
 }
 
-std::vector<std::string> ConcurrentQueue::PopAll() {
+std::vector<std::shared_ptr<worker::Message>> ConcurrentQueue::PopAll() {
     std::unique_lock<std::mutex> mlock(this->mutex_);
-    std::vector<std::string> messages;
+    std::vector<std::shared_ptr<worker::Message>> messages;
 
     while (!this->messagesQueue_.empty()) {
-        std::string message = this->messagesQueue_.front();
+        std::shared_ptr<worker::Message> message = this->messagesQueue_.front();
         this->messagesQueue_.pop();
         messages.push_back(message);
     }

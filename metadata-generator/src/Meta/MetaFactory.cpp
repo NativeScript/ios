@@ -535,10 +535,10 @@ void MetaFactory::populateIdentificationFields(const clang::NamedDecl& decl, Met
     // calculate file name and module
     clang::SourceLocation location = _sourceManager.getFileLoc(decl.getLocation());
     clang::FileID fileId = _sourceManager.getDecomposedLoc(location).first;
-    const clang::FileEntry* entry = _sourceManager.getFileEntryForID(fileId);
+    const clang::OptionalFileEntryRef entry = _sourceManager.getFileEntryRefForID(fileId);
     if (entry != nullptr) {
         meta.fileName = entry->getName();
-        meta.module = _headerSearch.findModuleForHeader(entry).getModule();
+        meta.module = _headerSearch.findModuleForHeader(*entry).getModule();
     }
 
     // calculate js name
@@ -715,8 +715,8 @@ Version MetaFactory::convertVersion(clang::VersionTuple clangVersion)
 {
     Version result = {
         .Major = (int)clangVersion.getMajor(),
-        .Minor = (int)(clangVersion.getMinor().hasValue() ? clangVersion.getMinor().getValue() : -1),
-        .SubMinor = (int)(clangVersion.getSubminor().hasValue() ? clangVersion.getSubminor().getValue() : -1)
+        .Minor = (int)(clangVersion.getMinor().has_value() ? clangVersion.getMinor().value() : -1),
+        .SubMinor = (int)(clangVersion.getSubminor().has_value() ? clangVersion.getSubminor().value() : -1)
     };
     return result;
 }

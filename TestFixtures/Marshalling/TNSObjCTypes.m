@@ -48,6 +48,16 @@ CFTypeRef TNSFunctionWithCreateCFTypeRefReturn() {
     block();
 }
 
+- (void)methodRetainingBlock:(void (^)(void))block {
+    _retainedBlock = block;
+}
+- (void)methodCallRetainingBlock {
+    _retainedBlock();
+}
+- (void)methodReleaseRetainingBlock {
+    _retainedBlock = NULL;
+}
+
 - (void)methodWithComplexBlock:(id (^)(int, id, SEL, NSObject*, TNSOStruct))block {
     TNSOStruct str = { 5, 6, 7 };
     id result = block(1, @2, @selector(init), @[@3, @4], str);

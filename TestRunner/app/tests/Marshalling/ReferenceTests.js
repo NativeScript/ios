@@ -329,6 +329,38 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe(str);
         expect(interop.handleof(result).toNumber() == interop.handleof(ptr).toNumber());
         expect(NSString.stringWithUTF8String(result).toString()).toBe(str);
+        interop.free(ptr);
+    });
+
+    it("interops string from CString", function () {
+        const str = "test";
+        const ptr = interop.alloc((str.length + 1) * interop.sizeof(interop.types.uint8));
+        var reference = new interop.Reference(interop.types.uint8, ptr);
+        for (ii in str) {
+            const i = parseInt(ii);
+            reference[i] = str.charCodeAt(i);
+        }
+        reference[str.length] = 0;
+        expect(interop.stringFromCString(ptr)).toBe(str);
+        expect(interop.stringFromCString(reference)).toBe(str);
+        interop.free(ptr);
+    });
+
+    it("interops string from CString with fixed length", function () {
+        const str = "te\0st";
+        const ptr = interop.alloc((str.length + 1) * interop.sizeof(interop.types.uint8));
+        var reference = new interop.Reference(interop.types.uint8, ptr);
+        for (ii in str) {
+            const i = parseInt(ii);
+            reference[i] = str.charCodeAt(i);
+        }
+        reference[str.length] = 0;
+        // no length means it will go until it finds \0
+        expect(interop.stringFromCString(ptr)).toBe('te');
+        expect(interop.stringFromCString(ptr, 1)).toBe('t');
+        expect(interop.stringFromCString(ptr, str.length)).toBe(str);
+        expect(interop.stringFromCString(reference, str.length)).toBe(str);
+        interop.free(ptr);
     });
 
     it("CString should be passed as its UTF8 encoding and returned as a reference to unsigned characters", function () {

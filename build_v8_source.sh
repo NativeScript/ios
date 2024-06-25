@@ -4,7 +4,7 @@ source "$(dirname "$0")/build_utils.sh"
 
 pushd v8
 
-ARCH_ARR=(x64-simulator arm64-simulator arm64-device)
+ARCH_ARR=(x64-simulator arm64-simulator arm64-xrsimulator arm64-device)
 MODULES=(
     cppgc_base
     torque_generated_definitions
@@ -29,7 +29,7 @@ GN_ARGS_BASE="
     is_debug=false
 
     enable_ios_bitcode=false
-    ios_deployment_target=12
+    ios_deployment_target=13
     ios_enable_code_signing=false
     target_os=\"ios\"
 
