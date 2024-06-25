@@ -42,15 +42,17 @@ static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleM
     if (!module->isAvailable())
         return std::error_code();
 
-    if (const FileEntry* umbrellaHeader = module->getUmbrellaHeader().Entry) {
+    if (module->Umbrella && module->Umbrella.is<FileEntryRef>()) {
+        const FileEntry* umbrellaHeader = module->Umbrella.get<FileEntryRef>();
         if (std::error_code err = addHeaderInclude(umbrellaHeader, includes))
             return err;
     }
-    else if (const DirectoryEntry* umbrellaDir = module->getUmbrellaDir().Entry) {
+    else if (module->Umbrella && module->Umbrella.is<DirectoryEntryRef>()) {
+        const DirectoryEntryRef umbrellaDir = module->Umbrella.get<DirectoryEntryRef>();
         // Add all of the headers we find in this subdirectory.
         std::error_code ec;
         SmallString<128> dirNative;
-        path::native(umbrellaDir->getName(), dirNative);
+        path::native(umbrellaDir.getName(), dirNative);
         for (fs::recursive_directory_iterator dir(dirNative.str(), ec), dirEnd; dir != dirEnd && !ec; dir.increment(ec)) {
             // Check whether this entry has an extension typically associated with headers.
             if (!llvm::StringSwitch<bool>(path::extension(dir->path()))
@@ -59,7 +61,8 @@ static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleM
                 continue;
 
             // If this header is marked 'unavailable' in this module, don't include it.
-            if (const llvm::ErrorOr<const FileEntry*> header = fileMgr.getFile(dir->path())) {
+            auto header = fileMgr.getFileRef(dir->path());
+            if (header) {
                 if (modMap.isHeaderUnavailableInModule(*header, module))
                     continue;
 
@@ -114,7 +117,7 @@ static std::error_code CreateUmbrellaHeaderForAmbientModules(const std::vector<s
         }
 
         collectModuleHeaderIncludes(fileManager, moduleMap, module, umbrellaHeaders);
-        std::for_each(module->submodule_begin(), module->submodule_end(), collector);
+        std::for_each(module->submodules().begin(), module->submodules().end(), collector);
     };
 
     std::for_each(modules.begin(), modules.end(), collector);
