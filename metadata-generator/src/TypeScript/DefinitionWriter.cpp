@@ -883,11 +883,9 @@ std::string DefinitionWriter::tsifyType(const Type& type, const bool isFuncParam
     case TypeSelector:
         return "string";
     case TypeCString: {
-        std::string res = "string";
-        if (isFuncParam) {
-            Type typeVoid(TypeVoid);
-            res += " | " + tsifyType(::Meta::PointerType(&typeVoid), isFuncParam);
-        }
+        std::string res = isFuncParam ? "string | " : "";
+        Type typeVoid(TypeVoid);
+        res += tsifyType(::Meta::PointerType(&typeVoid), isFuncParam);
         return res;
     }
     case TypeProtocol:
@@ -976,7 +974,26 @@ std::string DefinitionWriter::tsifyType(const Type& type, const bool isFuncParam
             }
         }
         
-        if (interface.name == "NSArray" && isFuncParam) {
+        std::vector<std::string> protocols;
+        if (type.is(TypeType::TypeInterface) && type.as<InterfaceType>().protocols.size() > 0) {
+            for (auto & protocol : type.as<InterfaceType>().protocols) {
+                if (protocol->jsName != "NSCopying") {
+                    protocols.push_back(protocol->jsName);
+                }
+            }
+        }
+        
+        if (protocols.size() > 0) {
+            // Example: -(NSObject<Option> *) getOption;
+            // Expected: getOption(): NSObject & Option;
+            for (auto & protocol : protocols) {
+                output << " & " << protocol;
+            }
+        } else if (interface.name == "NSArray" && isFuncParam) {
+            // In this case, NSArray<string> maps into NSArray<string> | string[]
+            // We only do this if there are no protocols, though
+            // for the very rare case where someone would do NSArray with a protocol
+            // as we can't marshal a JS array into NSArray + protocol
             if (hasClosedGenerics) {
                 std::string arrayType = firstElementType;
                 output << " | " << arrayType << "[]";

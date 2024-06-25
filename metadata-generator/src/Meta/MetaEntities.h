@@ -62,6 +62,19 @@ struct Version {
     bool operator >=(const Version& other) const {
         return !(*this < other);
     }
+    std::string toString() const {
+        std::string result;
+        if (Major >= 0) {
+            result.append(std::to_string(Major));
+            if (Minor >= 0) {
+                result.append("." + std::to_string(Minor));
+                if (SubMinor >= 0) {
+                    result.append("." + std::to_string(SubMinor));
+                }
+            }
+        }
+        return result;
+    }
 };
 
 enum MetaFlags : uint16_t {
