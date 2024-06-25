@@ -28,12 +28,20 @@
     "setup-ci": "./build_metadata_generator.sh",
     "update-version": "./update_version.sh",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
-    "version": "npm run changelog && git add CHANGELOG.md"
+    "version": "npm run changelog && git add CHANGELOG.md",
+    "prepare": "husky"
   },
   "license": "Apache-2.0",
   "devDependencies": {
     "conventional-changelog-cli": "^2.1.1",
     "dayjs": "^1.11.7",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.7",
     "semver": "^7.5.0"
+  },
+  "lint-staged": {
+    "{NativeScript,metadata-generator/src}/**/*.{h,hpp,c,cpp,mm}": [
+      "clang-format -i"
+    ]
   }
 }

@@ -1,0 +1,11 @@
+# clang format doesn't work properly with * and **
+NativeScript/include/*
+NativeScript/include/*/*
+NativeScript/include/*/*/*
+NativeScript/include/*/*/*/*
+NativeScript/include/*/*/*/*/*
+NativeScript/ada/*
+NativeScript/inspector/third_party/*
+NativeScript/inspector/third_party/*/*
+NativeScript/inspector/third_party/*/*/*
+NativeScript/inspector/third_party/*/*/*/*
