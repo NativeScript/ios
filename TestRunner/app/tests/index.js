@@ -78,6 +78,11 @@ require("./Modules");
 //
 require("./RuntimeImplementedAPIs");
 
+require("./Timers");
+
+require("./URL");
+require("./URLSearchParams");
+
 // Tests common for all runtimes.
 require("./shared/index").runAllTests();
 

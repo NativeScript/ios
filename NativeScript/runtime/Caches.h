@@ -48,6 +48,8 @@ public:
 
     Caches(v8::Isolate* isolate, const int& isolateId_ = -1);
     ~Caches();
+    
+    bool isWorker = false;
 
     static std::shared_ptr<ConcurrentMap<std::string, const Meta*>> Metadata;
     static std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> Workers;
@@ -71,6 +73,14 @@ public:
     
     inline int getIsolateId() {
         return isolateId_;
+    }
+
+    inline void InvalidateIsolate() {
+        isolateId_ = -1;
+    }
+
+    inline bool IsValid() {
+        return isolateId_ != -1;
     }
 
     void SetContext(v8::Local<v8::Context> context);

@@ -2,63 +2,71 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Interop.h"
-#include "Caches.h"
+#include "IsolateWrapper.h"
 
 using namespace tns;
 using namespace v8;
 
 @implementation ArrayAdapter {
-    Isolate* isolate_;
+    IsolateWrapper* wrapper_;
     std::shared_ptr<Persistent<Value>> object_;
-    std::shared_ptr<Caches> cache_;
+    // we're responsible for this wrapper
+    ObjCDataWrapper* dataWrapper_;
 }
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
     if (self) {
-        self->isolate_ = isolate;
-        self->cache_ = Caches::Get(isolate);
+        self->wrapper_ = new IsolateWrapper(isolate);
         self->object_ = std::make_shared<Persistent<Value>>(isolate, jsObject);
-        self->cache_->Instances.emplace(self, self->object_);
-        tns::SetValue(isolate, jsObject, new ObjCDataWrapper(self));
+        self->wrapper_->GetCache()->Instances.emplace(self, self->object_);
+        tns::SetValue(isolate, jsObject, (self->dataWrapper_ = new ObjCDataWrapper(self)));
     }
-
+    
     return self;
 }
 
 - (NSUInteger)count {
-    v8::Locker locker(self->isolate_);
-    Isolate::Scope isolate_scope(self->isolate_);
-    HandleScope handle_scope(self->isolate_);
-
-    Local<Object> object = self->object_->Get(self->isolate_).As<Object>();
+    auto isolate = wrapper_->Isolate();
+    if(!wrapper_->IsValid()) {
+        return 0;
+    }
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+    
+    Local<Object> object = self->object_->Get(isolate).As<Object>();
     if (object->IsArray()) {
         uint32_t length = object.As<v8::Array>()->Length();
         return length;
     }
-
-    Local<Context> context = self->cache_->GetContext();
+    
+    Local<Context> context = wrapper_->GetCache()->GetContext();
     Local<v8::Array> propertyNames;
     bool success = object->GetPropertyNames(context).ToLocal(&propertyNames);
-    tns::Assert(success, self->isolate_);
+    tns::Assert(success, isolate);
     uint32_t length = propertyNames->Length();
     return length;
 }
 
 - (id)objectAtIndex:(NSUInteger)index {
-    v8::Locker locker(self->isolate_);
-    Isolate::Scope isolate_scope(self->isolate_);
-    HandleScope handle_scope(self->isolate_);
-
-    if (!(index < [self count])) {
-        tns::Assert(false, self->isolate_);
+    auto isolate = wrapper_->Isolate();
+    if (!wrapper_->IsValid()) {
+        return nil;
     }
-
-    Local<Object> object = self->object_->Get(self->isolate_).As<Object>();
-    Local<Context> context = self->cache_->GetContext();
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+    
+    if (!(index < [self count])) {
+        tns::Assert(false, isolate);
+    }
+    
+    Local<Object> object = self->object_->Get(isolate).As<Object>();
+    Local<Context> context = wrapper_->GetCache()->GetContext();
     Local<Value> item;
     bool success = object->Get(context, (uint)index).ToLocal(&item);
-    tns::Assert(success, self->isolate_);
-
+    tns::Assert(success, isolate);
+    
     if (item->IsNullOrUndefined()) {
         return nil;
     }
@@ -68,16 +76,29 @@ using namespace v8;
 }
 
 - (void)dealloc {
-    self->cache_->Instances.erase(self);
-    Local<Value> value = self->object_->Get(self->isolate_);
-    BaseDataWrapper* wrapper = tns::GetValue(self->isolate_, value);
-    if (wrapper != nullptr) {
-        tns::DeleteValue(self->isolate_, value);
-        delete wrapper;
+    if (wrapper_->IsValid()) {
+        auto isolate = wrapper_->Isolate();
+        v8::Locker locker(isolate);
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        wrapper_->GetCache()->Instances.erase(self);
+        Local<Value> value = self->object_->Get(isolate);
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+        if (wrapper != nullptr) {
+            tns::DeleteValue(isolate, value);
+            // ensure we don't delete the same wrapper twice
+            // this is just needed as a failsafe in case some other wrapper is assigned to this object
+            if (wrapper == dataWrapper_) {
+                dataWrapper_ = nullptr;
+            }
+            delete wrapper;
+        }
+        self->object_->Reset();
     }
-    self->object_->Reset();
-    self->isolate_ = nullptr;
-    self->cache_ = nullptr;
+    delete wrapper_;
+    if (dataWrapper_ != nullptr) {
+        delete dataWrapper_;
+    }
     self->object_ = nullptr;
     [super dealloc];
 }

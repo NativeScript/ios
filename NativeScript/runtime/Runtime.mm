@@ -22,6 +22,10 @@
 #include "IsolateWrapper.h"
 #include "DisposerPHV.h"
 
+#include "ModuleBinding.hpp"
+#include "URLImpl.h"
+#include "URLSearchParamsImpl.h"
+
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
@@ -33,6 +37,25 @@ namespace tns {
 std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
+
+// TODO: consider listening to timezone changes and automatically reseting the DateTime. Probably makes more sense to move it to its own file
+//void UpdateTimezoneNotificationCallback(CFNotificationCenterRef center,
+//                void *observer,
+//                CFStringRef name,
+//                const void *object,
+//                CFDictionaryRef userInfo) {
+//    Runtime* r = (Runtime*)observer;
+//    auto isolate = r->GetIsolate();
+//
+//    CFRunLoopPerformBlock(r->RuntimeLoop(), kCFRunLoopDefaultMode, ^() {
+//        TODO: lock isolate here?
+//        isolate->DateTimeConfigurationChangeNotification(Isolate::TimeZoneDetection::kRedetect);
+//    });
+//}
+// add this to register (most likely on setting up isolate
+//CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), this, &UpdateTimezoneNotificationCallback, kCFTimeZoneSystemTimeZoneDidChangeNotification, nullptr, CFNotificationSuspensionBehaviorDeliverImmediately);
+// add this to remove the observer
+//CFNotificationCenterRemoveObserver(CFNotificationCenterGetLocalCenter(), this, kCFTimeZoneSystemTimeZoneDidChangeNotification, NULL);
 
 void DisposeIsolateWhenPossible(Isolate* isolate) {
     // most of the time, this will never delay disposal
@@ -68,6 +91,7 @@ Runtime::~Runtime() {
         // it terminates execution
         SpinLock lock(isolatesMutex_);
         Runtime::isolates_.erase(std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_), Runtime::isolates_.end());
+        Caches::Get(isolate_)->InvalidateIsolate();
     }
     this->isolate_->TerminateExecution();
     
@@ -142,6 +166,7 @@ Isolate* Runtime::CreateIsolate() {
 
 void Runtime::Init(Isolate* isolate, bool isWorker) {
     std::shared_ptr<Caches> cache = Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
+    cache->isWorker = isWorker;
     cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
     cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
 
@@ -149,10 +174,11 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     HandleScope handle_scope(isolate);
     Local<FunctionTemplate> globalTemplateFunction = FunctionTemplate::New(isolate);
     globalTemplateFunction->SetClassName(tns::ToV8String(isolate, "NativeScriptGlobalObject"));
+    tns::binding::CreateInternalBindingTemplates(isolate, globalTemplateFunction);
     Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
     DefineNativeScriptVersion(isolate, globalTemplate);
 
-    Worker::Init(isolate, globalTemplate, isWorker);
+    //Worker::Init(isolate, globalTemplate, isWorker);
     DefinePerformanceObject(isolate, globalTemplate);
     DefineTimeMethod(isolate, globalTemplate);
     DefineDrainMicrotaskMethod(isolate, globalTemplate);
@@ -171,6 +197,80 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     PromiseProxy::Init(context);
     Console::Init(context);
     WeakRef::Init(context);
+    
+    
+    auto blob_methods = R"js(
+    const BLOB_STORE = new Map();
+    URL.createObjectURL = function (object, options = null) {
+        try {
+            if (object instanceof Blob || object instanceof File) {
+                const id = NSUUID.UUID().UUIDString.toLowerCase();
+                const ret = `blob:nativescript/${id}`;
+                BLOB_STORE.set(ret, {
+                    blob: object,
+                    type: object?.type,
+                    ext: options?.ext,
+                });
+                return ret;
+            }
+        } catch (error) {
+            return null;
+        }
+        return null;
+    };
+    URL.revokeObjectURL = function (url) {
+        BLOB_STORE.delete(url);
+    };
+    const InternalAccessor = class {};
+    InternalAccessor.getData = function (url) {
+        return BLOB_STORE.get(url);
+    };
+    URL.InternalAccessor = InternalAccessor;
+    Object.defineProperty(URL.prototype, 'searchParams', {
+        get() {
+            if (this._searchParams == null) {
+                this._searchParams = new URLSearchParams(this.search);
+                Object.defineProperty(this._searchParams, '_url', {
+                    enumerable: false,
+                    writable: false,
+                    value: this,
+                });
+                this._searchParams._append = this._searchParams.append;
+                this._searchParams.append = function (name, value) {
+                    this._append(name, value);
+                    this._url.search = this.toString();
+                };
+                this._searchParams._delete = this._searchParams.delete;
+                this._searchParams.delete = function (name) {
+                    this._delete(name);
+                    this._url.search = this.toString();
+                };
+                this._searchParams._set = this._searchParams.set;
+                this._searchParams.set = function (name, value) {
+                    this._set(name, value);
+                    this._url.search = this.toString();
+                };
+                this._searchParams._sort = this._searchParams.sort;
+                this._searchParams.sort = function () {
+                    this._sort();
+                    this._url.search = this.toString();
+                };
+            }
+            return this._searchParams;
+        },
+    });
+    )js";
+    
+    
+    v8::Local<v8::Script> script;
+    auto done = v8::Script::Compile(context, ToV8String(isolate, blob_methods)).ToLocal(&script);
+    
+    v8::Local<v8::Value> outVal;
+    if(done){
+        done = script->Run(context).ToLocal(&outVal);
+    }
+      
+    
 
     this->moduleInternal_ = std::make_unique<ModuleInternal>(context);
 
@@ -298,7 +398,21 @@ void Runtime::DefineDrainMicrotaskMethod(v8::Isolate* isolate, v8::Local<v8::Obj
     globalTemplate->Set(ToV8String(isolate, "__drainMicrotaskQueue"), drainMicrotaskTemplate);
 }
 
+void Runtime::DefineDateTimeConfigurationChangeNotificationMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate) {
+    Local<FunctionTemplate> drainMicrotaskTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+        info.GetIsolate()->DateTimeConfigurationChangeNotification(Isolate::TimeZoneDetection::kRedetect);
+    });
+    globalTemplate->Set(ToV8String(isolate, "__dateTimeConfigurationChangeNotification"), drainMicrotaskTemplate);
+}
+
 bool Runtime::IsAlive(const Isolate* isolate) {
+    // speedup lookup by avoiding locking if thread locals match
+    // note: this can be a problem when the Runtime is deleted in a different thread that it was created
+    // which could happen under some specific embedding scenarios
+    if ((Isolate::TryGetCurrent() == isolate || (currentRuntime_ != nullptr && currentRuntime_->GetIsolate() == isolate))
+        && Caches::Get((Isolate*)isolate)->IsValid()) {
+        return true;
+    }
     SpinLock lock(isolatesMutex_);
     return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) != Runtime::isolates_.end();
 }

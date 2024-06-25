@@ -654,12 +654,12 @@ private:
 
 class WorkerWrapper: public BaseDataWrapper {
 public:
-    WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage);
+    WorkerWrapper(v8::Isolate* mainIsolate, std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::shared_ptr<worker::Message>)> onMessage);
 
     void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker, std::function<v8::Isolate* ()> func);
     void CallOnErrorHandlers(v8::TryCatch& tc);
     void PassUncaughtExceptionFromWorkerToMain(v8::Local<v8::Context> context, v8::TryCatch& tc, bool async = true);
-    void PostMessage(std::string message);
+    void PostMessage(std::shared_ptr<worker::Message> message);
     void Close();
     void Terminate();
 
@@ -691,7 +691,7 @@ private:
     std::atomic<bool> isTerminating_;
     bool isDisposed_;
     bool isWeak_;
-    std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::string)> onMessage_;
+    std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::shared_ptr<worker::Message>)> onMessage_;
     std::shared_ptr<v8::Persistent<v8::Value>> poWorker_;
     ConcurrentQueue queue_;
     static std::atomic<int> nextId_;

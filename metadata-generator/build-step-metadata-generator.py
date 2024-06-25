@@ -47,6 +47,14 @@ elif effective_platform_name == "-maccatalyst":
     docset_platform = "maccatalyst"
     default_deployment_target_flag_name = "-mmaccatalyst-version-min"
     default_deployment_target_clang_env_name = "MACCATALYST_DEPLOYMENT_TARGET"
+elif effective_platform_name == "-xrsimulator":
+    docset_platform = "xros"
+    default_deployment_target_flag_name = "-mxrossimulator-version-min"
+    default_deployment_target_clang_env_name = "XROS_DEPLOYMENT_TARGET"
+elif effective_platform_name == "-xros":
+    docset_platform = "xros"
+    default_deployment_target_flag_name = "-mxros-version-min"
+    default_deployment_target_clang_env_name = "XROS_DEPLOYMENT_TARGET"
 elif effective_platform_name == "-watchos":
     docset_platform = "watchOS"
     default_deployment_target_flag_name = "-mwatchos-version-min"
@@ -174,5 +182,11 @@ def generate_metadata(arch):
 
 
 for arch in env("ARCHS").split():
+    # skip metadata generation for architectures different than the one specified in the command line
+    # in case the command line argument is not specified, generate metadata for all architectures
+    if len(sys.argv) >= 2 and sys.argv[1].lower() != arch.lower():
+        print("Skipping metadata generation for " + arch)
+        continue
+
     print("Generating metadata for " + arch)
     generate_metadata(arch)
