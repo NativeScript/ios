@@ -8,7 +8,7 @@ namespace v8_inspector {
 std::string GetMIMEType(std::string filePath);
 std::string ToStdString(const v8_inspector::StringView& value);
 v8::Local<v8::Function> GetDebuggerFunction(v8::Local<v8::Context> context, std::string domain, std::string functionName, v8::Local<v8::Object>& domainDebugger);
-std::string GetDomainMethod(v8::Isolate* isolate, const v8::Local<v8::Object>& arg, std::string domain);
+v8::Local<v8::Function> GetDebuggerFunctionFromObject(v8::Local<v8::Context> context, const v8::Local<v8::Object>& object, v8::Local<v8::Object>& domainDebugger);
 
 class NetworkRequestData {
 public:

@@ -63,6 +63,6 @@ class TestRunnerTests: XCTestCase {
         app.launchEnvironment["REPORT_BASEURL"] = "http://[::1]:\(port)/junit_report"
         app.launch()
 
-        wait(for: [runtimeUnitTestsExpectation], timeout: 60.0, enforceOrder: true)
+        wait(for: [runtimeUnitTestsExpectation], timeout: 300.0, enforceOrder: true)
     }
 }

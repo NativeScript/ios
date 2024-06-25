@@ -19,6 +19,9 @@ git submodule update --init
 # Ensure that you have the required llvm binaries for building the metadata generator
 ./download_llvm.sh
 
+sudo gem install xcodeproj
+sudo gem install cocoapods
+
 # Open the runtime in Xcode
 open v8ios.xcodeproj
 ```
@@ -56,7 +59,7 @@ You can now open the `platforms/ios/{project-name}.xcworkspace` file in Xcode an
 
 <img width="941" alt="Screenshot 2020-09-09 at 18 46 18" src="https://user-images.githubusercontent.com/879060/92628228-c294c000-f2cc-11ea-8822-58df689d3cd3.png">
 
-Remove the `NativeScript.xcframework` and `TNSLiveSync.xcframework` from the General tab, as we will no longer be using the framework from node_modules and instead will use the source directly:
+Remove the `NativeScript.xcframework` and `TKLiveSync.xcframework` from the General tab, as we will no longer be using the framework from node_modules and instead will use the source directly:
 
 <img width="693" alt="Screenshot 2020-09-09 at 18 47 23" src="https://user-images.githubusercontent.com/879060/92628311-e6f09c80-f2cc-11ea-8977-201517badc3b.png">
 
@@ -64,7 +67,7 @@ Hitting Run in Xcode should start the app in the simulator, and we can now add b
 
 ## Only required when running on a physical device
 
-Add the `Nativescript.framework` from the v8ios workspace:
+Add the `Nativescript.framework` and `TKLiveSync.framework` from the v8ios workspace:
 
 <img width="402" alt="Screen Shot 2021-04-12 at 11 49 10 AM" src="https://user-images.githubusercontent.com/2379994/114423589-51c8c580-9b85-11eb-9d30-eb1cbf73454a.png">
 

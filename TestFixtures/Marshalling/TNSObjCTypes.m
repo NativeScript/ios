@@ -48,6 +48,16 @@ CFTypeRef TNSFunctionWithCreateCFTypeRefReturn() {
     block();
 }
 
+- (void)methodRetainingBlock:(void (^)(void))block {
+    _retainedBlock = block;
+}
+- (void)methodCallRetainingBlock {
+    _retainedBlock();
+}
+- (void)methodReleaseRetainingBlock {
+    _retainedBlock = NULL;
+}
+
 - (void)methodWithComplexBlock:(id (^)(int, id, SEL, NSObject*, TNSOStruct))block {
     TNSOStruct str = { 5, 6, 7 };
     id result = block(1, @2, @selector(init), @[@3, @4], str);
@@ -116,6 +126,14 @@ CFTypeRef TNSFunctionWithCreateCFTypeRefReturn() {
 
 - (NSNull*)methodWithNSNull {
     return [NSNull null];
+}
+
+- (NSArray*)getNSArrayOfNSURLs {
+    NSURL* url1 = [NSURL URLWithString:(@"dummy://url1")];
+    NSURL* url2 = [NSURL URLWithString:(@"dummy://url2")];
+    NSArray *urlArray = @[url1, url2];
+    
+    return urlArray;
 }
 
 @end

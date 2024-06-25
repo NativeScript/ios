@@ -179,8 +179,8 @@ void Utils::getAllLinkLibraries(clang::Module* module, std::vector<clang::Module
 {
     for (clang::Module::LinkLibrary lib : module->LinkLibraries)
         result.push_back(lib);
-    for (clang::Module::submodule_const_iterator it = module->submodule_begin();
-         it != module->submodule_end(); ++it)
+    for (clang::Module::submodule_const_iterator it = module->submodules().begin();
+         it != module->submodules().end(); ++it)
         getAllLinkLibraries(*it, result);
 }
 }

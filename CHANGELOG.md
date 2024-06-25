@@ -1,3 +1,106 @@
+## [8.7.2](https://github.com/NativeScript/ios/compare/v8.7.1...v8.7.2) (2024-05-16)
+
+
+### Bug Fixes
+
+* **ios:** watchOS embedded apps ([#250](https://github.com/NativeScript/ios/issues/250)) ([1df9ea2](https://github.com/NativeScript/ios/commit/1df9ea20b6bfde5163b0486e444e5471fb8343b2))
+
+
+
+## [8.7.1](https://github.com/NativeScript/ios/compare/v8.7.0...v8.7.1) (2024-04-26)
+
+
+### Bug Fixes
+
+* url href ([#252](https://github.com/NativeScript/ios/issues/252)) ([4a6e9ad](https://github.com/NativeScript/ios/commit/4a6e9adde6950e09ac0c2fd2713e25aa919ad448))
+* Xcode 15.3+ not setting TARGET_OS_IOS correctly ([#248](https://github.com/NativeScript/ios/issues/248)) ([74e1444](https://github.com/NativeScript/ios/commit/74e144432bf17cc043d0e64affc9cb1703e80832))
+
+
+
+# [8.7.0](https://github.com/NativeScript/ios/compare/v8.6.3...v8.7.0) (2024-04-08)
+
+
+### Bug Fixes
+
+* only generate metadata for the targeted arch ([#236](https://github.com/NativeScript/ios/issues/236)) ([17a5c5f](https://github.com/NativeScript/ios/commit/17a5c5ff118c2803c0385891224fb30168268ac8))
+* Xcode 15.3+ not setting TARGET_OS_IPHONE correctly ([#242](https://github.com/NativeScript/ios/issues/242)) ([0d52056](https://github.com/NativeScript/ios/commit/0d52056fdb102f40887abd47c9bc2af5f3cca94e))
+
+
+### Features
+
+* upgrade llvm to 15.0.7 ([#238](https://github.com/NativeScript/ios/issues/238)) ([6e9b51e](https://github.com/NativeScript/ios/commit/6e9b51e48c6b8ddf65c6669a035b97e5d935f202))
+* **visionos:** support for xros platform ([#235](https://github.com/NativeScript/ios/issues/235)) ([bb364f9](https://github.com/NativeScript/ios/commit/bb364f9558c336c43a9c43d3ded46ef1ad8e8bf3))
+* **WinterCG:** URL & URLSearchParams ([#234](https://github.com/NativeScript/ios/issues/234)) ([dc3c76f](https://github.com/NativeScript/ios/commit/dc3c76f1ff74bcd5b800df55210855871bb70563))
+
+
+
+## [8.6.3](https://github.com/NativeScript/ios/compare/v8.6.2...v8.6.3) (2023-11-08)
+
+
+### Bug Fixes
+
+* prevent crashes during isolate disposal ([3d70c11](https://github.com/NativeScript/ios/commit/3d70c110e1429a1d62c9b9e23020cf7044635511))
+
+
+
+## [8.6.2](https://github.com/NativeScript/ios/compare/v8.6.1...v8.6.2) (2023-11-01)
+
+
+### Bug Fixes
+
+* only reset timer persistent if Isolate is valid ([4379583](https://github.com/NativeScript/ios/commit/4379583fc0b2fa3eacde50eb471086f55c1eec18))
+
+
+
+## [8.6.0](https://github.com/NativeScript/ios/compare/v8.5.2...v8.6.1) (2023-10-09)
+
+
+### Bug Fixes
+
+* bridge release adapters ([#224](https://github.com/NativeScript/ios/issues/224)) ([70b1802](https://github.com/NativeScript/ios/commit/70b180202dc0752d01ae5b9249cbaabae65f53cc))
+* delay isolate disposal when isolate is in use ([5a6c2ee](https://github.com/NativeScript/ios/commit/5a6c2ee5efa0c557c94ae56da0d3b3a31911d1b8))
+* don't suppress timer exceptions ([0c4b819](https://github.com/NativeScript/ios/commit/0c4b819941b0327e572772018298cf9cf181436e))
+* fix setInterval not repeating correctly ([022893f](https://github.com/NativeScript/ios/commit/022893f1dcd9a7649db73e9735ff12e9246b3585))
+* prevent JS function to native block leak ([#223](https://github.com/NativeScript/ios/issues/223)) ([a6d7332](https://github.com/NativeScript/ios/commit/a6d73323718a1de12c5a9f4865a6abfe06fd6e03))
+
+
+### Features
+
+* add interop.stringFromCString ([#228](https://github.com/NativeScript/ios/issues/228)) ([185c12d](https://github.com/NativeScript/ios/commit/185c12dc85e86747f266867fb208c71caf5fc6b3))
+* add native timers ([#221](https://github.com/NativeScript/ios/issues/221)) ([119470f](https://github.com/NativeScript/ios/commit/119470f249c5aa85c4c2d0b1c9b5b691003c1ec7))
+* add timer strong retainer annotation ([efef961](https://github.com/NativeScript/ios/commit/efef961a67519aed881637ac0291894f3325b111))
+* log the fullMessage with more details about the error ([#229](https://github.com/NativeScript/ios/issues/229)) ([d67588c](https://github.com/NativeScript/ios/commit/d67588cb3866212ccd86b105edf1207fddde2db9))
+* use node logic for globals and modules ([#215](https://github.com/NativeScript/ios/issues/215)) ([a66cc42](https://github.com/NativeScript/ios/commit/a66cc42c768ee7712d1c1f441b8c4e8e88a19eca))
+
+
+
+## [8.5.2](https://github.com/NativeScript/ios/compare/v8.5.1...v8.5.2) (2023-05-24)
+
+
+### Bug Fixes
+
+* Cache shared_ptr leak ([8236cf3](https://github.com/NativeScript/ios/commit/8236cf3f191f8b5bd7098beeff92aef31c0fc6e7))
+* FunctionWrapper isolate-level leak ([0c4c017](https://github.com/NativeScript/ios/commit/0c4c017689a71433d567dde48c1464954f3af98b))
+* move TARGETED_DEVICE_FAMILY to xcconfig to allow override ([#211](https://github.com/NativeScript/ios/issues/211)) ([2e5f5f1](https://github.com/NativeScript/ios/commit/2e5f5f1e8c8b9551011e2566b8f134dd6cfb5378))
+* remove quotes for TARGETED_DEVICE_FAMILY ([157dda7](https://github.com/NativeScript/ios/commit/157dda704b6fbe7cd5077b4bb1ad9676a7c8d47e))
+* soif on runtime destruction ([7e24de8](https://github.com/NativeScript/ios/commit/7e24de8f1ace1d72318c0f0253759cd745307e5f))
+
+
+### Features
+
+* re-enabled inspector protocol handling ([#202](https://github.com/NativeScript/ios/issues/202)) ([c100f72](https://github.com/NativeScript/ios/commit/c100f725e48df5e61316281b82eed835d265b996))
+
+
+
+## [8.5.1](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.5.0...v8.5.1) (2023-03-30)
+
+
+### Bug Fixes
+
+* incorrect wrapper in indexed array access ([#206](https://github.com/NativeScript/ns-v8ios-runtime/issues/206)) ([b689434](https://github.com/NativeScript/ns-v8ios-runtime/commit/b6894346b273b289bfda713a8f0c7055911c945a))
+
+
+
 # [8.5.0](https://github.com/NativeScript/ns-v8ios-runtime/compare/v8.4.1...v8.5.0) (2023-03-28)
 
 

@@ -6,6 +6,7 @@
 #include "ModuleInternal.h"
 #include "MetadataBuilder.h"
 #include "SpinLock.h"
+#include "Caches.h"
 
 namespace tns {
 
@@ -68,11 +69,19 @@ private:
     void DefinePerformanceObject(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     void DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
     void DefineDrainMicrotaskMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+    void DefineDateTimeConfigurationChangeNotificationMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+
     static void PerformanceNowCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     v8::Isolate* isolate_;
     std::unique_ptr<ModuleInternal> moduleInternal_;
     int workerId_;
     CFRunLoopRef runtimeLoop_;
+    // TODO: refactor this. This is only needed because, during program termination (UIApplicationMain not called)
+    // the Cache::Workers is released (static initialization order fiasco https://en.cppreference.com/w/cpp/language/siof)
+    // so it released the Cache::Workers shared_ptr and then releases the Runtime unique_ptr
+    // eventually we just need to refactor so that Runtime::Initialize is responsible for its initalization
+    // and lifecycle
+    std::shared_ptr<ConcurrentMap<int, std::shared_ptr<Caches::WorkerState>>> workerCache_;
 };
 
 }

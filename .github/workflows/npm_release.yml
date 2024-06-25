@@ -1,0 +1,192 @@
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+env:
+  NPM_TAG: "next"
+  XCODE_VERSION: "^15.0"
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-14
+    outputs:
+      npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
+      npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
+    steps:
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{env.XCODE_VERSION}}
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: LLVM cache
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+          key: ${{ hashFiles('download_llvm.sh') }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3"
+      - name: Install Dependencies
+        run: |
+          npm install
+          python3 -m pip install --upgrade pip six
+          brew install cmake
+          [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+      - name: Get Current Version
+        run: |
+          NPM_VERSION=$(node -e "console.log(require('./package.json').version);")
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
+      - name: Bump version for dev release
+        if: ${{ !contains(github.ref, 'refs/tags/') }}
+        run: |
+          NPM_VERSION=$(node ./scripts/get-next-version.js)
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
+          npm version $NPM_VERSION --no-git-tag-version
+      - name: Output NPM Version and tag
+        id: npm_version_output
+        run: |
+          NPM_TAG=$(node ./scripts/get-npm-tag.js)
+          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_OUTPUT
+          echo NPM_TAG=$NPM_TAG >> $GITHUB_OUTPUT
+      - name: Build
+        run: npm run build-ios
+      - name: Upload npm package artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-package
+          path: dist/nativescript-ios-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
+      - name: Upload dSYMs artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: NativeScript-dSYMs
+          path: dist/dSYMs
+  test:
+    name: Test
+    runs-on: macos-14
+    needs: build
+    steps:
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{env.XCODE_VERSION}}
+      - uses: actions/checkout@v3
+      - name: LLVM cache
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+          key: ${{ hashFiles('download_llvm.sh') }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3"
+      - name: Install Dependencies
+        run: |
+          npm install
+          python3 -m pip install --upgrade pip six
+          brew install cmake
+          [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+          brew install chargepoint/xcparse/xcparse
+          npm install -g @edusperoni/junit-cli-report-viewer verify-junit-xml
+      - name: Prepare
+        run: npm run setup-ci
+      - name: Prepare test folder
+        run: |
+          mkdir -p dist-test
+          echo TEST_FOLDER=$(pwd)/dist-test >> $GITHUB_ENV
+      - name: Xcode Tests
+        uses: nick-fields/retry@v2
+        # try to run the tests with xcpretty. If it fails then try again without xcpretty twice for better log output
+        # the xcode tests are a bit flaky and they should never fail on this step, as this step only collects the JS test results as junit xml
+        with:
+          timeout_minutes: 20
+          max_attempts: 2
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test | xcpretty
+          on_retry_command: rm -rf $TEST_FOLDER/test_results* && xcrun simctl shutdown all
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test
+      - name: Validate Test Results
+        run: |
+          xcparse attachments $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test-out
+          find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
+          find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+      - name: Archive Test Result Data
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: ${{env.TEST_FOLDER}}/test_results.xcresult
+  publish:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - test
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NPM_VERSION: ${{needs.build.outputs.npm_version}}
+      NPM_TAG: ${{needs.build.outputs.npm_tag}}
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/download-artifact@v3
+        with:
+          name: npm-package
+          path: dist
+      - name: Publish package
+        run: |
+          echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG..."
+          npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+  github-release:
+    runs-on: ubuntu-latest
+    # only runs on tagged commits
+    if: ${{ contains(github.ref, 'refs/tags/') }}
+    permissions:
+      contents: write
+    needs:
+      - build
+      - test
+    env:
+      NPM_VERSION: ${{needs.build.outputs.npm_version}}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - name: Setup
+        run: npm install
+      - uses: actions/download-artifact@v3
+        with:
+          name: npm-package
+          path: dist
+      - uses: actions/download-artifact@v3
+        with:
+          name: NativeScript-dSYMs
+          path: dist/dSYMs
+      - name: Zip dSYMs
+        working-directory: dist/dSYMs
+        run: find . -maxdepth 1 -name '*.dSYM' -print | xargs -I@ zip -r @.zip @
+      - name: Partial Changelog
+        run: npx conventional-changelog -p angular -r2 > body.md
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "dist/nativescript-ios-*.tgz,dist/dSYMs/*.zip"
+          bodyFile: "body.md"
+          prerelease: ${{needs.build.outputs.npm_tag != 'latest'}}

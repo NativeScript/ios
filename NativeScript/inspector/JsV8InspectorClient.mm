@@ -13,6 +13,7 @@
 #include "include/libplatform/libplatform.h"
 #include "Helpers.h"
 #include "utils.h"
+#include "Caches.h"
 
 using namespace v8;
 
@@ -23,6 +24,16 @@ namespace v8_inspector {
     [[NSBundle mainBundle] bundleIdentifier], name] UTF8String]
 
 #define LOG_DEBUGGER_PORT(port) NSLog(@"NativeScript debugger has opened inspector socket on port %d for %@.", port, [[NSBundle mainBundle] bundleIdentifier])
+
+JsV8InspectorClient::JsV8InspectorClient(tns::Runtime* runtime)
+    : runtime_(runtime),
+      isolate_(runtime_->GetIsolate()),
+      messages_(),
+      runningNestedLoops_(false) {
+     this->messagesQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_queue", DISPATCH_QUEUE_SERIAL);
+     this->messageLoopQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_loop_queue", DISPATCH_QUEUE_SERIAL);
+     this->messageArrived_ = dispatch_semaphore_create(0);
+}
 
 void JsV8InspectorClient::enableInspector(int argc, char** argv) {
     int waitForDebuggerSubscription;
@@ -84,15 +95,6 @@ void JsV8InspectorClient::enableInspector(int argc, char** argv) {
     notify_cancel(waitForDebuggerSubscription);
 }
 
-JsV8InspectorClient::JsV8InspectorClient(tns::Runtime* runtime)
-    : runtime_(runtime),
-      messages_(),
-      runningNestedLoops_(false) {
-     this->messagesQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_queue", DISPATCH_QUEUE_SERIAL);
-     this->messageLoopQueue_ = dispatch_queue_create("NativeScript.v8.inspector.message_loop_queue", DISPATCH_QUEUE_SERIAL);
-     this->messageArrived_ = dispatch_semaphore_create(0);
-}
-
 void JsV8InspectorClient::onFrontendConnected(std::function<void (std::string)> sender) {
     if (this->isWaitingForDebugger_) {
         this->isWaitingForDebugger_ = NO;
@@ -105,11 +107,15 @@ void JsV8InspectorClient::onFrontendConnected(std::function<void (std::string)> 
     }
 
     this->sender_ = sender;
+
+    // this triggers a reconnection from the devtools so Debugger.scriptParsed etc. are all fired again
+    this->disconnect();
+    this->isConnected_ = true;
 }
 
 void JsV8InspectorClient::onFrontendMessageReceived(std::string message) {
     dispatch_sync(this->messagesQueue_, ^{
-        this->messages_.push_back(message);
+        this->messages_.push(message);
         dispatch_semaphore_signal(messageArrived_);
     });
 
@@ -136,7 +142,7 @@ void JsV8InspectorClient::init() {
         return;
     }
 
-    Isolate* isolate = runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
 
     Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
 
@@ -147,6 +153,8 @@ void JsV8InspectorClient::init() {
     context_.Reset(isolate, context);
 
     this->createInspectorSession();
+    
+    tracing_agent_.reset(new tns::inspector::TracingAgentImpl());
 }
 
 void JsV8InspectorClient::connect(int argc, char** argv) {
@@ -159,7 +167,7 @@ void JsV8InspectorClient::createInspectorSession() {
 }
 
 void JsV8InspectorClient::disconnect() {
-    Isolate* isolate = runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
@@ -198,7 +206,7 @@ void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
         }
 
         std::shared_ptr<Platform> platform = tns::Runtime::GetPlatform();
-        Isolate* isolate = runtime_->GetIsolate();
+        Isolate* isolate = isolate_;
         platform::PumpMessageLoop(platform.get(), isolate, platform::MessageLoopBehavior::kDoNotWait);
         if(shouldWait && !terminated_) {
             dispatch_semaphore_wait(messageArrived_, dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_MSEC)); // 1ms
@@ -240,24 +248,89 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     std::vector<uint16_t> vector = tns::ToVector(message);
     StringView messageView(vector.data(), vector.size());
-    Isolate* isolate = this->runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
     v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    v8::HandleScope handle_scope(isolate);
+    Local<Context> context = tns::Caches::Get(isolate)->GetContext();
+    bool success;
+
+    // livesync uses the inspector socket for HMR/LiveSync...
+    if(message.find("Page.reload") != std::string::npos) {
+        success = tns::LiveSync(this->isolate_);
+        if (!success) {
+            NSLog(@"LiveSync failed");
+        }
+        // todo: should we return here, or is it OK to pass onto a possible Page.reload domain handler?
+    }
+
+    if(message.find("Tracing.start") != std::string::npos) {
+        tracing_agent_->start();
+        
+        // echo back the request to notify frontend the action was a success
+        // todo: send an empty response for the incoming message id instead.
+        this->sendNotification(StringBuffer::create(messageView));
+        return;
+    }
+    
+    if(message.find("Tracing.end") != std::string::npos) {
+        tracing_agent_->end();
+        std::string res = tracing_agent_->getLastTrace();
+        tracing_agent_->SendToDevtools(context, res);
+        return;
+    }
+
+    // parse incoming message as JSON
+    Local<Value> arg;
+    success = v8::JSON::Parse(context, tns::ToV8String(isolate, message)).ToLocal(&arg);
+    
+    // stop processing invalid messages
+    if(!success) {
+        NSLog(@"Inspector failed to parse incoming message: %s", message.c_str());
+        // ignore failures to parse.
+        return;
+    }
+    
+    // Pass incoming message to a registerd domain handler if any
+    if(!arg.IsEmpty() && arg->IsObject()) {
+        Local<Object> domainDebugger;
+        Local<Object> argObject = arg.As<Object>();
+        Local<v8::Function> domainMethodFunc = v8_inspector::GetDebuggerFunctionFromObject(context, argObject, domainDebugger);
+        
+        Local<Value> result;
+        success = this->CallDomainHandlerFunction(context, domainMethodFunc, argObject, domainDebugger, result);
+        
+        if(success) {
+            auto requestId = arg.As<Object>()->Get(context, tns::ToV8String(isolate, "id")).ToLocalChecked();
+            auto returnString = GetReturnMessageFromDomainHandlerResult(result, requestId);
+
+            if(returnString.size() > 0) {
+                std::vector<uint16_t> vector = tns::ToVector(returnString);
+                StringView messageView(vector.data(), vector.size());
+                auto msg = StringBuffer::create(messageView);
+                this->sendNotification(std::move(msg));
+            }
+            return;
+        }
+    }
+
+    // if no handler handled the message successfully, fall-through to the default V8 implementation
     this->session_->dispatchProtocolMessage(messageView);
+    
     // TODO: check why this is needed (it should trigger automatically when script depth is 0)
     isolate->PerformMicrotaskCheckpoint();
 }
 
 Local<Context> JsV8InspectorClient::ensureDefaultContextInGroup(int contextGroupId) {
-    Isolate* isolate = runtime_->GetIsolate();
-    return context_.Get(isolate);
+    return context_.Get(isolate_);
 }
 
 std::string JsV8InspectorClient::PumpMessage() {
     __block std::string result;
     dispatch_sync(this->messagesQueue_, ^{
         if (this->messages_.size() > 0) {
-            result = this->messages_.back();
-            this->messages_.pop_back();
+            result = this->messages_.front();
+            this->messages_.pop();
         }
     });
 
@@ -265,15 +338,25 @@ std::string JsV8InspectorClient::PumpMessage() {
 }
 
 void JsV8InspectorClient::scheduleBreak() {
-    Isolate* isolate = runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
     v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
+    auto context = isolate->GetCurrentContext();
+    Context::Scope context_scope(context);
+    
+    if(!this->hasScheduledDebugBreak_) {
+        this->hasScheduledDebugBreak_ = true;
+        // hack: force a debugger; statement in ModuleInternal to actually break before loading the next (main) script...
+        // FIXME: find a proper fix to not need to resort to this hack.
+        context->Global()->Set(context, tns::ToV8String(isolate, "__pauseOnNextRequire"), v8::Boolean::New(isolate, true)).ToChecked();
+    }
+    
     this->session_->schedulePauseOnNextStatement({}, {});
 }
 
 void JsV8InspectorClient::registerModules() {
-    Isolate* isolate = runtime_->GetIsolate();
+    Isolate* isolate = isolate_;
     Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
     Local<Object> global = context->Global();
     Local<Object> inspectorObject = Object::New(isolate);
@@ -317,6 +400,20 @@ void JsV8InspectorClient::registerDomainDispatcherCallback(const FunctionCallbac
     }
 }
 
+void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<Value>& args) {
+    Local<External> data = args.Data().As<External>();
+    v8_inspector::JsV8InspectorClient* client = static_cast<v8_inspector::JsV8InspectorClient*>(data->Value());
+    Isolate* isolate = args.GetIsolate();
+    Local<v8::String> arg = args[0].As<v8::String>();
+    std::string message = tns::ToString(isolate, arg);
+    
+
+    std::vector<uint16_t> vector = tns::ToVector(message);
+    StringView messageView(vector.data(), vector.size());
+    auto msg = StringBuffer::create(messageView);
+    client->sendNotification(std::move(msg));
+}
+
 void JsV8InspectorClient::inspectorTimestampCallback(const FunctionCallbackInfo<Value>& args) {
     double timestamp = std::chrono::seconds(std::chrono::seconds(std::time(NULL))).count();
     args.GetReturnValue().Set(timestamp);
@@ -332,6 +429,11 @@ void JsV8InspectorClient::consoleLog(v8::Isolate* isolate, ConsoleAPIType method
     auto* impl = reinterpret_cast<v8_inspector::V8InspectorImpl*>(inspector_.get());
     auto* session = reinterpret_cast<v8_inspector::V8InspectorSessionImpl*>(session_.get());
     
+    if(impl->isolate() != isolate) {
+        // we don't currently support logging from a worker thread/isolate
+        return;
+    }
+
     v8::Local<v8::StackTrace> stack = v8::StackTrace::CurrentStackTrace(
         isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
     std::unique_ptr<V8StackTraceImpl> stackImpl = impl->debugger()->createStackTrace(stack);
@@ -345,6 +447,87 @@ void JsV8InspectorClient::consoleLog(v8::Isolate* isolate, ConsoleAPIType method
                 method, args, String16{}, std::move(stackImpl));
     
     session->runtimeAgent()->messageAdded(msg.get());
+}
+
+bool JsV8InspectorClient::CallDomainHandlerFunction(Local<Context> context, Local<Function> domainMethodFunc, const Local<Object>& arg, Local<Object>& domainDebugger, Local<Value>& result) {
+    if(domainMethodFunc.IsEmpty() || !domainMethodFunc->IsFunction()) {
+        return false;
+    }
+    
+    bool success;
+    Isolate* isolate = this->isolate_;
+    TryCatch tc(isolate);
+    
+    Local<Value> params;
+    success = arg.As<Object>()->Get(context, tns::ToV8String(isolate, "params")).ToLocal(&params);
+    
+    if(!success) {
+        return false;
+    }
+    
+    Local<Value> args[2] = { params, arg };
+    success = domainMethodFunc->Call(context, domainDebugger, 2, args).ToLocal(&result);
+    
+    if (tc.HasCaught()) {
+        std::string error = tns::ToString(isolate, tc.Message()->Get());
+
+        // backwards compatibility
+        if(error.find("may be enabled at a time") != std::string::npos) {
+            // not returning false here because we are catching bogus errors from core...
+            // Uncaught Error: One XXX may be enabled at a time...
+            result = v8::Boolean::New(isolate, true);
+            return true;
+        }
+        
+        // log any other errors - they are caught, but still make them visible to the user.
+        tns::LogError(isolate, tc);
+        
+        return false;
+    }
+    
+    return success;
+}
+
+std::string JsV8InspectorClient::GetReturnMessageFromDomainHandlerResult(const Local<Value>& result, const Local<Value>& requestId) {
+    if(result.IsEmpty() || !(result->IsBoolean() || result->IsObject() || result->IsNullOrUndefined())) {
+        return "";
+    }
+    
+    Isolate* isolate = this->isolate_;
+    
+    if(!result->IsObject()) {
+        // if there return value is a "true" boolean or undefined/null we send back an "ack" response with an empty result object
+        if(result->IsNullOrUndefined() || result->BooleanValue(isolate_)) {
+            return "{ \"id\":" + tns::ToString(isolate, requestId) + ", \"result\": {} }";
+        }
+        
+        return "";
+    }
+    
+    Local<Context> context = tns::Caches::Get(isolate)->GetContext();
+    Local<Object> resObject = result.As<v8::Object>();
+    Local<Value> stringified;
+    
+    bool success = true;
+    // already a { result: ... } object
+    if(resObject->Has(context, tns::ToV8String(isolate, "result")).ToChecked()) {
+        success = JSON::Stringify(context, result).ToLocal(&stringified);
+    } else {
+        // backwards compatibility - we wrap the response in a new object with the { id, result } keys
+        // since the returned response only contained the result part.
+        Context::Scope context_scope(context);
+
+        Local<Object> newResObject = v8::Object::New(isolate);
+        success = success && newResObject->Set(context, tns::ToV8String(isolate, "id"), requestId).ToChecked();
+        success = success && newResObject->Set(context, tns::ToV8String(isolate, "result"), resObject).ToChecked();
+        success = success && JSON::Stringify(context, newResObject).ToLocal(&stringified);
+    }
+    
+    if(!success) {
+        return "";
+    }
+    
+    return tns::ToString(isolate, stringified);
 }
 
 std::map<std::string, Persistent<Object>*> JsV8InspectorClient::Domains;

@@ -19,6 +19,7 @@ std::string v8_inspector::GetMIMEType(std::string filePath) {
     }
 
     NSString* fileExtension = [fullPath pathExtension];
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (__bridge CFStringRef)fileExtension, nil);
     if (uti == nil) {
         return std::string();
@@ -45,6 +46,8 @@ std::string v8_inspector::ToStdString(const StringView& value) {
 
     std::u16string value16(buffer.begin(), buffer.end());
 
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    // FIXME: std::codecvt_utf8_utf16 is deprecated
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
     std::string result = convert.to_bytes(value16);
 
@@ -69,20 +72,17 @@ Local<v8::Function> v8_inspector::GetDebuggerFunction(Local<Context> context, st
     return Local<v8::Function>();
 }
 
-std::string v8_inspector::GetDomainMethod(Isolate* isolate, const Local<Object>& arg, std::string domain) {
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Value> value;
-    assert(arg->Get(context, tns::ToV8String(isolate, "method")).ToLocal(&value));
-    std::string method = tns::ToString(isolate, value);
-
-    if (method.empty()) {
-        return "";
+Local<v8::Function> v8_inspector::GetDebuggerFunctionFromObject(Local<Context> context, const Local<Object>& object, Local<Object>& domainDebugger) {
+    Isolate* isolate = context->GetIsolate();
+    auto method = object->Get(context, tns::ToV8String(isolate, "method")).ToLocalChecked();
+    auto methodString = tns::ToString(isolate, method);
+    auto domainSeparatorIndex = methodString.find(".");
+    auto domain = methodString.substr(0, domainSeparatorIndex);
+    auto domainMethod = methodString.substr(domainSeparatorIndex + 1, methodString.size());
+    
+    if(domain.size() > 0) {
+        return v8_inspector::GetDebuggerFunction(context, domain, domainMethod, domainDebugger);
     }
 
-    size_t pos = method.find(domain);
-    if (pos == std::string::npos) {
-        return "";
-    }
-
-    return method.substr(pos + domain.length());
+    return Local<v8::Function>();
 }

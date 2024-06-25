@@ -12,6 +12,7 @@ CFTypeRef TNSFunctionWithCreateCFTypeRefReturn() CF_RETURNS_RETAINED;
 typedef int (^NumberReturner)(int, int, int);
 
 @interface TNSObjCTypes : NSObject
+@property (nonatomic, copy) void (^retainedBlock)(void);
 + (void)methodWithComplexBlock:(id (^)(int, id, SEL, NSObject*, TNSOStruct))block;
 + (id)methodWithObject:(id)x;
 
@@ -21,6 +22,10 @@ typedef int (^NumberReturner)(int, int, int);
 
 - (void)methodWithSimpleBlock:(void (^)(void))block;
 - (void)methodWithComplexBlock:(id (^)(int, id, SEL, NSObject*, TNSOStruct))block;
+
+- (void)methodRetainingBlock:(void (^)(void))block;
+- (void)methodCallRetainingBlock;
+- (void)methodReleaseRetainingBlock;
 
 - (NumberReturner)methodWithBlockScope:(int)number;
 - (id)methodReturningBlockAsId:(int)number;
@@ -34,4 +39,5 @@ typedef int (^NumberReturner)(int, int, int);
 - (NSDecimalNumber*)methodWithNSDecimalNumber:(NSDecimalNumber*)number;
 - (NSNumber*)methodWithNSCFBool;
 - (NSNull*)methodWithNSNull;
+- (NSArray*)getNSArrayOfNSURLs;
 @end

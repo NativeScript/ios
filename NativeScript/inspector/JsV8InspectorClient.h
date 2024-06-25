@@ -10,6 +10,7 @@
 #include "include/v8-inspector.h"
 #include "src/inspector/v8-console-message.h"
 
+#include "ns-v8-tracing-agent-impl.h"
 #include "runtime/Runtime.h"
 
 namespace v8_inspector {
@@ -46,14 +47,18 @@ private:
     v8::Persistent<v8::Context> context_;
     std::unique_ptr<V8InspectorSession> session_;
     tns::Runtime* runtime_;
+    v8::Isolate* isolate_;
     bool terminated_;
-    std::vector<std::string> messages_;
+    std::queue<std::string> messages_;
     bool runningNestedLoops_;
     dispatch_queue_t messagesQueue_;
     dispatch_queue_t messageLoopQueue_;
     dispatch_semaphore_t messageArrived_;
     std::function<void (std::string)> sender_;
     bool isWaitingForDebugger_;
+    bool hasScheduledDebugBreak_;
+    
+    std::unique_ptr<tns::inspector::TracingAgentImpl> tracing_agent_;
 
     // Override of V8InspectorClient
     v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
@@ -67,6 +72,14 @@ private:
     static void registerDomainDispatcherCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void inspectorSendEventCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void inspectorTimestampCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+    
+    // {N} specific helpers
+    bool CallDomainHandlerFunction(v8::Local<v8::Context> context,
+                              v8::Local<v8::Function> domainMethodFunc,
+                              const v8::Local<v8::Object>& arg,
+                              v8::Local<v8::Object>& domainDebugger,
+                              v8::Local<v8::Value>& result);
+    std::string GetReturnMessageFromDomainHandlerResult(const v8::Local<v8::Value>& result, const v8::Local<v8::Value>& requestId);
 };
 
 }

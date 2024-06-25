@@ -93,7 +93,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
     Isolate* isolate = data->isolateWrapper_.Isolate();
 
-    if (!Runtime::IsAlive(isolate) || !data->isolateWrapper_.IsValid()) {
+    if (!data->isolateWrapper_.IsValid()) {
         memset(retValue, 0, cif->rtype->size);
         return;
     }
@@ -869,7 +869,7 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index, const PropertyC
 
     Local<Context> context = isolate->GetCurrentContext();
     auto newWrapper = new ObjCDataWrapper(obj);
-    Local<Value> result = ArgConverter::ConvertArgument(context, wrapper);
+    Local<Value> result = ArgConverter::ConvertArgument(context, newWrapper);
     tns::DeleteWrapperIfUnused(isolate, result, newWrapper);
     args.GetReturnValue().Set(result);
 }

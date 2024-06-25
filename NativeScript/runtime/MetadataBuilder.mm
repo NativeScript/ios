@@ -97,7 +97,9 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property, const Prope
         tns::SetValue(isolate, func, new FunctionWrapper(funcMeta));
         MetadataBuilder::DefineFunctionLengthProperty(context, funcMeta->encodings(), func);
 
-        cache->CFunctions.emplace(funcName, std::make_unique<Persistent<v8::Function>>(isolate, func));
+        auto uniquePersistent = std::make_unique<Persistent<v8::Function>>(isolate, func);
+        uniquePersistent->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
+        cache->CFunctions.emplace(funcName, std::move(uniquePersistent));
 
         info.GetReturnValue().Set(func);
     } else if (meta->type() == MetaType::Var) {
