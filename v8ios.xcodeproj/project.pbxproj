@@ -34,7 +34,7 @@
 		6573B9E2291FE2A700B0ED7C /* jsi-inl.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9D9291FE2A700B0ED7C /* jsi-inl.h */; };
 		6573B9E3291FE2A700B0ED7C /* jsilib-posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9DA291FE2A700B0ED7C /* jsilib-posix.cpp */; };
 		6573B9E4291FE2A700B0ED7C /* jsilib-windows.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9DB291FE2A700B0ED7C /* jsilib-windows.cpp */; };
-		6573B9E5291FE2A700B0ED7C /* jsi.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9DC291FE2A700B0ED7C /* jsi.cpp */; };
+		6573B9E5291FE2A700B0ED7C /* jsi.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9DC291FE2A700B0ED7C /* jsi.cpp */; settings = {COMPILER_FLAGS = "-frtti"; }; };
 		6573B9E6291FE2A700B0ED7C /* instrumentation.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9DD291FE2A700B0ED7C /* instrumentation.h */; };
 		6573B9E7291FE2A700B0ED7C /* jsi.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9DE291FE2A700B0ED7C /* jsi.h */; };
 		6573B9E8291FE2A700B0ED7C /* decorator.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9DF291FE2A700B0ED7C /* decorator.h */; };
