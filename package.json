@@ -1,6 +1,6 @@
 {
-  "name": "@nativescript/ios",
-  "description": "NativeScript Runtime for iOS",
+  "name": "@nativescript/tvos",
+  "description": "NativeScript Runtime for tvOS",
   "version": "8.7.3",
   "keywords": [
     "NativeScript",
@@ -24,6 +24,7 @@
     "build-v8-source": "./build_v8_source.sh",
     "build-v8-source-catalyst": "./build_v8_source_catalyst.sh",
     "build-ios": "node prepare-target ios && ./build_all_ios.sh",
+    "build-tvos": "node prepare-target tvos && ./build_all_tvos.sh",
     "build-vision": "node prepare-target visionos && ./build_all_vision.sh",
     "setup-ci": "./build_metadata_generator.sh",
     "update-version": "./update_version.sh",

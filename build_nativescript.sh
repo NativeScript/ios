@@ -27,6 +27,7 @@ BUILD_CATALYST=$(to_bool ${BUILD_CATALYST:=true})
 BUILD_IPHONE=$(to_bool ${BUILD_IPHONE:=true})
 BUILD_SIMULATOR=$(to_bool ${BUILD_SIMULATOR:=true})
 BUILD_VISION=$(to_bool ${BUILD_VISION:=true})
+BUILD_TV=$(to_bool ${BUILD_TV:=true})
 VERBOSE=$(to_bool ${VERBOSE:=false})
 
 for arg in $@; do
@@ -39,6 +40,8 @@ for arg in $@; do
     --no-iphone|--no-device) BUILD_IPHONE=false ;;
     --xr|--vision) BUILD_VISION=true ;;
     --no-xr|--no-vision) BUILD_VISION=false ;;
+    --tv|--appletv) BUILD_TV=true ;;
+    --no-tv|--no-appletv) BUILD_TV=false ;;
     --verbose|-v) VERBOSE=true ;;
     *) ;;
   esac
@@ -131,6 +134,35 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -archivePath $DIST/intermediates/NativeScript.xrsimulator.xcarchive
 fi
 
+if $BUILD_TV; then
+
+checkpoint "Building NativeScript for Apple TV Device"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "NativeScript" \
+                   -configuration Release \
+                   -destination "generic/platform=tvOS" \
+                   $QUIET \
+                   EXCLUDED_ARCHS="i386 x86_64" \
+                   VALID_ARCHS=arm64 \
+                   DEVELOPMENT_TEAM=$DEV_TEAM \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/NativeScript.tvos.xcarchive
+
+checkpoint "Building NativeScript for Apple TV Simulators"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "NativeScript" \
+                   -configuration Release \
+                   -destination "generic/platform=tvOS Simulator" \
+                   $QUIET \
+                   EXCLUDED_ARCHS="i386 x86_64" \
+                   VALID_ARCHS=arm64 \
+                   DEVELOPMENT_TEAM=$DEV_TEAM \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/NativeScript.tvsimulator.xcarchive
+fi
+
 XCFRAMEWORKS=()
 if $BUILD_CATALYST; then
   XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.maccatalyst.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
@@ -152,6 +184,13 @@ if $BUILD_VISION; then
                   -debug-symbols "$DIST/intermediates/NativeScript.xros.xcarchive/dSYMs/NativeScript.framework.dSYM" )
   XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
                   -debug-symbols "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+fi
+
+if $BUILD_TV; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.tvos.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.tvos.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.tvsimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.tvsimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
 fi
 
 checkpoint "Creating NativeScript.xcframework"

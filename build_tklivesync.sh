@@ -27,6 +27,7 @@ BUILD_CATALYST=$(to_bool ${BUILD_CATALYST:=true})
 BUILD_IPHONE=$(to_bool ${BUILD_IPHONE:=true})
 BUILD_SIMULATOR=$(to_bool ${BUILD_SIMULATOR:=true})
 BUILD_VISION=$(to_bool ${BUILD_VISION:=true})
+BUILD_TV=$(to_bool ${BUILD_TV:=true})
 VERBOSE=$(to_bool ${VERBOSE:=false})
 
 for arg in $@; do
@@ -39,6 +40,8 @@ for arg in $@; do
     --no-iphone|--no-device) BUILD_IPHONE=false ;;
     --xr|--vision) BUILD_VISION=true ;;
     --no-xr|--no-vision) BUILD_VISION=false ;;
+    --tv|--appletv) BUILD_TV=true ;;
+    --no-tv|--no-appletv) BUILD_TV=false ;;
     --verbose|-v) VERBOSE=true ;;
     *) ;;
   esac
@@ -118,6 +121,29 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -archivePath $DIST/intermediates/TKLiveSync.xros.xcarchive
 fi
 
+if $BUILD_TV; then
+
+checkpoint "Building TKLiveSync for Apple TV Device"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "TKLiveSync" \
+                   -configuration Release \
+                   -destination "generic/platform=tvOS" \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/TKLiveSync.tvos.xcarchive
+
+checkpoint "Building TKLiveSync for Apple TV Simulators"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "TKLiveSync" \
+                   -configuration Release \
+                   -destination "generic/platform=tvOS Simulator" \
+                   -quiet \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/TKLiveSync.tvsimulator.xcarchive
+fi
+
 #Creates directory for fat-library
 OUTPUT_DIR="$DIST/TKLiveSync.xcframework"
 rm -rf "${OUTPUT_PATH}"
@@ -159,6 +185,13 @@ if $BUILD_VISION; then
                   -debug-symbols "$DIST/intermediates/TKLiveSync.xros.xcarchive/dSYMs/TKLiveSync.framework.dSYM" )
   XCFRAMEWORKS+=( -framework "$DIST/intermediates/TKLiveSync.xrsimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
                   -debug-symbols "$DIST/intermediates/TKLiveSync.xrsimulator.xcarchive/dSYMs/TKLiveSync.framework.dSYM" )
+fi
+
+if $BUILD_TV; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/TKLiveSync.tvos.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
+                  -debug-symbols "$DIST/intermediates/TKLiveSync.tvos.xcarchive/dSYMs/TKLiveSync.framework.dSYM" )
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/TKLiveSync.tvsimulator.xcarchive/Products/Library/Frameworks/TKLiveSync.framework" \
+                  -debug-symbols "$DIST/intermediates/TKLiveSync.tvsimulator.xcarchive/dSYMs/TKLiveSync.framework.dSYM" )
 fi
 
 checkpoint "Creating TKLiveSync.xcframework"
