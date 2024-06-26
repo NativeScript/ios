@@ -6,6 +6,7 @@
 //  Copyright © 2022 Progress. All rights reserved.
 //
 
+#pragma once
 #import <Foundation/Foundation.h>
 #import "v8runtime/V8Runtime.h"
 #include "runtime/Runtime.h"

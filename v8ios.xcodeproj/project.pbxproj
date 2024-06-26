@@ -15,6 +15,8 @@
 		2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE22052AC1C93100307752 /* metadata-arm64.bin */; };
 		3C1850542A6DCB2D002ACC81 /* Timers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C1850522A6DCB2D002ACC81 /* Timers.cpp */; };
 		3C1850552A6DCB2D002ACC81 /* Timers.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C1850532A6DCB2D002ACC81 /* Timers.hpp */; };
+		3C5333342B0E683100BE0C47 /* Message.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C5333322B0E683100BE0C47 /* Message.cpp */; };
+		3C5333352B0E683100BE0C47 /* Message.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C5333332B0E683100BE0C47 /* Message.hpp */; };
 		3C78BA5C2A0D600100C20A88 /* ModuleBinding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C78BA5A2A0D600100C20A88 /* ModuleBinding.cpp */; };
 		3C78BA5D2A0D600100C20A88 /* ModuleBinding.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C78BA5B2A0D600100C20A88 /* ModuleBinding.hpp */; };
 		3CA6E53529A78C6000D30F8B /* IsolateWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */; };
@@ -36,7 +38,7 @@
 		6573B9E2291FE2A700B0ED7C /* jsi-inl.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9D9291FE2A700B0ED7C /* jsi-inl.h */; };
 		6573B9E3291FE2A700B0ED7C /* jsilib-posix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9DA291FE2A700B0ED7C /* jsilib-posix.cpp */; };
 		6573B9E4291FE2A700B0ED7C /* jsilib-windows.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9DB291FE2A700B0ED7C /* jsilib-windows.cpp */; };
-		6573B9E5291FE2A700B0ED7C /* jsi.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9DC291FE2A700B0ED7C /* jsi.cpp */; };
+		6573B9E5291FE2A700B0ED7C /* jsi.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9DC291FE2A700B0ED7C /* jsi.cpp */; settings = {COMPILER_FLAGS = "-frtti"; }; };
 		6573B9E6291FE2A700B0ED7C /* instrumentation.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9DD291FE2A700B0ED7C /* instrumentation.h */; };
 		6573B9E7291FE2A700B0ED7C /* jsi.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9DE291FE2A700B0ED7C /* jsi.h */; };
 		6573B9E8291FE2A700B0ED7C /* decorator.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9DF291FE2A700B0ED7C /* decorator.h */; };
@@ -444,6 +446,8 @@
 		2BFE22052AC1C93100307752 /* metadata-arm64.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = "metadata-arm64.bin"; sourceTree = "<group>"; };
 		3C1850522A6DCB2D002ACC81 /* Timers.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Timers.cpp; sourceTree = "<group>"; };
 		3C1850532A6DCB2D002ACC81 /* Timers.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Timers.hpp; sourceTree = "<group>"; };
+		3C5333322B0E683100BE0C47 /* Message.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Message.cpp; sourceTree = "<group>"; };
+		3C5333332B0E683100BE0C47 /* Message.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Message.hpp; sourceTree = "<group>"; };
 		3C78BA5A2A0D600100C20A88 /* ModuleBinding.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ModuleBinding.cpp; sourceTree = "<group>"; };
 		3C78BA5B2A0D600100C20A88 /* ModuleBinding.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ModuleBinding.hpp; sourceTree = "<group>"; };
 		3CA6E53429A78C6000D30F8B /* IsolateWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IsolateWrapper.h; sourceTree = "<group>"; };
@@ -1469,6 +1473,8 @@
 				3C78BA5B2A0D600100C20A88 /* ModuleBinding.hpp */,
 				3C1850522A6DCB2D002ACC81 /* Timers.cpp */,
 				3C1850532A6DCB2D002ACC81 /* Timers.hpp */,
+				3C5333322B0E683100BE0C47 /* Message.cpp */,
+				3C5333332B0E683100BE0C47 /* Message.hpp */,
 			);
 			path = runtime;
 			sourceTree = "<group>";
@@ -1571,6 +1577,7 @@
 				C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */,
 				C2D7E9D523F42C1100DB289C /* PromiseProxy.h in Headers */,
 				C2A5F86B2359AEB600074AFA /* ExtVector.h in Headers */,
+				3C5333352B0E683100BE0C47 /* Message.hpp in Headers */,
 				C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */,
 				C247C16A22F82842001D2CA2 /* v8-profiler.h in Headers */,
 				C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */,
@@ -1894,7 +1901,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd \"${SRCROOT}/NativeScript\"\n\necho 'Copying headers into Framework..'\nfor H in `find . -name \"*.h\"`;  do\n    echo \"copying ${H} to ${BUILT_PRODUCTS_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}/${H}\"\n    ditto \"${H}\" \"${BUILT_PRODUCTS_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}/${H}\"\ndone\n";
+			shellScript = "cd \"${SRCROOT}/NativeScript\"\n\necho 'Copying headers into Framework..'\nfor H in `find . -name \"*.h\" -o -name \"*.hpp\"`;  do\n    echo \"copying ${H} to ${BUILT_PRODUCTS_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}/${H}\"\n    ditto \"${H}\" \"${BUILT_PRODUCTS_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}/${H}\"\ndone\n";
 		};
 		C27E5DB322F31FF800498ED0 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -2212,6 +2219,7 @@
 				F1F30E752B58FC74006A62C0 /* URLSearchParamsImpl.cpp in Sources */,
 				F1F30E742B58FC74006A62C0 /* URLImpl.cpp in Sources */,
 				C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */,
+				3C5333342B0E683100BE0C47 /* Message.cpp in Sources */,
 				C2C8EE7422CE3266001F8CEC /* ConcurrentQueue.cpp in Sources */,
 				C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */,
 				C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */,

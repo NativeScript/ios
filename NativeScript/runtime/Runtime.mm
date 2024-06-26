@@ -38,6 +38,25 @@ std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
 
+// TODO: consider listening to timezone changes and automatically reseting the DateTime. Probably makes more sense to move it to its own file
+//void UpdateTimezoneNotificationCallback(CFNotificationCenterRef center,
+//                void *observer,
+//                CFStringRef name,
+//                const void *object,
+//                CFDictionaryRef userInfo) {
+//    Runtime* r = (Runtime*)observer;
+//    auto isolate = r->GetIsolate();
+//
+//    CFRunLoopPerformBlock(r->RuntimeLoop(), kCFRunLoopDefaultMode, ^() {
+//        TODO: lock isolate here?
+//        isolate->DateTimeConfigurationChangeNotification(Isolate::TimeZoneDetection::kRedetect);
+//    });
+//}
+// add this to register (most likely on setting up isolate
+//CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), this, &UpdateTimezoneNotificationCallback, kCFTimeZoneSystemTimeZoneDidChangeNotification, nullptr, CFNotificationSuspensionBehaviorDeliverImmediately);
+// add this to remove the observer
+//CFNotificationCenterRemoveObserver(CFNotificationCenterGetLocalCenter(), this, kCFTimeZoneSystemTimeZoneDidChangeNotification, NULL);
+
 void DisposeIsolateWhenPossible(Isolate* isolate) {
     // most of the time, this will never delay disposal
     // occasionally this can happen when the runtime is destroyed by actions of its own isolate
@@ -386,6 +405,13 @@ void Runtime::DefineDrainMicrotaskMethod(v8::Isolate* isolate, v8::Local<v8::Obj
         info.GetIsolate()->PerformMicrotaskCheckpoint();
     });
     globalTemplate->Set(ToV8String(isolate, "__drainMicrotaskQueue"), drainMicrotaskTemplate);
+}
+
+void Runtime::DefineDateTimeConfigurationChangeNotificationMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate) {
+    Local<FunctionTemplate> drainMicrotaskTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+        info.GetIsolate()->DateTimeConfigurationChangeNotification(Isolate::TimeZoneDetection::kRedetect);
+    });
+    globalTemplate->Set(ToV8String(isolate, "__dateTimeConfigurationChangeNotification"), drainMicrotaskTemplate);
 }
 
 bool Runtime::IsAlive(const Isolate* isolate) {

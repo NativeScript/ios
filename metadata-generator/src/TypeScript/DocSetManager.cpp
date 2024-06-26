@@ -90,7 +90,7 @@ using namespace std;
 
 std::string TSComment::toString(std::string linePrefix)
 {
-    if (description.length() == 0 && params.size() == 0) {
+    if (description.length() == 0 && params.size() == 0 && deprecatedIn.isUnknown() && introducedIn.isUnknown()) {
         return std::string();
     }
 
@@ -98,11 +98,19 @@ std::string TSComment::toString(std::string linePrefix)
     result << linePrefix << "/**" << std::endl;
     std::string processedDesc = description;
     findAndReplaceIn(processedDesc, "\n", "");
-    result << linePrefix << " * " << processedDesc << std::endl;
+    if (processedDesc.length() > 0) {
+        result << linePrefix << " * " << processedDesc << std::endl;
+    }
     for (std::pair<std::string, std::string>& param : params) {
         // @param paramName - paramDesc
         result << linePrefix << " * "
                << "@param " + param.first + " - " + param.second << std::endl;
+    }
+    if (!introducedIn.isUnknown()) {
+        result << linePrefix << " * " << "@since " << introducedIn.toString() << std::endl;
+    }
+    if (!deprecatedIn.isUnknown()) {
+        result << linePrefix << " * " << "@deprecated " << deprecatedIn.toString() << std::endl;
     }
     result << linePrefix << " */" << std::endl;
     return result.str();
@@ -110,7 +118,11 @@ std::string TSComment::toString(std::string linePrefix)
 
 TSComment DocSetManager::getCommentFor(Meta::Meta* meta, Meta::Meta* parent)
 {
-    return (parent == nullptr) ? getCommentFor(meta->name, meta->type) : getCommentFor(meta->name, meta->type, parent->name, parent->type);
+    auto comment = (parent == nullptr) ? getCommentFor(meta->name, meta->type) : getCommentFor(meta->name, meta->type, parent->name, parent->type);
+    comment.deprecatedIn = meta->deprecatedIn;
+    comment.introducedIn = meta->introducedIn;
+    comment.obsoletedIn = meta->obsoletedIn;
+    return comment;
 }
 
 TSComment DocSetManager::getCommentFor(std::string name, Meta::MetaType type, std::string parentName, Meta::MetaType parentType)

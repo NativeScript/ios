@@ -38,6 +38,18 @@ class JSI_EXPORT Buffer {
   virtual const uint8_t* data() const = 0;
 };
 
+/// Base class for buffers of data that need to be passed to the runtime. The
+/// result of size() and data() must not change after construction. However, the
+/// region pointed to by data() may be modified by the user or the runtime. The
+/// user must ensure that access to the contents of the buffer is properly
+/// synchronised.
+class JSI_EXPORT MutableBuffer {
+    public:
+        virtual ~MutableBuffer();
+        virtual size_t size() const = 0;
+        virtual uint8_t* data() = 0;
+};
+
 class JSI_EXPORT StringBuffer : public Buffer {
  public:
   StringBuffer(std::string s) : s_(std::move(s)) {}
@@ -80,6 +92,7 @@ class Instrumentation;
 class Scope;
 class JSIException;
 class JSError;
+class TypedArray;
 
 /// A function which has this type can be registered as a function
 /// callable from JavaScript using Function::createFromHostFunction().
@@ -251,6 +264,8 @@ class JSI_EXPORT Runtime {
   friend class Value;
   friend class Scope;
   friend class JSError;
+  friend class TypedArray;
+    
 
   // Potential optimization: avoid the cloneFoo() virtual dispatch,
   // and instead just fix the number of fields, and copy them, since
@@ -307,6 +322,19 @@ class JSI_EXPORT Runtime {
 
   virtual bool isArray(const Object&) const = 0;
   virtual bool isArrayBuffer(const Object&) const = 0;
+  virtual bool isArrayBufferView(const Object&) const = 0;
+  virtual bool isTypedArray(const Object&) const = 0;
+  virtual bool isInt8Array(const Object&) const = 0;
+  virtual bool isUint8Array(const Object&) const = 0;
+  virtual bool isUint8ClampedArray(const Object&) const = 0;
+  virtual bool isInt16Array(const Object&) const = 0;
+  virtual bool isUint16Array(const Object&) const = 0;
+  virtual bool isInt32Array(const Object&) const = 0;
+  virtual bool isUint32Array(const Object&) const = 0;
+  virtual bool isFloat32Array(const Object&) const = 0;
+  virtual bool isBigInt64Array(const Object&) const = 0;
+  virtual bool isBigUint64Array(const Object&) const = 0;
+  virtual bool isFloat64Array(const Object&) const = 0;
   virtual bool isFunction(const Object&) const = 0;
   virtual bool isHostObject(const jsi::Object&) const = 0;
   virtual bool isHostFunction(const jsi::Function&) const = 0;
@@ -314,11 +342,20 @@ class JSI_EXPORT Runtime {
 
   virtual WeakObject createWeakObject(const Object&) = 0;
   virtual Value lockWeakObject(WeakObject&) = 0;
+    
+  virtual uint64_t uint64Value(const BigInt&, bool *lossless) const = 0;
+  virtual int64_t int64Value(const BigInt&, bool *lossless) const = 0;
+
 
   virtual Array createArray(size_t length) = 0;
+  virtual ArrayBuffer createArrayBuffer(
+                std::shared_ptr<MutableBuffer> buffer) = 0;
   virtual size_t size(const Array&) = 0;
   virtual size_t size(const ArrayBuffer&) = 0;
+  virtual size_t size(const TypedArray&) = 0;
   virtual uint8_t* data(const ArrayBuffer&) = 0;
+  virtual uint8_t* data(const TypedArray&) = 0;
+  virtual size_t offset(const TypedArray&) = 0;
   virtual Value getValueAtIndex(const Array&, size_t i) = 0;
   virtual void setValueAtIndexImpl(Array&, size_t i, const Value& value) = 0;
 
@@ -493,6 +530,26 @@ class JSI_EXPORT BigInt : public Pointer {
 
   BigInt(BigInt&& other) = default;
   BigInt& operator=(BigInt&& other) = default;
+    
+    
+    /**
+     * Returns the value of this BigInt as an unsigned 64-bit integer.
+     * If `lossless` is provided, it will reflect whether the return value was
+     * truncated or wrapped around. In particular, it is set to `false` if this
+     * BigInt is negative.
+     */
+    uint64_t Uint64Value(Runtime& runtime, bool* lossless = nullptr) const {
+        return runtime.uint64Value(*this, lossless);
+    }
+    
+    /**
+     * Returns the value of this BigInt as a signed 64-bit integer.
+     * If `lossless` is provided, it will reflect whether this BigInt was
+     * truncated or not.
+     */
+    int64_t Int64Value(Runtime& runtime, bool* lossless = nullptr) const {
+        return runtime.int64Value(*this, lossless);
+    }
 
   friend class Runtime;
   friend class Value;
@@ -641,6 +698,86 @@ class JSI_EXPORT Object : public Pointer {
   bool isArrayBuffer(Runtime& runtime) const {
     return runtime.isArrayBuffer(*this);
   }
+    
+    
+    /// \return true iff the Object is an isArrayBufferView. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isArrayBufferView(Runtime& runtime) const {
+        return runtime.isArrayBufferView(*this);
+    }
+    
+    /// \return true iff the Object is an isTypedArray. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isTypedArray(Runtime& runtime) const {
+        return runtime.isTypedArray(*this);
+    }
+    
+    
+    /// \return true iff the Object is an isInt8Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isInt8Array(Runtime& runtime) const {
+        return runtime.isInt8Array(*this);
+    }
+    
+    /// \return true iff the Object is an isUint8Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isUint8Array(Runtime& runtime) const {
+        return runtime.isUint8Array(*this);
+    }
+    
+    /// \return true iff the Object is an isUint8ClampedArray. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isUint8ClampedArray(Runtime& runtime) const {
+        return runtime.isUint8ClampedArray(*this);
+    }
+    
+    /// \return true iff the Object is an isInt16Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isInt16Array(Runtime& runtime) const {
+        return runtime.isInt16Array(*this);
+    }
+    
+    /// \return true iff the Object is an isUint16Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isUint16Array(Runtime& runtime) const {
+        return runtime.isUint16Array(*this);
+    }
+    
+    /// \return true iff the Object is an isInt32Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isInt32Array(Runtime& runtime) const {
+        return runtime.isInt32Array(*this);
+    }
+    
+    /// \return true iff the Object is an isUint32Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isUint32Array(Runtime& runtime) const {
+        return runtime.isUint32Array(*this);
+    }
+    
+    /// \return true iff the Object is an isFloat32Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isFloat32Array(Runtime& runtime) const {
+        return runtime.isFloat32Array(*this);
+    }
+    
+    /// \return true iff the Object is an isBigInt64Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isBigInt64Array(Runtime& runtime) const {
+        return runtime.isBigInt64Array(*this);
+    }
+    
+    /// \return true iff the Object is an isBigUint64Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isBigUint64Array(Runtime& runtime) const {
+        return runtime.isBigUint64Array(*this);
+    }
+    
+    /// \return true iff the Object is an isFloat64Array. If so, then \c
+    /// getArrayBuffer() will succeed.
+    bool isFloat64Array(Runtime& runtime) const {
+        return runtime.isFloat64Array(*this);
+    }
 
   /// \return true iff the Object is callable.  If so, then \c
   /// getFunction will succeed.
@@ -679,6 +816,16 @@ class JSI_EXPORT Object : public Pointer {
   /// \return an ArrayBuffer instance which refers to the same underlying
   /// object.  If \c isArrayBuffer() would return false, this will assert.
   ArrayBuffer getArrayBuffer(Runtime& runtime) &&;
+    
+    
+    /// \return an TypedArray instance which refers to the same underlying
+    /// object.  If \c isTypedArray() would return false, this will assert.
+    TypedArray getTypedArray(Runtime& runtime) const&;
+    
+    /// \return an TypedArray instance which refers to the same underlying
+    /// object.  If \c isTypedArray() would return false, this will assert.
+    TypedArray getTypedArray(Runtime& runtime) &&;
+
 
   /// \return a Function instance which refers to the same underlying
   /// object.  If \c isFunction() would return false, this will assert.
@@ -828,6 +975,8 @@ class JSI_EXPORT ArrayBuffer : public Object {
  public:
   ArrayBuffer(ArrayBuffer&&) = default;
   ArrayBuffer& operator=(ArrayBuffer&&) = default;
+    ArrayBuffer(Runtime& runtime, std::shared_ptr<MutableBuffer> buffer)
+    : ArrayBuffer(runtime.createArrayBuffer(std::move(buffer))) {}
 
   /// \return the size of the ArrayBuffer, according to its byteLength property.
   /// (C++ naming convention)
@@ -849,6 +998,41 @@ class JSI_EXPORT ArrayBuffer : public Object {
 
   ArrayBuffer(Runtime::PointerValue* value) : Object(value) {}
 };
+
+
+/// Represents a TypedArray
+class JSI_EXPORT TypedArray : public Object {
+public:
+    TypedArray(TypedArray &&) = default;
+    
+    TypedArray &operator=(TypedArray &&) = default;
+    
+    /// \return the size of the TypedArray ArrayBuffer, according to its byteLength property.
+    /// (C++ naming convention)
+    size_t size(Runtime &runtime) {
+        return runtime.size(*this);
+    }
+    
+    size_t offset(Runtime &runtime) const {
+        return runtime.offset(*this);
+    }
+    
+    size_t length(Runtime &runtime) const {
+        return runtime.size(*this);
+    }
+    
+    uint8_t *data(Runtime &runtime) {
+        return runtime.data(*this);
+    }
+    
+private:
+    friend class Object;
+    
+    friend class Value;
+    
+    TypedArray(Runtime::PointerValue *value) : Object(value) {}
+};
+
 
 /// Represents a JS Object which is guaranteed to be Callable.
 class JSI_EXPORT Function : public Object {

@@ -47,6 +47,10 @@ class JSIV8ValueConverter {
   static v8::Local<v8::Object> ToV8Object(
       const V8Runtime &runtime,
       const facebook::jsi::Object &object);
+    
+  static v8::Local<v8::BigInt> ToV8BigInt(
+      const V8Runtime &runtime,
+      const facebook::jsi::BigInt &bigInt);
 
   static v8::Local<v8::Array> ToV8Array(
       const V8Runtime &runtime,
