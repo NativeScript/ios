@@ -61,6 +61,20 @@ xcodebuild -project v8ios.xcodeproj \
            -configuration Release clean \
            $QUIET
 
+if $BUILD_CATALYST; then
+checkpoint "Building NativeScript for Mac Catalyst"
+xcodebuild archive -project v8ios.xcodeproj \
+                   -scheme "NativeScript" \
+                   -configuration Release \
+                   -destination "platform=macOS,variant=Mac Catalyst" \
+                   $QUIET \
+                   EXCLUDED_ARCHS="x86_64" \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARIES_FOR_DISTRIBUTION=YES \
+                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
+                   -archivePath $DIST/intermediates/NativeScript.maccatalyst.xcarchive
+fi
+
 if $BUILD_SIMULATOR; then
 checkpoint "Building NativeScript for iphone simulators (multi-arch)"
 xcodebuild archive -project v8ios.xcodeproj \
@@ -71,7 +85,8 @@ xcodebuild archive -project v8ios.xcodeproj \
                    EXCLUDED_ARCHS="i386" \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
-                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   BUILD_LIBRARIES_FOR_DISTRIBUTION=YES \
+                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.iphonesimulator.xcarchive
 fi
 
@@ -85,7 +100,8 @@ xcodebuild archive -project v8ios.xcodeproj \
                    EXCLUDED_ARCHS="armv7" \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
-                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   BUILD_LIBRARIES_FOR_DISTRIBUTION=YES \
+                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.iphoneos.xcarchive
 fi
 

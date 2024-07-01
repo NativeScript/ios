@@ -7,8 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */; };
+		2B5088A72BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
+		2B5088A82BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
+		2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE22052AC1C93100307752 /* metadata-arm64.bin */; };
 		3C1850542A6DCB2D002ACC81 /* Timers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C1850522A6DCB2D002ACC81 /* Timers.cpp */; };
 		3C1850552A6DCB2D002ACC81 /* Timers.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C1850532A6DCB2D002ACC81 /* Timers.hpp */; };
 		3C5333342B0E683100BE0C47 /* Message.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C5333322B0E683100BE0C47 /* Message.cpp */; };
@@ -47,7 +51,6 @@
 		91B25A0B29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = 91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
 		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		C20525A82577D86600C12A5C /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
 		C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */; };
 		C20AB5E726E1015300E2B41D /* OneByteStringResource.h in Headers */ = {isa = PBXBuildFile; fileRef = C20AB5E526E1015200E2B41D /* OneByteStringResource.h */; };
 		C22536B5241A318900192740 /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B0241A318900192740 /* ffitarget.h */; };
@@ -431,6 +434,15 @@
 /* Begin PBXFileReference section */
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
+		2BFE21F22AC1B7D500307752 /* UIView+NativeScript.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIView+NativeScript.h"; sourceTree = "<group>"; };
+		2BFE21F32AC1B7D500307752 /* UIView+NativeScript.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UIView+NativeScript.m"; sourceTree = "<group>"; };
+		2BFE21F42AC1B7D500307752 /* NativeScriptUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptUtils.h; sourceTree = "<group>"; };
+		2BFE21F52AC1B7D500307752 /* NativeScriptUtils.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NativeScriptUtils.m; sourceTree = "<group>"; };
+		2BFE21F62AC1B7D600307752 /* NativeScriptEmbedder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptEmbedder.h; sourceTree = "<group>"; };
+		2BFE21F72AC1B7D600307752 /* NativeScriptEmbedder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NativeScriptEmbedder.m; sourceTree = "<group>"; };
+		2BFE21F82AC1B7D600307752 /* NativeScriptSDK.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptSDK.h; sourceTree = "<group>"; };
+		2BFE22002AC1C65B00307752 /* module.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.modulemap; sourceTree = "<group>"; };
+		2BFE22052AC1C93100307752 /* metadata-arm64.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = "metadata-arm64.bin"; sourceTree = "<group>"; };
 		3C1850522A6DCB2D002ACC81 /* Timers.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Timers.cpp; sourceTree = "<group>"; };
 		3C1850532A6DCB2D002ACC81 /* Timers.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Timers.hpp; sourceTree = "<group>"; };
 		3C5333322B0E683100BE0C47 /* Message.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Message.cpp; sourceTree = "<group>"; };
@@ -842,7 +854,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */,
-				C20525A82577D86600C12A5C /* TNSWidgets.xcframework in Frameworks */,
+				2B5088A72BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -879,6 +891,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2BFE21F12AC1B79F00307752 /* embedding */ = {
+			isa = PBXGroup;
+			children = (
+				2BFE21F62AC1B7D600307752 /* NativeScriptEmbedder.h */,
+				2BFE21F72AC1B7D600307752 /* NativeScriptEmbedder.m */,
+				2BFE21F82AC1B7D600307752 /* NativeScriptSDK.h */,
+				2BFE21F42AC1B7D500307752 /* NativeScriptUtils.h */,
+				2BFE21F52AC1B7D500307752 /* NativeScriptUtils.m */,
+				2BFE21F22AC1B7D500307752 /* UIView+NativeScript.h */,
+				2BFE21F32AC1B7D500307752 /* UIView+NativeScript.m */,
+				2BFE22002AC1C65B00307752 /* module.modulemap */,
+			);
+			path = embedding;
+			sourceTree = "<group>";
+		};
 		6573B9C1291FE29F00B0ED7C /* v8runtime */ = {
 			isa = PBXGroup;
 			children = (
@@ -1326,6 +1353,8 @@
 		C2DDEB33229EAB3B00345BFE /* NativeScript */ = {
 			isa = PBXGroup;
 			children = (
+				2BFE22052AC1C93100307752 /* metadata-arm64.bin */,
+				2BFE21F12AC1B79F00307752 /* embedding */,
 				F1F30E862B58FE28006A62C0 /* ada */,
 				F6191AA529C0FCE7003F588F /* inspector */,
 				6573B9D8291FE2A700B0ED7C /* jsi */,
@@ -1706,6 +1735,7 @@
 				C2DDEB2F229EAB3B00345BFE /* Frameworks */,
 				C2DDEB30229EAB3B00345BFE /* Resources */,
 				65A6D684291F63A30074DF31 /* ShellScript */,
+				2BFE21F02AC1B28000307752 /* Add default metadata */,
 			);
 			buildRules = (
 			);
@@ -1813,6 +1843,7 @@
 			files = (
 				C27E5DB522F3206B00498ED0 /* app in Resources */,
 				C27E5DBA22F324C200498ED0 /* Default-568h@2x.png in Resources */,
+				2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1829,12 +1860,31 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		2BFE21F02AC1B28000307752 /* Add default metadata */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Add default metadata";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"Checking flags to determine whether to copy default metadata\"\nif [ \"$INCLUDE_DEFAULT_METADATA\" = true ] ; then\necho \"Copying ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-arm64.bin directory to ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework\"\ncp ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-arm64.bin ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework/metadata-arm64.bin\necho \"metadata-arm64.bin has been copied.\"\necho \"Copying ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-x86_64.bin directory to ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework\"\ncp ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-x86_64.bin ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework/metadata-x86_64.bin\necho \"metadata-x86_64.bin has been copied.\"\nelse\necho \"Skipped copying metadata binaries.\"\nfi\n\n";
+		};
 		65A6D684291F63A30074DF31 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -2508,7 +2558,10 @@
 					"$(PROJECT_DIR)/AppWithModules/Frameworks",
 				);
 				GCC_C_LANGUAGE_STANDARD = gnu99;
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/NativeScript",
+					"$(SRCROOT)/NativeScript/embedding/",
+				);
 				INFOPLIST_FILE = AppWithModules/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2543,7 +2596,10 @@
 					"$(PROJECT_DIR)/AppWithModules/Frameworks",
 				);
 				GCC_C_LANGUAGE_STANDARD = gnu99;
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/NativeScript",
+					"$(SRCROOT)/NativeScript/embedding/",
+				);
 				INFOPLIST_FILE = AppWithModules/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2779,6 +2835,10 @@
 					"-lcrdtp_platform",
 					"-linspector",
 					"-linspector_string_conversions",
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"\"$(SRCROOT)/NativeScript/metadata-arm64.bin\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -2867,6 +2927,10 @@
 					"-lcrdtp_platform",
 					"-linspector",
 					"-linspector_string_conversions",
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"\"$(SRCROOT)/NativeScript/metadata-arm64.bin\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";

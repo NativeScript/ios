@@ -10,6 +10,8 @@ class ModuleInternal {
 public:
     ModuleInternal(v8::Local<v8::Context> context);
     bool RunModule(v8::Isolate* isolate, std::string path);
+    void RunScript(v8::Isolate* isolate, std::string script);
+
 private:
     static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     v8::Local<v8::Function> GetRequireFunction(v8::Isolate* isolate, const std::string& dirName);
@@ -23,6 +25,8 @@ private:
     v8::ScriptCompiler::CachedData* LoadScriptCache(const std::string& path);
     void SaveScriptCache(const v8::Local<v8::Script> script, const std::string& path);
     std::string GetCacheFileName(const std::string& path);
+    v8::MaybeLocal<v8::Value> RunScriptString(v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string script);
+
 
     std::unique_ptr<v8::Persistent<v8::Function>> requireFunction_;
     std::unique_ptr<v8::Persistent<v8::Function>> requireFactoryFunction_;

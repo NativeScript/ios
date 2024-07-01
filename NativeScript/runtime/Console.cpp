@@ -39,6 +39,10 @@ void Console::AttachInspectorClient(v8_inspector::JsV8InspectorClient* aInspecto
     inspector = aInspector;
 }
 
+void Console::DetachInspectorClient() {
+    inspector = nullptr;
+}
+
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
     // TODO: implement 'forceLog' override option like android has, to force logs in prod if desired
     if (!RuntimeConfig.LogToSystemConsole) {
