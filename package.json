@@ -20,6 +20,7 @@
     "**/*"
   ],
   "scripts": {
+    "prepare": "husky",
     "apply-patches": "./apply_patches.sh",
     "build-v8-source": "./build_v8_source.sh",
     "build-v8-source-catalyst": "./build_v8_source_catalyst.sh",
@@ -34,6 +35,13 @@
   "devDependencies": {
     "conventional-changelog-cli": "^2.1.1",
     "dayjs": "^1.11.7",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.7",
     "semver": "^7.5.0"
+  },
+  "lint-staged": {
+    "{NativeScript,metadata-generator/src,TestFixtures}/**/*.{h,hpp,c,cpp,mm,m}": [
+      "clang-format -i"
+    ]
   }
 }

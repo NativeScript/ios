@@ -1,0 +1,4 @@
+# uses the same styling as V8
+BasedOnStyle: Google
+DerivePointerAlignment: false
+MaxEmptyLinesToKeep: 1
