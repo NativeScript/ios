@@ -1,3 +1,23 @@
+# [8.8.0](https://github.com/NativeScript/ios/compare/v8.7.2...v8.8.0) (2024-07-09)
+
+
+### Bug Fixes
+
+* ensure copy rule copy *.hpp headers ([3b13e9d](https://github.com/NativeScript/ios/commit/3b13e9dce88015c1e8eab29b9b0c7ec104b4f4d2))
+
+
+### Features
+
+* add `[@deprecation](https://github.com/deprecation)` and `[@since](https://github.com/since)` docs ([#246](https://github.com/NativeScript/ios/issues/246)) ([daceac1](https://github.com/NativeScript/ios/commit/daceac129d3b73c46a6de4f557d6c06a0621890f))
+* add protocol information to native types ([#247](https://github.com/NativeScript/ios/issues/247)) ([6286203](https://github.com/NativeScript/ios/commit/6286203ca5293f4a9bec536ee6af7415d8d4d8f5))
+* allow embedding into existing apple host projects ([#231](https://github.com/NativeScript/ios/issues/231)) ([7ab180a](https://github.com/NativeScript/ios/commit/7ab180a7c8788216126abbb985d72332b064217a))
+* expose __dateTimeConfigurationChangeNotification ([#220](https://github.com/NativeScript/ios/issues/220)) ([5088f5f](https://github.com/NativeScript/ios/commit/5088f5fff231023a722a4626e73661ff6b9ad9fd))
+* JSI support for BigInt, Initial TypedArrays & ArrayBuffer creation ([#204](https://github.com/NativeScript/ios/issues/204)) ([4cd869d](https://github.com/NativeScript/ios/commit/4cd869dd678cf875b31efa4b7a75ee0f571ce096))
+* use messaging object to pass message to workers ([#233](https://github.com/NativeScript/ios/issues/233)) ([7ded0c3](https://github.com/NativeScript/ios/commit/7ded0c38bb891b340bd8e1c5137e607447e26e60))
+* xcode 16 support ([#254](https://github.com/NativeScript/ios/issues/254)) ([6ec9a8f](https://github.com/NativeScript/ios/commit/6ec9a8fe7888780d7394a1e21c1041619212be1f))
+
+
+
 ## [8.7.2](https://github.com/NativeScript/ios/compare/v8.7.1...v8.7.2) (2024-05-16)
 
 
