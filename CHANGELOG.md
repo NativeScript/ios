@@ -1,3 +1,12 @@
+## [8.8.1](https://github.com/NativeScript/ios/compare/v8.8.0...v8.8.1) (2024-07-10)
+
+
+### Features
+
+* Ada 2.9 ([#256](https://github.com/NativeScript/ios/issues/256)) ([d16b144](https://github.com/NativeScript/ios/commit/d16b14436bddac42a12a4bddff92d2bc37dc8669))
+
+
+
 # [8.8.0](https://github.com/NativeScript/ios/compare/v8.7.2...v8.8.0) (2024-07-09)
 
 
