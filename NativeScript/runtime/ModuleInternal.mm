@@ -1,6 +1,8 @@
 #include "ModuleInternal.h"
 #include <Foundation/Foundation.h>
 #include <sys/stat.h>
+#include <time.h>
+#include <utime.h>
 #include <string>
 #include "Caches.h"
 #include "Helpers.h"
@@ -453,9 +455,9 @@ ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& p
     auto cacheLastModifiedTime = result.st_mtime;
     if (stat(path.c_str(), &result) == 0) {
       auto jsLastModifiedTime = result.st_mtime;
-      if (jsLastModifiedTime > 0 && cacheLastModifiedTime > 0 &&
-          jsLastModifiedTime > cacheLastModifiedTime) {
-        // The javascript file is more recent than the cache file => ignore the cache
+      if (jsLastModifiedTime != cacheLastModifiedTime) {
+        // files have different dates, ignore the cache file (this is enforced by the
+        // SaveScriptCache function)
         return nullptr;
       }
     }
@@ -485,6 +487,17 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
   std::string cachePath = GetCacheFileName(path + ".cache");
   tns::WriteBinary(cachePath, cachedData->data, length);
   delete cachedData;
+
+  // make sure cache and js file have the same modification date
+  struct stat result;
+  struct utimbuf new_times;
+  new_times.actime = time(nullptr);
+  new_times.modtime = time(nullptr);
+  if (stat(path.c_str(), &result) == 0) {
+    auto jsLastModifiedTime = result.st_mtime;
+    new_times.modtime = jsLastModifiedTime;
+  }
+  utime(cachePath.c_str(), &new_times);
 }
 
 std::string ModuleInternal::GetCacheFileName(const std::string& path) {
