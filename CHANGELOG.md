@@ -1,3 +1,13 @@
+## [8.8.2](https://github.com/NativeScript/ios/compare/v8.8.1...v8.8.2) (2024-09-06)
+
+
+### Bug Fixes
+
+* ensure same mtime for js and code cache to prevent loading old code caches ([#261](https://github.com/NativeScript/ios/issues/261)) ([055b042](https://github.com/NativeScript/ios/commit/055b0427cf49e7c4cb37991c9419b899868b6bbd))
+* revert visionOS changes to iOS project template ([55c5c51](https://github.com/NativeScript/ios/commit/55c5c5198f04ff2b5cbe1be6f5add92acb3ed23f))
+
+
+
 ## [8.8.1](https://github.com/NativeScript/ios/compare/v8.8.0...v8.8.1) (2024-07-10)
 
 
