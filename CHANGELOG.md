@@ -1,3 +1,13 @@
+## [8.8.3-alpha.0](https://github.com/NativeScript/ios/compare/v8.8.2...v8.8.3-alpha.0) (2024-12-05)
+
+
+### Bug Fixes
+
+* handle gc protection in runtime run loop ([78b5e37](https://github.com/NativeScript/ios/commit/78b5e3799f1305b3eafe7d3deb60a7e56b86b230))
+* possible race condition extending native class ([8b932a3](https://github.com/NativeScript/ios/commit/8b932a31fe735c69b9d72b76eb106037653764ce))
+
+
+
 ## [8.8.2](https://github.com/NativeScript/ios/compare/v8.8.1...v8.8.2) (2024-09-06)
 
 
