@@ -154,6 +154,9 @@ Isolate* Runtime::CreateIsolate() {
     v8Initialized_ = true;
   }
 
+  startTime = platform_->MonotonicallyIncreasingTime();
+  realtimeOrigin = platform_->CurrentClockTimeMillis();
+
   // auto version = v8::V8::GetVersion();
 
   Isolate::CreateParams create_params;
@@ -389,16 +392,17 @@ void Runtime::DefinePerformanceObject(Isolate* isolate, Local<ObjectTemplate> gl
   Local<FunctionTemplate> nowFuncTemplate = FunctionTemplate::New(isolate, PerformanceNowCallback);
   performanceTemplate->Set(tns::ToV8String(isolate, "now"), nowFuncTemplate);
 
+  performanceTemplate->Set(tns::ToV8String(isolate, "timeOrigin"),
+                           v8::Number::New(isolate, realtimeOrigin));
+
   Local<v8::String> performancePropertyName = ToV8String(isolate, "performance");
   globalTemplate->Set(performancePropertyName, performanceTemplate);
 }
 
 void Runtime::PerformanceNowCallback(const FunctionCallbackInfo<Value>& args) {
-  std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-  std::chrono::milliseconds timestampMs =
-      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
-  double result = timestampMs.count();
-  args.GetReturnValue().Set(result);
+  auto runtime = Runtime::GetRuntime(args.GetIsolate());
+  args.GetReturnValue().Set(
+      (runtime->platform_->MonotonicallyIncreasingTime() - runtime->startTime) * 1000.0);
 }
 
 void Runtime::DefineNativeScriptVersion(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
