@@ -77,6 +77,8 @@ class Runtime {
   std::unique_ptr<ModuleInternal> moduleInternal_;
   int workerId_;
   CFRunLoopRef runtimeLoop_;
+  double startTime;
+  double realtimeOrigin;
   // TODO: refactor this. This is only needed because, during program
   // termination (UIApplicationMain not called) the Cache::Workers is released
   // (static initialization order fiasco
