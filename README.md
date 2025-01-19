@@ -5,6 +5,9 @@ To start diving into the v8 iOS runtime make sure you have Xcode and [Homebrew](
 # Install CMake
 brew install cmake
 
+# Install jq (for scripting json replacements)
+brew install jq
+
 # (Optional) Install clang-format to format the code
 brew install clang-format
 
