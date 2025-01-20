@@ -17,13 +17,9 @@ class FileBuffer : public Buffer {
   FileBuffer(const std::string& path);
   ~FileBuffer() override;
 
-  size_t size() const override {
-    return size_;
-  }
+  size_t size() const override { return size_; }
 
-  const uint8_t* data() const override {
-    return data_;
-  }
+  const uint8_t* data() const override { return data_; }
 
  private:
   size_t size_;
@@ -38,22 +34,15 @@ class SourceJavaScriptPreparation final : public jsi::PreparedJavaScript,
   std::string sourceURL_;
 
  public:
-  SourceJavaScriptPreparation(
-      std::shared_ptr<const jsi::Buffer> buf,
-      std::string sourceURL)
+  SourceJavaScriptPreparation(std::shared_ptr<const jsi::Buffer> buf,
+                              std::string sourceURL)
       : buf_(std::move(buf)), sourceURL_(std::move(sourceURL)) {}
 
-  const std::string& sourceURL() const {
-    return sourceURL_;
-  }
+  const std::string& sourceURL() const { return sourceURL_; }
 
-  size_t size() const override {
-    return buf_->size();
-  }
-  const uint8_t* data() const override {
-    return buf_->data();
-  }
+  size_t size() const override { return buf_->size(); }
+  const uint8_t* data() const override { return buf_->data(); }
 };
 
-} // namespace jsi
-} // namespace facebook
+}  // namespace jsi
+}  // namespace facebook
