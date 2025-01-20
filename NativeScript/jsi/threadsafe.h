@@ -28,12 +28,8 @@ template <typename R, typename L>
 struct WithLock {
   L lock;
   WithLock(R& r) : lock(r) {}
-  void before() {
-    lock.lock();
-  }
-  void after() {
-    lock.unlock();
-  }
+  void before() { lock.lock(); }
+  void after() { lock.unlock(); }
 };
 
 // The actual implementation of a given ThreadSafeRuntime. It's parameterized
@@ -50,9 +46,8 @@ class ThreadSafeRuntimeImpl final
  public:
   template <typename... Args>
   ThreadSafeRuntimeImpl(Args&&... args)
-      : WithRuntimeDecorator<WithLock<R, L>, R, ThreadSafeRuntime>(
-            unsafe_,
-            lock_),
+      : WithRuntimeDecorator<WithLock<R, L>, R, ThreadSafeRuntime>(unsafe_,
+                                                                   lock_),
         unsafe_(std::forward<Args>(args)...),
         lock_(unsafe_) {}
 
@@ -60,20 +55,16 @@ class ThreadSafeRuntimeImpl final
     return WithRuntimeDecorator<WithLock<R, L>, R, ThreadSafeRuntime>::plain();
   }
 
-  void lock() const override {
-    lock_.before();
-  }
+  void lock() const override { lock_.before(); }
 
-  void unlock() const override {
-    lock_.after();
-  }
+  void unlock() const override { lock_.after(); }
 
  private:
   R unsafe_;
   mutable WithLock<R, L> lock_;
 };
 
-} // namespace detail
+}  // namespace detail
 
-} // namespace jsi
-} // namespace facebook
+}  // namespace jsi
+}  // namespace facebook
