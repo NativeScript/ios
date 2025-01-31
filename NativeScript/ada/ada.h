@@ -1,4 +1,4 @@
-/* auto-generated on 2025-01-30 14:25:38 -0500. Do not edit! */
+/* auto-generated on 2025-01-30 18:48:55 -0500. Do not edit! */
 /* begin file include/ada.h */
 /**
  * @file ada.h
@@ -5306,15 +5306,59 @@ class url_pattern {
       std::variant<std::string_view, url_pattern_init> input,
       const std::string_view* base_url, const url_pattern_options* options);
 
- private:
+  /**
+   * @private
+   * We can not make this private due to a LLVM bug.
+   * Ref: https://github.com/ada-url/ada/pull/859
+   */
   url_pattern_component<regex_provider> protocol_component{};
+  /**
+   * @private
+   * We can not make this private due to a LLVM bug.
+   * Ref: https://github.com/ada-url/ada/pull/859
+   */
   url_pattern_component<regex_provider> username_component{};
+  /**
+   * @private
+   * We can not make this private due to a LLVM bug.
+   * Ref: https://github.com/ada-url/ada/pull/859
+   */
   url_pattern_component<regex_provider> password_component{};
+  /**
+   * @private
+   * We can not make this private due to a LLVM bug.
+   * Ref: https://github.com/ada-url/ada/pull/859
+   */
   url_pattern_component<regex_provider> hostname_component{};
+  /**
+   * @private
+   * We can not make this private due to a LLVM bug.
+   * Ref: https://github.com/ada-url/ada/pull/859
+   */
   url_pattern_component<regex_provider> port_component{};
+  /**
+   * @private
+   * We can not make this private due to a LLVM bug.
+   * Ref: https://github.com/ada-url/ada/pull/859
+   */
   url_pattern_component<regex_provider> pathname_component{};
+  /**
+   * @private
+   * We can not make this private due to a LLVM bug.
+   * Ref: https://github.com/ada-url/ada/pull/859
+   */
   url_pattern_component<regex_provider> search_component{};
+  /**
+   * @private
+   * We can not make this private due to a LLVM bug.
+   * Ref: https://github.com/ada-url/ada/pull/859
+   */
   url_pattern_component<regex_provider> hash_component{};
+  /**
+   * @private
+   * We can not make this private due to a LLVM bug.
+   * Ref: https://github.com/ada-url/ada/pull/859
+   */
   bool ignore_case_ = false;
 };
 
@@ -10261,14 +10305,14 @@ constructor_string_parser<regex_provider>::parse(std::string_view input) {
 #ifndef ADA_ADA_VERSION_H
 #define ADA_ADA_VERSION_H
 
-#define ADA_VERSION "3.0.0"
+#define ADA_VERSION "3.0.1"
 
 namespace ada {
 
 enum {
   ADA_VERSION_MAJOR = 3,
   ADA_VERSION_MINOR = 0,
-  ADA_VERSION_REVISION = 0,
+  ADA_VERSION_REVISION = 1,
 };
 
 }  // namespace ada
