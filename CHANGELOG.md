@@ -1,3 +1,23 @@
+## [8.8.3-alpha.0](https://github.com/NativeScript/ios/compare/v8.8.2...v8.8.3-alpha.0) (2024-12-05)
+
+
+### Bug Fixes
+
+* handle gc protection in runtime run loop ([78b5e37](https://github.com/NativeScript/ios/commit/78b5e3799f1305b3eafe7d3deb60a7e56b86b230))
+* possible race condition extending native class ([8b932a3](https://github.com/NativeScript/ios/commit/8b932a31fe735c69b9d72b76eb106037653764ce))
+
+
+
+## [8.8.2](https://github.com/NativeScript/ios/compare/v8.8.1...v8.8.2) (2024-09-06)
+
+
+### Bug Fixes
+
+* ensure same mtime for js and code cache to prevent loading old code caches ([#261](https://github.com/NativeScript/ios/issues/261)) ([055b042](https://github.com/NativeScript/ios/commit/055b0427cf49e7c4cb37991c9419b899868b6bbd))
+* revert visionOS changes to iOS project template ([55c5c51](https://github.com/NativeScript/ios/commit/55c5c5198f04ff2b5cbe1be6f5add92acb3ed23f))
+
+
+
 ## [8.8.1](https://github.com/NativeScript/ios/compare/v8.8.0...v8.8.1) (2024-07-10)
 
 
