@@ -21,7 +21,7 @@ FileBuffer::~FileBuffer() {
   assert(false && "FileBuffer is not implemented on Windows");
 }
 
-} // namespace jsi
-} // namespace facebook
+}  // namespace jsi
+}  // namespace facebook
 
-#endif //_WINDOWS
+#endif  //_WINDOWS
