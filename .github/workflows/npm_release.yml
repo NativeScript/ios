@@ -61,14 +61,14 @@ jobs:
       - name: Build
         run: npm run build-ios
       - name: Upload npm package artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: npm-package
+          name: npm-package-${{ matrix.runs-on }}
           path: dist/nativescript-ios-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
       - name: Upload dSYMs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: NativeScript-dSYMs
+          name: NativeScript-dSYMs-${{ matrix.runs-on }}
           path: dist/dSYMs
   test:
     name: Test
@@ -122,9 +122,9 @@ jobs:
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
       - name: Archive Test Result Data
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.runs-on }}
           path: ${{env.TEST_FOLDER}}/test_results.xcresult
   publish:
     runs-on: ubuntu-latest
@@ -142,7 +142,7 @@ jobs:
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: npm-package
           path: dist
@@ -172,11 +172,11 @@ jobs:
           node-version: 20
       - name: Setup
         run: npm install
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: npm-package
           path: dist
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: NativeScript-dSYMs
           path: dist/dSYMs
