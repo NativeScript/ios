@@ -16,11 +16,11 @@ struct V8RuntimeConfig {
   V8RuntimeConfig() {}
   ~V8RuntimeConfig() = default;
 
-  V8RuntimeConfig(const V8RuntimeConfig &rhs) = delete;
-  V8RuntimeConfig &operator=(const V8RuntimeConfig &rhs) = delete;
+  V8RuntimeConfig(const V8RuntimeConfig& rhs) = delete;
+  V8RuntimeConfig& operator=(const V8RuntimeConfig& rhs) = delete;
 
-  V8RuntimeConfig(V8RuntimeConfig &&rhs) = default;
-  V8RuntimeConfig &operator=(V8RuntimeConfig &&rhs) = default;
+  V8RuntimeConfig(V8RuntimeConfig&& rhs) = default;
+  V8RuntimeConfig& operator=(V8RuntimeConfig&& rhs) = default;
 };
 
-} // namespace rnv8
+}  // namespace rnv8
