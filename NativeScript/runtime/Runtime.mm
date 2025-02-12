@@ -25,6 +25,7 @@
 #include "ModuleBinding.hpp"
 #include "URLImpl.h"
 #include "URLSearchParamsImpl.h"
+#include "URLPatternImpl.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)

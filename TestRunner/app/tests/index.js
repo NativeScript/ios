@@ -82,6 +82,7 @@ require("./Timers");
 
 require("./URL");
 require("./URLSearchParams");
+require("./URLPattern");
 
 // Tests common for all runtimes.
 require("./shared/index").runAllTests();
