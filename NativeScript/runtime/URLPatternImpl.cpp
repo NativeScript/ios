@@ -717,4 +717,4 @@ void URLPatternImpl::Exec(const v8::FunctionCallbackInfo<v8::Value> &args) {
     }
 }
 
-NODE_BINDING_PER_ISOLATE_INIT_OBJ(pattern, tns::URLPatternImpl::Init)
+NODE_BINDING_PER_ISOLATE_INIT_OBJ(urlpattern, tns::URLPatternImpl::Init)
