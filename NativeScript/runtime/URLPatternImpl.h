@@ -3,91 +3,90 @@
 //
 #pragma once
 
-#include "ada/ada.h"
 #include "Common.h"
 #include "Helpers.h"
+#include "ada/ada.h"
 using namespace ada;
 namespace tns {
 
-    class v8_regex_provider {
-    public:
+class v8_regex_provider {
+ public:
+  using regex_type = v8::Global<v8::RegExp>;
 
-        using regex_type = v8::Global<v8::RegExp>;
+  static std::optional<regex_type> create_instance(std::string_view pattern,
+                                                   bool ignore_case);
 
-        static std::optional<regex_type> create_instance(std::string_view pattern,
-                                                         bool ignore_case);
+  static std::optional<std::vector<std::optional<std::string>>> regex_search(
+      std::string_view input, const regex_type& pattern);
 
-        static std::optional<std::vector<std::optional<std::string>>> regex_search(
-                std::string_view input, const regex_type &pattern);
+  static bool regex_match(std::string_view input, const regex_type& pattern);
+};
 
-        static bool regex_match(std::string_view input, const regex_type &pattern);
-    };
+class URLPatternImpl {
+ public:
+  URLPatternImpl(url_pattern<v8_regex_provider> pattern);
 
-    class URLPatternImpl {
-    public:
+  static void Init(v8::Isolate* isolate,
+                   v8::Local<v8::ObjectTemplate> globalTemplate);
 
-        URLPatternImpl(url_pattern <v8_regex_provider> pattern);
+  url_pattern<v8_regex_provider>* GetPattern();
 
-        static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+  static URLPatternImpl* GetPointer(v8::Local<v8::Object> object);
 
-        url_pattern <v8_regex_provider> *GetPattern();
+  static v8::Local<v8::FunctionTemplate> GetCtor(v8::Isolate* isolate);
 
-        static URLPatternImpl *GetPointer(v8::Local<v8::Object> object);
+  static void Ctor(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        static v8::Local<v8::FunctionTemplate> GetCtor(v8::Isolate *isolate);
+  static void GetHash(v8::Local<v8::Name> name,
+                      const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void Ctor(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void GetHostName(v8::Local<v8::Name> name,
+                          const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void
-        GetHash(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+  static void GetPassword(v8::Local<v8::Name> name,
+                          const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void
-        GetHostName(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+  static void GetPathName(v8::Local<v8::Name> name,
+                          const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void
-        GetPassword(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+  static void GetPort(v8::Local<v8::Name> name,
+                      const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void
-        GetPathName(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+  static void GetProtocol(v8::Local<v8::Name> name,
+                          const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void
-        GetPort(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+  static void GetSearch(v8::Local<v8::Name> name,
+                        const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void
-        GetProtocol(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+  static void GetUserName(v8::Local<v8::Name> name,
+                          const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void
-        GetSearch(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+  static void GetHasRegExpGroups(
+      v8::Local<v8::Name> name,
+      const v8::PropertyCallbackInfo<v8::Value>& info);
 
-        static void
-        GetUserName(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value> &info);
+  static void Test(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        static void
-        GetHasRegexpGroups(v8::Local<v8::Name> name,
-                           const v8::PropertyCallbackInfo<v8::Value> &info);
+  static void Exec(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        static void Test(const v8::FunctionCallbackInfo<v8::Value> &args);
+  void BindFinalizer(v8::Isolate* isolate,
+                     const v8::Local<v8::Object>& object) {
+    v8::HandleScope scopedHandle(isolate);
+    weakHandle_.Reset(isolate, object);
+    weakHandle_.SetWeak(this, Finalizer, v8::WeakCallbackType::kParameter);
+  }
 
-        static void Exec(const v8::FunctionCallbackInfo<v8::Value> &args);
+  static void Finalizer(const v8::WeakCallbackInfo<URLPatternImpl>& data) {
+    auto* pThis = data.GetParameter();
+    pThis->weakHandle_.Reset();
+    delete pThis;
+  }
 
-        void BindFinalizer(v8::Isolate *isolate, const v8::Local<v8::Object> &object) {
-            v8::HandleScope scopedHandle(isolate);
-            weakHandle_.Reset(isolate, object);
-            weakHandle_.SetWeak(this, Finalizer, v8::WeakCallbackType::kParameter);
-        }
+ private:
+  url_pattern<v8_regex_provider> pattern_;
+  v8::Global<v8::Object> weakHandle_;
 
-        static void Finalizer(const v8::WeakCallbackInfo<URLPatternImpl> &data) {
-            auto *pThis = data.GetParameter();
-            pThis->weakHandle_.Reset();
-            delete pThis;
-        }
-
-    private:
-        url_pattern <v8_regex_provider> pattern_;
-        v8::Global<v8::Object> weakHandle_;
-
-        static std::optional<ada::url_pattern_init>
-        ParseInput(v8::Isolate *isolate, const v8::Local<v8::Value> &input);
-
-    };
-}
+  static std::optional<ada::url_pattern_init> ParseInput(
+      v8::Isolate* isolate, const v8::Local<v8::Value>& input);
+};
+}  // namespace tns
