@@ -60,7 +60,8 @@ namespace tns {
 V(worker) \
 V(timers) \
 V(url) \
-V(urlsearchparams)
+V(urlsearchparams) \
+V(urlpattern)
 
 enum {
     NM_F_BUILTIN = 1 << 0,  // Unused.

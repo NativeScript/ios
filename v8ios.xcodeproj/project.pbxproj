@@ -319,6 +319,8 @@
 		C2F64E8322E870A300EDB057 /* NativeScript.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F64E8222E870A300EDB057 /* NativeScript.mm */; };
 		C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */; };
 		C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */; };
+		F1CB51832D5C37100042555E /* URLPatternImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1CB51822D5C37100042555E /* URLPatternImpl.cpp */; };
+		F1CB51842D5C37100042555E /* URLPatternImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1CB51812D5C37100042555E /* URLPatternImpl.h */; };
 		F1F30E742B58FC74006A62C0 /* URLImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E702B58FC74006A62C0 /* URLImpl.cpp */; };
 		F1F30E752B58FC74006A62C0 /* URLSearchParamsImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E712B58FC74006A62C0 /* URLSearchParamsImpl.cpp */; };
 		F1F30E762B58FC74006A62C0 /* URLSearchParamsImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E722B58FC74006A62C0 /* URLSearchParamsImpl.h */; };
@@ -818,6 +820,8 @@
 		C2FF3017225203FD00933782 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		C2FF301C2252062A00933782 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		C2FF301F2252065E00933782 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		F1CB51812D5C37100042555E /* URLPatternImpl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = URLPatternImpl.h; sourceTree = "<group>"; };
+		F1CB51822D5C37100042555E /* URLPatternImpl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = URLPatternImpl.cpp; sourceTree = "<group>"; };
 		F1F30E702B58FC74006A62C0 /* URLImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLImpl.cpp; sourceTree = "<group>"; };
 		F1F30E712B58FC74006A62C0 /* URLSearchParamsImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLSearchParamsImpl.cpp; sourceTree = "<group>"; };
 		F1F30E722B58FC74006A62C0 /* URLSearchParamsImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLSearchParamsImpl.h; sourceTree = "<group>"; };
@@ -1372,6 +1376,8 @@
 		C2DDEB3B229EAB8600345BFE /* runtime */ = {
 			isa = PBXGroup;
 			children = (
+				F1CB51812D5C37100042555E /* URLPatternImpl.h */,
+				F1CB51822D5C37100042555E /* URLPatternImpl.cpp */,
 				F1F30E702B58FC74006A62C0 /* URLImpl.cpp */,
 				F1F30E732B58FC74006A62C0 /* URLImpl.h */,
 				F1F30E712B58FC74006A62C0 /* URLSearchParamsImpl.cpp */,
@@ -1543,6 +1549,7 @@
 				F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */,
 				C247C16722F82842001D2CA2 /* libplatform.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
+				F1CB51842D5C37100042555E /* URLPatternImpl.h in Headers */,
 				F1F30E8B2B58FE28006A62C0 /* ada.h in Headers */,
 				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
 				C247C17122F82842001D2CA2 /* v8config.h in Headers */,
@@ -2177,6 +2184,7 @@
 				F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
 				C266569322AFFF7E00EE15CC /* Pointer.cpp in Sources */,
+				F1CB51832D5C37100042555E /* URLPatternImpl.cpp in Sources */,
 				C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */,
 				C22C092222CA3F370080D176 /* Worker.mm in Sources */,
 				C2C8EE7A22CF64E4001F8CEC /* SimpleAllocator.cpp in Sources */,
@@ -2433,7 +2441,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -2496,7 +2504,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -2676,7 +2684,7 @@
 		C2DDEB2A229EA89200345BFE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_CXX_LIBRARY = "compiler-default";
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -2731,7 +2739,7 @@
 		C2DDEB2B229EA89200345BFE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_CXX_LIBRARY = "compiler-default";
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -2788,7 +2796,7 @@
 			buildSettings = {
 				ALLOW_TARGET_PLATFORM_SPECIALIZATION = NO;
 				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_ENABLE_MODULES = NO;
 				CLANG_ENABLE_OBJC_ARC = NO;
 				CURRENT_PROJECT_VERSION = 1;
@@ -2883,7 +2891,7 @@
 			buildSettings = {
 				ALLOW_TARGET_PLATFORM_SPECIALIZATION = NO;
 				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_ENABLE_MODULES = NO;
 				CLANG_ENABLE_OBJC_ARC = NO;
 				CURRENT_PROJECT_VERSION = 1;
