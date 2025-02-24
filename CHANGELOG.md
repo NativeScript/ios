@@ -1,3 +1,22 @@
+# [8.9.0](https://github.com/NativeScript/ios/compare/v8.8.2...v8.9.0) (2025-02-24)
+
+
+### Bug Fixes
+
+* handle gc protection in runtime run loop ([#264](https://github.com/NativeScript/ios/issues/264)) ([5e8214d](https://github.com/NativeScript/ios/commit/5e8214dc7fffa91abd6c870b294259583ec50ce7))
+* possible race condition extending native class ([8b932a3](https://github.com/NativeScript/ios/commit/8b932a31fe735c69b9d72b76eb106037653764ce))
+* **URL:** allow undefined 2nd args and fix pathname return value ([#263](https://github.com/NativeScript/ios/issues/263)) ([4219038](https://github.com/NativeScript/ios/commit/42190388ddfbd42ad3b87244f5f317860f43c327))
+
+
+### Features
+
+* ada 3.1.1 including URLPattern support ([#268](https://github.com/NativeScript/ios/issues/268)) ([08d4406](https://github.com/NativeScript/ios/commit/08d4406d36545117a5a7be2db900394f106c4ec2))
+* latest jsi updates ([#267](https://github.com/NativeScript/ios/issues/267)) ([d4f3b68](https://github.com/NativeScript/ios/commit/d4f3b680ba77823d9e03b82548ead26706993b99))
+* use monotonic time for performance object ([8b320a4](https://github.com/NativeScript/ios/commit/8b320a4b15a216d27d43acfda44cd068d84f6e65))
+* visionOS unit tests ([#257](https://github.com/NativeScript/ios/issues/257)) ([ac52442](https://github.com/NativeScript/ios/commit/ac524426242049db2844576cc4f6d4f8776e71d5))
+
+
+
 ## [8.8.3-alpha.0](https://github.com/NativeScript/ios/compare/v8.8.2...v8.8.3-alpha.0) (2024-12-05)
 
 
