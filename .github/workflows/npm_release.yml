@@ -63,12 +63,12 @@ jobs:
       - name: Upload npm package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: npm-package-${{ matrix.runs-on }}
+          name: npm-package
           path: dist/nativescript-ios-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
       - name: Upload dSYMs artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NativeScript-dSYMs-${{ matrix.runs-on }}
+          name: NativeScript-dSYMs
           path: dist/dSYMs
   test:
     name: Test
@@ -124,7 +124,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.runs-on }}
+          name: test-results
           path: ${{env.TEST_FOLDER}}/test_results.xcresult
   publish:
     runs-on: ubuntu-latest
