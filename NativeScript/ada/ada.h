@@ -1,4 +1,4 @@
-/* auto-generated on 2025-02-23 20:08:55 -0500. Do not edit! */
+/* auto-generated on 2025-02-26 20:29:12 -0500. Do not edit! */
 /* begin file include/ada.h */
 /**
  * @file ada.h
@@ -290,7 +290,8 @@ bool valid_name_code_point(char32_t input, bool first);
   ADA_DISABLE_GCC_WARNING("-Wreturn-type")          \
   ADA_DISABLE_GCC_WARNING("-Wshadow")               \
   ADA_DISABLE_GCC_WARNING("-Wunused-parameter")     \
-  ADA_DISABLE_GCC_WARNING("-Wunused-variable")
+  ADA_DISABLE_GCC_WARNING("-Wunused-variable")      \
+  ADA_DISABLE_GCC_WARNING("-Wsign-compare")
 #define ADA_PRAGMA(P) _Pragma(#P)
 #define ADA_DISABLE_GCC_WARNING(WARNING) \
   ADA_PRAGMA(GCC diagnostic ignored WARNING)
@@ -9202,25 +9203,24 @@ result<std::optional<url_pattern_result>> url_pattern<regex_provider>::match(
     // https://github.com/cloudflare/workerd/blob/8620d14012513a6ce04d079e401d3becac3c67bd/src/workerd/jsg/url.c%2B%2B#L2038
     protocol = url->get_protocol().substr(0, url->get_protocol().size() - 1);
     // Set username to url’s username.
-    username = std::move(url->get_username());
+    username = url->get_username();
     // Set password to url’s password.
-    password = std::move(url->get_password());
+    password = url->get_password();
     // Set hostname to url’s host, serialized, or the empty string if the value
     // is null.
-    hostname = std::move(url->get_hostname());
+    hostname = url->get_hostname();
     // Set port to url’s port, serialized, or the empty string if the value is
     // null.
-    port = std::move(url->get_port());
+    port = url->get_port();
     // Set pathname to the result of URL path serializing url.
-    pathname = std::move(url->get_pathname());
+    pathname = url->get_pathname();
     // Set search to url’s query or the empty string if the value is null.
     // IMPORTANT: Not documented on the URLPattern spec, but search prefix '?'
     // is removed. Similar work was done on workerd:
     // https://github.com/cloudflare/workerd/blob/8620d14012513a6ce04d079e401d3becac3c67bd/src/workerd/jsg/url.c%2B%2B#L2232
     if (url->has_search()) {
       auto view = url->get_search();
-      search =
-          view.starts_with("?") ? url->get_search().substr(1) : std::move(view);
+      search = view.starts_with("?") ? url->get_search().substr(1) : view;
     }
     // Set hash to url’s fragment or the empty string if the value is null.
     // IMPORTANT: Not documented on the URLPattern spec, but hash prefix '#' is
@@ -9228,8 +9228,7 @@ result<std::optional<url_pattern_result>> url_pattern<regex_provider>::match(
     // https://github.com/cloudflare/workerd/blob/8620d14012513a6ce04d079e401d3becac3c67bd/src/workerd/jsg/url.c%2B%2B#L2242
     if (url->has_hash()) {
       auto view = url->get_hash();
-      hash =
-          view.starts_with("#") ? url->get_hash().substr(1) : std::move(view);
+      hash = view.starts_with("#") ? url->get_hash().substr(1) : view;
     }
   }
 
@@ -9456,7 +9455,8 @@ constructor_string_parser<regex_provider>::is_non_special_pattern_char(
   // If token’s value is not value, then return false.
   // TODO: Remove this once we make sure get_safe_token returns a non-empty
   // string.
-  if (!token->value.empty() && token->value[0] != value) {
+  if (!token->value.empty() &&
+      static_cast<uint32_t>(token->value[0]) != value) {
     return false;
   }
 
@@ -10454,14 +10454,14 @@ constructor_string_parser<regex_provider>::parse(std::string_view input) {
 #ifndef ADA_ADA_VERSION_H
 #define ADA_ADA_VERSION_H
 
-#define ADA_VERSION "3.1.1"
+#define ADA_VERSION "3.1.3"
 
 namespace ada {
 
 enum {
   ADA_VERSION_MAJOR = 3,
   ADA_VERSION_MINOR = 1,
-  ADA_VERSION_REVISION = 1,
+  ADA_VERSION_REVISION = 3,
 };
 
 }  // namespace ada
