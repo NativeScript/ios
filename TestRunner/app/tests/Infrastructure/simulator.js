@@ -7,9 +7,3 @@ function isSimulator() {
 }
 
 global.isSimulator = isSimulator();
-
-function isVision() {
-    return UIDevice.currentDevice.model.toLowerCase().includes('vision');
-}
-
-global.isVision = isVision();

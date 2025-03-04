@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */; };
 		2B5088A72BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
+		2B5088A82BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
 		2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE22052AC1C93100307752 /* metadata-arm64.bin */; };
@@ -1848,6 +1850,7 @@
 			files = (
 				C27E5DB522F3206B00498ED0 /* app in Resources */,
 				C27E5DBA22F324C200498ED0 /* Default-568h@2x.png in Resources */,
+				2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2287,6 +2290,7 @@
 		};
 		C293752B229FC4740075CB16 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = C29374E1229FC0F60075CB16 /* TestFixtures */;
 			targetProxy = C293752A229FC4740075CB16 /* PBXContainerItemProxy */;
 		};
@@ -2380,7 +2384,6 @@
 		C23992CE236C2D6E00D2F720 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_STYLE = Automatic;
@@ -2396,8 +2399,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TestRunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTED_PLATFORMS = "xrsimulator xros iphonesimulator iphoneos";
-				SUPPORTS_MACCATALYST = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -2409,7 +2410,6 @@
 		C23992CF236C2D6E00D2F720 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_STYLE = Automatic;
@@ -2425,8 +2425,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TestRunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTED_PLATFORMS = "xrsimulator xros iphonesimulator iphoneos";
-				SUPPORTS_MACCATALYST = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -2559,7 +2557,6 @@
 		C27E5D9F22F31CCC00498ED0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
 				CLANG_CXX_LIBRARY = "compiler-default";
@@ -2591,8 +2588,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.AppWithModules;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTED_PLATFORMS = "xrsimulator xros iphonesimulator iphoneos";
-				SUPPORTS_MACCATALYST = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
@@ -2600,7 +2595,6 @@
 		C27E5DA022F31CCC00498ED0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
 				CLANG_CXX_LIBRARY = "compiler-default";
@@ -2632,8 +2626,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.AppWithModules;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTED_PLATFORMS = "xrsimulator xros iphonesimulator iphoneos";
-				SUPPORTS_MACCATALYST = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
@@ -2641,7 +2633,6 @@
 		C29374E9229FC0F60075CB16 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
 				CLANG_ENABLE_MODULES = NO;
 				CLANG_WARN_STRICT_PROTOTYPES = NO;
 				DEFINES_MODULE = YES;
@@ -2650,10 +2641,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "xrsimulator xros iphonesimulator iphoneos";
-				SUPPORTS_MACCATALYST = YES;
 				SYMROOT = build;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -2662,7 +2650,6 @@
 		C29374EA229FC0F60075CB16 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALLOW_TARGET_PLATFORM_SPECIALIZATION = YES;
 				CLANG_ENABLE_MODULES = NO;
 				CLANG_WARN_STRICT_PROTOTYPES = NO;
 				DEFINES_MODULE = YES;
@@ -2672,10 +2659,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "xrsimulator xros iphonesimulator iphoneos";
-				SUPPORTS_MACCATALYST = YES;
 				SYMROOT = build;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -2863,7 +2847,6 @@
 					__DATA,
 					__TNSMetadata,
 					"\"$(SRCROOT)/NativeScript/metadata-arm64.bin\"",
-					"-w",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -2956,7 +2939,6 @@
 					__DATA,
 					__TNSMetadata,
 					"\"$(SRCROOT)/NativeScript/metadata-arm64.bin\"",
-					"-w",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";

@@ -17,16 +17,8 @@ describe(module.id, function() {
     }
 
     function forEachVersion(action) {
-        let majorMinVersion = 9;
-        let majorMaxVersion = 15;
-        let minorMaxVersion = 5;
-        if (isVision) {
-            majorMinVersion = 1;
-            majorMaxVersion = 1;
-            minorMaxVersion = 2;
-        }
-        for (var major = majorMinVersion; major <= majorMaxVersion; major++) {
-            for (var minor = 0; minor <= minorMaxVersion; minor++) {
+        for (var major = 9; major <= 15; major++) {
+            for (var minor = 0; minor <= 5; minor++) {
                 action(major, minor);
             }
         }
@@ -82,10 +74,6 @@ describe(module.id, function() {
     });
 
     it("Base class which is unavailable should be skipped", function() {
-        if (isVision) {
-            pending();
-            return;
-        }
         // Test case inspired from MTLArrayType(8.0) : MTLType(11.0) : NSObject
         // TNSInterfaceNeverAvailableDescendant : TNSInterfaceNeverAvailable(API31.7 - skipped) : TNSInterfaceAlwaysAvailable
         expect(Object.getPrototypeOf(TNSInterfaceNeverAvailableDescendant).toString()).toBe(TNSInterfaceAlwaysAvailable.toString(), "TNSInterfaceNeverAvailable base class should be skipped as it is unavailable");
