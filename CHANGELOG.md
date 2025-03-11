@@ -6,12 +6,6 @@
 * Intel simulators ([#272](https://github.com/NativeScript/ios/issues/272)) ([0adeabf](https://github.com/NativeScript/ios/commit/0adeabf24aab579bdc10900495a46e9b8287b5d9))
 
 
-### Reverts
-
-* "feat: visionOS unit tests" ([f26d72c](https://github.com/NativeScript/ios/commit/f26d72c769c936b3ead647933f5da1af6c5c4434))
-
-
-
 # [8.9.0](https://github.com/NativeScript/ios/compare/v8.8.2...v8.9.0) (2025-02-24)
 
 
