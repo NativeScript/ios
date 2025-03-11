@@ -1,3 +1,7 @@
+## [8.9.2-dev.1](https://github.com/NativeScript/ios/compare/v8.9.2-dev.0...v8.9.2-dev.1) (2025-03-11)
+
+
+
 # [8.9.0](https://github.com/NativeScript/ios/compare/v8.8.2...v8.9.0) (2025-02-24)
 
 
