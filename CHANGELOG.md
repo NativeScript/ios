@@ -6,6 +6,21 @@
 * Intel simulators ([#272](https://github.com/NativeScript/ios/issues/272)) ([0adeabf](https://github.com/NativeScript/ios/commit/0adeabf24aab579bdc10900495a46e9b8287b5d9))
 
 
+### Reverts
+
+* "feat: visionOS unit tests" ([f26d72c](https://github.com/NativeScript/ios/commit/f26d72c769c936b3ead647933f5da1af6c5c4434))
+
+
+
+## [8.9.1](https://github.com/NativeScript/ios/compare/v8.9.0...v8.9.1) (2025-02-28)
+
+
+### Features
+
+* Ada 3.1.3 ([#270](https://github.com/NativeScript/ios/issues/270)) ([7081e5a](https://github.com/NativeScript/ios/commit/7081e5a50ee34f1d9edc1a6c3ae8a0cdbace30ec))
+
+
+
 # [8.9.0](https://github.com/NativeScript/ios/compare/v8.8.2...v8.9.0) (2025-02-24)
 
 
