@@ -309,18 +309,28 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
             return retain(self, @selector(retain));
           }
           if ([self retainCount] == 1) {
-            auto innerCache = isolateWrapper.GetCache();
-            auto it = innerCache->Instances.find(self);
-            if (it != innerCache->Instances.end()) {
-              v8::Locker locker(isolate);
-              Isolate::Scope isolate_scope(isolate);
-              HandleScope handle_scope(isolate);
-              Local<Value> value = it->second->Get(isolate);
-              BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-              if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                objcWrapper->GcProtect();
+            auto runtime = Runtime::GetRuntime(isolate);
+            auto runtimeLoop = runtime->RuntimeLoop();
+            void* weakSelf = (__bridge void*)self;
+            auto gcProtect = ^() {
+              auto innerCache = isolateWrapper.GetCache();
+              auto it = innerCache->Instances.find((id)weakSelf);
+              if (it != innerCache->Instances.end()) {
+                v8::Locker locker(isolate);
+                Isolate::Scope isolate_scope(isolate);
+                HandleScope handle_scope(isolate);
+                Local<Value> value = it->second->Get(isolate);
+                BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+                if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                  ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                  objcWrapper->GcProtect();
+                }
               }
+            };
+            if (CFRunLoopGetCurrent() != runtimeLoop) {
+              tns::ExecuteOnRunLoop(runtimeLoop, gcProtect);
+            } else {
+              gcProtect();
             }
           }
 
@@ -337,18 +347,42 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
           }
 
           if ([self retainCount] == 2) {
-            auto innerCache = isolateWrapper.GetCache();
-            auto it = innerCache->Instances.find(self);
-            if (it != innerCache->Instances.end()) {
-              v8::Locker locker(isolate);
-              Isolate::Scope isolate_scope(isolate);
-              HandleScope handle_scope(isolate);
-              if (it->second != nullptr) {
-                Local<Value> value = it->second->Get(isolate);
-                BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                  ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                  objcWrapper->GcUnprotect();
+            void* weakSelf = (__bridge void*)self;
+            auto gcUnprotect = ^() {
+              auto innerCache = isolateWrapper.GetCache();
+              auto it = innerCache->Instances.find((id)weakSelf);
+              if (it != innerCache->Instances.end()) {
+                v8::Locker locker(isolate);
+                Isolate::Scope isolate_scope(isolate);
+                HandleScope handle_scope(isolate);
+                if (it->second != nullptr) {
+                  Local<Value> value = it->second->Get(isolate);
+                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                    objcWrapper->GcUnprotect();
+                  }
+                }
+              }
+            };
+            auto runtime = Runtime::GetRuntime(isolate);
+            auto runtimeLoop = runtime->RuntimeLoop();
+            if (CFRunLoopGetCurrent() != runtimeLoop) {
+              tns::ExecuteOnRunLoop(runtimeLoop, gcUnprotect);
+            } else {
+              auto innerCache = isolateWrapper.GetCache();
+              auto it = innerCache->Instances.find(self);
+              if (it != innerCache->Instances.end()) {
+                v8::Locker locker(isolate);
+                Isolate::Scope isolate_scope(isolate);
+                HandleScope handle_scope(isolate);
+                if (it->second != nullptr) {
+                  Local<Value> value = it->second->Get(isolate);
+                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                    objcWrapper->GcUnprotect();
+                  }
                 }
               }
             }
@@ -952,4 +986,4 @@ IMP ClassBuilder::FindNotOverridenMethod(Class klass, SEL method) {
 
 unsigned long long ClassBuilder::classNameCounter_ = 0;
 
-}
+}  // namespace tns
