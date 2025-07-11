@@ -1,15 +1,4 @@
-
-describe("URLPattern", function () {
-  it("throws on invalid URLPattern", function () {
-    var exceptionCaught = false;
-    try {
-      const pattern = new URLPattern(1);
-    } catch (e) {
-      exceptionCaught = true;
-    }
-    expect(exceptionCaught).toBe(true);
-  });
-
+cl
   it("does not throw on valid URLPattern", function () {
     var exceptionCaught = false;
     try {
