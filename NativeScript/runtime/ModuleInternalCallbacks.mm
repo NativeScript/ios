@@ -2,6 +2,7 @@
 #include "ModuleInternalCallbacks.h"
 #include <sys/stat.h>
 #include <v8.h>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include "Helpers.h"         // for tns::Exists
@@ -67,8 +68,21 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     // Relative import (./ or ../)
     std::string cleanSpec = spec.rfind("./", 0) == 0 ? spec.substr(2) : spec;
     candidateBases.push_back(baseDir + cleanSpec);
+  } else if (spec.rfind("file://", 0) == 0) {
+    // Absolute file URL, e.g. file:///app/path/to/chunk.mjs
+    std::string tail = spec.substr(7);  // strip file://
+    if (tail.rfind("/", 0) != 0) {
+      tail = "/" + tail;
+    }
+    // If starts with /app/... drop the leading /app
+    const std::string appPrefix = "/app/";
+    if (tail.rfind(appPrefix, 0) == 0) {
+      tail = tail.substr(appPrefix.size());
+    }
+    std::string base = RuntimeConfig.ApplicationPath + "/" + tail;
+    candidateBases.push_back(base);
   } else if (!spec.empty() && spec[0] == '~') {
-    // App root alias "~/" → <ApplicationPath>/
+    // Alias to application root using ~/path
     std::string tail = spec.size() >= 2 && spec[1] == '/' ? spec.substr(2) : spec.substr(1);
     std::string base = RuntimeConfig.ApplicationPath + "/" + tail;
     candidateBases.push_back(base);
@@ -76,17 +90,19 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     // Absolute path within the bundle
     candidateBases.push_back(spec);
   } else {
-    // Bare specifier – look inside tns_modules like the CommonJS resolver
-    NSString* tnsModulesPath =
-        [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()]
-            stringByAppendingPathComponent:@"tns_modules"];
+    // Bare specifier – resolve relative to the application root directory
+    std::string base = RuntimeConfig.ApplicationPath + "/" + spec;
+    candidateBases.push_back(base);
 
-    std::string base1 = std::string([tnsModulesPath UTF8String]) + "/" + spec;
-    candidateBases.push_back(base1);
-
-    // Fallback to tns-core-modules/<spec>
-    std::string base2 = base1 + "/tns-core-modules/" + spec;
-    candidateBases.push_back(base2);
+    // Additional heuristic: Webpack encodes path separators as underscores in
+    // chunk IDs (e.g. "src_app_components_foo_bar_ts.mjs").  Try converting
+    // those underscores back to slashes and look for that file as well.
+    std::string withSlashes = spec;
+    std::replace(withSlashes.begin(), withSlashes.end(), '_', '/');
+    std::string baseSlashes = RuntimeConfig.ApplicationPath + "/" + withSlashes;
+    if (baseSlashes != base) {
+      candidateBases.push_back(baseSlashes);
+    }
   }
 
   // We'll iterate these bases and attempt to resolve to an actual file
@@ -220,5 +236,64 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     return v8::MaybeLocal<v8::Module>();
   }
   return v8::MaybeLocal<v8::Module>(it2->second.Get(isolate));
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Dynamic import() host callback
+v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
+    v8::Local<v8::Context> context, v8::Local<v8::ScriptOrModule> referrer,
+    v8::Local<v8::String> specifier, v8::Local<v8::FixedArray> import_assertions) {
+  v8::Isolate* isolate = context->GetIsolate();
+  v8::EscapableHandleScope scope(isolate);
+
+  // Create a Promise resolver we'll resolve/reject synchronously for now.
+  v8::Local<v8::Promise::Resolver> resolver = v8::Promise::Resolver::New(context).ToLocalChecked();
+
+  // Re-use the static resolver to locate / compile the module.
+  try {
+    v8::Local<v8::Module> refMod;  // empty -> ResolveModuleCallback falls back to absPath logic
+    v8::MaybeLocal<v8::Module> maybeModule =
+        ResolveModuleCallback(context, specifier, import_assertions, refMod);
+
+    v8::Local<v8::Module> module;
+    if (!maybeModule.ToLocal(&module)) {
+      // resolution failed → reject
+      std::string specStr = tns::ToString(isolate, specifier);
+      std::string errMsg = "Cannot resolve module " + specStr;
+      resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, errMsg))).Check();
+      return scope.Escape(resolver->GetPromise());
+    }
+
+    // If not yet instantiated/evaluated, do it now
+    if (module->GetStatus() == v8::Module::kUninstantiated) {
+      if (!module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+        resolver
+            ->Reject(context,
+                     v8::Exception::Error(tns::ToV8String(isolate, "Failed to instantiate module")))
+            .Check();
+        return scope.Escape(resolver->GetPromise());
+      }
+    }
+
+    if (module->GetStatus() != v8::Module::kEvaluated) {
+      if (module->Evaluate(context).IsEmpty()) {
+        resolver
+            ->Reject(context,
+                     v8::Exception::Error(tns::ToV8String(isolate, "Failed to evaluate module")))
+            .Check();
+        return scope.Escape(resolver->GetPromise());
+      }
+    }
+
+    resolver->Resolve(context, module->GetModuleNamespace()).Check();
+  } catch (NativeScriptException& ex) {
+    ex.ReThrowToV8(isolate);
+    resolver
+        ->Reject(context, v8::Exception::Error(
+                              tns::ToV8String(isolate, "Native error during dynamic import")))
+        .Check();
+  }
+
+  return scope.Escape(resolver->GetPromise());
 }
 }

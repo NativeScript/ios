@@ -23,9 +23,10 @@
 #include "IsolateWrapper.h"
 
 #include "ModuleBinding.hpp"
+#include "ModuleInternalCallbacks.h"
 #include "URLImpl.h"
-#include "URLSearchParamsImpl.h"
 #include "URLPatternImpl.h"
+#include "URLSearchParamsImpl.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -198,6 +199,12 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
   isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
+
+  // Enable dynamic import() support (handle API rename across V8 versions)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  isolate->SetHostImportModuleDynamicallyCallback(tns::ImportModuleDynamicallyCallback);
+#pragma clang diagnostic pop
   isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 
   Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
