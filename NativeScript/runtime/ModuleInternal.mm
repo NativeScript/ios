@@ -63,6 +63,18 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   Local<Context> context = cache->GetContext();
   Local<Object> globalObject = context->Global();
+  // Ensure global.__dirname is defined so ESM/CommonJS shims relying on it work.
+  {
+    Local<Value> dirVal;
+    bool hasDir = globalObject->Get(context, ToV8String(isolate, "__dirname")).ToLocal(&dirVal);
+    if (!hasDir || dirVal->IsUndefined()) {
+      bool setDir = globalObject
+                        ->Set(context, ToV8String(isolate, "__dirname"),
+                              ToV8String(isolate, RuntimeConfig.ApplicationPath))
+                        .FromMaybe(false);
+      tns::Assert(setDir, isolate);
+    }
+  }
   Local<Value> requireObj;
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
   tns::Assert(success && requireObj->IsFunction(), isolate);
@@ -218,8 +230,27 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
       std::make_shared<Persistent<Object>>(isolate, moduleObj);
   TempModule tempModule(this, modulePath, cacheKey, poModuleObj);
 
+  // Compile/load the JavaScript/ESM source
   Local<Value> scriptValue = LoadScript(isolate, modulePath);
 
+  bool isESM = modulePath.size() >= 4 && modulePath.compare(modulePath.size() - 4, 4, ".mjs") == 0;
+
+  if (isESM) {
+    // For ES modules the returned value is the module namespace object, not a
+    // factory function. Wire it as the exports and skip CommonJS invocation.
+    if (!scriptValue->IsObject()) {
+      throw NativeScriptException(isolate, "Failed to load ES module " + modulePath);
+    }
+    exportsObj = scriptValue.As<Object>();
+    bool succ =
+        moduleObj->Set(context, tns::ToV8String(isolate, "exports"), exportsObj).FromMaybe(false);
+    tns::Assert(succ, isolate);
+
+    tempModule.SaveToCache();
+    return moduleObj;
+  }
+
+  // Classic CommonJS path – expect a factory function.
   if (!scriptValue->IsFunction()) {
     throw NativeScriptException(isolate,
                                 "Expected module factory to be a function for " + modulePath);
@@ -300,6 +331,14 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
 }
 
 Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::string& path) {
+  // Ensure the resolved path maps to an actual regular file before attempting
+  // to read/compile it.  This prevents `ReadModule` from aborting the process
+  // when given a directory or non-existent path.
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+    throw NativeScriptException("Cannot find module " + path);
+  }
+
   auto context = isolate->GetCurrentContext();
   // build URL
   std::string base = ReplaceAll(path, RuntimeConfig.BaseDir, "");
