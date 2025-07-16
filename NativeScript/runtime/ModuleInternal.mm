@@ -8,11 +8,22 @@
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
+#include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
 
 using namespace v8;
 
 namespace tns {
+
+// Helper function to check if a module name looks like an optional external module
+bool IsLikelyOptionalModule(const std::string& moduleName) {
+  // Check if it's a bare module name (no path separators) that could be an npm package
+  if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
+      moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
+    return true;
+  }
+  return false;
+}
 
 ModuleInternal::ModuleInternal(Local<Context> context) {
   std::string requireFactoryScript = "(function() { "
@@ -182,6 +193,10 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
   Local<Value> exportsObj;
   std::string path = this->ResolvePath(isolate, baseDir, moduleName);
   if (path.empty()) {
+    // Create placeholder module for optional modules
+    if (IsLikelyOptionalModule(moduleName)) {
+      return this->CreatePlaceholderModule(isolate, moduleName, cacheKey);
+    }
     return Local<Object>();
   }
 
@@ -511,6 +526,11 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
   }
 
   if (exists == NO) {
+    // Check if this looks like an optional module
+    if (IsLikelyOptionalModule(moduleName)) {
+      // Return empty string to indicate optional module not found
+      return std::string();
+    }
     throw NativeScriptException("The specified module does not exist: " + moduleName);
   }
 
@@ -544,6 +564,11 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
 
   exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
   if (exists == NO) {
+    // Check if this looks like an optional module
+    if (IsLikelyOptionalModule(moduleName)) {
+      // Return empty string to indicate optional module not found
+      return std::string();
+    }
     throw NativeScriptException("The specified module does not exist: " + moduleName);
   }
 
@@ -590,6 +615,69 @@ std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packag
   }
 
   return [path UTF8String];
+}
+
+Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,
+                                                      const std::string& moduleName,
+                                                      const std::string& cacheKey) {
+  Local<Context> context = isolate->GetCurrentContext();
+
+  // Create a module object with exports that throws when accessed
+  Local<Object> moduleObj = Object::New(isolate);
+
+  // Create a Proxy that throws an error when any property is accessed
+  std::string errorMessage =
+      "Module '" + moduleName + "' is not available. This is an optional module.";
+  std::string proxyCode = "(function() {"
+                          "  const error = new Error('" +
+                          errorMessage +
+                          "');"
+                          "  return new Proxy({}, {"
+                          "    get: function(target, prop) {"
+                          "      throw error;"
+                          "    },"
+                          "    set: function(target, prop, value) {"
+                          "      throw error;"
+                          "    },"
+                          "    has: function(target, prop) {"
+                          "      return false;"
+                          "    },"
+                          "    ownKeys: function(target) {"
+                          "      return [];"
+                          "    },"
+                          "    getPrototypeOf: function(target) {"
+                          "      return null;"
+                          "    }"
+                          "  });"
+                          "})()";
+
+  Local<Script> proxyScript;
+  if (Script::Compile(context, tns::ToV8String(isolate, proxyCode.c_str())).ToLocal(&proxyScript)) {
+    Local<Value> proxyObject;
+    if (proxyScript->Run(context).ToLocal(&proxyObject)) {
+      // Set the exports to the proxy object
+      bool success = moduleObj->Set(context, tns::ToV8String(isolate, "exports"), proxyObject)
+                         .FromMaybe(false);
+      tns::Assert(success, isolate);
+    }
+  }
+
+  // Set up the module object
+  bool success = moduleObj
+                     ->Set(context, tns::ToV8String(isolate, "id"),
+                           tns::ToV8String(isolate, moduleName.c_str()))
+                     .FromMaybe(false);
+  tns::Assert(success, isolate);
+
+  success =
+      moduleObj->Set(context, tns::ToV8String(isolate, "loaded"), v8::Boolean::New(isolate, true))
+          .FromMaybe(false);
+  tns::Assert(success, isolate);
+
+  // Cache the placeholder module
+  this->loadedModules_[cacheKey] = std::make_shared<Persistent<Object>>(isolate, moduleObj);
+
+  return moduleObj;
 }
 
 ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& path) {

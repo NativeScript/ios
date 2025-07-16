@@ -27,6 +27,26 @@ static bool IsScriptLoadingLogEnabled() {
   return value ? [value boolValue] : false;
 }
 
+// Helper function to check if a module name looks like an optional external module
+static bool IsLikelyOptionalModule(const std::string& moduleName) {
+  // Skip Node.js built-in modules (they should be handled separately)
+  if (moduleName.rfind("node:", 0) == 0) {
+    return false;
+  }
+
+  // Check if it's a bare module name (no path separators) that could be an npm package
+  if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
+      moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
+    return true;
+  }
+  return false;
+}
+
+// Helper function to check if a module name is a Node.js built-in module
+static bool IsNodeBuiltinModule(const std::string& moduleName) {
+  return moduleName.rfind("node:", 0) == 0;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Simple in-process registry: maps absolute file paths → compiled Module handles
 std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
@@ -196,9 +216,112 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // If we still didn’t resolve to an actual file, surface an exception instead
   // of letting ReadModule() assert while trying to open a directory.
   if (!isFile(absPath)) {
-    std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-    isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-    return v8::MaybeLocal<v8::Module>();
+    // Check if this is a Node.js built-in module (e.g., node:url)
+    if (IsNodeBuiltinModule(spec)) {
+      // Strip the "node:" prefix and try to resolve as a regular module
+      std::string builtinName = spec.substr(5);  // Remove "node:" prefix
+      std::string builtinPath = RuntimeConfig.ApplicationPath + "/" + builtinName + ".mjs";
+
+      // Check if a polyfill file exists
+      if (!isFile(builtinPath)) {
+        // Create a basic polyfill for the built-in module
+        std::string polyfillContent;
+
+        if (builtinName == "url") {
+          // Create a polyfill for node:url with fileURLToPath
+          polyfillContent = "// Polyfill for node:url\n"
+                            "export function fileURLToPath(url) {\n"
+                            "  if (typeof url === 'string') {\n"
+                            "    if (url.startsWith('file://')) {\n"
+                            "      return decodeURIComponent(url.slice(7));\n"
+                            "    }\n"
+                            "    return url;\n"
+                            "  }\n"
+                            "  if (url && typeof url.href === 'string') {\n"
+                            "    return fileURLToPath(url.href);\n"
+                            "  }\n"
+                            "  throw new Error('Invalid URL');\n"
+                            "}\n"
+                            "\n"
+                            "export function pathToFileURL(path) {\n"
+                            "  return new URL('file://' + encodeURIComponent(path));\n"
+                            "}\n";
+        } else {
+          // Generic polyfill for other Node.js built-in modules
+          polyfillContent = "// Polyfill for node:" + builtinName +
+                            "\n"
+                            "console.warn('Node.js built-in module \\'node:" +
+                            builtinName +
+                            "\\' is not fully supported in NativeScript');\n"
+                            "export default {};\n";
+        }
+
+        // Write polyfill file
+        NSString* polyfillPathStr = [NSString stringWithUTF8String:builtinPath.c_str()];
+        NSString* polyfillContentStr = [NSString stringWithUTF8String:polyfillContent.c_str()];
+
+        if ([polyfillContentStr writeToFile:polyfillPathStr
+                                 atomically:YES
+                                   encoding:NSUTF8StringEncoding
+                                      error:nil]) {
+          // File created successfully, now resolve it normally
+          absPath = builtinPath;
+        } else {
+          // Failed to create file, fall back to throwing error
+          std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
+          isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+          return v8::MaybeLocal<v8::Module>();
+        }
+      } else {
+        // Polyfill file already exists, use it
+        absPath = builtinPath;
+      }
+    } else if (IsLikelyOptionalModule(spec)) {
+      // Create a placeholder file on disk that webpack can resolve to
+      std::string appPath = RuntimeConfig.ApplicationPath;
+      std::string placeholderPath = appPath + "/" + spec + ".mjs";
+
+      // Check if placeholder file already exists
+      if (!isFile(placeholderPath)) {
+        // Create placeholder content
+        std::string placeholderContent = "const error = new Error('Module \\'" + spec +
+                                         "\\' is not available. This is an optional module.');\n"
+                                         "const proxy = new Proxy({}, {\n"
+                                         "  get: function(target, prop) { throw error; },\n"
+                                         "  set: function(target, prop, value) { throw error; },\n"
+                                         "  has: function(target, prop) { return false; },\n"
+                                         "  ownKeys: function(target) { return []; },\n"
+                                         "  getPrototypeOf: function(target) { return null; }\n"
+                                         "});\n"
+                                         "export default proxy;\n";
+
+        // Write placeholder file
+        NSString* placeholderPathStr = [NSString stringWithUTF8String:placeholderPath.c_str()];
+        NSString* placeholderContentStr =
+            [NSString stringWithUTF8String:placeholderContent.c_str()];
+
+        if ([placeholderContentStr writeToFile:placeholderPathStr
+                                    atomically:YES
+                                      encoding:NSUTF8StringEncoding
+                                         error:nil]) {
+          // File created successfully, now resolve it normally
+          absPath = placeholderPath;
+        } else {
+          // Failed to create file, fall back to throwing error
+          std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
+          isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+          return v8::MaybeLocal<v8::Module>();
+        }
+      } else {
+        // Placeholder file already exists, use it
+        absPath = placeholderPath;
+      }
+    } else {
+      // Not an optional module, throw the original error
+      std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
+      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+      return v8::MaybeLocal<v8::Module>();
+    }
   }
 
   // Special handling for JSON imports (e.g. import data from './foo.json' assert {type:'json'})

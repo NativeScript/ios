@@ -39,6 +39,9 @@ class ModuleInternal {
                           const std::string& moduleName);
   std::string ResolvePathFromPackageJson(const std::string& packageJson,
                                          bool& error);
+  v8::Local<v8::Object> CreatePlaceholderModule(v8::Isolate* isolate,
+                                                const std::string& moduleName,
+                                                const std::string& cacheKey);
   static v8::ScriptCompiler::CachedData* LoadScriptCache(
       const std::string& path);
   static void SaveScriptCache(const v8::Local<v8::Script> script,
