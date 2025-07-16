@@ -8,6 +8,7 @@
 #include "Helpers.h"         // for tns::Exists
 #include "ModuleInternal.h"  // for LoadScript(...)
 #include "NativeScriptException.h"
+#include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
 
 // Do NOT pull all v8 symbols into namespace here; String would clash with
@@ -15,6 +16,16 @@
 // with explicit `v8::` qualification to avoid ambiguities.
 
 namespace tns {
+
+// ────────────────────────────────────────────────────────────────────────────
+// Helper function to check if script loading logging is enabled
+// This reads the "logScriptLoading" boolean option from nativescript.config (aka, package.json in
+// the app bundle). Usage: Add "logScriptLoading": true to your nativescript.config to enable
+// verbose logging of module resolution and dynamic imports for debugging.
+static bool IsScriptLoadingLogEnabled() {
+  id value = Runtime::GetAppConfigValue("logScriptLoading");
+  return value ? [value boolValue] : false;
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Simple in-process registry: maps absolute file paths → compiled Module handles
@@ -43,8 +54,14 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       break;
     }
   }
-  if (referrerPath.empty()) {
-    // we never compiled this referrer
+  // If we couldn't identify the referrer (e.g. coming from a dynamic import
+  // where the embedder did not pass the compiled Module), we can still proceed
+  // for absolute and application-rooted specifiers. Only bail out early when
+  // the specifier is clearly relative (starts with "./" or "../") and we
+  // would need the referrer's directory to resolve it.
+  bool specIsRelative = !spec.empty() && spec[0] == '.';
+  if (referrerPath.empty() && specIsRelative) {
+    // Unable to resolve a relative path without knowing the base directory.
     return v8::MaybeLocal<v8::Module>();
   }
 
@@ -76,11 +93,17 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     }
     // If starts with /app/... drop the leading /app
     const std::string appPrefix = "/app/";
+    std::string tailNoApp = tail;
     if (tail.rfind(appPrefix, 0) == 0) {
-      tail = tail.substr(appPrefix.size());
+      tailNoApp = tail.substr(appPrefix.size());
     }
-    std::string base = RuntimeConfig.ApplicationPath + "/" + tail;
-    candidateBases.push_back(base);
+    // Candidate that keeps /app/ prefix stripped
+    std::string baseNoApp = RuntimeConfig.ApplicationPath + "/" + tailNoApp;
+    candidateBases.push_back(baseNoApp);
+
+    // Also try path with original tail (includes /app/...) directly under application dir
+    std::string baseWithApp = RuntimeConfig.ApplicationPath + tail;  // tail already begins with '/'
+    candidateBases.push_back(baseWithApp);
   } else if (!spec.empty() && spec[0] == '~') {
     // Alias to application root using ~/path
     std::string tail = spec.size() >= 2 && spec[1] == '/' ? spec.substr(2) : spec.substr(1);
@@ -130,7 +153,12 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   for (const std::string& baseCandidate : candidateBases) {
     absPath = baseCandidate;
 
-    if (!isFile(absPath)) {
+    bool existsNow = isFile(absPath);
+    if (IsScriptLoadingLogEnabled()) {
+      NSLog(@"[resolver] %s -> %s", absPath.c_str(), existsNow ? "file" : "missing");
+    }
+
+    if (!existsNow) {
       // 1) Try adding .mjs, .js
       const char* exts[] = {".mjs", ".js"};
       bool found = false;
@@ -244,6 +272,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::Local<v8::Context> context, v8::Local<v8::ScriptOrModule> referrer,
     v8::Local<v8::String> specifier, v8::Local<v8::FixedArray> import_assertions) {
   v8::Isolate* isolate = context->GetIsolate();
+  // Diagnostic: log every dynamic import attempt.
+  v8::String::Utf8Value specUtf8(isolate, specifier);
+  const char* cSpec = (*specUtf8) ? *specUtf8 : "<invalid>";
+  NSString* specStr = [NSString stringWithUTF8String:cSpec];
+  if (IsScriptLoadingLogEnabled()) {
+    NSLog(@"[dyn-import] → %@", specStr);
+  }
   v8::EscapableHandleScope scope(isolate);
 
   // Create a Promise resolver we'll resolve/reject synchronously for now.
@@ -251,22 +286,25 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
   // Re-use the static resolver to locate / compile the module.
   try {
-    v8::Local<v8::Module> refMod;  // empty -> ResolveModuleCallback falls back to absPath logic
+    // Pass empty referrer since this V8 version doesn't expose GetModule() on
+    // ScriptOrModule. The resolver will fall back to absolute-path heuristics.
+    v8::Local<v8::Module> refMod;
+
     v8::MaybeLocal<v8::Module> maybeModule =
         ResolveModuleCallback(context, specifier, import_assertions, refMod);
 
     v8::Local<v8::Module> module;
     if (!maybeModule.ToLocal(&module)) {
-      // resolution failed → reject
-      std::string specStr = tns::ToString(isolate, specifier);
-      std::string errMsg = "Cannot resolve module " + specStr;
-      resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, errMsg))).Check();
+      // ResolveModuleCallback already threw; forward the V8 exception
       return scope.Escape(resolver->GetPromise());
     }
 
     // If not yet instantiated/evaluated, do it now
     if (module->GetStatus() == v8::Module::kUninstantiated) {
       if (!module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+        if (IsScriptLoadingLogEnabled()) {
+          NSLog(@"[dyn-import] ✗ instantiate failed %@", specStr);
+        }
         resolver
             ->Reject(context,
                      v8::Exception::Error(tns::ToV8String(isolate, "Failed to instantiate module")))
@@ -277,17 +315,107 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
     if (module->GetStatus() != v8::Module::kEvaluated) {
       if (module->Evaluate(context).IsEmpty()) {
-        resolver
-            ->Reject(context,
-                     v8::Exception::Error(tns::ToV8String(isolate, "Failed to evaluate module")))
-            .Check();
+        if (IsScriptLoadingLogEnabled()) {
+          NSLog(@"[dyn-import] ✗ evaluation failed %@", specStr);
+        }
+        v8::Local<v8::Value> ex =
+            v8::Exception::Error(tns::ToV8String(isolate, "Evaluation failed"));
+        resolver->Reject(context, ex).Check();
         return scope.Escape(resolver->GetPromise());
       }
     }
 
+    // Special handling for webpack chunks: check if this is a webpack chunk and install it
+    v8::Local<v8::Value> namespaceObj = module->GetModuleNamespace();
+    if (namespaceObj->IsObject()) {
+      v8::Local<v8::Object> nsObj = namespaceObj.As<v8::Object>();
+
+      // Check if this is a webpack chunk (has __webpack_ids__ export)
+      v8::Local<v8::String> webpackIdsKey = tns::ToV8String(isolate, "__webpack_ids__");
+      v8::Local<v8::Value> webpackIds;
+      if (nsObj->Get(context, webpackIdsKey).ToLocal(&webpackIds) && !webpackIds->IsUndefined()) {
+        if (IsScriptLoadingLogEnabled()) {
+          NSLog(@"[dyn-import] Detected webpack chunk %@", specStr);
+        }
+        // This is a webpack chunk, get the webpack runtime from the runtime module
+        try {
+          // Import the runtime module to get __webpack_require__
+          // For import assertions, we need to pass an empty FixedArray
+          // Use the empty fixed array from the isolate's roots
+          v8::Local<v8::FixedArray> empty_assertions = v8::Local<v8::FixedArray>();
+          v8::MaybeLocal<v8::Module> maybeRuntimeModule =
+              ResolveModuleCallback(context, tns::ToV8String(isolate, "file:///app/runtime.mjs"),
+                                    empty_assertions, v8::Local<v8::Module>());
+
+          v8::Local<v8::Module> runtimeModule;
+          if (maybeRuntimeModule.ToLocal(&runtimeModule)) {
+            v8::Local<v8::Value> runtimeNamespace = runtimeModule->GetModuleNamespace();
+            if (runtimeNamespace->IsObject()) {
+              v8::Local<v8::Object> runtimeObj = runtimeNamespace.As<v8::Object>();
+              v8::Local<v8::String> defaultKey = tns::ToV8String(isolate, "default");
+              v8::Local<v8::Value> webpackRequire;
+
+              if (runtimeObj->Get(context, defaultKey).ToLocal(&webpackRequire) &&
+                  webpackRequire->IsObject()) {
+                if (IsScriptLoadingLogEnabled()) {
+                  NSLog(@"[dyn-import] Found runtime module default export");
+                }
+                v8::Local<v8::String> installKey = tns::ToV8String(isolate, "C");
+                v8::Local<v8::Value> installFn;
+                if (webpackRequire.As<v8::Object>()->Get(context, installKey).ToLocal(&installFn) &&
+                    installFn->IsFunction()) {
+                  if (IsScriptLoadingLogEnabled()) {
+                    NSLog(@"[dyn-import] Calling webpack installChunk function");
+                  }
+                  // Call webpack's installChunk function with the module namespace
+                  v8::Local<v8::Value> args[] = {namespaceObj};
+                  v8::Local<v8::Value> result;
+                  if (!installFn.As<v8::Function>()
+                           ->Call(context, v8::Undefined(isolate), 1, args)
+                           .ToLocal(&result)) {
+                    // If the call fails, we can ignore it since this is just a helper for webpack
+                    // chunks
+                    if (IsScriptLoadingLogEnabled()) {
+                      NSLog(@"[dyn-import] ✗ webpack installChunk call failed");
+                    }
+                  } else {
+                    if (IsScriptLoadingLogEnabled()) {
+                      NSLog(@"[dyn-import] ✓ webpack installChunk call succeeded");
+                    }
+                  }
+                } else {
+                  if (IsScriptLoadingLogEnabled()) {
+                    NSLog(@"[dyn-import] ✗ webpack installChunk function not found");
+                  }
+                }
+              } else {
+                if (IsScriptLoadingLogEnabled()) {
+                  NSLog(@"[dyn-import] ✗ runtime module default export not found");
+                }
+              }
+            }
+          } else {
+            if (IsScriptLoadingLogEnabled()) {
+              NSLog(@"[dyn-import] ✗ runtime module not found");
+            }
+          }
+        } catch (...) {
+          if (IsScriptLoadingLogEnabled()) {
+            NSLog(@"[dyn-import] ✗ exception while accessing runtime module");
+          }
+        }
+      }
+    }
+
     resolver->Resolve(context, module->GetModuleNamespace()).Check();
+    if (IsScriptLoadingLogEnabled()) {
+      NSLog(@"[dyn-import] ✓ resolved %@", specStr);
+    }
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
+    if (IsScriptLoadingLogEnabled()) {
+      NSLog(@"[dyn-import] ✗ native failed %@", specStr);
+    }
     resolver
         ->Reject(context, v8::Exception::Error(
                               tns::ToV8String(isolate, "Native error during dynamic import")))

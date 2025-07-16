@@ -320,14 +320,14 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
 }
 
 Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& path) {
-  // Simple dispatch on extension:
   if (path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0) {
+    // Treat all .mjs files as standard ES modules.
     return ModuleInternal::LoadESModule(isolate, path);
-  } else {
-    Local<Script> script = ModuleInternal::LoadClassicScript(isolate, path);
-    // run it and return the value
-    return script->Run(isolate->GetCurrentContext()).ToLocalChecked();
   }
+
+  Local<Script> script = ModuleInternal::LoadClassicScript(isolate, path);
+  // run it and return the value
+  return script->Run(isolate->GetCurrentContext()).ToLocalChecked();
 }
 
 Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::string& path) {
