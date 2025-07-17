@@ -22,6 +22,7 @@
 #include "DisposerPHV.h"
 #include "IsolateWrapper.h"
 
+#include <unordered_map>
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
 #include "URLImpl.h"
@@ -33,6 +34,50 @@
 
 using namespace v8;
 using namespace std;
+
+// Import meta callback to support import.meta.url
+static void InitializeImportMetaObject(Local<Context> context, Local<Module> module,
+                                       Local<Object> meta) {
+  Isolate* isolate = context->GetIsolate();
+
+  // Look up the module path in the global module registry
+  std::string modulePath;
+
+  for (auto& kv : tns::g_moduleRegistry) {
+    Local<Module> registered = kv.second.Get(isolate);
+    if (registered == module) {
+      modulePath = kv.first;
+      break;
+    }
+  }
+
+  // Debug logging
+  NSLog(@"[import.meta] Module lookup: found path = %s",
+        modulePath.empty() ? "(empty)" : modulePath.c_str());
+  NSLog(@"[import.meta] Registry size: %zu", tns::g_moduleRegistry.size());
+
+  // Convert file path to file:// URL
+  std::string moduleUrl;
+  if (!modulePath.empty()) {
+    // Remove base directory and create file:// URL
+    std::string base = tns::ReplaceAll(modulePath, RuntimeConfig.BaseDir, "");
+    moduleUrl = "file://" + base;
+  } else {
+    // Fallback URL if module not found in registry
+    moduleUrl = "file:///app/";
+  }
+
+  NSLog(@"[import.meta] Final URL: %s", moduleUrl.c_str());
+
+  Local<String> url =
+      String::NewFromUtf8(isolate, moduleUrl.c_str(), NewStringType::kNormal).ToLocalChecked();
+
+  // Set import.meta.url property
+  meta->CreateDataProperty(
+          context, String::NewFromUtf8(isolate, "url", NewStringType::kNormal).ToLocalChecked(),
+          url)
+      .Check();
+}
 
 namespace tns {
 
@@ -205,6 +250,10 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   isolate->SetHostImportModuleDynamicallyCallback(tns::ImportModuleDynamicallyCallback);
 #pragma clang diagnostic pop
+
+  // Set up import.meta callback
+  isolate->SetHostInitializeImportMetaObjectCallback(InitializeImportMetaObject);
+
   isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 
   Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
