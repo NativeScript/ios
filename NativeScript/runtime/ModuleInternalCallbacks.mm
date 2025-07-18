@@ -65,6 +65,12 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     return v8::MaybeLocal<v8::Module>();
   }
 
+  // Debug: Log all module resolution attempts, especially for @nativescript/core/globals
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  if (cache->isWorker) {
+    printf("ResolveModuleCallback: Worker trying to resolve '%s'\n", spec.c_str());
+  }
+
   // 2) Find which filepath the referrer was compiled under
   std::string referrerPath;
   for (auto& kv : g_moduleRegistry) {
@@ -129,6 +135,12 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     std::string tail = spec.size() >= 2 && spec[1] == '/' ? spec.substr(2) : spec.substr(1);
     std::string base = RuntimeConfig.ApplicationPath + "/" + tail;
     candidateBases.push_back(base);
+
+    // Debug: Log tilde resolution for worker context
+    if (cache->isWorker) {
+      printf("ResolveModuleCallback: Worker resolving tilde path '%s' -> '%s'\n", spec.c_str(),
+             base.c_str());
+    }
   } else if (!spec.empty() && spec[0] == '/') {
     // Absolute path within the bundle
     candidateBases.push_back(spec);
@@ -213,9 +225,15 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
   // At this point, absPath is either a valid file or last attempted candidate.
 
-  // If we still didn’t resolve to an actual file, surface an exception instead
+  // If we still didn't resolve to an actual file, surface an exception instead
   // of letting ReadModule() assert while trying to open a directory.
   if (!isFile(absPath)) {
+    // Debug: Log resolution failure for worker context
+    if (cache->isWorker) {
+      printf("ResolveModuleCallback: Worker failed to resolve '%s' -> '%s'\n", spec.c_str(),
+             absPath.c_str());
+    }
+
     // Check if this is a Node.js built-in module (e.g., node:url)
     if (IsNodeBuiltinModule(spec)) {
       // Strip the "node:" prefix and try to resolve as a regular module
@@ -326,8 +344,19 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
   // Special handling for JSON imports (e.g. import data from './foo.json' assert {type:'json'})
   if (absPath.size() >= 5 && absPath.compare(absPath.size() - 5, 5, ".json") == 0) {
+    // Debug: Log JSON module handling for worker context
+    if (cache->isWorker) {
+      printf("ResolveModuleCallback: Worker handling JSON module '%s'\n", absPath.c_str());
+    }
+
     // Read file contents
     std::string jsonText = tns::ReadText(absPath);
+
+    // Debug: Log JSON content preview for worker context
+    if (cache->isWorker) {
+      std::string preview = jsonText.length() > 200 ? jsonText.substr(0, 200) + "..." : jsonText;
+      printf("ResolveModuleCallback: Worker JSON content preview: %s\n", preview.c_str());
+    }
 
     // Build a small ES module that just exports the parsed JSON as default
     std::string moduleSource = "export default " + jsonText + ";";
@@ -367,16 +396,28 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     return v8::MaybeLocal<v8::Module>(jsonModule);
   }
 
-  // 5) If we’ve already compiled that module (non-JSON case), return it
+  // 5) If we've already compiled that module (non-JSON case), return it
   auto it = g_moduleRegistry.find(absPath);
   if (it != g_moduleRegistry.end()) {
+    if (cache->isWorker) {
+      printf("ResolveModuleCallback: Worker found cached module '%s' -> '%s'\n", spec.c_str(),
+             absPath.c_str());
+    }
     return v8::MaybeLocal<v8::Module>(it->second.Get(isolate));
   }
 
   // 6) Otherwise, compile & register it
+  if (cache->isWorker) {
+    printf("ResolveModuleCallback: Worker compiling new module '%s' -> '%s'\n", spec.c_str(),
+           absPath.c_str());
+  }
   try {
     tns::ModuleInternal::LoadScript(isolate, absPath);
   } catch (NativeScriptException& ex) {
+    if (cache->isWorker) {
+      printf("ResolveModuleCallback: Worker failed to compile module '%s' -> '%s'\n", spec.c_str(),
+             absPath.c_str());
+    }
     ex.ReThrowToV8(isolate);
     return v8::MaybeLocal<v8::Module>();
   }
