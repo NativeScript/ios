@@ -114,14 +114,17 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
 void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
 
+  // Declare these outside try block so they're available in catch
+  std::string moduleName;
+  std::string callingModuleDirName;
+  NSString* fullPath = nil;
+
   try {
     ModuleInternal* moduleInternal =
         static_cast<ModuleInternal*>(info.Data().As<External>()->Value());
 
-    std::string moduleName = tns::ToString(isolate, info[0].As<v8::String>());
-    std::string callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
-
-    NSString* fullPath;
+    moduleName = tns::ToString(isolate, info[0].As<v8::String>());
+    callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
     if (moduleName.length() > 0 && moduleName[0] != '/') {
       if (moduleName[0] == '.') {
         fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()]
@@ -173,7 +176,50 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
       info.GetReturnValue().Set(exportsObj);
     }
   } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(isolate);
+    // Add context about the require call
+    std::string contextMsg = "Error in require() call:";
+    contextMsg += "\n  Requested module: '" + moduleName + "'";
+    contextMsg += "\n  Called from: " + callingModuleDirName;
+    if (fullPath != nil) {
+      contextMsg += "\n  Resolved path: " + std::string([fullPath UTF8String]);
+    }
+
+    // Add JavaScript stack trace to show who called require
+    Local<StackTrace> stackTrace =
+        StackTrace::CurrentStackTrace(isolate, 10, StackTrace::StackTraceOptions::kDetailed);
+    std::string jsStackTrace = "";
+    if (!stackTrace.IsEmpty()) {
+      for (int i = 0; i < stackTrace->GetFrameCount(); i++) {
+        Local<StackFrame> frame = stackTrace->GetFrame(isolate, i);
+        Local<v8::String> scriptName = frame->GetScriptName();
+        Local<v8::String> functionName = frame->GetFunctionName();
+        int lineNumber = frame->GetLineNumber();
+        int columnNumber = frame->GetColumn();
+
+        jsStackTrace += "\n    at ";
+        std::string funcName = tns::ToString(isolate, functionName);
+        std::string scriptNameStr = tns::ToString(isolate, scriptName);
+
+        if (!funcName.empty()) {
+          jsStackTrace += funcName + " (";
+        } else {
+          jsStackTrace += "<anonymous> (";
+        }
+        jsStackTrace += scriptNameStr + ":" + std::to_string(lineNumber) + ":" +
+                        std::to_string(columnNumber) + ")";
+      }
+    }
+
+    contextMsg += "\n\nJavaScript stack trace:" + jsStackTrace;
+    contextMsg += "\n\nOriginal error:\n" + ex.getMessage();
+
+    // Include original stack trace if available
+    if (!ex.getStackTrace().empty()) {
+      contextMsg += "\n\nOriginal stack trace:\n" + ex.getStackTrace();
+    }
+
+    NativeScriptException contextEx(isolate, contextMsg);
+    contextEx.ReThrowToV8(isolate);
   }
 }
 
@@ -191,7 +237,20 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
 
   Local<Object> moduleObj;
   Local<Value> exportsObj;
-  std::string path = this->ResolvePath(isolate, baseDir, moduleName);
+  std::string path;
+
+  try {
+    path = this->ResolvePath(isolate, baseDir, moduleName);
+  } catch (NativeScriptException& ex) {
+    // Add context about the module resolution
+    std::string contextMsg = "Failed to resolve module: '" + moduleName + "'";
+    contextMsg += "\n  Base directory: " + baseDir;
+    contextMsg += "\n  Module name: " + moduleName;
+    contextMsg += "\n\nOriginal error:\n" + ex.getMessage();
+
+    throw NativeScriptException(isolate, contextMsg);
+  }
+
   if (path.empty()) {
     // Create placeholder module for optional modules
     if (IsLikelyOptionalModule(moduleName)) {
@@ -531,7 +590,20 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
       // Return empty string to indicate optional module not found
       return std::string();
     }
-    throw NativeScriptException("The specified module does not exist: " + moduleName);
+
+    // Create a detailed error message with context
+    std::string errorMsg = "Module not found: '" + moduleName + "'";
+    errorMsg += "\n  Base directory: " + baseDir;
+    errorMsg += "\n  Attempted paths:";
+
+    // Show the original path attempt
+    NSString* originalPath =
+        [[baseDirStr stringByAppendingPathComponent:moduleNameStr] stringByStandardizingPath];
+    errorMsg += "\n    - " + std::string([originalPath UTF8String]);
+    errorMsg +=
+        "\n    - " + std::string([[originalPath stringByAppendingPathExtension:@"mjs"] UTF8String]);
+
+    throw NativeScriptException(isolate, errorMsg);
   }
 
   if (isDirectory == NO) {
@@ -569,7 +641,14 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
       // Return empty string to indicate optional module not found
       return std::string();
     }
-    throw NativeScriptException("The specified module does not exist: " + moduleName);
+
+    // Create a detailed error message with context for package.json resolution
+    std::string errorMsg = "Module not found: '" + moduleName + "'";
+    errorMsg += "\n  Base directory: " + baseDir;
+    errorMsg += "\n  Attempted final paths:";
+    errorMsg += "\n    - " + std::string([fullPath UTF8String]);
+
+    throw NativeScriptException(isolate, errorMsg);
   }
 
   return [fullPath UTF8String];
