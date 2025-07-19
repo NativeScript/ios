@@ -40,15 +40,25 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
                                        Local<Object> meta) {
   Isolate* isolate = context->GetIsolate();
 
-  // Look up the module path in the global module registry
+  // Look up the module path in the global module registry (with safety checks)
   std::string modulePath;
 
-  for (auto& kv : tns::g_moduleRegistry) {
-    Local<Module> registered = kv.second.Get(isolate);
-    if (registered == module) {
-      modulePath = kv.first;
-      break;
+  try {
+    for (auto& kv : tns::g_moduleRegistry) {
+      // Check if Global handle is empty before accessing
+      if (kv.second.IsEmpty()) {
+        continue;
+      }
+
+      Local<Module> registered = kv.second.Get(isolate);
+      if (!registered.IsEmpty() && registered == module) {
+        modulePath = kv.first;
+        break;
+      }
     }
+  } catch (...) {
+    NSLog(@"[import.meta] Exception during module registry lookup, using fallback");
+    modulePath = "";  // Will use fallback path
   }
 
   // Debug logging
@@ -76,6 +86,28 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
   meta->CreateDataProperty(
           context, String::NewFromUtf8(isolate, "url", NewStringType::kNormal).ToLocalChecked(),
           url)
+      .Check();
+
+  // Add import.meta.dirname support (extract directory from path)
+  std::string dirname;
+  if (!modulePath.empty()) {
+    size_t lastSlash = modulePath.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+      dirname = modulePath.substr(0, lastSlash);
+    } else {
+      dirname = "/app";  // fallback
+    }
+  } else {
+    dirname = "/app";  // fallback
+  }
+
+  Local<String> dirnameStr =
+      String::NewFromUtf8(isolate, dirname.c_str(), NewStringType::kNormal).ToLocalChecked();
+
+  // Set import.meta.dirname property
+  meta->CreateDataProperty(
+          context, String::NewFromUtf8(isolate, "dirname", NewStringType::kNormal).ToLocalChecked(),
+          dirnameStr)
       .Check();
 }
 
@@ -159,6 +191,15 @@ Runtime::~Runtime() {
 
   {
     v8::Locker lock(isolate_);
+
+    // Clear module registry before disposing other handles
+    // This prevents crashes during g_moduleRegistry cleanup
+    extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
+    for (auto& kv : g_moduleRegistry) {
+      kv.second.Reset();
+    }
+    g_moduleRegistry.clear();
+
     DisposerPHV phv(isolate_);
     isolate_->VisitHandlesWithClassIds(&phv);
 
@@ -419,6 +460,12 @@ void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
                                            global, readOnlyFlags)
                        .FromMaybe(false)) {
     tns::Assert(false, isolate);
+  }
+
+  if (isWorker) {
+    // Register proper interop types for worker context
+    // Worker bundles need full interop functionality, not just simple stubs
+    tns::Interop::RegisterInteropTypes(context);
   }
 }
 
