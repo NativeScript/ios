@@ -274,7 +274,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
     return it2->second->Get(isolate);
   }
 
-  if ([extension isEqualToString:@"mjs"]) {
+  if ([extension isEqualToString:@"mjs"] || [extension isEqualToString:@"js"]) {
     moduleObj = this->LoadModule(isolate, path, cacheKey);
   } else if ([extension isEqualToString:@"json"]) {
     moduleObj = this->LoadData(isolate, path);
@@ -311,15 +311,17 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   // Compile/load the JavaScript/ESM source
   Local<Value> scriptValue = LoadScript(isolate, modulePath);
 
+  // Check if this is an ES module
   bool isESM = modulePath.size() >= 4 && modulePath.compare(modulePath.size() - 4, 4, ".mjs") == 0;
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
-  // Debug: Log ES module detection
+  // Debug: Log module type detection
   printf("LoadModule: Module path: %s, isESM: %s\n", modulePath.c_str(), isESM ? "true" : "false");
 
   if (isESM) {
-    // For ES modules the returned value is the module namespace object, not a
-    // factory function. Wire it as the exports and skip CommonJS invocation.
+    // For ES modules, the returned value is the namespace object
     printf("LoadModule: Processing as ES module\n");
+
     if (!scriptValue->IsObject()) {
       printf("LoadModule: ES module failed - scriptValue is not an object\n");
       throw NativeScriptException(isolate, "Failed to load ES module " + modulePath);
@@ -352,7 +354,15 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
       }
     }
 
-    exportsObj = scriptValue.As<Object>();
+    // Handle exports differently for ES modules vs worker scripts
+    if (isESM) {
+      exportsObj = scriptValue.As<Object>();
+    } else {
+      // For worker scripts, create an empty exports object since they don't export anything
+      // They work through global scope (self.onmessage, etc.)
+      exportsObj = Object::New(isolate);
+    }
+
     bool succ =
         moduleObj->Set(context, tns::ToV8String(isolate, "exports"), exportsObj).FromMaybe(false);
     tns::Assert(succ, isolate);
@@ -522,6 +532,15 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 
   // 3) Register for resolution callback
   extern std::unordered_map<std::string, Global<Module>> g_moduleRegistry;
+
+  // Safe Global handle management: Clear any existing entry first
+  auto it = g_moduleRegistry.find(path);
+  if (it != g_moduleRegistry.end()) {
+    // Clear the existing Global handle before replacing it
+    it->second.Reset();
+  }
+
+  // Now safely set the new module handle
   g_moduleRegistry[path].Reset(isolate, module);
 
   // 4) Save cache if first time
@@ -559,30 +578,49 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 
     // Handle the case where evaluation returns a Promise (for top-level await)
     if (result->IsPromise()) {
-      printf("LoadESModule: Module evaluation returned a Promise, waiting for resolution\n");
+      printf("LoadESModule: Module evaluation returned a Promise, processing...\n");
+
+      // Use TryCatch to safely handle Promise operations
+      TryCatch promiseTc(isolate);
       Local<Promise> promise = result.As<Promise>();
 
-      // For worker context, we need to wait for the promise to resolve
-      // This is important for modules that use top-level await or have async initialization
-      std::shared_ptr<Caches> cache = Caches::Get(isolate);
-      if (cache->isWorker) {
-        printf("LoadESModule: In worker context, processing promise resolution\n");
+      // Process microtasks to allow Promise resolution (for both worker and main contexts)
+      printf("LoadESModule: Processing microtasks for Promise resolution\n");
 
-        // Run the microtask queue to allow the promise to resolve
-        while (promise->State() == Promise::kPending) {
-          isolate->PerformMicrotaskCheckpoint();
-          // Add a small delay to prevent busy waiting
-          usleep(1000);  // 1ms
+      // Limited attempts to resolve the promise to avoid infinite loops
+      int maxAttempts = 100;
+      int attempts = 0;
+
+      while (attempts < maxAttempts && !promiseTc.HasCaught()) {
+        isolate->PerformMicrotaskCheckpoint();
+
+        // Check promise state safely
+        if (promiseTc.HasCaught()) {
+          printf("LoadESModule: Exception during Promise processing, breaking\n");
+          break;
         }
 
-        if (promise->State() == Promise::kRejected) {
-          printf("LoadESModule: Promise was rejected\n");
-          Local<Value> reason = promise->Result();
-          isolate->ThrowException(reason);
-          throw NativeScriptException(isolate, tcEval, "Module evaluation promise rejected");
+        Promise::PromiseState state = promise->State();
+
+        if (state != Promise::kPending) {
+          if (state == Promise::kRejected) {
+            printf("LoadESModule: Promise was rejected\n");
+            if (!promiseTc.HasCaught()) {
+              Local<Value> reason = promise->Result();
+              isolate->ThrowException(reason);
+            }
+            throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
+          }
+          printf("LoadESModule: Promise resolved successfully\n");
+          break;
         }
 
-        printf("LoadESModule: Promise resolved successfully\n");
+        attempts++;
+        usleep(100);  // 0.1ms delay
+      }
+
+      if (attempts >= maxAttempts) {
+        printf("LoadESModule: Promise resolution timeout, continuing anyway\n");
       }
     }
   }
@@ -620,14 +658,17 @@ v8::Local<v8::String> ModuleInternal::WrapModuleContent(v8::Isolate* isolate,
   // in a function expression would turn those top-level keywords into syntax
   // errors (e.g. `export *` → "Unexpected token '*'").
 
+  // Check if we're in a worker context
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  bool isWorkerContext = cache && cache->isWorker;
+
   if (path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0) {
     // Read raw text without wrapping.
     std::string sourceText = tns::ReadText(path);
 
     // For ES modules in worker context, we need to provide access to global objects
     // since ES modules run in their own scope
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
-    if (cache && cache->isWorker) {
+    if (isWorkerContext) {
       // Prepend global declarations to make worker globals available in ES module scope
       std::string globalDeclarations = "const self = globalThis.self || globalThis;\n"
                                        "const postMessage = globalThis.postMessage;\n"
@@ -641,6 +682,9 @@ v8::Local<v8::String> ModuleInternal::WrapModuleContent(v8::Isolate* isolate,
 
     return tns::ToV8String(isolate, sourceText);
   }
+
+  // Worker .js files should use CommonJS wrapping like regular .js files
+  // This ensures proper runtime context and global object setup
 
   return tns::ReadModule(isolate, path);
 }
