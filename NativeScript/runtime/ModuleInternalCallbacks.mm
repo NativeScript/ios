@@ -391,7 +391,12 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       return v8::MaybeLocal<v8::Module>();
     }
 
-    // Store in registry and return
+    // Store in registry and return - with safe Global handle management
+    auto it = g_moduleRegistry.find(absPath);
+    if (it != g_moduleRegistry.end()) {
+      // Clear the existing Global handle before replacing it
+      it->second.Reset();
+    }
     g_moduleRegistry[absPath].Reset(isolate, jsonModule);
     return v8::MaybeLocal<v8::Module>(jsonModule);
   }
