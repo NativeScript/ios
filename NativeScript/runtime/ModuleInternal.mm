@@ -129,7 +129,41 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
 
     moduleName = tns::ToString(isolate, info[0].As<v8::String>());
     callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
-    if (moduleName.length() > 0 && moduleName[0] != '/') {
+
+    // Special handling for "./" - resolve to main entry point from package.json
+    if (moduleName == "./") {
+      id mainValue = Runtime::GetAppConfigValue("main");
+      NSString* mainEntry = nil;
+
+      if (mainValue && [mainValue isKindOfClass:[NSString class]]) {
+        mainEntry = (NSString*)mainValue;
+      } else {
+        // Fallback to "index" if no main field found
+        mainEntry = @"index";
+      }
+
+      // Try the main entry with different extensions
+      NSString* basePath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()]
+          stringByAppendingPathComponent:mainEntry];
+
+      // Check if file exists as-is
+      if (tns::Exists([basePath fileSystemRepresentation])) {
+        fullPath = basePath;
+      }
+      // Try with .js extension
+      else if (tns::Exists(
+                   [[basePath stringByAppendingPathExtension:@"js"] fileSystemRepresentation])) {
+        fullPath = [basePath stringByAppendingPathExtension:@"js"];
+      }
+      // Try with .mjs extension
+      else if (tns::Exists(
+                   [[basePath stringByAppendingPathExtension:@"mjs"] fileSystemRepresentation])) {
+        fullPath = [basePath stringByAppendingPathExtension:@"mjs"];
+      } else {
+        // If none found, default to .js (let the loading system handle the error)
+        fullPath = [basePath stringByAppendingPathExtension:@"js"];
+      }
+    } else if (moduleName.length() > 0 && moduleName[0] != '/') {
       if (moduleName[0] == '.') {
         fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()]
             stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
@@ -367,6 +401,17 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
         moduleObj->Set(context, tns::ToV8String(isolate, "exports"), exportsObj).FromMaybe(false);
     tns::Assert(succ, isolate);
 
+    tempModule.SaveToCache();
+    return moduleObj;
+  }
+
+  // Check if this is the main application bundle (webpack-style IIFE)
+  std::string appPath = RuntimeConfig.ApplicationPath;
+  std::string bundlePath = appPath + "/bundle.js";
+
+  if (modulePath == bundlePath) {
+    // Main application bundle is a webpack-style IIFE that executes immediately
+    // It doesn't return a function, so we just create an empty exports object
     tempModule.SaveToCache();
     return moduleObj;
   }
@@ -680,6 +725,18 @@ v8::Local<v8::String> ModuleInternal::WrapModuleContent(v8::Isolate* isolate,
       sourceText = globalDeclarations + sourceText;
     }
 
+    return tns::ToV8String(isolate, sourceText);
+  }
+
+  // Check if this is the main application bundle (webpack-style IIFE)
+  // Main bundles typically end with "bundle.js" and are in the app root
+  std::string appPath = RuntimeConfig.ApplicationPath;
+  std::string bundlePath = appPath + "/bundle.js";
+
+  if (path == bundlePath) {
+    // Main application bundle should not be wrapped in CommonJS factory
+    // as it's typically a webpack-style IIFE that executes immediately
+    std::string sourceText = tns::ReadText(path);
     return tns::ToV8String(isolate, sourceText);
   }
 
