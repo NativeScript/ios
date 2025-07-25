@@ -26,6 +26,42 @@ bool IsLikelyOptionalModule(const std::string& moduleName) {
   return false;
 }
 
+// Helper function to resolve main entry from package.json with proper extension handling
+std::string ResolveMainEntryFromPackageJson(const std::string& baseDir) {
+  // Get the main value from package.json
+  id mainValue = Runtime::GetAppConfigValue("main");
+  NSString* mainEntry = nil;
+
+  if (mainValue && [mainValue isKindOfClass:[NSString class]]) {
+    mainEntry = (NSString*)mainValue;
+  } else {
+    // Fallback to "index" if no main field found
+    mainEntry = @"index";
+  }
+
+  // Try the main entry with different extensions
+  NSString* basePath =
+      [[NSString stringWithUTF8String:baseDir.c_str()] stringByAppendingPathComponent:mainEntry];
+
+  // Check if file exists as-is
+  if (tns::Exists([basePath fileSystemRepresentation])) {
+    return std::string([basePath UTF8String]);
+  }
+  // Try with .js extension
+  else if (tns::Exists(
+               [[basePath stringByAppendingPathExtension:@"js"] fileSystemRepresentation])) {
+    return std::string([[basePath stringByAppendingPathExtension:@"js"] UTF8String]);
+  }
+  // Try with .mjs extension
+  else if (tns::Exists(
+               [[basePath stringByAppendingPathExtension:@"mjs"] fileSystemRepresentation])) {
+    return std::string([[basePath stringByAppendingPathExtension:@"mjs"] UTF8String]);
+  } else {
+    // If none found, default to .js (let the loading system handle the error)
+    return std::string([[basePath stringByAppendingPathExtension:@"js"] UTF8String]);
+  }
+}
+
 ModuleInternal::ModuleInternal(Local<Context> context) {
   std::string requireFactoryScript = "(function() { "
                                      "    function require_factory(requireInternal, dirName) { "
@@ -48,7 +84,6 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
     tns::LogError(isolate, tc);
     tns::Assert(false, isolate);
   }
-  tns::Assert(!script.IsEmpty(), isolate);
 
   Local<Value> result;
   if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
@@ -65,16 +100,16 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   this->requireFunction_ = std::make_unique<Persistent<v8::Function>>(
       isolate, requireFuncTemplate->GetFunction(context).ToLocalChecked());
 
-  Local<v8::Function> globalRequire = GetRequireFunction(isolate, RuntimeConfig.ApplicationPath);
+  // Use shortened path for global require function to avoid V8 parsing issues
+  std::string globalRequirePath = "/app";
+
+  Local<v8::Function> globalRequire = GetRequireFunction(isolate, globalRequirePath);
   bool success =
       global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
   tns::Assert(success, isolate);
 }
 
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
-  // Debug: Log module loading
-  printf("ModuleInternal::RunModule: Loading module: %s\n", path.c_str());
-
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   Local<Context> context = cache->GetContext();
   Local<Object> globalObject = context->Global();
@@ -109,8 +144,17 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
 
   Local<Value> result;
   Local<Object> thiz = Object::New(isolate);
+
+  TryCatch tc(isolate);
   bool success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
-  tns::Assert(success && !result.IsEmpty() && result->IsFunction(), isolate);
+  if (!success || tc.HasCaught()) {
+    if (tc.HasCaught()) {
+      tns::LogError(isolate, tc);
+    }
+    tns::Assert(false, isolate);
+  }
+
+  tns::Assert(!result.IsEmpty() && result->IsFunction(), isolate);
 
   return result.As<v8::Function>();
 }
@@ -130,43 +174,22 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
     moduleName = tns::ToString(isolate, info[0].As<v8::String>());
     callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
 
+    // Expand shortened paths back to full paths for file resolution
+    if (callingModuleDirName.length() > 0 && callingModuleDirName.substr(0, 4) == "/app") {
+      std::string expandedPath = RuntimeConfig.ApplicationPath + callingModuleDirName.substr(4);
+      callingModuleDirName = expandedPath;
+    }
+
     // Special handling for "./" - resolve to main entry point from package.json
     if (moduleName == "./") {
-      id mainValue = Runtime::GetAppConfigValue("main");
-      NSString* mainEntry = nil;
-
-      if (mainValue && [mainValue isKindOfClass:[NSString class]]) {
-        mainEntry = (NSString*)mainValue;
-      } else {
-        // Fallback to "index" if no main field found
-        mainEntry = @"index";
-      }
-
-      // Try the main entry with different extensions
-      NSString* basePath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()]
-          stringByAppendingPathComponent:mainEntry];
-
-      // Check if file exists as-is
-      if (tns::Exists([basePath fileSystemRepresentation])) {
-        fullPath = basePath;
-      }
-      // Try with .js extension
-      else if (tns::Exists(
-                   [[basePath stringByAppendingPathExtension:@"js"] fileSystemRepresentation])) {
-        fullPath = [basePath stringByAppendingPathExtension:@"js"];
-      }
-      // Try with .mjs extension
-      else if (tns::Exists(
-                   [[basePath stringByAppendingPathExtension:@"mjs"] fileSystemRepresentation])) {
-        fullPath = [basePath stringByAppendingPathExtension:@"mjs"];
-      } else {
-        // If none found, default to .js (let the loading system handle the error)
-        fullPath = [basePath stringByAppendingPathExtension:@"js"];
-      }
+      std::string mainEntryPath = ResolveMainEntryFromPackageJson(RuntimeConfig.ApplicationPath);
+      fullPath = [NSString stringWithUTF8String:mainEntryPath.c_str()];
     } else if (moduleName.length() > 0 && moduleName[0] != '/') {
       if (moduleName[0] == '.') {
-        fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()]
-            stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+        NSString* callingDirNS = [NSString stringWithUTF8String:callingModuleDirName.c_str()];
+        NSString* moduleNameNS = [NSString stringWithUTF8String:moduleName.c_str()];
+        fullPath =
+            [[callingDirNS stringByAppendingPathComponent:moduleNameNS] stringByStandardizingPath];
       } else if (moduleName[0] == '~') {
         moduleName = moduleName.substr(2);
         fullPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()]
@@ -180,9 +203,11 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
 
         const char* path1 = [fullPath fileSystemRepresentation];
         const char* path2 =
+            [[fullPath stringByAppendingPathExtension:@"js"] fileSystemRepresentation];
+        const char* path3 =
             [[fullPath stringByAppendingPathExtension:@"mjs"] fileSystemRepresentation];
 
-        if (!tns::Exists(path1) && !tns::Exists(path2)) {
+        if (!tns::Exists(path1) && !tns::Exists(path2) && !tns::Exists(path3)) {
           fullPath = [tnsModulesPath stringByAppendingPathComponent:@"tns-core-modules"];
           fullPath = [fullPath
               stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
@@ -198,6 +223,7 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
     bool isData = false;
     Local<Object> moduleObj =
         moduleInternal->LoadImpl(isolate, [fileNameOnly UTF8String], [pathOnly UTF8String], isData);
+
     if (moduleObj.IsEmpty()) {
       return;
     }
@@ -256,7 +282,7 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
       contextMsg += "\n\nOriginal stack trace:\n" + ex.getStackTrace();
     }
 
-    NativeScriptException contextEx(isolate, contextMsg);
+    NativeScriptException contextEx(isolate, contextMsg, "Error");
     contextEx.ReThrowToV8(isolate);
   }
 }
@@ -286,19 +312,30 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
     contextMsg += "\n  Module name: " + moduleName;
     contextMsg += "\n\nOriginal error:\n" + ex.getMessage();
 
-    throw NativeScriptException(isolate, contextMsg);
+    throw NativeScriptException(isolate, contextMsg, "Error");
   }
 
   if (path.empty()) {
-    // Create placeholder module for optional modules
-    if (IsLikelyOptionalModule(moduleName)) {
+    // For absolute paths (where baseDir is "/"), always throw an error instead of creating
+    // placeholder
+    bool isAbsolutePath = (baseDir == "/");
+
+    // Create placeholder module only for likely optional modules that aren't absolute paths
+    if (!isAbsolutePath && IsLikelyOptionalModule(moduleName)) {
       return this->CreatePlaceholderModule(isolate, moduleName, cacheKey);
     }
-    return Local<Object>();
+
+    // For absolute paths or non-optional modules, throw an error
+    std::string errorMsg = "Module not found: '" + moduleName + "'";
+    if (isAbsolutePath) {
+      errorMsg = "Cannot find module '" + baseDir + moduleName + "'";
+    }
+    throw NativeScriptException(isolate, errorMsg, "Error");
   }
 
   NSString* pathStr = [NSString stringWithUTF8String:path.c_str()];
   NSString* extension = [pathStr pathExtension];
+
   if ([extension isEqualToString:@"json"]) {
     isData = true;
   }
@@ -349,42 +386,29 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   bool isESM = modulePath.size() >= 4 && modulePath.compare(modulePath.size() - 4, 4, ".mjs") == 0;
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
-  // Debug: Log module type detection
-  printf("LoadModule: Module path: %s, isESM: %s\n", modulePath.c_str(), isESM ? "true" : "false");
-
   if (isESM) {
     // For ES modules, the returned value is the namespace object
-    printf("LoadModule: Processing as ES module\n");
 
     if (!scriptValue->IsObject()) {
-      printf("LoadModule: ES module failed - scriptValue is not an object\n");
       throw NativeScriptException(isolate, "Failed to load ES module " + modulePath);
     }
-    printf("LoadModule: ES module loaded successfully\n");
 
     // Debug: Check if we're in a worker context and if self.onmessage is set
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     if (cache->isWorker) {
-      printf("LoadModule: In worker context, checking self.onmessage\n");
       Local<Context> context = isolate->GetCurrentContext();
       Local<Object> global = context->Global();
 
       // Check if self exists
       Local<Value> selfValue;
       if (global->Get(context, ToV8String(isolate, "self")).ToLocal(&selfValue)) {
-        printf("LoadModule: self exists: %s\n", selfValue->IsObject() ? "object" : "not object");
         if (selfValue->IsObject()) {
           Local<Object> selfObj = selfValue.As<Object>();
           Local<Value> onmessageValue;
           if (selfObj->Get(context, ToV8String(isolate, "onmessage")).ToLocal(&onmessageValue)) {
-            printf("LoadModule: self.onmessage exists: %s\n",
-                   onmessageValue->IsFunction() ? "function" : "not function");
-          } else {
-            printf("LoadModule: self.onmessage does not exist\n");
+            // onmessage exists
           }
         }
-      } else {
-        printf("LoadModule: self does not exist\n");
       }
     }
 
@@ -433,7 +457,12 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
 
   std::string parentDir = [[[NSString stringWithUTF8String:modulePath.c_str()]
       stringByDeletingLastPathComponent] UTF8String];
-  Local<v8::Function> require = GetRequireFunction(isolate, parentDir);
+
+  // Shorten the parentDir for GetRequireFunction to avoid V8 parsing issues with long paths
+  std::string shortParentDir = "/app" + parentDir.substr(RuntimeConfig.ApplicationPath.length());
+
+  Local<v8::Function> require = GetRequireFunction(isolate, shortParentDir);
+  // Use full paths for __filename and __dirname to match module.id
   Local<Value> requireArgs[5]{moduleObj, exportsObj, require,
                               tns::ToV8String(isolate, modulePath.c_str()),
                               tns::ToV8String(isolate, parentDir.c_str())};
@@ -445,6 +474,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     TryCatch tc(isolate);
     Local<Value> result;
     Local<Object> thiz = Object::New(isolate);
+
     success =
         moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs)
             .ToLocal(&result);
@@ -757,17 +787,53 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
   BOOL isDirectory;
   BOOL exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
 
-  if (exists == YES && isDirectory == YES) {
-    NSString* jsFile = [fullPath stringByAppendingPathExtension:@"mjs"];
-    BOOL isDir;
-    if ([fileManager fileExistsAtPath:jsFile isDirectory:&isDir] && isDir == NO) {
-      return [jsFile UTF8String];
-    }
+  // If the exact path exists as a file (not directory), return it immediately
+  if (exists == YES && isDirectory == NO) {
+    return [fullPath UTF8String];
   }
 
-  if (exists == NO) {
-    fullPath = [fullPath stringByAppendingPathExtension:@"mjs"];
-    exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
+  // Priority 1: Check for file with .js extension
+  NSString* originalFullPath = fullPath;
+  NSString* jsPath = [fullPath stringByAppendingPathExtension:@"js"];
+  if ([fileManager fileExistsAtPath:jsPath isDirectory:&isDirectory] && isDirectory == NO) {
+    return [jsPath UTF8String];
+  }
+
+  // Priority 2: Check for file with .mjs extension
+  NSString* mjsPath = [originalFullPath stringByAppendingPathExtension:@"mjs"];
+  if ([fileManager fileExistsAtPath:mjsPath isDirectory:&isDirectory] && isDirectory == NO) {
+    return [mjsPath UTF8String];
+  }
+
+  // Priority 3: Only now check if it exists as a directory
+  if (exists == YES && isDirectory == YES) {
+    // For directories, check package.json first (Node.js always validates package.json if present)
+    NSString* packageJson = [fullPath stringByAppendingPathComponent:@"package.json"];
+    if ([fileManager fileExistsAtPath:packageJson]) {
+      bool error = false;
+      std::string entry = this->ResolvePathFromPackageJson([packageJson UTF8String], error);
+      if (error) {
+        throw NativeScriptException(
+            isolate, "Unable to locate main entry in " + std::string([packageJson UTF8String]),
+            "Error");
+      }
+
+      if (!entry.empty()) {
+        return entry;
+      }
+    }
+
+    // Fall back to index.js first, then index.mjs
+    NSString* indexJsPath = [fullPath stringByAppendingPathComponent:@"index.js"];
+    BOOL indexIsDir;
+    if ([fileManager fileExistsAtPath:indexJsPath isDirectory:&indexIsDir] && indexIsDir == NO) {
+      return [indexJsPath UTF8String];
+    }
+
+    NSString* indexMjsPath = [fullPath stringByAppendingPathComponent:@"index.mjs"];
+    if ([fileManager fileExistsAtPath:indexMjsPath isDirectory:&indexIsDir] && indexIsDir == NO) {
+      return [indexMjsPath UTF8String];
+    }
   }
 
   if (exists == NO) {
@@ -787,54 +853,15 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
         [[baseDirStr stringByAppendingPathComponent:moduleNameStr] stringByStandardizingPath];
     errorMsg += "\n    - " + std::string([originalPath UTF8String]);
     errorMsg +=
+        "\n    - " + std::string([[originalPath stringByAppendingPathExtension:@"js"] UTF8String]);
+    errorMsg +=
         "\n    - " + std::string([[originalPath stringByAppendingPathExtension:@"mjs"] UTF8String]);
 
-    throw NativeScriptException(isolate, errorMsg);
+    throw NativeScriptException(isolate, errorMsg, "Error");
   }
 
   if (isDirectory == NO) {
     return [fullPath UTF8String];
-  }
-
-  // Try to resolve module from main entry in package.json
-  NSString* packageJson = [fullPath stringByAppendingPathComponent:@"package.json"];
-  bool error = false;
-  std::string entry = this->ResolvePathFromPackageJson([packageJson UTF8String], error);
-  if (error) {
-    throw NativeScriptException("Unable to locate main entry in " +
-                                std::string([packageJson UTF8String]));
-  }
-
-  if (!entry.empty()) {
-    fullPath = [NSString stringWithUTF8String:entry.c_str()];
-  }
-
-  exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
-  if (exists == YES && isDirectory == NO) {
-    return [fullPath UTF8String];
-  }
-
-  if (exists == NO) {
-    fullPath = [fullPath stringByAppendingPathExtension:@"mjs"];
-  } else {
-    fullPath = [fullPath stringByAppendingPathComponent:@"index.mjs"];
-  }
-
-  exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
-  if (exists == NO) {
-    // Check if this looks like an optional module
-    if (IsLikelyOptionalModule(moduleName)) {
-      // Return empty string to indicate optional module not found
-      return std::string();
-    }
-
-    // Create a detailed error message with context for package.json resolution
-    std::string errorMsg = "Module not found: '" + moduleName + "'";
-    errorMsg += "\n  Base directory: " + baseDir;
-    errorMsg += "\n  Attempted final paths:";
-    errorMsg += "\n    - " + std::string([fullPath UTF8String]);
-
-    throw NativeScriptException(isolate, errorMsg);
   }
 
   return [fullPath UTF8String];
@@ -864,22 +891,59 @@ std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packag
 
   NSString* main = [dic objectForKey:@"main"];
   if (main == nil) {
-    return std::string();
+    main = @"index";  // Fallback to "index" if no main field found
   }
 
-  NSString* path = [[[packageJsonStr stringByDeletingLastPathComponent]
-      stringByAppendingPathComponent:main] stringByStandardizingPath];
-  exists = [fileManager fileExistsAtPath:path isDirectory:&isDirectory];
+  NSString* baseDir = [packageJsonStr stringByDeletingLastPathComponent];
+  NSString* basePath = [[baseDir stringByAppendingPathComponent:main] stringByStandardizingPath];
+
+  // Check if file exists as-is (but only if it's a file, not directory)
+  BOOL isFile;
+  if ([fileManager fileExistsAtPath:basePath isDirectory:&isFile] && isFile == NO) {
+    return std::string([basePath UTF8String]);
+  }
+  // Try with .js extension
+  else if ([fileManager fileExistsAtPath:[basePath stringByAppendingPathExtension:@"js"]
+                             isDirectory:&isFile] &&
+           isFile == NO) {
+    NSString* jsPath = [basePath stringByAppendingPathExtension:@"js"];
+    return std::string([jsPath UTF8String]);
+  }
+  // Try with .mjs extension
+  else if ([fileManager fileExistsAtPath:[basePath stringByAppendingPathExtension:@"mjs"]
+                             isDirectory:&isFile] &&
+           isFile == NO) {
+    NSString* mjsPath = [basePath stringByAppendingPathExtension:@"mjs"];
+    return std::string([mjsPath UTF8String]);
+  }
+
+  // Check if it's a directory and recurse
+  exists = [fileManager fileExistsAtPath:basePath isDirectory:&isDirectory];
 
   if (exists == YES && isDirectory == YES) {
-    packageJsonStr = [path stringByAppendingPathComponent:@"package.json"];
+    // First check for nested package.json
+    packageJsonStr = [basePath stringByAppendingPathComponent:@"package.json"];
     exists = [fileManager fileExistsAtPath:packageJsonStr isDirectory:&isDirectory];
     if (exists == YES && isDirectory == NO) {
       return this->ResolvePathFromPackageJson([packageJsonStr UTF8String], error);
     }
+
+    // If no package.json, fall back to index.js then index.mjs
+    NSString* indexJsPath = [basePath stringByAppendingPathComponent:@"index.js"];
+
+    if (tns::Exists([indexJsPath fileSystemRepresentation])) {
+      return std::string([indexJsPath UTF8String]);
+    }
+
+    NSString* indexMjsPath = [basePath stringByAppendingPathComponent:@"index.mjs"];
+
+    if (tns::Exists([indexMjsPath fileSystemRepresentation])) {
+      return std::string([indexMjsPath UTF8String]);
+    }
   }
 
-  return [path UTF8String];
+  // If none found, default to .js (let the loading system handle the error)
+  return std::string([[basePath stringByAppendingPathExtension:@"js"] UTF8String]);
 }
 
 Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,

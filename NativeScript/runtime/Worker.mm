@@ -66,18 +66,30 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     Local<Object> thiz = info.This();
     std::string workerPath;
 
-    // Handle URL objects by calling toString() on them
-    if (info[0]->IsObject()) {
+    // Handle both string URLs and URL objects
+    if (IsString(info[0])) {
+      workerPath = ToString(isolate, info[0]);
+    } else if (info[0]->IsObject()) {
       Local<Object> urlObj = info[0].As<Object>();
       Local<Value> toStringMethod;
       if (urlObj->Get(context, tns::ToV8String(isolate, "toString")).ToLocal(&toStringMethod)) {
         if (toStringMethod->IsFunction()) {
           Local<v8::Function> toString = toStringMethod.As<v8::Function>();
-          Local<Value> result = toString->Call(context, urlObj, 0, nullptr).ToLocalChecked();
-          if (result->IsString()) {
-            workerPath = ToString(isolate, result);
+          Local<Value> result;
+          if (toString->Call(context, urlObj, 0, nullptr).ToLocal(&result)) {
+            if (result->IsString()) {
+              std::string stringResult = ToString(isolate, result);
+              // Reject plain objects that return "[object Object]" from toString()
+              if (stringResult == "[object Object]") {
+                throw NativeScriptException(
+                    "Worker constructor expects a string URL or URL object.");
+              }
+              workerPath = stringResult;
+            } else {
+              throw NativeScriptException("Worker URL object toString() must return a string.");
+            }
           } else {
-            throw NativeScriptException("Worker URL object toString() must return a string.");
+            throw NativeScriptException("Error calling toString() on Worker URL object.");
           }
         } else {
           throw NativeScriptException("Worker URL object must have a toString() method.");
@@ -85,8 +97,6 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       } else {
         throw NativeScriptException("Worker URL object must have a toString() method.");
       }
-    } else if (IsString(info[0])) {
-      workerPath = ToString(isolate, info[0]);
     } else {
       throw NativeScriptException("Worker constructor expects a string URL or URL object.");
     }
@@ -111,19 +121,20 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       TryCatch tc(isolate);
 
       // Debug: Log worker execution
-      printf("Worker: About to run module: %s\n", workerPath.c_str());
+      // printf("Worker: About to run module: %s\n", workerPath.c_str());
 
       // Debug: Check if console exists in worker context
-      {
-        HandleScope debugScope(isolate);
-        Local<Context> workerContext = Caches::Get(isolate)->GetContext();
-        Local<Object> global = workerContext->Global();
-        if (global->Has(workerContext, tns::ToV8String(isolate, "console")).FromMaybe(false)) {
-          printf("Worker: console object exists in worker context\n");
-        } else {
-          printf("Worker: console object NOT found in worker context\n");
-        }
-      }
+      //      {
+      //        HandleScope debugScope(isolate);
+      //        Local<Context> workerContext = Caches::Get(isolate)->GetContext();
+      //        Local<Object> global = workerContext->Global();
+      //         if (global->Has(workerContext, tns::ToV8String(isolate,
+      //         "console")).FromMaybe(false)) {
+      //           printf("Worker: console object exists in worker context\n");
+      //         } else {
+      //           printf("Worker: console object NOT found in worker context\n");
+      //         }
+      //      }
 
       runtime->RunModule(workerPath);
 
@@ -133,18 +144,15 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         Local<Context> context = Caches::Get(isolate)->GetContext();
 
         // Debug: Log the error
-        printf("Worker: Error occurred while running module\n");
+        // printf("Worker: Error occurred while running module\n");
         Local<Value> exception = tc.Exception();
         if (!exception.IsEmpty()) {
           v8::String::Utf8Value error_str(isolate, exception);
-          printf("Worker: Exception: %s\n", *error_str);
+          // printf("Worker: Exception: %s\n", *error_str);
         }
 
         worker->PassUncaughtExceptionFromWorkerToMain(context, tc, false);
         worker->Terminate();
-      } else {
-        // Debug: Log successful execution
-        printf("Worker: Module executed successfully\n");
       }
 
       return isolate;
