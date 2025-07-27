@@ -87,8 +87,15 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // would need the referrer's directory to resolve it.
   bool specIsRelative = !spec.empty() && spec[0] == '.';
   if (referrerPath.empty() && specIsRelative) {
-    // Unable to resolve a relative path without knowing the base directory.
-    return v8::MaybeLocal<v8::Module>();
+    // For dynamic imports, assume the base directory is the application root
+    // This handles cases where runtime.mjs calls import("./chunk.mjs")
+    // but the referrer module isn't properly registered
+    if (IsScriptLoadingLogEnabled()) {
+      NSLog(@"[resolver] No referrer found for relative import '%s', assuming app root",
+            spec.c_str());
+    }
+    referrerPath =
+        RuntimeConfig.ApplicationPath + "/runtime.mjs";  // Default to runtime.mjs as referrer
   }
 
   // 3) Compute its directory
@@ -110,7 +117,13 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   if (!spec.empty() && spec[0] == '.') {
     // Relative import (./ or ../)
     std::string cleanSpec = spec.rfind("./", 0) == 0 ? spec.substr(2) : spec;
-    candidateBases.push_back(baseDir + cleanSpec);
+    std::string candidate = baseDir + cleanSpec;
+    candidateBases.push_back(candidate);
+
+    if (IsScriptLoadingLogEnabled()) {
+      NSLog(@"[resolver] Relative import: '%s' + '%s' -> '%s'", baseDir.c_str(), cleanSpec.c_str(),
+            candidate.c_str());
+    }
   } else if (spec.rfind("file://", 0) == 0) {
     // Absolute file URL, e.g. file:///app/path/to/chunk.mjs
     std::string tail = spec.substr(7);  // strip file://
@@ -149,7 +162,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     std::string base = RuntimeConfig.ApplicationPath + "/" + spec;
     candidateBases.push_back(base);
 
-    // Additional heuristic: Webpack encodes path separators as underscores in
+    // Additional heuristic: bundlers often encode path separators as underscores in
     // chunk IDs (e.g. "src_app_components_foo_bar_ts.mjs").  Try converting
     // those underscores back to slashes and look for that file as well.
     std::string withSlashes = spec;
@@ -295,7 +308,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         absPath = builtinPath;
       }
     } else if (IsLikelyOptionalModule(spec)) {
-      // Create a placeholder file on disk that webpack can resolve to
+      // Create a placeholder file on disk that bundler can resolve to
       std::string appPath = RuntimeConfig.ApplicationPath;
       std::string placeholderPath = appPath + "/" + spec + ".mjs";
 
@@ -494,7 +507,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
     }
 
-    // Special handling for webpack chunks: check if this is a webpack chunk and install it
+    // Special handling for bundler chunks: check if this is a bundler chunk and install it
     v8::Local<v8::Value> namespaceObj = module->GetModuleNamespace();
     if (namespaceObj->IsObject()) {
       v8::Local<v8::Object> nsObj = namespaceObj.As<v8::Object>();
