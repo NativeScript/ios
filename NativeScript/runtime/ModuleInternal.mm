@@ -522,8 +522,22 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
   }
 
   Local<Script> script = ModuleInternal::LoadClassicScript(isolate, path);
-  // run it and return the value
-  return script->Run(isolate->GetCurrentContext()).ToLocalChecked();
+
+  // run it and return the value with proper exception handling
+  Local<Context> context = isolate->GetCurrentContext();
+  TryCatch tc(isolate);
+  Local<Value> result;
+
+  if (!script->Run(context).ToLocal(&result)) {
+    // Script execution failed, throw a proper exception instead of aborting V8
+    if (tc.HasCaught()) {
+      throw NativeScriptException(isolate, tc, "Cannot execute script " + path);
+    } else {
+      throw NativeScriptException(isolate, "Script execution failed for " + path);
+    }
+  }
+
+  return result;
 }
 
 Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::string& path) {
@@ -709,7 +723,14 @@ MaybeLocal<Value> ModuleInternal::RunScriptString(Isolate* isolate, Local<Contex
   ScriptCompiler::CompileOptions options = ScriptCompiler::kNoCompileOptions;
   ScriptCompiler::Source source(tns::ToV8String(isolate, scriptString));
   TryCatch tc(isolate);
-  Local<Script> script = ScriptCompiler::Compile(context, &source, options).ToLocalChecked();
+
+  // Handle script compilation safely
+  Local<Script> script;
+  if (!ScriptCompiler::Compile(context, &source, options).ToLocal(&script)) {
+    // Compilation failed - return empty MaybeLocal to indicate failure
+    return MaybeLocal<Value>();
+  }
+
   MaybeLocal<Value> result = script->Run(context);
   return result;
 }

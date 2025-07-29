@@ -3,6 +3,7 @@
 #include "Caches.h"
 #include "Helpers.h"
 #include "Runtime.h"
+#include "RuntimeConfig.h"
 
 using namespace v8;
 
@@ -148,6 +149,56 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
         Exception::Error(tns::ToV8String(isolate, "No javascript exception or message provided."));
   }
 
+  // For critical exceptions (like module loading failures), provide detailed error reporting
+  bool isCriticalException = false;
+
+  // Check if this is a critical exception that should show detailed error info
+  if (!this->message_.empty()) {
+    // Module-related errors should show detailed stack traces
+    isCriticalException =
+        (this->message_.find("Error calling module function") != std::string::npos ||
+         this->message_.find("Cannot evaluate module") != std::string::npos ||
+         this->message_.find("Cannot instantiate module") != std::string::npos ||
+         this->message_.find("Cannot compile") != std::string::npos);
+  }
+
+  if (isCriticalException) {
+    // Create detailed error message similar to OnUncaughtError
+    std::string stackTrace = this->stackTrace_;
+    std::string fullMessage;
+
+    if (!this->fullMessage_.empty()) {
+      fullMessage = this->fullMessage_;
+    } else {
+      fullMessage = this->message_ + "\n at \n" + stackTrace;
+    }
+
+    // Always log the detailed error for critical exceptions (both debug and release)
+    NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****\n");
+    NSLog(@"NativeScript encountered an error:");
+    NSString* errorStr = [NSString stringWithUTF8String:fullMessage.c_str()];
+    if (errorStr != nil) {
+      NSLog(@"%@", errorStr);
+    } else {
+      NSLog(@"(error message contained invalid UTF-8)");
+    }
+
+    // In debug mode, continue execution; in release mode, terminate
+    if (RuntimeConfig.IsDebug) {
+      NSLog(@"***** End stack trace - continuing execution *****\n");
+      // In debug mode, just throw the exception normally - don't terminate
+      isolate->ThrowException(errObj);
+      return;
+    } else {
+      NSLog(@"***** End stack trace - terminating application *****\n");
+      // In release mode, create proper message and call OnUncaughtError for termination
+      Local<v8::Message> message = Exception::CreateMessage(isolate, errObj);
+      OnUncaughtError(message, errObj);
+      return;  // OnUncaughtError will terminate, so we don't continue
+    }
+  }
+
+  // For non-critical exceptions, just re-throw normally
   isolate->ThrowException(errObj);
 }
 
