@@ -117,6 +117,9 @@ std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
 
+// Global flag to track when JavaScript errors occur during execution
+bool jsErrorOccurred = false;
+
 // TODO: consider listening to timezone changes and automatically reseting the DateTime. Probably
 // makes more sense to move it to its own file
 // void UpdateTimezoneNotificationCallback(CFNotificationCenterRef center,

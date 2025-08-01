@@ -300,8 +300,14 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         } else {
           // Failed to create file, fall back to throwing error
           std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-          isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-          return v8::MaybeLocal<v8::Module>();
+          if (RuntimeConfig.IsDebug) {
+            NSLog(@"Debug mode - Node.js polyfill creation failed: %s", msg.c_str());
+            // Return empty instead of crashing in debug mode
+            return v8::MaybeLocal<v8::Module>();
+          } else {
+            isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+            return v8::MaybeLocal<v8::Module>();
+          }
         }
       } else {
         // Polyfill file already exists, use it
@@ -340,8 +346,14 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         } else {
           // Failed to create file, fall back to throwing error
           std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-          isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-          return v8::MaybeLocal<v8::Module>();
+          if (RuntimeConfig.IsDebug) {
+            NSLog(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
+            // Return empty instead of crashing in debug mode
+            return v8::MaybeLocal<v8::Module>();
+          } else {
+            isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+            return v8::MaybeLocal<v8::Module>();
+          }
         }
       } else {
         // Placeholder file already exists, use it
@@ -350,8 +362,14 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     } else {
       // Not an optional module, throw the original error
       std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-      return v8::MaybeLocal<v8::Module>();
+      if (RuntimeConfig.IsDebug) {
+        NSLog(@"Debug mode - Module not found: %s", msg.c_str());
+        // Return empty instead of crashing in debug mode
+        return v8::MaybeLocal<v8::Module>();
+      } else {
+        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+        return v8::MaybeLocal<v8::Module>();
+      }
     }
   }
 
@@ -379,18 +397,34 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     std::string base = ReplaceAll(absPath, RuntimeConfig.BaseDir, "");
     std::string url = "file://" + base;
 
-    v8::ScriptOrigin origin(
-        isolate,
-        v8::String::NewFromUtf8(isolate, url.c_str(), v8::NewStringType::kNormal).ToLocalChecked(),
-        0, 0, false, -1, v8::Local<v8::Value>(), false, false, true /* is_module */);
+    v8::Local<v8::String> urlString;
+    if (!v8::String::NewFromUtf8(isolate, url.c_str(), v8::NewStringType::kNormal)
+             .ToLocal(&urlString)) {
+      if (RuntimeConfig.IsDebug) {
+        NSLog(@"Debug mode - Failed to create URL string for JSON module");
+        return v8::MaybeLocal<v8::Module>();
+      } else {
+        isolate->ThrowException(v8::Exception::Error(
+            tns::ToV8String(isolate, "Failed to create URL string for JSON module")));
+        return v8::MaybeLocal<v8::Module>();
+      }
+    }
+
+    v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false,
+                            false, true /* is_module */);
 
     v8::ScriptCompiler::Source src(sourceText, origin);
 
     v8::Local<v8::Module> jsonModule;
     if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&jsonModule)) {
-      isolate->ThrowException(
-          v8::Exception::SyntaxError(tns::ToV8String(isolate, "Failed to compile JSON module")));
-      return v8::MaybeLocal<v8::Module>();
+      if (RuntimeConfig.IsDebug) {
+        NSLog(@"Debug mode - Failed to compile JSON module");
+        return v8::MaybeLocal<v8::Module>();
+      } else {
+        isolate->ThrowException(
+            v8::Exception::SyntaxError(tns::ToV8String(isolate, "Failed to compile JSON module")));
+        return v8::MaybeLocal<v8::Module>();
+      }
     }
 
     // No imports inside this module, so instantiate directly
@@ -464,7 +498,11 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   v8::EscapableHandleScope scope(isolate);
 
   // Create a Promise resolver we'll resolve/reject synchronously for now.
-  v8::Local<v8::Promise::Resolver> resolver = v8::Promise::Resolver::New(context).ToLocalChecked();
+  v8::Local<v8::Promise::Resolver> resolver;
+  if (!v8::Promise::Resolver::New(context).ToLocal(&resolver)) {
+    // Failed to create resolver, return empty promise
+    return v8::MaybeLocal<v8::Promise>();
+  }
 
   // Re-use the static resolver to locate / compile the module.
   try {

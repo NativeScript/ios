@@ -20,8 +20,14 @@ class NativeScriptException {
   const std::string& getStackTrace() const { return stackTrace_; }
   static void OnUncaughtError(v8::Local<v8::Message> message,
                               v8::Local<v8::Value> error);
+  static void ShowErrorModal(const std::string& title,
+                             const std::string& message,
+                             const std::string& stackTrace);
 
  private:
+  static void showErrorModalSynchronously(const std::string& title,
+                                          const std::string& message,
+                                          const std::string& stackTrace);
   v8::Persistent<v8::Value>* javascriptException_;
   std::string name_;
   std::string message_;
