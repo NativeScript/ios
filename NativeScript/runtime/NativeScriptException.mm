@@ -58,7 +58,6 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
     NSLog(@"🛡️ Boot error already handled, ignoring subsequent uncaught JavaScript error");
     return;
   }
-
   @try {
     Isolate* isolate = message->GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
@@ -155,12 +154,10 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
 
         // Use the same comprehensive fullMessage that the terminal uses (identical stack traces)
         std::string completeStackTrace = reasonStr ? [reasonStr UTF8String] : fullMessage;
-
         // Apply stack trace remapping to match what's shown in terminal
         if (isolate) {
           completeStackTrace = tns::RemapStackTrace(isolate, completeStackTrace);
         }
-
         NSLog(@"***** End stack trace - showing beautiful NativeScript error modal and continuing "
               @"execution *****\n");
         ShowErrorModal(errorTitle, errorMessage, completeStackTrace);
@@ -439,7 +436,6 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
     NSLog(@"🛡️ Boot error already handled, ignoring ShowErrorModal call");
     return;
   }
-
   // Only show modal in debug mode
   if (!RuntimeConfig.IsDebug) {
     return;
@@ -990,8 +986,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
             nuclearWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
             NSLog(@"🎨 Created nuclear window with scene");
           } else {
-            NSLog(@"🎨 ☢️ ABSOLUTE NUCLEAR: No scenes exist - attempting to force iOS to "
-                  @"create "
+            NSLog(@"🎨 ☢️ ABSOLUTE NUCLEAR: No scenes exist - attempting to force iOS to create "
                   @"one");
 
             // Try to force iOS to create a window scene by requesting one
@@ -1102,7 +1097,8 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
         UILabel* nuclearLabel = [[UILabel alloc] initWithFrame:nuclearWindow.bounds];
         nuclearLabel.text = [NSString
             stringWithFormat:
-                @"⚠️ JAVASCRIPT ERROR ⚠️\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nFix the error "
+                @"⚠️ JAVASCRIPT ERROR ⚠️\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nFix the "
+                @"error "
                 @"and "
                 @"save your file\nApp will stay alive for development\n\nTap anywhere to dismiss",
                 [NSString stringWithUTF8String:message.c_str()]];

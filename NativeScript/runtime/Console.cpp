@@ -108,7 +108,7 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
       stackTraceLines << std::endl << stacktrace << std::endl;
 
       std::string errorToDisplay = stackTraceLines.str();
-      //   Log("BEFORE mapped errorToDisplay %s", errorToDisplay.c_str());
+      // Log("BEFORE mapped errorToDisplay %s", errorToDisplay.c_str());
 
       // Extract error details
       std::string errorTitle = "JavaScript Error";
@@ -116,7 +116,7 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
       // Use the new helper function to remap the stack trace
       errorToDisplay = tns::RemapStackTrace(isolate, errorToDisplay);
 
-      //   Log("AFTER mapped errorToDisplay %s", errorToDisplay.c_str());
+      // Log("AFTER mapped errorToDisplay %s", errorToDisplay.c_str());
 
       try {
         NativeScriptException::ShowErrorModal(errorTitle, errorToDisplay,
