@@ -892,14 +892,11 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
               // Mark that a JavaScript error occurred
               jsErrorOccurred = true;
 
-              // First log the detailed JavaScript error with full stack trace
-              NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-
+              // Extract error information from the promise rejection
               std::string errorTitle = "Uncaught JavaScript Exception";
               std::string errorMessage = "Module evaluation promise rejected";
               std::string stackTrace = "";
 
-              // Try to get the promise result (the actual error)
               Local<Value> reason = promise->Result();
               if (!reason.IsEmpty()) {
                 if (reason->IsObject()) {
@@ -924,8 +921,6 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                     v8::String::Utf8Value stackUtf8(isolate, stackVal);
                     if (*stackUtf8) {
                       stackTrace = std::string(*stackUtf8);
-                      // Clean up the stack trace path
-                      stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
                     }
                   }
                 } else {
@@ -939,30 +934,24 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                     }
                   }
                 }
-
-                // Log the extracted error information
-                NSLog(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
-                if (!stackTrace.empty()) {
-                  NSLog(@"JavaScript stack trace:\n%s", stackTrace.c_str());
-                }
               }
 
-              // Also check if TryCatch caught anything
-              if (promiseTc.HasCaught()) {
-                tns::LogError(isolate, promiseTc);
+              // Log the error with proper remapping using the same format as LogError
+              NSLog(@"🚨🚨🚨 Boot Loading Error. Resolve to Continue. 🚨🚨🚨");
+              NSLog(@"Error: %s", errorMessage.c_str());
+              if (!stackTrace.empty()) {
+                // Remap the stack trace using the helper function
+                std::string remappedStackTrace = tns::RemapStackTrace(isolate, stackTrace);
+                NSLog(@"%s", remappedStackTrace.c_str());
               }
 
-              NSLog(@"***** End stack trace - continuing execution *****");
+              // Pass the raw stack trace to ShowBootError - it will handle the remapping
+              NativeScriptException::ShowBootError(errorTitle, errorMessage, stackTrace);
 
-              NSLog(@"🔥 📦 MODULE MODAL: About to call ShowErrorModal from ModuleInternal!");
-              NSLog(@"🔥 📦 ModuleInternal title: %s", errorTitle.c_str());
-              NSLog(@"🔥 📦 ModuleInternal message: %s", errorMessage.c_str());
-              NSLog(@"🔥 📦 ModuleInternal calling ShowErrorModal NOW!");
-
-              NativeScriptException::ShowErrorModal(errorTitle, errorMessage, stackTrace);
-
-              NSLog(@"Debug mode - ES module promise rejected, returning gracefully");
-              // In debug mode, don't throw any exceptions - just return empty value
+              NSLog(@"Debug mode - ES module promise rejected, but continuing normal execution");
+              NSLog(@"🔧 Boot error handled, allowing normal app lifecycle to continue");
+              // In debug mode, don't throw any exceptions - return empty value to prevent crashes
+              // The error UI is displayed via notification system, app continues normally
               return Local<Value>();
             } else {
               // Release mode - throw exceptions as before

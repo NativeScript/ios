@@ -108,44 +108,15 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
       stackTraceLines << std::endl << stacktrace << std::endl;
 
       std::string errorToDisplay = stackTraceLines.str();
-      Log("BEFORE mapped errorToDisplay %s", errorToDisplay.c_str());
+      //   Log("BEFORE mapped errorToDisplay %s", errorToDisplay.c_str());
 
       // Extract error details
       std::string errorTitle = "JavaScript Error";
 
-      // Get the current context from the isolate
-      Local<Context> context = isolate->GetCurrentContext();
+      // Use the new helper function to remap the stack trace
+      errorToDisplay = tns::RemapStackTrace(isolate, errorToDisplay);
 
-      // Get the global object
-      Local<Object> global = context->Global();
-
-      // Get the __ns_remapStack function from global
-      Local<Value> remapStackValue;
-      bool success =
-          global->Get(context, tns::ToV8String(isolate, "__ns_remapStack"))
-              .ToLocal(&remapStackValue);
-
-      if (success && remapStackValue->IsFunction()) {
-        Log("remapStackValue is a function!");
-        Local<v8::Function> remapStackFunction =
-            remapStackValue.As<v8::Function>();
-
-        // Prepare arguments - convert your string to V8 string
-        Local<Value> args[] = {tns::ToV8String(isolate, errorToDisplay)};
-
-        // Call the function
-        Local<Value> result;
-        bool callSuccess =
-            remapStackFunction->Call(context, global, 1, args).ToLocal(&result);
-
-        if (callSuccess && result->IsString()) {
-          // If the function returns a modified string, use it
-          std::string remappedError = tns::ToString(isolate, result);
-          errorToDisplay = remappedError;  // Update the error to display
-        }
-      }
-
-      Log("AFTER mapped errorToDisplay %s", errorToDisplay.c_str());
+      //   Log("AFTER mapped errorToDisplay %s", errorToDisplay.c_str());
 
       try {
         NativeScriptException::ShowErrorModal(errorTitle, errorToDisplay,

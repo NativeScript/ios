@@ -23,6 +23,9 @@ class NativeScriptException {
   static void ShowErrorModal(const std::string& title,
                              const std::string& message,
                              const std::string& stackTrace);
+  static void ShowBootError(const std::string& title,
+                            const std::string& message,
+                            const std::string& stackTrace);
 
  private:
   static void showErrorModalSynchronously(const std::string& title,

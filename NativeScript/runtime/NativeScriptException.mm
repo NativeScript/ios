@@ -1,4 +1,5 @@
 #include "NativeScriptException.h"
+#import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
@@ -14,6 +15,9 @@ namespace tns {
 
 // External flag from Runtime.mm to track JavaScript errors
 extern bool jsErrorOccurred;
+
+// Static flag to track if we've already handled a boot error to prevent multiple error screens
+static bool bootErrorHandled = false;
 
 NativeScriptException::NativeScriptException(const std::string& message) {
   this->javascriptException_ = nullptr;
@@ -49,6 +53,12 @@ NativeScriptException::NativeScriptException(Isolate* isolate, const std::string
 NativeScriptException::~NativeScriptException() { delete this->javascriptException_; }
 
 void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Value> error) {
+  // If we've already handled a boot error, ignore all subsequent JavaScript errors
+  if (bootErrorHandled) {
+    NSLog(@"🛡️ Boot error already handled, ignoring subsequent uncaught JavaScript error");
+    return;
+  }
+
   @try {
     Isolate* isolate = message->GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
@@ -145,6 +155,12 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
 
         // Use the same comprehensive fullMessage that the terminal uses (identical stack traces)
         std::string completeStackTrace = reasonStr ? [reasonStr UTF8String] : fullMessage;
+
+        // Apply stack trace remapping to match what's shown in terminal
+        if (isolate) {
+          completeStackTrace = tns::RemapStackTrace(isolate, completeStackTrace);
+        }
+
         NSLog(@"***** End stack trace - showing beautiful NativeScript error modal and continuing "
               @"execution *****\n");
         ShowErrorModal(errorTitle, errorMessage, completeStackTrace);
@@ -271,7 +287,9 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
         }
 
         // Use the same comprehensive fullMessage that the terminal uses
-        ShowErrorModal(errorTitle, errorMessage, fullMessage);
+        // Apply stack trace remapping to match what's shown in terminal
+        std::string remappedFullMessage = tns::RemapStackTrace(isolate, fullMessage);
+        ShowErrorModal(errorTitle, errorMessage, remappedFullMessage);
 
         // In debug mode, DON'T throw the exception - just return to prevent crash
         // The error modal will be shown and the app will continue running
@@ -416,6 +434,12 @@ std::string NativeScriptException::GetFullMessage(Isolate* isolate, Local<v8::Me
 
 void NativeScriptException::ShowErrorModal(const std::string& title, const std::string& message,
                                            const std::string& stackTrace) {
+  // If we've already handled a boot error, ignore all subsequent error modals
+  if (bootErrorHandled) {
+    NSLog(@"🛡️ Boot error already handled, ignoring ShowErrorModal call");
+    return;
+  }
+
   // Only show modal in debug mode
   if (!RuntimeConfig.IsDebug) {
     return;
@@ -446,6 +470,17 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
                                                         const std::string& message,
                                                         const std::string& stackTrace) {
   NSLog(@"🎨 Creating beautiful error modal UI...");
+
+  // Apply stack trace remapping to ensure error modal shows same remapped stack traces as terminal
+  std::string remappedStackTrace = stackTrace;
+  Runtime* runtime = Runtime::GetCurrentRuntime();
+  if (runtime != nullptr) {
+    Isolate* isolate = runtime->GetIsolate();
+    if (isolate != nullptr) {
+      remappedStackTrace = tns::RemapStackTrace(isolate, stackTrace);
+      NSLog(@"🔧 Applied stack trace remapping to error modal - should now match terminal output");
+    }
+  }
 
   // Use static variables to keep strong references and prevent deallocation
   static UIWindow* __attribute__((unused)) foundationWindowRef =
@@ -704,10 +739,9 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   stackTraceContainer.translatesAutoresizingMaskIntoConstraints = NO;
   [contentView addSubview:stackTraceContainer];
 
-  NSLog(@"errorToDisplay from in NativeScriptException ShowErrorModal: %s", stackTrace.c_str());
   // Stack trace text view - with proper terminal styling
   UITextView* stackTraceTextView = [[UITextView alloc] init];
-  stackTraceTextView.text = [NSString stringWithUTF8String:stackTrace.c_str()];
+  stackTraceTextView.text = [NSString stringWithUTF8String:remappedStackTrace.c_str()];
   stackTraceTextView.textColor = [UIColor colorWithRed:0.0
                                                  green:1.0
                                                   blue:0.0
@@ -956,7 +990,8 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
             nuclearWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
             NSLog(@"🎨 Created nuclear window with scene");
           } else {
-            NSLog(@"🎨 ☢️ ABSOLUTE NUCLEAR: No scenes exist - attempting to force iOS to create "
+            NSLog(@"🎨 ☢️ ABSOLUTE NUCLEAR: No scenes exist - attempting to force iOS to "
+                  @"create "
                   @"one");
 
             // Try to force iOS to create a window scene by requesting one
@@ -1022,11 +1057,12 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
                                                                    alpha:1.0];
 
                     UILabel* sceneLabel = [[UILabel alloc] initWithFrame:sceneNuclearWindow.bounds];
-                    sceneLabel.text = [NSString
-                        stringWithFormat:@"⚠️ ABSOLUTE NUCLEAR SUCCESS ⚠️\n\nJavaScript Error "
-                                         @"Detected\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nApp will stay "
-                                         @"alive for development",
-                                         [NSString stringWithUTF8String:message.c_str()]];
+                    sceneLabel.text =
+                        [NSString stringWithFormat:
+                                      @"⚠️ ABSOLUTE NUCLEAR SUCCESS ⚠️\n\nJavaScript Error "
+                                      @"Detected\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nApp will stay "
+                                      @"alive for development",
+                                      [NSString stringWithUTF8String:message.c_str()]];
                     sceneLabel.textColor = [UIColor whiteColor];
                     sceneLabel.font = [UIFont boldSystemFontOfSize:16];
                     sceneLabel.textAlignment = NSTextAlignmentCenter;
@@ -1066,7 +1102,8 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
         UILabel* nuclearLabel = [[UILabel alloc] initWithFrame:nuclearWindow.bounds];
         nuclearLabel.text = [NSString
             stringWithFormat:
-                @"⚠️ JAVASCRIPT ERROR ⚠️\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nFix the error and "
+                @"⚠️ JAVASCRIPT ERROR ⚠️\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nFix the error "
+                @"and "
                 @"save your file\nApp will stay alive for development\n\nTap anywhere to dismiss",
                 [NSString stringWithUTF8String:message.c_str()]];
         nuclearLabel.textColor = [UIColor whiteColor];
@@ -1413,6 +1450,140 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
                    // responsive
                    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
                  });
+}
+
+void NativeScriptException::ShowBootError(const std::string& title, const std::string& message,
+                                          const std::string& stackTrace) {
+  // Only show boot error in debug mode
+  if (!RuntimeConfig.IsDebug) {
+    return;
+  }
+
+  // Prevent multiple boot error screens
+  if (bootErrorHandled) {
+    NSLog(@"🛡️ Boot error already handled, ignoring subsequent error");
+    return;
+  }
+
+  bootErrorHandled = true;
+  NSLog(@"🚨 FATAL BOOT ERROR: Handling boot-time JavaScript error");
+
+  // 1. Send UIApplicationDidFinishLaunchingNotification to allow NativeScript to finish boot cycle
+  // dispatch_async(dispatch_get_main_queue(), ^{
+  NSLog(@"📡 Sending UIApplicationDidFinishLaunchingNotification to complete boot cycle");
+
+  // Format the error text to include in userInfo
+  NSString* errorText =
+      [NSString stringWithFormat:@"Boot Error\n\n%s\n\n%s", message.c_str(), stackTrace.c_str()];
+
+  NSDictionary* userInfo = @{@"NativeScriptBootCrash" : errorText};
+
+  [[NSNotificationCenter defaultCenter]
+      postNotificationName:UIApplicationDidFinishLaunchingNotification
+                    object:[UIApplication sharedApplication]
+                  userInfo:userInfo];
+  // });
+
+  // Add notification observer for runtime error display
+  // __block id observer = [[NSNotificationCenter defaultCenter]
+  //     addObserverForName:@"NativeScriptShowRuntimeErrorDisplay"
+  //                 object:nil
+  //                  queue:[NSOperationQueue mainQueue]
+  //             usingBlock:^(NSNotification * _Nonnull notification) {
+  // NSLog(@"🎨 Received NativeScriptShowRuntimeErrorDisplay notification, creating boot error
+  // UI...");
+
+  // Remove the observer since we only want to show this once
+  // [[NSNotificationCenter defaultCenter] removeObserver:observer];
+
+  @try {
+    NSLog(@"🎨 Creating boot error UI...");
+
+    // Create a new window for the error display using proper window scene
+    UIWindow* bootErrorWindow = nil;
+
+    if (@available(iOS 13.0, *)) {
+      // iOS 13+: Find an active window scene and use it
+      UIWindowScene* activeWindowScene = nil;
+
+      // Get the key window from connected scenes
+      for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+          UIWindowScene* windowScene = (UIWindowScene*)scene;
+          if (windowScene.activationState == UISceneActivationStateForegroundActive) {
+            activeWindowScene = windowScene;
+            break;
+          }
+        }
+      }
+
+      // If no active scene found, use the first available window scene
+      if (!activeWindowScene) {
+        for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+          if ([scene isKindOfClass:[UIWindowScene class]]) {
+            activeWindowScene = (UIWindowScene*)scene;
+            break;
+          }
+        }
+      }
+
+      if (activeWindowScene) {
+        bootErrorWindow = [[UIWindow alloc] initWithWindowScene:activeWindowScene];
+        NSLog(@"🎨 Created boot error window with window scene: %@", activeWindowScene);
+      } else {
+        // Fallback for when no window scene is available
+        bootErrorWindow = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+        NSLog(@"🎨 Warning: No window scene available, using frame-based window");
+      }
+    } else {
+      // iOS 12 and below
+      bootErrorWindow = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+      NSLog(@"🎨 Created boot error window for iOS 12");
+    }
+
+    // Create a minimal view controller with error UI
+    UIViewController* vc = [[UIViewController alloc] init];
+    vc.view.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.95];
+
+    // Create error label
+    UILabel* label = [[UILabel alloc] init];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    label.numberOfLines = 0;
+    label.textAlignment = NSTextAlignmentCenter;
+    label.textColor = [UIColor systemRedColor];
+    label.font = [UIFont systemFontOfSize:16];
+
+    // Format the error message
+    NSString* errorText =
+        [NSString stringWithFormat:@"Boot Error\n\n%s\n\n%s", message.c_str(), stackTrace.c_str()];
+    label.text = errorText;
+
+    [vc.view addSubview:label];
+
+    // Set up constraints
+    [NSLayoutConstraint activateConstraints:@[
+      [label.leadingAnchor constraintEqualToAnchor:vc.view.leadingAnchor constant:20],
+      [label.trailingAnchor constraintEqualToAnchor:vc.view.trailingAnchor constant:-20],
+      [label.centerYAnchor constraintEqualToAnchor:vc.view.centerYAnchor]
+    ]];
+
+    // Wire up the window
+    bootErrorWindow.rootViewController = vc;
+    bootErrorWindow.windowLevel = UIWindowLevelAlert + 1;
+
+    // Keep a static reference to prevent deallocation
+    static UIWindow* __attribute__((unused)) staticBootErrorWindow = nil;
+    staticBootErrorWindow = bootErrorWindow;
+
+    [bootErrorWindow makeKeyAndVisible];
+
+    NSLog(@"🎨 Boot error UI displayed successfully");
+
+  } @catch (NSException* exception) {
+    NSLog(@"Failed to create boot error UI: %@", exception);
+    NSLog(@"Boot error details - Title: %s, Message: %s", title.c_str(), message.c_str());
+  }
+  // }];
 }
 
 }

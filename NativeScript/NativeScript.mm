@@ -44,23 +44,28 @@ std::unique_ptr<Runtime> runtime_;
 - (void)runMainApplication {
   runtime_->RunMainScript();
 
-  // In debug mode, if JavaScript errors occurred, keep the app alive indefinitely
-  // This prevents iOS from terminating the app and allows hot-reload to work
+  // In debug mode, if JavaScript errors occurred during boot, we've already handled them
+  // The ShowBootError function sends UIApplicationDidFinishLaunchingNotification
+  // which triggers NativeScript core to display the error UI
   if (RuntimeConfig.IsDebug && jsErrorOccurred) {
-    NSLog(@"🔧 Debug mode - JavaScript errors detected, hijacking main thread to keep app alive");
-    NSLog(@"🔧 Debug mode - Entering infinite run loop to prevent app termination");
-    NSLog(@"🔧 Debug mode - Hot-reload and error modal should work normally");
+    NSLog(@"🔧 Debug mode - JavaScript boot error detected, but boot cycle completed successfully");
+    NSLog(@"🔧 Debug mode - Error UI should be displayed via notification system");
+    NSLog(@"🔧 Debug mode - App must stay alive indefinitely to prevent main() from returning");
 
-    // Main thread hijack: Enter infinite run loop to keep app alive
+    // CRITICAL: We must NOT let main() return when there's a boot error
+    // The error UI is displayed, but if main() returns, the entire app process terminates
+    // This is different from a normal app where UIApplicationMain() never returns
     while (true) {
-      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, true);
-      tns::Tasks::Drain();
+      @autoreleasepool {
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, true);
+        tns::Tasks::Drain();
+      }
     }
-    // Note: This line is never reached in debug mode with errors
+    // This line is never reached - we stay in the loop to keep the app process alive
+  } else {
+    // Normal path - no boot errors
+    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
   }
-
-  // Normal execution path (no errors or release mode)
-  CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
   tns::Tasks::Drain();
 }
 

@@ -410,8 +410,14 @@ void tns::LogError(Isolate* isolate, TryCatch& tc) {
   std::string stackTraceStr = tns::ToString(isolate, stackV8Str);
   stackTraceStr = ReplaceAll(stackTraceStr, RuntimeConfig.BaseDir, "");
 
-  Log(@"JavaScript error:");
+  // Apply stack trace remapping if available
+  stackTraceStr = tns::RemapStackTrace(isolate, stackTraceStr);
+
+  Log(@"🚨🚨🚨");
+  Log(@"Boot Loading Error. Resolve to Continue.");
+  Log(@" ");
   Log(@"%s", stackTraceStr.c_str());
+  Log(@" ");
 }
 
 Local<v8::String> tns::JsonStringifyObject(Local<Context> context, Local<Value> value,
@@ -571,6 +577,59 @@ const std::string tns::GetCurrentScriptUrl(Isolate* isolate) {
   }
 
   return "";
+}
+
+std::string tns::RemapStackTrace(Isolate* isolate, const std::string& stackTrace) {
+  // Get the current context from the isolate
+  Local<Context> context = isolate->GetCurrentContext();
+  if (context.IsEmpty()) {
+    return stackTrace;  // Return original if no context
+  }
+
+  // Get the global object
+  Local<Object> global = context->Global();
+
+  // Get the __ns_remapStack function from global
+  Local<Value> remapStackValue;
+  bool success =
+      global->Get(context, tns::ToV8String(isolate, "__ns_remapStack")).ToLocal(&remapStackValue);
+
+  if (success && remapStackValue->IsFunction()) {
+    Local<v8::Function> remapStackFunction = remapStackValue.As<v8::Function>();
+
+    // Prepare arguments - convert the stack trace string to V8 string
+    Local<Value> args[] = {tns::ToV8String(isolate, stackTrace)};
+
+    // Call the function with proper error handling
+    TryCatch tc(isolate);
+    Local<Value> result;
+    bool callSuccess = remapStackFunction->Call(context, global, 1, args).ToLocal(&result);
+
+    if (callSuccess && result->IsString() && !tc.HasCaught()) {
+      // If the function returns a modified string, use it
+      return tns::ToString(isolate, result);
+    } else if (tc.HasCaught()) {
+      // Only log failure for unexpected errors, not source map issues
+      Local<Value> exception = tc.Exception();
+      if (exception->IsObject()) {
+        Local<Object> errorObj = exception.As<Object>();
+        Local<Value> messageVal;
+        if (errorObj->Get(context, tns::ToV8String(isolate, "message")).ToLocal(&messageVal) &&
+            messageVal->IsString()) {
+          std::string errorMessage = tns::ToString(isolate, messageVal);
+          // Don't log for known source map issues
+          if (errorMessage.find("version") == std::string::npos &&
+              errorMessage.find("required argument") == std::string::npos) {
+            NSLog(@"Stack trace remapping failed: %s", errorMessage.c_str());
+          }
+        }
+      }
+      // Don't recursively call LogError since we're already in error handling
+    }
+  }
+
+  // If remapping failed or function not available, return original
+  return stackTrace;
 }
 
 const std::string tns::BuildStacktraceFrameLocationPart(Isolate* isolate, Local<StackFrame> frame) {
