@@ -137,6 +137,42 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
       }
     }
   }
+
+  // Check if this is an ES module (.mjs) and handle it directly
+  if (path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0) {
+    // For ES modules, use LoadESModule directly instead of require()
+    TryCatch tc(isolate);
+    Local<Value> moduleNamespace;
+
+    try {
+      moduleNamespace = ModuleInternal::LoadESModule(isolate, path);
+    } catch (const NativeScriptException& ex) {
+      if (RuntimeConfig.IsDebug) {
+        NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        NSLog(@"Error loading ES module: %s", path.c_str());
+        NSLog(@"Exception: %s", ex.getMessage().c_str());
+        NSLog(@"***** End stack trace - continuing execution *****");
+        NSLog(@"Debug mode - ES module loading failed, but telling iOS it succeeded to prevent "
+              @"app termination");
+        return true;  // LIE TO iOS - return success to prevent app termination
+      } else {
+        return false;
+      }
+    }
+
+    if (moduleNamespace.IsEmpty()) {
+      if (RuntimeConfig.IsDebug) {
+        NSLog(@"Debug mode - ES module returned empty namespace, but telling iOS it succeeded");
+        return true;  // LIE TO iOS - return success to prevent app termination
+      } else {
+        return false;
+      }
+    }
+
+    return true;  // ES module loaded successfully
+  }
+
+  // For CommonJS modules (.js), use the traditional require() approach
   Local<Value> requireObj;
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
   if (!success || !requireObj->IsFunction()) {
