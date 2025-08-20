@@ -446,6 +446,11 @@ id Runtime::GetAppConfigValue(std::string key) {
   return result;
 }
 
+bool Runtime::showErrorDisplay() {
+  id value = GetAppConfigValue("showErrorDisplay");
+  return value ? [value boolValue] : false;
+}
+
 void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
   Isolate* isolate = context->GetIsolate();
   Local<Object> global = context->Global();

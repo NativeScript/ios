@@ -92,13 +92,11 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
   Local<v8::String> data = args.Data().As<v8::String>();
   std::string verbosityLevel = tns::ToString(isolate, data);
 
-  if (RuntimeConfig.IsDebug &&
+  if (RuntimeConfig.IsDebug && Runtime::showErrorDisplay() &&
       (verbosityLevel == "error" || verbosityLevel == "log")) {
+    // Show in-flight error display when enabled
     // Simple universal error detection - any error with stack trace
     bool hasStackTrace = isStackFrame(stringResult);
-    // bool hasStackTrace = (stringResult.find(" at ") != std::string::npos &&
-    //                      stringResult.find("(file:") != std::string::npos &&
-    //                      stringResult.length() > 200);
 
     if (hasStackTrace && !consoleModalShown) {
       std::stringstream stackTraceLines;
