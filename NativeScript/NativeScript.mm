@@ -47,9 +47,9 @@ std::unique_ptr<Runtime> runtime_;
   // In debug mode, if JavaScript errors occurred, keep the app alive indefinitely
   // This prevents iOS from terminating the app and allows hot-reload to work
   if (RuntimeConfig.IsDebug && jsErrorOccurred) {
-    NSLog(@"🔧 Debug mode - JavaScript errors detected, hijacking main thread to keep app alive");
-    NSLog(@"🔧 Debug mode - Entering infinite run loop to prevent app termination");
-    NSLog(@"🔧 Debug mode - Hot-reload and error modal should work normally");
+    // NSLog(@"🔧 Debug mode - JavaScript errors detected, hijacking main thread to keep app alive");
+    // NSLog(@"🔧 Debug mode - Entering infinite run loop to prevent app termination");
+    // NSLog(@"🔧 Debug mode - Hot-reload and error modal should work normally");
 
     // Main thread hijack: Enter infinite run loop to keep app alive
     while (true) {

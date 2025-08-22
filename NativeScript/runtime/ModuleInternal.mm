@@ -505,8 +505,8 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   // Check if script loading failed (debug mode graceful returns)
   if (scriptValue.IsEmpty()) {
     if (RuntimeConfig.IsDebug) {
-      NSLog(@"Debug mode - Script loading returned empty value, returning gracefully: %s",
-            modulePath.c_str());
+      // NSLog(@"Debug mode - Script loading returned empty value, returning gracefully: %s",
+      //       modulePath.c_str());
       return Local<Object>();
     } else {
       throw NativeScriptException(isolate, "Script loading failed for " + modulePath);
@@ -994,16 +994,10 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                 tns::LogError(isolate, promiseTc);
               }
 
-              NSLog(@"***** End stack trace - continuing execution *****");
-
-              NSLog(@"🔥 📦 MODULE MODAL: About to call ShowErrorModal from ModuleInternal!");
-              NSLog(@"🔥 📦 ModuleInternal title: %s", errorTitle.c_str());
-              NSLog(@"🔥 📦 ModuleInternal message: %s", errorMessage.c_str());
-              NSLog(@"🔥 📦 ModuleInternal calling ShowErrorModal NOW!");
+              NSLog(@"***** End stack trace - Fix to continue *****");
 
               NativeScriptException::ShowErrorModal(errorTitle, errorMessage, stackTrace);
 
-              NSLog(@"Debug mode - ES module promise rejected, returning gracefully");
               // In debug mode, don't throw any exceptions - just return empty value
               return Local<Value>();
             } else {

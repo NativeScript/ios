@@ -1,5 +1,9 @@
 #include "NativeScriptException.h"
+#import <MobileCoreServices/MobileCoreServices.h>
 #import <UIKit/UIKit.h>
+#if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#endif
 #import <objc/message.h>
 #import <objc/runtime.h>
 #include <sstream>
@@ -256,6 +260,12 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
         NSLog(@"(error message contained invalid UTF-8)");
       }
 
+      // Additional guidance after the stack trace for boot/init errors
+      NSLog(@"\n======================================");
+      NSLog(@"Error on app inititialization.");
+      NSLog(@"Please fix the error and save the file to auto reload the app.");
+      NSLog(@"======================================");
+
       // In debug mode, continue execution; in release mode, terminate
       if (RuntimeConfig.IsDebug) {
         NSLog(@"***** End stack trace - showing error modal and continuing execution *****\n");
@@ -421,6 +431,126 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
     return;
   }
 
+  // For boot-level crashes, try a simpler approach first
+  UIApplication* app = [UIApplication sharedApplication];
+
+  // If we're in a very early boot state with no windows/scenes, use a simple approach
+  if (app.windows.count == 0 && app.connectedScenes.count == 0) {
+    NSLog(@"Note: JavaScript error during boot.");
+    NSLog(@"================================");
+    NSLog(@"%@", [NSString stringWithUTF8String:stackTrace.c_str()]);
+    NSLog(@"================================");
+    NSLog(@"Please fix the error and save the file to auto reload the app.");
+    NSLog(@"================================");
+
+    // Create a nuclear option window for boot crashes; attach to a UIWindowScene on iOS 13+
+    @try {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        UIApplication* app = [UIApplication sharedApplication];
+
+// Try to ensure a scene exists on iOS 13+
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+        if (@available(iOS 13.0, *)) {
+          if (app.connectedScenes.count == 0) {
+            // NSLog(@"🎨 Boot: requesting scene session activation");
+            UISceneActivationRequestOptions* opts = [[UISceneActivationRequestOptions alloc] init];
+            [app requestSceneSessionActivation:nil
+                                  userActivity:nil
+                                       options:opts
+                                  errorHandler:^(NSError* error) {
+                                    NSLog(@"🎨 Boot: scene activation error: %@", error);
+                                  }];
+          }
+        }
+#endif
+
+        // Slight delay to allow scene creation
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+              // NSLog(@"🎨 Creating nuclear boot error window...");
+
+              UIWindow* bootWindow = nil;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+              if (@available(iOS 13.0, *)) {
+                UIWindowScene* winScene = nil;
+                for (UIScene* scene in app.connectedScenes) {
+                  if ([scene isKindOfClass:[UIWindowScene class]]) {
+                    winScene = (UIWindowScene*)scene;
+                    break;
+                  }
+                }
+                if (winScene) {
+                  bootWindow = [[UIWindow alloc] initWithWindowScene:winScene];
+                  bootWindow.frame = winScene.coordinateSpace.bounds;
+                  NSLog(@"🎨 Boot: using scene-backed window");
+                }
+              }
+#endif
+
+              if (!bootWindow) {
+                bootWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+                // NSLog(@"🎨 Boot: using frame-backed window (no scene available)");
+              }
+
+              bootWindow.windowLevel = UIWindowLevelAlert + 2000;
+              bootWindow.backgroundColor = [UIColor colorWithRed:0.8 green:0.0 blue:0.0 alpha:1.0];
+              bootWindow.hidden = NO;
+              bootWindow.alpha = 1.0;
+
+              // Basic view controller + label
+              UIViewController* bootVC = [[UIViewController alloc] init];
+              bootVC.view.backgroundColor = [UIColor colorWithRed:0.8 green:0.0 blue:0.0 alpha:1.0];
+
+              UILabel* bootErrorLabel = [[UILabel alloc] init];
+              bootErrorLabel.text =
+                  [NSString stringWithFormat:@"🚨 BOOT ERROR 🚨\n\n%@\n\n🔧 STACK TRACE:\n%@\n\n💡 Fix "
+                                             @"the error and restart the app",
+                                             [NSString stringWithUTF8String:message.c_str()],
+                                             [NSString stringWithUTF8String:stackTrace.c_str()]];
+              bootErrorLabel.textColor = [UIColor whiteColor];
+              bootErrorLabel.font = [UIFont boldSystemFontOfSize:16];
+              bootErrorLabel.textAlignment = NSTextAlignmentCenter;
+              bootErrorLabel.numberOfLines = 0;
+              bootErrorLabel.translatesAutoresizingMaskIntoConstraints = NO;
+              [bootVC.view addSubview:bootErrorLabel];
+
+              [NSLayoutConstraint activateConstraints:@[
+                [bootErrorLabel.centerXAnchor constraintEqualToAnchor:bootVC.view.centerXAnchor],
+                [bootErrorLabel.centerYAnchor constraintEqualToAnchor:bootVC.view.centerYAnchor],
+                [bootErrorLabel.leadingAnchor
+                    constraintGreaterThanOrEqualToAnchor:bootVC.view.leadingAnchor
+                                                constant:20],
+                [bootErrorLabel.trailingAnchor
+                    constraintLessThanOrEqualToAnchor:bootVC.view.trailingAnchor
+                                             constant:-20]
+              ]];
+
+              bootWindow.rootViewController = bootVC;
+
+              [bootWindow makeKeyAndVisible];
+              [bootWindow layoutIfNeeded];
+              CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.02, false);
+
+              // NSLog(@"🎨 Nuclear boot error window created and displayed! key=%@ hidden=%@
+              // alpha=%.2f",
+              //       bootWindow.isKeyWindow ? @"YES" : @"NO",
+              //       bootWindow.hidden ? @"YES" : @"NO",
+              //       bootWindow.alpha);
+
+              static UIWindow* __attribute__((unused)) persistentBootWindow = nil;
+              persistentBootWindow = bootWindow;
+            });
+      });
+    } @catch (NSException* exception) {
+      // NSLog(@"🎨 Even nuclear boot window failed: %@", exception);
+      NSLog(@"Boot error details are in the logs above.");
+    }
+
+    return;  // Exit early for boot-level crashes
+  }
+
+  // For normal crashes, proceed with the full UI
   // Ensure we don't crash during UI creation
   // Make this synchronous if we're already on the main thread to prevent race conditions
   if ([NSThread isMainThread]) {
@@ -734,7 +864,53 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   // Configure copy button action
   void (^copyAction)(void) = ^{
     UIPasteboard* pasteboard = [UIPasteboard generalPasteboard];
-    pasteboard.string = [NSString stringWithUTF8String:stackTrace.c_str()];
+    NSString* stackTraceText = [NSString stringWithUTF8String:stackTrace.c_str()];
+    BOOL wrote = NO;
+
+    // Prefer modern UTType on iOS 14+, but avoid hard link to UTTypePlainText (use reflection)
+    if (@available(iOS 14.0, *)) {
+      Class UTTypeClass = NSClassFromString(@"UTType");
+      if (UTTypeClass) {
+        SEL plainSel = NSSelectorFromString(@"plainText");
+        if ([UTTypeClass respondsToSelector:plainSel]) {
+          id plain = ((id(*)(id, SEL))objc_msgSend)(UTTypeClass, plainSel);
+          if (plain) {
+            SEL idSel = NSSelectorFromString(@"identifier");
+            if ([plain respondsToSelector:idSel]) {
+              NSString* utiIdentifier = ((id(*)(id, SEL))objc_msgSend)(plain, idSel);
+              if (utiIdentifier.length > 0) {
+                [pasteboard setValue:stackTraceText forPasteboardType:utiIdentifier];
+                wrote = YES;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Fallback to kUTTypePlainText (MobileCoreServices)
+    if (!wrote) {
+      [pasteboard setValue:stackTraceText forPasteboardType:(NSString*)kUTTypePlainText];
+      wrote = YES;
+    }
+
+    // Quick verification; if pasteboard appears empty, try string fallback
+    if (wrote) {
+      BOOL hasString = NO;
+      if ([pasteboard respondsToSelector:@selector(hasStrings)]) {
+        hasString = pasteboard.hasStrings;
+      } else {
+        hasString = (pasteboard.string.length > 0);
+      }
+      if (!hasString) {
+        wrote = NO;
+      }
+    }
+
+    // Last resort: set .string
+    if (!wrote || pasteboard.string.length == 0) {
+      pasteboard.string = stackTraceText;
+    }
 
     // Show temporary feedback
     [copyButton setTitle:@"✅ Copied!" forState:UIControlStateNormal];
@@ -984,411 +1160,39 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
         }
       }
 
-      // NUCLEAR OPTION: No windows exist at all - create a completely independent window system
+      // SIMPLIFIED NUCLEAR OPTION: Create a basic error window that works even during boot
       if (windows.count == 0) {
-        NSLog(
-            @"🎨 NUCLEAR OPTION: No windows exist - creating completely independent error display");
+        NSLog(@"🎨 SIMPLIFIED NUCLEAR: Creating basic error window for boot-level crash");
 
-        // Force iOS to recognize our window by creating a new window scene or using the existing
-        // one
-        UIWindow* nuclearWindow = nil;
+        // Create the simplest possible window that can display
+        UIWindow* simpleWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        simpleWindow.windowLevel = UIWindowLevelAlert + 1000;
+        simpleWindow.backgroundColor = [UIColor redColor];
+        simpleWindow.hidden = NO;
+        simpleWindow.alpha = 1.0;
 
-        if (@available(iOS 13.0, *)) {
-          // Try to create a window scene manually if none exists
-          UIWindowScene* windowScene = nil;
+        // Create a basic view controller
+        UIViewController* simpleVC = [[UIViewController alloc] init];
+        simpleVC.view.backgroundColor = [UIColor redColor];
 
-          // Get all scenes
-          NSSet<UIScene*>* allScenes = [UIApplication sharedApplication].connectedScenes;
-          NSLog(@"🎨 Total connected scenes: %lu", (unsigned long)allScenes.count);
+        // Create error label
+        UILabel* errorLabel = [[UILabel alloc] initWithFrame:simpleWindow.bounds];
+        errorLabel.text =
+            [NSString stringWithFormat:@"🚨 BOOT ERROR 🚨\n\n%@\n\nRestart the app after fixing",
+                                       [NSString stringWithUTF8String:message.c_str()]];
+        errorLabel.textColor = [UIColor whiteColor];
+        errorLabel.font = [UIFont boldSystemFontOfSize:20];
+        errorLabel.textAlignment = NSTextAlignmentCenter;
+        errorLabel.numberOfLines = 0;
+        [simpleVC.view addSubview:errorLabel];
 
-          for (UIScene* scene in allScenes) {
-            NSLog(@"🎨 Scene: %@ - %@", scene.class, scene);
-            if ([scene isKindOfClass:[UIWindowScene class]]) {
-              windowScene = (UIWindowScene*)scene;
-              NSLog(@"🎨 Using existing window scene: %@", windowScene);
-              break;
-            }
-          }
+        simpleWindow.rootViewController = simpleVC;
 
-          if (windowScene) {
-            nuclearWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
-            NSLog(@"🎨 Created nuclear window with scene");
-          } else {
-            NSLog(@"🎨 ☢️ ABSOLUTE NUCLEAR: No scenes exist - attempting to force iOS to "
-                  @"create "
-                  @"one");
+        // Force display with minimal complexity
+        [simpleWindow makeKeyAndVisible];
 
-            // Try to force iOS to create a window scene by requesting one
-            UIApplication* app = [UIApplication sharedApplication];
-
-            // Try to activate any disconnected scenes first
-            NSSet<UISceneSession*>* sessions = app.openSessions;
-            NSLog(@"🎨 Total open sessions: %lu", (unsigned long)sessions.count);
-
-            for (UISceneSession* session in sessions) {
-              NSLog(@"🎨 Session: %@ - Role: %@", session, session.role);
-              if ([session.role isEqualToString:UIWindowSceneSessionRoleApplication]) {
-                NSLog(@"🎨 Found application session, trying to activate...");
-
-                // Request scene activation
-                UISceneActivationRequestOptions* options =
-                    [[UISceneActivationRequestOptions alloc] init];
-                [app requestSceneSessionActivation:session
-                                      userActivity:nil
-                                           options:options
-                                      errorHandler:^(NSError* error) {
-                                        NSLog(@"🎨 Scene activation failed: %@", error);
-                                      }];
-                break;
-              }
-            }
-
-            // Give iOS a moment to create the scene
-            dispatch_after(
-                dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)),
-                dispatch_get_main_queue(), ^{
-                  // Check again for scenes
-                  NSSet<UIScene*>* newScenes = [UIApplication sharedApplication].connectedScenes;
-                  NSLog(@"🎨 After activation attempt, connected scenes: %lu",
-                        (unsigned long)newScenes.count);
-
-                  UIWindowScene* newWindowScene = nil;
-                  for (UIScene* scene in newScenes) {
-                    if ([scene isKindOfClass:[UIWindowScene class]]) {
-                      newWindowScene = (UIWindowScene*)scene;
-                      break;
-                    }
-                  }
-
-                  if (newWindowScene) {
-                    NSLog(@"🎨 Successfully created window scene, recreating nuclear window...");
-                    // Recreate the nuclear window with the new scene
-                    UIWindow* sceneNuclearWindow =
-                        [[UIWindow alloc] initWithWindowScene:newWindowScene];
-                    sceneNuclearWindow.windowLevel = UIWindowLevelAlert + 5000;
-                    sceneNuclearWindow.backgroundColor = [UIColor colorWithRed:0.8
-                                                                         green:0.0
-                                                                          blue:0.0
-                                                                         alpha:1.0];
-                    sceneNuclearWindow.hidden = NO;
-                    sceneNuclearWindow.alpha = 1.0;
-
-                    // Recreate the view controller and label
-                    UIViewController* sceneVC = [[UIViewController alloc] init];
-                    sceneVC.view.backgroundColor = [UIColor colorWithRed:0.8
-                                                                   green:0.0
-                                                                    blue:0.0
-                                                                   alpha:1.0];
-
-                    UILabel* sceneLabel = [[UILabel alloc] initWithFrame:sceneNuclearWindow.bounds];
-                    sceneLabel.text =
-                        [NSString stringWithFormat:
-                                      @"⚠️ ABSOLUTE NUCLEAR SUCCESS ⚠️\n\nJavaScript Error "
-                                      @"Detected\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nApp will stay "
-                                      @"alive for development",
-                                      [NSString stringWithUTF8String:message.c_str()]];
-                    sceneLabel.textColor = [UIColor whiteColor];
-                    sceneLabel.font = [UIFont boldSystemFontOfSize:16];
-                    sceneLabel.textAlignment = NSTextAlignmentCenter;
-                    sceneLabel.numberOfLines = 0;
-                    sceneLabel.backgroundColor = [UIColor clearColor];
-                    [sceneVC.view addSubview:sceneLabel];
-
-                    sceneNuclearWindow.rootViewController = sceneVC;
-                    [sceneNuclearWindow makeKeyAndVisible];
-
-                    NSLog(@"🎨 ABSOLUTE NUCLEAR: Scene-based error window should now be visible!");
-                  } else {
-                    NSLog(@"🎨 Scene creation failed, falling back to sceneless window");
-                  }
-                });
-
-            // Create initial window without scene (immediate fallback)
-            nuclearWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-            NSLog(@"🎨 Created initial nuclear window without scene (absolute emergency mode)");
-          }
-        } else {
-          nuclearWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-          NSLog(@"🎨 Created nuclear window for iOS 12");
-        }
-
-        // Configure the nuclear window
-        nuclearWindow.windowLevel = UIWindowLevelAlert + 5000;  // MAXIMUM priority
-        nuclearWindow.backgroundColor = [UIColor colorWithRed:0.8 green:0.0 blue:0.0 alpha:1.0];
-        nuclearWindow.hidden = NO;
-        nuclearWindow.alpha = 1.0;
-
-        // Create a simple view controller
-        UIViewController* nuclearVC = [[UIViewController alloc] init];
-        nuclearVC.view.backgroundColor = [UIColor colorWithRed:0.8 green:0.0 blue:0.0 alpha:1.0];
-
-        // Create error label directly on the view
-        UILabel* nuclearLabel = [[UILabel alloc] initWithFrame:nuclearWindow.bounds];
-        nuclearLabel.text = [NSString
-            stringWithFormat:
-                @"⚠️ JAVASCRIPT ERROR ⚠️\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nFix the error "
-                @"and "
-                @"save your file\nApp will stay alive for development\n\nTap anywhere to dismiss",
-                [NSString stringWithUTF8String:message.c_str()]];
-        nuclearLabel.textColor = [UIColor whiteColor];
-        nuclearLabel.font = [UIFont boldSystemFontOfSize:18];
-        nuclearLabel.textAlignment = NSTextAlignmentCenter;
-        nuclearLabel.numberOfLines = 0;
-        nuclearLabel.backgroundColor = [UIColor clearColor];
-        nuclearLabel.userInteractionEnabled = YES;
-        [nuclearVC.view addSubview:nuclearLabel];
-
-        // Create dismiss action for tap gesture
-        void (^nuclearDismissAction)(void) = ^{
-          NSLog(@"🚀 Developer dismissed nuclear error modal - app continues running");
-          [UIView animateWithDuration:0.3
-              animations:^{
-                nuclearWindow.alpha = 0.0;
-              }
-              completion:^(BOOL finished) {
-                nuclearWindow.hidden = YES;
-                [nuclearWindow resignKeyWindow];
-                NSLog(@"💡 Debug mode: Nuclear error modal dismissed - app stays alive for "
-                      @"hot-reload");
-              }];
-        };
-
-        // Add tap gesture using the established pattern
-        UITapGestureRecognizer* nuclearTap = [[UITapGestureRecognizer alloc] init];
-        NSObject* nuclearTarget = [[NSObject alloc] init];
-        objc_setAssociatedObject(nuclearTarget, "dismissBlock", nuclearDismissAction,
-                                 OBJC_ASSOCIATION_COPY_NONATOMIC);
-
-        IMP nuclearDismissImp = imp_implementationWithBlock(^(id self) {
-          void (^block)(void) = objc_getAssociatedObject(self, "dismissBlock");
-          if (block) {
-            block();
-          }
-        });
-
-        class_addMethod([nuclearTarget class], NSSelectorFromString(@"dismissNuclearWindow"),
-                        nuclearDismissImp, "v@:");
-        [nuclearTap addTarget:nuclearTarget action:NSSelectorFromString(@"dismissNuclearWindow")];
-        [nuclearLabel addGestureRecognizer:nuclearTap];
-
-        // Set the root view controller
-        nuclearWindow.rootViewController = nuclearVC;
-
-        // Keep a strong reference to prevent deallocation
-        static UIWindow* persistentNuclearWindow __attribute__((unused)) = nil;
-        persistentNuclearWindow = nuclearWindow;
-
-        // FORCE the window to be visible with every possible method
-        [nuclearWindow makeKeyAndVisible];
-        [nuclearWindow becomeKeyWindow];
-        [nuclearWindow setNeedsLayout];
-        [nuclearWindow layoutIfNeeded];
-        [nuclearWindow setNeedsDisplay];
-
-        // Force a run loop cycle to process the UI update
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
-
-        // Additional system diagnostics
-        NSLog(@"🎨 NUCLEAR OPTION: Independent error window created and displayed!");
-        NSLog(@"🎨 Nuclear window properties: hidden=%@, alpha=%.2f, windowLevel=%.0f",
-              nuclearWindow.hidden ? @"YES" : @"NO", nuclearWindow.alpha,
-              nuclearWindow.windowLevel);
-        NSLog(@"🎨 Nuclear window frame: %@", NSStringFromCGRect(nuclearWindow.frame));
-        NSLog(@"🎨 Nuclear VC view frame: %@", NSStringFromCGRect(nuclearVC.view.frame));
-        NSLog(@"🎨 Nuclear label frame: %@", NSStringFromCGRect(nuclearLabel.frame));
-        NSLog(@"🎨 Main screen bounds: %@", NSStringFromCGRect([UIScreen mainScreen].bounds));
-        NSLog(@"🎨 Main screen scale: %.2f", [UIScreen mainScreen].scale);
-        NSLog(@"🎨 Is key window: %@", nuclearWindow.isKeyWindow ? @"YES" : @"NO");
-        NSLog(@"🎨 Window superview: %@", nuclearWindow.superview);
-        NSLog(@"🎨 Window subviews count: %lu", (unsigned long)nuclearWindow.subviews.count);
-        NSLog(@"🎨 Root VC view subviews count: %lu", (unsigned long)nuclearVC.view.subviews.count);
-
-        // Try to force multiple updates to ensure visibility
-        dispatch_async(dispatch_get_main_queue(), ^{
-          NSLog(@"🎨 Secondary display attempt...");
-          [nuclearWindow makeKeyAndVisible];
-          [nuclearWindow layoutIfNeeded];
-          nuclearWindow.backgroundColor = [UIColor redColor];  // Pure red for maximum visibility
-          [nuclearWindow.rootViewController.view setNeedsDisplay];
-          [nuclearWindow setNeedsDisplay];
-
-          // Try changing window level to see if that helps
-          nuclearWindow.windowLevel = UIWindowLevelStatusBar + 1000;
-          NSLog(@"🎨 Changed nuclear window level to: %.0f", nuclearWindow.windowLevel);
-
-          // Final check after all adjustments
-          dispatch_after(
-              dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
-              dispatch_get_main_queue(), ^{
-                NSLog(@"🎨 Final nuclear window state: hidden=%@, alpha=%.2f, key=%@",
-                      nuclearWindow.hidden ? @"YES" : @"NO", nuclearWindow.alpha,
-                      nuclearWindow.isKeyWindow ? @"YES" : @"NO");
-
-                // ULTIMATE FALLBACK: If window system is completely broken, try system alert
-                NSLog(@"🎨 🚨 SYSTEM ALERT FALLBACK: Attempting UIAlertController as last resort");
-                NSLog(@"🎨 🚨 Nuclear window for alert presentation: %@", nuclearWindow);
-                NSLog(@"🎨 🚨 Nuclear window rootVC: %@", nuclearWindow.rootViewController);
-                NSLog(@"🎨 🚨 Nuclear window rootVC presentedViewController: %@",
-                      nuclearWindow.rootViewController.presentedViewController);
-                NSLog(@"🎨 🚨 Current main thread: %@", [NSThread isMainThread] ? @"YES" : @"NO");
-
-                @try {
-                  NSLog(@"🎨 🚨 Creating UIAlertController...");
-                  UIAlertController* systemAlert = [UIAlertController
-                      alertControllerWithTitle:@"🚨 JAVASCRIPT ERROR 🚨"
-                                       message:[NSString
-                                                   stringWithFormat:
-                                                       @"Error: %@\n\n🔥 HOT-RELOAD READY 🔥\n\nFix "
-                                                       @"the error and save your file.\nApp will "
-                                                       @"stay alive for development.",
-                                                       [NSString
-                                                           stringWithUTF8String:message.c_str()]]
-                                preferredStyle:UIAlertControllerStyleAlert];
-                  NSLog(@"🎨 🚨 UIAlertController created successfully: %@", systemAlert);
-
-                  NSLog(@"🎨 🚨 Creating alert action...");
-                  UIAlertAction* continueAction = [UIAlertAction
-                      actionWithTitle:@"Continue Development 🚀"
-                                style:UIAlertActionStyleDefault
-                              handler:^(UIAlertAction* action) {
-                                NSLog(@"🚀 System alert dismissed - continuing development");
-                              }];
-                  [systemAlert addAction:continueAction];
-                  NSLog(@"🎨 🚨 Alert action added successfully");
-
-                  // Try to present from the nuclear window's root view controller
-                  if (nuclearWindow && nuclearWindow.rootViewController) {
-                    NSLog(@"🎨 🚨 Attempting to present UIAlertController from nuclear window...");
-                    NSLog(@"🎨 🚨 Nuclear window is key: %@",
-                          nuclearWindow.isKeyWindow ? @"YES" : @"NO");
-                    NSLog(@"🎨 🚨 Nuclear window is hidden: %@",
-                          nuclearWindow.hidden ? @"YES" : @"NO");
-                    NSLog(@"🎨 🚨 Nuclear rootVC view: %@", nuclearWindow.rootViewController.view);
-                    NSLog(@"🎨 🚨 Nuclear rootVC view window: %@",
-                          nuclearWindow.rootViewController.view.window);
-
-                    [nuclearWindow.rootViewController
-                        presentViewController:systemAlert
-                                     animated:YES
-                                   completion:^{
-                                     NSLog(@"🎨 🚨 SYSTEM ALERT: Successfully presented "
-                                           @"UIAlertController!");
-                                     NSLog(@"🎨 🚨 Alert should now be visible on screen");
-                                   }];
-                    NSLog(@"🎨 🚨 presentViewController call completed (async)");
-
-                    // Give time for presentation
-                    dispatch_after(
-                        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)),
-                        dispatch_get_main_queue(), ^{
-                          NSLog(@"🎨 🚨 After 0.1s - rootVC presentedViewController: %@",
-                                nuclearWindow.rootViewController.presentedViewController);
-                          if (nuclearWindow.rootViewController.presentedViewController) {
-                            NSLog(@"🎨 🚨 SUCCESS: UIAlertController is now being presented!");
-                          } else {
-                            NSLog(@"🎨 🚨 FAILED: UIAlertController presentation failed silently");
-                          }
-                        });
-                  } else {
-                    NSLog(@"🎨 🚨 SYSTEM ALERT: No nuclear window or root view controller available");
-                    NSLog(@"🎨 🚨 nuclearWindow: %@", nuclearWindow);
-                    NSLog(@"🎨 🚨 nuclearWindow.rootViewController: %@",
-                          nuclearWindow ? nuclearWindow.rootViewController : @"N/A");
-
-                    // Try presenting from any available window as last resort
-                    UIApplication* app = [UIApplication sharedApplication];
-                    if (app.windows.count > 0) {
-                      NSLog(@"🎨 🚨 Trying to present from first available window...");
-                      UIWindow* firstWindow = app.windows.firstObject;
-                      if (firstWindow.rootViewController) {
-                        NSLog(@"🎨 🚨 Presenting from first window: %@", firstWindow);
-                        [firstWindow.rootViewController
-                            presentViewController:systemAlert
-                                         animated:YES
-                                       completion:^{
-                                         NSLog(@"🎨 🚨 SYSTEM ALERT: Successfully presented from "
-                                               @"first window!");
-                                       }];
-                      } else {
-                        NSLog(@"🎨 🚨 First window has no root view controller");
-                      }
-                    } else {
-                      NSLog(@"🎨 🚨 No windows available for alert presentation");
-                    }
-                  }
-
-                } @catch (NSException* alertException) {
-                  NSLog(@"🎨 🚨 SYSTEM ALERT: Even UIAlertController failed: %@", alertException);
-                  NSLog(@"🎨 💀 COMPLETE SYSTEM FAILURE: All UI display methods exhausted");
-                  NSLog(@"🎨 💀 This indicates a fundamental iOS Simulator or graphics system issue");
-                  NSLog(@"🎨 💀 However, the app is staying alive - terminal logs show full error "
-                        @"details");
-                  NSLog(@"🎨 💀 FINAL DIAGNOSIS:");
-                  NSLog(@"🎨 💀   - Window exists: %@", nuclearWindow ? @"YES" : @"NO");
-                  NSLog(@"🎨 💀   - Window is key: %@", nuclearWindow.isKeyWindow ? @"YES" : @"NO");
-                  NSLog(@"🎨 💀   - Window level: %.0f", nuclearWindow.windowLevel);
-                  NSLog(@"🎨 💀   - Screen bounds: %@",
-                        NSStringFromCGRect([UIScreen mainScreen].bounds));
-                  NSLog(@"🎨 💀   - Window frame: %@", NSStringFromCGRect(nuclearWindow.frame));
-                  NSLog(@"🎨 💀   - Window background: %@", nuclearWindow.backgroundColor);
-                  NSLog(@"🎨 💀   - All UIWindow/UIView methods work but nothing renders");
-
-                  // DEEP SYSTEM DIAGNOSTICS
-                  NSLog(@"🎨 💀 DEEP SYSTEM DIAGNOSTICS:");
-                  UIApplication* diagApp = [UIApplication sharedApplication];
-                  NSLog(@"🎨 💀   - App state: %ld (0=active, 1=inactive, 2=background)",
-                        (long)diagApp.applicationState);
-                  NSLog(@"🎨 💀   - App delegate: %@", diagApp.delegate);
-                  NSLog(@"🎨 💀   - Total screens: %lu", (unsigned long)[UIScreen screens].count);
-                  NSLog(@"🎨 💀   - Main screen: %@", [UIScreen mainScreen]);
-                  NSLog(@"🎨 💀   - Main screen nativeBounds: %@",
-                        NSStringFromCGRect([UIScreen mainScreen].nativeBounds));
-
-                  if (@available(iOS 13.0, *)) {
-                    NSLog(@"🎨 💀   - iOS 13+ Scene diagnostics:");
-                    NSLog(@"🎨 💀     - Connected scenes: %lu",
-                          (unsigned long)diagApp.connectedScenes.count);
-                    NSLog(@"🎨 💀     - Open sessions: %lu",
-                          (unsigned long)diagApp.openSessions.count);
-                    for (UIScene* scene in diagApp.connectedScenes) {
-                      NSLog(@"🎨 💀     - Scene: %@ (state: %ld, role: %@)", scene,
-                            (long)scene.activationState, scene.session.role);
-                      if ([scene isKindOfClass:[UIWindowScene class]]) {
-                        UIWindowScene* winScene = (UIWindowScene*)scene;
-                        NSLog(@"🎨 💀       - Window scene windows: %lu",
-                              (unsigned long)winScene.windows.count);
-                        NSLog(@"🎨 💀       - Window scene screen: %@", winScene.screen);
-                      }
-                    }
-                  }
-
-                  NSLog(@"🎨 💀   - All app windows count: %lu",
-                        (unsigned long)diagApp.windows.count);
-                  for (NSUInteger i = 0; i < diagApp.windows.count; i++) {
-                    UIWindow* win = diagApp.windows[i];
-                    NSLog(
-                        @"🎨 💀     - Window %lu: %@ (level: %.0f, key: %@, hidden: %@, alpha: %.2f)",
-                        i, win, win.windowLevel, win.isKeyWindow ? @"YES" : @"NO",
-                        win.hidden ? @"YES" : @"NO", win.alpha);
-                    NSLog(@"🎨 💀       - Window rootVC: %@", win.rootViewController);
-                    NSLog(@"🎨 💀       - Window frame: %@", NSStringFromCGRect(win.frame));
-                    NSLog(@"🎨 💀       - Window bounds: %@", NSStringFromCGRect(win.bounds));
-                  }
-
-                  NSLog(@"🎨 💀 RECOMMENDATION: This is likely an iOS Simulator rendering bug");
-                  NSLog(@"🎨 💀 WORKAROUND: Use terminal logs for complete error details - app stays "
-                        @"alive for hot-reload");
-                  NSLog(@"🎨 💀 ALTERNATIVE: Try running on a physical device instead of Simulator");
-                  NSLog(@"🎨 💀 ALTERNATIVE: Restart iOS Simulator and try again");
-                  NSLog(@"🎨 💀 FINAL STATUS: App is stable and hot-reload ready - just no visual "
-                        @"error display");
-                }
-              });
-        });
-
+        NSLog(@"🎨 Simple nuclear window created - should be visible immediately");
       } else {
-        // Existing windows exist - use the previous overlay approach
-        NSLog(@"🎨 FALLBACK: Adding error overlay to existing window");
         UIWindow* existingWindow = windows.firstObject;
 
         // Create a full-screen overlay view
@@ -1436,7 +1240,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
         [existingWindow addSubview:errorOverlay];
         [existingWindow bringSubviewToFront:errorOverlay];
 
-        NSLog(@"🎨 FALLBACK: Error overlay added to existing window successfully!");
+        NSLog(@"🎨 Error overlay added to existing window successfully!");
       }
     }
 
@@ -1475,5 +1279,4 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
                    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
                  });
 }
-
 }
