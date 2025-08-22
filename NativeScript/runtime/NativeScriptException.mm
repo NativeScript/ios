@@ -126,11 +126,11 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
       if (RuntimeConfig.IsDebug) {
         // Mark that a JavaScript error occurred
         jsErrorOccurred = true;
-        NSLog(@"***** JavaScript exception occurred - showing beautiful NativeScript error modal "
+        NSLog(@"***** JavaScript exception occurred "
               @"in debug mode *****\n");
         NSLog(@"%@", reasonStr);
-        NSLog(@"🎨 CALLING ShowErrorModal for OnUncaughtError - should display beautiful branded "
-              @"modal...");
+        // NSLog(@"🎨 CALLING ShowErrorModal for OnUncaughtError - should display beautiful branded "
+        //       @"modal...");
 
         // Show the beautiful error modal with SAME comprehensive message as terminal
         std::string errorTitle = "Uncaught JavaScript Exception";
@@ -149,8 +149,7 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
 
         // Use the same comprehensive fullMessage that the terminal uses (identical stack traces)
         std::string completeStackTrace = reasonStr ? [reasonStr UTF8String] : fullMessage;
-        NSLog(@"***** End stack trace - showing beautiful NativeScript error modal and continuing "
-              @"execution *****\n");
+        NSLog(@"***** End stack trace - Fix error to continue *****\n");
         ShowErrorModal(errorTitle, errorMessage, completeStackTrace);
 
         // Don't crash in debug mode - just return
@@ -557,7 +556,7 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
     @try {
       NativeScriptException::showErrorModalSynchronously(title, message, stackTrace);
     } @catch (NSException* exception) {
-      NSLog(@"Failed to create error modal UI: %@", exception);
+      // NSLog(@"Failed to create error modal UI: %@", exception);
       NSLog(@"Error details - Title: %s, Message: %s", title.c_str(), message.c_str());
     }
   } else {
@@ -565,7 +564,7 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
       @try {
         NativeScriptException::showErrorModalSynchronously(title, message, stackTrace);
       } @catch (NSException* exception) {
-        NSLog(@"Failed to create error modal UI: %@", exception);
+        // NSLog(@"Failed to create error modal UI: %@", exception);
         NSLog(@"Error details - Title: %s, Message: %s", title.c_str(), message.c_str());
       }
     });
@@ -575,8 +574,6 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
 void NativeScriptException::showErrorModalSynchronously(const std::string& title,
                                                         const std::string& message,
                                                         const std::string& stackTrace) {
-  NSLog(@"🎨 Creating beautiful error modal UI...");
-
   // Use static variables to keep strong references and prevent deallocation
   static UIWindow* __attribute__((unused)) foundationWindowRef =
       nil;  // Keep foundation window alive
@@ -585,19 +582,10 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   // BOOTSTRAP iOS APP LIFECYCLE: Ensure basic app infrastructure exists
   // This is crucial when JavaScript fails before UIApplicationMain completes normal setup
   UIApplication* sharedApp = [UIApplication sharedApplication];
-  NSLog(@"🚀 Bootstrap: Current app state: %ld", (long)sharedApp.applicationState);
-  NSLog(@"🚀 Bootstrap: Connected scenes: %lu", (unsigned long)sharedApp.connectedScenes.count);
-  NSLog(@"🚀 Bootstrap: App windows: %lu", (unsigned long)sharedApp.windows.count);
-  NSLog(@"🚀 Bootstrap: App delegate: %@", sharedApp.delegate);
-  NSLog(@"🚀 Bootstrap: App delegate class: %@",
-        sharedApp.delegate ? NSStringFromClass([sharedApp.delegate class]) : @"NULL");
-  NSLog(@"🚀 Bootstrap: Main screen: %@", [UIScreen mainScreen]);
-  NSLog(@"🚀 Bootstrap: Main screen bounds: %@", NSStringFromCGRect([UIScreen mainScreen].bounds));
-  NSLog(@"🚀 Bootstrap: Main screen scale: %.2f", [UIScreen mainScreen].scale);
 
   // If no windows exist, create a foundational window to establish the hierarchy
   if (sharedApp.windows.count == 0) {
-    NSLog(@"🚀 Bootstrap: No app windows exist - creating foundational window hierarchy");
+    // NSLog(@"🚀 Bootstrap: No app windows exist - creating foundational window hierarchy");
 
     // Create a basic foundational window that mimics what UIApplicationMain would create
     UIWindow* foundationWindow = nil;
@@ -610,23 +598,23 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
       for (UIScene* scene in sharedApp.connectedScenes) {
         if ([scene isKindOfClass:[UIWindowScene class]]) {
           foundationScene = (UIWindowScene*)scene;
-          NSLog(@"🚀 Bootstrap: Found existing scene for foundation window");
+          // NSLog(@"🚀 Bootstrap: Found existing scene for foundation window");
           break;
         }
       }
 
       if (foundationScene) {
         foundationWindow = [[UIWindow alloc] initWithWindowScene:foundationScene];
-        NSLog(@"🚀 Bootstrap: Created foundation window with existing scene");
+        // NSLog(@"🚀 Bootstrap: Created foundation window with existing scene");
       } else {
         // If no scenes exist, create a window without scene (iOS 12 style fallback)
         foundationWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        NSLog(@"🚀 Bootstrap: Created foundation window without scene (emergency mode)");
+        // NSLog(@"🚀 Bootstrap: Created foundation window without scene (emergency mode)");
       }
     } else {
       // iOS 12 and below - simple window creation
       foundationWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-      NSLog(@"🚀 Bootstrap: Created foundation window for iOS 12");
+      // NSLog(@"🚀 Bootstrap: Created foundation window for iOS 12");
     }
 
     if (foundationWindow) {
@@ -643,57 +631,57 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
       // Keep a strong reference to prevent deallocation
       foundationWindowRef = foundationWindow;
 
-      NSLog(@"🚀 Bootstrap: Foundation window established - app now has basic window hierarchy");
-      NSLog(@"🚀 Bootstrap: Foundation window frame: %@",
-            NSStringFromCGRect(foundationWindow.frame));
-      NSLog(@"🚀 Bootstrap: Foundation window isKeyWindow: %@",
-            foundationWindow.isKeyWindow ? @"YES" : @"NO");
-      NSLog(@"🚀 Bootstrap: Foundation window hidden: %@", foundationWindow.hidden ? @"YES" : @"NO");
-      NSLog(@"🚀 Bootstrap: Foundation window alpha: %.2f", foundationWindow.alpha);
-      NSLog(@"🚀 Bootstrap: Foundation window level: %.0f", foundationWindow.windowLevel);
-      NSLog(@"🚀 Bootstrap: Foundation window rootViewController: %@",
-            foundationWindow.rootViewController);
+      // NSLog(@"🚀 Bootstrap: Foundation window established - app now has basic window hierarchy");
+      // NSLog(@"🚀 Bootstrap: Foundation window frame: %@",
+      //       NSStringFromCGRect(foundationWindow.frame));
+      // NSLog(@"🚀 Bootstrap: Foundation window isKeyWindow: %@",
+      //       foundationWindow.isKeyWindow ? @"YES" : @"NO");
+      // NSLog(@"🚀 Bootstrap: Foundation window hidden: %@", foundationWindow.hidden ? @"YES" :
+      // @"NO"); NSLog(@"🚀 Bootstrap: Foundation window alpha: %.2f", foundationWindow.alpha);
+      // NSLog(@"🚀 Bootstrap: Foundation window level: %.0f", foundationWindow.windowLevel);
+      // NSLog(@"🚀 Bootstrap: Foundation window rootViewController: %@",
+      //       foundationWindow.rootViewController);
 
       // Give iOS a moment to process the new window hierarchy (we're already on main queue)
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
 
       // Check again after run loop processing
-      NSLog(@"🚀 Bootstrap: App windows after bootstrap: %lu",
-            (unsigned long)sharedApp.windows.count);
-      NSLog(@"🚀 Bootstrap: Foundation window still exists: %@", foundationWindow ? @"YES" : @"NO");
-      NSLog(@"🚀 Bootstrap: Foundation window ref still exists: %@",
-            foundationWindowRef ? @"YES" : @"NO");
+      // NSLog(@"🚀 Bootstrap: App windows after bootstrap: %lu",
+      //       (unsigned long)sharedApp.windows.count);
+      // NSLog(@"🚀 Bootstrap: Foundation window still exists: %@", foundationWindow ? @"YES" :
+      // @"NO"); NSLog(@"🚀 Bootstrap: Foundation window ref still exists: %@",
+      //       foundationWindowRef ? @"YES" : @"NO");
 
       // Detailed window hierarchy inspection
       if (sharedApp.windows.count > 0) {
-        NSLog(@"🚀 Bootstrap: Window hierarchy details:");
-        for (NSUInteger i = 0; i < sharedApp.windows.count; i++) {
-          UIWindow* window = sharedApp.windows[i];
-          NSLog(@"🚀 Bootstrap:   Window %lu: %@ (level: %.0f, key: %@, hidden: %@)", i, window,
-                window.windowLevel, window.isKeyWindow ? @"YES" : @"NO",
-                window.hidden ? @"YES" : @"NO");
-        }
+        // NSLog(@"🚀 Bootstrap: Window hierarchy details:");
+        // for (NSUInteger i = 0; i < sharedApp.windows.count; i++) {
+        //   UIWindow* window = sharedApp.windows[i];
+        //   NSLog(@"🚀 Bootstrap:   Window %lu: %@ (level: %.0f, key: %@, hidden: %@)", i, window,
+        //         window.windowLevel, window.isKeyWindow ? @"YES" : @"NO",
+        //         window.hidden ? @"YES" : @"NO");
+        // }
       } else {
-        NSLog(@"🚀 Bootstrap: 🚨 CRITICAL: Foundation window not in app.windows hierarchy!");
-        NSLog(@"🚀 Bootstrap: This indicates a fundamental iOS window system issue");
+        // NSLog(@"🚀 Bootstrap: 🚨 CRITICAL: Foundation window not in app.windows hierarchy!");
+        // NSLog(@"🚀 Bootstrap: This indicates a fundamental iOS window system issue");
 
         // Try alternative window registration approach
-        NSLog(@"🚀 Bootstrap: Attempting alternative window registration...");
+        // NSLog(@"🚀 Bootstrap: Attempting alternative window registration...");
         [foundationWindow.layer setNeedsDisplay];
         [foundationWindow.layer displayIfNeeded];
         [foundationWindow layoutIfNeeded];
 
         // Force another run loop cycle
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
-        NSLog(@"🚀 Bootstrap: After alternative registration - App windows: %lu",
-              (unsigned long)sharedApp.windows.count);
+        // NSLog(@"🚀 Bootstrap: After alternative registration - App windows: %lu",
+        //       (unsigned long)sharedApp.windows.count);
       }
     } else {
-      NSLog(@"🚀 Bootstrap: WARNING - Failed to create foundation window");
+      // NSLog(@"🚀 Bootstrap: WARNING - Failed to create foundation window");
     }
   } else {
-    NSLog(@"🚀 Bootstrap: App windows already exist (%lu) - no bootstrap needed",
-          (unsigned long)sharedApp.windows.count);
+    // NSLog(@"🚀 Bootstrap: App windows already exist (%lu) - no bootstrap needed",
+    //       (unsigned long)sharedApp.windows.count);
   }
 
   // Create a dedicated error window that works even during early app lifecycle
@@ -714,23 +702,23 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
       if ([scene isKindOfClass:[UIWindowScene class]]) {
         windowScene = (UIWindowScene*)scene;
-        NSLog(@"🎨 Found existing window scene for error modal");
+        // NSLog(@"🎨 Found existing window scene for error modal");
         break;
       }
     }
 
     if (windowScene) {
       errorWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
-      NSLog(@"🎨 Created error window with existing scene");
+      // NSLog(@"🎨 Created error window with existing scene");
     } else {
       // Fallback: create window with screen bounds (older behavior)
       errorWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-      NSLog(@"🎨 Created error window with screen bounds (no scene available)");
+      // NSLog(@"🎨 Created error window with screen bounds (no scene available)");
     }
   } else {
     // iOS 12 and below
     errorWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    NSLog(@"🎨 Created error window for iOS 12");
+    // NSLog(@"🎨 Created error window for iOS 12");
   }
 
   errorWindow.windowLevel = UIWindowLevelAlert + 1000;  // Above everything
@@ -774,13 +762,13 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
             if (logoImage) {
               dispatch_async(dispatch_get_main_queue(), ^{
                 logoImageView.image = logoImage;
-                NSLog(@"🎨 NativeScript logo loaded successfully");
+                // NSLog(@"🎨 NativeScript logo loaded successfully");
               });
             } else {
-              NSLog(@"🎨 Failed to create image from logo data");
+              // NSLog(@"🎨 Failed to create image from logo data");
             }
           } else {
-            NSLog(@"🎨 Failed to load NativeScript logo: %@", error.localizedDescription);
+            // NSLog(@"🎨 Failed to load NativeScript logo: %@", error.localizedDescription);
             // Fallback: show text logo
             dispatch_async(dispatch_get_main_queue(), ^{
               UILabel* fallbackLogo = [[UILabel alloc] init];
@@ -834,7 +822,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   stackTraceContainer.translatesAutoresizingMaskIntoConstraints = NO;
   [contentView addSubview:stackTraceContainer];
 
-  NSLog(@"errorToDisplay from in NativeScriptException ShowErrorModal: %s", stackTrace.c_str());
+  // NSLog(@"errorToDisplay from in NativeScriptException ShowErrorModal: %s", stackTrace.c_str());
   // Stack trace text view - with proper terminal styling
   UITextView* stackTraceTextView = [[UITextView alloc] init];
   stackTraceTextView.text = [NSString stringWithUTF8String:stackTrace.c_str()];
@@ -1084,12 +1072,12 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   errorWindow.rootViewController = errorViewController;
 
   // Force the window to be visible with multiple approaches
-  NSLog(@"🎨 Attempting to display error modal...");
+  // NSLog(@"🎨 Attempting to display error modal...");
 
   @try {
     // Primary approach: makeKeyAndVisible
     [errorWindow makeKeyAndVisible];
-    NSLog(@"🎨 makeKeyAndVisible called successfully");
+    // NSLog(@"🎨 makeKeyAndVisible called successfully");
 
     // Secondary approach: force visibility
     errorWindow.hidden = NO;
@@ -1102,20 +1090,20 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     // Bring window to front (alternative to makeKeyAndVisible)
     [errorWindow bringSubviewToFront:errorViewController.view];
 
-    NSLog(@"🎨 Error window properties: hidden=%@, alpha=%.2f, windowLevel=%.0f",
-          errorWindow.hidden ? @"YES" : @"NO", errorWindow.alpha, errorWindow.windowLevel);
+    // NSLog(@"🎨 Error window properties: hidden=%@, alpha=%.2f, windowLevel=%.0f",
+    //       errorWindow.hidden ? @"YES" : @"NO", errorWindow.alpha, errorWindow.windowLevel);
 
-    NSLog(@"🎨 Error window frame: %@", NSStringFromCGRect(errorWindow.frame));
-    NSLog(@"🎨 Error window rootViewController: %@", errorWindow.rootViewController);
+    // NSLog(@"🎨 Error window frame: %@", NSStringFromCGRect(errorWindow.frame));
+    // NSLog(@"🎨 Error window rootViewController: %@", errorWindow.rootViewController);
 
     // Verify the window is in the window hierarchy
     NSArray* windows = [UIApplication sharedApplication].windows;
     BOOL windowInHierarchy = [windows containsObject:errorWindow];
-    NSLog(@"🎨 Error window in app windows: %@", windowInHierarchy ? @"YES" : @"NO");
+    // NSLog(@"🎨 Error window in app windows: %@", windowInHierarchy ? @"YES" : @"NO");
 
     if (!windowInHierarchy) {
-      NSLog(@"🎨 WARNING: Error window not found in app windows hierarchy!");
-      NSLog(@"🎨 FIXING: Forcing window into hierarchy using aggressive methods...");
+      // NSLog(@"🎨 WARNING: Error window not found in app windows hierarchy!");
+      // NSLog(@"🎨 FIXING: Forcing window into hierarchy using aggressive methods...");
 
       // Aggressive fix 1: Try to force the window to be key and make it the only visible window
       NSLog(@"🎨 Total app windows before fix: %lu", (unsigned long)windows.count);
@@ -1125,7 +1113,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
         if (window != errorWindow) {
           window.hidden = YES;
           window.alpha = 0.0;
-          NSLog(@"🎨 Hiding existing window: %@", window);
+          // NSLog(@"🎨 Hiding existing window: %@", window);
         }
       }
 
@@ -1148,12 +1136,12 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
         for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
           if ([scene isKindOfClass:[UIWindowScene class]]) {
             UIWindowScene* windowScene = (UIWindowScene*)scene;
-            NSLog(@"🎨 Found scene: %@ with %lu windows", scene,
-                  (unsigned long)windowScene.windows.count);
+            // NSLog(@"🎨 Found scene: %@ with %lu windows", scene,
+            //       (unsigned long)windowScene.windows.count);
 
             // Check if our window is in this scene
             if (![windowScene.windows containsObject:errorWindow]) {
-              NSLog(@"🎨 Error window not in scene - this is the core issue!");
+              // NSLog(@"🎨 Error window not in scene - this is the core issue!");
             }
             break;
           }
@@ -1162,7 +1150,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
 
       // SIMPLIFIED NUCLEAR OPTION: Create a basic error window that works even during boot
       if (windows.count == 0) {
-        NSLog(@"🎨 SIMPLIFIED NUCLEAR: Creating basic error window for boot-level crash");
+        // NSLog(@"🎨 SIMPLIFIED NUCLEAR: Creating basic error window for boot-level crash");
 
         // Create the simplest possible window that can display
         UIWindow* simpleWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
@@ -1191,7 +1179,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
         // Force display with minimal complexity
         [simpleWindow makeKeyAndVisible];
 
-        NSLog(@"🎨 Simple nuclear window created - should be visible immediately");
+        // NSLog(@"🎨 Simple nuclear window created - should be visible immediately");
       } else {
         UIWindow* existingWindow = windows.firstObject;
 
@@ -1240,15 +1228,15 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
         [existingWindow addSubview:errorOverlay];
         [existingWindow bringSubviewToFront:errorOverlay];
 
-        NSLog(@"🎨 Error overlay added to existing window successfully!");
+        // NSLog(@"🎨 Error overlay added to existing window successfully!");
       }
     }
 
-    NSLog(@"🎨 Beautiful NativeScript-branded error modal displayed successfully!");
+    // NSLog(@"🎨 Beautiful NativeScript-branded error modal displayed successfully!");
 
   } @catch (NSException* exception) {
-    NSLog(@"🎨 ERROR: Failed to display error modal: %@", exception);
-    NSLog(@"🎨 Attempting fallback display method...");
+    // NSLog(@"🎨 ERROR: Failed to display error modal: %@", exception);
+    // NSLog(@"🎨 Attempting fallback display method...");
 
     // Fallback: Try to show an alert instead
     UIAlertController* alert =
@@ -1272,7 +1260,8 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   // Add a delay to ensure the UI is fully rendered and give the modal time to stabilize
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
                  dispatch_get_main_queue(), ^{
-                   NSLog(@"🎨 Error modal UI fully rendered and stable - app should stay alive now");
+                   //  NSLog(@"🎨 Error modal UI fully rendered and stable - app should stay alive
+                   //  now");
 
                    // Force the main run loop to process any pending events to keep the app
                    // responsive

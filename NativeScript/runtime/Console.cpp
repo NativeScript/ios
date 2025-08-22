@@ -106,7 +106,6 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
       stackTraceLines << std::endl << stacktrace << std::endl;
 
       std::string errorToDisplay = stackTraceLines.str();
-      Log("BEFORE mapped errorToDisplay %s", errorToDisplay.c_str());
 
       // Extract error details
       std::string errorTitle = "JavaScript Error";
@@ -124,7 +123,6 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
               .ToLocal(&remapStackValue);
 
       if (success && remapStackValue->IsFunction()) {
-        Log("remapStackValue is a function!");
         Local<v8::Function> remapStackFunction =
             remapStackValue.As<v8::Function>();
 
@@ -142,8 +140,6 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
           errorToDisplay = remappedError;  // Update the error to display
         }
       }
-
-      Log("AFTER mapped errorToDisplay %s", errorToDisplay.c_str());
 
       try {
         NativeScriptException::ShowErrorModal(errorTitle, errorToDisplay,

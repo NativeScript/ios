@@ -57,14 +57,14 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
       }
     }
   } catch (...) {
-    NSLog(@"[import.meta] Exception during module registry lookup, using fallback");
+    // NSLog(@"[import.meta] Exception during module registry lookup, using fallback");
     modulePath = "";  // Will use fallback path
   }
 
   // Debug logging
-  NSLog(@"[import.meta] Module lookup: found path = %s",
-        modulePath.empty() ? "(empty)" : modulePath.c_str());
-  NSLog(@"[import.meta] Registry size: %zu", tns::g_moduleRegistry.size());
+  // NSLog(@"[import.meta] Module lookup: found path = %s",
+  //       modulePath.empty() ? "(empty)" : modulePath.c_str());
+  // NSLog(@"[import.meta] Registry size: %zu", tns::g_moduleRegistry.size());
 
   // Convert file path to file:// URL
   std::string moduleUrl;
@@ -77,7 +77,7 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
     moduleUrl = "file:///app/";
   }
 
-  NSLog(@"[import.meta] Final URL: %s", moduleUrl.c_str());
+  // NSLog(@"[import.meta] Final URL: %s", moduleUrl.c_str());
 
   Local<String> url =
       String::NewFromUtf8(isolate, moduleUrl.c_str(), NewStringType::kNormal).ToLocalChecked();
