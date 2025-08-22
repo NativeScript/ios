@@ -29,6 +29,12 @@ bool IsLikelyOptionalModule(const std::string& moduleName) {
   return false;
 }
 
+// Helper function to check if a file path is an ES module (.mjs) but not a source map (.mjs.map)
+bool IsESModule(const std::string& path) {
+  return path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0 &&
+         !(path.size() >= 8 && path.compare(path.size() - 8, 8, ".mjs.map") == 0);
+}
+
 // Helper function to resolve main entry from package.json with proper extension handling
 std::string ResolveMainEntryFromPackageJson(const std::string& baseDir) {
   // Get the main value from package.json
@@ -139,7 +145,7 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   }
 
   // Check if this is an ES module (.mjs) and handle it directly
-  if (path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0) {
+  if (IsESModule(path)) {
     // For ES modules, use LoadESModule directly instead of require()
     TryCatch tc(isolate);
     Local<Value> moduleNamespace;
@@ -508,7 +514,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   }
 
   // Check if this is an ES module
-  bool isESM = modulePath.size() >= 4 && modulePath.compare(modulePath.size() - 4, 4, ".mjs") == 0;
+  bool isESM = IsESModule(modulePath);
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
   if (isESM) {
@@ -662,7 +668,7 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
 }
 
 Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& path) {
-  if (path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0) {
+  if (IsESModule(path)) {
     // Treat all .mjs files as standard ES modules.
     return ModuleInternal::LoadESModule(isolate, path);
   }
@@ -1070,7 +1076,8 @@ v8::Local<v8::String> ModuleInternal::WrapModuleContent(v8::Isolate* isolate,
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   bool isWorkerContext = cache && cache->isWorker;
 
-  if (path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0) {
+  // Check if this is an .mjs file but NOT a .mjs.map file
+  if (IsESModule(path)) {
     // Read raw text without wrapping.
     std::string sourceText = tns::ReadText(path);
 

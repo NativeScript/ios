@@ -7,6 +7,7 @@
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
+#include "RuntimeConfig.h"
 
 using namespace v8;
 
@@ -110,6 +111,15 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(context, thiz);
 
     std::function<Isolate*()> func([worker, workerPath]() {
+      // Resolve tilde paths before creating the runtime
+      std::string resolvedPath = workerPath;
+      if (!workerPath.empty() && workerPath[0] == '~') {
+        // Convert ~/path to ApplicationPath/path
+        std::string tail = workerPath.size() >= 2 && workerPath[1] == '/' ? workerPath.substr(2)
+                                                                          : workerPath.substr(1);
+        resolvedPath = RuntimeConfig.ApplicationPath + "/" + tail;
+      }
+
       tns::Runtime* runtime = new tns::Runtime();
       Isolate* isolate = runtime->CreateIsolate();
       v8::Locker locker(isolate);
@@ -121,7 +131,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       TryCatch tc(isolate);
 
       // Debug: Log worker execution
-      // printf("Worker: About to run module: %s\n", workerPath.c_str());
+      // printf("Worker: About to run module: %s\n", resolvedPath.c_str());
 
       // Debug: Check if console exists in worker context
       //      {
@@ -136,7 +146,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       //         }
       //      }
 
-      runtime->RunModule(workerPath);
+      runtime->RunModule(resolvedPath);
 
       if (tc.HasCaught()) {
         Isolate::Scope isolate_scope(isolate);
