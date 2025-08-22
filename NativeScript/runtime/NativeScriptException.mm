@@ -721,6 +721,58 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   stackTraceTextView.translatesAutoresizingMaskIntoConstraints = NO;
   [stackTraceContainer addSubview:stackTraceTextView];
 
+  // Copy button for stack trace
+  UIButton* copyButton = [UIButton buttonWithType:UIButtonTypeSystem];
+  [copyButton setTitle:@"📋 Copy Stack Trace" forState:UIControlStateNormal];
+  [copyButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+  copyButton.backgroundColor = [UIColor colorWithRed:0.3 green:0.3 blue:0.3 alpha:1.0];
+  copyButton.titleLabel.font = [UIFont systemFontOfSize:16];
+  copyButton.layer.cornerRadius = 8;
+  copyButton.translatesAutoresizingMaskIntoConstraints = NO;
+  [contentView addSubview:copyButton];
+
+  // Configure copy button action
+  void (^copyAction)(void) = ^{
+    UIPasteboard* pasteboard = [UIPasteboard generalPasteboard];
+    pasteboard.string = [NSString stringWithUTF8String:stackTrace.c_str()];
+
+    // Show temporary feedback
+    [copyButton setTitle:@"✅ Copied!" forState:UIControlStateNormal];
+    copyButton.backgroundColor = [UIColor colorWithRed:0.2 green:0.7 blue:0.2 alpha:1.0];
+
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, 1.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+          [copyButton setTitle:@"📋 Copy Stack Trace" forState:UIControlStateNormal];
+          copyButton.backgroundColor = [UIColor colorWithRed:0.3 green:0.3 blue:0.3 alpha:1.0];
+        });
+  };
+
+  if (@available(iOS 14.0, *)) {
+    UIAction* action = [UIAction actionWithTitle:@""
+                                           image:nil
+                                      identifier:nil
+                                         handler:^(UIAction* action) {
+                                           copyAction();
+                                         }];
+    [copyButton addAction:action forControlEvents:UIControlEventTouchUpInside];
+  } else {
+    // For older iOS versions, use target-action pattern
+    NSObject* target = [[NSObject alloc] init];
+    objc_setAssociatedObject(target, "copyBlock", copyAction, OBJC_ASSOCIATION_COPY_NONATOMIC);
+
+    IMP copyImp = imp_implementationWithBlock(^(id self) {
+      void (^block)(void) = objc_getAssociatedObject(self, "copyBlock");
+      if (block) {
+        block();
+      }
+    });
+
+    class_addMethod([target class], NSSelectorFromString(@"copyStackTrace"), copyImp, "v@:");
+    [copyButton addTarget:target
+                   action:NSSelectorFromString(@"copyStackTrace")
+         forControlEvents:UIControlEventTouchUpInside];
+  }
+
   // Hot-reload indicator
   UILabel* hotReloadLabel = [[UILabel alloc] init];
   hotReloadLabel.text = @"Fix the error and save your changes to continue.";
@@ -818,14 +870,13 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     [errorTitleLabel.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor
                                                    constant:-20],
 
-    // Stack trace container (black terminal-like background)
+    // Stack trace container (black terminal-like background) - flexible height
     [stackTraceContainer.topAnchor constraintEqualToAnchor:errorTitleLabel.bottomAnchor
                                                   constant:15],
     [stackTraceContainer.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor
                                                       constant:20],
     [stackTraceContainer.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor
                                                        constant:-20],
-    [stackTraceContainer.heightAnchor constraintEqualToConstant:320],
 
     // Stack trace text view (terminal green text on black)
     [stackTraceTextView.topAnchor constraintEqualToAnchor:stackTraceContainer.topAnchor],
@@ -833,10 +884,17 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     [stackTraceTextView.trailingAnchor constraintEqualToAnchor:stackTraceContainer.trailingAnchor],
     [stackTraceTextView.bottomAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor],
 
-    // Hot-reload indicator below stack trace
-    [hotReloadLabel.topAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor constant:15],
+    // Copy button below stack trace
+    [copyButton.topAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor constant:10],
+    [copyButton.centerXAnchor constraintEqualToAnchor:contentView.centerXAnchor],
+    [copyButton.widthAnchor constraintEqualToConstant:200],
+    [copyButton.heightAnchor constraintEqualToConstant:40],
+
+    // Hot-reload indicator below copy button - this will push stack trace up to fill space
+    [hotReloadLabel.topAnchor constraintEqualToAnchor:copyButton.bottomAnchor constant:15],
     [hotReloadLabel.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:20],
     [hotReloadLabel.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-20],
+    [hotReloadLabel.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-30],
 
     // Continue button at bottom
     // [continueButton.topAnchor constraintEqualToAnchor:hotReloadLabel.bottomAnchor constant:25],
@@ -956,7 +1014,8 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
             nuclearWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
             NSLog(@"🎨 Created nuclear window with scene");
           } else {
-            NSLog(@"🎨 ☢️ ABSOLUTE NUCLEAR: No scenes exist - attempting to force iOS to create "
+            NSLog(@"🎨 ☢️ ABSOLUTE NUCLEAR: No scenes exist - attempting to force iOS to "
+                  @"create "
                   @"one");
 
             // Try to force iOS to create a window scene by requesting one
@@ -1022,11 +1081,12 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
                                                                    alpha:1.0];
 
                     UILabel* sceneLabel = [[UILabel alloc] initWithFrame:sceneNuclearWindow.bounds];
-                    sceneLabel.text = [NSString
-                        stringWithFormat:@"⚠️ ABSOLUTE NUCLEAR SUCCESS ⚠️\n\nJavaScript Error "
-                                         @"Detected\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nApp will stay "
-                                         @"alive for development",
-                                         [NSString stringWithUTF8String:message.c_str()]];
+                    sceneLabel.text =
+                        [NSString stringWithFormat:
+                                      @"⚠️ ABSOLUTE NUCLEAR SUCCESS ⚠️\n\nJavaScript Error "
+                                      @"Detected\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nApp will stay "
+                                      @"alive for development",
+                                      [NSString stringWithUTF8String:message.c_str()]];
                     sceneLabel.textColor = [UIColor whiteColor];
                     sceneLabel.font = [UIFont boldSystemFontOfSize:16];
                     sceneLabel.textAlignment = NSTextAlignmentCenter;
@@ -1066,7 +1126,8 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
         UILabel* nuclearLabel = [[UILabel alloc] initWithFrame:nuclearWindow.bounds];
         nuclearLabel.text = [NSString
             stringWithFormat:
-                @"⚠️ JAVASCRIPT ERROR ⚠️\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nFix the error and "
+                @"⚠️ JAVASCRIPT ERROR ⚠️\n\n%@\n\n🔥 HOT-RELOAD READY 🔥\n\nFix the error "
+                @"and "
                 @"save your file\nApp will stay alive for development\n\nTap anywhere to dismiss",
                 [NSString stringWithUTF8String:message.c_str()]];
         nuclearLabel.textColor = [UIColor whiteColor];
