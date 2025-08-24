@@ -91,18 +91,18 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
            .ToLocal(&script) &&
       tc.HasCaught()) {
     tns::LogError(isolate, tc);
-    NSLog(@"FATAL: Failed to compile require factory script");
+    Log(@"FATAL: Failed to compile require factory script");
     return;
   }
 
   Local<Value> result;
   if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
     tns::LogError(isolate, tc);
-    NSLog(@"FATAL: Failed to run require factory script");
+    Log(@"FATAL: Failed to run require factory script");
     return;
   }
   if (result.IsEmpty() || !result->IsFunction()) {
-    NSLog(@"FATAL: Require factory script did not return a function");
+    Log(@"FATAL: Require factory script did not return a function");
     return;
   }
 
@@ -121,7 +121,7 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   bool success =
       global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
   if (!success) {
-    NSLog(@"FATAL: Failed to set global require function");
+    Log(@"FATAL: Failed to set global require function");
   }
 }
 
@@ -139,7 +139,7 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
                               ToV8String(isolate, RuntimeConfig.ApplicationPath))
                         .FromMaybe(false);
       if (!setDir) {
-        NSLog(@"Warning: Failed to set __dirname on global object");
+        Log(@"Warning: Failed to set __dirname on global object");
       }
     }
   }
@@ -154,12 +154,12 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
       moduleNamespace = ModuleInternal::LoadESModule(isolate, path);
     } catch (const NativeScriptException& ex) {
       if (RuntimeConfig.IsDebug) {
-        NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-        NSLog(@"Error loading ES module: %s", path.c_str());
-        NSLog(@"Exception: %s", ex.getMessage().c_str());
-        NSLog(@"***** End stack trace - continuing execution *****");
-        NSLog(@"Debug mode - ES module loading failed, but telling iOS it succeeded to prevent "
-              @"app termination");
+        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        Log(@"Error loading ES module: %s", path.c_str());
+        Log(@"Exception: %s", ex.getMessage().c_str());
+        Log(@"***** End stack trace - continuing execution *****");
+        Log(@"Debug mode - ES module loading failed, but telling iOS it succeeded to prevent "
+            @"app termination");
         return true;  // LIE TO iOS - return success to prevent app termination
       } else {
         return false;
@@ -168,7 +168,7 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
 
     if (moduleNamespace.IsEmpty()) {
       if (RuntimeConfig.IsDebug) {
-        NSLog(@"Debug mode - ES module returned empty namespace, but telling iOS it succeeded");
+        Log(@"Debug mode - ES module returned empty namespace, but telling iOS it succeeded");
         return true;  // LIE TO iOS - return success to prevent app termination
       } else {
         return false;
@@ -182,7 +182,7 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   Local<Value> requireObj;
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
   if (!success || !requireObj->IsFunction()) {
-    NSLog(@"Warning: Failed to get require function from global object");
+    Log(@"Warning: Failed to get require function from global object");
     return false;
   }
   Local<v8::Function> requireFunc = requireObj.As<v8::Function>();
@@ -195,24 +195,24 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
 
   if (!success || tc.HasCaught()) {
     if (RuntimeConfig.IsDebug) {
-      NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-      NSLog(@"Error in require() call:");
-      NSLog(@"  Requested module: '%s'", path.c_str());
-      NSLog(@"  Called from: %s", RuntimeConfig.ApplicationPath.c_str());
+      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+      Log(@"Error in require() call:");
+      Log(@"  Requested module: '%s'", path.c_str());
+      Log(@"  Called from: %s", RuntimeConfig.ApplicationPath.c_str());
 
       if (tc.HasCaught()) {
         tns::LogError(isolate, tc);
       }
 
-      NSLog(@"***** End stack trace - continuing execution *****");
-      NSLog(@"Debug mode - Main script execution failed, but telling iOS it succeeded to prevent "
-            @"app termination");
+      Log(@"***** End stack trace - continuing execution *****");
+      Log(@"Debug mode - Main script execution failed, but telling iOS it succeeded to prevent "
+          @"app termination");
 
       // Add a small delay to ensure error modal has time to render before we return
       dispatch_after(
           dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
           dispatch_get_main_queue(), ^{
-            NSLog(@"🛡️ Debug mode - Crash prevention complete, app should remain stable");
+            Log(@"🛡️ Debug mode - Crash prevention complete, app should remain stable");
           });
 
       return true;  // LIE TO iOS - return success to prevent app termination
@@ -241,11 +241,11 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
     if (tc.HasCaught()) {
       tns::LogError(isolate, tc);
     }
-    NSLog(@"FATAL: Failed to call require factory function");
+    Log(@"FATAL: Failed to call require factory function");
     // Return a dummy function to avoid further crashes
     result = v8::Function::New(context, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                if (RuntimeConfig.IsDebug) {
-                 NSLog(@"Debug mode - Require function unavailable (factory failed)");
+                 Log(@"Debug mode - Require function unavailable (factory failed)");
                  info.GetReturnValue().SetUndefined();
                } else {
                  info.GetIsolate()->ThrowException(v8::Exception::Error(
@@ -255,11 +255,11 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
   }
 
   if (result.IsEmpty() || !result->IsFunction()) {
-    NSLog(@"FATAL: Require factory did not return a function");
+    Log(@"FATAL: Require factory did not return a function");
     // Return a dummy function
     result = v8::Function::New(context, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                if (RuntimeConfig.IsDebug) {
-                 NSLog(@"Debug mode - Require function unavailable (no function returned)");
+                 Log(@"Debug mode - Require function unavailable (no function returned)");
                  info.GetReturnValue().SetUndefined();
                } else {
                  info.GetIsolate()->ThrowException(v8::Exception::Error(
@@ -351,7 +351,7 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
       if (success) {
         info.GetReturnValue().Set(exportsObj);
       } else {
-        NSLog(@"Warning: Failed to get exports from module object");
+        Log(@"Warning: Failed to get exports from module object");
       }
     }
   } catch (NativeScriptException& ex) {
@@ -481,7 +481,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   bool success =
       moduleObj->Set(context, tns::ToV8String(isolate, "exports"), exportsObj).FromMaybe(false);
   if (!success) {
-    NSLog(@"Warning: Failed to set exports property on module object");
+    Log(@"Warning: Failed to set exports property on module object");
   }
 
   const PropertyAttribute readOnlyFlags =
@@ -492,7 +492,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
       moduleObj->DefineOwnProperty(context, tns::ToV8String(isolate, "id"), fileName, readOnlyFlags)
           .FromMaybe(false);
   if (!success) {
-    NSLog(@"Warning: Failed to set id property on module object");
+    Log(@"Warning: Failed to set id property on module object");
   }
 
   std::shared_ptr<Persistent<Object>> poModuleObj =
@@ -523,8 +523,8 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     // First check if scriptValue is empty (from debug mode graceful returns)
     if (scriptValue.IsEmpty()) {
       if (RuntimeConfig.IsDebug) {
-        NSLog(@"Debug mode - ES module returned empty value, returning gracefully: %s",
-              modulePath.c_str());
+        Log(@"Debug mode - ES module returned empty value, returning gracefully: %s",
+            modulePath.c_str());
         return Local<Object>();
       } else {
         throw NativeScriptException(isolate, "ES module load returned empty value " + modulePath);
@@ -533,7 +533,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
 
     if (!scriptValue->IsObject()) {
       if (RuntimeConfig.IsDebug) {
-        NSLog(@"Debug mode - ES module load failed, returning gracefully: %s", modulePath.c_str());
+        Log(@"Debug mode - ES module load failed, returning gracefully: %s", modulePath.c_str());
         // Return empty module object to prevent crashes
         return Local<Object>();
       } else {
@@ -572,7 +572,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     bool succ =
         moduleObj->Set(context, tns::ToV8String(isolate, "exports"), exportsObj).FromMaybe(false);
     if (!succ) {
-      NSLog(@"Warning: Failed to set exports property after module execution");
+      Log(@"Warning: Failed to set exports property after module execution");
     }
 
     tempModule.SaveToCache();
@@ -619,7 +619,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
 
   success = moduleObj->Set(context, tns::ToV8String(isolate, "require"), require).FromMaybe(false);
   if (!success) {
-    NSLog(@"Warning: Failed to set require property on module object");
+    Log(@"Warning: Failed to set require property on module object");
   }
 
   {
@@ -678,8 +678,8 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
   // Check if script compilation failed (debug mode graceful returns)
   if (script.IsEmpty()) {
     if (RuntimeConfig.IsDebug) {
-      NSLog(@"Debug mode - Classic script compilation returned empty, returning gracefully: %s",
-            path.c_str());
+      Log(@"Debug mode - Classic script compilation returned empty, returning gracefully: %s",
+          path.c_str());
       return Local<Value>();
     } else {
       throw NativeScriptException(isolate, "Classic script compilation failed for " + path);
@@ -698,13 +698,13 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
       jsErrorOccurred = true;
 
       // Log the detailed JavaScript error with full stack trace
-      NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-      NSLog(@"Error executing script: %s", path.c_str());
+      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+      Log(@"Error executing script: %s", path.c_str());
       if (tc.HasCaught()) {
         tns::LogError(isolate, tc);
       }
-      NSLog(@"***** End stack trace - continuing execution *****");
-      NSLog(@"Debug mode - Script execution failed, returning gracefully: %s", path.c_str());
+      Log(@"***** End stack trace - continuing execution *****");
+      Log(@"Debug mode - Script execution failed, returning gracefully: %s", path.c_str());
       return Local<Value>();
     } else {
       if (tc.HasCaught()) {
@@ -764,13 +764,13 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
       jsErrorOccurred = true;
 
       // Log the detailed JavaScript error with full stack trace
-      NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-      NSLog(@"Error compiling classic script: %s", path.c_str());
+      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+      Log(@"Error compiling classic script: %s", path.c_str());
       if (tc.HasCaught()) {
         tns::LogError(isolate, tc);
       }
-      NSLog(@"***** End stack trace - continuing execution *****");
-      NSLog(@"Debug mode - Script compilation failed, returning gracefully: %s", path.c_str());
+      Log(@"***** End stack trace - continuing execution *****");
+      Log(@"Debug mode - Script compilation failed, returning gracefully: %s", path.c_str());
       // Return empty script to prevent crashes
       return Local<Script>();
     } else {
@@ -816,13 +816,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       // V8 threw a syntax error or similar
       if (RuntimeConfig.IsDebug) {
         // Log the detailed JavaScript error with full stack trace
-        NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-        NSLog(@"Error compiling ES module: %s", path.c_str());
+        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        Log(@"Error compiling ES module: %s", path.c_str());
         if (tcCompile.HasCaught()) {
           tns::LogError(isolate, tcCompile);
         }
-        NSLog(@"***** End stack trace - continuing execution *****");
-        NSLog(@"Debug mode - ES module compilation failed, returning gracefully: %s", path.c_str());
+        Log(@"***** End stack trace - continuing execution *****");
+        Log(@"Debug mode - ES module compilation failed, returning gracefully: %s", path.c_str());
         // Return empty to prevent crashes
         return Local<Value>();
       } else {
@@ -859,13 +859,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     if (!linked) {
       if (RuntimeConfig.IsDebug) {
         // Log the detailed JavaScript error with full stack trace
-        NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-        NSLog(@"Error instantiating module: %s", path.c_str());
+        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        Log(@"Error instantiating module: %s", path.c_str());
         if (tcLink.HasCaught()) {
           tns::LogError(isolate, tcLink);
         }
-        NSLog(@"***** End stack trace - continuing execution *****");
-        NSLog(@"Debug mode - Module instantiation failed, returning gracefully: %s", path.c_str());
+        Log(@"***** End stack trace - continuing execution *****");
+        Log(@"Debug mode - Module instantiation failed, returning gracefully: %s", path.c_str());
         return Local<Value>();
       } else {
         if (tcLink.HasCaught()) {
@@ -887,13 +887,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       printf("LoadESModule: Evaluation failed for module: %s\n", path.c_str());
       if (RuntimeConfig.IsDebug) {
         // Log the detailed JavaScript error with full stack trace
-        NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-        NSLog(@"Error evaluating ES module: %s", path.c_str());
+        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        Log(@"Error evaluating ES module: %s", path.c_str());
         if (tcEval.HasCaught()) {
           tns::LogError(isolate, tcEval);
         }
-        NSLog(@"***** End stack trace - continuing execution *****");
-        NSLog(@"Debug mode - Module evaluation failed, returning gracefully: %s", path.c_str());
+        Log(@"***** End stack trace - continuing execution *****");
+        Log(@"Debug mode - Module evaluation failed, returning gracefully: %s", path.c_str());
         return Local<Value>();
       } else {
         throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + path);
@@ -935,7 +935,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
               jsErrorOccurred = true;
 
               // First log the detailed JavaScript error with full stack trace
-              NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+              Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
 
               std::string errorTitle = "Uncaught JavaScript Exception";
               std::string errorMessage = "Module evaluation promise rejected";
@@ -983,9 +983,9 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                 }
 
                 // Log the extracted error information
-                NSLog(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
+                Log(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
                 if (!stackTrace.empty()) {
-                  NSLog(@"JavaScript stack trace:\n%s", stackTrace.c_str());
+                  Log(@"JavaScript stack trace:\n%s", stackTrace.c_str());
                 }
               }
 
@@ -994,7 +994,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                 tns::LogError(isolate, promiseTc);
               }
 
-              NSLog(@"***** End stack trace - Fix to continue *****");
+              Log(@"***** End stack trace - Fix to continue *****");
 
               NativeScriptException::ShowErrorModal(errorTitle, errorMessage, stackTrace);
 
@@ -1051,7 +1051,7 @@ void ModuleInternal::RunScript(Isolate* isolate, std::string script) {
   Local<Value> requireObj;
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
   if (!success || !requireObj->IsFunction()) {
-    NSLog(@"Warning: Failed to get require function from global object in RunScript");
+    Log(@"Warning: Failed to get require function from global object in RunScript");
     return;
   }
   Local<Value> result;
@@ -1322,7 +1322,7 @@ Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,
       bool success = moduleObj->Set(context, tns::ToV8String(isolate, "exports"), proxyObject)
                          .FromMaybe(false);
       if (!success) {
-        NSLog(@"Warning: Failed to set exports property on proxy module object");
+        Log(@"Warning: Failed to set exports property on proxy module object");
       }
     }
   }
@@ -1333,14 +1333,14 @@ Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,
                            tns::ToV8String(isolate, moduleName.c_str()))
                      .FromMaybe(false);
   if (!success) {
-    NSLog(@"Warning: Failed to set id property on module object");
+    Log(@"Warning: Failed to set id property on module object");
   }
 
   success =
       moduleObj->Set(context, tns::ToV8String(isolate, "loaded"), v8::Boolean::New(isolate, true))
           .FromMaybe(false);
   if (!success) {
-    NSLog(@"Warning: Failed to set loaded property on module object");
+    Log(@"Warning: Failed to set loaded property on module object");
   }
 
   // Cache the placeholder module

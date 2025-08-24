@@ -91,8 +91,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     // This handles cases where runtime.mjs calls import("./chunk.mjs")
     // but the referrer module isn't properly registered
     if (IsScriptLoadingLogEnabled()) {
-      NSLog(@"[resolver] No referrer found for relative import '%s', assuming app root",
-            spec.c_str());
+      Log(@"[resolver] No referrer found for relative import '%s', assuming app root",
+          spec.c_str());
     }
     referrerPath =
         RuntimeConfig.ApplicationPath + "/runtime.mjs";  // Default to runtime.mjs as referrer
@@ -121,8 +121,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     candidateBases.push_back(candidate);
 
     if (IsScriptLoadingLogEnabled()) {
-      NSLog(@"[resolver] Relative import: '%s' + '%s' -> '%s'", baseDir.c_str(), cleanSpec.c_str(),
-            candidate.c_str());
+      Log(@"[resolver] Relative import: '%s' + '%s' -> '%s'", baseDir.c_str(), cleanSpec.c_str(),
+          candidate.c_str());
     }
   } else if (spec.rfind("file://", 0) == 0) {
     // Absolute file URL, e.g. file:///app/path/to/chunk.mjs
@@ -200,7 +200,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     bool existsNow = isFile(absPath);
     if (IsScriptLoadingLogEnabled()) {
-      NSLog(@"[resolver] %s -> %s", absPath.c_str(), existsNow ? "file" : "missing");
+      Log(@"[resolver] %s -> %s", absPath.c_str(), existsNow ? "file" : "missing");
     }
 
     if (!existsNow) {
@@ -301,7 +301,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
           // Failed to create file, fall back to throwing error
           std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
           if (RuntimeConfig.IsDebug) {
-            NSLog(@"Debug mode - Node.js polyfill creation failed: %s", msg.c_str());
+            Log(@"Debug mode - Node.js polyfill creation failed: %s", msg.c_str());
             // Return empty instead of crashing in debug mode
             return v8::MaybeLocal<v8::Module>();
           } else {
@@ -347,7 +347,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
           // Failed to create file, fall back to throwing error
           std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
           if (RuntimeConfig.IsDebug) {
-            NSLog(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
+            Log(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
             // Return empty instead of crashing in debug mode
             return v8::MaybeLocal<v8::Module>();
           } else {
@@ -363,7 +363,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       // Not an optional module, throw the original error
       std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
       if (RuntimeConfig.IsDebug) {
-        NSLog(@"Debug mode - Module not found: %s", msg.c_str());
+        Log(@"Debug mode - Module not found: %s", msg.c_str());
         // Return empty instead of crashing in debug mode
         return v8::MaybeLocal<v8::Module>();
       } else {
@@ -401,7 +401,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     if (!v8::String::NewFromUtf8(isolate, url.c_str(), v8::NewStringType::kNormal)
              .ToLocal(&urlString)) {
       if (RuntimeConfig.IsDebug) {
-        NSLog(@"Debug mode - Failed to create URL string for JSON module");
+        Log(@"Debug mode - Failed to create URL string for JSON module");
         return v8::MaybeLocal<v8::Module>();
       } else {
         isolate->ThrowException(v8::Exception::Error(
@@ -418,7 +418,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     v8::Local<v8::Module> jsonModule;
     if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&jsonModule)) {
       if (RuntimeConfig.IsDebug) {
-        NSLog(@"Debug mode - Failed to compile JSON module");
+        Log(@"Debug mode - Failed to compile JSON module");
         return v8::MaybeLocal<v8::Module>();
       } else {
         isolate->ThrowException(
@@ -493,7 +493,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   const char* cSpec = (*specUtf8) ? *specUtf8 : "<invalid>";
   NSString* specStr = [NSString stringWithUTF8String:cSpec];
   if (IsScriptLoadingLogEnabled()) {
-    NSLog(@"[dyn-import] → %@", specStr);
+    Log(@"[dyn-import] → %@", specStr);
   }
   v8::EscapableHandleScope scope(isolate);
 
@@ -523,7 +523,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     if (module->GetStatus() == v8::Module::kUninstantiated) {
       if (!module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
         if (IsScriptLoadingLogEnabled()) {
-          NSLog(@"[dyn-import] ✗ instantiate failed %@", specStr);
+          Log(@"[dyn-import] ✗ instantiate failed %@", specStr);
         }
         resolver
             ->Reject(context,
@@ -536,7 +536,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     if (module->GetStatus() != v8::Module::kEvaluated) {
       if (module->Evaluate(context).IsEmpty()) {
         if (IsScriptLoadingLogEnabled()) {
-          NSLog(@"[dyn-import] ✗ evaluation failed %@", specStr);
+          Log(@"[dyn-import] ✗ evaluation failed %@", specStr);
         }
         v8::Local<v8::Value> ex =
             v8::Exception::Error(tns::ToV8String(isolate, "Evaluation failed"));
@@ -555,7 +555,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       v8::Local<v8::Value> webpackIds;
       if (nsObj->Get(context, webpackIdsKey).ToLocal(&webpackIds) && !webpackIds->IsUndefined()) {
         if (IsScriptLoadingLogEnabled()) {
-          NSLog(@"[dyn-import] Detected webpack chunk %@", specStr);
+          Log(@"[dyn-import] Detected webpack chunk %@", specStr);
         }
         // This is a webpack chunk, get the webpack runtime from the runtime module
         try {
@@ -578,14 +578,14 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
               if (runtimeObj->Get(context, defaultKey).ToLocal(&webpackRequire) &&
                   webpackRequire->IsObject()) {
                 if (IsScriptLoadingLogEnabled()) {
-                  NSLog(@"[dyn-import] Found runtime module default export");
+                  Log(@"[dyn-import] Found runtime module default export");
                 }
                 v8::Local<v8::String> installKey = tns::ToV8String(isolate, "C");
                 v8::Local<v8::Value> installFn;
                 if (webpackRequire.As<v8::Object>()->Get(context, installKey).ToLocal(&installFn) &&
                     installFn->IsFunction()) {
                   if (IsScriptLoadingLogEnabled()) {
-                    NSLog(@"[dyn-import] Calling webpack installChunk function");
+                    Log(@"[dyn-import] Calling webpack installChunk function");
                   }
                   // Call webpack's installChunk function with the module namespace
                   v8::Local<v8::Value> args[] = {namespaceObj};
@@ -596,32 +596,32 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                     // If the call fails, we can ignore it since this is just a helper for webpack
                     // chunks
                     if (IsScriptLoadingLogEnabled()) {
-                      NSLog(@"[dyn-import] ✗ webpack installChunk call failed");
+                      Log(@"[dyn-import] ✗ webpack installChunk call failed");
                     }
                   } else {
                     if (IsScriptLoadingLogEnabled()) {
-                      NSLog(@"[dyn-import] ✓ webpack installChunk call succeeded");
+                      Log(@"[dyn-import] ✓ webpack installChunk call succeeded");
                     }
                   }
                 } else {
                   if (IsScriptLoadingLogEnabled()) {
-                    NSLog(@"[dyn-import] ✗ webpack installChunk function not found");
+                    Log(@"[dyn-import] ✗ webpack installChunk function not found");
                   }
                 }
               } else {
                 if (IsScriptLoadingLogEnabled()) {
-                  NSLog(@"[dyn-import] ✗ runtime module default export not found");
+                  Log(@"[dyn-import] ✗ runtime module default export not found");
                 }
               }
             }
           } else {
             if (IsScriptLoadingLogEnabled()) {
-              NSLog(@"[dyn-import] ✗ runtime module not found");
+              Log(@"[dyn-import] ✗ runtime module not found");
             }
           }
         } catch (...) {
           if (IsScriptLoadingLogEnabled()) {
-            NSLog(@"[dyn-import] ✗ exception while accessing runtime module");
+            Log(@"[dyn-import] ✗ exception while accessing runtime module");
           }
         }
       }
@@ -629,12 +629,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
     resolver->Resolve(context, module->GetModuleNamespace()).Check();
     if (IsScriptLoadingLogEnabled()) {
-      NSLog(@"[dyn-import] ✓ resolved %@", specStr);
+      Log(@"[dyn-import] ✓ resolved %@", specStr);
     }
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
     if (IsScriptLoadingLogEnabled()) {
-      NSLog(@"[dyn-import] ✗ native failed %@", specStr);
+      Log(@"[dyn-import] ✗ native failed %@", specStr);
     }
     resolver
         ->Reject(context, v8::Exception::Error(

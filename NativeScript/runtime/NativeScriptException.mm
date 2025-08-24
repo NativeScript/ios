@@ -94,7 +94,7 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
                                        tns::ToV8String(isolate, stackTrace))
                                  .FromMaybe(false);
         if (!stackTraceSet) {
-          NSLog(@"Warning: Failed to set stackTrace property on error object");
+          Log(@"Warning: Failed to set stackTrace property on error object");
         }
       }
 
@@ -110,7 +110,7 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
 
       // Don't crash if error handler call failed - just log it
       if (!success) {
-        NSLog(@"Warning: Error handler function call failed");
+        Log(@"Warning: Error handler function call failed");
       }
     }
 
@@ -126,9 +126,9 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
       if (RuntimeConfig.IsDebug) {
         // Mark that a JavaScript error occurred
         jsErrorOccurred = true;
-        NSLog(@"***** JavaScript exception occurred "
-              @"in debug mode *****\n");
-        NSLog(@"%@", reasonStr);
+        Log(@"***** JavaScript exception occurred "
+            @"in debug mode *****\n");
+        Log(@"%@", reasonStr);
         // NSLog(@"🎨 CALLING ShowErrorModal for OnUncaughtError - should display beautiful branded "
         //       @"modal...");
 
@@ -149,7 +149,7 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
 
         // Use the same comprehensive fullMessage that the terminal uses (identical stack traces)
         std::string completeStackTrace = reasonStr ? [reasonStr UTF8String] : fullMessage;
-        NSLog(@"***** End stack trace - Fix error to continue *****\n");
+        Log(@"***** End stack trace - Fix error to continue *****\n");
         ShowErrorModal(errorTitle, errorMessage, completeStackTrace);
 
         // Don't crash in debug mode - just return
@@ -165,18 +165,18 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
                                       reason:reasonStr
                                     userInfo:@{@"sender" : @"onUncaughtError"}];
 
-          NSLog(@"***** Fatal JavaScript exception - application has been terminated. *****\n");
-          NSLog(@"%@", objcException);
+          Log(@"***** Fatal JavaScript exception - application has been terminated. *****\n");
+          Log(@"%@", objcException);
           @throw objcException;
         });
       }
     } else {
-      NSLog(@"NativeScript discarding uncaught JS exception!");
+      Log(@"NativeScript discarding uncaught JS exception!");
     }
   } @catch (NSException* exception) {
-    NSLog(@"OnUncaughtError: Caught exception during error handling: %@", exception);
+    Log(@"OnUncaughtError: Caught exception during error handling: %@", exception);
     if (RuntimeConfig.IsDebug) {
-      NSLog(@"Debug mode - suppressing crash and continuing");
+      Log(@"Debug mode - suppressing crash and continuing");
     } else {
       @throw exception;  // Re-throw in release mode
     }
@@ -201,7 +201,7 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
                                    tns::ToV8String(isolate, this->fullMessage_))
                              .FromMaybe(false);
           if (!success) {
-            NSLog(@"Warning: Failed to set fullMessage property on error object");
+            Log(@"Warning: Failed to set fullMessage property on error object");
           }
         } else if (!this->message_.empty()) {
           bool success = errObj.As<Object>()
@@ -209,7 +209,7 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
                                    tns::ToV8String(isolate, this->message_))
                              .FromMaybe(false);
           if (!success) {
-            NSLog(@"Warning: Failed to set fullMessage property on error object");
+            Log(@"Warning: Failed to set fullMessage property on error object");
           }
         }
       }
@@ -250,24 +250,24 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
       }
 
       // Always log the detailed error for critical exceptions (both debug and release)
-      NSLog(@"***** JavaScript exception occurred - detailed stack trace follows *****\n");
-      NSLog(@"NativeScript encountered an error:");
+      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****\n");
+      Log(@"NativeScript encountered an error:");
       NSString* errorStr = [NSString stringWithUTF8String:fullMessage.c_str()];
       if (errorStr != nil) {
-        NSLog(@"%@", errorStr);
+        Log(@"%@", errorStr);
       } else {
-        NSLog(@"(error message contained invalid UTF-8)");
+        Log(@"(error message contained invalid UTF-8)");
       }
 
       // Additional guidance after the stack trace for boot/init errors
-      NSLog(@"\n======================================");
-      NSLog(@"Error on app inititialization.");
-      NSLog(@"Please fix the error and save the file to auto reload the app.");
-      NSLog(@"======================================");
+      Log(@"\n======================================");
+      Log(@"Error on app inititialization.");
+      Log(@"Please fix the error and save the file to auto reload the app.");
+      Log(@"======================================");
 
       // In debug mode, continue execution; in release mode, terminate
       if (RuntimeConfig.IsDebug) {
-        NSLog(@"***** End stack trace - showing error modal and continuing execution *****\n");
+        Log(@"***** End stack trace - showing error modal and continuing execution *****\n");
 
         // Show beautiful error modal in debug mode with SAME detailed message as terminal
         std::string errorTitle = "JavaScript Error";
@@ -284,10 +284,10 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
 
         // In debug mode, DON'T throw the exception - just return to prevent crash
         // The error modal will be shown and the app will continue running
-        NSLog(@"***** Error handled gracefully - app continues without crash *****\n");
+        Log(@"***** Error handled gracefully - app continues without crash *****\n");
         return;
       } else {
-        NSLog(@"***** End stack trace - terminating application *****\n");
+        Log(@"***** End stack trace - terminating application *****\n");
         // In release mode, create proper message and call OnUncaughtError for termination
         Local<v8::Message> message = Exception::CreateMessage(isolate, errObj);
         OnUncaughtError(message, errObj);
@@ -297,15 +297,15 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
 
     // For non-critical exceptions, just re-throw normally
     if (RuntimeConfig.IsDebug) {
-      NSLog(@"Debug mode - converting V8 exception to safe log instead of throw");
-      NSLog(@"Would have thrown: %s", this->message_.c_str());
+      Log(@"Debug mode - converting V8 exception to safe log instead of throw");
+      Log(@"Would have thrown: %s", this->message_.c_str());
     } else {
       isolate->ThrowException(errObj);
     }
   } @catch (NSException* exception) {
-    NSLog(@"ReThrowToV8: Caught exception during error handling: %@", exception);
+    Log(@"ReThrowToV8: Caught exception during error handling: %@", exception);
     if (RuntimeConfig.IsDebug) {
-      NSLog(@"Debug mode - suppressing crash and continuing");
+      Log(@"Debug mode - suppressing crash and continuing");
     } else {
       @throw exception;  // Re-throw in release mode
     }
@@ -336,7 +336,7 @@ std::string NativeScriptException::GetErrorMessage(Isolate* isolate, Local<Value
     } else {
       errMessage = "";
       if (!success) {
-        NSLog(@"Warning: Failed to get fullMessage property from error object");
+        Log(@"Warning: Failed to get fullMessage property from error object");
       }
     }
     ss << errMessage;
@@ -435,12 +435,12 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
 
   // If we're in a very early boot state with no windows/scenes, use a simple approach
   if (app.windows.count == 0 && app.connectedScenes.count == 0) {
-    NSLog(@"Note: JavaScript error during boot.");
-    NSLog(@"================================");
-    NSLog(@"%@", [NSString stringWithUTF8String:stackTrace.c_str()]);
-    NSLog(@"================================");
-    NSLog(@"Please fix the error and save the file to auto reload the app.");
-    NSLog(@"================================");
+    Log(@"Note: JavaScript error during boot.");
+    Log(@"================================");
+    Log(@"%@", [NSString stringWithUTF8String:stackTrace.c_str()]);
+    Log(@"================================");
+    Log(@"Please fix the error and save the file to auto reload the app.");
+    Log(@"================================");
 
     // Create a nuclear option window for boot crashes; attach to a UIWindowScene on iOS 13+
     @try {
@@ -457,7 +457,7 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
                                   userActivity:nil
                                        options:opts
                                   errorHandler:^(NSError* error) {
-                                    NSLog(@"🎨 Boot: scene activation error: %@", error);
+                                    Log(@"🎨 Boot: scene activation error: %@", error);
                                   }];
           }
         }
@@ -482,7 +482,7 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
                 if (winScene) {
                   bootWindow = [[UIWindow alloc] initWithWindowScene:winScene];
                   bootWindow.frame = winScene.coordinateSpace.bounds;
-                  NSLog(@"🎨 Boot: using scene-backed window");
+                  Log(@"🎨 Boot: using scene-backed window");
                 }
               }
 #endif
@@ -543,7 +543,7 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
       });
     } @catch (NSException* exception) {
       // NSLog(@"🎨 Even nuclear boot window failed: %@", exception);
-      NSLog(@"Boot error details are in the logs above.");
+      Log(@"Boot error details are in the logs above.");
     }
 
     return;  // Exit early for boot-level crashes
@@ -557,7 +557,7 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
       NativeScriptException::showErrorModalSynchronously(title, message, stackTrace);
     } @catch (NSException* exception) {
       // NSLog(@"Failed to create error modal UI: %@", exception);
-      NSLog(@"Error details - Title: %s, Message: %s", title.c_str(), message.c_str());
+      Log(@"Error details - Title: %s, Message: %s", title.c_str(), message.c_str());
     }
   } else {
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -565,7 +565,7 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
         NativeScriptException::showErrorModalSynchronously(title, message, stackTrace);
       } @catch (NSException* exception) {
         // NSLog(@"Failed to create error modal UI: %@", exception);
-        NSLog(@"Error details - Title: %s, Message: %s", title.c_str(), message.c_str());
+        Log(@"Error details - Title: %s, Message: %s", title.c_str(), message.c_str());
       }
     });
   }
@@ -1106,7 +1106,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
       // NSLog(@"🎨 FIXING: Forcing window into hierarchy using aggressive methods...");
 
       // Aggressive fix 1: Try to force the window to be key and make it the only visible window
-      NSLog(@"🎨 Total app windows before fix: %lu", (unsigned long)windows.count);
+      Log(@"🎨 Total app windows before fix: %lu", (unsigned long)windows.count);
 
       // Hide all other windows to ensure our error window is the only one visible
       for (UIWindow* window in windows) {
@@ -1253,7 +1253,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     [topViewController presentViewController:alert
                                     animated:YES
                                   completion:^{
-                                    NSLog(@"🎨 Fallback alert displayed successfully!");
+                                    Log(@"🎨 Fallback alert displayed successfully!");
                                   }];
   }
 
