@@ -786,19 +786,23 @@ describe(module.id, function () {
 
 
     it('Derived_BaseProtocolProperty1', function () {
+        __setRuntimeIsDebug(false);
         var instance = TNSDerivedInterface.alloc().init();
         instance.baseProtocolProperty1 = 1;
         UNUSED(instance.baseProtocolProperty1);
 
         var actual = TNSGetOutput();
         expect(actual).toBe('instance setBaseProtocolProperty1: calledinstance baseProtocolProperty1 called');
+        __setRuntimeIsDebug(true);
     });
     it('Derived_BaseProtocolProperty1', function () {
+        __setRuntimeIsDebug(false);
         TNSDerivedInterface.baseProtocolProperty1 = 1;
         UNUSED(TNSDerivedInterface.baseProtocolProperty1);
 
         var actual = TNSGetOutput();
         expect(actual).toBe('static setBaseProtocolProperty1: calledstatic baseProtocolProperty1 called');
+        __setRuntimeIsDebug(true);
     });
     it('Derived_BaseProtocolProperty1Optional', function () {
         var instance = TNSDerivedInterface.alloc().init();

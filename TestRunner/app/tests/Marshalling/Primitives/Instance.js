@@ -214,6 +214,7 @@ describe(module.id, function () {
     });
 
     it("InstanceMethodWithUnichar", function () {
+        __setRuntimeIsDebug(false);
         var result = TNSPrimitives.alloc().init().methodWithUnichar('i');
         expect(result).toBe('i');
 
@@ -223,6 +224,7 @@ describe(module.id, function () {
         expect(function () {
             TNSPrimitives.alloc().init().methodWithUnichar('iPhone');
         }).toThrowError();
+        __setRuntimeIsDebug(true);
     });
     
     it("InstanceMethodWithNSNumber1", function () {

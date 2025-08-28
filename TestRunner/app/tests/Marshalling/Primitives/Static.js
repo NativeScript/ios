@@ -214,6 +214,7 @@ describe(module.id, function () {
     });
 
     it("StaticMethodWithUnichar", function () {
+        __setRuntimeIsDebug(false);
         var result = TNSPrimitives.methodWithUnichar('i');
         expect(result).toBe('i');
 
@@ -223,6 +224,7 @@ describe(module.id, function () {
         expect(function () {
             TNSPrimitives.methodWithUnichar('iPhone');
         }).toThrowError();
+        __setRuntimeIsDebug(true);
     });
     
     

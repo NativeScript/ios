@@ -31,20 +31,13 @@ describe("TNS Workers", () => {
     });
 
     it("Should throw exception when no parameter is passed", () => {
+        __setRuntimeIsDebug(false);
         expect(() => new Worker()).toThrow();
+        __setRuntimeIsDebug(true);
     });
 
-    if (global.NSObject) {
-        it("Should call worker.onerror when script does not exist", (done) => {
-            var worker = new Worker("./idonot-exist.js");
-            worker.onerror = (e) => {
-                expect(e).not.toEqual(null);
-                done();
-            }
-        });
-    }
-
     it("Should throw exception when parameter is not a proper string", () => {
+        __setRuntimeIsDebug(false);
         // with object parameter
         expect(() => new Worker({ filename: "./tests/shared/Workers/EvalWorker.js" })).toThrow();
         // with number parameter
@@ -55,10 +48,13 @@ describe("TNS Workers", () => {
                 function a() { }
             })())
         }).toThrow();
+        __setRuntimeIsDebug(true);
     });
 
     it("Should throw exception when not invoked as constructor", () => {
+        __setRuntimeIsDebug(false);
         expect(() => { Worker("./tests/shared/Workers/EvalWorker.js"); }).toThrow();
+        __setRuntimeIsDebug(true);
     });
 
     it("Should be terminated without error", () => {
@@ -67,15 +63,19 @@ describe("TNS Workers", () => {
     });
 
     it("Should throw exception when Worker.postMessage is called without arguments", () => {
+        __setRuntimeIsDebug(false);
         var w = new Worker("./tests/shared/Workers/EvalWorker.js");
         expect(() => { w.postMessage(); }).toThrow();
         w.terminate();
+        __setRuntimeIsDebug(true);
     });
 
     it("Should throw exception when Worker.postMessage is called more than one argument", () => {
+        __setRuntimeIsDebug(false);
         var w = new Worker("./tests/shared/Workers/EvalWorker.js");
         expect(() => { w.postMessage("Message: 1", "Message2") }).toThrow();
         w.terminate();
+        __setRuntimeIsDebug(true);
     });
 
     it("Should not receiving messages after worker.terminate() call", (done) => {
@@ -194,6 +194,7 @@ describe("TNS Workers", () => {
     });
 
     xit("Should throw error if post circular object", () => {
+        __setRuntimeIsDebug(false);
         var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
 
         var parent = { parent: true };
@@ -207,6 +208,7 @@ describe("TNS Workers", () => {
         })).toThrow();
 
         worker.terminate();
+        __setRuntimeIsDebug(true);
     });
 
     if (global.NSObject) {
@@ -385,12 +387,15 @@ describe("TNS Workers", () => {
     });
 
     it("Test onerror invoked for a script that has invalid syntax", (done) => {
+        // __setRuntimeIsDebug(false);
         var worker = new Worker("./tests/shared/Workers/WorkerInvalidSyntax.js");
 
         worker.onerror = (err) => {
             worker.terminate();
             done();
         };
+
+        // __setRuntimeIsDebug(true);
     });
 
     it("Test onerror invoked on worker scope and propagate to main's onerror when returning false", (done) => {

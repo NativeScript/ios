@@ -214,6 +214,7 @@ describe(module.id, function () {
     });
 
     it("FunctionWithUnichar", function () {
+        __setRuntimeIsDebug(false);
         var result = functionWithUnichar('i');
         expect(result).toBe('i');
 
@@ -223,5 +224,6 @@ describe(module.id, function () {
         expect(function () {
             functionWithUnichar('iPhone');
         }).toThrowError();
+        __setRuntimeIsDebug(true);
     });
 });

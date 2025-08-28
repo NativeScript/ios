@@ -94,8 +94,10 @@ describe("Constructing Objective-C classes with new operator", function () {
     });
 
     it("initAWithIntNotImplemented:andInt:andInt and initZWithIntNotImplemented:andInt:andInt from protocol should be missing", function () {
+        __setRuntimeIsDebug(false);
         expect(() => new TNSCInterface(1, 2, 3)).toThrowError("No initializer found that matches constructor invocation.");
         expect(() => new (TNSCInterface.extend({}))(1, 2, 3)).toThrowError("No initializer found that matches constructor invocation.");
+        __setRuntimeIsDebug(true);
     });
 
     it("NSArray with JS array constructor", function () {
@@ -104,9 +106,11 @@ describe("Constructing Objective-C classes with new operator", function () {
     });
 
     it("Invalid empty constructor args", function () {
+        __setRuntimeIsDebug(false);
         expect(function() {
             var nsarray = new NSObject({});
         }).toThrowError();
+        __setRuntimeIsDebug(true);
     });
 
     // it('allocAndNewMethodsRetaining', function () {
