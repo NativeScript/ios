@@ -229,6 +229,43 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context
       async);
 }
 
+void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(const std::string& message, const std::string& source, const std::string& stackTrace, int lineNumber, bool async) {
+  auto runtime = static_cast<Runtime*>(mainIsolate_->GetData(Constants::RUNTIME_SLOT));
+  if (runtime == nullptr) {
+    return;
+  }
+  tns::ExecuteOnRunLoop(
+      runtime->RuntimeLoop(),
+      [this, message, source, stackTrace, lineNumber]() {
+        v8::Locker locker(this->mainIsolate_);
+        Isolate::Scope isolate_scope(this->mainIsolate_);
+        HandleScope handle_scope(this->mainIsolate_);
+        Local<Context> context = Caches::Get(this->mainIsolate_)->GetContext();
+        Local<Object> worker = this->poWorker_->Get(this->mainIsolate_).As<Object>();
+
+        Local<Value> onErrorVal;
+        bool success = worker->Get(context, tns::ToV8String(this->mainIsolate_, "onerror"))
+                           .ToLocal(&onErrorVal);
+        tns::Assert(success, this->mainIsolate_);
+
+        if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
+          Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
+          Local<Object> arg = this->ConstructErrorObject(context, message, source, stackTrace, lineNumber);
+          Local<Value> args[1] = {arg};
+          Local<Value> result;
+          TryCatch tc(this->mainIsolate_);
+          bool success = onErrorFunc->Call(context, v8::Undefined(this->mainIsolate_), 1, args)
+                             .ToLocal(&result);
+          if (!success && tc.HasCaught()) {
+            Local<Value> error = tc.Exception();
+            Log(@"%s", tns::ToString(this->mainIsolate_, error).c_str());
+            this->mainIsolate_->ThrowException(error);
+          }
+        }
+      },
+      async);
+}
+
 Local<Object> WorkerWrapper::ConstructErrorObject(Local<Context> context, std::string message,
                                                   std::string source, std::string stackTrace,
                                                   int lineNumber) {

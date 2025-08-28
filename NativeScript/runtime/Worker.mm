@@ -148,6 +148,22 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
       runtime->RunModule(resolvedPath);
 
+      // If in debug mode the module loader may have set the global jsErrorOccurred
+      // flag and returned gracefully. In that case create an error payload and
+      // pass it to the main thread so that `worker.onerror` can be invoked.
+      extern bool jsErrorOccurred;
+      if (RuntimeConfig.IsDebug && jsErrorOccurred) {
+        // Construct a minimal error payload to match TryCatch extraction
+        std::string message = "Script compilation failed";
+        std::string src = resolvedPath;
+        std::string stackTrace = "";
+        int lineNumber = 1;
+         // Dispatch asynchronously so the main thread can attach handlers
+         worker->PassUncaughtExceptionFromWorkerToMain(message, src, stackTrace, lineNumber, true);
+            // Clear the global flag to avoid duplicate reporting
+            jsErrorOccurred = false;
+          }
+
       if (tc.HasCaught()) {
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
@@ -161,7 +177,11 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
           // printf("Worker: Exception: %s\n", *error_str);
         }
 
-        worker->PassUncaughtExceptionFromWorkerToMain(context, tc, false);
+  // Ensure we dispatch the error asynchronously to the main thread so
+  // the caller has a chance to attach `worker.onerror` immediately
+  // after construction. Delivering synchronously can race with the
+  // test which sets the handler right after `new Worker(...)`.
+  worker->PassUncaughtExceptionFromWorkerToMain(context, tc, true);
         worker->Terminate();
       }
 
