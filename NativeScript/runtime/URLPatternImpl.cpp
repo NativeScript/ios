@@ -4,6 +4,8 @@
 
 #include "URLPatternImpl.h"
 
+#include <utility>
+
 #include "ModuleBinding.hpp"
 
 using namespace std;
@@ -324,7 +326,9 @@ void URLPatternImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (args.Length() == 0) {
     auto thiz = args.This();
     auto init = ada::url_pattern_init{};
-    auto url_pattern = ada::parse_url_pattern<v8_regex_provider>(init);
+    ada::url_pattern_input input = init;
+    auto url_pattern =
+        ada::parse_url_pattern<v8_regex_provider>(std::move(input));
     if (!url_pattern) {
       isolate->ThrowException(v8::Exception::TypeError(
           tns::ToV8String(isolate, "Failed to construct URLPattern")));
@@ -414,7 +418,7 @@ void URLPatternImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   auto url_pattern = ada::parse_url_pattern<v8_regex_provider>(
-      arg0, base_url.has_value() ? &base_url_view : nullptr,
+      std::move(arg0), base_url.has_value() ? &base_url_view : nullptr,
       options.has_value() ? &options.value() : nullptr);
   if (!url_pattern) {
     isolate->ThrowException(v8::Exception::TypeError(
