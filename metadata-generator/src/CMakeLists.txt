@@ -35,6 +35,10 @@ set(GENERATOR_HEADERS
     Utils/StringUtils.h
     Yaml/MetaYamlTraits.h
     Yaml/YamlSerializer.h
+    
+    # Swift support
+    Swift/SymbolGraphParser.h
+    TypeScript/SwiftDefinitionWriter.h
 )
 
 set(GENERATOR_SOURCES
@@ -63,6 +67,10 @@ set(GENERATOR_SOURCES
     TypeScript/DocSetManager.cpp
     Utils/fileStream.cpp
     Utils/memoryStream.cpp
+    
+    # Swift support
+    Swift/SymbolGraphParser.cpp
+    TypeScript/SwiftDefinitionWriter.cpp
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${LIBXML2_INCLUDE_DIR})

@@ -1,0 +1,47 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "PackageStructure": ["<PackageStructure>"]
+  "SwiftDemo-arm64-apple-macosx26.0-debug.module": ["<SwiftDemo-arm64-apple-macosx26.0-debug.module>"]
+  "main": ["<SwiftDemo-arm64-apple-macosx26.0-debug.module>"]
+  "test": ["<SwiftDemo-arm64-apple-macosx26.0-debug.module>"]
+default: "main"
+nodes:
+  "/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/Sources/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/SwiftDemo.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/Sources/SwiftDemo/Demo.swift"]
+    outputs: ["/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/SwiftDemo.build/sources"]
+    description: "Write auxiliary file /Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/SwiftDemo.build/sources"
+
+  "/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/swift-version-39B54973F684ADAB.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/swift-version-39B54973F684ADAB.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/swift-version-39B54973F684ADAB.txt"
+
+  "<SwiftDemo-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/Modules/SwiftDemo.swiftmodule"]
+    outputs: ["<SwiftDemo-arm64-apple-macosx26.0-debug.module>"]
+
+  "C.SwiftDemo-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/Sources/SwiftDemo/Demo.swift","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/swift-version-39B54973F684ADAB.txt","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/SwiftDemo.build/sources"]
+    outputs: ["/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/Modules/SwiftDemo.swiftmodule"]
+    description: "Compiling Swift Module 'SwiftDemo' (1 sources)"
+    args: ["/Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","SwiftDemo","-emit-dependencies","-emit-module","-emit-module-path","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/Modules/SwiftDemo.swiftmodule","-output-file-map","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/SwiftDemo.build/output-file-map.json","-parse-as-library","-incremental","@/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/SwiftDemo.build/sources","-I","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx10.13","-incremental","-enable-batch-mode","-serialize-diagnostics","-Onone","-enable-testing","-j16","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/.build/index-build/arm64-apple-macosx/debug/SwiftDemo.build/include/SwiftDemo-Swift.h","-swift-version","5","-Xfrontend","-experimental-lazy-typecheck","-Xfrontend","-experimental-skip-all-function-bodies","-Xfrontend","-experimental-allow-module-with-compiler-errors","-Xfrontend","-empty-abi-descriptor","-plugin-path","/Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk","-F","/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk","-Xcc","-F","-Xcc","/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","swiftdemo"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/Sources/","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/Package.swift","/Users/nstudio/Documents/github/NativeScript/ios/metadata-generator/TestFixtures/SwiftDemo/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

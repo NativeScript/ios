@@ -108,6 +108,8 @@ docset_path = os.path.join(os.path.expanduser("~"),
                            .format(docset_platform))
 yaml_output_folder = env_or_none("NS_DEBUG_METADATA_PATH") or env_or_none("TNS_DEBUG_METADATA_PATH")
 strict_includes = env_or_none("NS_DEBUG_METADATA_STRICT_INCLUDES") or env_or_none("TNS_DEBUG_METADATA_STRICT_INCLUDES")
+swift_symbolgraph_dir = env_or_none("NS_SWIFT_SYMBOLGRAPH_DIR") or env_or_none("TNS_SWIFT_SYMBOLGRAPH_DIR")
+skip_objc = env_bool("NS_SKIP_OBJC_METADATA") or env_bool("TNS_SKIP_OBJC_METADATA")
 
 
 def save_stream_to_file(filename, stream):
@@ -126,6 +128,12 @@ def generate_metadata(arch):
 
     if strict_includes is not None:
         generator_call.extend(["-strict-includes={}".format(strict_includes)])
+
+    # Swift-only mode or Swift supplement
+    if swift_symbolgraph_dir is not None and len(swift_symbolgraph_dir) > 0:
+        generator_call.extend(["--swift-symbolgraph-dir", swift_symbolgraph_dir])
+    if skip_objc:
+        generator_call.extend(["--skip-objc"]) 
 
     # optionally add typescript output folder
     if typescript_output_folder is not None:
