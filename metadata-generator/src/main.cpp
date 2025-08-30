@@ -10,13 +10,17 @@
 #include "TypeScript/DefinitionWriter.h"
 #include "TypeScript/DocSetManager.h"
 #include "Yaml/YamlSerializer.h"
+#include "Swift/SymbolGraphParser.h"
+#include "TypeScript/SwiftDefinitionWriter.h"
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Tooling/Tooling.h>
 #include <fstream>
 #include <llvm/Support/Debug.h>
+#include <llvm/Support/CommandLine.h>
 #include <llvm/Support/Path.h>
 #include <pwd.h>
 #include <sstream>
+#include <string>
 
 // Command line parameters
 llvm::cl::opt<bool>   cla_verbose("verbose", llvm::cl::desc("Set verbose output mode"), llvm::cl::value_desc("bool"));
@@ -33,6 +37,10 @@ llvm::cl::opt<string> cla_whiteListModuleRegexesFile("whitelist-modules-file", l
 llvm::cl::opt<bool>   cla_applyManualDtsChanges("apply-manual-dts-changes", llvm::cl::desc("Specify whether to disable manual adjustments to generated .d.ts files for specific erroneous cases in the iOS SDK"), llvm::cl::init(true));
 llvm::cl::opt<string> cla_clangArgumentsDelimiter(llvm::cl::Positional, llvm::cl::desc("Xclang"), llvm::cl::init("-"));
 llvm::cl::list<string> cla_clangArguments(llvm::cl::ConsumeAfter, llvm::cl::desc("<clang arguments>..."));
+
+// Swift support
+llvm::cl::opt<string> cla_swiftSymbolGraphDir("swift-symbolgraph-dir", llvm::cl::desc("Directory containing Swift .symbolgraph files to import"), llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<bool>   cla_skipObjC("skip-objc", llvm::cl::desc("Skip Objective-C parsing and only run Swift symbolgraph import"), llvm::cl::init(false));
 
 class MetaGenerationConsumer : public clang::ASTConsumer {
 public:
@@ -102,7 +110,7 @@ public:
             file.save(cla_outputBinFile);
         }
 
-        // Generate TypeScript definitions
+    // Generate TypeScript definitions (Objective-C)
         if (!cla_outputDtsFolder.empty()) {
             llvm::sys::fs::create_directories(cla_outputDtsFolder);
             std::string docSetPath = cla_docSetFile.empty() ? "" : cla_docSetFile.getValue();
@@ -183,54 +191,82 @@ int main(int argc, const char** argv)
 
         TypeScript::DefinitionWriter::applyManualChanges = cla_applyManualDtsChanges;
 
-        std::vector<std::string> clangArgs{
-            "-v",
-            "-x", "objective-c",
-            "-fno-objc-arc", "-fmodule-maps", "-ferror-limit=0",
-            "-Wno-unknown-pragmas", "-Wno-ignored-attributes", "-Wno-nullability-completeness", "-Wno-expansion-to-defined",
-            "-D__NATIVESCRIPT_METADATA_GENERATOR=1"
-        };
+        if (!cla_skipObjC) {
+            std::vector<std::string> clangArgs{
+                "-v",
+                "-x", "objective-c",
+                "-fno-objc-arc", "-fmodule-maps", "-ferror-limit=0",
+                "-Wno-unknown-pragmas", "-Wno-ignored-attributes", "-Wno-nullability-completeness", "-Wno-expansion-to-defined",
+                "-D__NATIVESCRIPT_METADATA_GENERATOR=1"
+            };
 
-        // merge with hardcoded clang arguments
-        clangArgs.insert(clangArgs.end(), cla_clangArguments.begin(), cla_clangArguments.end());
+            // merge with hardcoded clang arguments
+            clangArgs.insert(clangArgs.end(), cla_clangArguments.begin(), cla_clangArguments.end());
 
-        // Log Clang Arguments
-        std::cout << "Clang Arguments: \n";
-        for (const std::string& arg : clangArgs) {
-            std::cout << "\"" << arg << "\","
-                      << " ";
+            // Log Clang Arguments
+            std::cout << "Clang Arguments: \n";
+            for (const std::string& arg : clangArgs) {
+                std::cout << "\"" << arg << "\"," << " ";
+            }
+            std::cout << std::endl;
+
+            std::string isysroot;
+            std::vector<string>::const_iterator it = std::find(clangArgs.begin(), clangArgs.end(), "-isysroot");
+            if (it != clangArgs.end() && ++it != clangArgs.end()) {
+                isysroot = *it;
+            }
+
+            std::vector<std::string> includePaths;
+            std::string umbrellaContent = CreateUmbrellaHeader(clangArgs, includePaths);
+
+            if (!cla_inputUmbrellaHeaderFile.empty()) {
+                std::ifstream fs(cla_inputUmbrellaHeaderFile);
+                umbrellaContent = std::string((std::istreambuf_iterator<char>(fs)), std::istreambuf_iterator<char>());
+            }
+
+            clangArgs.insert(clangArgs.end(), includePaths.begin(), includePaths.end());
+
+            // Save the umbrella file
+            if (!cla_outputUmbrellaHeaderFile.empty()) {
+                std::error_code errorCode;
+                llvm::raw_fd_ostream umbrellaFileStream(cla_outputUmbrellaHeaderFile, errorCode, llvm::sys::fs::OpenFlags::OF_None);
+                if (!errorCode) {
+                    umbrellaFileStream << umbrellaContent;
+                    umbrellaFileStream.close();
+                }
+            }
+            // generate metadata for the intermediate sdk header
+            Meta::ModulesBlacklist modulesBlacklist(cla_whiteListModuleRegexesFile, cla_blackListModuleRegexesFile);
+            clang::tooling::runToolOnCodeWithArgs(std::unique_ptr<MetaGenerationFrontendAction>(new MetaGenerationFrontendAction(/*r*/modulesBlacklist)), umbrellaContent, clangArgs, "umbrella.h", "objc-metadata-generator");
         }
-        std::cout << std::endl;
 
-        std::string isysroot;
-        std::vector<string>::const_iterator it = std::find(clangArgs.begin(), clangArgs.end(), "-isysroot");
-        if (it != clangArgs.end() && ++it != clangArgs.end()) {
-            isysroot = *it;
-        }
+        // Swift: read symbol graphs and emit TS
+        if (!cla_outputDtsFolder.empty() && !cla_swiftSymbolGraphDir.empty()) {
+            auto graphs = Swift::SymbolGraphParser::scanDirectory(cla_swiftSymbolGraphDir);
+            llvm::sys::fs::create_directories(cla_outputDtsFolder);
+            std::string docSetPath = cla_docSetFile.empty() ? "" : cla_docSetFile.getValue();
+            for (auto &entry : graphs.filesByModule) {
+                const auto &moduleName = entry.first;
+                const auto &files = entry.second;
+                auto metas = Swift::SymbolGraphParser::parseModule(moduleName, files);
+                std::pair<std::string, std::vector<Meta::Meta*>> swiftModule(moduleName, metas);
 
-        std::vector<std::string> includePaths;
-        std::string umbrellaContent = CreateUmbrellaHeader(clangArgs, includePaths);
+                TypeScript::SwiftDefinitionWriter swiftWriter(swiftModule, docSetPath);
+                llvm::SmallString<128> path;
+                llvm::sys::path::append(path, cla_outputDtsFolder, "swift!" + moduleName + ".d.ts");
+                std::error_code error;
+                llvm::raw_fd_ostream file(path.str(), error, llvm::sys::fs::OF_Text);
+                if (error) {
+                    std::cout << error.message();
+                } else {
+                    file << swiftWriter.write();
+                    file.close();
+                }
 
-        if (!cla_inputUmbrellaHeaderFile.empty()) {
-            std::ifstream fs(cla_inputUmbrellaHeaderFile);
-            umbrellaContent = std::string((std::istreambuf_iterator<char>(fs)),
-                                          std::istreambuf_iterator<char>());
-        }
-
-        clangArgs.insert(clangArgs.end(), includePaths.begin(), includePaths.end());
-
-        // Save the umbrella file
-        if (!cla_outputUmbrellaHeaderFile.empty()) {
-            std::error_code errorCode;
-            llvm::raw_fd_ostream umbrellaFileStream(cla_outputUmbrellaHeaderFile, errorCode, llvm::sys::fs::OpenFlags::OF_None);
-            if (!errorCode) {
-                umbrellaFileStream << umbrellaContent;
-                umbrellaFileStream.close();
+                // cleanup allocated metas (bootstrap only; later we will manage via factories)
+                for (auto *m : metas) delete m;
             }
         }
-        // generate metadata for the intermediate sdk header
-        Meta::ModulesBlacklist modulesBlacklist(cla_whiteListModuleRegexesFile, cla_blackListModuleRegexesFile);
-        clang::tooling::runToolOnCodeWithArgs(std::unique_ptr<MetaGenerationFrontendAction>(new MetaGenerationFrontendAction(/*r*/modulesBlacklist)), umbrellaContent, clangArgs, "umbrella.h", "objc-metadata-generator");
 
         std::clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;

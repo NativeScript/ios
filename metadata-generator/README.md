@@ -46,3 +46,31 @@ Example command line arguments:
 ```
 
 For a better way of generating these arguments, just run the TestRunner scheme on the v8ios-runtime project and get the arguments from the log.
+
+## Swift (Symbol Graph) support
+
+You can generate TypeScript from Swift modules by pointing the generator to a directory of `.symbolgraph` files.
+
+1. Produce symbol graphs for your Swift module (Swift 5.9+):
+
+```
+swift build
+swift symbolgraph-extract --module-name YourModule \
+	--minimum-access-level public \
+	--output-dir .symbolgraph
+```
+
+2. Run the generator with the new flags:
+
+```
+./objc-metadata-generator \
+	-output-typescript <out_dir> \
+	--swift-symbolgraph-dir <path_to>/.symbolgraph \
+	--skip-objc
+```
+
+Environment variables (if using build-step script):
+- `NS_SWIFT_SYMBOLGRAPH_DIR` (or `TNS_SWIFT_SYMBOLGRAPH_DIR`) – path to symbol graph directory
+- `NS_SKIP_OBJC_METADATA` (or `TNS_SKIP_OBJC_METADATA`) – set to `1` to skip Objective-C phase
+
+A tiny sample package is in `TestFixtures/SwiftDemo`. See its README for quick steps.
