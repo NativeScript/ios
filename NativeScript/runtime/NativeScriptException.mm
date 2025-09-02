@@ -128,7 +128,8 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
         jsErrorOccurred = true;
         Log(@"***** JavaScript exception occurred "
             @"in debug mode *****\n");
-        Log(@"%@", reasonStr);
+        Log(@"%s", fullMessage.c_str());
+        Log(@"%s", stackTrace.c_str());
         // NSLog(@"🎨 CALLING ShowErrorModal for OnUncaughtError - should display beautiful branded "
         //       @"modal...");
 
@@ -150,7 +151,7 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
         // Use the same comprehensive fullMessage that the terminal uses (identical stack traces)
         std::string completeStackTrace = reasonStr ? [reasonStr UTF8String] : fullMessage;
         Log(@"***** End stack trace - Fix error to continue *****\n");
-        ShowErrorModal(errorTitle, errorMessage, completeStackTrace);
+        ShowErrorModal(errorTitle, errorMessage, stackTrace);
 
         // Don't crash in debug mode - just return
         return;
@@ -437,7 +438,7 @@ void NativeScriptException::ShowErrorModal(const std::string& title, const std::
   if (app.windows.count == 0 && app.connectedScenes.count == 0) {
     Log(@"Note: JavaScript error during boot.");
     Log(@"================================");
-    Log(@"%@", [NSString stringWithUTF8String:stackTrace.c_str()]);
+    Log(@"%s", stackTrace.c_str());
     Log(@"================================");
     Log(@"Please fix the error and save the file to auto reload the app.");
     Log(@"================================");
