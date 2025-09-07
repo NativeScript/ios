@@ -28,6 +28,7 @@
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
+#include <mutex>
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -116,6 +117,8 @@ namespace tns {
 std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
+static std::unordered_map<std::string, id> AppConfigCache; // generic cache for app config values
+static std::mutex AppConfigCacheMutex;
 
 // Global flag to track when JavaScript errors occur during execution
 bool jsErrorOccurred = false;
@@ -442,7 +445,27 @@ id Runtime::GetAppConfigValue(std::string key) {
     }
   }
 
-  id result = AppPackageJson[[NSString stringWithUTF8String:key.c_str()]];
+  // Generic cache for all keys to avoid repeated NSString conversion and NSDictionary hashing
+  {
+    std::lock_guard<std::mutex> lock(AppConfigCacheMutex);
+    auto it = AppConfigCache.find(key);
+    if (it != AppConfigCache.end()) {
+      return it->second;
+    }
+  }
+
+  id result = nil;
+  if (AppPackageJson != nil) {
+    NSString* nsKey = [NSString stringWithUTF8String:key.c_str()];
+    result = AppPackageJson[nsKey];
+  }
+
+  // Store in cache (can cache nil as NSNull to differentiate presence if desired; for now, cache as-is)
+  {
+    std::lock_guard<std::mutex> lock(AppConfigCacheMutex);
+    AppConfigCache[key] = result;
+  }
+
   return result;
 }
 
