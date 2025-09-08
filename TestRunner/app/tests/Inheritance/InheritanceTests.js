@@ -1887,9 +1887,11 @@ describe(module.id, function () {
     });
 
     it('ExtendDerivedClass', function () {
+        __setRuntimeIsDebug(false);
         expect(function () {
             NSObject.extend({}).extend({});
         }).toThrowError();
+        __setRuntimeIsDebug(true);
     });
 
     // it('OptionalProtocolMethodsAndCategories', function () {
