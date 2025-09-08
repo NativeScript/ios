@@ -59,19 +59,56 @@ printf "Generating metadata..."
 GEN_METADATA $TARGET_ARCH
 DELETE_SWIFT_MODULES_DIR
 
-# Resolve linker: prefer provided NS_LD, otherwise use toolchain clang if present.
-DEFAULT_LD="$TOOLCHAIN_DIR/usr/bin/clang"
-if [[ -z "$NS_LD" ]]; then
-    if [[ -x "$DEFAULT_LD" ]]; then
-        NS_LD="$DEFAULT_LD"
-    else
-        echo "NSLD: Skipping link because toolchain clang not found: $DEFAULT_LD (TOOLCHAIN_DIR may be missing)."
+function resolve_clang() {
+    # 1) If NS_LD is set and executable, honor it.
+    if [[ -n "$NS_LD" && -x "$NS_LD" ]]; then
+        echo "$NS_LD"
+        return 0
     fi
+
+    # 2) TOOLCHAIN_DIR (if provided)
+    if [[ -n "$TOOLCHAIN_DIR" && -x "$TOOLCHAIN_DIR/usr/bin/clang" ]]; then
+        echo "$TOOLCHAIN_DIR/usr/bin/clang"
+        return 0
+    fi
+
+    # 3) Xcode's DT_TOOLCHAIN_DIR (provided by xcodebuild)
+    if [[ -n "$DT_TOOLCHAIN_DIR" && -x "$DT_TOOLCHAIN_DIR/usr/bin/clang" ]]; then
+        echo "$DT_TOOLCHAIN_DIR/usr/bin/clang"
+        return 0
+    fi
+
+    # 4) xcrun lookup (most reliable within Xcode build env)
+    local xcrun_clang
+    xcrun_clang=$(xcrun --find clang 2>/dev/null) || true
+    if [[ -n "$xcrun_clang" && -x "$xcrun_clang" ]]; then
+        echo "$xcrun_clang"
+        return 0
+    fi
+
+    # 5) Xcode default toolchain from xcode-select
+    local xcode_path
+    xcode_path=$(xcode-select -p 2>/dev/null) || true
+    if [[ -n "$xcode_path" && -x "$xcode_path/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" ]]; then
+        echo "$xcode_path/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+        return 0
+    fi
+
+    # 6) System fallback
+    if [[ -x "/usr/bin/clang" ]]; then
+        echo "/usr/bin/clang"
+        return 0
+    fi
+
+    return 1
+}
+
+CLANG_PATH=$(resolve_clang)
+if [[ -z "$CLANG_PATH" ]]; then
+    echo "NSLD: ERROR: Could not locate a usable clang. TOOLCHAIN_DIR='${TOOLCHAIN_DIR}' DT_TOOLCHAIN_DIR='${DT_TOOLCHAIN_DIR}'."
+    exit 1
 fi
 
-# If NS_LD was explicitly set to the default path but it's missing, skip as well.
-if [[ "$NS_LD" == "$DEFAULT_LD" && ! -x "$NS_LD" ]]; then
-    echo "NSLD: Skipping link because toolchain clang not found: $NS_LD (TOOLCHAIN_DIR may be missing)."
-else
-  "$NS_LD" "$@"
-fi
+# For visibility downstream, set NS_LD to the resolved path and invoke.
+NS_LD="$CLANG_PATH"
+"$NS_LD" "$@"
