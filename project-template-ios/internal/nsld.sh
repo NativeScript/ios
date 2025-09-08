@@ -59,4 +59,9 @@ printf "Generating metadata..."
 GEN_METADATA $TARGET_ARCH
 DELETE_SWIFT_MODULES_DIR
 NS_LD="${NS_LD:-"$TOOLCHAIN_DIR/usr/bin/clang"}"
+# Skip linking if the resolved linker path points to a transient Metal.xctoolchain
+if [[ "$NS_LD" == *"Metal.xctoolchain"* ]]; then
+    echo "NSLD: Skipping link because NS_LD resolves to a Metal.xctoolchain: $NS_LD"
+    exit 0
+fi
 $NS_LD "$@"
