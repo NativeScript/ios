@@ -66,14 +66,12 @@ if [[ -z "$NS_LD" ]]; then
         NS_LD="$DEFAULT_LD"
     else
         echo "NSLD: Skipping link because toolchain clang not found: $DEFAULT_LD (TOOLCHAIN_DIR may be missing)."
-        exit 0
     fi
 fi
 
 # If NS_LD was explicitly set to the default path but it's missing, skip as well.
 if [[ "$NS_LD" == "$DEFAULT_LD" && ! -x "$NS_LD" ]]; then
     echo "NSLD: Skipping link because toolchain clang not found: $NS_LD (TOOLCHAIN_DIR may be missing)."
-    exit 0
+else
+  "$NS_LD" "$@"
 fi
-
-"$NS_LD" "$@"
