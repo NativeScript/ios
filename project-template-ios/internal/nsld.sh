@@ -58,10 +58,22 @@ GEN_MODULEMAP $TARGET_ARCH
 printf "Generating metadata..."
 GEN_METADATA $TARGET_ARCH
 DELETE_SWIFT_MODULES_DIR
-NS_LD="${NS_LD:-"$TOOLCHAIN_DIR/usr/bin/clang"}"
-# Skip linking if the resolved linker path points to a transient Metal.xctoolchain
-if [[ "$NS_LD" == *"Metal.xctoolchain"* ]]; then
-    echo "NSLD: Skipping link because NS_LD resolves to a Metal.xctoolchain: $NS_LD"
+
+# Resolve linker: prefer provided NS_LD, otherwise use toolchain clang if present.
+DEFAULT_LD="$TOOLCHAIN_DIR/usr/bin/clang"
+if [[ -z "$NS_LD" ]]; then
+    if [[ -x "$DEFAULT_LD" ]]; then
+        NS_LD="$DEFAULT_LD"
+    else
+        echo "NSLD: Skipping link because toolchain clang not found: $DEFAULT_LD (TOOLCHAIN_DIR may be missing)."
+        exit 0
+    fi
+fi
+
+# If NS_LD was explicitly set to the default path but it's missing, skip as well.
+if [[ "$NS_LD" == "$DEFAULT_LD" && ! -x "$NS_LD" ]]; then
+    echo "NSLD: Skipping link because toolchain clang not found: $NS_LD (TOOLCHAIN_DIR may be missing)."
     exit 0
 fi
-$NS_LD "$@"
+
+"$NS_LD" "$@"
