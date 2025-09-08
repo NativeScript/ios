@@ -32,8 +32,15 @@ jobs:
         run: |
           npm install
           python3 -m pip install --upgrade pip six
-          brew install cmake
-          [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+          # Ensure CMake is available without conflicting with pinned Homebrew formula
+          if ! command -v cmake >/dev/null; then
+            brew list cmake || brew install cmake
+          fi
+          # Some scripts expect cmake at /usr/local/bin; create a shim if needed
+          if [ ! -x /usr/local/bin/cmake ]; then
+            sudo mkdir -p /usr/local/bin
+            sudo ln -sf "$(command -v cmake)" /usr/local/bin/cmake
+          fi
       - name: Get Current Version
         run: |
           echo NPM_VERSION=$(node -e "console.log(require('./package.json').version);") >> $GITHUB_ENV
@@ -79,8 +86,15 @@ jobs:
         run: |
           npm install
           python3 -m pip install --upgrade pip six
-          brew install cmake
-          [ ! -f /usr/local/bin/cmake ] && ln -s /usr/local/bin/cmake $(which cmake) || true
+          # Ensure CMake is available without conflicting with pinned Homebrew formula
+          if ! command -v cmake >/dev/null; then
+            brew list cmake || brew install cmake
+          fi
+          # Some scripts expect cmake at /usr/local/bin; create a shim if needed
+          if [ ! -x /usr/local/bin/cmake ]; then
+            sudo mkdir -p /usr/local/bin
+            sudo ln -sf "$(command -v cmake)" /usr/local/bin/cmake
+          fi
           brew install chargepoint/xcparse/xcparse
           npm install -g @edusperoni/junit-cli-report-viewer verify-junit-xml
       - name: Prepare test folder
