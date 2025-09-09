@@ -1,0 +1,146 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: npm
+    directory: /AppWithModules/app
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tests
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tests/shared/Require/PackageJsonApp/io
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tests/shared/Require/PackageJsonAppNoMain/io
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tests/shared/Require/PackageJsonAppWithoutExtension/io
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tests/shared/Require/PackageJsonMainPointsToDir
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tests/shared/Require/PackageJsonSyntaxError/io
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tests/shared/Require/ResolveCanonicalPath
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tests/shared
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tns_modules/dummy-package
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tns_modules/tns-core-modules/shared/Require/PackageJsonTns/io
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /TestRunner/app/tns_modules/tns-core-modules/shared/Require/RequirePriority/dependency5
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+      time: "23:00"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
