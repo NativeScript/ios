@@ -1,3 +1,10 @@
+## [8.9.4](https://github.com/NativeScript/ios/compare/v8.9.2...v8.9.3) (2025-09-09)
+
+
+### Features
+
+- include dSYMs
+
 ## [8.9.3](https://github.com/NativeScript/ios/compare/v8.9.2...v8.9.3) (2025-09-09)
 
 
