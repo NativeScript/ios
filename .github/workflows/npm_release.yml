@@ -204,3 +204,4 @@ jobs:
           artifacts: "dist/nativescript-ios-*.tgz,dist/dSYMs/*.zip"
           bodyFile: "body.md"
           prerelease: ${{needs.build.outputs.npm_tag != 'latest'}}
+          allowUpdates: true
