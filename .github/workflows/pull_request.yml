@@ -103,7 +103,7 @@ jobs:
           mkdir -p dist-test
           echo TEST_FOLDER=$(pwd)/dist-test >> $GITHUB_ENV
       - name: Xcode Tests
-        uses: nick-fields/retry@14672906e672a08bd6eeb15720e9ed3ce869cdd4 # v2.9.0
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         # try to run the tests with xcpretty. If it fails then try again without xcpretty twice for better log output
         # the xcode tests are a bit flaky and they should never fail on this step, as this step only collects the JS test results as junit xml
         with:
