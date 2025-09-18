@@ -1,3 +1,28 @@
+## [8.9.4](https://github.com/NativeScript/ios/compare/v8.9.2...v8.9.3) (2025-09-09)
+
+
+### Features
+
+- include dSYMs
+
+## [8.9.3](https://github.com/NativeScript/ios/compare/v8.9.2...v8.9.3) (2025-09-09)
+
+
+### Bug Fixes
+
+* **catalyst:** variable-length arrays ([#275](https://github.com/NativeScript/ios/issues/275)) ([6d3dfc2](https://github.com/NativeScript/ios/commit/6d3dfc2558e60da60a9f6cbb45cdfd272eefabe7))
+
+
+### Features
+
+* Xcode 26 
+* Ada 3.2.7 ([#279](https://github.com/NativeScript/ios/issues/279)) ([fb56643](https://github.com/NativeScript/ios/commit/fb56643b2ec0e41a10f3acf5633e59bcbd2b0514))
+* improve robustness of linking with clang path checks ([#280](https://github.com/NativeScript/ios/issues/280)) ([debc76d](https://github.com/NativeScript/ios/commit/debc76dfd143d26956180c35c8a96534dd7ad152))
+* opt for os_log with graceful backwards compat fallback ([#278](https://github.com/NativeScript/ios/issues/278)) ([3c5d894](https://github.com/NativeScript/ios/commit/3c5d894e670bcb9ef7c48446b6c565a196f0cfd2))
+* search sub framework paths in metadata generator ([#277](https://github.com/NativeScript/ios/issues/277)) ([7bd239f](https://github.com/NativeScript/ios/commit/7bd239fa43e3884bffe06a7fef6f39aa4a156e39))
+
+
+
 ## [8.9.2](https://github.com/NativeScript/ios/compare/v8.9.1...v8.9.2) (2025-03-11)
 
 
