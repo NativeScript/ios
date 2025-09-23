@@ -203,7 +203,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
                 tns::ToV8String(isolate, "queueMicrotask: callback must be a function")));
             return;
           }
-          Local<Function> cb = info[0].As<Function>();
+          v8::Local<v8::Function> cb = info[0].As<v8::Function>();
           isolate->EnqueueMicrotask(cb);
         });
     globalTemplate->Set(tns::ToV8String(isolate, "queueMicrotask"), qmtTemplate);
