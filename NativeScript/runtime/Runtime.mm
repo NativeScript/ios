@@ -286,6 +286,21 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   DefinePerformanceObject(isolate, globalTemplate);
   DefineTimeMethod(isolate, globalTemplate);
   DefineDrainMicrotaskMethod(isolate, globalTemplate);
+  // queueMicrotask(callback) per spec
+  {
+    Local<FunctionTemplate> qmtTemplate = FunctionTemplate::New(
+        isolate, [](const FunctionCallbackInfo<Value>& info) {
+          auto* isolate = info.GetIsolate();
+          if (info.Length() < 1 || !info[0]->IsFunction()) {
+            isolate->ThrowException(Exception::TypeError(
+                tns::ToV8String(isolate, "queueMicrotask: callback must be a function")));
+            return;
+          }
+          v8::Local<v8::Function> cb = info[0].As<v8::Function>();
+          isolate->EnqueueMicrotask(cb);
+        });
+    globalTemplate->Set(tns::ToV8String(isolate, "queueMicrotask"), qmtTemplate);
+  }
   ObjectManager::Init(isolate, globalTemplate);
   //    SetTimeout::Init(isolate, globalTemplate);
   MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
