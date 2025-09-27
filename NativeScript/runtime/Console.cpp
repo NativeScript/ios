@@ -78,6 +78,41 @@ std::vector<std::string> filterErrorLines(
   return result;
 }
 
+std::string Console::RemapStackTrace(v8::Isolate* isolate, const std::string& stackTrace) {
+  // Get the current context from the isolate
+  Local<Context> context = isolate->GetCurrentContext();
+
+  // Get the global object
+  Local<Object> global = context->Global();
+
+  // Get the __ns_remapStack function from global
+  Local<Value> remapStackValue;
+  bool success =
+      global->Get(context, tns::ToV8String(isolate, "__ns_remapStack"))
+          .ToLocal(&remapStackValue);
+
+  if (success && remapStackValue->IsFunction()) {
+    Local<v8::Function> remapStackFunction =
+        remapStackValue.As<v8::Function>();
+
+    // Prepare arguments - convert your string to V8 string
+    Local<Value> args[] = {tns::ToV8String(isolate, stackTrace)};
+
+    // Call the function
+    Local<Value> result;
+    bool callSuccess =
+        remapStackFunction->Call(context, global, 1, args).ToLocal(&result);
+
+    if (callSuccess && result->IsString()) {
+      // If the function returns a modified string, use it
+      return tns::ToString(isolate, result);
+    }
+  }
+
+  // Return original string if remapping failed or function not available
+  return stackTrace;
+}
+
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
   // TODO: implement 'forceLog' override option like android has, to force logs
   // in prod if desired
@@ -110,36 +145,8 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
       // Extract error details
       std::string errorTitle = "JavaScript Error";
 
-      // Get the current context from the isolate
-      Local<Context> context = isolate->GetCurrentContext();
-
-      // Get the global object
-      Local<Object> global = context->Global();
-
-      // Get the __ns_remapStack function from global
-      Local<Value> remapStackValue;
-      bool success =
-          global->Get(context, tns::ToV8String(isolate, "__ns_remapStack"))
-              .ToLocal(&remapStackValue);
-
-      if (success && remapStackValue->IsFunction()) {
-        Local<v8::Function> remapStackFunction =
-            remapStackValue.As<v8::Function>();
-
-        // Prepare arguments - convert your string to V8 string
-        Local<Value> args[] = {tns::ToV8String(isolate, errorToDisplay)};
-
-        // Call the function
-        Local<Value> result;
-        bool callSuccess =
-            remapStackFunction->Call(context, global, 1, args).ToLocal(&result);
-
-        if (callSuccess && result->IsString()) {
-          // If the function returns a modified string, use it
-          std::string remappedError = tns::ToString(isolate, result);
-          errorToDisplay = remappedError;  // Update the error to display
-        }
-      }
+      // Apply source map remapping to the error display
+      errorToDisplay = RemapStackTrace(isolate, errorToDisplay);
 
       try {
         NativeScriptException::ShowErrorModal(errorTitle, errorToDisplay,
@@ -158,7 +165,15 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
                  verbosityLevelUpper.begin(), ::toupper);
 
   std::stringstream ss;
-  ss << stringResult;
+  std::string processedStringResult = stringResult;
+
+  // Apply source map remapping if this contains a stack trace
+  bool hasStackTrace = isStackFrame(stringResult);
+  if (hasStackTrace) {
+    processedStringResult = RemapStackTrace(isolate, processedStringResult);
+  }
+
+  ss << processedStringResult;
 
   if (verbosityLevel == "trace") {
     std::string stacktrace = tns::GetStackTrace(isolate);

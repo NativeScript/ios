@@ -25,6 +25,7 @@ private:
     static const v8::Local<v8::String> BuildStringFromArg(v8::Local<v8::Context> context, const v8::Local<v8::Value>& val);
     static const v8::Local<v8::String> TransformJSObject(v8::Local<v8::Object> object);
     static ConsoleAPIType VerbosityToInspectorMethod(const std::string level);
+    static std::string RemapStackTrace(v8::Isolate* isolate, const std::string& stackTrace);
     
     static void SendToDevToolsFrontEnd(ConsoleAPIType method,
                                        const v8::FunctionCallbackInfo<v8::Value>& args);

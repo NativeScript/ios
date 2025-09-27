@@ -296,11 +296,12 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
       }
     }
 
-    // For non-critical exceptions, just re-throw normally
+    // For non-critical exceptions:
     if (RuntimeConfig.IsDebug) {
-      Log(@"Debug mode - converting V8 exception to safe log instead of throw");
-      Log(@"Would have thrown: %s", this->message_.c_str());
+      // Be gentle, state case in logs and allow developer to continue
+      Log(@"Debug mode - suppressing throw to continue: %s", this->message_.c_str());
     } else {
+      // just re-throw normally
       isolate->ThrowException(errObj);
     }
   } @catch (NSException* exception) {
