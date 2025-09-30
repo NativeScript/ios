@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include <sstream>
+#include <unordered_set>
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "DictionaryAdapter.h"
@@ -37,8 +38,13 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
                 const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
                 const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
                 const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-                Log(@"ArgConverter::Invoke: ignore method on non-native receiver (class: %s, selector: %s, jsName: %s, args: %d). Common during HMR.",
-                    classNameStr, selectorStr, jsNameStr, (int)args.Length());
+                // Suppress duplicate logs: only log once per class+selector for this process.
+                static std::unordered_set<std::string> s_logged;
+                std::string key = std::string(classNameStr) + ":" + selectorStr;
+                if (s_logged.insert(key).second) {
+                    Log(@"Note: ignore method on non-native receiver (class: %s, selector: %s, jsName: %s, args: %d). Common during HMR.",
+                        classNameStr, selectorStr, jsNameStr, (int)args.Length());
+                }
                 return v8::Undefined(isolate);
             } else {
                 tns::Assert(false, isolate);
@@ -63,8 +69,13 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
                 const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
                 const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
                 const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-                Log(@"ArgConverter::Invoke: unexpected receiver wrapper type %d (class: %s, selector: %s, jsName: %s). Skipping in DEBUG.",
-                    (int)wrapper->Type(), classNameStr, selectorStr, jsNameStr);
+                // Suppress duplicate logs: only log once per class+selector for this process.
+                static std::unordered_set<std::string> s_logged;
+                std::string key = std::string(classNameStr) + ":" + selectorStr;
+                if (s_logged.insert(key).second) {
+                    Log(@"Note: ignore receiver wrapper type %d (class: %s, selector: %s, jsName: %s). Common during HMR.",
+                        (int)wrapper->Type(), classNameStr, selectorStr, jsNameStr);
+                }
                 return v8::Undefined(isolate);
             } else {
                 tns::Assert(false, isolate);
