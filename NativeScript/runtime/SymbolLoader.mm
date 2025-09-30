@@ -108,8 +108,6 @@ SymbolResolver* SymbolLoader::resolveModule(const ModuleMeta* module) {
         NSURL* bundleUrl = [NSURL URLWithString:frameworkPathStr relativeToURL:baseUrl];
         if (CFBundleRef bundle = CFBundleCreate(kCFAllocatorDefault, (CFURLRef)bundleUrl)) {
             resolver = std::make_unique<CFBundleSymbolResolver>(bundle);
-        } else {
-            os_log_debug(ns_symbolloader_log(), "NativeScript could not load bundle %{public}s", bundleUrl.absoluteString.UTF8String);
         }
     } else if (module->libraries->count == 1) {
         if (module->isSystem()) {
@@ -118,7 +116,6 @@ SymbolResolver* SymbolLoader::resolveModule(const ModuleMeta* module) {
             NSString* libraryPath = [NSString stringWithFormat:@"%@/lib%s.dylib", libsPath, module->libraries->first()->value().getName()];
 
             if (void* library = dlopen(libraryPath.UTF8String, RTLD_LAZY | RTLD_LOCAL)) {
-                os_log_debug(ns_symbolloader_log(), "NativeScript loaded library %{public}s", libraryPath.UTF8String);
                 resolver = std::make_unique<DlSymbolResolver>(library);
             } else if (const char* libraryError = dlerror()) {
                 os_log_debug(ns_symbolloader_log(), "NativeScript could not load library %{public}s, error: %{public}s", libraryPath.UTF8String, libraryError);
