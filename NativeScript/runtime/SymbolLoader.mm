@@ -2,8 +2,16 @@
 #include "SymbolLoader.h"
 #include "Helpers.h"
 #include <dlfcn.h>
+#include <os/log.h>
 
 namespace tns {
+
+// Unified logging: create a dedicated log for the SymbolLoader
+static os_log_t ns_symbolloader_log() {
+    // Function-local static initialization is thread-safe in C++11+.
+    static os_log_t log = os_log_create("@nativescript/ios", "SymbolLoader");
+    return log;
+}
 
 class SymbolResolver {
 public:
@@ -101,7 +109,7 @@ SymbolResolver* SymbolLoader::resolveModule(const ModuleMeta* module) {
         if (CFBundleRef bundle = CFBundleCreate(kCFAllocatorDefault, (CFURLRef)bundleUrl)) {
             resolver = std::make_unique<CFBundleSymbolResolver>(bundle);
         } else {
-            NSLog(@"NativeScript could not load bundle %s\n", bundleUrl.absoluteString.UTF8String);
+            os_log_error(ns_symbolloader_log(), "NativeScript could not load bundle %{public}s", bundleUrl.absoluteString.UTF8String);
         }
     } else if (module->libraries->count == 1) {
         if (module->isSystem()) {
@@ -110,10 +118,10 @@ SymbolResolver* SymbolLoader::resolveModule(const ModuleMeta* module) {
             NSString* libraryPath = [NSString stringWithFormat:@"%@/lib%s.dylib", libsPath, module->libraries->first()->value().getName()];
 
             if (void* library = dlopen(libraryPath.UTF8String, RTLD_LAZY | RTLD_LOCAL)) {
-                NSLog(@"NativeScript loaded library %s\n", libraryPath.UTF8String);
+                os_log_info(ns_symbolloader_log(), "NativeScript loaded library %{public}s", libraryPath.UTF8String);
                 resolver = std::make_unique<DlSymbolResolver>(library);
             } else if (const char* libraryError = dlerror()) {
-                NSLog(@"NativeScript could not load library %s, error: %s\n", libraryPath.UTF8String, libraryError);
+                os_log_error(ns_symbolloader_log(), "NativeScript could not load library %{public}s, error: %{public}s", libraryPath.UTF8String, libraryError);
             }
         }
     }
