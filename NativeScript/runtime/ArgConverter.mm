@@ -27,7 +27,22 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     bool callSuper = false;
     if (instanceMethod) {
         BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
-        tns::Assert(wrapper != nullptr, isolate);
+        
+        if (wrapper == nullptr) {
+            // During fast view churn like HMR in development, JS objects can outlive their
+            // native wrappers briefly. In Debug, avoid a crash and just skip the native call.
+            // In Release, assert so crash reporting can capture unexpected cases.
+            #ifdef DEBUG
+                const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
+                const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
+                const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
+                Log(@"ArgConverter::Invoke: skipping instance method on non-native receiver (class: %s, selector: %s, jsName: %s, args: %d). Normal during HMR.",
+                    classNameStr, selectorStr, jsNameStr, (int)args.Length());
+                return v8::Undefined(isolate);
+            #else
+                tns::Assert(false, isolate);
+            #endif
+        }
 
         if (wrapper->Type() == WrapperType::ObjCAllocObject) {
             ObjCAllocDataWrapper* allocWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
@@ -878,7 +893,7 @@ void ArgConverter::IndexedPropertySetterCallback(uint32_t index, Local<Value> va
     Local<Object> thiz = args.This();
     Isolate* isolate = args.GetIsolate();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
-    if (wrapper == nullptr && wrapper->Type() != WrapperType::ObjCObject) {
+    if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
         return;
     }
 
