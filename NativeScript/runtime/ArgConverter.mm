@@ -7,6 +7,7 @@
 #include "Interop.h"
 #include "Helpers.h"
 #include "Runtime.h"
+#include "RuntimeConfig.h"
 
 using namespace v8;
 using namespace std;
@@ -32,16 +33,16 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
             // During fast view churn like HMR in development, JS objects can outlive their
             // native wrappers briefly. In Debug, avoid a crash and just skip the native call.
             // In Release, assert so crash reporting can capture unexpected cases.
-            #ifdef DEBUG
+            if (RuntimeConfig.IsDebug) {
                 const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
                 const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
                 const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-                Log(@"ArgConverter::Invoke: skipping instance method on non-native receiver (class: %s, selector: %s, jsName: %s, args: %d). Normal during HMR.",
+                Log(@"ArgConverter::Invoke: ignore method on non-native receiver (class: %s, selector: %s, jsName: %s, args: %d). Common during HMR.",
                     classNameStr, selectorStr, jsNameStr, (int)args.Length());
                 return v8::Undefined(isolate);
-            #else
+            } else {
                 tns::Assert(false, isolate);
-            #endif
+            }
         }
 
         if (wrapper->Type() == WrapperType::ObjCAllocObject) {
@@ -58,7 +59,16 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
             // For extended classes we will call the base method
             callSuper = isMethodCallback && it != cache->ClassPrototypes.end();
         } else {
-            tns::Assert(false, isolate);
+            if (RuntimeConfig.IsDebug) {
+                const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
+                const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
+                const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
+                Log(@"ArgConverter::Invoke: unexpected receiver wrapper type %d (class: %s, selector: %s, jsName: %s). Skipping in DEBUG.",
+                    (int)wrapper->Type(), classNameStr, selectorStr, jsNameStr);
+                return v8::Undefined(isolate);
+            } else {
+                tns::Assert(false, isolate);
+            }
         }
     }
 
