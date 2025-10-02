@@ -841,103 +841,104 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   stackTraceTextView.translatesAutoresizingMaskIntoConstraints = NO;
   [stackTraceContainer addSubview:stackTraceTextView];
 
+  // TODO: Investigate why the copy action doesn't copy to clipboard
   // Copy button for stack trace
-  UIButton* copyButton = [UIButton buttonWithType:UIButtonTypeSystem];
-  [copyButton setTitle:@"📋 Copy Stack Trace" forState:UIControlStateNormal];
-  [copyButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-  copyButton.backgroundColor = [UIColor colorWithRed:0.3 green:0.3 blue:0.3 alpha:1.0];
-  copyButton.titleLabel.font = [UIFont systemFontOfSize:16];
-  copyButton.layer.cornerRadius = 8;
-  copyButton.translatesAutoresizingMaskIntoConstraints = NO;
-  [contentView addSubview:copyButton];
+  // UIButton* copyButton = [UIButton buttonWithType:UIButtonTypeSystem];
+  // [copyButton setTitle:@"📋 Copy Stack Trace" forState:UIControlStateNormal];
+  // [copyButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+  // copyButton.backgroundColor = [UIColor colorWithRed:0.3 green:0.3 blue:0.3 alpha:1.0];
+  // copyButton.titleLabel.font = [UIFont systemFontOfSize:16];
+  // copyButton.layer.cornerRadius = 8;
+  // copyButton.translatesAutoresizingMaskIntoConstraints = NO;
+  // [contentView addSubview:copyButton];
 
   // Configure copy button action
-  void (^copyAction)(void) = ^{
-    UIPasteboard* pasteboard = [UIPasteboard generalPasteboard];
-    NSString* stackTraceText = [NSString stringWithUTF8String:stackTrace.c_str()];
-    BOOL wrote = NO;
+  // void (^copyAction)(void) = ^{
+  //   UIPasteboard* pasteboard = [UIPasteboard generalPasteboard];
+  //   NSString* stackTraceText = [NSString stringWithUTF8String:stackTrace.c_str()];
+  //   BOOL wrote = NO;
 
-    // Prefer modern UTType on iOS 14+, but avoid hard link to UTTypePlainText (use reflection)
-    if (@available(iOS 14.0, *)) {
-      Class UTTypeClass = NSClassFromString(@"UTType");
-      if (UTTypeClass) {
-        SEL plainSel = NSSelectorFromString(@"plainText");
-        if ([UTTypeClass respondsToSelector:plainSel]) {
-          id plain = ((id(*)(id, SEL))objc_msgSend)(UTTypeClass, plainSel);
-          if (plain) {
-            SEL idSel = NSSelectorFromString(@"identifier");
-            if ([plain respondsToSelector:idSel]) {
-              NSString* utiIdentifier = ((id(*)(id, SEL))objc_msgSend)(plain, idSel);
-              if (utiIdentifier.length > 0) {
-                [pasteboard setValue:stackTraceText forPasteboardType:utiIdentifier];
-                wrote = YES;
-              }
-            }
-          }
-        }
-      }
-    }
+  //   // Prefer modern UTType on iOS 14+, but avoid hard link to UTTypePlainText (use reflection)
+  //   if (@available(iOS 14.0, *)) {
+  //     Class UTTypeClass = NSClassFromString(@"UTType");
+  //     if (UTTypeClass) {
+  //       SEL plainSel = NSSelectorFromString(@"plainText");
+  //       if ([UTTypeClass respondsToSelector:plainSel]) {
+  //         id plain = ((id(*)(id, SEL))objc_msgSend)(UTTypeClass, plainSel);
+  //         if (plain) {
+  //           SEL idSel = NSSelectorFromString(@"identifier");
+  //           if ([plain respondsToSelector:idSel]) {
+  //             NSString* utiIdentifier = ((id(*)(id, SEL))objc_msgSend)(plain, idSel);
+  //             if (utiIdentifier.length > 0) {
+  //               [pasteboard setValue:stackTraceText forPasteboardType:utiIdentifier];
+  //               wrote = YES;
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
 
-    // Fallback to kUTTypePlainText (MobileCoreServices)
-    if (!wrote) {
-      [pasteboard setValue:stackTraceText forPasteboardType:(NSString*)kUTTypePlainText];
-      wrote = YES;
-    }
+  //   // Fallback to kUTTypePlainText (MobileCoreServices)
+  //   if (!wrote) {
+  //     [pasteboard setValue:stackTraceText forPasteboardType:(NSString*)kUTTypePlainText];
+  //     wrote = YES;
+  //   }
 
-    // Quick verification; if pasteboard appears empty, try string fallback
-    if (wrote) {
-      BOOL hasString = NO;
-      if ([pasteboard respondsToSelector:@selector(hasStrings)]) {
-        hasString = pasteboard.hasStrings;
-      } else {
-        hasString = (pasteboard.string.length > 0);
-      }
-      if (!hasString) {
-        wrote = NO;
-      }
-    }
+  //   // Quick verification; if pasteboard appears empty, try string fallback
+  //   if (wrote) {
+  //     BOOL hasString = NO;
+  //     if ([pasteboard respondsToSelector:@selector(hasStrings)]) {
+  //       hasString = pasteboard.hasStrings;
+  //     } else {
+  //       hasString = (pasteboard.string.length > 0);
+  //     }
+  //     if (!hasString) {
+  //       wrote = NO;
+  //     }
+  //   }
 
-    // Last resort: set .string
-    if (!wrote || pasteboard.string.length == 0) {
-      pasteboard.string = stackTraceText;
-    }
+  //   // Last resort: set .string
+  //   if (!wrote || pasteboard.string.length == 0) {
+  //     pasteboard.string = stackTraceText;
+  //   }
 
-    // Show temporary feedback
-    [copyButton setTitle:@"✅ Copied!" forState:UIControlStateNormal];
-    copyButton.backgroundColor = [UIColor colorWithRed:0.2 green:0.7 blue:0.2 alpha:1.0];
+  //   // Show temporary feedback
+  //   [copyButton setTitle:@"✅ Copied!" forState:UIControlStateNormal];
+  //   copyButton.backgroundColor = [UIColor colorWithRed:0.2 green:0.7 blue:0.2 alpha:1.0];
 
-    dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, 1.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-          [copyButton setTitle:@"📋 Copy Stack Trace" forState:UIControlStateNormal];
-          copyButton.backgroundColor = [UIColor colorWithRed:0.3 green:0.3 blue:0.3 alpha:1.0];
-        });
-  };
+  //   dispatch_after(
+  //       dispatch_time(DISPATCH_TIME_NOW, 1.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+  //         [copyButton setTitle:@"📋 Copy Stack Trace" forState:UIControlStateNormal];
+  //         copyButton.backgroundColor = [UIColor colorWithRed:0.3 green:0.3 blue:0.3 alpha:1.0];
+  //       });
+  // };
 
-  if (@available(iOS 14.0, *)) {
-    UIAction* action = [UIAction actionWithTitle:@""
-                                           image:nil
-                                      identifier:nil
-                                         handler:^(UIAction* action) {
-                                           copyAction();
-                                         }];
-    [copyButton addAction:action forControlEvents:UIControlEventTouchUpInside];
-  } else {
-    // For older iOS versions, use target-action pattern
-    NSObject* target = [[NSObject alloc] init];
-    objc_setAssociatedObject(target, "copyBlock", copyAction, OBJC_ASSOCIATION_COPY_NONATOMIC);
+  // if (@available(iOS 14.0, *)) {
+  //   UIAction* action = [UIAction actionWithTitle:@""
+  //                                          image:nil
+  //                                     identifier:nil
+  //                                        handler:^(UIAction* action) {
+  //                                          copyAction();
+  //                                        }];
+  //   [copyButton addAction:action forControlEvents:UIControlEventTouchUpInside];
+  // } else {
+  //   // For older iOS versions, use target-action pattern
+  //   NSObject* target = [[NSObject alloc] init];
+  //   objc_setAssociatedObject(target, "copyBlock", copyAction, OBJC_ASSOCIATION_COPY_NONATOMIC);
 
-    IMP copyImp = imp_implementationWithBlock(^(id self) {
-      void (^block)(void) = objc_getAssociatedObject(self, "copyBlock");
-      if (block) {
-        block();
-      }
-    });
+  //   IMP copyImp = imp_implementationWithBlock(^(id self) {
+  //     void (^block)(void) = objc_getAssociatedObject(self, "copyBlock");
+  //     if (block) {
+  //       block();
+  //     }
+  //   });
 
-    class_addMethod([target class], NSSelectorFromString(@"copyStackTrace"), copyImp, "v@:");
-    [copyButton addTarget:target
-                   action:NSSelectorFromString(@"copyStackTrace")
-         forControlEvents:UIControlEventTouchUpInside];
-  }
+  //   class_addMethod([target class], NSSelectorFromString(@"copyStackTrace"), copyImp, "v@:");
+  //   [copyButton addTarget:target
+  //                  action:NSSelectorFromString(@"copyStackTrace")
+  //        forControlEvents:UIControlEventTouchUpInside];
+  // }
 
   // Hot-reload indicator
   UILabel* hotReloadLabel = [[UILabel alloc] init];
@@ -1051,13 +1052,17 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     [stackTraceTextView.bottomAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor],
 
     // Copy button below stack trace
-    [copyButton.topAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor constant:10],
-    [copyButton.centerXAnchor constraintEqualToAnchor:contentView.centerXAnchor],
-    [copyButton.widthAnchor constraintEqualToConstant:200],
-    [copyButton.heightAnchor constraintEqualToConstant:40],
+    // [copyButton.topAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor constant:10],
+    // [copyButton.centerXAnchor constraintEqualToAnchor:contentView.centerXAnchor],
+    // [copyButton.widthAnchor constraintEqualToConstant:200],
+    // [copyButton.heightAnchor constraintEqualToConstant:40],
 
     // Hot-reload indicator below copy button - this will push stack trace up to fill space
-    [hotReloadLabel.topAnchor constraintEqualToAnchor:copyButton.bottomAnchor constant:15],
+    // [hotReloadLabel.topAnchor constraintEqualToAnchor:copyButton.bottomAnchor constant:15],
+    // [hotReloadLabel.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:20],
+    // [hotReloadLabel.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-20],
+    // [hotReloadLabel.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-30],
+    [hotReloadLabel.topAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor constant:15],
     [hotReloadLabel.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:20],
     [hotReloadLabel.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-20],
     [hotReloadLabel.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-30],
