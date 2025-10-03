@@ -659,6 +659,10 @@ public:
     void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker, std::function<v8::Isolate* ()> func);
     void CallOnErrorHandlers(v8::TryCatch& tc);
     void PassUncaughtExceptionFromWorkerToMain(v8::Local<v8::Context> context, v8::TryCatch& tc, bool async = true);
+    // Overload to pass a pre-built error payload when a TryCatch isn't available
+    // Note: this overload accepts only primitive types to avoid passing V8 handles
+    // across isolates/threads.
+    void PassUncaughtExceptionFromWorkerToMain(const std::string& message, const std::string& source, const std::string& stackTrace, int lineNumber, bool async = true);
     void PostMessage(std::shared_ptr<worker::Message> message);
     void Close();
     void Terminate();

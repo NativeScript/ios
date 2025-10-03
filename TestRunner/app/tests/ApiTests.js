@@ -262,12 +262,15 @@ describe(module.id, function () {
   });
 
    it("ArgumentsCount", function () {
+        __setRuntimeIsDebug(false);
        expect(function () {
            NSObject.alloc().init(3);
        }).toThrowError();
+       __setRuntimeIsDebug(true);
    });
 
     it("NSError", function () {
+        __setRuntimeIsDebug(false);
         expect(function () {
             TNSApi.new().methodError(0);
         }).not.toThrow();
@@ -294,6 +297,7 @@ describe(module.id, function () {
         var errorRef = new interop.Reference();
         TNSApi.new().methodError(1, errorRef);
         expect(errorRef.value instanceof NSError).toBe(true);
+        __setRuntimeIsDebug(true);
     });
 
     it("NSErrorOverride", function () {
@@ -618,10 +622,14 @@ describe(module.id, function () {
         expect(value.retainCount()).toBe(2);
         CFRelease(value);
 
+        __setRuntimeIsDebug(false);
+
         unmanaged.takeRetainedValue();
         expect(function() {
             unmanaged.takeUnretainedValue();
         }).toThrow();
+
+        __setRuntimeIsDebug(true);
     });
 
     it('methods can be recursively called', function() {
