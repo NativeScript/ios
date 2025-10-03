@@ -427,8 +427,12 @@ std::string NativeScriptException::GetFullMessage(Isolate* isolate, Local<v8::Me
 
 void NativeScriptException::ShowErrorModal(const std::string& title, const std::string& message,
                                            const std::string& stackTrace) {
-  // Only show modal in debug mode
   if (!RuntimeConfig.IsDebug) {
+    return;
+  }
+
+    // only show when enabled via nativescript.config
+  if (Runtime::showErrorDisplay() == false) {
     return;
   }
 
