@@ -337,7 +337,7 @@ static inline void TNS_FormatAndLog(const char* fmt, ...) {
 }
 
 // Keep the existing Log(...) macro name for call-site compatibility.
-#define Log(...) TNS_FormatAndLog(__VA_ARGS__)
+#define Log(...) ::tns::TNS_FormatAndLog(__VA_ARGS__)
 
 v8::Local<v8::String> JsonStringifyObject(v8::Local<v8::Context> context,
                                           v8::Local<v8::Value> value,

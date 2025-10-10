@@ -1,5 +1,5 @@
 #include "ModuleInternal.h"
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -9,6 +9,7 @@
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
+#include "DevFlags.h"
 #include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
 
@@ -33,6 +34,26 @@ bool IsLikelyOptionalModule(const std::string& moduleName) {
 bool IsESModule(const std::string& path) {
   return path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0 &&
          !(path.size() >= 8 && path.compare(path.size() - 8, 8, ".mjs.map") == 0);
+}
+
+// Normalize file system paths to a canonical representation so lookups in
+// g_moduleRegistry remain consistent regardless of how the path was provided.
+static std::string NormalizePath(const std::string& path) {
+  if (path.empty()) {
+    return path;
+  }
+
+  NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
+  if (nsPath == nil) {
+    return path;
+  }
+
+  NSString* standardized = [nsPath stringByStandardizingPath];
+  if (standardized == nil) {
+    return path;
+  }
+
+  return std::string([standardized UTF8String]);
 }
 
 // Helper function to resolve main entry from package.json with proper extension handling
@@ -69,19 +90,6 @@ std::string ResolveMainEntryFromPackageJson(const std::string& baseDir) {
     // If none found, default to .js (let the loading system handle the error)
     return std::string([[basePath stringByAppendingPathExtension:@"js"] UTF8String]);
   }
-}
-
-// Test helper: allow toggling RuntimeConfig.IsDebug from JS during tests.
-// Usage from JS: __setRuntimeIsDebug(true|false)
-// This helps test cases where we want to test standard "release-like" thrown errors
-// In Debug mode, we gracefully handle errors so you can unit test either case by toggling this
-static void SetRuntimeIsDebug(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (args.Length() > 0) {
-    bool val = args[0]->ToBoolean(isolate)->Value();
-    RuntimeConfig.IsDebug = val;
-  }
-  args.GetReturnValue().Set(v8::Boolean::New(isolate, RuntimeConfig.IsDebug));
 }
 
 ModuleInternal::ModuleInternal(Local<Context> context) {
@@ -137,11 +145,6 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
     Log(@"FATAL: Failed to set global require function");
   }
 
-  // Expose a small test-only helper to toggle debug mode from JS tests
-  // Helps testing debug vs release mode error handling within unit tests
-  v8::Local<v8::FunctionTemplate> setDebugTpl = v8::FunctionTemplate::New(isolate, SetRuntimeIsDebug);
-  v8::Local<v8::Function> setDebugFunc = setDebugTpl->GetFunction(context).ToLocalChecked();
-  global->Set(context, tns::ToV8String(isolate, "__setRuntimeIsDebug"), setDebugFunc).FromMaybe(false);
 }
 
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
@@ -163,12 +166,10 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
     }
   }
 
-  // Check if this is an ES module (.mjs) and handle it directly
+  // ES module fast path
   if (IsESModule(path)) {
-    // For ES modules, use LoadESModule directly instead of require()
     TryCatch tc(isolate);
     Local<Value> moduleNamespace;
-
     try {
       moduleNamespace = ModuleInternal::LoadESModule(isolate, path);
     } catch (const NativeScriptException& ex) {
@@ -177,27 +178,24 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
         Log(@"Error loading ES module: %s", path.c_str());
         Log(@"Exception: %s", ex.getMessage().c_str());
         Log(@"***** End stack trace - continuing execution *****");
-        Log(@"Debug mode - ES module loading failed, but telling iOS it succeeded to prevent "
-            @"app termination");
-        return true;  // LIE TO iOS - return success to prevent app termination
+        Log(@"Debug mode - ES module loading failed, but telling iOS it succeeded to prevent app termination");
+        return true;  // avoid termination in debug
       } else {
         return false;
       }
     }
-
     if (moduleNamespace.IsEmpty()) {
       if (RuntimeConfig.IsDebug) {
         Log(@"Debug mode - ES module returned empty namespace, but telling iOS it succeeded");
-        return true;  // LIE TO iOS - return success to prevent app termination
+        return true;
       } else {
         return false;
       }
     }
-
-    return true;  // ES module loaded successfully
+    return true;  // success
   }
 
-  // For CommonJS modules (.js), use the traditional require() approach
+  // CommonJS / classic path
   Local<Value> requireObj;
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
   if (!success || !requireObj->IsFunction()) {
@@ -299,6 +297,17 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
   NSString* fullPath = nil;
 
   try {
+    // Guard: URL-based modules must be loaded via dynamic import() in dev HTTP ESM mode.
+    if (info.Length() > 0 && info[0]->IsString()) {
+      v8::String::Utf8Value s(isolate, info[0]);
+      if (*s) {
+        moduleName.assign(*s, s.length());
+        if (moduleName.rfind("http://", 0) == 0 || moduleName.rfind("https://", 0) == 0) {
+          std::string msg = std::string("NativeScript: require() of URL module is not supported: ") + moduleName + ". Use dynamic import() instead.";
+          throw NativeScriptException(msg.c_str());
+        }
+      }
+    }
     ModuleInternal* moduleInternal =
         static_cast<ModuleInternal*>(info.Data().As<External>()->Value());
 
@@ -326,6 +335,7 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
         fullPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()]
             stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
       } else {
+        // Default: resolve in tns_modules (shared folder override removed)
         NSString* tnsModulesPath =
             [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()]
                 stringByAppendingPathComponent:@"tns_modules"];
@@ -347,6 +357,7 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
     } else {
       fullPath = [NSString stringWithUTF8String:moduleName.c_str()];
     }
+
 
     NSString* fileNameOnly = [fullPath lastPathComponent];
     NSString* pathOnly = [fullPath stringByDeletingLastPathComponent];
@@ -687,21 +698,23 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
 }
 
 Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& path) {
-  if (IsESModule(path)) {
+  std::string canonicalPath = NormalizePath(path);
+
+  if (IsESModule(canonicalPath)) {
     // Treat all .mjs files as standard ES modules.
-    return ModuleInternal::LoadESModule(isolate, path);
+    return ModuleInternal::LoadESModule(isolate, canonicalPath);
   }
 
-  Local<Script> script = ModuleInternal::LoadClassicScript(isolate, path);
+  Local<Script> script = ModuleInternal::LoadClassicScript(isolate, canonicalPath);
 
   // Check if script compilation failed (debug mode graceful returns)
   if (script.IsEmpty()) {
     if (RuntimeConfig.IsDebug) {
       Log(@"Debug mode - Classic script compilation returned empty, returning gracefully: %s",
-          path.c_str());
+          canonicalPath.c_str());
       return Local<Value>();
     } else {
-      throw NativeScriptException(isolate, "Classic script compilation failed for " + path);
+      throw NativeScriptException(isolate, "Classic script compilation failed for " + canonicalPath);
     }
   }
 
@@ -718,18 +731,18 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
 
       // Log the detailed JavaScript error with full stack trace
       Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-      Log(@"Error executing script: %s", path.c_str());
+      Log(@"Error executing script: %s", canonicalPath.c_str());
       if (tc.HasCaught()) {
         tns::LogError(isolate, tc);
       }
       Log(@"***** End stack trace - continuing execution *****");
-      Log(@"Debug mode - Script execution failed, returning gracefully: %s", path.c_str());
+      Log(@"Debug mode - Script execution failed, returning gracefully: %s", canonicalPath.c_str());
       return Local<Value>();
     } else {
       if (tc.HasCaught()) {
-        throw NativeScriptException(isolate, tc, "Cannot execute script " + path);
+        throw NativeScriptException(isolate, tc, "Cannot execute script " + canonicalPath);
       } else {
-        throw NativeScriptException(isolate, "Script execution failed for " + path);
+        throw NativeScriptException(isolate, "Script execution failed for " + canonicalPath);
       }
     }
   }
@@ -738,27 +751,29 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
 }
 
 Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::string& path) {
+  std::string canonicalPath = NormalizePath(path);
+
   // Ensure the resolved path maps to an actual regular file before attempting
   // to read/compile it.  This prevents `ReadModule` from aborting the process
   // when given a directory or non-existent path.
   struct stat st;
-  if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
-    throw NativeScriptException("Cannot find module " + path);
+  if (stat(canonicalPath.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+    throw NativeScriptException("Cannot find module " + canonicalPath);
   }
 
   auto context = isolate->GetCurrentContext();
   // build URL
-  std::string base = ReplaceAll(path, RuntimeConfig.BaseDir, "");
+  std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
   std::string url = "file://" + base;
 
   // wrap & cache lookup
-  Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, path);
-  auto* cacheData = ModuleInternal::LoadScriptCache(path);
+  Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
+  auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
 
   // note: is_module=false here
   Local<v8::String> urlString;
   if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
-    throw NativeScriptException(isolate, "Failed to create URL string for script " + path);
+    throw NativeScriptException(isolate, "Failed to create URL string for script " + canonicalPath);
   }
 
   ScriptOrigin origin(isolate, urlString,
@@ -784,38 +799,39 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
 
       // Log the detailed JavaScript error with full stack trace
       Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-      Log(@"Error compiling classic script: %s", path.c_str());
+      Log(@"Error compiling classic script: %s", canonicalPath.c_str());
       if (tc.HasCaught()) {
         tns::LogError(isolate, tc);
       }
       Log(@"***** End stack trace - continuing execution *****");
-      Log(@"Debug mode - Script compilation failed, returning gracefully: %s", path.c_str());
+      Log(@"Debug mode - Script compilation failed, returning gracefully: %s", canonicalPath.c_str());
       // Return empty script to prevent crashes
       return Local<Script>();
     } else {
-      throw NativeScriptException(isolate, tc, "Cannot compile script " + path);
+      throw NativeScriptException(isolate, tc, "Cannot compile script " + canonicalPath);
     }
   }
 
   if (cacheData == nullptr) {
-    ModuleInternal::SaveScriptCache(script, path);
+    ModuleInternal::SaveScriptCache(script, canonicalPath);
   }
 
   return script;
 }
 
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
+  std::string canonicalPath = NormalizePath(path);
   auto context = isolate->GetCurrentContext();
 
   // 1) Prepare URL & source
-  std::string base = ReplaceAll(path, RuntimeConfig.BaseDir, "");
+  std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
   std::string url = "file://" + base;
-  v8::Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, path);
-  auto* cacheData = ModuleInternal::LoadScriptCache(path);
+  v8::Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
+  auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
 
   Local<v8::String> urlString;
   if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
-    throw NativeScriptException(isolate, "Failed to create URL string for ES module " + path);
+    throw NativeScriptException(isolate, "Failed to create URL string for ES module " + canonicalPath);
   }
 
   ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, Local<Value>(), false, false,
@@ -824,6 +840,25 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   ScriptCompiler::Source source(sourceText, origin, cacheData);
 
   // 2) Compile with its own TryCatch
+  // Phase diagnostics helper (local lambda) – only active in debug builds when logScriptLoading is enabled
+  auto logPhase = [&](const char* phase, const char* status, const char* classification = "", const char* extra = "") {
+    if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+      if (classification && classification[0] != '\0') {
+        if (extra && extra[0] != '\0') {
+          Log(@"[esm][%s][%s][%s] %s %s", phase, status, classification, canonicalPath.c_str(), extra);
+        } else {
+          Log(@"[esm][%s][%s][%s] %s", phase, status, classification, canonicalPath.c_str());
+        }
+      } else {
+        if (extra && extra[0] != '\0') {
+          Log(@"[esm][%s][%s] %s %s", phase, status, canonicalPath.c_str(), extra);
+        } else {
+          Log(@"[esm][%s][%s] %s", phase, status, canonicalPath.c_str());
+        }
+      }
+    }
+  };
+  logPhase("compile", "begin");
   Local<Module> module;
   {
     TryCatch tcCompile(isolate);
@@ -832,215 +867,199 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
 
     if (!maybeMod.ToLocal(&module)) {
+      // Attempt classification heuristics
+      const char* classification = "unknown";
+      if (tcCompile.HasCaught()) {
+        Local<Message> msg = tcCompile.Message();
+        if (!msg.IsEmpty()) {
+          v8::String::Utf8Value w(isolate, msg->Get());
+          if (*w) {
+            std::string m(*w);
+            if (m.find("Unexpected token") != std::string::npos || m.find("SyntaxError") != std::string::npos) classification = "syntax";
+            else if (m.find("Cannot use import statement outside a module") != std::string::npos) classification = "not-a-module";
+          }
+        }
+      }
+      logPhase("compile", "fail", classification);
       // V8 threw a syntax error or similar
       if (RuntimeConfig.IsDebug) {
         // Log the detailed JavaScript error with full stack trace
-        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-        Log(@"Error compiling ES module: %s", path.c_str());
+        Log(@"***** JavaScript exception occurred *****");
+        Log(@"Error compiling ES module: %s", canonicalPath.c_str());
         if (tcCompile.HasCaught()) {
           tns::LogError(isolate, tcCompile);
         }
-        Log(@"***** End stack trace - continuing execution *****");
-        Log(@"Debug mode - ES module compilation failed, returning gracefully: %s", path.c_str());
+        Log(@"***** Debug mode - continuing execution *****");
+        Log(@"ES module compilation failed: %s", canonicalPath.c_str());
         // Return empty to prevent crashes
         return Local<Value>();
       } else {
-        throw NativeScriptException(isolate, tcCompile, "Cannot compile ES module " + path);
+        throw NativeScriptException(isolate, tcCompile, "Cannot compile ES module " + canonicalPath);
       }
     }
   }
+  logPhase("compile", "ok");
 
   // 3) Register for resolution callback
   extern std::unordered_map<std::string, Global<Module>> g_moduleRegistry;
 
   // Safe Global handle management: Clear any existing entry first
-  auto it = g_moduleRegistry.find(path);
+  auto it = g_moduleRegistry.find(canonicalPath);
   if (it != g_moduleRegistry.end()) {
     // Clear the existing Global handle before replacing it
     it->second.Reset();
   }
 
   // Now safely set the new module handle
-  g_moduleRegistry[path].Reset(isolate, module);
+  g_moduleRegistry[canonicalPath].Reset(isolate, module);
 
   // 4) Save cache if first time
   if (cacheData == nullptr) {
     Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
     auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
-    ModuleInternal::SaveScriptCache(generatedCache, path);
+    ModuleInternal::SaveScriptCache(generatedCache, canonicalPath);
   }
 
   // 5) Instantiate (link) with its own TryCatch
+  logPhase("instantiate", "begin");
   {
     TryCatch tcLink(isolate);
     bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
 
     if (!linked) {
+      RemoveModuleFromRegistry(canonicalPath);
+      const char* classification = "unknown";
+      if (tcLink.HasCaught()) {
+        Local<Message> msg = tcLink.Message();
+        if (!msg.IsEmpty()) {
+          v8::String::Utf8Value w(isolate, msg->Get());
+          if (*w) {
+            std::string m(*w);
+            if (m.find("Cannot find module") != std::string::npos || m.find("failed to resolve module specifier") != std::string::npos) classification = "resolve";
+            else if (m.find("does not provide an export named") != std::string::npos) classification = "link-export";
+          }
+        }
+      }
+      logPhase("instantiate", "fail", classification);
       if (RuntimeConfig.IsDebug) {
         // Log the detailed JavaScript error with full stack trace
-        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-        Log(@"Error instantiating module: %s", path.c_str());
+        Log(@"***** JavaScript exception occurred *****");
+  Log(@"Error instantiating module: %s", canonicalPath.c_str());
         if (tcLink.HasCaught()) {
           tns::LogError(isolate, tcLink);
         }
-        Log(@"***** End stack trace - continuing execution *****");
-        Log(@"Debug mode - Module instantiation failed, returning gracefully: %s", path.c_str());
+        Log(@"***** Debug mode - continuing execution *****");
+        Log(@"Module instantiation failed: %s", canonicalPath.c_str());
         return Local<Value>();
       } else {
         if (tcLink.HasCaught()) {
-          throw NativeScriptException(isolate, tcLink, "Cannot instantiate module " + path);
+          throw NativeScriptException(isolate, tcLink, "Cannot instantiate module " + canonicalPath);
         } else {
           // V8 gave no exception object—throw plain text
-          throw NativeScriptException(isolate, "Cannot instantiate module " + path);
+          throw NativeScriptException(isolate, "Cannot instantiate module " + canonicalPath);
         }
       }
     }
   }
+  logPhase("instantiate", "ok");
 
   // 6) Evaluate with its own TryCatch
+  logPhase("evaluate", "begin");
   Local<Value> result;
   {
     TryCatch tcEval(isolate);
-    printf("LoadESModule: About to evaluate module: %s\n", path.c_str());
+    // Keep existing debug print minimal; phase logger already outputs
     if (!module->Evaluate(context).ToLocal(&result)) {
-      printf("LoadESModule: Evaluation failed for module: %s\n", path.c_str());
+      RemoveModuleFromRegistry(canonicalPath);
+      const char* classification = "unknown";
+      if (tcEval.HasCaught()) {
+        Local<Message> msg = tcEval.Message();
+        if (!msg.IsEmpty()) {
+          v8::String::Utf8Value w(isolate, msg->Get());
+          if (*w) {
+            std::string m(*w);
+            if (m.find("is not defined") != std::string::npos) classification = "reference";
+            else if (m.find("TypeError") != std::string::npos) classification = "type";
+            else if (m.find("Cannot read properties") != std::string::npos) classification = "type-nullish";
+          }
+        }
+      }
+      logPhase("evaluate", "fail", classification);
       if (RuntimeConfig.IsDebug) {
         // Log the detailed JavaScript error with full stack trace
-        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-        Log(@"Error evaluating ES module: %s", path.c_str());
+        Log(@"***** JavaScript exception occurred *****");
+        Log(@"Error evaluating ES module: %s", canonicalPath.c_str());
         if (tcEval.HasCaught()) {
           tns::LogError(isolate, tcEval);
         }
-        Log(@"***** End stack trace - continuing execution *****");
-        Log(@"Debug mode - Module evaluation failed, returning gracefully: %s", path.c_str());
+        Log(@"***** Debug mode - continuing execution *****");
+        Log(@"Module evaluation failed: %s", canonicalPath.c_str());
         return Local<Value>();
       } else {
-        throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + path);
+        throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + canonicalPath);
       }
     }
-    printf("LoadESModule: Evaluation completed successfully for module: %s\n", path.c_str());
+    logPhase("evaluate", "ok");
 
     // Handle the case where evaluation returns a Promise (for top-level await)
-    if (result->IsPromise()) {
-      printf("LoadESModule: Module evaluation returned a Promise, processing...\n");
-
-      // Use TryCatch to safely handle Promise operations
+    // Only perform microtask processing & detailed diagnostics in debug builds.
+    if (RuntimeConfig.IsDebug && result->IsPromise()) {
+      logPhase("evaluate", "promise");
       TryCatch promiseTc(isolate);
       Local<Promise> promise = result.As<Promise>();
-
-      // Process microtasks to allow Promise resolution (for both worker and main contexts)
-      printf("LoadESModule: Processing microtasks for Promise resolution\n");
-
-      // Limited attempts to resolve the promise to avoid infinite loops
+      // Limited attempts to resolve quickly while in debug mode
       int maxAttempts = 100;
       int attempts = 0;
-
       while (attempts < maxAttempts && !promiseTc.HasCaught()) {
         isolate->PerformMicrotaskCheckpoint();
-
-        // Check promise state safely
         if (promiseTc.HasCaught()) {
-          printf("LoadESModule: Exception during Promise processing, breaking\n");
           break;
         }
-
         Promise::PromiseState state = promise->State();
-
         if (state != Promise::kPending) {
           if (state == Promise::kRejected) {
-            printf("LoadESModule: Promise was rejected\n");
-            if (RuntimeConfig.IsDebug) {
-              // Mark that a JavaScript error occurred
-              jsErrorOccurred = true;
-
-              // First log the detailed JavaScript error with full stack trace
-              Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
-
-              std::string errorTitle = "Uncaught JavaScript Exception";
-              std::string errorMessage = "Module evaluation promise rejected";
-              std::string stackTrace = "";
-
-              // Try to get the promise result (the actual error)
-              Local<Value> reason = promise->Result();
-              if (!reason.IsEmpty()) {
-                if (reason->IsObject()) {
-                  Local<Context> context = isolate->GetCurrentContext();
-                  Local<Object> errorObj = reason.As<Object>();
-
-                  // Get error message
-                  auto messageKey = tns::ToV8String(isolate, "message");
-                  Local<Value> messageVal;
-                  if (errorObj->Get(context, messageKey).ToLocal(&messageVal) &&
-                      messageVal->IsString()) {
-                    v8::String::Utf8Value messageUtf8(isolate, messageVal);
-                    if (*messageUtf8) {
-                      errorMessage = std::string(*messageUtf8);
-                    }
-                  }
-
-                  // Get stack trace
-                  auto stackKey = tns::ToV8String(isolate, "stack");
-                  Local<Value> stackVal;
-                  if (errorObj->Get(context, stackKey).ToLocal(&stackVal) && stackVal->IsString()) {
-                    v8::String::Utf8Value stackUtf8(isolate, stackVal);
-                    if (*stackUtf8) {
-                      stackTrace = std::string(*stackUtf8);
-                      // Clean up the stack trace path
-                      stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
-                    }
-                  }
-                } else {
-                  // If reason is not an object, convert it to string
-                  Local<Context> context = isolate->GetCurrentContext();
-                  auto maybeReasonStr = reason->ToString(context);
-                  if (!maybeReasonStr.IsEmpty()) {
-                    v8::String::Utf8Value reasonUtf8(isolate, maybeReasonStr.ToLocalChecked());
-                    if (*reasonUtf8) {
-                      errorMessage = std::string(*reasonUtf8);
-                    }
+            RemoveModuleFromRegistry(canonicalPath);
+            logPhase("evaluate", "promise-rejected");
+            // In debug mode, show modal and continue without throwing
+            jsErrorOccurred = true;
+            Local<Value> reason = promise->Result();
+            std::string errorMessage = "Module evaluation promise rejected";
+            std::string stackTrace = "";
+            if (!reason.IsEmpty()) {
+              if (reason->IsObject()) {
+                Local<Context> context = isolate->GetCurrentContext();
+                Local<Object> errorObj = reason.As<Object>();
+                auto messageKey = tns::ToV8String(isolate, "message");
+                Local<Value> messageVal;
+                if (errorObj->Get(context, messageKey).ToLocal(&messageVal) && messageVal->IsString()) {
+                  v8::String::Utf8Value messageUtf8(isolate, messageVal);
+                  if (*messageUtf8) errorMessage = std::string(*messageUtf8);
+                }
+                auto stackKey = tns::ToV8String(isolate, "stack");
+                Local<Value> stackVal;
+                if (errorObj->Get(context, stackKey).ToLocal(&stackVal) && stackVal->IsString()) {
+                  v8::String::Utf8Value stackUtf8(isolate, stackVal);
+                  if (*stackUtf8) {
+                    stackTrace = std::string(*stackUtf8);
+                    stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
                   }
                 }
-
-                // Log the extracted error information
-                Log(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
-                if (!stackTrace.empty()) {
-                  Log(@"JavaScript stack trace:\n%s", stackTrace.c_str());
-                }
               }
-
-              // Also check if TryCatch caught anything
-              if (promiseTc.HasCaught()) {
-                tns::LogError(isolate, promiseTc);
-              }
-
-              Log(@"***** End stack trace - Fix to continue *****");
-
-              NativeScriptException::ShowErrorModal(errorTitle, errorMessage, stackTrace);
-
-              // In debug mode, don't throw any exceptions - just return empty value
-              return Local<Value>();
-            } else {
-              // Release mode - throw exceptions as before
-              if (!promiseTc.HasCaught()) {
-                Local<Value> reason = promise->Result();
-                isolate->ThrowException(reason);
-              }
-              throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
             }
+            NativeScriptException::ShowErrorModal("Uncaught JavaScript Exception", errorMessage, stackTrace);
+            logPhase("evaluate", "promise-rejected-handled");
+            return Local<Value>();
           }
-          printf("LoadESModule: Promise resolved successfully\n");
           break;
         }
-
         attempts++;
-        usleep(100);  // 0.1ms delay
+        usleep(100);
       }
-
-      if (attempts >= maxAttempts) {
-        printf("LoadESModule: Promise resolution timeout, continuing anyway\n");
-      }
+      // Timeout: continue; the host event loop will settle microtasks later
     }
   }
+
+  tns::UpdateModuleFallback(isolate, canonicalPath, module);
 
   // 7) Return the namespace
   return module->GetModuleNamespace();
@@ -1369,17 +1388,18 @@ Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,
 }
 
 ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& path) {
+  std::string canonicalPath = NormalizePath(path);
   if (RuntimeConfig.IsDebug) {
     return nullptr;
   }
 
   long length = 0;
-  std::string cachePath = ModuleInternal::GetCacheFileName(path + ".cache");
+  std::string cachePath = ModuleInternal::GetCacheFileName(canonicalPath + ".cache");
 
   struct stat result;
   if (stat(cachePath.c_str(), &result) == 0) {
     auto cacheLastModifiedTime = result.st_mtime;
-    if (stat(path.c_str(), &result) == 0) {
+    if (stat(canonicalPath.c_str(), &result) == 0) {
       auto jsLastModifiedTime = result.st_mtime;
       if (jsLastModifiedTime != cacheLastModifiedTime) {
         // files have different dates, ignore the cache file (this is enforced by the
@@ -1402,7 +1422,8 @@ ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& p
 
 void ModuleInternal::SaveScriptCache(const ScriptCompiler::CachedData* cache,
                                      const std::string& path) {
-  std::string cachePath = ModuleInternal::GetCacheFileName(path + ".cache");
+  std::string canonicalPath = NormalizePath(path);
+  std::string cachePath = ModuleInternal::GetCacheFileName(canonicalPath + ".cache");
 
   // std::ofstream ofs(cachePath, std::ios::binary);
   // if (!ofs) return;  // or throw
@@ -1420,7 +1441,7 @@ void ModuleInternal::SaveScriptCache(const ScriptCompiler::CachedData* cache,
   struct utimbuf new_times;
   new_times.actime = time(nullptr);
   new_times.modtime = time(nullptr);
-  if (stat(path.c_str(), &result) == 0) {
+  if (stat(canonicalPath.c_str(), &result) == 0) {
     auto jsLastModifiedTime = result.st_mtime;
     new_times.modtime = jsLastModifiedTime;
   }
@@ -1432,12 +1453,14 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
     return;
   }
 
+  std::string canonicalPath = NormalizePath(path);
+
   Local<UnboundScript> unboundScript = script->GetUnboundScript();
   // CachedData returned by this function should be owned by the caller (v8 docs)
   ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
 
   int length = cachedData->length;
-  std::string cachePath = ModuleInternal::GetCacheFileName(path + ".cache");
+  std::string cachePath = ModuleInternal::GetCacheFileName(canonicalPath + ".cache");
   tns::WriteBinary(cachePath, cachedData->data, length);
   delete cachedData;
 
@@ -1446,7 +1469,7 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
   struct utimbuf new_times;
   new_times.actime = time(nullptr);
   new_times.modtime = time(nullptr);
-  if (stat(path.c_str(), &result) == 0) {
+  if (stat(canonicalPath.c_str(), &result) == 0) {
     auto jsLastModifiedTime = result.st_mtime;
     new_times.modtime = jsLastModifiedTime;
   }

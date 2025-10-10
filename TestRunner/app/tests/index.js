@@ -84,6 +84,9 @@ require("./URL");
 require("./URLSearchParams");
 require("./URLPattern");
 
+// HTTP ESM Loader tests
+require("./HttpEsmLoaderTests");
+
 // Exception handling tests
 require("./ExceptionHandlingTests");
 
