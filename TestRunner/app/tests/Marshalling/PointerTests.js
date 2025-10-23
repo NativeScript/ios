@@ -117,6 +117,8 @@ describe(module.id, function () {
     });
 
     it("Handleof", function () {
+        __setRuntimeIsDebug(false);
+
         expect(interop.handleof(NSObject) instanceof interop.Pointer).toBe(true);
         expect(interop.handleof(NSObject.alloc().init()) instanceof interop.Pointer).toBe(true);
 
@@ -147,6 +149,8 @@ describe(module.id, function () {
         expect(interop.handleof(functionReference) instanceof interop.Pointer).toBe(true);
 
         expect(interop.handleof(null)).toBe(null);
+
+        __setRuntimeIsDebug(true);
     });
 
     it("Sizeof", function () {
