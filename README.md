@@ -10,7 +10,7 @@ brew install clang-format
 
 # To avoid errors, you might need to link cmake to: /usr/local/bin/cmake
 # xcode doesn't read your profile during the build step, which causes it to ignore the PATH
-sudo ln -s /usr/local/bin/cmake $(which cmake)
+sudo ln -s $(which cmake) /usr/local/bin/cmake
 
 # Clone repo
 git clone https://github.com/NativeScript/ios.git
