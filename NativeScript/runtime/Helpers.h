@@ -219,8 +219,7 @@ bool IsArrayOrArrayLike(v8::Isolate* isolate,
 void* TryGetBufferFromArrayBuffer(const v8::Local<v8::Value>& value,
                                   bool& isArrayBuffer);
 
-void ExecuteOnRunLoop(CFRunLoopRef queue, std::function<void()> func,
-                      bool async = true);
+void ExecuteOnRunLoop(CFRunLoopRef queue, void (^func)(void), bool async = true);
 void ExecuteOnDispatchQueue(dispatch_queue_t queue, std::function<void()> func,
                             bool async = true);
 void ExecuteOnMainThread(std::function<void()> func, bool async = true);

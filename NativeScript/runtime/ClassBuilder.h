@@ -23,13 +23,13 @@ public:
 class ClassBuilder {
 public:
     static v8::Local<v8::FunctionTemplate> GetExtendFunction(v8::Isolate* isolate, const InterfaceMeta* interfaceMeta);
-    static Class GetExtendedClass(std::string baseClassName, std::string staticClassName);
+    static Class GetExtendedClass(std::string baseClassName, std::string staticClassName, std::string suffix);
 
     static void RegisterBaseTypeScriptExtendsFunction(v8::Local<v8::Context> context);
     static void RegisterNativeTypeScriptExtendsFunction(v8::Local<v8::Context> context);
     static std::string GetTypeEncoding(const TypeEncoding* typeEncoding, int argsCount);
 private:
-    static unsigned long long classNameCounter_;
+    static std::atomic<unsigned long long> classNameCounter_;
 
     static void ExtendCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void SuperAccessorGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value>& info);
