@@ -262,7 +262,7 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
 
       // Additional guidance after the stack trace for boot/init errors
       Log(@"\n======================================");
-      Log(@"Error on app inititialization.");
+      Log(@"Error on app initialization.");
       Log(@"Please fix the error and save the file to auto reload the app.");
       Log(@"======================================");
 
