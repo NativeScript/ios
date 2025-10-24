@@ -1,3 +1,21 @@
+## [8.9.5](https://github.com/NativeScript/ios/compare/v8.9.4...v8.9.5) (2025-10-24)
+
+
+### Bug Fixes
+
+* make debugger log public ([#302](https://github.com/NativeScript/ios/issues/302)) ([e89067c](https://github.com/NativeScript/ios/commit/e89067cf0f57adcc2479642e4e043b6d6e0d8a0b))
+* prevent crash during debug on fast view churn (like with HMR) ([#294](https://github.com/NativeScript/ios/issues/294)) ([42a5328](https://github.com/NativeScript/ios/commit/42a5328f9e95b2298efe067485ac6775718d0510))
+* properly convert objective-c logs into os_log ([#301](https://github.com/NativeScript/ios/issues/301)) ([5733af1](https://github.com/NativeScript/ios/commit/5733af1abd896ef8902fbd5b0f57888e71d67d1b))
+* symbol loader log true errors only to not confuse terminal output ([#293](https://github.com/NativeScript/ios/issues/293)) ([7101127](https://github.com/NativeScript/ios/commit/710112731a9149020c49c2b2b34a82ebd39a2d49))
+* x86 simulators and add better failsafe around generated class names ([#303](https://github.com/NativeScript/ios/issues/303)) ([bb02623](https://github.com/NativeScript/ios/commit/bb02623415359d11cd9e17f3d6351c3b04c4f01d))
+
+
+### Features
+
+* queueMicrotask support ([#291](https://github.com/NativeScript/ios/issues/291)) ([b12d552](https://github.com/NativeScript/ios/commit/b12d5528885086335487bae4c62cab13ccdb841a))
+
+
+
 ## [8.9.4](https://github.com/NativeScript/ios/compare/v8.9.2...v8.9.3) (2025-09-09)
 
 
