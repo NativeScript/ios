@@ -76,4 +76,4 @@ describe("Exception Handling Tests", function () {
         console.log("✓ Hot-reload friendly: 2 errors caught, 1 success, app never crashed");
         done();
     });
-}); 
+});
