@@ -57,8 +57,10 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         staticClassName = tns::ToString(isolate, explicitClassName);
       }
     }
+    auto cache = Caches::Get(isolate);
+    auto isolateId = cache->getIsolateId();
 
-    Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName);
+    Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName, std::to_string(isolateId) + "_");
     class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
     class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 
@@ -70,7 +72,6 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
                                          implementationObject);
     }
 
-    auto cache = Caches::Get(isolate);
     Local<v8::Function> baseCtorFunc =
         cache->CtorFuncs.find(item->meta_->name())->second->Get(isolate);
 
@@ -212,8 +213,9 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
         std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
 
+        auto isolateId = cache->getIsolateId();
         __block Class extendedClass =
-            ClassBuilder::GetExtendedClass(baseClassName, extendedClassName);
+            ClassBuilder::GetExtendedClass(baseClassName, extendedClassName, std::to_string(isolateId) + "_");
         class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
         class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 
@@ -984,6 +986,6 @@ IMP ClassBuilder::FindNotOverridenMethod(Class klass, SEL method) {
   return class_getMethodImplementation(klass, method);
 }
 
-unsigned long long ClassBuilder::classNameCounter_ = 0;
+std::atomic<unsigned long long> ClassBuilder::classNameCounter_{0};
 
 }  // namespace tns

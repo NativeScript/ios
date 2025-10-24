@@ -331,7 +331,7 @@ struct LockAndCV {
     std::condition_variable cv;
 };
 
-void tns::ExecuteOnRunLoop(CFRunLoopRef queue, std::function<void ()> func, bool async) {
+void tns::ExecuteOnRunLoop(CFRunLoopRef queue, void (^func)(void), bool async) {
     if(!async) {
         bool __block finished = false;
         auto v = new LockAndCV;
@@ -350,12 +350,9 @@ void tns::ExecuteOnRunLoop(CFRunLoopRef queue, std::function<void ()> func, bool
         }
         delete v;
     } else {
-        CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, ^(void) {
-            func();
-        });
+        CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, func);
         CFRunLoopWakeUp(queue);
     }
-    
 }
 
 void tns::ExecuteOnDispatchQueue(dispatch_queue_t queue, std::function<void ()> func, bool async) {
