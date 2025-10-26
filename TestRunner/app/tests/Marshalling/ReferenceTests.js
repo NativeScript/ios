@@ -346,6 +346,57 @@ describe(module.id, function () {
         interop.free(ptr);
     });
 
+    it("Struct reference with value", function () {
+        const value = new TNSSimpleStruct({x: 1, y: 2});
+        const ref = new interop.Reference(TNSSimpleStruct, value);
+
+        expect(TNSSimpleStruct.equals(ref.value, value)).toBe(true);
+    });
+
+    it("Struct reference with pointer and indexed values", function () {
+        const structs = [
+            new TNSSimpleStruct({x: 1, y: 2}),
+            new TNSSimpleStruct({x: 3, y: 4}),
+            new TNSSimpleStruct({x: 5, y: 6})
+        ];
+        const length = structs.length;
+        const ptr = interop.alloc(interop.sizeof(TNSSimpleStruct) * length);
+
+        const ref = new interop.Reference(TNSSimpleStruct, ptr);
+        for (let i = 0; i < length; i++) {
+            ref[i] = structs[i];
+        }
+
+        // Check if values were stored into pointer
+        const resultRef = new interop.Reference(TNSSimpleStruct, ptr);
+        for (let i = 0; i < length; i++) {
+            expect(TNSSimpleStruct.equals(resultRef[i], structs[i])).toBe(true);
+        }
+
+        interop.free(ptr);
+    });
+
+    it("Struct reference get first value as referred value", function () {
+        const structs = [
+            new TNSSimpleStruct({x: 1, y: 2}),
+            new TNSSimpleStruct({x: 3, y: 4}),
+            new TNSSimpleStruct({x: 5, y: 6})
+        ];
+        const length = structs.length;
+        const ptr = interop.alloc(interop.sizeof(TNSSimpleStruct) * length);
+
+        const ref = new interop.Reference(TNSSimpleStruct, ptr);
+        for (let i = 0; i < length; i++) {
+            ref[i] = structs[i];
+        }
+
+        // Check if values were stored into pointer
+        const resultRef = new interop.Reference(TNSSimpleStruct, ptr);
+        expect(TNSSimpleStruct.equals(resultRef.value, structs[0])).toBe(true);
+
+        interop.free(ptr);
+    });
+
     it("interops string from CString with fixed length", function () {
         const str = "te\0st";
         const ptr = interop.alloc((str.length + 1) * interop.sizeof(interop.types.uint8));

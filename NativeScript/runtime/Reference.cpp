@@ -99,14 +99,20 @@ void Reference::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbac
     Local<Object> thiz = info.This();
     Local<Context> context = isolate->GetCurrentContext();
 
-    DataPair pair = Reference::GetTypeEncodingDataPair(thiz);
+    DataPair pair = Reference::GetDataPair(thiz);
     const TypeEncoding* typeEncoding = pair.typeEncoding_;
     size_t size = pair.size_;
     void* data = pair.data_;
 
     void* ptr = (uint8_t*)data + index * size;
     BaseCall call((uint8_t*)ptr);
-    Local<Value> result = Interop::GetResult(context, typeEncoding, &call, false);
+    
+    Local<Value> result;
+    if (typeEncoding != nullptr) {
+        result = Interop::GetResult(context, typeEncoding, &call, false);
+    } else {
+        result = Interop::GetResultByType(context, pair.typeWrapper_, &call);
+    }
     info.GetReturnValue().Set(result);
 }
 
@@ -115,13 +121,17 @@ void Reference::IndexedPropertySetCallback(uint32_t index, Local<Value> value, c
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> thiz = info.This();
 
-    DataPair pair = Reference::GetTypeEncodingDataPair(thiz);
+    DataPair pair = Reference::GetDataPair(thiz);
     const TypeEncoding* typeEncoding = pair.typeEncoding_;
     size_t size = pair.size_;
     void* data = pair.data_;
-
     void* ptr = (uint8_t*)data + index * size;
-    Interop::WriteValue(context, typeEncoding, ptr, value);
+    
+    if (typeEncoding != nullptr) {
+        Interop::WriteValue(context, typeEncoding, ptr, value);
+    } else {
+        Interop::WriteTypeValue(context, pair.typeWrapper_, ptr, value);
+    }
 }
 
 void Reference::GetValueCallback(Local<v8::Name> name, const PropertyCallbackInfo<Value>& info) {
@@ -186,11 +196,17 @@ Local<Value> Reference::GetReferredValue(Local<Context> context, Local<Value> va
     }
 
     BaseDataWrapper* typeWrapper = wrapper->TypeWrapper();
-    if (typeWrapper != nullptr && typeWrapper->Type() == WrapperType::Primitive && baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Pointer) {
-        Reference::DataPair pair = GetTypeEncodingDataPair(value.As<Object>());
-        if (pair.data_ != nullptr && pair.typeEncoding_ != nullptr) {
+    if (typeWrapper != nullptr && Reference::IsSupportedType(typeWrapper->Type()) && baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Pointer) {
+        Reference::DataPair pair = Reference::GetDataPair(value.As<Object>());
+        if (pair.data_ != nullptr) {
             BaseCall call((uint8_t*)pair.data_);
-            Local<Value> result = Interop::GetResult(context, pair.typeEncoding_, &call, false);
+            Local<Value> result;
+            
+            if (pair.typeEncoding_ != nullptr) {
+                result = Interop::GetResult(context, pair.typeEncoding_, &call, false);
+            } else {
+                result = Interop::GetResultByType(context, typeWrapper, &call);
+            }
             return result;
         }
     }
@@ -202,7 +218,6 @@ void* Reference::GetWrappedPointer(Local<Context> context, Local<Value> referenc
     if (reference.IsEmpty() || reference->IsNullOrUndefined()) {
         return nullptr;
     }
-
 
     Isolate* isolate = context->GetIsolate();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, reference);
@@ -313,7 +328,7 @@ void Reference::RegisterToStringMethod(Local<Context> context, Local<Object> pro
     tns::Assert(success, isolate);
 }
 
-Reference::DataPair Reference::GetTypeEncodingDataPair(Local<Object> obj) {
+Reference::DataPair Reference::GetDataPair(Local<Object> obj) {
     Local<Context> context;
     bool success = obj->GetCreationContext().ToLocal(&context);
     tns::Assert(success);
@@ -327,33 +342,62 @@ Reference::DataPair Reference::GetTypeEncodingDataPair(Local<Object> obj) {
         // TODO: Missing type when creating the Reference instance
         tns::Assert(false, isolate);
     }
+    
+    size_t size = 0;
+    const TypeEncoding* typeEncoding = nullptr;
+    bool isUnknownType = false;
 
-    if (typeWrapper->Type() != WrapperType::Primitive) {
-        // TODO: Currently only PrimitiveDataWrappers are supported as type parameters
-        // Objective C class classes and structures should also be handled
+    if (Reference::IsSupportedType(typeWrapper->Type())) {
+        switch(typeWrapper->Type()) {
+            case WrapperType::Primitive: {
+                PrimitiveDataWrapper* primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
+                
+                size = primitiveWrapper->Size();
+                typeEncoding = primitiveWrapper->TypeEncoding();
+                break;
+            }
+            case WrapperType::StructType: {
+                StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
+                StructInfo structInfo = structTypeWrapper->StructInfo();
+                
+                size = structInfo.FFIType()->size;
+                break;
+            }
+            default: {
+                isUnknownType = true;
+                break;
+            }
+        }
+    } else {
+        isUnknownType = true;
+    }
+    
+    if (isUnknownType) {
+        // TODO: Currently only PrimitiveDataWrappers and Structs are supported as type parameters
+        // Objective C class classes should also be handled
         tns::Assert(false, isolate);
     }
-
-    PrimitiveDataWrapper* primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
 
     Local<Value> value = refWrapper->Value()->Get(isolate);
     BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
     if (wrappedValue != nullptr && wrappedValue->Type() == WrapperType::Pointer) {
-        const TypeEncoding* typeEncoding = primitiveWrapper->TypeEncoding();
         PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
         void* data = pw->Data();
 
-        DataPair pair(typeEncoding, data, primitiveWrapper->Size());
+        DataPair pair(typeWrapper, typeEncoding, data, size);
         return pair;
     }
 
     if (refWrapper->Encoding() != nullptr && refWrapper->Data() != nullptr) {
-        DataPair pair(refWrapper->Encoding(), refWrapper->Data(), primitiveWrapper->Size());
+        DataPair pair(typeWrapper, refWrapper->Encoding(), refWrapper->Data(), size);
         return pair;
     }
 
     tns::Assert(false, isolate);
-    return DataPair(nullptr, nullptr, 0);
+    return DataPair(typeWrapper, nullptr, nullptr, 0);
 }
 
+bool Reference::IsSupportedType(WrapperType type) {
+    return type == WrapperType::Primitive || type == WrapperType::StructType;
+}
 }

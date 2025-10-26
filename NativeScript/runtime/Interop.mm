@@ -182,6 +182,42 @@ class ValueCache {
     IsOfType _isObject = UNDEFINED;
 };
 
+void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrapper, void* dest, Local<Value> arg) {
+    Isolate* isolate = context->GetIsolate();
+    ValueCache argHelper(arg);
+    bool isEmptyOrUndefined = arg.IsEmpty() || arg->IsNullOrUndefined();
+    
+    if (typeWrapper->Type() == WrapperType::StructType) {
+        if (isEmptyOrUndefined) {
+            StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(typeWrapper);
+            StructInfo structInfo = structTypeWrapper->StructInfo();
+            
+            memset(dest, 0, structInfo.FFIType()->size);
+        } else if (argHelper.isObject()) {
+            BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
+            if (wrapper != nullptr) {
+                if (wrapper->Type() == WrapperType::Struct) {
+                    StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
+                    void* buffer = structWrapper->Data();
+                    size_t size = structWrapper->StructInfo().FFIType()->size;
+                    memcpy(dest, buffer, size);
+                } else {
+                    tns::Assert(false, isolate);
+                }
+            } else {
+                // Create the structure using the struct initializer syntax
+                StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(typeWrapper);
+                StructInfo structInfo = structTypeWrapper->StructInfo();
+                Interop::InitializeStruct(context, dest, structInfo.Fields(), arg.As<Object>());
+            }
+        } else {
+            tns::Assert(false, isolate);
+        }
+    } else {
+        tns::Assert(false, isolate);
+    }
+}
+
 void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncoding, void* dest, Local<Value> arg) {
     Isolate* isolate = context->GetIsolate();
     ExecuteWriteValueDebugValidationsIfInDebug(context, typeEncoding, dest, arg);
@@ -804,6 +840,21 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
     double result = !value.IsEmpty() && !value->IsNullOrUndefined() && value->IsNumber()
         ? value.As<Number>()->Value() : 0;
     *static_cast<T*>((void*)((uint8_t*)destBuffer + position)) = result;
+}
+
+Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* typeWrapper, BaseCall* call, std::shared_ptr<Persistent<Value>> parentStruct) {
+    Isolate* isolate = context->GetIsolate();
+    
+    if (typeWrapper->Type() == WrapperType::StructType) {
+        StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(typeWrapper);
+        StructInfo structInfo = structTypeWrapper->StructInfo();
+
+        void* result = call->ResultBuffer();
+        Local<Value> value = Interop::StructToValue(context, result, structInfo, parentStruct);
+        return value;
+    }
+    
+    return Null(isolate);
 }
 
 Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<Persistent<Value>> parentStruct, bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged, bool isInitializer) {
