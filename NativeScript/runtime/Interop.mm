@@ -186,6 +186,7 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
     Isolate* isolate = context->GetIsolate();
     ValueCache argHelper(arg);
     bool isEmptyOrUndefined = arg.IsEmpty() || arg->IsNullOrUndefined();
+    bool success = false;
     
     if (typeWrapper->Type() == WrapperType::StructType) {
         if (isEmptyOrUndefined) {
@@ -193,6 +194,7 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
             StructInfo structInfo = structTypeWrapper->StructInfo();
             
             memset(dest, 0, structInfo.FFIType()->size);
+            success = true;
         } else if (argHelper.isObject()) {
             BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
             if (wrapper != nullptr) {
@@ -201,19 +203,19 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
                     void* buffer = structWrapper->Data();
                     size_t size = structWrapper->StructInfo().FFIType()->size;
                     memcpy(dest, buffer, size);
-                } else {
-                    tns::Assert(false, isolate);
+                    success = true;
                 }
             } else {
                 // Create the structure using the struct initializer syntax
                 StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(typeWrapper);
                 StructInfo structInfo = structTypeWrapper->StructInfo();
                 Interop::InitializeStruct(context, dest, structInfo.Fields(), arg.As<Object>());
+                success = true;
             }
-        } else {
-            tns::Assert(false, isolate);
         }
-    } else {
+    }
+    
+    if (!success) {
         tns::Assert(false, isolate);
     }
 }
