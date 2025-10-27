@@ -1084,18 +1084,16 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         }
 
         const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
+        Local<Value> pointer = Pointer::NewInstance(context, result);
 
         if (innerType->type == BinaryTypeEncodingType::VoidEncoding) {
-            Local<Value> instance = Pointer::NewInstance(context, result);
-            return instance;
+            return pointer;
         }
 
-        BaseCall c(result);
-        Local<Value> value = Interop::GetResult(context, innerType, &c, true);
         Local<Value> type = Interop::GetInteropType(context, innerType->type);
 
         std::vector<Local<Value>> args;
-        args.push_back(value);
+        args.push_back(pointer);
         if (!type.IsEmpty()) {
             args.insert(args.begin(), type);
         }
