@@ -397,6 +397,62 @@ describe(module.id, function () {
         interop.free(ptr);
     });
 
+    it("Reference access indexed values from pointer array property", function () {
+        const structs = [
+            new TNSPoint({x: 1, y: 2}),
+            new TNSPoint({x: 3, y: 4}),
+            new TNSPoint({x: 5, y: 6})
+        ];
+        const length = structs.length;
+        const ptr = interop.alloc(interop.sizeof(TNSPoint) * length);
+
+        const ref = new interop.Reference(TNSPoint, ptr);
+        for (let i = 0; i < length; i++) {
+            ref[i] = structs[i];
+        }
+
+        const pointCollection = TNSPointCollection.alloc().initWithPointsCount(ptr, length);
+        
+        // Runtime converts pointers into references for cases with type so use handleof to get pointer
+        const pointsPtr = interop.handleof(pointCollection.points);
+
+        // Check if values were retrieved from pointer
+        const resultRef = new interop.Reference(TNSPoint, pointsPtr);
+        for (let i = 0; i < length; i++) {
+            expect(TNSPoint.equals(resultRef[i], structs[i])).toBe(true);
+        }
+
+        interop.free(ptr);
+        interop.free(pointsPtr);
+    });
+
+    it("Reference access value from pointer array property", function () {
+        const structs = [
+            new TNSPoint({x: 1, y: 2}),
+            new TNSPoint({x: 3, y: 4}),
+            new TNSPoint({x: 5, y: 6})
+        ];
+        const length = structs.length;
+        const ptr = interop.alloc(interop.sizeof(TNSPoint) * length);
+
+        const ref = new interop.Reference(TNSPoint, ptr);
+        for (let i = 0; i < length; i++) {
+            ref[i] = structs[i];
+        }
+
+        const pointCollection = TNSPointCollection.alloc().initWithPointsCount(ptr, length);
+        
+        // Runtime converts pointers into references for cases with type so use handleof to get pointer
+        const pointsPtr = interop.handleof(pointCollection.points);
+
+        // Check if values were retrieved from pointer
+        const resultRef = new interop.Reference(TNSPoint, pointsPtr);
+        expect(TNSPoint.equals(resultRef.value, structs[0])).toBe(true);
+
+        interop.free(ptr);
+        interop.free(pointsPtr);
+    });
+
     it("interops string from CString with fixed length", function () {
         const str = "te\0st";
         const ptr = interop.alloc((str.length + 1) * interop.sizeof(interop.types.uint8));
