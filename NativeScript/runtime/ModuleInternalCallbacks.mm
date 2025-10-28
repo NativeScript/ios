@@ -316,6 +316,10 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
     Log(@"[resolver][remove:pre] key=%s class=%s", canonicalPath.c_str(), classify(canonicalPath));
   }
 
+  size_t regPre = g_moduleRegistry.size();
+  size_t fbPre = g_moduleFallbackRegistry.size();
+  size_t relPre = g_moduleFallbackByRelative.size();
+
   auto it = g_moduleRegistry.find(canonicalPath);
   if (it != g_moduleRegistry.end()) {
     // Only log stale removal for non-HTTP keys to avoid noisy dev HTTP churn.
@@ -342,6 +346,16 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
       fbr->second.Reset();
       g_moduleFallbackByRelative.erase(fbr);
     }
+  }
+
+  if (IsScriptLoadingLogEnabled()) {
+    size_t regPost = g_moduleRegistry.size();
+    size_t fbPost = g_moduleFallbackRegistry.size();
+    size_t relPost = g_moduleFallbackByRelative.size();
+    Log(@"[resolver][remove:post] reg %lu→%lu fb %lu→%lu rel %lu→%lu",
+        (unsigned long)regPre, (unsigned long)regPost,
+        (unsigned long)fbPre, (unsigned long)fbPost,
+        (unsigned long)relPre, (unsigned long)relPost);
   }
 }
 
@@ -924,6 +938,11 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       candidateBases.push_back(baseApp);
     }
 
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[resolver][tilde] spec=%s base=%s appBase=%s",
+          spec.c_str(), base.c_str(), baseApp.c_str());
+    }
+
     // Debug: Log tilde resolution for worker context
     if (cache->isWorker) {
       printf("ResolveModuleCallback: Worker resolving tilde path '%s' -> '%s'\n", spec.c_str(),
@@ -943,6 +962,12 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       if (baseNoApp != base) {
         candidateBases.push_back(baseNoApp);
       }
+      if (IsScriptLoadingLogEnabled()) {
+        Log(@"[resolver][abs] spec=%s base=%s baseNoApp=%s",
+            spec.c_str(), base.c_str(), baseNoApp.c_str());
+      }
+    } else if (IsScriptLoadingLogEnabled()) {
+      Log(@"[resolver][abs] spec=%s base=%s", spec.c_str(), base.c_str());
     }
   } else {
     // Bare specifier – resolve relative to the application root directory
@@ -1729,6 +1754,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   NSString* specStr = [NSString stringWithUTF8String:cSpec];
   if (IsScriptLoadingLogEnabled()) {
     Log(@"[dyn-import] → %@", specStr);
+    // Also log the referrer resource when available to correlate origin of dynamic imports
+    v8::Local<v8::Value> resName = referrer->GetResourceName();
+    if (!resName.IsEmpty() && resName->IsString()) {
+      v8::String::Utf8Value rn(isolate, resName);
+      if (*rn) { Log(@"[dyn-import][referrer] %s", *rn); }
+    }
   }
   // ── Early guard: intercept bare "@" immediately to avoid any downstream handling ──
   // We perform this check again here (in addition to normalization guards below) to ensure
@@ -1973,6 +2004,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                   v8::Local<v8::Context> ctx = d->ctx.Get(iso);
                   std::string keyLocal = d->key;
                   v8::Local<v8::Value> reason = (info.Length() > 0) ? info[0] : v8::Exception::Error(tns::ToV8String(iso, "Evaluation failed (http-cache TLA)"));
+                  if (IsScriptLoadingLogEnabled()) {
+                    v8::String::Utf8Value r(iso, reason);
+                    if (*r) { Log(@"[dyn-import][http-cache][tla] rejected: %s", *r); }
+                  }
                   auto ws = g_httpDynamicWaiters.find(keyLocal);
                   if (ws != g_httpDynamicWaiters.end()) {
                     for (auto &res : ws->second) {
@@ -2074,6 +2109,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 v8::Local<v8::Context> ctx = d->ctx.Get(iso);
                 std::string keyLocal = d->key;
                 v8::Local<v8::Value> reason = (info.Length() > 0) ? info[0] : v8::Exception::Error(tns::ToV8String(iso, "Evaluation failed (http-loader TLA)"));
+                if (IsScriptLoadingLogEnabled()) {
+                  v8::String::Utf8Value r(iso, reason);
+                  if (*r) { Log(@"[dyn-import][http-loader][tla] rejected: %s", *r); }
+                }
                 auto ws = g_httpDynamicWaiters.find(keyLocal);
                 if (ws != g_httpDynamicWaiters.end()) {
                   for (auto &res : ws->second) {
@@ -2172,6 +2211,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   v8::TryCatch resolveTc(isolate);
   v8::MaybeLocal<v8::Module> maybeModule =
     ResolveModuleCallback(context, adjustedSpecifier, import_assertions, refMod);
+  if (IsScriptLoadingLogEnabled()) {
+    // Log the adjusted specifier we sent to the resolver
+    v8::String::Utf8Value adj(isolate, adjustedSpecifier);
+    const char* cAdj = (*adj) ? *adj : "<invalid>";
+    Log(@"[dyn-import][resolver-call] raw=%s normalized=%s adjusted=%s",
+        rawSpec.c_str(), normalizedSpec.c_str(), cAdj);
+  }
   if (maybeModule.IsEmpty()) {
     if (resolveTc.HasCaught()) {
       // Reject the promise with the thrown exception so callers don't hang
@@ -2325,6 +2371,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           v8::Local<v8::Context> ctx = d->ctx.Get(iso);
           v8::Local<v8::Module> modLocal = d->mod.Get(iso);
           v8::Local<v8::Promise::Resolver> res = d->res.Get(iso);
+          if (IsScriptLoadingLogEnabled()) {
+            Log(@"[dyn-import][tla] fulfilled, resolving namespace");
+          }
           if (!res.IsEmpty()) res->Resolve(ctx, modLocal->GetModuleNamespace()).FromMaybe(false);
           delete d;
         };
@@ -2336,6 +2385,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           v8::Local<v8::Context> ctx = d->ctx.Get(iso);
           v8::Local<v8::Promise::Resolver> res = d->res.Get(iso);
           v8::Local<v8::Value> reason = (info.Length() > 0) ? info[0] : v8::Exception::Error(tns::ToV8String(iso, "Evaluation failed (TLA)"));
+          if (IsScriptLoadingLogEnabled()) {
+            v8::String::Utf8Value r(iso, reason);
+            if (*r) { Log(@"[dyn-import][tla] rejected: %s", *r); }
+          }
           if (!res.IsEmpty()) res->Reject(ctx, reason).FromMaybe(false);
           delete d;
         };

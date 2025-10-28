@@ -1044,7 +1044,16 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                     stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
                   }
                 }
+              } else if (reason->IsString()) {
+                v8::String::Utf8Value messageUtf8(isolate, reason);
+                if (*messageUtf8) errorMessage = std::string(*messageUtf8);
               }
+            }
+            if (IsScriptLoadingLogEnabled()) {
+              // Emit a concise summary of the rejection for diagnostics
+              std::string stackPreview = stackTrace.size() > 240 ? stackTrace.substr(0, 240) + "…" : stackTrace;
+              Log(@"[esm][evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
+                  canonicalPath.c_str(), errorMessage.c_str(), stackPreview.c_str());
             }
             NativeScriptException::ShowErrorModal("Uncaught JavaScript Exception", errorMessage, stackTrace);
             logPhase("evaluate", "promise-rejected-handled");
