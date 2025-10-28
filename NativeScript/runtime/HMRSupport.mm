@@ -184,11 +184,11 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
 
   // Decide behavior based on path prefix
   std::string pathOnly = noHash.substr(pathStart, (qPos == std::string::npos) ? std::string::npos : (qPos - pathStart));
-  bool isAppMod = pathOnly.find("/@ns/m") != std::string::npos;
-  bool isSfcMod = pathOnly.find("/@ns/sfc") != std::string::npos;
-  bool isSfcAsm = pathOnly.find("/@ns/asm") != std::string::npos;
-  bool isRt = pathOnly.find("/@ns/rt") != std::string::npos;
-  bool isCore = pathOnly.find("/@ns/core") != std::string::npos;
+  bool isAppMod = pathOnly.find("/ns/m") != std::string::npos;
+  bool isSfcMod = pathOnly.find("/ns/sfc") != std::string::npos;
+  bool isSfcAsm = pathOnly.find("/ns/asm") != std::string::npos;
+  bool isRt = pathOnly.find("/ns/rt") != std::string::npos;
+  bool isCore = pathOnly.find("/ns/core") != std::string::npos;
 
   if (query.empty()) return originAndPath;
 
@@ -198,7 +198,7 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
 
   if (isRt || isCore) {
     std::string canonical = originAndPath;
-    const char* needle = isRt ? "/@ns/rt" : "/@ns/core";
+    const char* needle = isRt ? "/ns/rt" : "/ns/core";
     size_t pos = canonical.find(needle);
     if (pos != std::string::npos) {
       canonical = canonical.substr(0, pos) + std::string(needle);
