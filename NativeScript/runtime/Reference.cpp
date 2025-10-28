@@ -336,65 +336,65 @@ Reference::DataPair Reference::GetDataPair(Local<Object> obj) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
     tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
     ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
-
     BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
-    if (typeWrapper == nullptr) {
-        // TODO: Missing type when creating the Reference instance
-        tns::Assert(false, isolate);
-    }
     
     size_t size = 0;
-    const TypeEncoding* typeEncoding = nullptr;
-    bool isUnknownType = false;
-
-    if (Reference::IsSupportedType(typeWrapper->Type())) {
-        switch(typeWrapper->Type()) {
-            case WrapperType::Primitive: {
-                PrimitiveDataWrapper* primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
-                
-                size = primitiveWrapper->Size();
-                typeEncoding = primitiveWrapper->TypeEncoding();
-                break;
-            }
-            case WrapperType::StructType: {
-                StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
-                StructInfo structInfo = structTypeWrapper->StructInfo();
-                
-                size = structInfo.FFIType()->size;
-                break;
-            }
-            default: {
-                isUnknownType = true;
-                break;
-            }
-        }
-    } else {
-        isUnknownType = true;
-    }
     
-    if (isUnknownType) {
-        // TODO: Currently only PrimitiveDataWrappers and Structs are supported as type parameters
-        // Objective C class classes should also be handled
-        tns::Assert(false, isolate);
-    }
+    if (typeWrapper != nullptr) {
+        const TypeEncoding* typeEncoding = nullptr;
 
-    Local<Value> value = refWrapper->Value()->Get(isolate);
-    BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
-    if (wrappedValue != nullptr && wrappedValue->Type() == WrapperType::Pointer) {
-        PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
-        void* data = pw->Data();
+        if (Reference::IsSupportedType(typeWrapper->Type())) {
+            switch(typeWrapper->Type()) {
+                case WrapperType::Primitive: {
+                    PrimitiveDataWrapper* primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
+                    
+                    size = primitiveWrapper->Size();
+                    typeEncoding = primitiveWrapper->TypeEncoding();
+                    break;
+                }
+                case WrapperType::StructType: {
+                    StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
+                    StructInfo structInfo = structTypeWrapper->StructInfo();
+                    
+                    size = structInfo.FFIType()->size;
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+        } else {
+            // TODO: Currently only PrimitiveDataWrappers and Structs are supported as type parameters
+            // Objective C class classes should also be handled
+            tns::Assert(false, isolate);
+        }
 
-        DataPair pair(typeWrapper, typeEncoding, data, size);
-        return pair;
+        Local<Value> value = refWrapper->Value()->Get(isolate);
+        BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
+        if (wrappedValue != nullptr && wrappedValue->Type() == WrapperType::Pointer) {
+            PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
+            void* data = pw->Data();
+
+            DataPair pair(typeWrapper, typeEncoding, data, size);
+            return pair;
+        }
     }
 
     if (refWrapper->Encoding() != nullptr && refWrapper->Data() != nullptr) {
-        DataPair pair(typeWrapper, refWrapper->Encoding(), refWrapper->Data(), size);
+        const TypeEncoding* typeEncoding = refWrapper->Encoding();
+        
+        if (typeWrapper == nullptr) {
+            ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
+            size = ffiType->size;
+            FFICall::DisposeFFIType(ffiType, typeEncoding);
+        }
+        
+        DataPair pair(typeWrapper, typeEncoding, refWrapper->Data(), size);
         return pair;
     }
 
     tns::Assert(false, isolate);
-    return DataPair(typeWrapper, nullptr, nullptr, 0);
+    return DataPair(typeWrapper, nullptr, nullptr, size);
 }
 
 bool Reference::IsSupportedType(WrapperType type) {
