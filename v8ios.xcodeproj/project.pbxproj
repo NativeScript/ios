@@ -46,6 +46,7 @@
 		6573B9EA291FE2A700B0ED7C /* jsilib.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9E1291FE2A700B0ED7C /* jsilib.h */; };
 		6573B9ED291FE5B700B0ED7C /* JSIRuntime.h in Headers */ = {isa = PBXBuildFile; fileRef = 6573B9EB291FE5B700B0ED7C /* JSIRuntime.h */; };
 		6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */ = {isa = PBXBuildFile; fileRef = 6573B9EC291FE5B700B0ED7C /* JSIRuntime.m */; };
+		68E0071A2EB0F7EC00B923AE /* TNSPointCollection.m in Sources */ = {isa = PBXBuildFile; fileRef = 68E007192EB0F7EC00B923AE /* TNSPointCollection.m */; };
 		9160C065291ED41F000641C0 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 9160C064291ED41F000641C0 /* SpinLock.h */; };
 		91B25A0A29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */; };
 		91B25A0B29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = 91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */; };
@@ -479,6 +480,8 @@
 		6573B9E1291FE2A700B0ED7C /* jsilib.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = jsilib.h; sourceTree = "<group>"; };
 		6573B9EB291FE5B700B0ED7C /* JSIRuntime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JSIRuntime.h; sourceTree = "<group>"; };
 		6573B9EC291FE5B700B0ED7C /* JSIRuntime.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; path = JSIRuntime.m; sourceTree = "<group>"; };
+		68E007192EB0F7EC00B923AE /* TNSPointCollection.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TNSPointCollection.m; sourceTree = "<group>"; };
+		68E0071B2EB0F80D00B923AE /* TNSPointCollection.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSPointCollection.h; sourceTree = "<group>"; };
 		9160C064291ED41F000641C0 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SpinLock.h; path = NativeScript/runtime/SpinLock.h; sourceTree = "<group>"; };
 		91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = "ns-v8-tracing-agent-impl.mm"; sourceTree = "<group>"; };
 		91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ns-v8-tracing-agent-impl.h"; sourceTree = "<group>"; };
@@ -1134,6 +1137,8 @@
 				C29374EF229FC1600075CB16 /* TNSClassWithPlaceholder.m */,
 				C22EF68C2379414300D67CBF /* TNSSwiftLike.h */,
 				C22EF68A2379412100D67CBF /* TNSSwiftLike.m */,
+				68E007192EB0F7EC00B923AE /* TNSPointCollection.m */,
+				68E0071B2EB0F80D00B923AE /* TNSPointCollection.h */,
 			);
 			path = Interfaces;
 			sourceTree = "<group>";
@@ -2160,6 +2165,7 @@
 				C293751B229FC1600075CB16 /* TNSTestNativeCallbacks.m in Sources */,
 				C293751D229FC1600075CB16 /* TNSTestCommon.m in Sources */,
 				C293751F229FC1600075CB16 /* TNSBridgedTypes.m in Sources */,
+				68E0071A2EB0F7EC00B923AE /* TNSPointCollection.m in Sources */,
 				C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */,
 				C2937526229FC1600075CB16 /* TNSRecords.m in Sources */,
 				C2937522229FC1600075CB16 /* TNSReturnsRetained.m in Sources */,
