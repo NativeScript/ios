@@ -314,6 +314,52 @@ describe(module.id, function () {
             JSApi.new().methodError(1);
         }).toThrowError(/JS error/);
     });
+    it("throws JS Error wrapping NSError when no error arg is passed", function () {
+        var isThrown = false;
+        try {
+            // TNSApi.methodError(errorCode, error: NSError**)
+            // Calling without the last interop.Reference should cause the runtime to
+            // throw a JS Error that wraps the native NSError (for non-zero errorCode).
+            TNSApi.new().methodError(1);
+        } catch (e) {
+            isThrown = true;
+
+            // Basic shape checks
+            expect(e).toBeDefined();
+            expect(e.message).toEqual(jasmine.any(String));
+            expect(e.stack).toEqual(jasmine.any(String)); // proper JS stack present
+
+            // Fields we attach from the NSError
+            expect(e.code).toBe(1);
+            expect(e.domain).toBe("TNSErrorDomain");
+
+            // nativeException should be the wrapped NSError object
+            expect(e.nativeException).toBeDefined();
+            // The wrapped object should behave like an NSError proxy/wrapper
+            // (we assert existence of localizedDescription property)
+            expect(typeof e.nativeException.localizedDescription === "string" || e.nativeException.localizedDescription instanceof String).toBe(true);
+        } finally {
+            expect(isThrown).toBe(true);
+        }
+    });
+
+    it("does not throw when error arg is passed and the error ref is filled", function () {
+        // When the caller passes an interop.Reference() as the last argument,
+        // the runtime should not throw; it should return the method's boolean
+        // result and write the NSError into the reference.
+        var errorRef = new interop.Reference();
+        var result = TNSApi.new().methodError(1, errorRef);
+
+        // The method returns false for non-zero error code
+        expect(result).toBe(false);
+
+        // The errorRef should be populated with an NSError
+        expect(errorRef.value instanceof NSError).toBe(true);
+
+        // Validate the NSError contents
+        expect(errorRef.value.code).toBe(1);
+        expect(errorRef.value.domain).toBe("TNSErrorDomain");
+    });
 
 //     it("NSErrorExpose", function () {
 //         var JSApi = TNSApi.extend({
