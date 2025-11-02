@@ -1523,7 +1523,38 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
         NSError* error = errorPtr[0];
         std::free(errorRef);
         if (error) {
-            throw NativeScriptException([[error localizedDescription] UTF8String]);
+            // Create JS Error with localizedDescription, attach code, domain and nativeException,
+            // and throw it into V8 so JS catch handlers receive it (with proper stack).
+            Isolate* isolate = methodCall.context_->GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+
+            Local<Value> jsErrVal = Exception::Error(tns::ToV8String(isolate, [[error localizedDescription] UTF8String]));
+            if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
+                // Fallback: if for some reason we cannot create an Error object, throw a generic NativeScriptException
+                throw NativeScriptException([[error localizedDescription] UTF8String]);
+            }
+
+            Local<Object> jsErrObj = jsErrVal.As<Object>();
+
+            // Attach the NSError code (number) and domain (string)
+            jsErrObj->Set(context, tns::ToV8String(isolate, "code"), Number::New(isolate, (double)[error code])).FromMaybe(false);
+            if (error.domain) {
+                jsErrObj->Set(context, tns::ToV8String(isolate, "domain"), tns::ToV8String(isolate, [error.domain UTF8String])).FromMaybe(false);
+            } else {
+                jsErrObj->Set(context, tns::ToV8String(isolate, "domain"), Null(isolate)).FromMaybe(false);
+            }
+
+            // Wrap the native NSError instance into a JS object and attach as nativeException
+            ObjCDataWrapper* wrapper = new ObjCDataWrapper(error);
+            Local<Value> nativeWrapper = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
+            jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper).FromMaybe(false);
+
+            // Ensure the Error has a proper 'name' property.
+            jsErrObj->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, "NSError")).FromMaybe(false);
+
+            // Throw the JS Error with full stack information — V8 will populate the stack for the created Error object.
+            isolate->ThrowException(jsErrObj);
+            return Local<Value>();
         }
     }
 
