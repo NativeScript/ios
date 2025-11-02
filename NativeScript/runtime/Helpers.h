@@ -219,8 +219,7 @@ bool IsArrayOrArrayLike(v8::Isolate* isolate,
 void* TryGetBufferFromArrayBuffer(const v8::Local<v8::Value>& value,
                                   bool& isArrayBuffer);
 
-void ExecuteOnRunLoop(CFRunLoopRef queue, std::function<void()> func,
-                      bool async = true);
+void ExecuteOnRunLoop(CFRunLoopRef queue, void (^func)(void), bool async = true);
 void ExecuteOnDispatchQueue(dispatch_queue_t queue, std::function<void()> func,
                             bool async = true);
 void ExecuteOnMainThread(std::function<void()> func, bool async = true);
@@ -240,47 +239,27 @@ static inline void TNS_FormatAndLog(NSString* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
 
-  // Convert NSString format to C string and delegate to the main implementation
-  const char* cFmt = [fmt UTF8String];
-  if (!cFmt) {
-    va_end(ap);
-    return;
-  }
-
-  // Fast path: try a reasonably sized stack buffer first
-  const int STACK_BUF_SIZE = 1024;
-  char stack_buf[STACK_BUF_SIZE];
-
-  va_list ap_copy;
-  va_copy(ap_copy, ap);
-  int needed = vsnprintf(stack_buf, STACK_BUF_SIZE, cFmt, ap_copy);
-  va_end(ap_copy);
-
-  if (needed < 0) {
-    va_end(ap);
-    return;
-  }
-
-  if (needed < STACK_BUF_SIZE) {
-    // Message fit into stack buffer
-#if TNS_HAVE_OS_LOG
-    os_log(OS_LOG_DEFAULT, "%{public}s", stack_buf);
-#else
-    NSLog(@"%s", stack_buf);
-#endif
-  } else {
-    // Needs heap allocation
-    std::vector<char> buffer((size_t)needed + 1);
-    vsnprintf(buffer.data(), buffer.size(), cFmt, ap);
-
-#if TNS_HAVE_OS_LOG
-    os_log(OS_LOG_DEFAULT, "%{public}s", buffer.data());
-#else
-    NSLog(@"%s", buffer.data());
-#endif
-  }
-
+  // Use NSString's formatting to handle both C and Objective-C format
+  // specifiers
+  NSString* formattedString =
+      [[NSString alloc] initWithFormat:fmt arguments:ap];
   va_end(ap);
+
+  if (!formattedString) {
+    return;
+  }
+
+  // Convert to C string for logging
+  const char* cStr = [formattedString UTF8String];
+  if (!cStr) {
+    return;
+  }
+
+#if TNS_HAVE_OS_LOG
+  os_log(OS_LOG_DEFAULT, "%{public}s", cStr);
+#else
+  NSLog(@"%s", cStr);
+#endif
 }
 #endif
 
@@ -337,7 +316,7 @@ static inline void TNS_FormatAndLog(const char* fmt, ...) {
 }
 
 // Keep the existing Log(...) macro name for call-site compatibility.
-#define Log(...) TNS_FormatAndLog(__VA_ARGS__)
+#define Log(...) tns::TNS_FormatAndLog(__VA_ARGS__)
 
 v8::Local<v8::String> JsonStringifyObject(v8::Local<v8::Context> context,
                                           v8::Local<v8::Value> value,

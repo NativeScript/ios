@@ -24,9 +24,9 @@ namespace v8_inspector {
   [[NSString stringWithFormat:@"%@:NativeScript.Debug.%s", \
                               [[NSBundle mainBundle] bundleIdentifier], name] UTF8String]
 
-#define LOG_DEBUGGER_PORT(port)                                                        \
-  NSLog(@"NativeScript debugger has opened inspector socket on port %d for %@.", port, \
-        [[NSBundle mainBundle] bundleIdentifier])
+#define LOG_DEBUGGER_PORT(port)                                                      \
+  Log(@"NativeScript debugger has opened inspector socket on port %d for %@.", port, \
+      [[NSBundle mainBundle] bundleIdentifier])
 
 JsV8InspectorClient::JsV8InspectorClient(tns::Runtime* runtime)
     : runtime_(runtime), isolate_(runtime_->GetIsolate()), messages_(), runningNestedLoops_(false) {
@@ -578,4 +578,4 @@ std::string JsV8InspectorClient::GetReturnMessageFromDomainHandlerResult(
 
 std::map<std::string, Persistent<Object>*> JsV8InspectorClient::Domains;
 
-}
+}  // namespace v8_inspector

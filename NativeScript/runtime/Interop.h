@@ -119,9 +119,11 @@ public:
     static id CallInitializer(v8::Local<v8::Context> context, const MethodMeta* methodMeta, id target, Class clazz, V8Args& args);
     static v8::Local<v8::Value> CallFunction(ObjCMethodCall& methodCall);
     static v8::Local<v8::Value> CallFunction(CMethodCall& methodCall);
+    static v8::Local<v8::Value> GetResultByType(v8::Local<v8::Context> context, BaseDataWrapper* typeWrapper, BaseCall* call, std::shared_ptr<v8::Persistent<v8::Value>> parentStruct = nullptr);
     static v8::Local<v8::Value> GetResult(v8::Local<v8::Context> context, const TypeEncoding* typeEncoding, BaseCall* call, bool marshalToPrimitive, std::shared_ptr<v8::Persistent<v8::Value>> parentStruct = nullptr, bool isStructMember = false, bool ownsReturnedObject = false, bool returnsUnmanaged = false, bool isInitializer = false);
     static void SetStructPropertyValue(v8::Local<v8::Context> context, StructWrapper* wrapper, StructField field, v8::Local<v8::Value> value);
     static void InitializeStruct(v8::Local<v8::Context> context, void* destBuffer, std::vector<StructField> fields, v8::Local<v8::Value> inititalizer);
+    static void WriteTypeValue(v8::Local<v8::Context> context, BaseDataWrapper* typeWrapper, void* dest, v8::Local<v8::Value> arg);
     static void WriteValue(v8::Local<v8::Context> context, const TypeEncoding* typeEncoding, void* dest, v8::Local<v8::Value> arg);
     static id ToObject(v8::Local<v8::Context> context, v8::Local<v8::Value> arg);
     static v8::Local<v8::Value> GetPrimitiveReturnType(v8::Local<v8::Context> context, BinaryTypeEncodingType type, BaseCall* call);
