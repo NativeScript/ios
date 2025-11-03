@@ -7,6 +7,9 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 #include <sstream>
+#include <mutex>
+#include <limits>
+#include <algorithm>
 #include "Caches.h"
 #include "Helpers.h"
 #include "Runtime.h"
@@ -14,10 +17,48 @@
 
 using namespace v8;
 
+namespace {
+static UITextView* gErrorStackTextView = nil;
+static NSString* gLatestStackText = nil;
+
+struct PendingErrorDisplay {
+  uint64_t ticket = 0;
+  bool contextCaptured = false;
+  bool modalPresented = false;
+  bool fallbackScheduled = false;
+  v8::Isolate* isolate = nullptr;
+  std::string title;
+  std::string message;
+  std::string rawStack;
+  std::string canonicalStack;
+  std::string consolePayload;
+  int canonicalQuality = -1;
+};
+
+static std::mutex gErrorDisplayMutex;
+static PendingErrorDisplay gPendingErrorDisplay;
+static uint64_t gNextErrorTicket = 1;
+
+}
+
 namespace tns {
 
 // External flag from Runtime.mm to track JavaScript errors
 extern bool jsErrorOccurred;
+extern bool isErrorDisplayShowing;
+
+static void UpdateDisplayedStackText(const std::string& stackText);
+static void RenderErrorModalUI(v8::Isolate* isolate, const std::string& title,
+                               const std::string& message, const std::string& stackText);
+static void ShowErrorModalSynchronously(const std::string& title,
+                                        const std::string& message,
+                                        const std::string& stackTrace);
+static void ScheduleFallbackPresentation(uint64_t ticket);
+static void PresentFallbackIfNeeded(uint64_t ticket);
+static std::string ResolveDisplayStack(const PendingErrorDisplay& state);
+static int EvaluateStackQuality(const std::string& stackText);
+static void ConsiderStackCandidate(PendingErrorDisplay& state, v8::Isolate* isolate,
+                                   const std::string& candidateStack);
 
 NativeScriptException::NativeScriptException(const std::string& message) {
   this->javascriptException_ = nullptr;
@@ -30,7 +71,7 @@ NativeScriptException::NativeScriptException(Isolate* isolate, TryCatch& tc,
   Local<Value> error = tc.Exception();
   this->javascriptException_ = new Persistent<Value>(isolate, tc.Exception());
   this->message_ = GetErrorMessage(isolate, error, message);
-  this->stackTrace_ = GetErrorStackTrace(isolate, tc.Message()->GetStackTrace());
+  this->stackTrace_ = tns::GetSmartStackTrace(isolate, &tc, error);
   this->fullMessage_ = GetFullMessage(isolate, tc, this->message_);
   this->name_ = "NativeScriptException";
   tc.Reset();
@@ -64,7 +105,10 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
     std::string cbName = isDiscarded ? "__onDiscardedError" : "__onUncaughtError";
     bool success = global->Get(context, tns::ToV8String(isolate, cbName)).ToLocal(&handler);
 
-    std::string stackTrace = GetErrorStackTrace(isolate, message->GetStackTrace());
+    std::string stackTrace = tns::GetSmartStackTrace(isolate, nullptr, error);
+    if (stackTrace.empty()) {
+      stackTrace = GetErrorStackTrace(isolate, message->GetStackTrace());
+    }
     std::string fullMessage;
 
     auto errObject = error.As<Object>();
@@ -122,7 +166,7 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
 
       NSString* name = @"NativeScriptUncaughtJSException";
 
-      // In debug mode, show beautiful error modal instead of crashing
+      // In debug mode, show error modal instead of crashing
       if (RuntimeConfig.IsDebug) {
         // Mark that a JavaScript error occurred
         jsErrorOccurred = true;
@@ -130,10 +174,9 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
             @"in debug mode *****\n");
         Log(@"%s", fullMessage.c_str());
         Log(@"%s", stackTrace.c_str());
-        // NSLog(@"🎨 CALLING ShowErrorModal for OnUncaughtError - should display beautiful branded "
-        //       @"modal...");
+        // Log(@"🎨 CALLING ShowErrorModal for OnUncaughtError - should display branded modal");
 
-        // Show the beautiful error modal with SAME comprehensive message as terminal
+        // Show the error modal with same message as terminal
         std::string errorTitle = "Uncaught JavaScript Exception";
 
         // Extract just the error type/message (first line) for cleaner display
@@ -148,10 +191,9 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
           }
         }
 
-        // Use the same comprehensive fullMessage that the terminal uses (identical stack traces)
-        std::string completeStackTrace = reasonStr ? [reasonStr UTF8String] : fullMessage;
         Log(@"***** End stack trace - Fix error to continue *****\n");
-        ShowErrorModal(errorTitle, errorMessage, stackTrace);
+
+        ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
 
         // Don't crash in debug mode - just return
         return;
@@ -270,7 +312,7 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
       if (RuntimeConfig.IsDebug) {
         Log(@"***** End stack trace - showing error modal and continuing execution *****\n");
 
-        // Show beautiful error modal in debug mode with SAME detailed message as terminal
+        // Show error modal in debug mode
         std::string errorTitle = "JavaScript Error";
 
         // Extract just the error message (first line) for the title
@@ -280,8 +322,12 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
           errorMessage = errorMessage.substr(0, firstNewline);
         }
 
-        // Use the same comprehensive fullMessage that the terminal uses
-        ShowErrorModal(errorTitle, errorMessage, fullMessage);
+        // Prefer a clean stack for the modal
+        std::string displayStack = stackTrace;
+        if (displayStack.empty()) {
+          displayStack = fullMessage;  // last resort
+        }
+        ShowErrorModal(isolate, errorTitle, errorMessage, displayStack);
 
         // In debug mode, DON'T throw the exception - just return to prevent crash
         // The error modal will be shown and the app will continue running
@@ -425,161 +471,422 @@ std::string NativeScriptException::GetFullMessage(Isolate* isolate, Local<v8::Me
   return loggedMessage;
 }
 
-void NativeScriptException::ShowErrorModal(const std::string& title, const std::string& message,
+void NativeScriptException::ShowErrorModal(Isolate* isolate, const std::string& title,
+                                           const std::string& message,
                                            const std::string& stackTrace) {
   if (!RuntimeConfig.IsDebug) {
     return;
   }
 
-    // only show when enabled via nativescript.config
-  if (Runtime::showErrorDisplay() == false) {
+  if (!Runtime::showErrorDisplay()) {
     return;
   }
 
-  // For boot-level crashes, try a simpler approach first
-  UIApplication* app = [UIApplication sharedApplication];
+  uint64_t ticketToSchedule = 0;
 
-  // If we're in a very early boot state with no windows/scenes, use a simple approach
-  if (app.windows.count == 0 && app.connectedScenes.count == 0) {
-    Log(@"Note: JavaScript error during boot.");
-    Log(@"================================");
-    Log(@"%s", stackTrace.c_str());
-    Log(@"================================");
-    Log(@"Please fix the error and save the file to auto reload the app.");
-    Log(@"================================");
+  {
+    std::lock_guard<std::mutex> lock(gErrorDisplayMutex);
 
-    // Create a nuclear option window for boot crashes; attach to a UIWindowScene on iOS 13+
-    @try {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        UIApplication* app = [UIApplication sharedApplication];
-
-// Try to ensure a scene exists on iOS 13+
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
-        if (@available(iOS 13.0, *)) {
-          if (app.connectedScenes.count == 0) {
-            // NSLog(@"🎨 Boot: requesting scene session activation");
-            UISceneActivationRequestOptions* opts = [[UISceneActivationRequestOptions alloc] init];
-            [app requestSceneSessionActivation:nil
-                                  userActivity:nil
-                                       options:opts
-                                  errorHandler:^(NSError* error) {
-                                    Log(@"🎨 Boot: scene activation error: %@", error);
-                                  }];
-          }
-        }
-#endif
-
-        // Slight delay to allow scene creation
-        dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)),
-            dispatch_get_main_queue(), ^{
-              // NSLog(@"🎨 Creating nuclear boot error window...");
-
-              UIWindow* bootWindow = nil;
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
-              if (@available(iOS 13.0, *)) {
-                UIWindowScene* winScene = nil;
-                for (UIScene* scene in app.connectedScenes) {
-                  if ([scene isKindOfClass:[UIWindowScene class]]) {
-                    winScene = (UIWindowScene*)scene;
-                    break;
-                  }
-                }
-                if (winScene) {
-                  bootWindow = [[UIWindow alloc] initWithWindowScene:winScene];
-                  bootWindow.frame = winScene.coordinateSpace.bounds;
-                  Log(@"🎨 Boot: using scene-backed window");
-                }
-              }
-#endif
-
-              if (!bootWindow) {
-                bootWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-                // NSLog(@"🎨 Boot: using frame-backed window (no scene available)");
-              }
-
-              bootWindow.windowLevel = UIWindowLevelAlert + 2000;
-              bootWindow.backgroundColor = [UIColor colorWithRed:0.8 green:0.0 blue:0.0 alpha:1.0];
-              bootWindow.hidden = NO;
-              bootWindow.alpha = 1.0;
-
-              // Basic view controller + label
-              UIViewController* bootVC = [[UIViewController alloc] init];
-              bootVC.view.backgroundColor = [UIColor colorWithRed:0.8 green:0.0 blue:0.0 alpha:1.0];
-
-              UILabel* bootErrorLabel = [[UILabel alloc] init];
-              bootErrorLabel.text =
-                  [NSString stringWithFormat:@"🚨 BOOT ERROR 🚨\n\n%@\n\n🔧 STACK TRACE:\n%@\n\n💡 Fix "
-                                             @"the error and restart the app",
-                                             [NSString stringWithUTF8String:message.c_str()],
-                                             [NSString stringWithUTF8String:stackTrace.c_str()]];
-              bootErrorLabel.textColor = [UIColor whiteColor];
-              bootErrorLabel.font = [UIFont boldSystemFontOfSize:16];
-              bootErrorLabel.textAlignment = NSTextAlignmentCenter;
-              bootErrorLabel.numberOfLines = 0;
-              bootErrorLabel.translatesAutoresizingMaskIntoConstraints = NO;
-              [bootVC.view addSubview:bootErrorLabel];
-
-              [NSLayoutConstraint activateConstraints:@[
-                [bootErrorLabel.centerXAnchor constraintEqualToAnchor:bootVC.view.centerXAnchor],
-                [bootErrorLabel.centerYAnchor constraintEqualToAnchor:bootVC.view.centerYAnchor],
-                [bootErrorLabel.leadingAnchor
-                    constraintGreaterThanOrEqualToAnchor:bootVC.view.leadingAnchor
-                                                constant:20],
-                [bootErrorLabel.trailingAnchor
-                    constraintLessThanOrEqualToAnchor:bootVC.view.trailingAnchor
-                                             constant:-20]
-              ]];
-
-              bootWindow.rootViewController = bootVC;
-
-              [bootWindow makeKeyAndVisible];
-              [bootWindow layoutIfNeeded];
-              CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.02, false);
-
-              // NSLog(@"🎨 Nuclear boot error window created and displayed! key=%@ hidden=%@
-              // alpha=%.2f",
-              //       bootWindow.isKeyWindow ? @"YES" : @"NO",
-              //       bootWindow.hidden ? @"YES" : @"NO",
-              //       bootWindow.alpha);
-
-              static UIWindow* __attribute__((unused)) persistentBootWindow = nil;
-              persistentBootWindow = bootWindow;
-            });
-      });
-    } @catch (NSException* exception) {
-      // NSLog(@"🎨 Even nuclear boot window failed: %@", exception);
-      Log(@"Boot error details are in the logs above.");
+    // If the console already presented this error (console-first scenario), just enrich the context.
+    if (gPendingErrorDisplay.ticket != 0 && !gPendingErrorDisplay.contextCaptured &&
+        gPendingErrorDisplay.modalPresented) {
+      gPendingErrorDisplay.contextCaptured = true;
+      gPendingErrorDisplay.isolate = isolate;
+      gPendingErrorDisplay.title = title;
+      gPendingErrorDisplay.message = message;
+      gPendingErrorDisplay.rawStack = stackTrace;
+      ConsiderStackCandidate(gPendingErrorDisplay, isolate, stackTrace);
+      return;
     }
 
-    return;  // Exit early for boot-level crashes
+    gPendingErrorDisplay.ticket = gNextErrorTicket++;
+    gPendingErrorDisplay.contextCaptured = true;
+    gPendingErrorDisplay.modalPresented = false;
+    gPendingErrorDisplay.fallbackScheduled = true;
+    gPendingErrorDisplay.isolate = isolate;
+    gPendingErrorDisplay.title = title;
+    gPendingErrorDisplay.message = message;
+    gPendingErrorDisplay.rawStack = stackTrace;
+    gPendingErrorDisplay.consolePayload.clear();
+    gPendingErrorDisplay.canonicalStack.clear();
+    gPendingErrorDisplay.canonicalQuality = -1;
+    ConsiderStackCandidate(gPendingErrorDisplay, isolate, stackTrace);
+    ticketToSchedule = gPendingErrorDisplay.ticket;
   }
 
-  // For normal crashes, proceed with the full UI
-  // Ensure we don't crash during UI creation
-  // Make this synchronous if we're already on the main thread to prevent race conditions
-  if ([NSThread isMainThread]) {
-    @try {
-      NativeScriptException::showErrorModalSynchronously(title, message, stackTrace);
-    } @catch (NSException* exception) {
-      // NSLog(@"Failed to create error modal UI: %@", exception);
-      Log(@"Error details - Title: %s, Message: %s", title.c_str(), message.c_str());
-    }
-  } else {
-    dispatch_sync(dispatch_get_main_queue(), ^{
-      @try {
-        NativeScriptException::showErrorModalSynchronously(title, message, stackTrace);
-      } @catch (NSException* exception) {
-        // NSLog(@"Failed to create error modal UI: %@", exception);
-        Log(@"Error details - Title: %s, Message: %s", title.c_str(), message.c_str());
-      }
+  if (ticketToSchedule != 0) {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+      ScheduleFallbackPresentation(ticketToSchedule);
     });
   }
 }
 
-void NativeScriptException::showErrorModalSynchronously(const std::string& title,
-                                                        const std::string& message,
-                                                        const std::string& stackTrace) {
+void NativeScriptException::SubmitConsoleErrorPayload(Isolate* isolate, const std::string& payload) {
+  if (!RuntimeConfig.IsDebug) {
+    return;
+  }
+
+  if (!Runtime::showErrorDisplay()) {
+    return;
+  }
+
+  PendingErrorDisplay stateSnapshot;
+  bool presentNow = false;
+  bool updateExisting = false;
+
+  auto promoteConsolePayload = [&](const std::string& text, v8::Isolate* payloadIsolate) {
+    gPendingErrorDisplay.consolePayload = text;
+    if (payloadIsolate != nullptr) {
+      gPendingErrorDisplay.isolate = payloadIsolate;
+    }
+    gPendingErrorDisplay.canonicalStack = text;
+    gPendingErrorDisplay.canonicalQuality = std::numeric_limits<int>::max();
+  };
+
+  {
+    std::lock_guard<std::mutex> lock(gErrorDisplayMutex);
+
+    auto buildDefaultContext = [&](void) {
+      gPendingErrorDisplay.title = "JavaScript Error";
+      std::string firstLine = payload;
+      size_t newlinePos = payload.find('\n');
+      if (newlinePos != std::string::npos) {
+        firstLine = payload.substr(0, newlinePos);
+      }
+      gPendingErrorDisplay.message = firstLine;
+      gPendingErrorDisplay.rawStack = payload;
+      promoteConsolePayload(payload, isolate);
+    };
+
+    if (gPendingErrorDisplay.ticket == 0) {
+      gPendingErrorDisplay.ticket = gNextErrorTicket++;
+      gPendingErrorDisplay.canonicalStack.clear();
+      gPendingErrorDisplay.canonicalQuality = -1;
+    }
+
+    if (!gPendingErrorDisplay.contextCaptured && !gPendingErrorDisplay.modalPresented) {
+      // Console-first scenario for a brand new error
+      gPendingErrorDisplay.modalPresented = true;
+      gPendingErrorDisplay.isolate = isolate;
+      buildDefaultContext();
+      stateSnapshot = gPendingErrorDisplay;
+      presentNow = true;
+    } else if (!gPendingErrorDisplay.modalPresented) {
+      // Context captured (or pending) but UI not yet shown – prefer the console payload
+      if (!gPendingErrorDisplay.contextCaptured) {
+        buildDefaultContext();
+      }
+      if (isolate != nullptr) {
+        gPendingErrorDisplay.isolate = isolate;
+      }
+      promoteConsolePayload(payload, isolate);
+      gPendingErrorDisplay.modalPresented = true;
+      stateSnapshot = gPendingErrorDisplay;
+      presentNow = true;
+    } else {
+      // Modal already visible (fallback or previous payload) – just update the text content
+      promoteConsolePayload(payload, isolate);
+      updateExisting = true;
+    }
+  }
+
+  if (presentNow) {
+    std::string displayStack = stateSnapshot.canonicalStack.empty()
+                                    ? (stateSnapshot.consolePayload.empty()
+                                           ? ResolveDisplayStack(stateSnapshot)
+                                           : stateSnapshot.consolePayload)
+                                    : stateSnapshot.canonicalStack;
+    RenderErrorModalUI(stateSnapshot.isolate, stateSnapshot.title, stateSnapshot.message,
+                       displayStack);
+  } else if (updateExisting) {
+    std::string displayStack = gPendingErrorDisplay.canonicalStack.empty()
+                                    ? (gPendingErrorDisplay.consolePayload.empty()
+                                           ? ResolveDisplayStack(gPendingErrorDisplay)
+                                           : gPendingErrorDisplay.consolePayload)
+                                    : gPendingErrorDisplay.canonicalStack;
+    UpdateDisplayedStackText(displayStack);
+  }
+}
+
+static void ScheduleFallbackPresentation(uint64_t ticket) {
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
+                 dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                   PresentFallbackIfNeeded(ticket);
+                 });
+}
+
+static void PresentFallbackIfNeeded(uint64_t ticket) {
+  PendingErrorDisplay snapshot;
+  bool shouldPresent = false;
+
+  {
+    std::lock_guard<std::mutex> lock(gErrorDisplayMutex);
+    if (gPendingErrorDisplay.ticket == ticket && !gPendingErrorDisplay.modalPresented) {
+      gPendingErrorDisplay.modalPresented = true;
+      snapshot = gPendingErrorDisplay;
+      shouldPresent = true;
+    }
+  }
+
+  if (!shouldPresent) {
+    return;
+  }
+
+  std::string finalStack = ResolveDisplayStack(snapshot);
+
+  RenderErrorModalUI(snapshot.isolate, snapshot.title, snapshot.message, finalStack);
+}
+
+static std::string ResolveDisplayStack(const PendingErrorDisplay& state) {
+  if (!state.canonicalStack.empty()) {
+    size_t previewLen = std::min<size_t>(state.canonicalStack.size(), 120);
+    std::string preview = state.canonicalStack.substr(0, previewLen);
+    Log(@"[ErrorDisplay] resolved stack (canonical) len=%zu preview=%@",
+        state.canonicalStack.size(), [NSString stringWithUTF8String:preview.c_str()]);
+    return state.canonicalStack;
+  }
+
+  std::string bestStack;
+  int bestQuality = std::numeric_limits<int>::min();
+
+  auto consider = [&](const std::string& candidate, v8::Isolate* isolate) {
+    if (candidate.empty()) {
+      return;
+    }
+    std::string normalized = candidate;
+    if (isolate != nullptr) {
+      std::string remapped = tns::RemapStackTraceIfAvailable(isolate, candidate);
+      if (!remapped.empty()) {
+        normalized = remapped;
+      }
+    }
+    int candidateQuality = EvaluateStackQuality(normalized);
+    size_t previewLen = std::min<size_t>(normalized.size(), 120);
+    std::string preview = normalized.substr(0, previewLen);
+    Log(@"[ErrorDisplay] consider: quality=%d len=%zu preview=%@", candidateQuality,
+        normalized.size(), [NSString stringWithUTF8String:preview.c_str()]);
+    if (candidateQuality > bestQuality ||
+        (candidateQuality == bestQuality && normalized.size() > bestStack.size())) {
+      bestStack = normalized;
+      bestQuality = candidateQuality;
+    }
+  };
+
+  if (!state.canonicalStack.empty()) {
+    consider(state.canonicalStack, nullptr);
+  }
+  if (!state.consolePayload.empty()) {
+    consider(state.consolePayload, state.isolate);
+  }
+  if (!state.rawStack.empty()) {
+    consider(state.rawStack, state.isolate);
+  }
+
+  if (bestStack.empty()) {
+    return state.message;
+  }
+
+  size_t finalPreviewLen = std::min<size_t>(bestStack.size(), 120);
+  std::string finalPreview = bestStack.substr(0, finalPreviewLen);
+  Log(@"[ErrorDisplay] resolved stack quality=%d len=%zu preview=%@", bestQuality,
+      bestStack.size(), [NSString stringWithUTF8String:finalPreview.c_str()]);
+
+  return bestStack;
+}
+
+static size_t CountOccurrences(const std::string& haystack, const std::string& needle) {
+  if (haystack.empty() || needle.empty()) {
+    return 0;
+  }
+  size_t count = 0;
+  size_t pos = haystack.find(needle, 0);
+  while (pos != std::string::npos) {
+    ++count;
+    pos = haystack.find(needle, pos + needle.length());
+  }
+  return count;
+}
+
+static int EvaluateStackQuality(const std::string& stackText) {
+  if (stackText.empty()) {
+    return std::numeric_limits<int>::min();
+  }
+
+  auto hasAny = [&](const std::initializer_list<const char*>& tokens) {
+    for (const auto* token : tokens) {
+      if (stackText.find(token) != std::string::npos) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  int score = 0;
+
+  size_t tsFrames = CountOccurrences(stackText, ".ts:") +
+                    CountOccurrences(stackText, ".tsx:") +
+                    CountOccurrences(stackText, ".vue:");
+  if (tsFrames > 0) {
+    score += 60;
+    score += static_cast<int>(tsFrames) * 5;
+  }
+
+  if (hasAny({"webpack:/", "file: src/", "sourceURL"})) {
+    score += 20;
+  }
+
+  size_t newlineCount = CountOccurrences(stackText, "\n");
+  if (newlineCount > 0) {
+    score += static_cast<int>(std::min<size_t>(20, newlineCount));
+  }
+
+  if (stackText.find(" at ") != std::string::npos) {
+    score += 10;
+  }
+
+  int penalty = 0;
+  penalty += static_cast<int>(CountOccurrences(stackText, "file:///app/")) * 3;
+  penalty += static_cast<int>(CountOccurrences(stackText, ".bundle.js")) * 2;
+  penalty = std::min(penalty, score / 2);  // don't let bundle frames dominate completely
+  score -= penalty;
+
+  score += static_cast<int>(std::min<size_t>(10, stackText.size() / 400));
+
+  if (score <= 0) {
+    score = 1;  // ensure non-empty strings beat truly empty candidates
+  }
+
+  return score;
+}
+
+static void ConsiderStackCandidate(PendingErrorDisplay& state, v8::Isolate* isolate,
+                                   const std::string& candidateStack) {
+  if (candidateStack.empty()) {
+    return;
+  }
+
+  v8::Isolate* effectiveIsolate = isolate != nullptr ? isolate : state.isolate;
+  std::string normalized = candidateStack;
+  if (effectiveIsolate != nullptr) {
+    std::string remapped = tns::RemapStackTraceIfAvailable(effectiveIsolate, candidateStack);
+    if (!remapped.empty()) {
+      normalized = remapped;
+    }
+  }
+
+  int quality = EvaluateStackQuality(normalized);
+  if (quality < 0 && state.canonicalQuality >= 0) {
+    return;
+  }
+
+  bool shouldReplace = false;
+  if (quality > state.canonicalQuality) {
+    shouldReplace = true;
+  } else if (quality == state.canonicalQuality && normalized.size() > state.canonicalStack.size()) {
+    shouldReplace = true;
+  }
+
+  if (state.canonicalStack.empty()) {
+    shouldReplace = true;
+  }
+
+  if (shouldReplace) {
+    state.canonicalStack = normalized;
+    state.canonicalQuality = quality;
+  }
+}
+
+static void UpdateDisplayedStackText(const std::string& stackText) {
+  NSString* stackNSString = [NSString stringWithUTF8String:stackText.c_str()];
+  if (stackNSString == nil) {
+    stackNSString = @"(invalid UTF-8 stack trace)";
+  }
+  gLatestStackText = stackNSString;
+
+  auto applyUpdate = ^{
+    if (gErrorStackTextView != nil) {
+      gErrorStackTextView.text = gLatestStackText;
+      gErrorStackTextView.contentOffset = CGPointMake(0, 0);
+    }
+  };
+
+  if ([NSThread isMainThread]) {
+    applyUpdate();
+  } else {
+    dispatch_async(dispatch_get_main_queue(), applyUpdate);
+  }
+}
+
+static void RenderErrorModalUI(v8::Isolate* isolate, const std::string& title,
+                               const std::string& message, const std::string& stackText) {
+  if (!RuntimeConfig.IsDebug || !Runtime::showErrorDisplay()) {
+    return;
+  }
+
+  // Always prefer the shared pending state's canonical/console text so callers cannot
+  // accidentally overwrite with a worse stack.
+  std::string stackForModal = stackText;
+  {
+    std::lock_guard<std::mutex> lock(gErrorDisplayMutex);
+    if (!gPendingErrorDisplay.canonicalStack.empty()) {
+      stackForModal = gPendingErrorDisplay.canonicalStack;
+    } else if (!gPendingErrorDisplay.consolePayload.empty()) {
+      stackForModal = gPendingErrorDisplay.consolePayload;
+    }
+  }
+  if (stackForModal.empty()) {
+    stackForModal = message;
+  }
+
+  // Final guard: remap here as well so the UI always matches the terminal output,
+  // even if earlier stages missed remapping due to timing.
+  if (isolate != nullptr) {
+    std::string maybeRemapped = tns::RemapStackTraceIfAvailable(isolate, stackForModal);
+    if (!maybeRemapped.empty()) {
+      stackForModal = maybeRemapped;
+    }
+  }
+
+  UpdateDisplayedStackText(stackForModal);
+
+  bool alreadyShowing = isErrorDisplayShowing;
+
+  UIApplication* app = [UIApplication sharedApplication];
+  if (!alreadyShowing && app.windows.count == 0 && app.connectedScenes.count == 0) {
+    Log(@"Note: JavaScript error during boot.");
+    Log(@"================================");
+    Log(@"%s", stackForModal.c_str());
+    Log(@"================================");
+    Log(@"Please fix the error and save the file to auto reload the app.");
+    Log(@"================================");
+    return;
+  }
+
+  if (alreadyShowing) {
+    return;
+  }
+
+  isErrorDisplayShowing = true;
+
+  auto showSynchronously = ^{
+    @try {
+      // Log(@"[ShowErrorModal] On main thread - showing modal synchronously %s", message.c_str());
+      ShowErrorModalSynchronously(title, message, stackForModal);
+    } @catch (NSException* exception) {
+      Log(@"Error details - Title: %s, Message: %s", title.c_str(), message.c_str());
+    }
+  };
+
+  if ([NSThread isMainThread]) {
+    showSynchronously();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), showSynchronously);
+  }
+}
+
+static void ShowErrorModalSynchronously(const std::string& title,
+                                        const std::string& message,
+                                        const std::string& stackTrace) {
   // Use static variables to keep strong references and prevent deallocation
   static UIWindow* __attribute__((unused)) foundationWindowRef =
       nil;  // Keep foundation window alive
@@ -591,7 +898,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
 
   // If no windows exist, create a foundational window to establish the hierarchy
   if (sharedApp.windows.count == 0) {
-    // NSLog(@"🚀 Bootstrap: No app windows exist - creating foundational window hierarchy");
+    // Log(@"🚀 Bootstrap: No app windows exist - creating foundational window hierarchy");
 
     // Create a basic foundational window that mimics what UIApplicationMain would create
     UIWindow* foundationWindow = nil;
@@ -604,23 +911,23 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
       for (UIScene* scene in sharedApp.connectedScenes) {
         if ([scene isKindOfClass:[UIWindowScene class]]) {
           foundationScene = (UIWindowScene*)scene;
-          // NSLog(@"🚀 Bootstrap: Found existing scene for foundation window");
+          // Log(@"🚀 Bootstrap: Found existing scene for foundation window");
           break;
         }
       }
 
       if (foundationScene) {
         foundationWindow = [[UIWindow alloc] initWithWindowScene:foundationScene];
-        // NSLog(@"🚀 Bootstrap: Created foundation window with existing scene");
+        // Log(@"🚀 Bootstrap: Created foundation window with existing scene");
       } else {
         // If no scenes exist, create a window without scene (iOS 12 style fallback)
         foundationWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        // NSLog(@"🚀 Bootstrap: Created foundation window without scene (emergency mode)");
+        // Log(@"🚀 Bootstrap: Created foundation window without scene (emergency mode)");
       }
     } else {
       // iOS 12 and below - simple window creation
       foundationWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-      // NSLog(@"🚀 Bootstrap: Created foundation window for iOS 12");
+      // Log(@"🚀 Bootstrap: Created foundation window for iOS 12");
     }
 
     if (foundationWindow) {
@@ -637,56 +944,29 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
       // Keep a strong reference to prevent deallocation
       foundationWindowRef = foundationWindow;
 
-      // NSLog(@"🚀 Bootstrap: Foundation window established - app now has basic window hierarchy");
-      // NSLog(@"🚀 Bootstrap: Foundation window frame: %@",
-      //       NSStringFromCGRect(foundationWindow.frame));
-      // NSLog(@"🚀 Bootstrap: Foundation window isKeyWindow: %@",
-      //       foundationWindow.isKeyWindow ? @"YES" : @"NO");
-      // NSLog(@"🚀 Bootstrap: Foundation window hidden: %@", foundationWindow.hidden ? @"YES" :
-      // @"NO"); NSLog(@"🚀 Bootstrap: Foundation window alpha: %.2f", foundationWindow.alpha);
-      // NSLog(@"🚀 Bootstrap: Foundation window level: %.0f", foundationWindow.windowLevel);
-      // NSLog(@"🚀 Bootstrap: Foundation window rootViewController: %@",
-      //       foundationWindow.rootViewController);
-
       // Give iOS a moment to process the new window hierarchy (we're already on main queue)
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
 
-      // Check again after run loop processing
-      // NSLog(@"🚀 Bootstrap: App windows after bootstrap: %lu",
-      //       (unsigned long)sharedApp.windows.count);
-      // NSLog(@"🚀 Bootstrap: Foundation window still exists: %@", foundationWindow ? @"YES" :
-      // @"NO"); NSLog(@"🚀 Bootstrap: Foundation window ref still exists: %@",
-      //       foundationWindowRef ? @"YES" : @"NO");
 
       // Detailed window hierarchy inspection
-      if (sharedApp.windows.count > 0) {
-        // NSLog(@"🚀 Bootstrap: Window hierarchy details:");
-        // for (NSUInteger i = 0; i < sharedApp.windows.count; i++) {
-        //   UIWindow* window = sharedApp.windows[i];
-        //   NSLog(@"🚀 Bootstrap:   Window %lu: %@ (level: %.0f, key: %@, hidden: %@)", i, window,
-        //         window.windowLevel, window.isKeyWindow ? @"YES" : @"NO",
-        //         window.hidden ? @"YES" : @"NO");
-        // }
-      } else {
-        // NSLog(@"🚀 Bootstrap: 🚨 CRITICAL: Foundation window not in app.windows hierarchy!");
-        // NSLog(@"🚀 Bootstrap: This indicates a fundamental iOS window system issue");
+      if (sharedApp.windows.count == 0) {
+        // Log(@"🚀 Bootstrap: 🚨 CRITICAL: Foundation window not in app.windows hierarchy!");
+        // Log(@"🚀 Bootstrap: This indicates a fundamental iOS window system issue");
 
         // Try alternative window registration approach
-        // NSLog(@"🚀 Bootstrap: Attempting alternative window registration...");
+        // Log(@"🚀 Bootstrap: Attempting alternative window registration...");
         [foundationWindow.layer setNeedsDisplay];
         [foundationWindow.layer displayIfNeeded];
         [foundationWindow layoutIfNeeded];
 
         // Force another run loop cycle
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
-        // NSLog(@"🚀 Bootstrap: After alternative registration - App windows: %lu",
-        //       (unsigned long)sharedApp.windows.count);
       }
     } else {
-      // NSLog(@"🚀 Bootstrap: WARNING - Failed to create foundation window");
+      // Log(@"🚀 Bootstrap: WARNING - Failed to create foundation window");
     }
   } else {
-    // NSLog(@"🚀 Bootstrap: App windows already exist (%lu) - no bootstrap needed",
+    // Log(@"🚀 Bootstrap: App windows already exist (%lu) - no bootstrap needed",
     //       (unsigned long)sharedApp.windows.count);
   }
 
@@ -697,6 +977,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     errorWindow.hidden = YES;
     [errorWindow resignKeyWindow];
     errorWindow = nil;
+    gErrorStackTextView = nil;
   }
 
   // iOS 13+ requires proper window scene handling
@@ -708,23 +989,23 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
       if ([scene isKindOfClass:[UIWindowScene class]]) {
         windowScene = (UIWindowScene*)scene;
-        // NSLog(@"🎨 Found existing window scene for error modal");
+        // Log(@"🎨 Found existing window scene for error modal");
         break;
       }
     }
 
     if (windowScene) {
       errorWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
-      // NSLog(@"🎨 Created error window with existing scene");
+      // Log(@"🎨 Created error window with existing scene");
     } else {
       // Fallback: create window with screen bounds (older behavior)
       errorWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-      // NSLog(@"🎨 Created error window with screen bounds (no scene available)");
+      // Log(@"🎨 Created error window with screen bounds (no scene available)");
     }
   } else {
     // iOS 12 and below
     errorWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    // NSLog(@"🎨 Created error window for iOS 12");
+    // Log(@"🎨 Created error window for iOS 12");
   }
 
   errorWindow.windowLevel = UIWindowLevelAlert + 1000;  // Above everything
@@ -737,7 +1018,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   errorWindow.hidden = NO;
   errorWindow.alpha = 1.0;
 
-  // Create the error view controller with beautiful NativeScript-branded design
+  // Create the error view controller
   UIViewController* errorViewController = [[UIViewController alloc] init];
   errorViewController.view.backgroundColor = [UIColor colorWithRed:0.15
                                                              green:0.15
@@ -768,13 +1049,13 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
             if (logoImage) {
               dispatch_async(dispatch_get_main_queue(), ^{
                 logoImageView.image = logoImage;
-                // NSLog(@"🎨 NativeScript logo loaded successfully");
+                // Log(@"🎨 NativeScript logo loaded successfully");
               });
             } else {
-              // NSLog(@"🎨 Failed to create image from logo data");
+              // Log(@"🎨 Failed to create image from logo data");
             }
           } else {
-            // NSLog(@"🎨 Failed to load NativeScript logo: %@", error.localizedDescription);
+            // Log(@"🎨 Failed to load NativeScript logo: %@", error.localizedDescription);
             // Fallback: show text logo
             dispatch_async(dispatch_get_main_queue(), ^{
               UILabel* fallbackLogo = [[UILabel alloc] init];
@@ -828,10 +1109,18 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   stackTraceContainer.translatesAutoresizingMaskIntoConstraints = NO;
   [contentView addSubview:stackTraceContainer];
 
-  // NSLog(@"errorToDisplay from in NativeScriptException ShowErrorModal: %s", stackTrace.c_str());
+  // Log(@"errorToDisplay from in NativeScriptException ShowErrorModal: %s", stackTrace.c_str());
   // Stack trace text view - with proper terminal styling
   UITextView* stackTraceTextView = [[UITextView alloc] init];
-  stackTraceTextView.text = [NSString stringWithUTF8String:stackTrace.c_str()];
+  NSString* initialStackText = gLatestStackText;
+  if (initialStackText == nil) {
+    initialStackText = [NSString stringWithUTF8String:stackTrace.c_str()];
+    if (initialStackText == nil) {
+      initialStackText = @"(invalid UTF-8 stack trace)";
+    }
+    gLatestStackText = initialStackText;
+  }
+  stackTraceTextView.text = initialStackText;
   stackTraceTextView.textColor = [UIColor colorWithRed:0.0
                                                  green:1.0
                                                   blue:0.0
@@ -844,105 +1133,8 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   stackTraceTextView.contentInset = UIEdgeInsetsMake(15, 15, 15, 15);
   stackTraceTextView.translatesAutoresizingMaskIntoConstraints = NO;
   [stackTraceContainer addSubview:stackTraceTextView];
+  gErrorStackTextView = stackTraceTextView;
 
-  // TODO: Investigate why the copy action doesn't copy to clipboard
-  // Copy button for stack trace
-  // UIButton* copyButton = [UIButton buttonWithType:UIButtonTypeSystem];
-  // [copyButton setTitle:@"📋 Copy Stack Trace" forState:UIControlStateNormal];
-  // [copyButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-  // copyButton.backgroundColor = [UIColor colorWithRed:0.3 green:0.3 blue:0.3 alpha:1.0];
-  // copyButton.titleLabel.font = [UIFont systemFontOfSize:16];
-  // copyButton.layer.cornerRadius = 8;
-  // copyButton.translatesAutoresizingMaskIntoConstraints = NO;
-  // [contentView addSubview:copyButton];
-
-  // Configure copy button action
-  // void (^copyAction)(void) = ^{
-  //   UIPasteboard* pasteboard = [UIPasteboard generalPasteboard];
-  //   NSString* stackTraceText = [NSString stringWithUTF8String:stackTrace.c_str()];
-  //   BOOL wrote = NO;
-
-  //   // Prefer modern UTType on iOS 14+, but avoid hard link to UTTypePlainText (use reflection)
-  //   if (@available(iOS 14.0, *)) {
-  //     Class UTTypeClass = NSClassFromString(@"UTType");
-  //     if (UTTypeClass) {
-  //       SEL plainSel = NSSelectorFromString(@"plainText");
-  //       if ([UTTypeClass respondsToSelector:plainSel]) {
-  //         id plain = ((id(*)(id, SEL))objc_msgSend)(UTTypeClass, plainSel);
-  //         if (plain) {
-  //           SEL idSel = NSSelectorFromString(@"identifier");
-  //           if ([plain respondsToSelector:idSel]) {
-  //             NSString* utiIdentifier = ((id(*)(id, SEL))objc_msgSend)(plain, idSel);
-  //             if (utiIdentifier.length > 0) {
-  //               [pasteboard setValue:stackTraceText forPasteboardType:utiIdentifier];
-  //               wrote = YES;
-  //             }
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
-
-  //   // Fallback to kUTTypePlainText (MobileCoreServices)
-  //   if (!wrote) {
-  //     [pasteboard setValue:stackTraceText forPasteboardType:(NSString*)kUTTypePlainText];
-  //     wrote = YES;
-  //   }
-
-  //   // Quick verification; if pasteboard appears empty, try string fallback
-  //   if (wrote) {
-  //     BOOL hasString = NO;
-  //     if ([pasteboard respondsToSelector:@selector(hasStrings)]) {
-  //       hasString = pasteboard.hasStrings;
-  //     } else {
-  //       hasString = (pasteboard.string.length > 0);
-  //     }
-  //     if (!hasString) {
-  //       wrote = NO;
-  //     }
-  //   }
-
-  //   // Last resort: set .string
-  //   if (!wrote || pasteboard.string.length == 0) {
-  //     pasteboard.string = stackTraceText;
-  //   }
-
-  //   // Show temporary feedback
-  //   [copyButton setTitle:@"✅ Copied!" forState:UIControlStateNormal];
-  //   copyButton.backgroundColor = [UIColor colorWithRed:0.2 green:0.7 blue:0.2 alpha:1.0];
-
-  //   dispatch_after(
-  //       dispatch_time(DISPATCH_TIME_NOW, 1.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-  //         [copyButton setTitle:@"📋 Copy Stack Trace" forState:UIControlStateNormal];
-  //         copyButton.backgroundColor = [UIColor colorWithRed:0.3 green:0.3 blue:0.3 alpha:1.0];
-  //       });
-  // };
-
-  // if (@available(iOS 14.0, *)) {
-  //   UIAction* action = [UIAction actionWithTitle:@""
-  //                                          image:nil
-  //                                     identifier:nil
-  //                                        handler:^(UIAction* action) {
-  //                                          copyAction();
-  //                                        }];
-  //   [copyButton addAction:action forControlEvents:UIControlEventTouchUpInside];
-  // } else {
-  //   // For older iOS versions, use target-action pattern
-  //   NSObject* target = [[NSObject alloc] init];
-  //   objc_setAssociatedObject(target, "copyBlock", copyAction, OBJC_ASSOCIATION_COPY_NONATOMIC);
-
-  //   IMP copyImp = imp_implementationWithBlock(^(id self) {
-  //     void (^block)(void) = objc_getAssociatedObject(self, "copyBlock");
-  //     if (block) {
-  //       block();
-  //     }
-  //   });
-
-  //   class_addMethod([target class], NSSelectorFromString(@"copyStackTrace"), copyImp, "v@:");
-  //   [copyButton addTarget:target
-  //                  action:NSSelectorFromString(@"copyStackTrace")
-  //        forControlEvents:UIControlEventTouchUpInside];
-  // }
 
   // Hot-reload indicator
   UILabel* hotReloadLabel = [[UILabel alloc] init];
@@ -957,63 +1149,7 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   hotReloadLabel.translatesAutoresizingMaskIntoConstraints = NO;
   [contentView addSubview:hotReloadLabel];
 
-  // Continue button with NativeScript colors
-  // UIButton* continueButton = [UIButton buttonWithType:UIButtonTypeSystem];
-  // [continueButton setTitle:@"Continue Development 🚀" forState:UIControlStateNormal];
-  // [continueButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-  // continueButton.backgroundColor = [UIColor colorWithRed:0.25 green:0.5 blue:1.0 alpha:1.0]; //
-  // NativeScript blue continueButton.titleLabel.font = [UIFont boldSystemFontOfSize:16];
-  // continueButton.layer.cornerRadius = 10;
-  // continueButton.translatesAutoresizingMaskIntoConstraints = NO;
-  // [contentView addSubview:continueButton];
-
-  // Dismiss action
-  // void (^dismissAction)(void) = ^{
-  //     NSLog(@"🚀 Developer dismissed error modal - app continues running for hot-reload");
-  //     [UIView animateWithDuration:0.3 animations:^{
-  //         errorWindow.alpha = 0.0;
-  //     } completion:^(BOOL finished) {
-  //         errorWindow.hidden = YES;
-  //         [errorWindow resignKeyWindow];
-  //         NSLog(@"💡 Debug mode: App stays alive - fix your code and save to hot-reload");
-  //     }];
-  // };
-
-  // Configure button action based on iOS version
-  // if (@available(iOS 14.0, *)) {
-  //     UIAction* action = [UIAction actionWithTitle:@"" image:nil identifier:nil
-  //     handler:^(UIAction* action) {
-  //         dismissAction();
-  //     }];
-  //     [continueButton addAction:action forControlEvents:UIControlEventTouchUpInside];
-  // } else {
-  //     // For older iOS versions, use target-action pattern
-  //     NSObject* target = [[NSObject alloc] init];
-  //     objc_setAssociatedObject(target, "dismissBlock", dismissAction,
-  //     OBJC_ASSOCIATION_COPY_NONATOMIC);
-
-  //     IMP dismissImp = imp_implementationWithBlock(^(id self) {
-  //         void (^block)(void) = objc_getAssociatedObject(self, "dismissBlock");
-  //         if (block) {
-  //             block();
-  //         }
-  //     });
-
-  //     class_addMethod([target class], NSSelectorFromString(@"dismissWindow"), dismissImp, "v@:");
-  //     [continueButton addTarget:target action:NSSelectorFromString(@"dismissWindow")
-  //     forControlEvents:UIControlEventTouchUpInside];
-  // }
-
-  // Auto-dismiss after 60 seconds (safety net)
-  // dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 60 * NSEC_PER_SEC), dispatch_get_main_queue(),
-  // ^{
-  //     if (!errorWindow.hidden) {
-  //         NSLog(@"⏰ Auto-dismissing error modal after 60 seconds");
-  //         dismissAction();
-  //     }
-  // });
-
-  // Set up constraints for beautiful NativeScript-branded layout
+  // Set up constraints
   [NSLayoutConstraint activateConstraints:@[
     // Content view
     [contentView.topAnchor
@@ -1055,40 +1191,22 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     [stackTraceTextView.trailingAnchor constraintEqualToAnchor:stackTraceContainer.trailingAnchor],
     [stackTraceTextView.bottomAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor],
 
-    // Copy button below stack trace
-    // [copyButton.topAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor constant:10],
-    // [copyButton.centerXAnchor constraintEqualToAnchor:contentView.centerXAnchor],
-    // [copyButton.widthAnchor constraintEqualToConstant:200],
-    // [copyButton.heightAnchor constraintEqualToConstant:40],
-
-    // Hot-reload indicator below copy button - this will push stack trace up to fill space
-    // [hotReloadLabel.topAnchor constraintEqualToAnchor:copyButton.bottomAnchor constant:15],
-    // [hotReloadLabel.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:20],
-    // [hotReloadLabel.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-20],
-    // [hotReloadLabel.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-30],
     [hotReloadLabel.topAnchor constraintEqualToAnchor:stackTraceContainer.bottomAnchor constant:15],
     [hotReloadLabel.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:20],
     [hotReloadLabel.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-20],
     [hotReloadLabel.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-30],
-
-    // Continue button at bottom
-    // [continueButton.topAnchor constraintEqualToAnchor:hotReloadLabel.bottomAnchor constant:25],
-    // [continueButton.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:20],
-    // [continueButton.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor
-    // constant:-20], [continueButton.heightAnchor constraintEqualToConstant:50],
-    // [continueButton.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-30]
   ]];
 
   // Present the error window with robust error handling
   errorWindow.rootViewController = errorViewController;
 
   // Force the window to be visible with multiple approaches
-  // NSLog(@"🎨 Attempting to display error modal...");
+  // Log(@"Attempting to display error modal...");
 
   @try {
     // Primary approach: makeKeyAndVisible
     [errorWindow makeKeyAndVisible];
-    // NSLog(@"🎨 makeKeyAndVisible called successfully");
+    // Log(@"makeKeyAndVisible called successfully");
 
     // Secondary approach: force visibility
     errorWindow.hidden = NO;
@@ -1101,30 +1219,22 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
     // Bring window to front (alternative to makeKeyAndVisible)
     [errorWindow bringSubviewToFront:errorViewController.view];
 
-    // NSLog(@"🎨 Error window properties: hidden=%@, alpha=%.2f, windowLevel=%.0f",
-    //       errorWindow.hidden ? @"YES" : @"NO", errorWindow.alpha, errorWindow.windowLevel);
-
-    // NSLog(@"🎨 Error window frame: %@", NSStringFromCGRect(errorWindow.frame));
-    // NSLog(@"🎨 Error window rootViewController: %@", errorWindow.rootViewController);
-
     // Verify the window is in the window hierarchy
     NSArray* windows = [UIApplication sharedApplication].windows;
     BOOL windowInHierarchy = [windows containsObject:errorWindow];
-    // NSLog(@"🎨 Error window in app windows: %@", windowInHierarchy ? @"YES" : @"NO");
+    // Log(@"Error window in app windows: %@", windowInHierarchy ? @"YES" : @"NO");
 
     if (!windowInHierarchy) {
-      // NSLog(@"🎨 WARNING: Error window not found in app windows hierarchy!");
-      // NSLog(@"🎨 FIXING: Forcing window into hierarchy using aggressive methods...");
 
       // Aggressive fix 1: Try to force the window to be key and make it the only visible window
-      Log(@"🎨 Total app windows before fix: %lu", (unsigned long)windows.count);
+      Log(@"Total app windows before fix: %lu", (unsigned long)windows.count);
 
       // Hide all other windows to ensure our error window is the only one visible
       for (UIWindow* window in windows) {
         if (window != errorWindow) {
           window.hidden = YES;
           window.alpha = 0.0;
-          // NSLog(@"🎨 Hiding existing window: %@", window);
+          // Log(@"🎨 Hiding existing window: %@", window);
         }
       }
 
@@ -1141,118 +1251,26 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
       [errorWindow setNeedsLayout];
       [errorWindow layoutIfNeeded];
       [errorWindow setNeedsDisplay];
+    }
 
-      // Manual approach: Add ourselves to a window scene if possible
-      if (@available(iOS 13.0, *)) {
-        for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
-          if ([scene isKindOfClass:[UIWindowScene class]]) {
-            UIWindowScene* windowScene = (UIWindowScene*)scene;
-            // NSLog(@"🎨 Found scene: %@ with %lu windows", scene,
-            //       (unsigned long)windowScene.windows.count);
+    // Log(@"Error modal displayed successfully!");
 
-            // Check if our window is in this scene
-            if (![windowScene.windows containsObject:errorWindow]) {
-              // NSLog(@"🎨 Error window not in scene - this is the core issue!");
-            }
-            break;
-          }
-        }
-      }
+  } @catch (NSException* exception) {
+    // Log(@"ERROR: Failed to display error modal: %@", exception);
+    // Log(@"Attempting fallback display method...");
 
-      // SIMPLIFIED NUCLEAR OPTION: Create a basic error window that works even during boot
-      if (windows.count == 0) {
-        // NSLog(@"🎨 SIMPLIFIED NUCLEAR: Creating basic error window for boot-level crash");
-
-        // Create the simplest possible window that can display
-        UIWindow* simpleWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        simpleWindow.windowLevel = UIWindowLevelAlert + 1000;
-        simpleWindow.backgroundColor = [UIColor redColor];
-        simpleWindow.hidden = NO;
-        simpleWindow.alpha = 1.0;
-
-        // Create a basic view controller
-        UIViewController* simpleVC = [[UIViewController alloc] init];
-        simpleVC.view.backgroundColor = [UIColor redColor];
-
-        // Create error label
-        UILabel* errorLabel = [[UILabel alloc] initWithFrame:simpleWindow.bounds];
-        errorLabel.text =
-            [NSString stringWithFormat:@"🚨 BOOT ERROR 🚨\n\n%@\n\nRestart the app after fixing",
-                                       [NSString stringWithUTF8String:message.c_str()]];
-        errorLabel.textColor = [UIColor whiteColor];
-        errorLabel.font = [UIFont boldSystemFontOfSize:20];
-        errorLabel.textAlignment = NSTextAlignmentCenter;
-        errorLabel.numberOfLines = 0;
-        [simpleVC.view addSubview:errorLabel];
-
-        simpleWindow.rootViewController = simpleVC;
-
-        // Force display with minimal complexity
-        [simpleWindow makeKeyAndVisible];
-
-        // NSLog(@"🎨 Simple nuclear window created - should be visible immediately");
-      } else {
-        UIWindow* existingWindow = windows.firstObject;
-
-        // Create a full-screen overlay view
-        UIView* errorOverlay = [[UIView alloc] initWithFrame:existingWindow.bounds];
-        errorOverlay.backgroundColor = [UIColor colorWithRed:0.8 green:0.0 blue:0.0 alpha:0.95];
-        errorOverlay.tag = 99999;  // Unique tag for identification
-
-        // Add error text to the overlay
-        UILabel* errorLabel = [[UILabel alloc] init];
-        errorLabel.text =
-            [NSString stringWithFormat:@"⚠️ JavaScript Error\n\n%@\n\nFix the error and save "
-                                       @"your changes to continue.",
-                                       [NSString stringWithUTF8String:message.c_str()]];
-        errorLabel.textColor = [UIColor whiteColor];
-        errorLabel.font = [UIFont boldSystemFontOfSize:16];
-        errorLabel.textAlignment = NSTextAlignmentCenter;
-        errorLabel.numberOfLines = 0;
-        errorLabel.translatesAutoresizingMaskIntoConstraints = NO;
-        [errorOverlay addSubview:errorLabel];
-
-        // Center the label
-        [NSLayoutConstraint activateConstraints:@[
-          [errorLabel.centerXAnchor constraintEqualToAnchor:errorOverlay.centerXAnchor],
-          [errorLabel.centerYAnchor constraintEqualToAnchor:errorOverlay.centerYAnchor],
-          [errorLabel.leadingAnchor constraintGreaterThanOrEqualToAnchor:errorOverlay.leadingAnchor
-                                                                constant:20],
-          [errorLabel.trailingAnchor constraintLessThanOrEqualToAnchor:errorOverlay.trailingAnchor
-                                                              constant:-20]
-        ]];
-
-        // Add tap gesture to dismiss
-        UITapGestureRecognizer* tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:nil
-                                                                                     action:nil];
-        [tapGesture addTarget:errorOverlay action:@selector(removeFromSuperview)];
-        [errorOverlay addGestureRecognizer:tapGesture];
-
-        // Remove any previous error overlay
-        for (UIView* subview in existingWindow.subviews) {
-          if (subview.tag == 99999) {
-            [subview removeFromSuperview];
-          }
-        }
-
-        // Add the overlay to the existing window
-        [existingWindow addSubview:errorOverlay];
-        [existingWindow bringSubviewToFront:errorOverlay];
-
-        // NSLog(@"🎨 Error overlay added to existing window successfully!");
+    // Fallback: Try to show an alert instead
+    NSString* fallbackMessage = gLatestStackText;
+    if (fallbackMessage == nil) {
+      fallbackMessage = [NSString stringWithUTF8String:stackTrace.c_str()];
+      if (fallbackMessage == nil) {
+        fallbackMessage = @"(invalid UTF-8 stack trace)";
       }
     }
 
-    // NSLog(@"🎨 Beautiful NativeScript-branded error modal displayed successfully!");
-
-  } @catch (NSException* exception) {
-    // NSLog(@"🎨 ERROR: Failed to display error modal: %@", exception);
-    // NSLog(@"🎨 Attempting fallback display method...");
-
-    // Fallback: Try to show an alert instead
     UIAlertController* alert =
         [UIAlertController alertControllerWithTitle:@"⚠️ JavaScript Error"
-                                            message:[NSString stringWithUTF8String:message.c_str()]
+                                            message:fallbackMessage
                                      preferredStyle:UIAlertControllerStyleAlert];
     UIAlertAction* action = [UIAlertAction actionWithTitle:@"Continue Development 🚀"
                                                      style:UIAlertActionStyleDefault
@@ -1271,12 +1289,13 @@ void NativeScriptException::showErrorModalSynchronously(const std::string& title
   // Add a delay to ensure the UI is fully rendered and give the modal time to stabilize
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
                  dispatch_get_main_queue(), ^{
-                   //  NSLog(@"🎨 Error modal UI fully rendered and stable - app should stay alive
+                   //  Log(@"🎨 Error modal UI fully rendered and stable - app should stay alive
                    //  now");
 
                    // Force the main run loop to process any pending events to keep the app
                    // responsive
                    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
                  });
-}
-}
+}  // namespace
+
+}  // namespace tns

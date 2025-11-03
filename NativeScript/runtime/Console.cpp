@@ -17,9 +17,6 @@ using namespace v8;
 
 namespace tns {
 
-// Flag to prevent duplicate error modals from OnUncaughtError
-bool consoleModalShown = false;
-
 void Console::Init(Local<Context> context) {
   Isolate* isolate = context->GetIsolate();
   Context::Scope context_scope(context);
@@ -61,56 +58,12 @@ bool isErrorMessage(const std::string& line) {
 }
 
 bool isStackFrame(const std::string& line) {
-  // e.g. "    at foo (/path/to/file.ts:123:45)"
-  static const std::regex stackRe(R"(\s+at\s+\S+:\d+:\d+)");
-  return std::regex_search(line, stackRe);
-}
-
-std::vector<std::string> filterErrorLines(
-    const std::vector<std::string>& allLines) {
-  std::vector<std::string> result;
-  result.reserve(allLines.size());
-  for (auto& line : allLines) {
-    if (isErrorMessage(line) || isStackFrame(line)) {
-      result.push_back(line);
-    }
-  }
-  return result;
-}
-
-std::string Console::RemapStackTrace(v8::Isolate* isolate, const std::string& stackTrace) {
-  // Get the current context from the isolate
-  Local<Context> context = isolate->GetCurrentContext();
-
-  // Get the global object
-  Local<Object> global = context->Global();
-
-  // Get the __ns_remapStack function from global
-  Local<Value> remapStackValue;
-  bool success =
-      global->Get(context, tns::ToV8String(isolate, "__ns_remapStack"))
-          .ToLocal(&remapStackValue);
-
-  if (success && remapStackValue->IsFunction()) {
-    Local<v8::Function> remapStackFunction =
-        remapStackValue.As<v8::Function>();
-
-    // Prepare arguments - convert your string to V8 string
-    Local<Value> args[] = {tns::ToV8String(isolate, stackTrace)};
-
-    // Call the function
-    Local<Value> result;
-    bool callSuccess =
-        remapStackFunction->Call(context, global, 1, args).ToLocal(&result);
-
-    if (callSuccess && result->IsString()) {
-      // If the function returns a modified string, use it
-      return tns::ToString(isolate, result);
-    }
-  }
-
-  // Return original string if remapping failed or function not available
-  return stackTrace;
+  // Recognize both styles:
+  //   "    at foo (/path/to/file.ts:123:45)"  -> with parentheses
+  //   "    at /path/to/file.ts:123:45"        -> bare location
+  static const std::regex withParens(R"(\s+at\s+.*\(.+?:\d+:\d+\))");
+  static const std::regex bare(R"(\s+at\s+[^\s\(\)]+:\d+:\d+)");
+  return std::regex_search(line, withParens) || std::regex_search(line, bare);
 }
 
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
@@ -127,52 +80,19 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
   Local<v8::String> data = args.Data().As<v8::String>();
   std::string verbosityLevel = tns::ToString(isolate, data);
 
-  if (RuntimeConfig.IsDebug && Runtime::showErrorDisplay() &&
-      (verbosityLevel == "error" || verbosityLevel == "log")) {
-    // Show in-flight error display when enabled
-    // Simple universal error detection - any error with stack trace
-    bool hasStackTrace = isStackFrame(stringResult);
-
-    if (hasStackTrace && !consoleModalShown) {
-      std::stringstream stackTraceLines;
-      stackTraceLines << stringResult;
-
-      std::string stacktrace = tns::GetStackTrace(isolate);
-      stackTraceLines << std::endl << stacktrace << std::endl;
-
-      std::string errorToDisplay = stackTraceLines.str();
-
-      // Extract error details
-      std::string errorTitle = "JavaScript Error";
-
-      // Apply source map remapping to the error display
-      errorToDisplay = RemapStackTrace(isolate, errorToDisplay);
-
-      try {
-        NativeScriptException::ShowErrorModal(errorTitle, errorToDisplay,
-                                              errorToDisplay);
-        consoleModalShown = true;  // Prevent duplicate modals
-
-      } catch (const std::exception& e) {
-        Log("Console.cpp: Exception showing modal: %s", e.what());
-      } catch (...) {
-        Log("Console.cpp: Unknown exception showing modal");
-      }
-    }
+  // Compute remapped payload ONCE and use it for both the modal and terminal
+  // so they always match exactly.
+  bool hasStackTrace = isStackFrame(stringResult);
+  std::string processedStringResult = stringResult;
+  if (hasStackTrace) {
+    processedStringResult = tns::RemapStackTraceIfAvailable(isolate, processedStringResult);
   }
+
   std::string verbosityLevelUpper = verbosityLevel;
   std::transform(verbosityLevelUpper.begin(), verbosityLevelUpper.end(),
                  verbosityLevelUpper.begin(), ::toupper);
 
   std::stringstream ss;
-  std::string processedStringResult = stringResult;
-
-  // Apply source map remapping if this contains a stack trace
-  bool hasStackTrace = isStackFrame(stringResult);
-  if (hasStackTrace) {
-    processedStringResult = RemapStackTrace(isolate, processedStringResult);
-  }
-
   ss << processedStringResult;
 
   if (verbosityLevel == "trace") {
@@ -187,6 +107,17 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
   std::string msgWithVerbosity =
       "CONSOLE " + verbosityLevelUpper + ": " + msgToLog;
   Log("%s", msgWithVerbosity.c_str());
+
+  if (RuntimeConfig.IsDebug && Runtime::showErrorDisplay() && verbosityLevel == "error" && hasStackTrace) {
+    try {
+      // Log("Console.cpp: Forwarding console payload to error display: %s", msgToLog.c_str());
+      NativeScriptException::SubmitConsoleErrorPayload(isolate, msgToLog);
+    } catch (const std::exception& e) {
+      Log("Console.cpp: Exception updating modal: %s", e.what());
+    } catch (...) {
+      Log("Console.cpp: Unknown exception updating modal");
+    }
+  }
 }
 
 void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
