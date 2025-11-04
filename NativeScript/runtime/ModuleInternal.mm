@@ -736,7 +736,29 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
         tns::LogError(isolate, tc);
       }
       Log(@"***** End stack trace - continuing execution *****");
-      Log(@"Debug mode - Script execution failed, returning gracefully: %s", canonicalPath.c_str());
+      Log(@"Debug mode - Script execution failed, returning gracefully: %s", path.c_str());
+
+      std::string errorTitle = "Uncaught JavaScript Exception";
+      std::string errorMessage = "Error executing script.";
+
+      // Extract error message for modal when available
+      if (tc.HasCaught()) {
+        Local<Value> exception = tc.Exception();
+        if (!exception.IsEmpty()) {
+          Local<Context> ctx = isolate->GetCurrentContext();
+          Local<v8::String> excStr;
+          if (exception->ToString(ctx).ToLocal(&excStr)) {
+            std::string excMsg = tns::ToString(isolate, excStr);
+            if (!excMsg.empty()) {
+              errorMessage = excMsg;
+            }
+          }
+        }
+      }
+
+      std::string stackTrace = tns::GetSmartStackTrace(isolate, &tc, tc.Exception());
+
+      NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
       return Local<Value>();
     } else {
       if (tc.HasCaught()) {
@@ -1044,10 +1066,40 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                     stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
                   }
                 }
-              } else if (reason->IsString()) {
-                v8::String::Utf8Value messageUtf8(isolate, reason);
-                if (*messageUtf8) errorMessage = std::string(*messageUtf8);
+
+                // Log the extracted error information
+                Log(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
+                // Reverted: do not remap before logging/displaying
+                if (!stackTrace.empty()) {
+                  Log(@"JavaScript stack trace:\n%s", stackTrace.c_str());
+                }
               }
+
+              // Also check if TryCatch caught anything
+              if (promiseTc.HasCaught()) {
+                tns::LogError(isolate, promiseTc);
+              }
+
+              Log(@"***** End stack trace - Fix to continue *****");
+
+              // Ensure we have a stack for the modal
+              if (stackTrace.empty()) {
+                stackTrace = tns::GetSmartStackTrace(isolate);
+              } else {
+                stackTrace = tns::RemapStackTraceIfAvailable(isolate, stackTrace);
+              }
+
+              NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
+
+              // In debug mode, don't throw any exceptions - just return empty value
+              return Local<Value>();
+            } else {
+              // Release mode - throw exceptions as before
+              if (!promiseTc.HasCaught()) {
+                Local<Value> reason = promise->Result();
+                isolate->ThrowException(reason);
+              }
+              throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
             }
             if (IsScriptLoadingLogEnabled()) {
               // Emit a concise summary of the rejection for diagnostics

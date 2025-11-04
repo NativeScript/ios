@@ -336,30 +336,28 @@ struct LockAndCV {
   std::condition_variable cv;
 };
 
-void tns::ExecuteOnRunLoop(CFRunLoopRef queue, std::function<void()> func, bool async) {
-  if (!async) {
-    bool __block finished = false;
-    auto v = new LockAndCV;
-    std::unique_lock<std::mutex> lock(v->m);
-    CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, ^(void) {
-      func();
-      {
-        std::unique_lock lk(v->m);
-        finished = true;
-      }
-      v->cv.notify_all();
-    });
-    CFRunLoopWakeUp(queue);
-    while (!finished) {
-      v->cv.wait(lock);
+void tns::ExecuteOnRunLoop(CFRunLoopRef queue, void (^func)(void), bool async) {
+    if(!async) {
+        bool __block finished = false;
+        auto v = new LockAndCV;
+        std::unique_lock<std::mutex> lock(v->m);
+        CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, ^(void) {
+            func();
+            {
+                std::unique_lock lk(v->m);
+                finished = true;
+            }
+            v->cv.notify_all();
+        });
+        CFRunLoopWakeUp(queue);
+        while(!finished) {
+            v->cv.wait(lock);
+        }
+        delete v;
+    } else {
+        CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, func);
+        CFRunLoopWakeUp(queue);
     }
-    delete v;
-  } else {
-    CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, ^(void) {
-      func();
-    });
-    CFRunLoopWakeUp(queue);
-  }
 }
 
 void tns::ExecuteOnDispatchQueue(dispatch_queue_t queue, std::function<void()> func, bool async) {
@@ -571,6 +569,98 @@ const std::string tns::GetCurrentScriptUrl(Isolate* isolate) {
   }
 
   return "";
+}
+
+std::string tns::RemapStackTraceIfAvailable(Isolate* isolate, const std::string& stackTrace) {
+  if (stackTrace.empty()) {
+    return stackTrace;
+  }
+  if (isolate == nullptr) {
+    return stackTrace;
+  }
+
+  v8::Locker locker(isolate);
+  Isolate::Scope isolateScope(isolate);
+  HandleScope handleScope(isolate);
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  if (context.IsEmpty()) {
+    return stackTrace;
+  }
+  Context::Scope contextScope(context);
+  Local<Object> global = context->Global();
+  Local<Value> remapFnVal;
+  bool hasRemap =
+      global->Get(context, tns::ToV8String(isolate, "__ns_remapStack")).ToLocal(&remapFnVal);
+  if (hasRemap && remapFnVal->IsFunction()) {
+    Local<v8::Function> remapFn = remapFnVal.As<v8::Function>();
+    Local<Value> args[] = {tns::ToV8String(isolate, stackTrace)};
+    Local<Value> remapped;
+    if (remapFn->Call(context, global, 1, args).ToLocal(&remapped) && remapped->IsString()) {
+      return tns::ToString(isolate, remapped.As<v8::String>());
+    }
+  }
+  return stackTrace;
+}
+
+std::string tns::GetSmartStackTrace(Isolate* isolate, v8::TryCatch* tryCatch,
+                                    v8::Local<v8::Value> exception) {
+  std::string stack;
+  Local<Context> context = isolate->GetCurrentContext();
+
+  // 1) Prefer exception.stack when provided
+  if (!exception.IsEmpty()) {
+    if (exception->IsObject()) {
+      Local<Object> excObj = exception.As<Object>();
+      Local<Value> stackVal;
+      if (excObj->Get(context, tns::ToV8String(isolate, "stack")).ToLocal(&stackVal) &&
+          stackVal->IsString()) {
+        stack = tns::ToString(isolate, stackVal.As<v8::String>());
+      }
+    }
+
+    // Fallback to v8::Exception::GetStackTrace on the exception value
+    if (stack.empty()) {
+      Local<StackTrace> v8Stack = v8::Exception::GetStackTrace(exception);
+      if (!v8Stack.IsEmpty()) {
+        int framesCount = v8Stack->GetFrameCount();
+        std::stringstream ss;
+        for (int i = 0; i < framesCount; i++) {
+          Local<StackFrame> frame = v8Stack->GetFrame(isolate, i);
+          ss << BuildStacktraceFrameMessage(isolate, frame) << std::endl;
+        }
+        stack = ss.str();
+      }
+    }
+  }
+
+  // 2) TryCatch-provided stack if available
+  if (stack.empty() && tryCatch != nullptr) {
+    Local<Value> stackVal;
+    if (tryCatch->StackTrace(context).ToLocal(&stackVal) && stackVal->IsString()) {
+      stack = tns::ToString(isolate, stackVal.As<v8::String>());
+    } else {
+      Local<Message> message = tryCatch->Message();
+      if (!message.IsEmpty()) {
+        Local<StackTrace> v8Stack = message->GetStackTrace();
+        if (!v8Stack.IsEmpty()) {
+          int framesCount = v8Stack->GetFrameCount();
+          std::stringstream ss;
+          for (int i = 0; i < framesCount; i++) {
+            Local<StackFrame> frame = v8Stack->GetFrame(isolate, i);
+            ss << BuildStacktraceFrameMessage(isolate, frame) << std::endl;
+          }
+          stack = ss.str();
+        }
+      }
+    }
+  }
+
+  // 3) Finally, current stack if still empty
+  if (stack.empty()) {
+    stack = tns::GetStackTrace(isolate);
+  }
+
+  return stack;
 }
 
 const std::string tns::BuildStacktraceFrameLocationPart(Isolate* isolate, Local<StackFrame> frame) {

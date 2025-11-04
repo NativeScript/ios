@@ -611,6 +611,17 @@ std::string DefinitionWriter::writeMethod(MethodMeta* meta, BaseClassMeta* owner
         
     }
     
+    // If the method has an NSError** last parameter, emit an optional error parameter
+    if (meta->getFlags(::Meta::MetaFlags::MethodHasErrorOutParameter)) {
+        // If there were already parameters emitted, ensure we add a comma
+        if (lastParamIndex > 1) {
+            output << ", ";
+        }
+        // Emit a typed optional parameter for the NSError** out parameter.
+        // We use the conventional name 'error' and the interop.Reference wrapper expected by NativeScript.
+        output << "error?: interop.Reference<NSError>";
+    }
+    
     output << "): ";
     if (skipGenerics) {
         output << "any;";

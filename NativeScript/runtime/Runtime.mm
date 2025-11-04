@@ -135,6 +135,8 @@ static std::mutex AppConfigCacheMutex;
 
 // Global flag to track when JavaScript errors occur during execution
 bool jsErrorOccurred = false;
+// Global flag to track if error display is currently showing
+bool isErrorDisplayShowing = false;
 
 // TODO: consider listening to timezone changes and automatically reseting the DateTime. Probably
 // makes more sense to move it to its own file
