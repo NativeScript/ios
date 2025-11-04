@@ -641,8 +641,8 @@ static std::string ResolveDisplayStack(const PendingErrorDisplay& state) {
   if (!state.canonicalStack.empty()) {
     size_t previewLen = std::min<size_t>(state.canonicalStack.size(), 120);
     std::string preview = state.canonicalStack.substr(0, previewLen);
-    Log(@"[ErrorDisplay] resolved stack (canonical) len=%zu preview=%@",
-        state.canonicalStack.size(), [NSString stringWithUTF8String:preview.c_str()]);
+    // Log(@"[ErrorDisplay] resolved stack (canonical) len=%zu preview=%@",
+    //     state.canonicalStack.size(), [NSString stringWithUTF8String:preview.c_str()]);
     return state.canonicalStack;
   }
 
@@ -663,8 +663,8 @@ static std::string ResolveDisplayStack(const PendingErrorDisplay& state) {
     int candidateQuality = EvaluateStackQuality(normalized);
     size_t previewLen = std::min<size_t>(normalized.size(), 120);
     std::string preview = normalized.substr(0, previewLen);
-    Log(@"[ErrorDisplay] consider: quality=%d len=%zu preview=%@", candidateQuality,
-        normalized.size(), [NSString stringWithUTF8String:preview.c_str()]);
+    // Log(@"[ErrorDisplay] consider: quality=%d len=%zu preview=%@", candidateQuality,
+    //     normalized.size(), [NSString stringWithUTF8String:preview.c_str()]);
     if (candidateQuality > bestQuality ||
         (candidateQuality == bestQuality && normalized.size() > bestStack.size())) {
       bestStack = normalized;
@@ -688,8 +688,8 @@ static std::string ResolveDisplayStack(const PendingErrorDisplay& state) {
 
   size_t finalPreviewLen = std::min<size_t>(bestStack.size(), 120);
   std::string finalPreview = bestStack.substr(0, finalPreviewLen);
-  Log(@"[ErrorDisplay] resolved stack quality=%d len=%zu preview=%@", bestQuality,
-      bestStack.size(), [NSString stringWithUTF8String:finalPreview.c_str()]);
+  // Log(@"[ErrorDisplay] resolved stack quality=%d len=%zu preview=%@", bestQuality,
+  //     bestStack.size(), [NSString stringWithUTF8String:finalPreview.c_str()]);
 
   return bestStack;
 }
