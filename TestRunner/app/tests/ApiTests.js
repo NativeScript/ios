@@ -337,7 +337,7 @@ describe(module.id, function () {
             expect(e.nativeException).toBeDefined();
             // The wrapped object should behave like an NSError proxy/wrapper
             // (we assert existence of localizedDescription property)
-            expect(typeof e.nativeException.localizedDescription === "string" || e.nativeException.localizedDescription instanceof String).toBe(true);
+            expect(typeof e.nativeException.localizedDescription).toBe('string');
         } finally {
             expect(isThrown).toBe(true);
         }
