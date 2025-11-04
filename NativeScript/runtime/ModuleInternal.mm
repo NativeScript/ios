@@ -966,7 +966,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       if (RuntimeConfig.IsDebug) {
         // Log the detailed JavaScript error with full stack trace
         Log(@"***** JavaScript exception occurred *****");
-  Log(@"Error instantiating module: %s", canonicalPath.c_str());
+        Log(@"Error instantiating module: %s", canonicalPath.c_str());
         if (tcLink.HasCaught()) {
           tns::LogError(isolate, tcLink);
         }
@@ -1045,6 +1045,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             // In debug mode, show modal and continue without throwing
             jsErrorOccurred = true;
             Local<Value> reason = promise->Result();
+            std::string errorTitle = "Uncaught JavaScript Exception";
             std::string errorMessage = "Module evaluation promise rejected";
             std::string stackTrace = "";
             if (!reason.IsEmpty()) {
@@ -1088,27 +1089,19 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
               } else {
                 stackTrace = tns::RemapStackTraceIfAvailable(isolate, stackTrace);
               }
-
-              NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
-
-              // In debug mode, don't throw any exceptions - just return empty value
-              return Local<Value>();
-            } else {
-              // Release mode - throw exceptions as before
-              if (!promiseTc.HasCaught()) {
-                Local<Value> reason = promise->Result();
-                isolate->ThrowException(reason);
-              }
-              throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
             }
+
             if (IsScriptLoadingLogEnabled()) {
               // Emit a concise summary of the rejection for diagnostics
               std::string stackPreview = stackTrace.size() > 240 ? stackTrace.substr(0, 240) + "…" : stackTrace;
               Log(@"[esm][evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
                   canonicalPath.c_str(), errorMessage.c_str(), stackPreview.c_str());
             }
-            NativeScriptException::ShowErrorModal("Uncaught JavaScript Exception", errorMessage, stackTrace);
+
+            NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
             logPhase("evaluate", "promise-rejected-handled");
+
+            // In debug mode, don't throw any exceptions - just return empty value
             return Local<Value>();
           }
           break;
