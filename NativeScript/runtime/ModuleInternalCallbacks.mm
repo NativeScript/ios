@@ -720,7 +720,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
     std::string key = CanonicalizeHttpUrlKey(spec);
     // Added instrumentation for unified phase logging
-  Log(@"[http-esm][compile][begin] %s", key.c_str());
+    Log(@"[http-esm][compile][begin] %s", key.c_str());
     // Reuse compiled module if present and healthy
     auto itExisting = g_moduleRegistry.find(key);
     if (itExisting != g_moduleRegistry.end()) {
@@ -728,11 +728,14 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       if (!existing.IsEmpty()) {
         v8::Module::Status st = existing->GetStatus();
         if (st == v8::Module::kErrored) {
-          if (IsScriptLoadingLogEnabled()) { Log(@"[resolver][http-cache] dropping errored %s", key.c_str()); }
+          if (IsScriptLoadingLogEnabled()) { 
+            Log(@"[resolver][http-cache] dropping errored %s", key.c_str()); 
+          }
           RemoveModuleFromRegistry(key);
         } else {
-          if (IsScriptLoadingLogEnabled()) { Log(@"[resolver][http-cache] hit %s", key.c_str()); }
-          Log(@"[http-esm][compile][cache-hit] %s", key.c_str());
+          if (IsScriptLoadingLogEnabled()) { 
+            Log(@"[http-esm][compile][cache-hit] %s", key.c_str());
+          }
           return v8::MaybeLocal<v8::Module>(existing);
         }
       }
@@ -743,13 +746,15 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       if (!m.IsEmpty()) {
         v8::Local<v8::Module> mod;
         if (m.ToLocal(&mod)) {
-          if (IsScriptLoadingLogEnabled()) { Log(@"[resolver][http-compile] ok %s", key.c_str()); }
-          Log(@"[http-esm][compile][ok] %s bytes=%zu", key.c_str(), body.size());
+          if (IsScriptLoadingLogEnabled()) { 
+            Log(@"[http-esm][compile][ok] %s bytes=%zu", key.c_str(), body.size());
+          }
           return m;
         }
       }
-      if (IsScriptLoadingLogEnabled()) { Log(@"[resolver][http-compile] failed %s", key.c_str()); }
-  Log(@"[http-esm][compile][fail][unknown] %s bytes=%zu", key.c_str(), body.size());
+      if (IsScriptLoadingLogEnabled()) { 
+        Log(@"[http-esm][compile][fail][unknown] %s bytes=%zu", key.c_str(), body.size());
+      }
       if (RuntimeConfig.IsDebug) {
         std::string msg = "HTTP import compile failed: " + spec;
         isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
@@ -761,7 +766,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
         return v8::MaybeLocal<v8::Module>();
       }
-  Log(@"[http-esm][compile][fail][network] %s status=%d", key.c_str(), status);
+      if (IsScriptLoadingLogEnabled()) { 
+        Log(@"[http-esm][compile][fail][network] %s status=%d", key.c_str(), status);
+      }
     }
     // In release, fall through to normal path if HTTP load failed
   }
@@ -769,7 +776,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // Debug: Log all module resolution attempts, especially for @nativescript/core/globals
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   if (cache->isWorker) {
-    printf("ResolveModuleCallback: Worker trying to resolve '%s'\n", spec.c_str());
+    if (IsScriptLoadingLogEnabled()) { 
+      Log("ResolveModuleCallback: Worker trying to resolve '%s'\n", spec.c_str());
+    }
   }
 
   // 2) Find which filepath the referrer was compiled under
@@ -945,8 +954,10 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     // Debug: Log tilde resolution for worker context
     if (cache->isWorker) {
-      printf("ResolveModuleCallback: Worker resolving tilde path '%s' -> '%s'\n", spec.c_str(),
+      if (IsScriptLoadingLogEnabled()) {
+        Log("ResolveModuleCallback: Worker resolving tilde path '%s' -> '%s'\n", spec.c_str(),
              base.c_str());
+      }
     }
   } else if (!spec.empty() && spec[0] == '/') {
     // Absolute path within the bundle (e.g., /app/..., /src/...)
@@ -991,7 +1002,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // If the specifier is an HTTP(S) URL, fetch via HTTP loader and return
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
     std::string key = CanonicalizeHttpUrlKey(spec);
-  Log(@"[http-esm][compile][begin] %s", key.c_str());
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-esm][compile][begin] %s", key.c_str());
+    }
     // If we've already compiled this URL, return it immediately
     auto itExisting = g_moduleRegistry.find(key);
     if (itExisting != g_moduleRegistry.end()) {
@@ -1006,9 +1019,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
           // proceed to refetch/compile below
         } else {
           if (IsScriptLoadingLogEnabled()) {
-            Log(@"[resolver][http-cache] hit %s", key.c_str());
+            Log(@"[http-esm][compile][cache-hit] %s", key.c_str());
           }
-          Log(@"[http-esm][compile][cache-hit] %s", key.c_str());
           return v8::MaybeLocal<v8::Module>(existing);
         }
       }
@@ -1022,17 +1034,15 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         v8::Local<v8::Module> mod;
         if (m.ToLocal(&mod)) {
           if (IsScriptLoadingLogEnabled()) {
-            Log(@"[resolver][http-compile] ok %s", key.c_str());
+            Log(@"[http-esm][compile][ok] %s bytes=%zu", key.c_str(), body.size());
           }
-          Log(@"[http-esm][compile][ok] %s bytes=%zu", key.c_str(), body.size());
           return m;
         }
       }
       // Compile failed: avoid misleading filesystem fallback in debug; surface error clearly
       if (IsScriptLoadingLogEnabled()) {
-        Log(@"[resolver][http-compile] failed %s", key.c_str());
+        Log(@"[http-esm][compile][fail][unknown] %s bytes=%zu", key.c_str(), body.size());
       }
-  Log(@"[http-esm][compile][fail][unknown] %s bytes=%zu", key.c_str(), body.size());
       if (RuntimeConfig.IsDebug) {
         std::string msg = "HTTP import compile failed: " + spec;
         isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
@@ -1043,7 +1053,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         std::string msg = "HTTP import failed: " + spec + " (status=" + std::to_string(status) + ")";
         isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
       }
-  Log(@"[http-esm][compile][fail][network] %s status=%d", key.c_str(), status);
+      if (IsScriptLoadingLogEnabled()) {
+        Log(@"[http-esm][compile][fail][network] %s status=%d", key.c_str(), status);
+      }
       // Regardless of build, do not fall back to filesystem for absolute HTTP specifiers in dev.
       return v8::MaybeLocal<v8::Module>();
     }
@@ -1070,7 +1082,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   //  ── Resolution attempts ───────────────────────────────────────
   // Iterate base candidates until we find a file match
   for (const std::string& baseCandidate : candidateBases) {
-  absPath = NormalizePath(baseCandidate);
+    absPath = NormalizePath(baseCandidate);
 
     // If a candidate accidentally embeds a collapsed HTTP URL like '/app/http:/host/...',
     // reconstruct the HTTP URL and resolve via the HTTP loader instead of touching the filesystem.
@@ -1181,28 +1193,28 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         Log(@"[resolver][mirror-consider] spec=%s looksApp=%s", spec.c_str(), looksLogicalApp ? "true" : "false");
       }
       if (looksLogicalApp) {
-      std::string logical = spec; // e.g. /whatever/path/file.ts
-      std::string baseNoQuery = logical;
-      size_t qpos = baseNoQuery.find_first_of("?#");
-      if (qpos != std::string::npos) baseNoQuery = baseNoQuery.substr(0, qpos);
-      // Strip a terminal .ts/.js when constructing mirror .mjs candidate
-      std::string noExt = baseNoQuery;
-      if (EndsWith(noExt, ".ts") || EndsWith(noExt, ".js")) {
-        noExt = noExt.substr(0, noExt.size() - 3);
-      }
-  // Use cached Documents directory (generic dynamic fetch mirror fallback)
-  const std::string& docsRootBase = GetDocumentsDirectory();
-  std::string mirrorMjs;
-  if (!docsRootBase.empty()) {
-    mirrorMjs = docsRootBase + "/_ns_hmr" + noExt + ".mjs"; // canonical transform output location
-  }
-      if (isFile(mirrorMjs)) {
-        absPath = mirrorMjs;
-        if (IsScriptLoadingLogEnabled()) { Log(@"[resolver][mirror] generic %s -> %s", spec.c_str(), absPath.c_str()); }
+        std::string logical = spec; // e.g. /whatever/path/file.ts
+        std::string baseNoQuery = logical;
+        size_t qpos = baseNoQuery.find_first_of("?#");
+        if (qpos != std::string::npos) baseNoQuery = baseNoQuery.substr(0, qpos);
+        // Strip a terminal .ts/.js when constructing mirror .mjs candidate
+        std::string noExt = baseNoQuery;
+        if (EndsWith(noExt, ".ts") || EndsWith(noExt, ".js")) {
+          noExt = noExt.substr(0, noExt.size() - 3);
+        }
+        // Use cached Documents directory (generic dynamic fetch mirror fallback)
+        const std::string& docsRootBase = GetDocumentsDirectory();
+        std::string mirrorMjs;
+        if (!docsRootBase.empty()) {
+          mirrorMjs = docsRootBase + "/_ns_hmr" + noExt + ".mjs"; // canonical transform output location
+        }
+        if (isFile(mirrorMjs)) {
+          absPath = mirrorMjs;
+          if (IsScriptLoadingLogEnabled()) { Log(@"[resolver][mirror] generic %s -> %s", spec.c_str(), absPath.c_str()); }
+        }
       }
     }
   }
-}
   absPath = NormalizePath(absPath);
 
   if (!isFile(absPath)) {
@@ -1216,7 +1228,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     if (IsNodeBuiltinModule(spec)) {
       // Strip the "node:" prefix and try to resolve as a regular module
       std::string builtinName = spec.substr(5);  // Remove "node:" prefix
-  std::string builtinPath = NormalizePath(RuntimeConfig.ApplicationPath + "/" + builtinName + ".mjs");
+      std::string builtinPath = NormalizePath(RuntimeConfig.ApplicationPath + "/" + builtinName + ".mjs");
 
       // Check if a polyfill file exists
       if (!isFile(builtinPath)) {
@@ -1281,7 +1293,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     } else if (IsLikelyOptionalModule(spec)) {
       // Create a placeholder file on disk that bundler can resolve to
       std::string appPath = RuntimeConfig.ApplicationPath;
-  std::string placeholderPath = NormalizePath(appPath + "/" + spec + ".mjs");
+      std::string placeholderPath = NormalizePath(appPath + "/" + spec + ".mjs");
 
       // Check if placeholder file already exists
       if (!isFile(placeholderPath)) {
@@ -1450,7 +1462,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     static std::atomic<size_t> g_hmrModuleGatedCount {0};
 
     size_t reentryCount = 0;
-  bool unfinished = status == v8::Module::kUninstantiated || status == v8::Module::kInstantiating ||
+    bool unfinished = status == v8::Module::kUninstantiated || status == v8::Module::kInstantiating ||
             status == v8::Module::kEvaluating;
     bool moduleInFlight = g_modulesInFlight.find(absPath) != g_modulesInFlight.end();
     bool pendingReset = g_modulesPendingReset.find(absPath) != g_modulesPendingReset.end();
@@ -1724,7 +1736,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     Log(@"[resolver] → LoadScript %s", absPath.c_str());
   }
   try {
-  tns::ModuleInternal::LoadScript(isolate, absPath);
+    tns::ModuleInternal::LoadScript(isolate, absPath);
   } catch (NativeScriptException& ex) {
     if (cache->isWorker) {
       printf("ResolveModuleCallback: Worker failed to compile module '%s' -> '%s'\n", spec.c_str(),
@@ -1904,13 +1916,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
       // Classify SFC base vs variant: base is /@ns/sfc without a specific type (script/template/style)
       bool specIsSfc = normalizedSpec.find("/@ns/sfc/") != std::string::npos;
-  bool specIsAsm = normalizedSpec.find("/@ns/asm/") != std::string::npos;
+      bool specIsAsm = normalizedSpec.find("/@ns/asm/") != std::string::npos;
       bool specHasTypeScript = normalizedSpec.find("type=script") != std::string::npos;
       bool specHasTypeTemplate = normalizedSpec.find("type=template") != std::string::npos;
       bool specHasTypeStyle = normalizedSpec.find("type=style") != std::string::npos;
       bool isSfcVariant = specIsSfc && (specHasTypeScript || specHasTypeTemplate || specHasTypeStyle);
       // Base SFC has no explicit type param; variants carry type=script|template|style
-  bool isSfcBase = (specIsSfc && !isSfcVariant) || specIsAsm;
+      bool isSfcBase = (specIsSfc && !isSfcVariant) || specIsAsm;
       if (isSfcBase) {
         auto ex = g_moduleRegistry.find(key);
         if (ex != g_moduleRegistry.end()) {
@@ -2419,8 +2431,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           // For import assertions, we need to pass an empty FixedArray
           // Use the empty fixed array from the isolate's roots
           v8::Local<v8::FixedArray> empty_assertions = v8::Local<v8::FixedArray>();
-      v8::MaybeLocal<v8::Module> maybeRuntimeModule =
-        ResolveModuleCallback(context, tns::ToV8String(isolate, "file:///app/runtime.mjs"),
+          v8::MaybeLocal<v8::Module> maybeRuntimeModule =
+          ResolveModuleCallback(context, tns::ToV8String(isolate, "file:///app/runtime.mjs"),
                                     empty_assertions, v8::Local<v8::Module>());
 
           v8::Local<v8::Module> runtimeModule;

@@ -32,7 +32,6 @@ struct PendingErrorDisplay {
   std::string rawStack;
   std::string canonicalStack;
   std::string consolePayload;
-  int canonicalQuality = -1;
 };
 
 static std::mutex gErrorDisplayMutex;
@@ -56,7 +55,6 @@ static void ShowErrorModalSynchronously(const std::string& title,
 static void ScheduleFallbackPresentation(uint64_t ticket);
 static void PresentFallbackIfNeeded(uint64_t ticket);
 static std::string ResolveDisplayStack(const PendingErrorDisplay& state);
-static int EvaluateStackQuality(const std::string& stackText);
 static void ConsiderStackCandidate(PendingErrorDisplay& state, v8::Isolate* isolate,
                                    const std::string& candidateStack);
 
@@ -509,7 +507,6 @@ void NativeScriptException::ShowErrorModal(Isolate* isolate, const std::string& 
     gPendingErrorDisplay.rawStack = stackTrace;
     gPendingErrorDisplay.consolePayload.clear();
     gPendingErrorDisplay.canonicalStack.clear();
-    gPendingErrorDisplay.canonicalQuality = -1;
     ConsiderStackCandidate(gPendingErrorDisplay, isolate, stackTrace);
     ticketToSchedule = gPendingErrorDisplay.ticket;
   }
@@ -540,7 +537,6 @@ void NativeScriptException::SubmitConsoleErrorPayload(Isolate* isolate, const st
       gPendingErrorDisplay.isolate = payloadIsolate;
     }
     gPendingErrorDisplay.canonicalStack = text;
-    gPendingErrorDisplay.canonicalQuality = std::numeric_limits<int>::max();
   };
 
   {
@@ -561,7 +557,6 @@ void NativeScriptException::SubmitConsoleErrorPayload(Isolate* isolate, const st
     if (gPendingErrorDisplay.ticket == 0) {
       gPendingErrorDisplay.ticket = gNextErrorTicket++;
       gPendingErrorDisplay.canonicalStack.clear();
-      gPendingErrorDisplay.canonicalQuality = -1;
     }
 
     if (!gPendingErrorDisplay.contextCaptured && !gPendingErrorDisplay.modalPresented) {
@@ -638,125 +633,30 @@ static void PresentFallbackIfNeeded(uint64_t ticket) {
 }
 
 static std::string ResolveDisplayStack(const PendingErrorDisplay& state) {
+  // Deterministic preference: canonicalStack > consolePayload > rawStack > message
+  // Remap when possible so the UI matches terminal output.
   if (!state.canonicalStack.empty()) {
-    size_t previewLen = std::min<size_t>(state.canonicalStack.size(), 120);
-    std::string preview = state.canonicalStack.substr(0, previewLen);
-    // Log(@"[ErrorDisplay] resolved stack (canonical) len=%zu preview=%@",
-    //     state.canonicalStack.size(), [NSString stringWithUTF8String:preview.c_str()]);
     return state.canonicalStack;
   }
 
-  std::string bestStack;
-  int bestQuality = std::numeric_limits<int>::min();
-
-  auto consider = [&](const std::string& candidate, v8::Isolate* isolate) {
-    if (candidate.empty()) {
-      return;
-    }
-    std::string normalized = candidate;
-    if (isolate != nullptr) {
-      std::string remapped = tns::RemapStackTraceIfAvailable(isolate, candidate);
+  auto remapIfPossible = [&](const std::string& text) -> std::string {
+    if (text.empty()) return std::string();
+    if (state.isolate != nullptr) {
+      std::string remapped = tns::RemapStackTraceIfAvailable(state.isolate, text);
       if (!remapped.empty()) {
-        normalized = remapped;
+        return remapped;
       }
     }
-    int candidateQuality = EvaluateStackQuality(normalized);
-    size_t previewLen = std::min<size_t>(normalized.size(), 120);
-    std::string preview = normalized.substr(0, previewLen);
-    // Log(@"[ErrorDisplay] consider: quality=%d len=%zu preview=%@", candidateQuality,
-    //     normalized.size(), [NSString stringWithUTF8String:preview.c_str()]);
-    if (candidateQuality > bestQuality ||
-        (candidateQuality == bestQuality && normalized.size() > bestStack.size())) {
-      bestStack = normalized;
-      bestQuality = candidateQuality;
-    }
+    return text;
   };
 
-  if (!state.canonicalStack.empty()) {
-    consider(state.canonicalStack, nullptr);
-  }
   if (!state.consolePayload.empty()) {
-    consider(state.consolePayload, state.isolate);
+    return remapIfPossible(state.consolePayload);
   }
   if (!state.rawStack.empty()) {
-    consider(state.rawStack, state.isolate);
+    return remapIfPossible(state.rawStack);
   }
-
-  if (bestStack.empty()) {
-    return state.message;
-  }
-
-  size_t finalPreviewLen = std::min<size_t>(bestStack.size(), 120);
-  std::string finalPreview = bestStack.substr(0, finalPreviewLen);
-  // Log(@"[ErrorDisplay] resolved stack quality=%d len=%zu preview=%@", bestQuality,
-  //     bestStack.size(), [NSString stringWithUTF8String:finalPreview.c_str()]);
-
-  return bestStack;
-}
-
-static size_t CountOccurrences(const std::string& haystack, const std::string& needle) {
-  if (haystack.empty() || needle.empty()) {
-    return 0;
-  }
-  size_t count = 0;
-  size_t pos = haystack.find(needle, 0);
-  while (pos != std::string::npos) {
-    ++count;
-    pos = haystack.find(needle, pos + needle.length());
-  }
-  return count;
-}
-
-static int EvaluateStackQuality(const std::string& stackText) {
-  if (stackText.empty()) {
-    return std::numeric_limits<int>::min();
-  }
-
-  auto hasAny = [&](const std::initializer_list<const char*>& tokens) {
-    for (const auto* token : tokens) {
-      if (stackText.find(token) != std::string::npos) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  int score = 0;
-
-  size_t tsFrames = CountOccurrences(stackText, ".ts:") +
-                    CountOccurrences(stackText, ".tsx:") +
-                    CountOccurrences(stackText, ".vue:");
-  if (tsFrames > 0) {
-    score += 60;
-    score += static_cast<int>(tsFrames) * 5;
-  }
-
-  if (hasAny({"webpack:/", "file: src/", "sourceURL"})) {
-    score += 20;
-  }
-
-  size_t newlineCount = CountOccurrences(stackText, "\n");
-  if (newlineCount > 0) {
-    score += static_cast<int>(std::min<size_t>(20, newlineCount));
-  }
-
-  if (stackText.find(" at ") != std::string::npos) {
-    score += 10;
-  }
-
-  int penalty = 0;
-  penalty += static_cast<int>(CountOccurrences(stackText, "file:///app/")) * 3;
-  penalty += static_cast<int>(CountOccurrences(stackText, ".bundle.js")) * 2;
-  penalty = std::min(penalty, score / 2);  // don't let bundle frames dominate completely
-  score -= penalty;
-
-  score += static_cast<int>(std::min<size_t>(10, stackText.size() / 400));
-
-  if (score <= 0) {
-    score = 1;  // ensure non-empty strings beat truly empty candidates
-  }
-
-  return score;
+  return state.message;
 }
 
 static void ConsiderStackCandidate(PendingErrorDisplay& state, v8::Isolate* isolate,
@@ -773,26 +673,10 @@ static void ConsiderStackCandidate(PendingErrorDisplay& state, v8::Isolate* isol
       normalized = remapped;
     }
   }
-
-  int quality = EvaluateStackQuality(normalized);
-  if (quality < 0 && state.canonicalQuality >= 0) {
-    return;
-  }
-
-  bool shouldReplace = false;
-  if (quality > state.canonicalQuality) {
-    shouldReplace = true;
-  } else if (quality == state.canonicalQuality && normalized.size() > state.canonicalStack.size()) {
-    shouldReplace = true;
-  }
-
+  // Deterministic behavior: if no canonical stack yet, set it to the first available candidate.
+  // Console payloads will explicitly override canonicalStack elsewhere.
   if (state.canonicalStack.empty()) {
-    shouldReplace = true;
-  }
-
-  if (shouldReplace) {
     state.canonicalStack = normalized;
-    state.canonicalQuality = quality;
   }
 }
 

@@ -144,7 +144,6 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   if (!success) {
     Log(@"FATAL: Failed to set global require function");
   }
-
 }
 
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
@@ -192,10 +191,10 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
         return false;
       }
     }
-    return true;  // success
+    return true;  // ES module loaded successfully
   }
 
-  // CommonJS / classic path
+  // For CommonJS modules (.js), use the traditional require() approach
   Local<Value> requireObj;
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
   if (!success || !requireObj->IsFunction()) {
@@ -1024,47 +1023,69 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     logPhase("evaluate", "ok");
 
     // Handle the case where evaluation returns a Promise (for top-level await)
-    // Only perform microtask processing & detailed diagnostics in debug builds.
-    if (RuntimeConfig.IsDebug && result->IsPromise()) {
+    if (result->IsPromise()) {
       logPhase("evaluate", "promise");
+
       TryCatch promiseTc(isolate);
       Local<Promise> promise = result.As<Promise>();
-      // Limited attempts to resolve quickly while in debug mode
+
+      // Process microtasks to allow Promise resolution (for both worker and main contexts)
       int maxAttempts = 100;
       int attempts = 0;
+
       while (attempts < maxAttempts && !promiseTc.HasCaught()) {
         isolate->PerformMicrotaskCheckpoint();
+
         if (promiseTc.HasCaught()) {
           break;
         }
         Promise::PromiseState state = promise->State();
+
         if (state != Promise::kPending) {
           if (state == Promise::kRejected) {
             RemoveModuleFromRegistry(canonicalPath);
             logPhase("evaluate", "promise-rejected");
-            // In debug mode, show modal and continue without throwing
-            jsErrorOccurred = true;
-            Local<Value> reason = promise->Result();
-            std::string errorTitle = "Uncaught JavaScript Exception";
-            std::string errorMessage = "Module evaluation promise rejected";
-            std::string stackTrace = "";
-            if (!reason.IsEmpty()) {
-              if (reason->IsObject()) {
-                Local<Context> context = isolate->GetCurrentContext();
-                Local<Object> errorObj = reason.As<Object>();
-                auto messageKey = tns::ToV8String(isolate, "message");
-                Local<Value> messageVal;
-                if (errorObj->Get(context, messageKey).ToLocal(&messageVal) && messageVal->IsString()) {
-                  v8::String::Utf8Value messageUtf8(isolate, messageVal);
-                  if (*messageUtf8) errorMessage = std::string(*messageUtf8);
-                }
-                auto stackKey = tns::ToV8String(isolate, "stack");
-                Local<Value> stackVal;
-                if (errorObj->Get(context, stackKey).ToLocal(&stackVal) && stackVal->IsString()) {
-                  v8::String::Utf8Value stackUtf8(isolate, stackVal);
-                  if (*stackUtf8) {
-                    stackTrace = std::string(*stackUtf8);
-                    stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
+            if (RuntimeConfig.IsDebug) {
+              // In debug mode, show modal and continue without throwing
+              jsErrorOccurred = true;
+
+              std::string errorTitle = "Uncaught JavaScript Exception";
+              std::string errorMessage = "Module evaluation promise rejected";
+              std::string stackTrace = "";
+              
+              // Try to get the promise result (the actual error)
+              Local<Value> reason = promise->Result();
+              if (!reason.IsEmpty()) {
+                if (reason->IsObject()) {
+                  Local<Context> context = isolate->GetCurrentContext();
+                  Local<Object> errorObj = reason.As<Object>();
+
+                  auto messageKey = tns::ToV8String(isolate, "message");
+                  Local<Value> messageVal;
+                  if (errorObj->Get(context, messageKey).ToLocal(&messageVal) && messageVal->IsString()) {
+                    v8::String::Utf8Value messageUtf8(isolate, messageVal);
+                    if (*messageUtf8) errorMessage = std::string(*messageUtf8);
+                  }
+
+                  // get stack trace
+                  auto stackKey = tns::ToV8String(isolate, "stack");
+                  Local<Value> stackVal;
+                  if (errorObj->Get(context, stackKey).ToLocal(&stackVal) && stackVal->IsString()) {
+                    v8::String::Utf8Value stackUtf8(isolate, stackVal);
+                    if (*stackUtf8) {
+                      stackTrace = std::string(*stackUtf8);
+                      stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
+                    }
+                  }
+                } else {
+                  // If reason is not an object, convert it to string
+                  Local<Context> context = isolate->GetCurrentContext();
+                  auto maybeReasonStr = reason->ToString(context);
+                  if (!maybeReasonStr.IsEmpty()) {
+                    v8::String::Utf8Value reasonUtf8(isolate, maybeReasonStr.ToLocalChecked());
+                    if (*reasonUtf8) {
+                      errorMessage = std::string(*reasonUtf8);
+                    }
                   }
                 }
 
@@ -1089,30 +1110,44 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
               } else {
                 stackTrace = tns::RemapStackTraceIfAvailable(isolate, stackTrace);
               }
+
+              if (IsScriptLoadingLogEnabled()) {
+                // Emit a concise summary of the rejection for diagnostics
+                std::string stackPreview = stackTrace.size() > 240 ? stackTrace.substr(0, 240) + "…" : stackTrace;
+                Log(@"[esm][evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
+                    canonicalPath.c_str(), errorMessage.c_str(), stackPreview.c_str());
+              }
+
+              NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
+              logPhase("evaluate", "promise-rejected-handled");
+
+              // In debug mode, don't throw any exceptions - just return empty value
+              return Local<Value>();
+            } else {
+              // Release mode - throw exceptions as before
+              if (!promiseTc.HasCaught()) {
+                Local<Value> reason = promise->Result();
+                isolate->ThrowException(reason);
+              }
+              throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
             }
-
-            if (IsScriptLoadingLogEnabled()) {
-              // Emit a concise summary of the rejection for diagnostics
-              std::string stackPreview = stackTrace.size() > 240 ? stackTrace.substr(0, 240) + "…" : stackTrace;
-              Log(@"[esm][evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
-                  canonicalPath.c_str(), errorMessage.c_str(), stackPreview.c_str());
-            }
-
-            NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
-            logPhase("evaluate", "promise-rejected-handled");
-
-            // In debug mode, don't throw any exceptions - just return empty value
-            return Local<Value>();
+          }
+          if (IsScriptLoadingLogEnabled()) {
+            Log("LoadESModule: Promise resolved successfully\n");
           }
           break;
         }
+
         attempts++;
-        usleep(100);
+        usleep(100);  // 0.1ms delay
       }
       // Timeout: continue; the host event loop will settle microtasks later
+
+      if (attempts >= maxAttempts) {
+        printf("LoadESModule: Promise resolution timeout, continuing anyway\n");
+      }
     }
   }
-
   tns::UpdateModuleFallback(isolate, canonicalPath, module);
 
   // 7) Return the namespace

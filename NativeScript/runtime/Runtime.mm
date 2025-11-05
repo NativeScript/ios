@@ -32,7 +32,7 @@
 #include "HMRSupport.h"
 #include "HMRSupport.mm"
 #include "DevFlags.h"
-#include "DevFlags.mm" // temporary: ensure IsScriptLoadingLogEnabled is linked without Xcode project changes
+#include "DevFlags.mm"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
