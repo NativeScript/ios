@@ -84,6 +84,9 @@ require("./URL");
 require("./URLSearchParams");
 require("./URLPattern");
 
+// Exception handling tests
+require("./ExceptionHandlingTests");
+
 // Tests common for all runtimes.
 require("./shared/index").runAllTests();
 

@@ -22,10 +22,13 @@
 #include "DisposerPHV.h"
 #include "IsolateWrapper.h"
 
+#include <unordered_map>
 #include "ModuleBinding.hpp"
+#include "ModuleInternalCallbacks.h"
 #include "URLImpl.h"
-#include "URLSearchParamsImpl.h"
 #include "URLPatternImpl.h"
+#include "URLSearchParamsImpl.h"
+#include <mutex>
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -33,11 +36,94 @@
 using namespace v8;
 using namespace std;
 
+// Import meta callback to support import.meta.url
+static void InitializeImportMetaObject(Local<Context> context, Local<Module> module,
+                                       Local<Object> meta) {
+  Isolate* isolate = context->GetIsolate();
+
+  // Look up the module path in the global module registry (with safety checks)
+  std::string modulePath;
+
+  try {
+    for (auto& kv : tns::g_moduleRegistry) {
+      // Check if Global handle is empty before accessing
+      if (kv.second.IsEmpty()) {
+        continue;
+      }
+
+      Local<Module> registered = kv.second.Get(isolate);
+      if (!registered.IsEmpty() && registered == module) {
+        modulePath = kv.first;
+        break;
+      }
+    }
+  } catch (...) {
+    // NSLog(@"[import.meta] Exception during module registry lookup, using fallback");
+    modulePath = "";  // Will use fallback path
+  }
+
+  // Debug logging
+  // NSLog(@"[import.meta] Module lookup: found path = %s",
+  //       modulePath.empty() ? "(empty)" : modulePath.c_str());
+  // NSLog(@"[import.meta] Registry size: %zu", tns::g_moduleRegistry.size());
+
+  // Convert file path to file:// URL
+  std::string moduleUrl;
+  if (!modulePath.empty()) {
+    // Remove base directory and create file:// URL
+    std::string base = tns::ReplaceAll(modulePath, RuntimeConfig.BaseDir, "");
+    moduleUrl = "file://" + base;
+  } else {
+    // Fallback URL if module not found in registry
+    moduleUrl = "file:///app/";
+  }
+
+  // NSLog(@"[import.meta] Final URL: %s", moduleUrl.c_str());
+
+  Local<String> url =
+      String::NewFromUtf8(isolate, moduleUrl.c_str(), NewStringType::kNormal).ToLocalChecked();
+
+  // Set import.meta.url property
+  meta->CreateDataProperty(
+          context, String::NewFromUtf8(isolate, "url", NewStringType::kNormal).ToLocalChecked(),
+          url)
+      .Check();
+
+  // Add import.meta.dirname support (extract directory from path)
+  std::string dirname;
+  if (!modulePath.empty()) {
+    size_t lastSlash = modulePath.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+      dirname = modulePath.substr(0, lastSlash);
+    } else {
+      dirname = "/app";  // fallback
+    }
+  } else {
+    dirname = "/app";  // fallback
+  }
+
+  Local<String> dirnameStr =
+      String::NewFromUtf8(isolate, dirname.c_str(), NewStringType::kNormal).ToLocalChecked();
+
+  // Set import.meta.dirname property
+  meta->CreateDataProperty(
+          context, String::NewFromUtf8(isolate, "dirname", NewStringType::kNormal).ToLocalChecked(),
+          dirnameStr)
+      .Check();
+}
+
 namespace tns {
 
 std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
+static std::unordered_map<std::string, id> AppConfigCache; // generic cache for app config values
+static std::mutex AppConfigCacheMutex;
+
+// Global flag to track when JavaScript errors occur during execution
+bool jsErrorOccurred = false;
+// Global flag to track if error display is currently showing
+bool isErrorDisplayShowing = false;
 
 // TODO: consider listening to timezone changes and automatically reseting the DateTime. Probably
 // makes more sense to move it to its own file
@@ -113,6 +199,15 @@ Runtime::~Runtime() {
 
   {
     v8::Locker lock(isolate_);
+
+    // Clear module registry before disposing other handles
+    // This prevents crashes during g_moduleRegistry cleanup
+    extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
+    for (auto& kv : g_moduleRegistry) {
+      kv.second.Reset();
+    }
+    g_moduleRegistry.clear();
+
     DisposerPHV phv(isolate_);
     isolate_->VisitHandlesWithClassIds(&phv);
 
@@ -213,6 +308,16 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
   isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
+
+  // Enable dynamic import() support (handle API rename across V8 versions)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  isolate->SetHostImportModuleDynamicallyCallback(tns::ImportModuleDynamicallyCallback);
+#pragma clang diagnostic pop
+
+  // Set up import.meta callback
+  isolate->SetHostInitializeImportMetaObjectCallback(InitializeImportMetaObject);
+
   isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 
   Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
@@ -357,8 +462,33 @@ id Runtime::GetAppConfigValue(std::string key) {
     }
   }
 
-  id result = AppPackageJson[[NSString stringWithUTF8String:key.c_str()]];
+  // Generic cache for all keys to avoid repeated NSString conversion and NSDictionary hashing
+  {
+    std::lock_guard<std::mutex> lock(AppConfigCacheMutex);
+    auto it = AppConfigCache.find(key);
+    if (it != AppConfigCache.end()) {
+      return it->second;
+    }
+  }
+
+  id result = nil;
+  if (AppPackageJson != nil) {
+    NSString* nsKey = [NSString stringWithUTF8String:key.c_str()];
+    result = AppPackageJson[nsKey];
+  }
+
+  // Store in cache (can cache nil as NSNull to differentiate presence if desired; for now, cache as-is)
+  {
+    std::lock_guard<std::mutex> lock(AppConfigCacheMutex);
+    AppConfigCache[key] = result;
+  }
+
   return result;
+}
+
+bool Runtime::showErrorDisplay() {
+  id value = GetAppConfigValue("showErrorDisplay");
+  return value ? [value boolValue] : false;
 }
 
 void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
@@ -378,6 +508,12 @@ void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
                                            global, readOnlyFlags)
                        .FromMaybe(false)) {
     tns::Assert(false, isolate);
+  }
+
+  if (isWorker) {
+    // Register proper interop types for worker context
+    // Worker bundles need full interop functionality, not just simple stubs
+    tns::Interop::RegisterInteropTypes(context);
   }
 }
 

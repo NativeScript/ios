@@ -2,16 +2,74 @@
 #include <Foundation/Foundation.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 #include <utime.h>
 #include <string>
 #include "Caches.h"
 #include "Helpers.h"
+#include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
+#include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
 
 using namespace v8;
 
 namespace tns {
+
+// External flag from Runtime.mm to track JavaScript errors
+extern bool jsErrorOccurred;
+
+// Helper function to check if a module name looks like an optional external module
+bool IsLikelyOptionalModule(const std::string& moduleName) {
+  // Check if it's a bare module name (no path separators) that could be an npm package
+  if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
+      moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
+    return true;
+  }
+  return false;
+}
+
+// Helper function to check if a file path is an ES module (.mjs) but not a source map (.mjs.map)
+bool IsESModule(const std::string& path) {
+  return path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0 &&
+         !(path.size() >= 8 && path.compare(path.size() - 8, 8, ".mjs.map") == 0);
+}
+
+// Helper function to resolve main entry from package.json with proper extension handling
+std::string ResolveMainEntryFromPackageJson(const std::string& baseDir) {
+  // Get the main value from package.json
+  id mainValue = Runtime::GetAppConfigValue("main");
+  NSString* mainEntry = nil;
+
+  if (mainValue && [mainValue isKindOfClass:[NSString class]]) {
+    mainEntry = (NSString*)mainValue;
+  } else {
+    // Fallback to "index" if no main field found
+    mainEntry = @"index";
+  }
+
+  // Try the main entry with different extensions
+  NSString* basePath =
+      [[NSString stringWithUTF8String:baseDir.c_str()] stringByAppendingPathComponent:mainEntry];
+
+  // Check if file exists as-is
+  if (tns::Exists([basePath fileSystemRepresentation])) {
+    return std::string([basePath UTF8String]);
+  }
+  // Try with .js extension
+  else if (tns::Exists(
+               [[basePath stringByAppendingPathExtension:@"js"] fileSystemRepresentation])) {
+    return std::string([[basePath stringByAppendingPathExtension:@"js"] UTF8String]);
+  }
+  // Try with .mjs extension
+  else if (tns::Exists(
+               [[basePath stringByAppendingPathExtension:@"mjs"] fileSystemRepresentation])) {
+    return std::string([[basePath stringByAppendingPathExtension:@"mjs"] UTF8String]);
+  } else {
+    // If none found, default to .js (let the loading system handle the error)
+    return std::string([[basePath stringByAppendingPathExtension:@"js"] UTF8String]);
+  }
+}
 
 ModuleInternal::ModuleInternal(Local<Context> context) {
   std::string requireFactoryScript = "(function() { "
@@ -33,16 +91,20 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
            .ToLocal(&script) &&
       tc.HasCaught()) {
     tns::LogError(isolate, tc);
-    tns::Assert(false, isolate);
+    Log(@"FATAL: Failed to compile require factory script");
+    return;
   }
-  tns::Assert(!script.IsEmpty(), isolate);
 
   Local<Value> result;
   if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
     tns::LogError(isolate, tc);
-    tns::Assert(false, isolate);
+    Log(@"FATAL: Failed to run require factory script");
+    return;
   }
-  tns::Assert(!result.IsEmpty() && result->IsFunction(), isolate);
+  if (result.IsEmpty() || !result->IsFunction()) {
+    Log(@"FATAL: Require factory script did not return a function");
+    return;
+  }
 
   this->requireFactoryFunction_ =
       std::make_unique<Persistent<v8::Function>>(isolate, result.As<v8::Function>());
@@ -52,23 +114,114 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   this->requireFunction_ = std::make_unique<Persistent<v8::Function>>(
       isolate, requireFuncTemplate->GetFunction(context).ToLocalChecked());
 
-  Local<v8::Function> globalRequire = GetRequireFunction(isolate, RuntimeConfig.ApplicationPath);
+  // Use shortened path for global require function to avoid V8 parsing issues
+  std::string globalRequirePath = "/app";
+
+  Local<v8::Function> globalRequire = GetRequireFunction(isolate, globalRequirePath);
   bool success =
       global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
-  tns::Assert(success, isolate);
+  if (!success) {
+    Log(@"FATAL: Failed to set global require function");
+  }
 }
 
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   Local<Context> context = cache->GetContext();
   Local<Object> globalObject = context->Global();
+  // Ensure global.__dirname is defined so ESM/CommonJS shims relying on it work.
+  {
+    Local<Value> dirVal;
+    bool hasDir = globalObject->Get(context, ToV8String(isolate, "__dirname")).ToLocal(&dirVal);
+    if (!hasDir || dirVal->IsUndefined()) {
+      bool setDir = globalObject
+                        ->Set(context, ToV8String(isolate, "__dirname"),
+                              ToV8String(isolate, RuntimeConfig.ApplicationPath))
+                        .FromMaybe(false);
+      if (!setDir) {
+        Log(@"Warning: Failed to set __dirname on global object");
+      }
+    }
+  }
+
+  // Check if this is an ES module (.mjs) and handle it directly
+  if (IsESModule(path)) {
+    // For ES modules, use LoadESModule directly instead of require()
+    TryCatch tc(isolate);
+    Local<Value> moduleNamespace;
+
+    try {
+      moduleNamespace = ModuleInternal::LoadESModule(isolate, path);
+    } catch (const NativeScriptException& ex) {
+      if (RuntimeConfig.IsDebug) {
+        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        Log(@"Error loading ES module: %s", path.c_str());
+        Log(@"Exception: %s", ex.getMessage().c_str());
+        Log(@"***** End stack trace - continuing execution *****");
+        Log(@"Debug mode - ES module loading failed, but telling iOS it succeeded to prevent "
+            @"app termination");
+        return true;  // LIE TO iOS - return success to prevent app termination
+      } else {
+        return false;
+      }
+    }
+
+    if (moduleNamespace.IsEmpty()) {
+      if (RuntimeConfig.IsDebug) {
+        Log(@"Debug mode - ES module returned empty namespace, but telling iOS it succeeded");
+        return true;  // LIE TO iOS - return success to prevent app termination
+      } else {
+        return false;
+      }
+    }
+
+    return true;  // ES module loaded successfully
+  }
+
+  // For CommonJS modules (.js), use the traditional require() approach
   Local<Value> requireObj;
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
-  tns::Assert(success && requireObj->IsFunction(), isolate);
+  if (!success || !requireObj->IsFunction()) {
+    Log(@"Warning: Failed to get require function from global object");
+    return false;
+  }
   Local<v8::Function> requireFunc = requireObj.As<v8::Function>();
   Local<Value> args[] = {ToV8String(isolate, path)};
   Local<Value> result;
+
+  // Add TryCatch to handle any exceptions from the require call
+  TryCatch tc(isolate);
   success = requireFunc->Call(context, globalObject, 1, args).ToLocal(&result);
+
+  if (!success || tc.HasCaught()) {
+    if (RuntimeConfig.IsDebug) {
+      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+      Log(@"Error in require() call:");
+      Log(@"  Requested module: '%s'", path.c_str());
+      Log(@"  Called from: %s", RuntimeConfig.ApplicationPath.c_str());
+
+      if (tc.HasCaught()) {
+        tns::LogError(isolate, tc);
+      }
+
+      Log(@"***** End stack trace - continuing execution *****");
+      Log(@"Debug mode - Main script execution failed, but telling iOS it succeeded to prevent "
+          @"app termination");
+
+      // Add a small delay to ensure error modal has time to render before we return
+      dispatch_after(
+          dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
+          dispatch_get_main_queue(), ^{
+            Log(@"🛡️ Debug mode - Crash prevention complete, app should remain stable");
+          });
+
+      return true;  // LIE TO iOS - return success to prevent app termination
+    } else {
+      // In release mode, still fail as before
+      return false;
+    }
+  }
+
   return success;
 }
 
@@ -81,8 +234,39 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
 
   Local<Value> result;
   Local<Object> thiz = Object::New(isolate);
+
+  TryCatch tc(isolate);
   bool success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
-  tns::Assert(success && !result.IsEmpty() && result->IsFunction(), isolate);
+  if (!success || tc.HasCaught()) {
+    if (tc.HasCaught()) {
+      tns::LogError(isolate, tc);
+    }
+    Log(@"FATAL: Failed to call require factory function");
+    // Return a dummy function to avoid further crashes
+    result = v8::Function::New(context, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+               if (RuntimeConfig.IsDebug) {
+                 Log(@"Debug mode - Require function unavailable (factory failed)");
+                 info.GetReturnValue().SetUndefined();
+               } else {
+                 info.GetIsolate()->ThrowException(v8::Exception::Error(
+                     tns::ToV8String(info.GetIsolate(), "Require function unavailable")));
+               }
+             }).ToLocalChecked();
+  }
+
+  if (result.IsEmpty() || !result->IsFunction()) {
+    Log(@"FATAL: Require factory did not return a function");
+    // Return a dummy function
+    result = v8::Function::New(context, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+               if (RuntimeConfig.IsDebug) {
+                 Log(@"Debug mode - Require function unavailable (no function returned)");
+                 info.GetReturnValue().SetUndefined();
+               } else {
+                 info.GetIsolate()->ThrowException(v8::Exception::Error(
+                     tns::ToV8String(info.GetIsolate(), "Require function unavailable")));
+               }
+             }).ToLocalChecked();
+  }
 
   return result.As<v8::Function>();
 }
@@ -90,18 +274,34 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
 void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
 
+  // Declare these outside try block so they're available in catch
+  std::string moduleName;
+  std::string callingModuleDirName;
+  NSString* fullPath = nil;
+
   try {
     ModuleInternal* moduleInternal =
         static_cast<ModuleInternal*>(info.Data().As<External>()->Value());
 
-    std::string moduleName = tns::ToString(isolate, info[0].As<v8::String>());
-    std::string callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
+    moduleName = tns::ToString(isolate, info[0].As<v8::String>());
+    callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
 
-    NSString* fullPath;
-    if (moduleName.length() > 0 && moduleName[0] != '/') {
+    // Expand shortened paths back to full paths for file resolution
+    if (callingModuleDirName.length() > 0 && callingModuleDirName.substr(0, 4) == "/app") {
+      std::string expandedPath = RuntimeConfig.ApplicationPath + callingModuleDirName.substr(4);
+      callingModuleDirName = expandedPath;
+    }
+
+    // Special handling for "./" - resolve to main entry point from package.json
+    if (moduleName == "./") {
+      std::string mainEntryPath = ResolveMainEntryFromPackageJson(RuntimeConfig.ApplicationPath);
+      fullPath = [NSString stringWithUTF8String:mainEntryPath.c_str()];
+    } else if (moduleName.length() > 0 && moduleName[0] != '/') {
       if (moduleName[0] == '.') {
-        fullPath = [[NSString stringWithUTF8String:callingModuleDirName.c_str()]
-            stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+        NSString* callingDirNS = [NSString stringWithUTF8String:callingModuleDirName.c_str()];
+        NSString* moduleNameNS = [NSString stringWithUTF8String:moduleName.c_str()];
+        fullPath =
+            [[callingDirNS stringByAppendingPathComponent:moduleNameNS] stringByStandardizingPath];
       } else if (moduleName[0] == '~') {
         moduleName = moduleName.substr(2);
         fullPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()]
@@ -116,8 +316,10 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
         const char* path1 = [fullPath fileSystemRepresentation];
         const char* path2 =
             [[fullPath stringByAppendingPathExtension:@"js"] fileSystemRepresentation];
+        const char* path3 =
+            [[fullPath stringByAppendingPathExtension:@"mjs"] fileSystemRepresentation];
 
-        if (!tns::Exists(path1) && !tns::Exists(path2)) {
+        if (!tns::Exists(path1) && !tns::Exists(path2) && !tns::Exists(path3)) {
           fullPath = [tnsModulesPath stringByAppendingPathComponent:@"tns-core-modules"];
           fullPath = [fullPath
               stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
@@ -133,23 +335,70 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
     bool isData = false;
     Local<Object> moduleObj =
         moduleInternal->LoadImpl(isolate, [fileNameOnly UTF8String], [pathOnly UTF8String], isData);
+
     if (moduleObj.IsEmpty()) {
       return;
     }
 
     if (isData) {
-      tns::Assert(!moduleObj.IsEmpty(), isolate);
+      // moduleObj is guaranteed to be non-empty here due to check above
       info.GetReturnValue().Set(moduleObj);
     } else {
       Local<Context> context = isolate->GetCurrentContext();
       Local<Value> exportsObj;
       bool success =
           moduleObj->Get(context, tns::ToV8String(isolate, "exports")).ToLocal(&exportsObj);
-      tns::Assert(success, isolate);
-      info.GetReturnValue().Set(exportsObj);
+      if (success) {
+        info.GetReturnValue().Set(exportsObj);
+      } else {
+        Log(@"Warning: Failed to get exports from module object");
+      }
     }
   } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(isolate);
+    // Add context about the require call
+    std::string contextMsg = "Error in require() call:";
+    contextMsg += "\n  Requested module: '" + moduleName + "'";
+    contextMsg += "\n  Called from: " + callingModuleDirName;
+    if (fullPath != nil) {
+      contextMsg += "\n  Resolved path: " + std::string([fullPath UTF8String]);
+    }
+
+    // Add JavaScript stack trace to show who called require
+    Local<StackTrace> stackTrace =
+        StackTrace::CurrentStackTrace(isolate, 10, StackTrace::StackTraceOptions::kDetailed);
+    std::string jsStackTrace = "";
+    if (!stackTrace.IsEmpty()) {
+      for (int i = 0; i < stackTrace->GetFrameCount(); i++) {
+        Local<StackFrame> frame = stackTrace->GetFrame(isolate, i);
+        Local<v8::String> scriptName = frame->GetScriptName();
+        Local<v8::String> functionName = frame->GetFunctionName();
+        int lineNumber = frame->GetLineNumber();
+        int columnNumber = frame->GetColumn();
+
+        jsStackTrace += "\n    at ";
+        std::string funcName = tns::ToString(isolate, functionName);
+        std::string scriptNameStr = tns::ToString(isolate, scriptName);
+
+        if (!funcName.empty()) {
+          jsStackTrace += funcName + " (";
+        } else {
+          jsStackTrace += "<anonymous> (";
+        }
+        jsStackTrace += scriptNameStr + ":" + std::to_string(lineNumber) + ":" +
+                        std::to_string(columnNumber) + ")";
+      }
+    }
+
+    contextMsg += "\n\nJavaScript stack trace:" + jsStackTrace;
+    contextMsg += "\n\nOriginal error:\n" + ex.getMessage();
+
+    // Include original stack trace if available
+    if (!ex.getStackTrace().empty()) {
+      contextMsg += "\n\nOriginal stack trace:\n" + ex.getStackTrace();
+    }
+
+    NativeScriptException contextEx(isolate, contextMsg, "Error");
+    contextEx.ReThrowToV8(isolate);
   }
 }
 
@@ -167,13 +416,41 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
 
   Local<Object> moduleObj;
   Local<Value> exportsObj;
-  std::string path = this->ResolvePath(isolate, baseDir, moduleName);
+  std::string path;
+
+  try {
+    path = this->ResolvePath(isolate, baseDir, moduleName);
+  } catch (NativeScriptException& ex) {
+    // Add context about the module resolution
+    std::string contextMsg = "Failed to resolve module: '" + moduleName + "'";
+    contextMsg += "\n  Base directory: " + baseDir;
+    contextMsg += "\n  Module name: " + moduleName;
+    contextMsg += "\n\nOriginal error:\n" + ex.getMessage();
+
+    throw NativeScriptException(isolate, contextMsg, "Error");
+  }
+
   if (path.empty()) {
-    return Local<Object>();
+    // For absolute paths (where baseDir is "/"), always throw an error instead of creating
+    // placeholder
+    bool isAbsolutePath = (baseDir == "/");
+
+    // Create placeholder module only for likely optional modules that aren't absolute paths
+    if (!isAbsolutePath && IsLikelyOptionalModule(moduleName)) {
+      return this->CreatePlaceholderModule(isolate, moduleName, cacheKey);
+    }
+
+    // For absolute paths or non-optional modules, throw an error
+    std::string errorMsg = "Module not found: '" + moduleName + "'";
+    if (isAbsolutePath) {
+      errorMsg = "Cannot find module '" + baseDir + moduleName + "'";
+    }
+    throw NativeScriptException(isolate, errorMsg, "Error");
   }
 
   NSString* pathStr = [NSString stringWithUTF8String:path.c_str()];
   NSString* extension = [pathStr pathExtension];
+
   if ([extension isEqualToString:@"json"]) {
     isData = true;
   }
@@ -183,13 +460,14 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
     return it2->second->Get(isolate);
   }
 
-  if ([extension isEqualToString:@"js"]) {
+  if ([extension isEqualToString:@"mjs"] || [extension isEqualToString:@"js"]) {
     moduleObj = this->LoadModule(isolate, path, cacheKey);
   } else if ([extension isEqualToString:@"json"]) {
     moduleObj = this->LoadData(isolate, path);
   } else {
-    // TODO: throw an error for unsupported file extension
-    tns::Assert(false, isolate);
+    // Throw an error for unsupported file extension instead of crashing
+    std::string errorMsg = "Unsupported file extension: " + std::string([extension UTF8String]);
+    throw NativeScriptException(errorMsg);
   }
 
   return moduleObj;
@@ -202,7 +480,9 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   Local<Context> context = isolate->GetCurrentContext();
   bool success =
       moduleObj->Set(context, tns::ToV8String(isolate, "exports"), exportsObj).FromMaybe(false);
-  tns::Assert(success, isolate);
+  if (!success) {
+    Log(@"Warning: Failed to set exports property on module object");
+  }
 
   const PropertyAttribute readOnlyFlags =
       static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -211,18 +491,115 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   success =
       moduleObj->DefineOwnProperty(context, tns::ToV8String(isolate, "id"), fileName, readOnlyFlags)
           .FromMaybe(false);
-  tns::Assert(success, isolate);
+  if (!success) {
+    Log(@"Warning: Failed to set id property on module object");
+  }
 
   std::shared_ptr<Persistent<Object>> poModuleObj =
       std::make_shared<Persistent<Object>>(isolate, moduleObj);
   TempModule tempModule(this, modulePath, cacheKey, poModuleObj);
 
-  Local<Script> script = LoadScript(isolate, modulePath);
+  // Compile/load the JavaScript/ESM source
+  Local<Value> scriptValue = LoadScript(isolate, modulePath);
 
-  Local<v8::Function> moduleFunc;
+  // Check if script loading failed (debug mode graceful returns)
+  if (scriptValue.IsEmpty()) {
+    if (RuntimeConfig.IsDebug) {
+      // NSLog(@"Debug mode - Script loading returned empty value, returning gracefully: %s",
+      //       modulePath.c_str());
+      return Local<Object>();
+    } else {
+      throw NativeScriptException(isolate, "Script loading failed for " + modulePath);
+    }
+  }
+
+  // Check if this is an ES module
+  bool isESM = IsESModule(modulePath);
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+
+  if (isESM) {
+    // For ES modules, the returned value is the namespace object
+
+    // First check if scriptValue is empty (from debug mode graceful returns)
+    if (scriptValue.IsEmpty()) {
+      if (RuntimeConfig.IsDebug) {
+        Log(@"Debug mode - ES module returned empty value, returning gracefully: %s",
+            modulePath.c_str());
+        return Local<Object>();
+      } else {
+        throw NativeScriptException(isolate, "ES module load returned empty value " + modulePath);
+      }
+    }
+
+    if (!scriptValue->IsObject()) {
+      if (RuntimeConfig.IsDebug) {
+        Log(@"Debug mode - ES module load failed, returning gracefully: %s", modulePath.c_str());
+        // Return empty module object to prevent crashes
+        return Local<Object>();
+      } else {
+        throw NativeScriptException(isolate, "Failed to load ES module " + modulePath);
+      }
+    }
+
+    // Debug: Check if we're in a worker context and if self.onmessage is set
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    if (cache->isWorker) {
+      Local<Context> context = isolate->GetCurrentContext();
+      Local<Object> global = context->Global();
+
+      // Check if self exists
+      Local<Value> selfValue;
+      if (global->Get(context, ToV8String(isolate, "self")).ToLocal(&selfValue)) {
+        if (selfValue->IsObject()) {
+          Local<Object> selfObj = selfValue.As<Object>();
+          Local<Value> onmessageValue;
+          if (selfObj->Get(context, ToV8String(isolate, "onmessage")).ToLocal(&onmessageValue)) {
+            // onmessage exists
+          }
+        }
+      }
+    }
+
+    // Handle exports differently for ES modules vs worker scripts
+    if (isESM) {
+      exportsObj = scriptValue.As<Object>();
+    } else {
+      // For worker scripts, create an empty exports object since they don't export anything
+      // They work through global scope (self.onmessage, etc.)
+      exportsObj = Object::New(isolate);
+    }
+
+    bool succ =
+        moduleObj->Set(context, tns::ToV8String(isolate, "exports"), exportsObj).FromMaybe(false);
+    if (!succ) {
+      Log(@"Warning: Failed to set exports property after module execution");
+    }
+
+    tempModule.SaveToCache();
+    return moduleObj;
+  }
+
+  // Check if this is the main application bundle (webpack-style IIFE)
+  std::string appPath = RuntimeConfig.ApplicationPath;
+  std::string bundlePath = appPath + "/bundle.js";
+
+  if (modulePath == bundlePath) {
+    // Main application bundle is a webpack-style IIFE that executes immediately
+    // It doesn't return a function, so we just create an empty exports object
+    tempModule.SaveToCache();
+    return moduleObj;
+  }
+
+  // Classic CommonJS path – expect a factory function.
+  if (!scriptValue->IsFunction()) {
+    throw NativeScriptException(isolate,
+                                "Expected module factory to be a function for " + modulePath);
+  }
+  v8::Local<v8::Function> moduleFunc = scriptValue.As<v8::Function>();
+
   {
     TryCatch tc(isolate);
-    moduleFunc = script->Run(context).ToLocalChecked().As<v8::Function>();
+    // moduleFunc = script->Run(context).ToLocalChecked().As<v8::Function>();
     if (tc.HasCaught()) {
       throw NativeScriptException(isolate, tc, "Error running script " + modulePath);
     }
@@ -230,18 +607,26 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
 
   std::string parentDir = [[[NSString stringWithUTF8String:modulePath.c_str()]
       stringByDeletingLastPathComponent] UTF8String];
-  Local<v8::Function> require = GetRequireFunction(isolate, parentDir);
+
+  // Shorten the parentDir for GetRequireFunction to avoid V8 parsing issues with long paths
+  std::string shortParentDir = "/app" + parentDir.substr(RuntimeConfig.ApplicationPath.length());
+
+  Local<v8::Function> require = GetRequireFunction(isolate, shortParentDir);
+  // Use full paths for __filename and __dirname to match module.id
   Local<Value> requireArgs[5]{moduleObj, exportsObj, require,
                               tns::ToV8String(isolate, modulePath.c_str()),
                               tns::ToV8String(isolate, parentDir.c_str())};
 
   success = moduleObj->Set(context, tns::ToV8String(isolate, "require"), require).FromMaybe(false);
-  tns::Assert(success, isolate);
+  if (!success) {
+    Log(@"Warning: Failed to set require property on module object");
+  }
 
   {
     TryCatch tc(isolate);
     Local<Value> result;
     Local<Object> thiz = Object::New(isolate);
+
     success =
         moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs)
             .ToLocal(&result);
@@ -282,33 +667,394 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
   return json;
 }
 
-Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const std::string& path) {
-  Local<Context> context = isolate->GetCurrentContext();
-  std::string baseOrigin = tns::ReplaceAll(path, RuntimeConfig.BaseDir, "");
-  std::string fullRequiredModulePathWithSchema = "file://" + baseOrigin;
-  ScriptOrigin origin(isolate, tns::ToV8String(isolate, fullRequiredModulePathWithSchema));
-  Local<v8::String> scriptText = WrapModuleContent(isolate, path);
-  ScriptCompiler::CachedData* cacheData = LoadScriptCache(path);
-  ScriptCompiler::Source source(scriptText, origin, cacheData);
-
-  ScriptCompiler::CompileOptions options = ScriptCompiler::kNoCompileOptions;
-
-  if (cacheData != nullptr) {
-    options = ScriptCompiler::kConsumeCodeCache;
+Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& path) {
+  if (IsESModule(path)) {
+    // Treat all .mjs files as standard ES modules.
+    return ModuleInternal::LoadESModule(isolate, path);
   }
 
-  Local<Script> script;
+  Local<Script> script = ModuleInternal::LoadClassicScript(isolate, path);
+
+  // Check if script compilation failed (debug mode graceful returns)
+  if (script.IsEmpty()) {
+    if (RuntimeConfig.IsDebug) {
+      Log(@"Debug mode - Classic script compilation returned empty, returning gracefully: %s",
+          path.c_str());
+      return Local<Value>();
+    } else {
+      throw NativeScriptException(isolate, "Classic script compilation failed for " + path);
+    }
+  }
+
+  // run it and return the value with proper exception handling
+  Local<Context> context = isolate->GetCurrentContext();
   TryCatch tc(isolate);
-  bool success = ScriptCompiler::Compile(context, &source, options).ToLocal(&script);
-  if (!success || tc.HasCaught()) {
-    throw NativeScriptException(isolate, tc, "Cannot compile " + path);
+  Local<Value> result;
+
+  if (!script->Run(context).ToLocal(&result)) {
+    // Script execution failed, throw a proper exception instead of aborting V8
+    if (RuntimeConfig.IsDebug) {
+      // Mark that a JavaScript error occurred
+      jsErrorOccurred = true;
+
+      // Log the detailed JavaScript error with full stack trace
+      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+      Log(@"Error executing script: %s", path.c_str());
+      if (tc.HasCaught()) {
+        tns::LogError(isolate, tc);
+      }
+      Log(@"***** End stack trace - continuing execution *****");
+      Log(@"Debug mode - Script execution failed, returning gracefully: %s", path.c_str());
+
+      std::string errorTitle = "Uncaught JavaScript Exception";
+      std::string errorMessage = "Error executing script.";
+
+      // Extract error message for modal when available
+      if (tc.HasCaught()) {
+        Local<Value> exception = tc.Exception();
+        if (!exception.IsEmpty()) {
+          Local<Context> ctx = isolate->GetCurrentContext();
+          Local<v8::String> excStr;
+          if (exception->ToString(ctx).ToLocal(&excStr)) {
+            std::string excMsg = tns::ToString(isolate, excStr);
+            if (!excMsg.empty()) {
+              errorMessage = excMsg;
+            }
+          }
+        }
+      }
+
+      std::string stackTrace = tns::GetSmartStackTrace(isolate, &tc, tc.Exception());
+
+      NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
+      return Local<Value>();
+    } else {
+      if (tc.HasCaught()) {
+        throw NativeScriptException(isolate, tc, "Cannot execute script " + path);
+      } else {
+        throw NativeScriptException(isolate, "Script execution failed for " + path);
+      }
+    }
+  }
+
+  return result;
+}
+
+Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::string& path) {
+  // Ensure the resolved path maps to an actual regular file before attempting
+  // to read/compile it.  This prevents `ReadModule` from aborting the process
+  // when given a directory or non-existent path.
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+    throw NativeScriptException("Cannot find module " + path);
+  }
+
+  auto context = isolate->GetCurrentContext();
+  // build URL
+  std::string base = ReplaceAll(path, RuntimeConfig.BaseDir, "");
+  std::string url = "file://" + base;
+
+  // wrap & cache lookup
+  Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, path);
+  auto* cacheData = ModuleInternal::LoadScriptCache(path);
+
+  // note: is_module=false here
+  Local<v8::String> urlString;
+  if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
+    throw NativeScriptException(isolate, "Failed to create URL string for script " + path);
+  }
+
+  ScriptOrigin origin(isolate, urlString,
+                      0,      // line offset
+                      0,      // column offset
+                      false,  // shared_cross_origin
+                      -1,     // script_id
+                      Local<Value>(),
+                      false,  // is_opaque
+                      false,  // is_wasm
+                      false   // is_module
+  );
+  ScriptCompiler::Source source(sourceText, origin, cacheData);
+
+  auto opts = cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions;
+
+  TryCatch tc(isolate);
+  Local<Script> script;
+  if (!ScriptCompiler::Compile(context, &source, opts).ToLocal(&script) || tc.HasCaught()) {
+    if (RuntimeConfig.IsDebug) {
+      // Mark that a JavaScript error occurred
+      jsErrorOccurred = true;
+
+      // Log the detailed JavaScript error with full stack trace
+      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+      Log(@"Error compiling classic script: %s", path.c_str());
+      if (tc.HasCaught()) {
+        tns::LogError(isolate, tc);
+      }
+      Log(@"***** End stack trace - continuing execution *****");
+      Log(@"Debug mode - Script compilation failed, returning gracefully: %s", path.c_str());
+      // Return empty script to prevent crashes
+      return Local<Script>();
+    } else {
+      throw NativeScriptException(isolate, tc, "Cannot compile script " + path);
+    }
   }
 
   if (cacheData == nullptr) {
-    SaveScriptCache(script, path);
+    ModuleInternal::SaveScriptCache(script, path);
   }
 
   return script;
+}
+
+Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
+  auto context = isolate->GetCurrentContext();
+
+  // 1) Prepare URL & source
+  std::string base = ReplaceAll(path, RuntimeConfig.BaseDir, "");
+  std::string url = "file://" + base;
+  v8::Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, path);
+  auto* cacheData = ModuleInternal::LoadScriptCache(path);
+
+  Local<v8::String> urlString;
+  if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
+    throw NativeScriptException(isolate, "Failed to create URL string for ES module " + path);
+  }
+
+  ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, Local<Value>(), false, false,
+                      true  // ← is_module
+  );
+  ScriptCompiler::Source source(sourceText, origin, cacheData);
+
+  // 2) Compile with its own TryCatch
+  Local<Module> module;
+  {
+    TryCatch tcCompile(isolate);
+    MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
+        isolate, &source,
+        cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
+
+    if (!maybeMod.ToLocal(&module)) {
+      // V8 threw a syntax error or similar
+      if (RuntimeConfig.IsDebug) {
+        // Log the detailed JavaScript error with full stack trace
+        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        Log(@"Error compiling ES module: %s", path.c_str());
+        if (tcCompile.HasCaught()) {
+          tns::LogError(isolate, tcCompile);
+        }
+        Log(@"***** End stack trace - continuing execution *****");
+        Log(@"Debug mode - ES module compilation failed, returning gracefully: %s", path.c_str());
+        // Return empty to prevent crashes
+        return Local<Value>();
+      } else {
+        throw NativeScriptException(isolate, tcCompile, "Cannot compile ES module " + path);
+      }
+    }
+  }
+
+  // 3) Register for resolution callback
+  extern std::unordered_map<std::string, Global<Module>> g_moduleRegistry;
+
+  // Safe Global handle management: Clear any existing entry first
+  auto it = g_moduleRegistry.find(path);
+  if (it != g_moduleRegistry.end()) {
+    // Clear the existing Global handle before replacing it
+    it->second.Reset();
+  }
+
+  // Now safely set the new module handle
+  g_moduleRegistry[path].Reset(isolate, module);
+
+  // 4) Save cache if first time
+  if (cacheData == nullptr) {
+    Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
+    auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
+    ModuleInternal::SaveScriptCache(generatedCache, path);
+  }
+
+  // 5) Instantiate (link) with its own TryCatch
+  {
+    TryCatch tcLink(isolate);
+    bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
+
+    if (!linked) {
+      if (RuntimeConfig.IsDebug) {
+        // Log the detailed JavaScript error with full stack trace
+        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        Log(@"Error instantiating module: %s", path.c_str());
+        if (tcLink.HasCaught()) {
+          tns::LogError(isolate, tcLink);
+        }
+        Log(@"***** End stack trace - continuing execution *****");
+        Log(@"Debug mode - Module instantiation failed, returning gracefully: %s", path.c_str());
+        return Local<Value>();
+      } else {
+        if (tcLink.HasCaught()) {
+          throw NativeScriptException(isolate, tcLink, "Cannot instantiate module " + path);
+        } else {
+          // V8 gave no exception object—throw plain text
+          throw NativeScriptException(isolate, "Cannot instantiate module " + path);
+        }
+      }
+    }
+  }
+
+  // 6) Evaluate with its own TryCatch
+  Local<Value> result;
+  {
+    TryCatch tcEval(isolate);
+    printf("LoadESModule: About to evaluate module: %s\n", path.c_str());
+    if (!module->Evaluate(context).ToLocal(&result)) {
+      printf("LoadESModule: Evaluation failed for module: %s\n", path.c_str());
+      if (RuntimeConfig.IsDebug) {
+        // Log the detailed JavaScript error with full stack trace
+        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        Log(@"Error evaluating ES module: %s", path.c_str());
+        if (tcEval.HasCaught()) {
+          tns::LogError(isolate, tcEval);
+        }
+        Log(@"***** End stack trace - continuing execution *****");
+        Log(@"Debug mode - Module evaluation failed, returning gracefully: %s", path.c_str());
+        return Local<Value>();
+      } else {
+        throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + path);
+      }
+    }
+    printf("LoadESModule: Evaluation completed successfully for module: %s\n", path.c_str());
+
+    // Handle the case where evaluation returns a Promise (for top-level await)
+    if (result->IsPromise()) {
+      printf("LoadESModule: Module evaluation returned a Promise, processing...\n");
+
+      // Use TryCatch to safely handle Promise operations
+      TryCatch promiseTc(isolate);
+      Local<Promise> promise = result.As<Promise>();
+
+      // Process microtasks to allow Promise resolution (for both worker and main contexts)
+      printf("LoadESModule: Processing microtasks for Promise resolution\n");
+
+      // Limited attempts to resolve the promise to avoid infinite loops
+      int maxAttempts = 100;
+      int attempts = 0;
+
+      while (attempts < maxAttempts && !promiseTc.HasCaught()) {
+        isolate->PerformMicrotaskCheckpoint();
+
+        // Check promise state safely
+        if (promiseTc.HasCaught()) {
+          printf("LoadESModule: Exception during Promise processing, breaking\n");
+          break;
+        }
+
+        Promise::PromiseState state = promise->State();
+
+        if (state != Promise::kPending) {
+          if (state == Promise::kRejected) {
+            printf("LoadESModule: Promise was rejected\n");
+            if (RuntimeConfig.IsDebug) {
+              // Mark that a JavaScript error occurred
+              jsErrorOccurred = true;
+
+              // First log the detailed JavaScript error with full stack trace
+              Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+
+              std::string errorTitle = "Uncaught JavaScript Exception";
+              std::string errorMessage = "Module evaluation promise rejected";
+              std::string stackTrace = "";
+
+              // Try to get the promise result (the actual error)
+              Local<Value> reason = promise->Result();
+              if (!reason.IsEmpty()) {
+                if (reason->IsObject()) {
+                  Local<Context> context = isolate->GetCurrentContext();
+                  Local<Object> errorObj = reason.As<Object>();
+
+                  // Get error message
+                  auto messageKey = tns::ToV8String(isolate, "message");
+                  Local<Value> messageVal;
+                  if (errorObj->Get(context, messageKey).ToLocal(&messageVal) &&
+                      messageVal->IsString()) {
+                    v8::String::Utf8Value messageUtf8(isolate, messageVal);
+                    if (*messageUtf8) {
+                      errorMessage = std::string(*messageUtf8);
+                    }
+                  }
+
+                  // Get stack trace
+                  auto stackKey = tns::ToV8String(isolate, "stack");
+                  Local<Value> stackVal;
+                  if (errorObj->Get(context, stackKey).ToLocal(&stackVal) && stackVal->IsString()) {
+                    v8::String::Utf8Value stackUtf8(isolate, stackVal);
+                    if (*stackUtf8) {
+                      stackTrace = std::string(*stackUtf8);
+                      // Clean up the stack trace path
+                      stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
+                    }
+                  }
+                } else {
+                  // If reason is not an object, convert it to string
+                  Local<Context> context = isolate->GetCurrentContext();
+                  auto maybeReasonStr = reason->ToString(context);
+                  if (!maybeReasonStr.IsEmpty()) {
+                    v8::String::Utf8Value reasonUtf8(isolate, maybeReasonStr.ToLocalChecked());
+                    if (*reasonUtf8) {
+                      errorMessage = std::string(*reasonUtf8);
+                    }
+                  }
+                }
+
+                // Log the extracted error information
+                Log(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
+                // Reverted: do not remap before logging/displaying
+                if (!stackTrace.empty()) {
+                  Log(@"JavaScript stack trace:\n%s", stackTrace.c_str());
+                }
+              }
+
+              // Also check if TryCatch caught anything
+              if (promiseTc.HasCaught()) {
+                tns::LogError(isolate, promiseTc);
+              }
+
+              Log(@"***** End stack trace - Fix to continue *****");
+
+              // Ensure we have a stack for the modal
+              if (stackTrace.empty()) {
+                stackTrace = tns::GetSmartStackTrace(isolate);
+              } else {
+                stackTrace = tns::RemapStackTraceIfAvailable(isolate, stackTrace);
+              }
+
+              NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
+
+              // In debug mode, don't throw any exceptions - just return empty value
+              return Local<Value>();
+            } else {
+              // Release mode - throw exceptions as before
+              if (!promiseTc.HasCaught()) {
+                Local<Value> reason = promise->Result();
+                isolate->ThrowException(reason);
+              }
+              throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
+            }
+          }
+          printf("LoadESModule: Promise resolved successfully\n");
+          break;
+        }
+
+        attempts++;
+        usleep(100);  // 0.1ms delay
+      }
+
+      if (attempts >= maxAttempts) {
+        printf("LoadESModule: Promise resolution timeout, continuing anyway\n");
+      }
+    }
+  }
+
+  // 7) Return the namespace
+  return module->GetModuleNamespace();
 }
 
 MaybeLocal<Value> ModuleInternal::RunScriptString(Isolate* isolate, Local<Context> context,
@@ -316,7 +1062,14 @@ MaybeLocal<Value> ModuleInternal::RunScriptString(Isolate* isolate, Local<Contex
   ScriptCompiler::CompileOptions options = ScriptCompiler::kNoCompileOptions;
   ScriptCompiler::Source source(tns::ToV8String(isolate, scriptString));
   TryCatch tc(isolate);
-  Local<Script> script = ScriptCompiler::Compile(context, &source, options).ToLocalChecked();
+
+  // Handle script compilation safely
+  Local<Script> script;
+  if (!ScriptCompiler::Compile(context, &source, options).ToLocal(&script)) {
+    // Compilation failed - return empty MaybeLocal to indicate failure
+    return MaybeLocal<Value>();
+  }
+
   MaybeLocal<Value> result = script->Run(context);
   return result;
 }
@@ -327,12 +1080,63 @@ void ModuleInternal::RunScript(Isolate* isolate, std::string script) {
   Local<Object> globalObject = context->Global();
   Local<Value> requireObj;
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
-  tns::Assert(success && requireObj->IsFunction(), isolate);
+  if (!success || !requireObj->IsFunction()) {
+    Log(@"Warning: Failed to get require function from global object in RunScript");
+    return;
+  }
   Local<Value> result;
   this->RunScriptString(isolate, context, script);
 }
 
-Local<v8::String> ModuleInternal::WrapModuleContent(Isolate* isolate, const std::string& path) {
+v8::Local<v8::String> ModuleInternal::WrapModuleContent(v8::Isolate* isolate,
+                                                        const std::string& path) {
+  // For classical scripts we wrap the source into the CommonJS factory function
+  // but for ES modules (".mjs") we must leave the source intact so that the
+  // V8 parser can recognise the "export"/"import" syntax. Wrapping an ES module
+  // in a function expression would turn those top-level keywords into syntax
+  // errors (e.g. `export *` → "Unexpected token '*'").
+
+  // Check if we're in a worker context
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  bool isWorkerContext = cache && cache->isWorker;
+
+  // Check if this is an .mjs file but NOT a .mjs.map file
+  if (IsESModule(path)) {
+    // Read raw text without wrapping.
+    std::string sourceText = tns::ReadText(path);
+
+    // For ES modules in worker context, we need to provide access to global objects
+    // since ES modules run in their own scope
+    if (isWorkerContext) {
+      // Prepend global declarations to make worker globals available in ES module scope
+      std::string globalDeclarations = "const self = globalThis.self || globalThis;\n"
+                                       "const postMessage = globalThis.postMessage;\n"
+                                       "const close = globalThis.close;\n"
+                                       "const importScripts = globalThis.importScripts;\n"
+                                       "const console = globalThis.console;\n"
+                                       "\n";
+
+      sourceText = globalDeclarations + sourceText;
+    }
+
+    return tns::ToV8String(isolate, sourceText);
+  }
+
+  // Check if this is the main application bundle (webpack-style IIFE)
+  // Main bundles typically end with "bundle.js" and are in the app root
+  std::string appPath = RuntimeConfig.ApplicationPath;
+  std::string bundlePath = appPath + "/bundle.js";
+
+  if (path == bundlePath) {
+    // Main application bundle should not be wrapped in CommonJS factory
+    // as it's typically a webpack-style IIFE that executes immediately
+    std::string sourceText = tns::ReadText(path);
+    return tns::ToV8String(isolate, sourceText);
+  }
+
+  // Worker .js files should use CommonJS wrapping like regular .js files
+  // This ensures proper runtime context and global object setup
+
   return tns::ReadModule(isolate, path);
 }
 
@@ -347,54 +1151,81 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
   BOOL isDirectory;
   BOOL exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
 
-  if (exists == YES && isDirectory == YES) {
-    NSString* jsFile = [fullPath stringByAppendingPathExtension:@"js"];
-    BOOL isDir;
-    if ([fileManager fileExistsAtPath:jsFile isDirectory:&isDir] && isDir == NO) {
-      return [jsFile UTF8String];
-    }
-  }
-
-  if (exists == NO) {
-    fullPath = [fullPath stringByAppendingPathExtension:@"js"];
-    exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
-  }
-
-  if (exists == NO) {
-    throw NativeScriptException("The specified module does not exist: " + moduleName);
-  }
-
-  if (isDirectory == NO) {
-    return [fullPath UTF8String];
-  }
-
-  // Try to resolve module from main entry in package.json
-  NSString* packageJson = [fullPath stringByAppendingPathComponent:@"package.json"];
-  bool error = false;
-  std::string entry = this->ResolvePathFromPackageJson([packageJson UTF8String], error);
-  if (error) {
-    throw NativeScriptException("Unable to locate main entry in " +
-                                std::string([packageJson UTF8String]));
-  }
-
-  if (!entry.empty()) {
-    fullPath = [NSString stringWithUTF8String:entry.c_str()];
-  }
-
-  exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
+  // If the exact path exists as a file (not directory), return it immediately
   if (exists == YES && isDirectory == NO) {
     return [fullPath UTF8String];
   }
 
-  if (exists == NO) {
-    fullPath = [fullPath stringByAppendingPathExtension:@"js"];
-  } else {
-    fullPath = [fullPath stringByAppendingPathComponent:@"index.js"];
+  // Priority 1: Check for file with .js extension
+  NSString* originalFullPath = fullPath;
+  NSString* jsPath = [fullPath stringByAppendingPathExtension:@"js"];
+  if ([fileManager fileExistsAtPath:jsPath isDirectory:&isDirectory] && isDirectory == NO) {
+    return [jsPath UTF8String];
   }
 
-  exists = [fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory];
+  // Priority 2: Check for file with .mjs extension
+  NSString* mjsPath = [originalFullPath stringByAppendingPathExtension:@"mjs"];
+  if ([fileManager fileExistsAtPath:mjsPath isDirectory:&isDirectory] && isDirectory == NO) {
+    return [mjsPath UTF8String];
+  }
+
+  // Priority 3: Only now check if it exists as a directory
+  if (exists == YES && isDirectory == YES) {
+    // For directories, check package.json first (Node.js always validates package.json if present)
+    NSString* packageJson = [fullPath stringByAppendingPathComponent:@"package.json"];
+    if ([fileManager fileExistsAtPath:packageJson]) {
+      bool error = false;
+      std::string entry = this->ResolvePathFromPackageJson([packageJson UTF8String], error);
+      if (error) {
+        throw NativeScriptException(
+            isolate, "Unable to locate main entry in " + std::string([packageJson UTF8String]),
+            "Error");
+      }
+
+      if (!entry.empty()) {
+        return entry;
+      }
+    }
+
+    // Fall back to index.js first, then index.mjs
+    NSString* indexJsPath = [fullPath stringByAppendingPathComponent:@"index.js"];
+    BOOL indexIsDir;
+    if ([fileManager fileExistsAtPath:indexJsPath isDirectory:&indexIsDir] && indexIsDir == NO) {
+      return [indexJsPath UTF8String];
+    }
+
+    NSString* indexMjsPath = [fullPath stringByAppendingPathComponent:@"index.mjs"];
+    if ([fileManager fileExistsAtPath:indexMjsPath isDirectory:&indexIsDir] && indexIsDir == NO) {
+      return [indexMjsPath UTF8String];
+    }
+  }
+
   if (exists == NO) {
-    throw NativeScriptException("The specified module does not exist: " + moduleName);
+    // Check if this looks like an optional module
+    if (IsLikelyOptionalModule(moduleName)) {
+      // Return empty string to indicate optional module not found
+      return std::string();
+    }
+
+    // Create a detailed error message with context
+    std::string errorMsg = "Module not found: '" + moduleName + "'";
+    errorMsg += "\n  Base directory: " + baseDir;
+    errorMsg += "\n  Attempted paths:";
+
+    // Show the original path attempt
+    NSString* originalPath =
+        [[baseDirStr stringByAppendingPathComponent:moduleNameStr] stringByStandardizingPath];
+    errorMsg += "\n    - " + std::string([originalPath UTF8String]);
+    errorMsg +=
+        "\n    - " + std::string([[originalPath stringByAppendingPathExtension:@"js"] UTF8String]);
+    errorMsg +=
+        "\n    - " + std::string([[originalPath stringByAppendingPathExtension:@"mjs"] UTF8String]);
+
+    throw NativeScriptException(isolate, errorMsg, "Error");
+  }
+
+  if (isDirectory == NO) {
+    return [fullPath UTF8String];
   }
 
   return [fullPath UTF8String];
@@ -424,22 +1255,128 @@ std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packag
 
   NSString* main = [dic objectForKey:@"main"];
   if (main == nil) {
-    return std::string();
+    main = @"index";  // Fallback to "index" if no main field found
   }
 
-  NSString* path = [[[packageJsonStr stringByDeletingLastPathComponent]
-      stringByAppendingPathComponent:main] stringByStandardizingPath];
-  exists = [fileManager fileExistsAtPath:path isDirectory:&isDirectory];
+  NSString* baseDir = [packageJsonStr stringByDeletingLastPathComponent];
+  NSString* basePath = [[baseDir stringByAppendingPathComponent:main] stringByStandardizingPath];
+
+  // Check if file exists as-is (but only if it's a file, not directory)
+  BOOL isFile;
+  if ([fileManager fileExistsAtPath:basePath isDirectory:&isFile] && isFile == NO) {
+    return std::string([basePath UTF8String]);
+  }
+  // Try with .js extension
+  else if ([fileManager fileExistsAtPath:[basePath stringByAppendingPathExtension:@"js"]
+                             isDirectory:&isFile] &&
+           isFile == NO) {
+    NSString* jsPath = [basePath stringByAppendingPathExtension:@"js"];
+    return std::string([jsPath UTF8String]);
+  }
+  // Try with .mjs extension
+  else if ([fileManager fileExistsAtPath:[basePath stringByAppendingPathExtension:@"mjs"]
+                             isDirectory:&isFile] &&
+           isFile == NO) {
+    NSString* mjsPath = [basePath stringByAppendingPathExtension:@"mjs"];
+    return std::string([mjsPath UTF8String]);
+  }
+
+  // Check if it's a directory and recurse
+  exists = [fileManager fileExistsAtPath:basePath isDirectory:&isDirectory];
 
   if (exists == YES && isDirectory == YES) {
-    packageJsonStr = [path stringByAppendingPathComponent:@"package.json"];
+    // First check for nested package.json
+    packageJsonStr = [basePath stringByAppendingPathComponent:@"package.json"];
     exists = [fileManager fileExistsAtPath:packageJsonStr isDirectory:&isDirectory];
     if (exists == YES && isDirectory == NO) {
       return this->ResolvePathFromPackageJson([packageJsonStr UTF8String], error);
     }
+
+    // If no package.json, fall back to index.js then index.mjs
+    NSString* indexJsPath = [basePath stringByAppendingPathComponent:@"index.js"];
+
+    if (tns::Exists([indexJsPath fileSystemRepresentation])) {
+      return std::string([indexJsPath UTF8String]);
+    }
+
+    NSString* indexMjsPath = [basePath stringByAppendingPathComponent:@"index.mjs"];
+
+    if (tns::Exists([indexMjsPath fileSystemRepresentation])) {
+      return std::string([indexMjsPath UTF8String]);
+    }
   }
 
-  return [path UTF8String];
+  // If none found, default to .js (let the loading system handle the error)
+  return std::string([[basePath stringByAppendingPathExtension:@"js"] UTF8String]);
+}
+
+Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,
+                                                      const std::string& moduleName,
+                                                      const std::string& cacheKey) {
+  Local<Context> context = isolate->GetCurrentContext();
+
+  // Create a module object with exports that throws when accessed
+  Local<Object> moduleObj = Object::New(isolate);
+
+  // Create a Proxy that throws an error when any property is accessed
+  std::string errorMessage =
+      "Module '" + moduleName + "' is not available. This is an optional module.";
+  std::string proxyCode = "(function() {"
+                          "  const error = new Error('" +
+                          errorMessage +
+                          "');"
+                          "  return new Proxy({}, {"
+                          "    get: function(target, prop) {"
+                          "      throw error;"
+                          "    },"
+                          "    set: function(target, prop, value) {"
+                          "      throw error;"
+                          "    },"
+                          "    has: function(target, prop) {"
+                          "      return false;"
+                          "    },"
+                          "    ownKeys: function(target) {"
+                          "      return [];"
+                          "    },"
+                          "    getPrototypeOf: function(target) {"
+                          "      return null;"
+                          "    }"
+                          "  });"
+                          "})()";
+
+  Local<Script> proxyScript;
+  if (Script::Compile(context, tns::ToV8String(isolate, proxyCode.c_str())).ToLocal(&proxyScript)) {
+    Local<Value> proxyObject;
+    if (proxyScript->Run(context).ToLocal(&proxyObject)) {
+      // Set the exports to the proxy object
+      bool success = moduleObj->Set(context, tns::ToV8String(isolate, "exports"), proxyObject)
+                         .FromMaybe(false);
+      if (!success) {
+        Log(@"Warning: Failed to set exports property on proxy module object");
+      }
+    }
+  }
+
+  // Set up the module object
+  bool success = moduleObj
+                     ->Set(context, tns::ToV8String(isolate, "id"),
+                           tns::ToV8String(isolate, moduleName.c_str()))
+                     .FromMaybe(false);
+  if (!success) {
+    Log(@"Warning: Failed to set id property on module object");
+  }
+
+  success =
+      moduleObj->Set(context, tns::ToV8String(isolate, "loaded"), v8::Boolean::New(isolate, true))
+          .FromMaybe(false);
+  if (!success) {
+    Log(@"Warning: Failed to set loaded property on module object");
+  }
+
+  // Cache the placeholder module
+  this->loadedModules_[cacheKey] = std::make_shared<Persistent<Object>>(isolate, moduleObj);
+
+  return moduleObj;
 }
 
 ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& path) {
@@ -448,7 +1385,7 @@ ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& p
   }
 
   long length = 0;
-  std::string cachePath = GetCacheFileName(path + ".cache");
+  std::string cachePath = ModuleInternal::GetCacheFileName(path + ".cache");
 
   struct stat result;
   if (stat(cachePath.c_str(), &result) == 0) {
@@ -474,6 +1411,33 @@ ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& p
       isNew ? ScriptCompiler::CachedData::BufferOwned : ScriptCompiler::CachedData::BufferNotOwned);
 }
 
+void ModuleInternal::SaveScriptCache(const ScriptCompiler::CachedData* cache,
+                                     const std::string& path) {
+  std::string cachePath = ModuleInternal::GetCacheFileName(path + ".cache");
+
+  // std::ofstream ofs(cachePath, std::ios::binary);
+  // if (!ofs) return;  // or throw
+
+  // ofs.write(reinterpret_cast<const char*>(cache->data),
+  //           cache->length);
+  // ofs.close();
+
+  int length = cache->length;
+  tns::WriteBinary(cachePath, cache->data, length);
+  delete cache;
+
+  // make sure cache and js file have the same modification date
+  struct stat result;
+  struct utimbuf new_times;
+  new_times.actime = time(nullptr);
+  new_times.modtime = time(nullptr);
+  if (stat(path.c_str(), &result) == 0) {
+    auto jsLastModifiedTime = result.st_mtime;
+    new_times.modtime = jsLastModifiedTime;
+  }
+  utime(cachePath.c_str(), &new_times);
+}
+
 void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::string& path) {
   if (RuntimeConfig.IsDebug) {
     return;
@@ -484,7 +1448,7 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
   ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
 
   int length = cachedData->length;
-  std::string cachePath = GetCacheFileName(path + ".cache");
+  std::string cachePath = ModuleInternal::GetCacheFileName(path + ".cache");
   tns::WriteBinary(cachePath, cachedData->data, length);
   delete cachedData;
 

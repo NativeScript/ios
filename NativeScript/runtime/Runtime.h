@@ -48,6 +48,11 @@ class Runtime {
 
   static id GetAppConfigValue(std::string key);
 
+  // Convenience accessor for whether to show the JS error display UI.
+  // Reads the boolean `showErrorDisplay` from the nativescript.config (aka,
+  // bundled package.json). Defaults to false when not present.
+  static bool showErrorDisplay();
+
   static bool IsAlive(const v8::Isolate* isolate);
 
  private:

@@ -8,6 +8,7 @@
 #include "V8Runtime.h"
 
 #include "runtime/Runtime.h"
+#include "runtime/Helpers.h"
 #include "v8.h"
 
 // #include <glog/logging.h>
@@ -293,8 +294,10 @@ void V8Runtime::ReportException(v8::Isolate* isolate,
     if (tryCatch->StackTrace(context).ToLocal(&stackTraceString) &&
         stackTraceString->IsString() &&
         v8::Local<v8::String>::Cast(stackTraceString)->Length() > 0) {
-      v8::String::Utf8Value stackTrace(isolate, stackTraceString);
-      ss << JSIV8ValueConverter::ToSTLString(stackTrace) << std::endl;
+  v8::String::Utf8Value stackTrace(isolate, stackTraceString);
+  std::string stlStack = JSIV8ValueConverter::ToSTLString(stackTrace);
+  // Reverted: do not remap stack here
+  ss << stlStack << std::endl;
     }
 
     throw jsi::JSError(const_cast<V8Runtime&>(*this), ss.str());

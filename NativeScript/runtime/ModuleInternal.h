@@ -11,6 +11,8 @@ class ModuleInternal {
   ModuleInternal(v8::Local<v8::Context> context);
   bool RunModule(v8::Isolate* isolate, std::string path);
   void RunScript(v8::Isolate* isolate, std::string script);
+  static v8::Local<v8::Value> LoadScript(v8::Isolate* isolate,
+                                         const std::string& path);
 
  private:
   static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -19,10 +21,15 @@ class ModuleInternal {
   v8::Local<v8::Object> LoadImpl(v8::Isolate* isolate,
                                  const std::string& moduleName,
                                  const std::string& baseDir, bool& isData);
-  v8::Local<v8::Script> LoadScript(v8::Isolate* isolate,
-                                   const std::string& path);
-  v8::Local<v8::String> WrapModuleContent(v8::Isolate* isolate,
-                                          const std::string& path);
+  // Compile (and cache) a classic script; returns the compiled Script handle.
+  static v8::Local<v8::Script> LoadClassicScript(v8::Isolate* isolate,
+                                                 const std::string& path);
+
+  // Compile/link/evaluate an ES module; returns its namespace object.
+  static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate,
+                                           const std::string& path);
+  static v8::Local<v8::String> WrapModuleContent(v8::Isolate* isolate,
+                                                 const std::string& path);
   v8::Local<v8::Object> LoadModule(v8::Isolate* isolate,
                                    const std::string& modulePath,
                                    const std::string& cacheKey);
@@ -32,10 +39,16 @@ class ModuleInternal {
                           const std::string& moduleName);
   std::string ResolvePathFromPackageJson(const std::string& packageJson,
                                          bool& error);
-  v8::ScriptCompiler::CachedData* LoadScriptCache(const std::string& path);
-  void SaveScriptCache(const v8::Local<v8::Script> script,
-                       const std::string& path);
-  std::string GetCacheFileName(const std::string& path);
+  v8::Local<v8::Object> CreatePlaceholderModule(v8::Isolate* isolate,
+                                                const std::string& moduleName,
+                                                const std::string& cacheKey);
+  static v8::ScriptCompiler::CachedData* LoadScriptCache(
+      const std::string& path);
+  static void SaveScriptCache(const v8::Local<v8::Script> script,
+                              const std::string& path);
+  static void SaveScriptCache(const v8::ScriptCompiler::CachedData* cache,
+                              const std::string& path);
+  static std::string GetCacheFileName(const std::string& path);
   v8::MaybeLocal<v8::Value> RunScriptString(v8::Isolate* isolate,
                                             v8::Local<v8::Context> context,
                                             const std::string script);

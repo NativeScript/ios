@@ -333,6 +333,17 @@ const std::string BuildStacktraceFrameMessage(v8::Isolate* isolate,
 const std::string GetStackTrace(v8::Isolate* isolate);
 const std::string GetCurrentScriptUrl(v8::Isolate* isolate);
 
+// Returns stack trace string remapped to original sources using global __ns_remapStack if present.
+std::string RemapStackTraceIfAvailable(v8::Isolate* isolate, const std::string& stackTrace);
+
+// Smart stack extraction that prefers:
+// 1) exception.stack if provided
+// 2) TryCatch.StackTrace / Message()->GetStackTrace when TryCatch provided
+// 3) Current stack via GetStackTrace
+std::string GetSmartStackTrace(v8::Isolate* isolate,
+                               v8::TryCatch* tryCatch = nullptr,
+                               v8::Local<v8::Value> exception = v8::Local<v8::Value>());
+
 bool LiveSync(v8::Isolate* isolate);
 
 void Assert(bool condition, v8::Isolate* isolate = nullptr,

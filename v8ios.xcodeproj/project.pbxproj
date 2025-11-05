@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */; };
 		2B5088A72BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
-		2B5088A82BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
 		2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE22052AC1C93100307752 /* metadata-arm64.bin */; };
@@ -50,6 +49,8 @@
 		9160C065291ED41F000641C0 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 9160C064291ED41F000641C0 /* SpinLock.h */; };
 		91B25A0A29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */; };
 		91B25A0B29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = 91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */; };
+		AA8C47B12E27114300649BF5 /* ModuleInternalCallbacks.h in Headers */ = {isa = PBXBuildFile; fileRef = AA8C47AF2E27114300649BF5 /* ModuleInternalCallbacks.h */; };
+		AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */ = {isa = PBXBuildFile; fileRef = AA8C47B02E27114300649BF5 /* ModuleInternalCallbacks.mm */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
 		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */; };
@@ -485,6 +486,8 @@
 		9160C064291ED41F000641C0 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SpinLock.h; path = NativeScript/runtime/SpinLock.h; sourceTree = "<group>"; };
 		91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = "ns-v8-tracing-agent-impl.mm"; sourceTree = "<group>"; };
 		91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ns-v8-tracing-agent-impl.h"; sourceTree = "<group>"; };
+		AA8C47AF2E27114300649BF5 /* ModuleInternalCallbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ModuleInternalCallbacks.h; sourceTree = "<group>"; };
+		AA8C47B02E27114300649BF5 /* ModuleInternalCallbacks.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ModuleInternalCallbacks.mm; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
 		C20525A72577D86600C12A5C /* TNSWidgets.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = TNSWidgets.xcframework; sourceTree = "<group>"; };
 		C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OneByteStringResource.cpp; sourceTree = "<group>"; };
@@ -1431,6 +1434,8 @@
 				C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */,
 				C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */,
 				C2DDEB89229EAC8300345BFE /* ModuleInternal.h */,
+				AA8C47AF2E27114300649BF5 /* ModuleInternalCallbacks.h */,
+				AA8C47B02E27114300649BF5 /* ModuleInternalCallbacks.mm */,
 				C2DDEB81229EAC8200345BFE /* ModuleInternal.mm */,
 				2B7EA6AE2353477000E5184E /* NativeScriptException.h */,
 				2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */,
@@ -1626,6 +1631,7 @@
 				C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */,
 				C247C16822F82842001D2CA2 /* libplatform-export.h in Headers */,
 				F1F30E762B58FC74006A62C0 /* URLSearchParamsImpl.h in Headers */,
+				AA8C47B12E27114300649BF5 /* ModuleInternalCallbacks.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
 				6573B9ED291FE5B700B0ED7C /* JSIRuntime.h in Headers */,
 				C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */,
@@ -2189,6 +2195,7 @@
 				6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */,
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
+				AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
 				F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,

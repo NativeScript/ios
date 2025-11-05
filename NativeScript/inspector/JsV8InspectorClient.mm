@@ -12,6 +12,7 @@
 #include "Helpers.h"
 #include "InspectorServer.h"
 #include "JsV8InspectorClient.h"
+#include "RuntimeConfig.h"
 #include "include/libplatform/libplatform.h"
 #include "utils.h"
 
@@ -392,7 +393,26 @@ void JsV8InspectorClient::registerModules() {
   {
     v8::Locker locker(isolate);
     TryCatch tc(isolate);
-    runtime_->RunModule("inspector_modules");
+
+    // Check for ES module (.mjs) first, then fallback to CommonJS (.js)
+    NSString* appPath = [NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()];
+    NSString* mjsPath =
+        [[appPath stringByAppendingPathComponent:@"tns_modules/inspector_modules.mjs"]
+            stringByStandardizingPath];
+    NSString* jsPath = [[appPath stringByAppendingPathComponent:@"tns_modules/inspector_modules.js"]
+        stringByStandardizingPath];
+
+    std::string modulePath;
+    if ([[NSFileManager defaultManager] fileExistsAtPath:mjsPath]) {
+      modulePath = [mjsPath UTF8String];
+    } else if ([[NSFileManager defaultManager] fileExistsAtPath:jsPath]) {
+      modulePath = [jsPath UTF8String];
+    } else {
+      // No inspector modules found, skip loading
+      return;
+    }
+
+    runtime_->RunModule(modulePath);
     // FIXME: This triggers some DCHECK failures, due to the entered v8::Context in
     // Runtime::init().
   }

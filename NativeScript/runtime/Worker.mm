@@ -1,323 +1,420 @@
-#include <functional>
-#include "ObjectManager.h"
-#include "NativeScriptException.h"
 #include "Worker.h"
+#include <functional>
 #include "Caches.h"
-#include "Helpers.h"
-#include "Runtime.h"
 #include "Constants.h"
+#include "Helpers.h"
 #include "ModuleBinding.hpp"
+#include "NativeScriptException.h"
+#include "ObjectManager.h"
+#include "Runtime.h"
+#include "RuntimeConfig.h"
 
 using namespace v8;
 
 namespace tns {
 
-std::vector<std::string> Worker::GlobalFunctions = {
-    "postMessage",
-    "close"
-};
+std::vector<std::string> Worker::GlobalFunctions = {"postMessage", "close"};
 
 void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
-    Worker::Init(isolate, globalTemplate, Caches::Get(isolate)->isWorker);
+  Worker::Init(isolate, globalTemplate, Caches::Get(isolate)->isWorker);
 }
 
 void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool isWorkerThread) {
-    if (isWorkerThread) {
-        // Register functions in the worker thread
-        Local<FunctionTemplate> postMessageTemplate = FunctionTemplate::New(isolate, Worker::PostMessageToMainCallback);
-        globalTemplate->Set(tns::ToV8String(isolate, "postMessage"), postMessageTemplate);
+  if (isWorkerThread) {
+    // Register functions in the worker thread
+    Local<FunctionTemplate> postMessageTemplate =
+        FunctionTemplate::New(isolate, Worker::PostMessageToMainCallback);
+    globalTemplate->Set(tns::ToV8String(isolate, "postMessage"), postMessageTemplate);
 
-        Local<FunctionTemplate> closeTemplate = FunctionTemplate::New(isolate, Worker::CloseWorkerCallback);
-        globalTemplate->Set(tns::ToV8String(isolate, "close"), closeTemplate);
-    }
-    // Register functions in the main thread
-    Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback);
-    workerFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-    Local<v8::String> workerFuncName = ToV8String(isolate, "Worker");
-    workerFuncTemplate->SetClassName(workerFuncName);
+    Local<FunctionTemplate> closeTemplate =
+        FunctionTemplate::New(isolate, Worker::CloseWorkerCallback);
+    globalTemplate->Set(tns::ToV8String(isolate, "close"), closeTemplate);
+  }
+  // Register functions in the main thread
+  Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback);
+  workerFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+  Local<v8::String> workerFuncName = ToV8String(isolate, "Worker");
+  workerFuncTemplate->SetClassName(workerFuncName);
 
-    Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
-    Local<FunctionTemplate> postMessageFuncTemplate = FunctionTemplate::New(isolate, PostMessageCallback);
-    Local<FunctionTemplate> terminateWorkerFuncTemplate = FunctionTemplate::New(isolate, TerminateCallback);
+  Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
+  Local<FunctionTemplate> postMessageFuncTemplate =
+      FunctionTemplate::New(isolate, PostMessageCallback);
+  Local<FunctionTemplate> terminateWorkerFuncTemplate =
+      FunctionTemplate::New(isolate, TerminateCallback);
 
-    prototype->Set(ToV8String(isolate, "postMessage"), postMessageFuncTemplate);
-    prototype->Set(ToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
+  prototype->Set(ToV8String(isolate, "postMessage"), postMessageFuncTemplate);
+  prototype->Set(ToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
 
-    globalTemplate->Set(workerFuncName, workerFuncTemplate);
-
+  globalTemplate->Set(workerFuncName, workerFuncTemplate);
 }
 
 void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    try {
-        if (!info.IsConstructCall()) {
-            throw NativeScriptException("Worker function must be called as a constructor.");
-        }
-
-        if (info.Length() < 1) {
-            throw NativeScriptException("Not enough arguments.");
-        }
-
-        if (info.Length() > 1) {
-            throw NativeScriptException("Too many arguments passed.");
-        }
-
-        if (!tns::IsString(info[0])) {
-            throw NativeScriptException("Worker function must be called as a constructor.");
-        }
-
-        Local<Object> thiz = info.This();
-        std::string workerPath = ToString(isolate, info[0]);
-        // TODO: Validate worker path and call worker.onerror if the script does not exist
-
-        WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
-        tns::SetValue(isolate, thiz, worker);
-        std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(context, thiz);
-
-        std::function<Isolate* ()> func([worker, workerPath]() {
-            tns::Runtime* runtime = new tns::Runtime();
-            Isolate* isolate = runtime->CreateIsolate();
-            v8::Locker locker(isolate);
-            runtime->Init(isolate, true);
-            runtime->SetWorkerId(worker->WorkerId());
-            int workerId = worker->WorkerId();
-            Worker::SetWorkerId(isolate, workerId);
-
-            TryCatch tc(isolate);
-            runtime->RunModule(workerPath);
-            if (tc.HasCaught()) {
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                Local<Context> context = Caches::Get(isolate)->GetContext();
-                worker->PassUncaughtExceptionFromWorkerToMain(context, tc, false);
-                worker->Terminate();
-            }
-
-            return isolate;
-        });
-
-        worker->Start(poWorker, func);
-
-        std::shared_ptr<Caches::WorkerState> state = std::make_shared<Caches::WorkerState>(isolate, poWorker, worker);
-        int workerId = worker->Id();
-        Caches::Workers->Insert(workerId, state);
-    } catch (NativeScriptException& ex) {
-        ex.ReThrowToV8(isolate);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  try {
+    if (!info.IsConstructCall()) {
+      throw NativeScriptException("Worker function must be called as a constructor.");
     }
+
+    if (info.Length() < 1) {
+      throw NativeScriptException("Not enough arguments.");
+    }
+
+    if (info.Length() > 2) {
+      throw NativeScriptException("Too many arguments passed.");
+    }
+
+    Local<Object> thiz = info.This();
+    std::string workerPath;
+
+    // Handle both string URLs and URL objects
+    if (IsString(info[0])) {
+      workerPath = ToString(isolate, info[0]);
+    } else if (info[0]->IsObject()) {
+      Local<Object> urlObj = info[0].As<Object>();
+      Local<Value> toStringMethod;
+      if (urlObj->Get(context, tns::ToV8String(isolate, "toString")).ToLocal(&toStringMethod)) {
+        if (toStringMethod->IsFunction()) {
+          Local<v8::Function> toString = toStringMethod.As<v8::Function>();
+          Local<Value> result;
+          if (toString->Call(context, urlObj, 0, nullptr).ToLocal(&result)) {
+            if (result->IsString()) {
+              std::string stringResult = ToString(isolate, result);
+              // Reject plain objects that return "[object Object]" from toString()
+              if (stringResult == "[object Object]") {
+                throw NativeScriptException(
+                    "Worker constructor expects a string URL or URL object.");
+              }
+              workerPath = stringResult;
+            } else {
+              throw NativeScriptException("Worker URL object toString() must return a string.");
+            }
+          } else {
+            throw NativeScriptException("Error calling toString() on Worker URL object.");
+          }
+        } else {
+          throw NativeScriptException("Worker URL object must have a toString() method.");
+        }
+      } else {
+        throw NativeScriptException("Worker URL object must have a toString() method.");
+      }
+    } else {
+      throw NativeScriptException("Worker constructor expects a string URL or URL object.");
+    }
+
+    // TODO: Handle options parameter (info[1]) if provided
+    // For now, we ignore the options parameter to maintain compatibility
+    // TODO: Validate worker path and call worker.onerror if the script does not exist
+
+    WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
+    tns::SetValue(isolate, thiz, worker);
+    std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(context, thiz);
+
+    std::function<Isolate*()> func([worker, workerPath]() {
+      // Resolve tilde paths before creating the runtime
+      std::string resolvedPath = workerPath;
+      if (!workerPath.empty() && workerPath[0] == '~') {
+        // Convert ~/path to ApplicationPath/path
+        std::string tail = workerPath.size() >= 2 && workerPath[1] == '/' ? workerPath.substr(2)
+                                                                          : workerPath.substr(1);
+        resolvedPath = RuntimeConfig.ApplicationPath + "/" + tail;
+      }
+
+      tns::Runtime* runtime = new tns::Runtime();
+      Isolate* isolate = runtime->CreateIsolate();
+      v8::Locker locker(isolate);
+      runtime->Init(isolate, true);
+      runtime->SetWorkerId(worker->WorkerId());
+      int workerId = worker->WorkerId();
+      Worker::SetWorkerId(isolate, workerId);
+
+      TryCatch tc(isolate);
+
+      // Debug: Log worker execution
+      // printf("Worker: About to run module: %s\n", resolvedPath.c_str());
+
+      // Debug: Check if console exists in worker context
+      //      {
+      //        HandleScope debugScope(isolate);
+      //        Local<Context> workerContext = Caches::Get(isolate)->GetContext();
+      //        Local<Object> global = workerContext->Global();
+      //         if (global->Has(workerContext, tns::ToV8String(isolate,
+      //         "console")).FromMaybe(false)) {
+      //           printf("Worker: console object exists in worker context\n");
+      //         } else {
+      //           printf("Worker: console object NOT found in worker context\n");
+      //         }
+      //      }
+
+      runtime->RunModule(resolvedPath);
+
+      // If in debug mode the module loader may have set the global jsErrorOccurred
+      // flag and returned gracefully. In that case create an error payload and
+      // pass it to the main thread so that `worker.onerror` can be invoked.
+      extern bool jsErrorOccurred;
+      if (RuntimeConfig.IsDebug && jsErrorOccurred) {
+        // Construct a minimal error payload to match TryCatch extraction
+        std::string message = "Script compilation failed";
+        std::string src = resolvedPath;
+        std::string stackTrace = "";
+        int lineNumber = 1;
+         // Dispatch asynchronously so the main thread can attach handlers
+         worker->PassUncaughtExceptionFromWorkerToMain(message, src, stackTrace, lineNumber, true);
+            // Clear the global flag to avoid duplicate reporting
+            jsErrorOccurred = false;
+          }
+
+      if (tc.HasCaught()) {
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        Local<Context> context = Caches::Get(isolate)->GetContext();
+
+        // Debug: Log the error
+        // printf("Worker: Error occurred while running module\n");
+        Local<Value> exception = tc.Exception();
+        if (!exception.IsEmpty()) {
+          v8::String::Utf8Value error_str(isolate, exception);
+          // printf("Worker: Exception: %s\n", *error_str);
+        }
+
+  // Ensure we dispatch the error asynchronously to the main thread so
+  // the caller has a chance to attach `worker.onerror` immediately
+  // after construction. Delivering synchronously can race with the
+  // test which sets the handler right after `new Worker(...)`.
+  worker->PassUncaughtExceptionFromWorkerToMain(context, tc, true);
+        worker->Terminate();
+      }
+
+      return isolate;
+    });
+
+    worker->Start(poWorker, func);
+
+    std::shared_ptr<Caches::WorkerState> state =
+        std::make_shared<Caches::WorkerState>(isolate, poWorker, worker);
+    int workerId = worker->Id();
+    Caches::Workers->Insert(workerId, state);
+  } catch (NativeScriptException& ex) {
+    ex.ReThrowToV8(isolate);
+  }
 }
 
 void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) {
-    // Send message from worker to main
-    Isolate* isolate = info.GetIsolate();
+  // Send message from worker to main
+  Isolate* isolate = info.GetIsolate();
 
-    try {
-        if (info.Length() < 1) {
-            throw NativeScriptException("Not enough arguments.");
-        }
-        
-        if (info.Length() > 1) {
-            throw NativeScriptException("Too many arguments passed.");
-        }
-        
-        int workerId = Worker::GetWorkerId(isolate, info.This());
-        std::shared_ptr<Caches::WorkerState> state = Caches::Workers->Get(workerId);
-        tns::Assert(state != nullptr, isolate);
-        WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
-        if (!worker->IsRunning()) {
-            return;
-        }
-        
-//        Local<Value> error;
-//        Local<Value> result = Worker::Serialize(isolate, info[0], error);
-//        if (result.IsEmpty()) {
-//            isolate->ThrowException(error);
-//            return;
-//        }
-        
-        auto context = Caches::Get(isolate)->GetContext();
-        auto message = std::make_shared<worker::Message>();
-        Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-        Local<Object> obj;
-        bool success = objTemplate->NewInstance(context).ToLocal(&obj);
-        tns::Assert(success, isolate);
-
-        success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
-        tns::Assert(success, isolate);
-        
-        message->Serialize(isolate, context, obj);
-        // std::string message = tns::ToString(isolate, result);
-        
-        auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
-        if (runtime == nullptr) {
-            return;
-        }
-        tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [state, message]() {
-            Isolate* isolate = state->GetIsolate();
-            v8::Locker locker(isolate);
-            Isolate::Scope isolate_scope(isolate);
-            HandleScope handle_scope(isolate);
-            Local<Value> workerInstance = state->GetWorker()->Get(isolate);
-            tns::Assert(!workerInstance.IsEmpty() && workerInstance->IsObject(), isolate);
-            Worker::OnMessageCallback(isolate, workerInstance, message);
-        });
-    } catch (NativeScriptException& ex) {
-        ex.ReThrowToV8(isolate);
-    }
-}
-
-void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
-    // Send message from main to worker
-    Isolate* isolate = info.GetIsolate();
-    try {
-        if (info.Length() < 1) {
-            throw NativeScriptException("Not enough arguments.");
-            return;
-        }
-
-        if (info.Length() > 1) {
-            throw NativeScriptException("Too many arguments passed.");
-            return;
-        }
-
-        BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-        tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker, isolate);
-
-        WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
-        if (!worker->IsRunning() || worker->IsClosing()) {
-            return;
-        }
-
-        Local<Value> error;
-        auto context = Caches::Get(isolate)->GetContext();
-        auto message = std::make_shared<worker::Message>();
-        Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-        Local<Object> obj;
-        bool success = objTemplate->NewInstance(context).ToLocal(&obj);
-        tns::Assert(success, isolate);
-
-        success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
-        tns::Assert(success, isolate);
-        
-        message->Serialize(isolate, context, obj);
-        
-         
-//        Local<Value> result = Worker::Serialize(isolate, info[0], error);
-//        if (result.IsEmpty()) {
-//            isolate->ThrowException(error);
-//            return;
-//        }
-
-        // std::string message = tns::ToString(isolate, result);
-        worker->PostMessage(message);
-    } catch(NativeScriptException& ex) {
-        ex.ReThrowToV8(isolate);
-    }
-}
-
-void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver, std::shared_ptr<worker::Message> message) {
-    Local<Context> context = Caches::Get(isolate)->GetContext();
-    Local<Value> onMessageValue;
-    bool success = receiver.As<Object>()->Get(context, tns::ToV8String(isolate, "onmessage")).ToLocal(&onMessageValue);
-    tns::Assert(success, isolate);
-
-    if (!onMessageValue->IsFunction()) {
-        return;
+  try {
+    if (info.Length() < 1) {
+      throw NativeScriptException("Not enough arguments.");
     }
 
-    Local<v8::Function> onMessageFunc = onMessageValue.As<v8::Function>();
-    Local<Value> result;
-
-    Local<Value> arg;
-//    TryCatch tc(isolate);
-    if(!message->Deserialize(isolate, context).ToLocal(&arg)) {
-//        tc.ReThrow();
-        return;
+    if (info.Length() > 1) {
+      throw NativeScriptException("Too many arguments passed.");
     }
 
-    Local<Value> args[1] { arg };
-    success = onMessageFunc->Call(context, receiver, 1, args).ToLocal(&result);
-}
-
-void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
-    Isolate* isolate = info.GetIsolate();
     int workerId = Worker::GetWorkerId(isolate, info.This());
     std::shared_ptr<Caches::WorkerState> state = Caches::Workers->Get(workerId);
     tns::Assert(state != nullptr, isolate);
     WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
-
-    if (!worker->IsRunning() || worker->IsClosing()) {
-        return;
+    if (!worker->IsRunning()) {
+      return;
     }
 
-    worker->Close();
+    //        Local<Value> error;
+    //        Local<Value> result = Worker::Serialize(isolate, info[0], error);
+    //        if (result.IsEmpty()) {
+    //            isolate->ThrowException(error);
+    //            return;
+    //        }
 
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> global = context->Global();
-    Local<Value> onCloseVal;
-    bool success = global->Get(context, tns::ToV8String(isolate, "onclose")).ToLocal(&onCloseVal);
-    tns::Assert(success, isolate);
-    if (!onCloseVal.IsEmpty() && onCloseVal->IsFunction()) {
-        Local<v8::Function> onCloseFunc = onCloseVal.As<v8::Function>();
-        Local<Value> args[0] { };
-        Local<Value> result;
-        TryCatch tc(isolate);
-        success = onCloseFunc->Call(context, v8::Undefined(isolate), 0, args).ToLocal(&result);
-        if (!success && tc.HasCaught()) {
-            worker->CallOnErrorHandlers(tc);
-        }
-    }
-}
-
-void Worker::TerminateCallback(const FunctionCallbackInfo<Value>& info) {
-    Isolate* isolate = info.GetIsolate();
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-    tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker, isolate);
-
-    WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
-    worker->Terminate();
-}
-
-Local<v8::String> Worker::Serialize(Isolate* isolate, Local<Value> value, Local<Value>& error) {
-    Local<Context> context = isolate->GetCurrentContext();
+    auto context = Caches::Get(isolate)->GetContext();
+    auto message = std::make_shared<worker::Message>();
     Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-
     Local<Object> obj;
     bool success = objTemplate->NewInstance(context).ToLocal(&obj);
     tns::Assert(success, isolate);
 
-    success = obj->Set(context, tns::ToV8String(isolate, "data"), value).FromMaybe(false);
+    success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
     tns::Assert(success, isolate);
 
-    Local<Value> result;
-    TryCatch tc(isolate);
-    success = v8::JSON::Stringify(context, obj).ToLocal(&result);
-    if (!success && tc.HasCaught()) {
-        error = tc.Exception();
-        return Local<v8::String>();
+    message->Serialize(isolate, context, obj);
+    // std::string message = tns::ToString(isolate, result);
+
+    auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
+    if (runtime == nullptr) {
+      return;
+    }
+    tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [state, message]() {
+      Isolate* isolate = state->GetIsolate();
+      v8::Locker locker(isolate);
+      Isolate::Scope isolate_scope(isolate);
+      HandleScope handle_scope(isolate);
+      Local<Value> workerInstance = state->GetWorker()->Get(isolate);
+      tns::Assert(!workerInstance.IsEmpty() && workerInstance->IsObject(), isolate);
+      Worker::OnMessageCallback(isolate, workerInstance, message);
+    });
+  } catch (NativeScriptException& ex) {
+    ex.ReThrowToV8(isolate);
+  }
+}
+
+void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
+  // Send message from main to worker
+  Isolate* isolate = info.GetIsolate();
+  try {
+    if (info.Length() < 1) {
+      throw NativeScriptException("Not enough arguments.");
+      return;
     }
 
+    if (info.Length() > 1) {
+      throw NativeScriptException("Too many arguments passed.");
+      return;
+    }
+
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
+    tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker, isolate);
+
+    WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
+    if (!worker->IsRunning() || worker->IsClosing()) {
+      return;
+    }
+
+    Local<Value> error;
+    auto context = Caches::Get(isolate)->GetContext();
+    auto message = std::make_shared<worker::Message>();
+    Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
+    Local<Object> obj;
+    bool success = objTemplate->NewInstance(context).ToLocal(&obj);
     tns::Assert(success, isolate);
 
-    return result.As<v8::String>();
+    success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
+    tns::Assert(success, isolate);
+
+    message->Serialize(isolate, context, obj);
+
+    //        Local<Value> result = Worker::Serialize(isolate, info[0], error);
+    //        if (result.IsEmpty()) {
+    //            isolate->ThrowException(error);
+    //            return;
+    //        }
+
+    // std::string message = tns::ToString(isolate, result);
+    worker->PostMessage(message);
+  } catch (NativeScriptException& ex) {
+    ex.ReThrowToV8(isolate);
+  }
+}
+
+void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver,
+                               std::shared_ptr<worker::Message> message) {
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Local<Value> onMessageValue;
+  bool success = receiver.As<Object>()
+                     ->Get(context, tns::ToV8String(isolate, "onmessage"))
+                     .ToLocal(&onMessageValue);
+  tns::Assert(success, isolate);
+
+  if (!onMessageValue->IsFunction()) {
+    return;
+  }
+
+  Local<v8::Function> onMessageFunc = onMessageValue.As<v8::Function>();
+  Local<Value> result;
+
+  Local<Value> arg;
+  //    TryCatch tc(isolate);
+  if (!message->Deserialize(isolate, context).ToLocal(&arg)) {
+    //        tc.ReThrow();
+    return;
+  }
+
+  Local<Value> args[1]{arg};
+  success = onMessageFunc->Call(context, receiver, 1, args).ToLocal(&result);
+}
+
+void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  int workerId = Worker::GetWorkerId(isolate, info.This());
+  std::shared_ptr<Caches::WorkerState> state = Caches::Workers->Get(workerId);
+  tns::Assert(state != nullptr, isolate);
+  WorkerWrapper* worker = static_cast<WorkerWrapper*>(state->UserData());
+
+  if (!worker->IsRunning() || worker->IsClosing()) {
+    return;
+  }
+
+  worker->Close();
+
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> global = context->Global();
+  Local<Value> onCloseVal;
+  bool success = global->Get(context, tns::ToV8String(isolate, "onclose")).ToLocal(&onCloseVal);
+  tns::Assert(success, isolate);
+  if (!onCloseVal.IsEmpty() && onCloseVal->IsFunction()) {
+    Local<v8::Function> onCloseFunc = onCloseVal.As<v8::Function>();
+    Local<Value> args[0]{};
+    Local<Value> result;
+    TryCatch tc(isolate);
+    success = onCloseFunc->Call(context, v8::Undefined(isolate), 0, args).ToLocal(&result);
+    if (!success && tc.HasCaught()) {
+      worker->CallOnErrorHandlers(tc);
+    }
+  }
+}
+
+void Worker::TerminateCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
+  tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Worker, isolate);
+
+  WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
+  worker->Terminate();
+}
+
+Local<v8::String> Worker::Serialize(Isolate* isolate, Local<Value> value, Local<Value>& error) {
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
+
+  Local<Object> obj;
+  bool success = objTemplate->NewInstance(context).ToLocal(&obj);
+  tns::Assert(success, isolate);
+
+  success = obj->Set(context, tns::ToV8String(isolate, "data"), value).FromMaybe(false);
+  tns::Assert(success, isolate);
+
+  Local<Value> result;
+  TryCatch tc(isolate);
+  success = v8::JSON::Stringify(context, obj).ToLocal(&result);
+  if (!success && tc.HasCaught()) {
+    error = tc.Exception();
+    return Local<v8::String>();
+  }
+
+  tns::Assert(success, isolate);
+
+  return result.As<v8::String>();
 }
 
 void Worker::SetWorkerId(Isolate* isolate, int workerId) {
-    HandleScope scope(isolate);
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> global = context->Global();
-    global->SetPrivate(context, Private::ForApi(isolate, tns::ToV8String(isolate, "workerId")), Number::New(isolate, workerId));
+  HandleScope scope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> global = context->Global();
+  global->SetPrivate(context, Private::ForApi(isolate, tns::ToV8String(isolate, "workerId")),
+                     Number::New(isolate, workerId));
 }
 
 int Worker::GetWorkerId(Isolate* isolate, Local<Object> global) {
-    Local<Value> value;
+  Local<Value> value;
 
-    Local<Context> context = isolate->GetCurrentContext();
-    bool success = global->GetPrivate(context, Private::ForApi(isolate, tns::ToV8String(isolate, "workerId"))).ToLocal(&value);
-    tns::Assert(success && value->IsNumber(), isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  bool success =
+      global->GetPrivate(context, Private::ForApi(isolate, tns::ToV8String(isolate, "workerId")))
+          .ToLocal(&value);
+  tns::Assert(success && value->IsNumber(), isolate);
 
-    Local<Number> number = value.As<Number>();
-    return number->Value();
+  Local<Number> number = value.As<Number>();
+  return number->Value();
 }
 
 }
