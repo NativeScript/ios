@@ -10,7 +10,6 @@ describe(module.id, function () {
     });
 
     it("ReferenceValue", function () {
-        __setRuntimeIsDebug(false);
         var reference = new interop.Reference();
         expect(reference.value).toBeUndefined();
         // In Debug mode, errors may be suppressed; accept both behaviors
@@ -39,8 +38,6 @@ describe(module.id, function () {
         expect(reference.value).toBe(10);
 
         expect(TNSGetOutput()).toBe('510');
-
-        __setRuntimeIsDebug(true);
     });
 
     it("LiveReference", function () {
