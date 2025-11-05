@@ -71,19 +71,6 @@ std::string ResolveMainEntryFromPackageJson(const std::string& baseDir) {
   }
 }
 
-// Test helper: allow toggling RuntimeConfig.IsDebug from JS during tests.
-// Usage from JS: __setRuntimeIsDebug(true|false)
-// This helps test cases where we want to test standard "release-like" thrown errors
-// In Debug mode, we gracefully handle errors so you can unit test either case by toggling this
-static void SetRuntimeIsDebug(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (args.Length() > 0) {
-    bool val = args[0]->ToBoolean(isolate)->Value();
-    RuntimeConfig.IsDebug = val;
-  }
-  args.GetReturnValue().Set(v8::Boolean::New(isolate, RuntimeConfig.IsDebug));
-}
-
 ModuleInternal::ModuleInternal(Local<Context> context) {
   std::string requireFactoryScript = "(function() { "
                                      "    function require_factory(requireInternal, dirName) { "
@@ -136,12 +123,6 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   if (!success) {
     Log(@"FATAL: Failed to set global require function");
   }
-
-  // Expose a small test-only helper to toggle debug mode from JS tests
-  // Helps testing debug vs release mode error handling within unit tests
-  v8::Local<v8::FunctionTemplate> setDebugTpl = v8::FunctionTemplate::New(isolate, SetRuntimeIsDebug);
-  v8::Local<v8::Function> setDebugFunc = setDebugTpl->GetFunction(context).ToLocalChecked();
-  global->Set(context, tns::ToV8String(isolate, "__setRuntimeIsDebug"), setDebugFunc).FromMaybe(false);
 }
 
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {

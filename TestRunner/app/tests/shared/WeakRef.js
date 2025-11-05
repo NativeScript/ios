@@ -13,21 +13,17 @@ describe("WeakRef", function () {
     });
 
     it("should throw when constructed with zero parameters", function () {
-        __setRuntimeIsDebug(false);
         expect(function () {
             new WeakRef();
         }).toThrow();
-        __setRuntimeIsDebug(true);
     });
 
     it("should throw when constructed with primitive parameters", function () {
-        __setRuntimeIsDebug(false);
         for (var primitive of [null, undefined, 0]) {
             expect(function () {
                 new WeakRef(primitive);
             }).toThrow();
         }
-        __setRuntimeIsDebug(true);
     });
 
     it("clear should exist", function () {
