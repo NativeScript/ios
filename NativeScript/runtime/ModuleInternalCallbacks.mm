@@ -1291,16 +1291,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         absPath = builtinPath;
       }
     } else if (IsLikelyOptionalModule(spec)) {
-      // In debug/test builds, surface a clear unresolved bare specifier error instead of
-      // synthesizing a placeholder module; more helpful signal during development.
-      if (RuntimeConfig.IsDebug) {
-        std::string msg = "Cannot resolve bare specifier '" + spec + "'";
-        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
-        return v8::MaybeLocal<v8::Module>();
-      }
-
-      // In release builds, create a placeholder that throws on use,
-      // so apps can guard optional imports without crashing at import time.
+      // Treat bare specifiers as optional modules by creating a placeholder ES module that
+      // throws on property access. This lets applications guard optional imports at runtime
+      // without crashing during startup, especially in development.
       std::string appPath = RuntimeConfig.ApplicationPath;
       std::string placeholderPath = NormalizePath(appPath + "/" + spec + ".mjs");
 
@@ -1330,10 +1323,16 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
           // File created successfully, now resolve it normally
           absPath = placeholderPath;
         } else {
-          // Failed to create file, fall back to throwing error
+          // Failed to create file. In debug, avoid throwing to keep dev sessions alive; in release
+          // throw to surface the missing optional module.
           std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-          isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-          return v8::MaybeLocal<v8::Module>();
+          if (RuntimeConfig.IsDebug) {
+            Log(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
+            return v8::MaybeLocal<v8::Module>();
+          } else {
+            isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+            return v8::MaybeLocal<v8::Module>();
+          }
         }
       } else {
         // Placeholder file already exists, use it

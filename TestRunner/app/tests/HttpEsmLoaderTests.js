@@ -16,12 +16,24 @@ describe("HTTP ESM Loader", function() {
             });
         });
         it("should surface helpful errors for unresolved bare specifiers", function(done) {
-            import("bare-spec-example").then(function() {
-                (done.fail ? done.fail : fail)("Bare specifier should not have resolved successfully");
+            import("bare-spec-example").then(function(mod) {
+                // Placeholder modules export a default Proxy. Accessing a property on that proxy
+                // should throw with a helpful error message containing the specifier.
+                let threw = false;
+                try {
+                    // Trigger the proxy's get trap by accessing a property on the default export
+                    // eslint-disable-next-line no-unused-expressions
+                    mod && mod.default && mod.default.__touch__;
+                } catch (useErr) {
+                    threw = true;
+                    const msg = (useErr && useErr.message) ? useErr.message : String(useErr);
+                    expect(msg).toContain("bare-spec-example");
+                }
+                expect(threw).toBe(true);
                 done();
             }).catch(function(error) {
+                // Other runtimes throw on import; assert message includes the specifier name.
                 const message = (error && error.message) ? error.message : String(error);
-                // Expect our thrown helpful message containing the specifier name
                 expect(message).toContain("bare-spec-example");
                 done();
             });
