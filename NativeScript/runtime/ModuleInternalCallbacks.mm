@@ -1291,15 +1291,24 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         absPath = builtinPath;
       }
     } else if (IsLikelyOptionalModule(spec)) {
-      // Create a placeholder file on disk that bundler can resolve to
+      // In debug/test builds, surface a clear unresolved bare specifier error instead of
+      // synthesizing a placeholder module; more helpful signal during development.
+      if (RuntimeConfig.IsDebug) {
+        std::string msg = "Cannot resolve bare specifier '" + spec + "'";
+        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
+        return v8::MaybeLocal<v8::Module>();
+      }
+
+      // In release builds, create a placeholder that throws on use,
+      // so apps can guard optional imports without crashing at import time.
       std::string appPath = RuntimeConfig.ApplicationPath;
       std::string placeholderPath = NormalizePath(appPath + "/" + spec + ".mjs");
 
       // Check if placeholder file already exists
       if (!isFile(placeholderPath)) {
         // Create placeholder content
-        std::string placeholderContent = "const error = new Error('Module \\'" + spec +
-                                         "\\' is not available. This is an optional module.');\n"
+        std::string placeholderContent = "const error = new Error('Module \\\'" + spec +
+                                         "\\\' is not available. This is an optional module.');\n"
                                          "const proxy = new Proxy({}, {\n"
                                          "  get: function(target, prop) { throw error; },\n"
                                          "  set: function(target, prop, value) { throw error; },\n"
@@ -1323,14 +1332,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         } else {
           // Failed to create file, fall back to throwing error
           std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-          if (RuntimeConfig.IsDebug) {
-            Log(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
-            // Return empty instead of crashing in debug mode
-            return v8::MaybeLocal<v8::Module>();
-          } else {
-            isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-            return v8::MaybeLocal<v8::Module>();
-          }
+          isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+          return v8::MaybeLocal<v8::Module>();
         }
       } else {
         // Placeholder file already exists, use it

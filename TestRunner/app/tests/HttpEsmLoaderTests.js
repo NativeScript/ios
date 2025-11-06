@@ -17,10 +17,11 @@ describe("HTTP ESM Loader", function() {
         });
         it("should surface helpful errors for unresolved bare specifiers", function(done) {
             import("bare-spec-example").then(function() {
-                fail("Bare specifier should not have resolved successfully");
+                (done.fail ? done.fail : fail)("Bare specifier should not have resolved successfully");
                 done();
             }).catch(function(error) {
                 const message = (error && error.message) ? error.message : String(error);
+                // Expect our thrown helpful message containing the specifier name
                 expect(message).toContain("bare-spec-example");
                 done();
             });
