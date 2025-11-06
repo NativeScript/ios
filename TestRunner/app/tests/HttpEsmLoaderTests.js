@@ -1,16 +1,29 @@
 // HTTP ESM Loader Tests
-// Test the dev-only HTTP ESM loader functionality for fetching modules from Vite dev server
+// Test the dev-only HTTP ESM loader functionality for fetching modules remotely
 
 describe("HTTP ESM Loader", function() {
     
-    // Configuration APIs were removed; loader triggers only for explicit http(s) imports
-    
     describe("URL Resolution", function() {
-        it("should handle relative imports", function() {
-            pending("Requires native module resolution integration");
+        it("should handle relative imports", function(done) {
+            import("~/tests/esm/relative/entry.mjs").then(function(module) {
+                expect(module.viaDefault).toBe("relative-import-success");
+                expect(module.viaNamed).toBe("relative-import-success");
+                expect(module.readDependencyPayload()).toBe(true);
+                done();
+            }).catch(function(error) {
+                fail("Relative import module should resolve: " + error.message);
+                done();
+            });
         });
-        it("should handle bare specifiers", function() {
-            pending("Requires native module resolution integration");
+        it("should surface helpful errors for unresolved bare specifiers", function(done) {
+            import("bare-spec-example").then(function() {
+                fail("Bare specifier should not have resolved successfully");
+                done();
+            }).catch(function(error) {
+                const message = (error && error.message) ? error.message : String(error);
+                expect(message).toContain("bare-spec-example");
+                done();
+            });
         });
     });
     
@@ -54,16 +67,32 @@ describe("HTTP ESM Loader", function() {
     
     describe("Module Compilation", function() {
         
-        it("should compile fetched ES modules with URL origin", function() {
-            // This tests that CompileAndRegisterModuleFromSource works correctly
-            // The actual compilation happens in native code, but we can verify
-            // that modules loaded via HTTP have the correct resource names
-            pending("Requires access to native module registry for verification");
+        it("should compile filesystem-backed ES modules successfully", function(done) {
+            import("~/tests/esm/hmr/test-esm-module.mjs").then(function(module) {
+                expect(module).toBeDefined();
+                expect(module.testValue).toBe("http-esm-loaded");
+                expect(typeof module.default).toBe("function");
+                expect(module.default()).toContain("HTTP ESM loader working");
+                done();
+            }).catch(function(error) {
+                fail("Expected module compilation to succeed: " + error.message);
+                done();
+            });
         });
         
-        it("should register modules in URL-keyed registry", function() {
-            // Test that HTTP-loaded modules are stored with URL keys for HMR compatibility
-            pending("Requires access to native module registry for verification");
+        it("should reuse compiled modules across multiple dynamic imports", function(done) {
+            const spec = "~/tests/esm/hmr/test-esm-module.mjs";
+            Promise.all([import(spec), import(spec)]).then(function(results) {
+                const first = results[0];
+                const second = results[1];
+                expect(first).toBeDefined();
+                expect(second).toBeDefined();
+                expect(first.timestamp).toBe(second.timestamp);
+                done();
+            }).catch(function(error) {
+                fail("Expected module reuse to succeed: " + error.message);
+                done();
+            });
         });
     });
     
@@ -104,14 +133,41 @@ describe("HTTP ESM Loader", function() {
     
     describe("Integration with HMR", function() {
         
-        it("should support module invalidation", function() {
-            // Test that HTTP-loaded modules can be invalidated for HMR
-            pending("Requires HMR invalidation API access");
+        it("should expose import.meta.hot with a working invalidate hook", function(done) {
+            import("~/tests/esm/hmr/test-esm-module.mjs").then(function(module) {
+                const hot = module.getHotContext();
+                if (!hot) {
+                    // In release builds import.meta.hot is stripped; ensure helper reports false.
+                    expect(module.callInvalidateSafe()).toBe(false);
+                    done();
+                    return;
+                }
+                expect(module.callInvalidateSafe()).toBe(true);
+                expect(typeof hot.invalidate).toBe("function");
+                done();
+            }).catch(function(error) {
+                fail("Expected to access HMR helpers: " + error.message);
+                done();
+            });
         });
         
-        it("should recompile modules on HMR update", function() {
-            // Test that invalidated modules are recompiled on next import
-            pending("Requires HMR update simulation");
+        it("should provide stable accept and dispose hooks", function(done) {
+            import("~/tests/esm/hmr/test-esm-module.mjs").then(function(module) {
+                const hot = module.getHotContext();
+                if (!hot) {
+                    // Nothing to assert in release builds; ensure helper reported correctly.
+                    expect(module.callInvalidateSafe()).toBe(false);
+                    done();
+                    return;
+                }
+                expect(typeof hot.accept).toBe("function");
+                expect(typeof hot.dispose).toBe("function");
+                expect(typeof hot.invalidate).toBe("function");
+                done();
+            }).catch(function(error) {
+                fail("Expected import.meta.hot hook inspection to succeed: " + error.message);
+                done();
+            });
         });
     });
 });
