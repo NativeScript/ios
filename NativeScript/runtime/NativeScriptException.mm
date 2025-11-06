@@ -6,6 +6,7 @@
 #endif
 #import <objc/message.h>
 #import <objc/runtime.h>
+#include <TargetConditionals.h>
 #include <sstream>
 #include <mutex>
 #include <limits>
@@ -736,7 +737,20 @@ static void RenderErrorModalUI(v8::Isolate* isolate, const std::string& title,
   bool alreadyShowing = isErrorDisplayShowing;
 
   UIApplication* app = [UIApplication sharedApplication];
-  if (!alreadyShowing && app.windows.count == 0 && app.connectedScenes.count == 0) {
+  BOOL hasAnyWindows = NO;
+#if TARGET_OS_VISION
+  if (@available(iOS 13.0, *)) {
+    for (UIScene* scene in app.connectedScenes) {
+      if ([scene isKindOfClass:[UIWindowScene class]]) {
+        UIWindowScene* ws = (UIWindowScene*)scene;
+        if (ws.windows.count > 0) { hasAnyWindows = YES; break; }
+      }
+    }
+  }
+#else
+  hasAnyWindows = app.windows.count > 0;
+#endif
+  if (!alreadyShowing && !hasAnyWindows && app.connectedScenes.count == 0) {
     Log(@"Note: JavaScript error during boot.");
     Log(@"================================");
     Log(@"%s", stackForModal.c_str());
@@ -781,7 +795,19 @@ static void ShowErrorModalSynchronously(const std::string& title,
   UIApplication* sharedApp = [UIApplication sharedApplication];
 
   // If no windows exist, create a foundational window to establish the hierarchy
-  if (sharedApp.windows.count == 0) {
+  BOOL appHasWindows = NO;
+#if TARGET_OS_VISION
+  if (@available(iOS 13.0, *)) {
+    for (UIScene* scene in sharedApp.connectedScenes) {
+      if ([scene isKindOfClass:[UIWindowScene class]]) {
+        if (((UIWindowScene*)scene).windows.count > 0) { appHasWindows = YES; break; }
+      }
+    }
+  }
+#else
+  appHasWindows = sharedApp.windows.count > 0;
+#endif
+  if (!appHasWindows) {
     // Log(@"🚀 Bootstrap: No app windows exist - creating foundational window hierarchy");
 
     // Create a basic foundational window that mimics what UIApplicationMain would create
@@ -805,12 +831,18 @@ static void ShowErrorModalSynchronously(const std::string& title,
         // Log(@"🚀 Bootstrap: Created foundation window with existing scene");
       } else {
         // If no scenes exist, create a window without scene (iOS 12 style fallback)
+        // On visionOS, UIScreen is unavailable. Skip frame-based creation there.
+#if !TARGET_OS_VISION
         foundationWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+#endif
         // Log(@"🚀 Bootstrap: Created foundation window without scene (emergency mode)");
       }
     } else {
       // iOS 12 and below - simple window creation
+      // On visionOS, UIScreen is unavailable; this branch is only for iOS 12 and below.
+#if !TARGET_OS_VISION
       foundationWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+#endif
       // Log(@"🚀 Bootstrap: Created foundation window for iOS 12");
     }
 
@@ -833,7 +865,19 @@ static void ShowErrorModalSynchronously(const std::string& title,
 
 
       // Detailed window hierarchy inspection
-      if (sharedApp.windows.count == 0) {
+      BOOL appHasWindowsAfterBootstrap = NO;
+#if TARGET_OS_VISION
+      if (@available(iOS 13.0, *)) {
+        for (UIScene* scene in sharedApp.connectedScenes) {
+          if ([scene isKindOfClass:[UIWindowScene class]]) {
+            if (((UIWindowScene*)scene).windows.count > 0) { appHasWindowsAfterBootstrap = YES; break; }
+          }
+        }
+      }
+#else
+      appHasWindowsAfterBootstrap = sharedApp.windows.count > 0;
+#endif
+      if (!appHasWindowsAfterBootstrap) {
         // Log(@"🚀 Bootstrap: 🚨 CRITICAL: Foundation window not in app.windows hierarchy!");
         // Log(@"🚀 Bootstrap: This indicates a fundamental iOS window system issue");
 
@@ -883,12 +927,18 @@ static void ShowErrorModalSynchronously(const std::string& title,
       // Log(@"🎨 Created error window with existing scene");
     } else {
       // Fallback: create window with screen bounds (older behavior)
+      // On visionOS, UIScreen is unavailable. Guard frame-based creation.
+#if !TARGET_OS_VISION
       errorWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+#endif
       // Log(@"🎨 Created error window with screen bounds (no scene available)");
     }
   } else {
     // iOS 12 and below
+    // On visionOS, UIScreen is unavailable; this branch is only for iOS 12 and below.
+#if !TARGET_OS_VISION
     errorWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+#endif
     // Log(@"🎨 Created error window for iOS 12");
   }
 
@@ -1104,7 +1154,22 @@ static void ShowErrorModalSynchronously(const std::string& title,
     [errorWindow bringSubviewToFront:errorViewController.view];
 
     // Verify the window is in the window hierarchy
-    NSArray* windows = [UIApplication sharedApplication].windows;
+    NSArray<UIWindow*>* windows = nil;
+#if TARGET_OS_VISION
+    if (@available(iOS 13.0, *)) {
+      NSMutableArray<UIWindow*>* acc = [NSMutableArray array];
+      for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+          [acc addObjectsFromArray:((UIWindowScene*)scene).windows];
+        }
+      }
+      windows = [acc copy];
+    } else {
+      windows = @[];
+    }
+#else
+    windows = [UIApplication sharedApplication].windows;
+#endif
     BOOL windowInHierarchy = [windows containsObject:errorWindow];
     // Log(@"Error window in app windows: %@", windowInHierarchy ? @"YES" : @"NO");
 
