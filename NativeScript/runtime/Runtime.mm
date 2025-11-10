@@ -30,9 +30,7 @@
 #include "URLSearchParamsImpl.h"
 #include <mutex>
 #include "HMRSupport.h"
-#include "HMRSupport.mm"
 #include "DevFlags.h"
-#include "DevFlags.mm"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)

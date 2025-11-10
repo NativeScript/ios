@@ -126,6 +126,8 @@ describe("HTTP ESM Loader", function() {
         
         it("should handle network timeouts", function(done) {
             // Attempt to import from an unreachable address to test timeout
+            // 192.0.2.1 is a TEST-NET-1 address reserved by RFC 5737 for documentation and testing purposes.
+            // It is intentionally used here to trigger a network timeout scenario.
             import("http://192.0.2.1:5173/timeout-test.js").then(function(module) {
                 fail("Should not have succeeded for unreachable server");
                 done();
@@ -184,17 +186,5 @@ describe("HTTP ESM Loader", function() {
         });
     });
 });
-
-// Helper function to create a test dev server module (if dev server is running)
-function createTestDevModule() {
-    return `
-// Test ES module for HTTP ESM loader
-export const testValue = "http-esm-loaded";
-export default function testFunction() {
-    return "HTTP ESM loader working";
-}
-export { testFunction as namedExport };
-`;
-}
 
 console.log("HTTP ESM Loader tests loaded");

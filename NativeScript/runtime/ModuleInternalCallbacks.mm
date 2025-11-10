@@ -421,6 +421,11 @@ static thread_local std::unordered_map<std::string, std::unordered_set<std::stri
 static thread_local std::unordered_map<std::string, std::string> g_modulePrimaryImporters;
 static thread_local std::unordered_set<std::string> g_modulesInFlight;
 static thread_local std::unordered_set<std::string> g_modulesPendingReset;
+// The threshold for detecting circular dependencies during module resolution.
+// 256 was chosen as a high enough value to allow deep but legitimate module graphs,
+// but low enough to catch runaway recursion or infinite circular imports.
+// If a module is re-entered more than this limit, module loading is aborted and
+// an error is reported to prevent stack overflow or infinite loops.
 static constexpr size_t kMaxModuleReentryCount = 256;
 // Waiters: module path -> list of Promise resolvers waiting for completion (instantiated/evaluated or errored)
 static std::unordered_map<std::string, std::vector<v8::Global<v8::Promise::Resolver>>> g_moduleWaiters;
@@ -680,39 +685,43 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
   // 1) Turn the specifier literal into a std::string:
   v8::String::Utf8Value specUtf8(isolate, specifier);
-  std::string spec = *specUtf8 ? *specUtf8 : "";
-  if (spec.empty()) {
+  const std::string rawSpec = *specUtf8 ? *specUtf8 : "";
+  if (rawSpec.empty()) {
     return v8::MaybeLocal<v8::Module>();
   }
+
+  std::string normalizedSpec = rawSpec;
 
   // Normalize malformed HTTP(S) schemes that sometimes appear as 'http:/host' (single slash)
   // due to upstream path joins or standardization. This ensures our HTTP loader fast-path
   // is used and avoids filesystem fallback attempts like '/app/http:/host'.
-  if (spec.rfind("http:/", 0) == 0 && spec.rfind("http://", 0) != 0) {
-    spec.insert(5, "/"); // http:/ -> http://
-  } else if (spec.rfind("https:/", 0) == 0 && spec.rfind("https://", 0) != 0) {
-    spec.insert(6, "/"); // https:/ -> https://
+  if (normalizedSpec.rfind("http:/", 0) == 0 && normalizedSpec.rfind("http://", 0) != 0) {
+    normalizedSpec.insert(5, "/"); // http:/ -> http://
+  } else if (normalizedSpec.rfind("https:/", 0) == 0 && normalizedSpec.rfind("https://", 0) != 0) {
+    normalizedSpec.insert(6, "/"); // https:/ -> https://
   }
 
   if (IsScriptLoadingLogEnabled()) {
-    Log(@"[resolver][spec] %s", spec.c_str());
+    Log(@"[resolver][spec] %s", normalizedSpec.c_str());
   }
 
   // Normalize '@/' alias to '/src/' for static imports (mirrors client dynamic import normalization)
-  if (spec.rfind("@/", 0) == 0) {
-    std::string orig = spec;
-    spec = std::string("/src/") + spec.substr(2);
+  if (normalizedSpec.rfind("@/", 0) == 0) {
+    std::string orig = normalizedSpec;
+    normalizedSpec = std::string("/src/") + normalizedSpec.substr(2);
     if (IsScriptLoadingLogEnabled()) {
-      Log(@"[resolver][normalize] %@ -> %@", [NSString stringWithUTF8String:orig.c_str()], [NSString stringWithUTF8String:spec.c_str()]);
+      Log(@"[resolver][normalize] %@ -> %@", [NSString stringWithUTF8String:orig.c_str()], [NSString stringWithUTF8String:normalizedSpec.c_str()]);
     }
   }
   // Guard against a bare '@' spec showing up (invalid); return empty to avoid poisoning registry with '@'
-  if (spec == "@") {
+  if (normalizedSpec == "@") {
     if (IsScriptLoadingLogEnabled()) {
       Log(@"[resolver][normalize] ignoring invalid '@' static spec");
     }
     return v8::MaybeLocal<v8::Module>();
   }
+
+  const std::string& spec = normalizedSpec; // use normalized spec for the rest of the resolution logic
 
   // ── Early absolute-HTTP fast path ─────────────────────────────
   // If the specifier itself is an absolute HTTP(S) URL, resolve it immediately via
@@ -1199,8 +1208,13 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         if (qpos != std::string::npos) baseNoQuery = baseNoQuery.substr(0, qpos);
         // Strip a terminal .ts/.js when constructing mirror .mjs candidate
         std::string noExt = baseNoQuery;
-        if (EndsWith(noExt, ".ts") || EndsWith(noExt, ".js")) {
-          noExt = noExt.substr(0, noExt.size() - 3);
+        // Handle variable-length extensions: .ts, .js, .tsx, .jsx, .mts, .cts
+        const std::vector<std::string> knownExts = {".ts", ".js", ".tsx", ".jsx", ".mts", ".cts"};
+        for (const auto& ext : knownExts) {
+          if (EndsWith(noExt, ext)) {
+            noExt = noExt.substr(0, noExt.size() - ext.size());
+            break;
+          }
         }
         // Use cached Documents directory (generic dynamic fetch mirror fallback)
         const std::string& docsRootBase = GetDocumentsDirectory();
@@ -1498,7 +1512,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
           if (parentKey == primaryImporter) {
             parentAlreadyRecorded = false;  // Owner re-entry is expected during evaluation.
           } else {
-            // NEW: gating block—only applied for dynamic Documents modules when unfinished.
+            // gating block—only applied for dynamic Documents modules when unfinished.
             if (!gatingDisabled && unfinished) {
               g_hmrModuleGatedCount.fetch_add(1, std::memory_order_relaxed);
               if (IsScriptLoadingLogEnabled()) {

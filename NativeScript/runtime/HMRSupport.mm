@@ -273,6 +273,7 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
       NSURLSessionConfiguration* cfg = [NSURLSessionConfiguration defaultSessionConfiguration];
       cfg.HTTPAdditionalHeaders = @{ @"Accept": @"application/javascript, text/javascript, */*;q=0.1",
                                      @"Accept-Encoding": @"identity" };
+      // Note: this could be made configurable if needed
       cfg.timeoutIntervalForRequest = 5.0;
       cfg.timeoutIntervalForResource = 5.0;
       NSURLSession* session = [NSURLSession sessionWithConfiguration:cfg];
