@@ -127,6 +127,10 @@
             totalSpecsExecuted++;
 
             if (self.verbosity === 2) {
+                // Print the spec name inline before the marker for clarity
+                if (failed) {
+                    log(indentWithLevel(spec._depth, spec.fullName));
+                }
                 resultText = failed ? 'F' : skipped ? 'S' : '';
             } else if (self.verbosity > 2) {
                 resultText = ' ' + (failed ? 'Failed' : skipped ? 'Skipped' : 'Passed');
@@ -134,10 +138,13 @@
             log(inColor(resultText, color));
 
             if (failed) {
+                // Always include the full spec name after a failure so it's clear what failed
                 if (self.verbosity === 1) {
                     log(spec.fullName);
                 } else if (self.verbosity === 2) {
                     log(' ');
+                    log(indentWithLevel(spec._depth, spec.fullName));
+                } else if (self.verbosity > 2) {
                     log(indentWithLevel(spec._depth, spec.fullName));
                 }
 

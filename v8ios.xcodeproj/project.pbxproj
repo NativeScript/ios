@@ -49,6 +49,10 @@
 		9160C065291ED41F000641C0 /* SpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 9160C064291ED41F000641C0 /* SpinLock.h */; };
 		91B25A0A29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */; };
 		91B25A0B29DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h in Headers */ = {isa = PBXBuildFile; fileRef = 91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */; };
+		AA5DBFD32EC191F8008D12F9 /* HMRSupport.mm in Sources */ = {isa = PBXBuildFile; fileRef = AA5DBFD22EC191F8008D12F9 /* HMRSupport.mm */; };
+		AA5DBFD42EC191F8008D12F9 /* HMRSupport.h in Headers */ = {isa = PBXBuildFile; fileRef = AA5DBFD12EC191F8008D12F9 /* HMRSupport.h */; };
+		AA5DBFD72EC19216008D12F9 /* DevFlags.h in Headers */ = {isa = PBXBuildFile; fileRef = AA5DBFD52EC19216008D12F9 /* DevFlags.h */; };
+		AA5DBFD82EC19216008D12F9 /* DevFlags.mm in Sources */ = {isa = PBXBuildFile; fileRef = AA5DBFD62EC19216008D12F9 /* DevFlags.mm */; };
 		AA8C47B12E27114300649BF5 /* ModuleInternalCallbacks.h in Headers */ = {isa = PBXBuildFile; fileRef = AA8C47AF2E27114300649BF5 /* ModuleInternalCallbacks.h */; };
 		AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */ = {isa = PBXBuildFile; fileRef = AA8C47B02E27114300649BF5 /* ModuleInternalCallbacks.mm */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
@@ -486,6 +490,10 @@
 		9160C064291ED41F000641C0 /* SpinLock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SpinLock.h; path = NativeScript/runtime/SpinLock.h; sourceTree = "<group>"; };
 		91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = "ns-v8-tracing-agent-impl.mm"; sourceTree = "<group>"; };
 		91B25A0929DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ns-v8-tracing-agent-impl.h"; sourceTree = "<group>"; };
+		AA5DBFD12EC191F8008D12F9 /* HMRSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HMRSupport.h; sourceTree = "<group>"; };
+		AA5DBFD22EC191F8008D12F9 /* HMRSupport.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = HMRSupport.mm; sourceTree = "<group>"; };
+		AA5DBFD52EC19216008D12F9 /* DevFlags.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DevFlags.h; sourceTree = "<group>"; };
+		AA5DBFD62EC19216008D12F9 /* DevFlags.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DevFlags.mm; sourceTree = "<group>"; };
 		AA8C47AF2E27114300649BF5 /* ModuleInternalCallbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ModuleInternalCallbacks.h; sourceTree = "<group>"; };
 		AA8C47B02E27114300649BF5 /* ModuleInternalCallbacks.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ModuleInternalCallbacks.mm; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
@@ -1409,6 +1417,8 @@
 				C2DDEB79229EAC8200345BFE /* Console.h */,
 				C2DDEB6B229EAC8200345BFE /* Console.cpp */,
 				C2DDEB72229EAC8200345BFE /* DataWrapper.h */,
+				AA5DBFD52EC19216008D12F9 /* DevFlags.h */,
+				AA5DBFD62EC19216008D12F9 /* DevFlags.mm */,
 				C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */,
 				C2DDEB8B229EAC8300345BFE /* DictionaryAdapter.mm */,
 				C2A5F8692359AEB600074AFA /* ExtVector.h */,
@@ -1421,6 +1431,8 @@
 				C266569C22B282BA00EE15CC /* FunctionReference.cpp */,
 				C2DDEB6D229EAC8200345BFE /* Helpers.h */,
 				C2DDEB7D229EAC8200345BFE /* Helpers.mm */,
+				AA5DBFD12EC191F8008D12F9 /* HMRSupport.h */,
+				AA5DBFD22EC191F8008D12F9 /* HMRSupport.mm */,
 				C2FEA16E22A3C75C00A5C0FC /* InlineFunctions.h */,
 				C2FEA16D22A3C75C00A5C0FC /* InlineFunctions.cpp */,
 				C2DDEB65229EAC8100345BFE /* Interop.h */,
@@ -1622,6 +1634,7 @@
 				C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */,
 				C2F4D0CB2334A6E70008A2EB /* RuntimeConfig.h in Headers */,
 				C247C16B22F82842001D2CA2 /* v8.h in Headers */,
+				AA5DBFD72EC19216008D12F9 /* DevFlags.h in Headers */,
 				C22536B6241A318900192740 /* ffi.h in Headers */,
 				C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */,
 				3CBFF7442971C1C200C5DE36 /* ArcMacro.h in Headers */,
@@ -1634,6 +1647,7 @@
 				AA8C47B12E27114300649BF5 /* ModuleInternalCallbacks.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
 				6573B9ED291FE5B700B0ED7C /* JSIRuntime.h in Headers */,
+				AA5DBFD42EC191F8008D12F9 /* HMRSupport.h in Headers */,
 				C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */,
 				C2DDEB9B229EAC8300345BFE /* DataWrapper.h in Headers */,
 				C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */,
@@ -2197,6 +2211,7 @@
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
+				AA5DBFD82EC19216008D12F9 /* DevFlags.mm in Sources */,
 				F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
 				C266569322AFFF7E00EE15CC /* Pointer.cpp in Sources */,
@@ -2231,6 +2246,7 @@
 				C26656B322B3768C00EE15CC /* InteropTypes.mm in Sources */,
 				3C78BA5C2A0D600100C20A88 /* ModuleBinding.cpp in Sources */,
 				C2F4D0AD232F85E20008A2EB /* SymbolIterator.mm in Sources */,
+				AA5DBFD32EC191F8008D12F9 /* HMRSupport.mm in Sources */,
 				C2DDEBA5229EAC8300345BFE /* Runtime.mm in Sources */,
 				6573B9CF291FE29F00B0ED7C /* V8Runtime.cpp in Sources */,
 				6573B9E3291FE2A700B0ED7C /* jsilib-posix.cpp in Sources */,

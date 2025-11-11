@@ -29,6 +29,8 @@
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
 #include <mutex>
+#include "HMRSupport.h"
+#include "DevFlags.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -110,6 +112,15 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
           context, String::NewFromUtf8(isolate, "dirname", NewStringType::kNormal).ToLocalChecked(),
           dirnameStr)
       .Check();
+
+  if (RuntimeConfig.IsDebug) {
+    // Attach minimal import.meta.hot only in dev
+    try {
+      tns::InitializeImportMetaHot(isolate, context, meta, modulePath);
+    } catch (...) {
+      // If anything fails, keep meta without hot to avoid crashing
+    }
+  }
 }
 
 namespace tns {
