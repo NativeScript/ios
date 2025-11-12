@@ -1,4 +1,4 @@
-/* auto-generated on 2025-07-27 12:29:50 -0400. Do not edit! */
+/* auto-generated on 2025-09-23 12:57:35 -0400. Do not edit! */
 /* begin file src/ada.cpp */
 #include "ada.h"
 /* begin file src/checkers.cpp */
@@ -64,25 +64,24 @@ ada_really_inline constexpr bool is_ipv4(std::string_view view) noexcept {
 // encoding.
 static constexpr std::array<uint8_t, 256> path_signature_table =
     []() consteval {
-  std::array<uint8_t, 256> result{};
-  for (size_t i = 0; i < 256; i++) {
-    if (i <= 0x20 || i == 0x22 || i == 0x23 || i == 0x3c || i == 0x3e ||
-        i == 0x3f || i == 0x5e || i == 0x60 || i == 0x7b || i == 0x7d ||
-        i > 0x7e) {
-      result[i] = 1;
-    } else if (i == 0x25) {
-      result[i] = 8;
-    } else if (i == 0x2e) {
-      result[i] = 4;
-    } else if (i == 0x5c) {
-      result[i] = 2;
-    } else {
-      result[i] = 0;
-    }
-  }
-  return result;
-}
-();
+      std::array<uint8_t, 256> result{};
+      for (size_t i = 0; i < 256; i++) {
+        if (i <= 0x20 || i == 0x22 || i == 0x23 || i == 0x3c || i == 0x3e ||
+            i == 0x3f || i == 0x5e || i == 0x60 || i == 0x7b || i == 0x7d ||
+            i > 0x7e) {
+          result[i] = 1;
+        } else if (i == 0x25) {
+          result[i] = 8;
+        } else if (i == 0x2e) {
+          result[i] = 4;
+        } else if (i == 0x5c) {
+          result[i] = 2;
+        } else {
+          result[i] = 0;
+        }
+      }
+      return result;
+    }();
 
 ada_really_inline constexpr uint8_t path_signature(
     std::string_view input) noexcept {
@@ -15842,7 +15841,11 @@ tl::expected<std::string, errors> url_pattern_init::process_search(
   if (value.starts_with("?")) {
     value.remove_prefix(1);
   }
-  ADA_ASSERT_TRUE(!value.starts_with("?"));
+  // We cannot assert that the value is no longer starting with a single
+  // question mark because technically it can start. The question is whether or
+  // not we should remove the first question mark. Ref:
+  // https://github.com/ada-url/ada/pull/992 The spec is not clear on this.
+
   // If type is "pattern" then return strippedValue.
   if (type == process_type::pattern) {
     return std::string(value);
@@ -16283,7 +16286,10 @@ tl::expected<std::string, errors> canonicalize_search(std::string_view input) {
   url->set_search(input);
   if (url->has_search()) {
     const auto search = url->get_search();
-    return std::string(search.substr(1));
+    if (!search.empty()) {
+      return std::string(search.substr(1));
+    }
+    return "";
   }
   return tl::unexpected(errors::type_error);
 }
@@ -16303,7 +16309,10 @@ tl::expected<std::string, errors> canonicalize_hash(std::string_view input) {
   // Return dummyURL's fragment.
   if (url->has_hash()) {
     const auto hash = url->get_hash();
-    return std::string(hash.substr(1));
+    if (!hash.empty()) {
+      return std::string(hash.substr(1));
+    }
+    return "";
   }
   return tl::unexpected(errors::type_error);
 }
