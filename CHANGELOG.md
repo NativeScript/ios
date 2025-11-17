@@ -1,3 +1,22 @@
+# [9.0.0](https://github.com/NativeScript/ios/compare/v8.9.5...v9.0.0) (2025-11-17)
+
+
+### Bug Fixes
+
+* optional error parameter for NSError out parameters ([#310](https://github.com/NativeScript/ios/issues/310)) ([99824ec](https://github.com/NativeScript/ios/commit/99824eca41c1ae7fb939a6790ae83f6e2bc41574))
+* **visionos:** build flags ([29e5d79](https://github.com/NativeScript/ios/commit/29e5d79924ae65c32f93f8cb19aece4ef6f370fd))
+* **visionos:** linker robustness ([14355d5](https://github.com/NativeScript/ios/commit/14355d5647e4b61c60be3fb87282d441575f1de0))
+
+
+### Features
+
+* Ada 3.3.0 ([#313](https://github.com/NativeScript/ios/issues/313)) ([e24388c](https://github.com/NativeScript/ios/commit/e24388c9261bcbf9c2580abf76cffdc87b6d2bf6))
+* ES modules (ESM) support with conditional esm or commonjs consumption + better error handling ([#276](https://github.com/NativeScript/ios/issues/276)) ([e72977a](https://github.com/NativeScript/ios/commit/e72977ab9a1059a8e9686c169f3090c6fdcee398))
+* http loaded es module realms + HMR DX enrichments ([#312](https://github.com/NativeScript/ios/issues/312)) ([59191d3](https://github.com/NativeScript/ios/commit/59191d3b921c29346bbfeb4f0947f13e5b08288e))
+* support for struct reference index access ([#304](https://github.com/NativeScript/ios/issues/304)) ([d289232](https://github.com/NativeScript/ios/commit/d2892320e773cc12729f3b6edc5da683534aef9b))
+
+
+
 ## [8.9.5](https://github.com/NativeScript/ios/compare/v8.9.4...v8.9.5) (2025-10-24)
 
 
