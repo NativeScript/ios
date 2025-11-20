@@ -638,7 +638,14 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
       stringByDeletingLastPathComponent] UTF8String];
 
   // Shorten the parentDir for GetRequireFunction to avoid V8 parsing issues with long paths
-  std::string shortParentDir = "/app" + parentDir.substr(RuntimeConfig.ApplicationPath.length());
+  std::string shortParentDir;
+  if (parentDir.length() >= RuntimeConfig.ApplicationPath.length() &&
+      parentDir.compare(0, RuntimeConfig.ApplicationPath.length(), RuntimeConfig.ApplicationPath) == 0) {
+    shortParentDir = "/app" + parentDir.substr(RuntimeConfig.ApplicationPath.length());
+  } else {
+    // Fallback: use the entire path if it doesn't start with ApplicationPath
+    shortParentDir = parentDir;
+  }
 
   Local<v8::Function> require = GetRequireFunction(isolate, shortParentDir);
   // Use full paths for __filename and __dirname to match module.id
@@ -1566,7 +1573,14 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
 }
 
 std::string ModuleInternal::GetCacheFileName(const std::string& path) {
-  std::string key = path.substr(RuntimeConfig.ApplicationPath.size() + 1);
+  std::string key;
+  if (path.length() > RuntimeConfig.ApplicationPath.size() &&
+      path.compare(0, RuntimeConfig.ApplicationPath.size(), RuntimeConfig.ApplicationPath) == 0) {
+    key = path.substr(RuntimeConfig.ApplicationPath.size() + 1);
+  } else {
+    // Fallback: use the entire path if it doesn't start with ApplicationPath
+    key = path;
+  }
   std::replace(key.begin(), key.end(), '/', '-');
 
   NSArray* paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
