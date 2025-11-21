@@ -22,15 +22,15 @@
 #include "DisposerPHV.h"
 #include "IsolateWrapper.h"
 
-#include <mutex>
 #include <unordered_map>
-#include "DevFlags.h"
-#include "HMRSupport.h"
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
+#include <mutex>
+#include "HMRSupport.h"
+#include "DevFlags.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -128,7 +128,7 @@ namespace tns {
 std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
-static std::unordered_map<std::string, id> AppConfigCache;  // generic cache for app config values
+static std::unordered_map<std::string, id> AppConfigCache; // generic cache for app config values
 static std::mutex AppConfigCacheMutex;
 
 // Global flag to track when JavaScript errors occur during execution
@@ -261,9 +261,6 @@ Isolate* Runtime::CreateIsolate() {
     v8Initialized_ = true;
   }
 
-  int runtimeId = Runtime::nextRuntimeId_.fetch_add(1, std::memory_order_relaxed);
-  this->SetWorkerId(runtimeId);
-
   startTime = platform_->MonotonicallyIncreasingTime();
   realtimeOrigin = platform_->CurrentClockTimeMillis();
 
@@ -304,8 +301,8 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   DefineDrainMicrotaskMethod(isolate, globalTemplate);
   // queueMicrotask(callback) per spec
   {
-    Local<FunctionTemplate> qmtTemplate =
-        FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+    Local<FunctionTemplate> qmtTemplate = FunctionTemplate::New(
+        isolate, [](const FunctionCallbackInfo<Value>& info) {
           auto* isolate = info.GetIsolate();
           if (info.Length() < 1 || !info[0]->IsFunction()) {
             isolate->ThrowException(Exception::TypeError(
@@ -437,11 +434,6 @@ void Runtime::RunMainScript() {
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
-
-  auto cache = Caches::Get(isolate);
-  auto context = cache->GetContext();
-  Context::Scope context_scope(context);
-
   this->moduleInternal_->RunModule(isolate, "./");
 }
 
@@ -496,8 +488,7 @@ id Runtime::GetAppConfigValue(std::string key) {
     result = AppPackageJson[nsKey];
   }
 
-  // Store in cache (can cache nil as NSNull to differentiate presence if desired; for now, cache
-  // as-is)
+  // Store in cache (can cache nil as NSNull to differentiate presence if desired; for now, cache as-is)
   {
     std::lock_guard<std::mutex> lock(AppConfigCacheMutex);
     AppConfigCache[key] = result;
@@ -633,7 +624,6 @@ std::shared_ptr<Platform> Runtime::platform_;
 std::vector<Isolate*> Runtime::isolates_;
 bool Runtime::v8Initialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;
-std::atomic<int> Runtime::nextRuntimeId_ = {0};
 SpinMutex Runtime::isolatesMutex_;
 
 }  // namespace tns
