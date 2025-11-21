@@ -1,8 +1,6 @@
 #ifndef Runtime_h
 #define Runtime_h
 
-#include <atomic>
-
 #include "Caches.h"
 #include "Common.h"
 #include "MetadataBuilder.h"
@@ -61,7 +59,6 @@ class Runtime {
   static thread_local Runtime* currentRuntime_;
   static std::shared_ptr<v8::Platform> platform_;
   static std::vector<v8::Isolate*> isolates_;
-  static std::atomic<int> nextRuntimeId_;
   static SpinMutex isolatesMutex_;
   static bool v8Initialized_;
   static std::atomic<int> nextIsolateId;
