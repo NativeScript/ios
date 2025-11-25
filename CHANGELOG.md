@@ -1,3 +1,13 @@
+## [9.0.1](https://github.com/NativeScript/ios/compare/v9.0.0...v9.0.1) (2025-11-25)
+
+
+### Bug Fixes
+
+* node built-in modules handling ([#319](https://github.com/NativeScript/ios/issues/319)) ([f748751](https://github.com/NativeScript/ios/commit/f748751c74968ea015c8abff30fe86bfacd84930))
+* **runtime:** app path substr considerations ([#314](https://github.com/NativeScript/ios/issues/314)) ([fd2703d](https://github.com/NativeScript/ios/commit/fd2703d59e6ba2472d8baefe014f0afc4c8952df))
+
+
+
 # [9.0.0](https://github.com/NativeScript/ios/compare/v8.9.5...v9.0.0) (2025-11-17)
 
 
