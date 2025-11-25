@@ -1240,117 +1240,111 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     // Check if this is a Node.js built-in module (e.g., node:url)
     if (IsNodeBuiltinModule(spec)) {
-      // Strip the "node:" prefix and try to resolve as a regular module
+      // Strip the "node:" prefix and create an in-memory polyfill module.
       std::string builtinName = spec.substr(5);  // Remove "node:" prefix
-      std::string builtinPath = NormalizePath(RuntimeConfig.ApplicationPath + "/" + builtinName + ".mjs");
 
-      // Check if a polyfill file exists
-      if (!isFile(builtinPath)) {
-        // Create a basic polyfill for the built-in module
-        std::string polyfillContent;
+      // Use a virtual key for registry
+      std::string key = std::string("node:") + builtinName;
 
-        if (builtinName == "url") {
-          // Create a polyfill for node:url with fileURLToPath
-          polyfillContent = "// Polyfill for node:url\n"
-                            "export function fileURLToPath(url) {\n"
-                            "  if (typeof url === 'string') {\n"
-                            "    if (url.startsWith('file://')) {\n"
-                            "      return decodeURIComponent(url.slice(7));\n"
-                            "    }\n"
-                            "    return url;\n"
-                            "  }\n"
-                            "  if (url && typeof url.href === 'string') {\n"
-                            "    return fileURLToPath(url.href);\n"
-                            "  }\n"
-                            "  throw new Error('Invalid URL');\n"
-                            "}\n"
-                            "\n"
-                            "export function pathToFileURL(path) {\n"
-                            "  return new URL('file://' + encodeURIComponent(path));\n"
-                            "}\n";
-        } else {
-          // Generic polyfill for other Node.js built-in modules
-          polyfillContent = "// Polyfill for node:" + builtinName +
-                            "\n"
-                            "console.warn('Node.js built-in module \\'node:" +
-                            builtinName +
-                            "\\' is not fully supported in NativeScript');\n"
-                            "export default {};\n";
+      auto itExisting = g_moduleRegistry.find(key);
+      if (itExisting != g_moduleRegistry.end()) {
+        v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
+        if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
+          return v8::MaybeLocal<v8::Module>(existing);
         }
+        RemoveModuleFromRegistry(key);
+      }
 
-        // Write polyfill file
-        NSString* polyfillPathStr = [NSString stringWithUTF8String:builtinPath.c_str()];
-        NSString* polyfillContentStr = [NSString stringWithUTF8String:polyfillContent.c_str()];
-
-        if ([polyfillContentStr writeToFile:polyfillPathStr
-                                 atomically:YES
-                                   encoding:NSUTF8StringEncoding
-                                      error:nil]) {
-          // File created successfully, now resolve it normally
-          absPath = builtinPath;
-        } else {
-          // Failed to create file, fall back to throwing error
-          std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-          if (RuntimeConfig.IsDebug) {
-            Log(@"Debug mode - Node.js polyfill creation failed: %s", msg.c_str());
-            // Return empty instead of crashing in debug mode
-            return v8::MaybeLocal<v8::Module>();
-          } else {
-            isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-            return v8::MaybeLocal<v8::Module>();
-          }
-        }
+      std::string polyfillContent;
+      if (builtinName == "url") {
+        // Polyfill for node:url with fileURLToPath/pathToFileURL
+        polyfillContent =
+            "// In-memory polyfill for node:url\n"
+            "export function fileURLToPath(url) {\n"
+            "  if (typeof url === 'string') {\n"
+            "    if (url.startsWith('file://')) {\n"
+            "      return decodeURIComponent(url.slice(7));\n"
+            "    }\n"
+            "    return url;\n"
+            "  }\n"
+            "  if (url && typeof url.href === 'string') {\n"
+            "    return fileURLToPath(url.href);\n"
+            "  }\n"
+            "  throw new Error('Invalid URL');\n"
+            "}\n"
+            "\n"
+            "export function pathToFileURL(path) {\n"
+            "  const encoded = encodeURIComponent(path).replace(/%2F/g, '/');\n"
+            "  return new URL('file://' + encoded);\n"
+            "}\n";
       } else {
-        // Polyfill file already exists, use it
-        absPath = builtinPath;
+        // Generic polyfill for other Node.js built-in modules
+        polyfillContent =
+            "// In-memory polyfill for node:" + builtinName + "\n" +
+            "console.warn('Node.js built-in module \\'node:" + builtinName +
+            "\\' is not fully supported in NativeScript');\n" +
+            "export default {};\n";
+      }
+
+      v8::MaybeLocal<v8::Module> m =
+          CompileModuleForResolveRegisterOnly(isolate, context, polyfillContent, key);
+      if (!m.IsEmpty()) {
+        v8::Local<v8::Module> mod;
+        if (m.ToLocal(&mod)) {
+          return m;
+        }
+      }
+
+      std::string msg = "Cannot find module " + spec + " (failed to create in-memory polyfill)";
+      if (RuntimeConfig.IsDebug) {
+        Log(@"Debug mode - Node.js polyfill creation failed: %s", msg.c_str());
+        return v8::MaybeLocal<v8::Module>();
+      } else {
+        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+        return v8::MaybeLocal<v8::Module>();
       }
     } else if (IsLikelyOptionalModule(spec)) {
-      // Treat bare specifiers as optional modules by creating a placeholder ES module that
-      // throws on property access. This lets applications guard optional imports at runtime
-      // without crashing during startup, especially in development.
-      std::string appPath = RuntimeConfig.ApplicationPath;
-      std::string placeholderPath = NormalizePath(appPath + "/" + spec + ".mjs");
+      // Treat bare specifiers as optional modules with an in-memory placeholder ES module
+      // that throws on property access. This avoids bundle writes in iOS release builds.
 
-      // Check if placeholder file already exists
-      if (!isFile(placeholderPath)) {
-        // Create placeholder content
-        std::string placeholderContent = "const error = new Error('Module \\\'" + spec +
-                                         "\\\' is not available. This is an optional module.');\n"
-                                         "const proxy = new Proxy({}, {\n"
-                                         "  get: function(target, prop) { throw error; },\n"
-                                         "  set: function(target, prop, value) { throw error; },\n"
-                                         "  has: function(target, prop) { return false; },\n"
-                                         "  ownKeys: function(target) { return []; },\n"
-                                         "  getPrototypeOf: function(target) { return null; }\n"
-                                         "});\n"
-                                         "export default proxy;\n";
-
-        // Write placeholder file
-        NSString* placeholderPathStr = [NSString stringWithUTF8String:placeholderPath.c_str()];
-        NSString* placeholderContentStr =
-            [NSString stringWithUTF8String:placeholderContent.c_str()];
-
-        if ([placeholderContentStr writeToFile:placeholderPathStr
-                                    atomically:YES
-                                      encoding:NSUTF8StringEncoding
-                                         error:nil]) {
-          // File created successfully, now resolve it normally
-          absPath = placeholderPath;
-        } else {
-          // Failed to create file. In debug, avoid throwing to keep dev sessions alive; in release
-          // throw to surface the missing optional module.
-          std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-          if (RuntimeConfig.IsDebug) {
-            Log(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
-            return v8::MaybeLocal<v8::Module>();
-          } else {
-            isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-            return v8::MaybeLocal<v8::Module>();
-          }
+      std::string key = std::string("optional:") + spec;
+      auto itExisting = g_moduleRegistry.find(key);
+      if (itExisting != g_moduleRegistry.end()) {
+        v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
+        if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
+          return v8::MaybeLocal<v8::Module>(existing);
         }
+        RemoveModuleFromRegistry(key);
+      }
+
+        std::string placeholderContent =
+            "const error = new Error(\"Module '" + spec +
+            "' is not available. This is an optional module.\");\n"
+            "const proxy = new Proxy({}, {\n"
+            "  get: function(target, prop) { throw error; },\n"
+            "  set: function(target, prop, value) { throw error; },\n"
+            "  has: function(target, prop) { return false; },\n"
+            "  ownKeys: function(target) { return []; },\n"
+            "  getPrototypeOf: function(target) { return null; }\n"
+            "});\n"
+            "export default proxy;\n";
+
+      v8::MaybeLocal<v8::Module> m =
+          CompileModuleForResolveRegisterOnly(isolate, context, placeholderContent, key);
+      if (!m.IsEmpty()) {
+        v8::Local<v8::Module> mod;
+        if (m.ToLocal(&mod)) {
+          return m;
+        }
+      }
+
+      std::string msg = "Cannot find module " + spec + " (failed to create in-memory optional placeholder)";
+      if (RuntimeConfig.IsDebug) {
+        Log(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
+        return v8::MaybeLocal<v8::Module>();
       } else {
-        // Placeholder file already exists, use it
-        absPath = placeholderPath;
+        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+        return v8::MaybeLocal<v8::Module>();
       }
     } else {
       // Not an optional module, throw the original error

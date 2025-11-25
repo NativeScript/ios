@@ -87,6 +87,9 @@ require("./URLPattern");
 // HTTP ESM Loader tests
 require("./HttpEsmLoaderTests");
 
+// Node built-in and optional module resolution tests (ESM)
+require("./NodeBuiltinsAndOptionalModulesTests.mjs");
+
 // Exception handling tests
 require("./ExceptionHandlingTests");
 
