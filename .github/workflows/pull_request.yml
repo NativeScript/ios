@@ -52,12 +52,12 @@ jobs:
       - name: Build
         run: npm run build-ios
       - name: Upload npm package artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: npm-package
           path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
       - name: Upload dSYMs artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: NativeScript-dSYMs
           path: dist/dSYMs
@@ -119,7 +119,7 @@ jobs:
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
       - name: Archive Test Result Data
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: test-results
           path: ${{env.TEST_FOLDER}}/test_results.xcresult
