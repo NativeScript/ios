@@ -65,11 +65,8 @@ class TimerState {
       it->second->Unschedule();
       timerMap_.erase(it);
       CFRunLoopTimerInvalidate(timer);
-      // timer and context will be released by the retain function
-      // CFRunLoopTimerContext context;
-      // CFRunLoopTimerGetContext(timer, &context);
-      // delete static_cast<std::shared_ptr<TimerTask>*>(context.info);
-      // CFRelease(timer);
+      // CFRunLoopTimerInvalidate triggers our TimerRelease callback, which
+      // deletes TimerContext, whose destructor calls CFRelease(task->timer)
     }
   }
 
