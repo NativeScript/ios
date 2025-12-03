@@ -72,6 +72,27 @@ void PromiseProxy::Init(v8::Local<v8::Context> context) {
                     });
                 }
             });
+            globalThis = new Proxy(globalThis, {
+                defineProperty: (target, prop, descriptor) => {
+                    if (prop === 'Promise') {
+                        return true;
+                    }
+                    return Object.defineProperty(target, prop, descriptor);
+                },
+                set: (target, prop, value, receiver) => {
+                    if (prop === 'Promise') {
+                        return true;
+                    }
+
+                    const descriptor = Object.getOwnPropertyDescriptor(target, prop);
+                    if (descriptor && !descriptor.writable) {
+                        return false;
+                    }
+
+                    target[prop] = value;
+                    return true;
+                }
+            });
         })();
     )";
 
