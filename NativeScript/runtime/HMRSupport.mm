@@ -193,7 +193,29 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   if (query.empty()) return originAndPath;
 
   if (isAppMod) {
-    return originAndPath;
+    // Treat query params as part of module identity (browser-like),
+    // but ignore internal `import` markers.
+    std::vector<std::string> kept;
+    size_t start = 0;
+    while (start <= query.size()) {
+      size_t amp = query.find('&', start);
+      std::string pair = (amp == std::string::npos) ? query.substr(start) : query.substr(start, amp - start);
+      if (!pair.empty()) {
+        size_t eq = pair.find('=');
+        std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
+        if (!(name == "import")) kept.push_back(pair);
+      }
+      if (amp == std::string::npos) break;
+      start = amp + 1;
+    }
+    if (kept.empty()) return originAndPath;
+    std::sort(kept.begin(), kept.end());
+    std::string rebuilt = originAndPath + "?";
+    for (size_t i = 0; i < kept.size(); i++) {
+      if (i > 0) rebuilt += "&";
+      rebuilt += kept[i];
+    }
+    return rebuilt;
   }
 
   if (isRt || isCore) {
