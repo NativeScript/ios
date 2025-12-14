@@ -1,6 +1,8 @@
 #include "HMRSupport.h"
 #import <Foundation/Foundation.h>
 #include <algorithm>
+#include <cctype>
+#include <cstring>
 #include "DevFlags.h"
 
 #include <unordered_map>
@@ -182,78 +184,38 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   std::string originAndPath = (qPos == std::string::npos) ? noHash : noHash.substr(0, qPos);
   std::string query = (qPos == std::string::npos) ? std::string() : noHash.substr(qPos + 1);
 
-  // Decide behavior based on path prefix
-  std::string pathOnly = noHash.substr(pathStart, (qPos == std::string::npos) ? std::string::npos : (qPos - pathStart));
-  bool isAppMod = pathOnly.find("/ns/m") != std::string::npos;
-  bool isSfcMod = pathOnly.find("/ns/sfc") != std::string::npos;
-  bool isSfcAsm = pathOnly.find("/ns/asm") != std::string::npos;
-  bool isRt = pathOnly.find("/ns/rt") != std::string::npos;
-  bool isCore = pathOnly.find("/ns/core") != std::string::npos;
+  // Normalize bridge endpoints to keep a single realm across HMR updates:
+  // - /ns/rt/<ver>    -> /ns/rt
+  // - /ns/core/<ver>  -> /ns/core
+  // Preserve query params (e.g. /ns/core?p=...) as part of module identity.
+  {
+    std::string pathOnly = originAndPath.substr(pathStart);
+    auto normalizeBridge = [&](const char* needle) {
+      size_t nlen = strlen(needle);
+      if (pathOnly.compare(0, nlen, needle) != 0) return;
+      if (pathOnly.size() == nlen) return; // already canonical
+      if (pathOnly.size() <= nlen + 1 || pathOnly[nlen] != '/') return;
+
+      // Only normalize exact version segment: /ns/*/<digits> (no further segments)
+      size_t i = nlen + 1;
+      size_t j = i;
+      while (j < pathOnly.size() && std::isdigit(static_cast<unsigned char>(pathOnly[j]))) {
+        j++;
+      }
+      if (j == i) return;              // no digits
+      if (j != pathOnly.size()) return; // has extra path
+
+      originAndPath = originAndPath.substr(0, pathStart) + std::string(needle);
+      pathOnly = originAndPath.substr(pathStart);
+    };
+
+    normalizeBridge("/ns/rt");
+    normalizeBridge("/ns/core");
+  }
 
   if (query.empty()) return originAndPath;
 
-  if (isAppMod) {
-    // Treat query params as part of module identity (browser-like),
-    // but ignore internal `import` markers.
-    std::vector<std::string> kept;
-    size_t start = 0;
-    while (start <= query.size()) {
-      size_t amp = query.find('&', start);
-      std::string pair = (amp == std::string::npos) ? query.substr(start) : query.substr(start, amp - start);
-      if (!pair.empty()) {
-        size_t eq = pair.find('=');
-        std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
-        if (!(name == "import")) kept.push_back(pair);
-      }
-      if (amp == std::string::npos) break;
-      start = amp + 1;
-    }
-    if (kept.empty()) return originAndPath;
-    std::sort(kept.begin(), kept.end());
-    std::string rebuilt = originAndPath + "?";
-    for (size_t i = 0; i < kept.size(); i++) {
-      if (i > 0) rebuilt += "&";
-      rebuilt += kept[i];
-    }
-    return rebuilt;
-  }
-
-  if (isRt || isCore) {
-    std::string canonical = originAndPath;
-    const char* needle = isRt ? "/ns/rt" : "/ns/core";
-    size_t pos = canonical.find(needle);
-    if (pos != std::string::npos) {
-      canonical = canonical.substr(0, pos) + std::string(needle);
-    }
-    return canonical;
-  }
-
-  if (isSfcMod || isSfcAsm) {
-    std::vector<std::string> keptParams;
-    size_t startPos = 0;
-    while (startPos <= query.size()) {
-      size_t amp = query.find('&', startPos);
-      std::string pair = (amp == std::string::npos) ? query.substr(startPos) : query.substr(startPos, amp - startPos);
-      if (!pair.empty()) {
-        size_t eq = pair.find('=');
-        std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
-        if (!(name == "import")) {
-          keptParams.push_back(pair);
-        }
-      }
-      if (amp == std::string::npos) break;
-      startPos = amp + 1;
-    }
-    if (keptParams.empty()) return originAndPath;
-    std::string rebuilt = originAndPath + "?";
-    for (size_t i = 0; i < keptParams.size(); i++) {
-      rebuilt += keptParams[i];
-      if (i + 1 < keptParams.size()) rebuilt += "&";
-    }
-    return rebuilt;
-  }
-
-  // Other URLs: keep all params except Vite's import marker; sort for stability
+  // Keep all params except Vite's import marker; sort for stability.
   std::vector<std::string> kept;
   size_t start = 0;
   while (start <= query.size()) {
