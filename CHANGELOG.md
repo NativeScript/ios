@@ -1,3 +1,14 @@
+## [9.0.2](https://github.com/NativeScript/ios/compare/v9.0.1...v9.0.2) (2025-12-14)
+
+
+### Bug Fixes
+
+* http realm cache key with query params ([#328](https://github.com/NativeScript/ios/issues/328)) ([f0c9df3](https://github.com/NativeScript/ios/commit/f0c9df35ecf01aaad340d325b0fba3f8ec083eae))
+* http realm normalization ([faa6762](https://github.com/NativeScript/ios/commit/faa67626695f133f5d37dca09aaab957214c7bd2))
+* URLSearchParams.forEach() crash and spec compliance ([#327](https://github.com/NativeScript/ios/issues/327)) ([28242ec](https://github.com/NativeScript/ios/commit/28242ecc3bc52875f7ffe13ae1665224026191a3))
+
+
+
 ## [9.0.1](https://github.com/NativeScript/ios/compare/v9.0.0...v9.0.1) (2025-11-25)
 
 
