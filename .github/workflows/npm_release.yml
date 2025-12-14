@@ -34,7 +34,7 @@ jobs:
           key: ${{ hashFiles('download_llvm.sh') }}
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: 20
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
       - name: Install Python
         uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4.9.1
@@ -101,7 +101,7 @@ jobs:
           key: ${{ hashFiles('download_llvm.sh') }}
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: 20
+          node-version: 22
       - name: Install Python
         uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4.9.1
         with:
@@ -150,6 +150,7 @@ jobs:
           path: ${{env.TEST_FOLDER}}/test_results.xcresult
   publish:
     runs-on: ubuntu-latest
+    environment: npm-publish
     needs:
       - build
       - test
@@ -166,16 +167,33 @@ jobs:
           egress-policy: audit
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: 20
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: npm-package
           path: dist
-      - name: Publish package
+      - name: Update npm (required for OIDC trusted publishing)
         run: |
-          echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG..."
-          npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --provenance
+          npm install -g npm@^11.5.1
+          npm --version
+      - name: Publish package (OIDC trusted publishing)
+        if: ${{ vars.USE_NPM_TOKEN != 'true' }}
+        run: |
+          echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG via OIDC trusted publishing..."
+          unset NODE_AUTH_TOKEN
+          if [ -n "${NPM_CONFIG_USERCONFIG:-}" ]; then
+            rm -f "$NPM_CONFIG_USERCONFIG"
+          fi
+          npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ""
+
+      - name: Publish package (granular token)
+        if: ${{ vars.USE_NPM_TOKEN == 'true' }}
+        run: |
+          echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG via granular token..."
+          npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
   github-release:
@@ -199,7 +217,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: 20
+          node-version: 22
       - name: Setup
         run: npm install
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
