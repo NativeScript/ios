@@ -19,6 +19,11 @@ static inline bool StartsWith(const std::string& s, const char* prefix) {
   return s.size() >= n && s.compare(0, n, prefix) == 0;
 }
 
+static inline bool EndsWith(const std::string& s, const char* suffix) {
+  size_t n = strlen(suffix);
+  return s.size() >= n && s.compare(s.size() - n, n, suffix) == 0;
+}
+
 // Per-module hot data and callbacks. Keyed by canonical module path.
 static std::unordered_map<std::string, v8::Global<v8::Object>> g_hotData;
 static std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>> g_hotAccept;
@@ -82,9 +87,67 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
   // Ensure context scope for property creation
   v8::HandleScope scope(isolate);
 
+  // Canonicalize key to ensure per-module hot.data persists across HMR URLs.
+  // Important: this must NOT affect the HTTP loader cache key; otherwise HMR fetches
+  // can collapse onto an already-evaluated module and no update occurs.
+  auto canonicalHotKey = [&](const std::string& in) -> std::string {
+    // Unwrap file://http(s)://...
+    std::string s = in;
+    if (StartsWith(s, "file://http://") || StartsWith(s, "file://https://")) {
+      s = s.substr(strlen("file://"));
+    }
+
+    // Drop fragment
+    size_t hashPos = s.find('#');
+    if (hashPos != std::string::npos) s = s.substr(0, hashPos);
+
+    // Split query (we'll drop it for hot key stability)
+    size_t qPos = s.find('?');
+    std::string noQuery = (qPos == std::string::npos) ? s : s.substr(0, qPos);
+
+    // If it's an http(s) URL, normalize only the path portion below.
+    size_t schemePos = noQuery.find("://");
+    size_t pathStart = (schemePos == std::string::npos) ? 0 : noQuery.find('/', schemePos + 3);
+    if (pathStart == std::string::npos) {
+      // No path; return without query
+      return noQuery;
+    }
+
+    std::string origin = noQuery.substr(0, pathStart);
+    std::string path = noQuery.substr(pathStart);
+
+    // Normalize NS HMR virtual module paths:
+    // /ns/m/__ns_hmr__/<token>/<rest> -> /ns/m/<rest>
+    const char* hmrPrefix = "/ns/m/__ns_hmr__/";
+    size_t hmrLen = strlen(hmrPrefix);
+    if (path.compare(0, hmrLen, hmrPrefix) == 0) {
+      size_t nextSlash = path.find('/', hmrLen);
+      if (nextSlash != std::string::npos) {
+        path = std::string("/ns/m/") + path.substr(nextSlash + 1);
+      }
+    }
+
+    // Normalize common script extensions so `/foo` and `/foo.ts` share hot.data.
+    const char* exts[] = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"};
+    for (auto ext : exts) {
+      if (EndsWith(path, ext)) {
+        path = path.substr(0, path.size() - strlen(ext));
+        break;
+      }
+    }
+
+    // Also drop `.vue`? No — SFC endpoints should stay distinct.
+    return origin + path;
+  };
+
+  const std::string key = canonicalHotKey(modulePath);
+  if (tns::IsScriptLoadingLogEnabled() && key != modulePath) {
+    Log(@"[hmr] canonical key: %s -> %s", modulePath.c_str(), key.c_str());
+  }
+
   // Helper to capture key in function data
-  auto makeKeyData = [&](const std::string& key) -> Local<Value> {
-    return tns::ToV8String(isolate, key.c_str());
+  auto makeKeyData = [&](const std::string& k) -> Local<Value> {
+    return tns::ToV8String(isolate, k.c_str());
   };
 
   // accept([deps], cb?) — we register cb if provided; deps ignored for now
@@ -134,22 +197,22 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
   Local<Object> hot = Object::New(isolate);
   // Stable flags
   hot->CreateDataProperty(context, tns::ToV8String(isolate, "data"),
-                          GetOrCreateHotData(isolate, modulePath)).Check();
+                          GetOrCreateHotData(isolate, key)).Check();
   hot->CreateDataProperty(context, tns::ToV8String(isolate, "prune"),
                           v8::Boolean::New(isolate, false)).Check();
   // Methods
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "accept"),
-      v8::Function::New(context, acceptCb, makeKeyData(modulePath)).ToLocalChecked()).Check();
+      v8::Function::New(context, acceptCb, makeKeyData(key)).ToLocalChecked()).Check();
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "dispose"),
-      v8::Function::New(context, disposeCb, makeKeyData(modulePath)).ToLocalChecked()).Check();
+      v8::Function::New(context, disposeCb, makeKeyData(key)).ToLocalChecked()).Check();
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "decline"),
-      v8::Function::New(context, declineCb, makeKeyData(modulePath)).ToLocalChecked()).Check();
+      v8::Function::New(context, declineCb, makeKeyData(key)).ToLocalChecked()).Check();
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "invalidate"),
-      v8::Function::New(context, invalidateCb, makeKeyData(modulePath)).ToLocalChecked()).Check();
+      v8::Function::New(context, invalidateCb, makeKeyData(key)).ToLocalChecked()).Check();
 
   // Attach to import.meta
   importMeta->CreateDataProperty(
@@ -158,15 +221,20 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
 }
 
 // ─────────────────────────────────────────────────────────────
-// Dev HTTP loader helpers
+// HTTP loader helpers
 
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
-  if (!(StartsWith(url, "http://") || StartsWith(url, "https://"))) {
-    return url;
+  // Some loaders wrap HTTP module URLs as file://http(s)://...
+  std::string normalizedUrl = url;
+  if (StartsWith(normalizedUrl, "file://http://") || StartsWith(normalizedUrl, "file://https://")) {
+    normalizedUrl = normalizedUrl.substr(strlen("file://"));
+  }
+  if (!(StartsWith(normalizedUrl, "http://") || StartsWith(normalizedUrl, "https://"))) {
+    return normalizedUrl;
   }
   // Drop fragment entirely
-  size_t hashPos = url.find('#');
-  std::string noHash = (hashPos == std::string::npos) ? url : url.substr(0, hashPos);
+  size_t hashPos = normalizedUrl.find('#');
+  std::string noHash = (hashPos == std::string::npos) ? normalizedUrl : normalizedUrl.substr(0, hashPos);
 
   // Locate path start and query start
   size_t schemePos = noHash.find("://");
@@ -184,10 +252,10 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   std::string originAndPath = (qPos == std::string::npos) ? noHash : noHash.substr(0, qPos);
   std::string query = (qPos == std::string::npos) ? std::string() : noHash.substr(qPos + 1);
 
-  // Normalize bridge endpoints to keep a single realm across HMR updates:
+  // Normalize bridge endpoints to keep a single realm across reloads:
   // - /ns/rt/<ver>    -> /ns/rt
   // - /ns/core/<ver>  -> /ns/core
-  // Preserve query params (e.g. /ns/core?p=...) as part of module identity.
+  // Preserve query params (e.g. /ns/core?p=...), except for internal cache-busters (import, t, v), as part of module identity.
   {
     std::string pathOnly = originAndPath.substr(pathStart);
     auto normalizeBridge = [&](const char* needle) {
@@ -213,9 +281,27 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     normalizeBridge("/ns/core");
   }
 
+  // IMPORTANT: This function is used as an HTTP module registry/cache key.
+  // For general-purpose HTTP module loading (public internet), the query string
+  // can be part of the module's identity (auth, content versioning, routing, etc).
+  // Therefore we only apply query normalization (sorting/dropping) for known
+  // NativeScript dev endpoints where `t`/`v`/`import` are purely cache busters.
+  {
+    std::string pathOnly = originAndPath.substr(pathStart);
+    const bool isDevEndpoint =
+      StartsWith(pathOnly, "/ns/") ||
+      StartsWith(pathOnly, "/node_modules/.vite/") ||
+      StartsWith(pathOnly, "/@id/") ||
+      StartsWith(pathOnly, "/@fs/");
+    if (!isDevEndpoint) {
+      // Preserve query as-is (fragment already removed).
+      return noHash;
+    }
+  }
+
   if (query.empty()) return originAndPath;
 
-  // Keep all params except Vite's import marker; sort for stability.
+  // Keep all params except typical import markers or t/v cache busters; sort for stability.
   std::vector<std::string> kept;
   size_t start = 0;
   while (start <= query.size()) {
@@ -224,7 +310,8 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     if (!pair.empty()) {
       size_t eq = pair.find('=');
       std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
-      if (!(name == "import")) kept.push_back(pair);
+      // Drop import marker and common cache-busting stamps.
+      if (!(name == "import" || name == "t" || name == "v")) kept.push_back(pair);
     }
     if (amp == std::string::npos) break;
     start = amp + 1;
