@@ -728,8 +728,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // the HTTP dev loader and return before any filesystem candidate logic runs.
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
     std::string key = CanonicalizeHttpUrlKey(spec);
-    // Added instrumentation for unified phase logging
-    Log(@"[http-esm][compile][begin] %s", key.c_str());
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-esm][compile][begin] %s", key.c_str());
+    }
     // Reuse compiled module if present and healthy
     auto itExisting = g_moduleRegistry.find(key);
     if (itExisting != g_moduleRegistry.end()) {
