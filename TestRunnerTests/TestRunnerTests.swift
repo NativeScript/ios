@@ -18,14 +18,58 @@ class TestRunnerTests: XCTestCase {
                 startResponse: @escaping ((String, [(String, String)]) -> Void),
                 sendBody: @escaping ((Data) -> Void)
             ) in
+            let method = (environ["REQUEST_METHOD"] as? String) ?? ""
+            let path = (environ["PATH_INFO"] as? String) ?? "/"
+            let query = (environ["QUERY_STRING"] as? String) ?? ""
 
-            let method: String? = environ["REQUEST_METHOD"] as! String?
-            if method != "POST" {
-                XCTFail("invalid request method")
-                startResponse("204 No Content", [])
-                sendBody(Data())
-                self.runtimeUnitTestsExpectation.fulfill()
-            } else {
+            // Serve tiny ESM modules for runtime HTTP loader tests.
+            if method == "GET" {
+                if path == "/esm/query.mjs" || path == "/ns/m/query.mjs" {
+                    func jsStringLiteral(_ s: String) -> String {
+                        return s
+                            .replacingOccurrences(of: "\\", with: "\\\\")
+                            .replacingOccurrences(of: "\"", with: "\\\"")
+                            .replacingOccurrences(of: "\n", with: "\\n")
+                            .replacingOccurrences(of: "\r", with: "\\r")
+                    }
+                    let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
+                    let body = """
+                    export const path = \"\(jsStringLiteral(path))\";
+                    export const query = \"\(jsStringLiteral(query))\";
+                    export const evaluatedAt = \(nowMs);
+                    export default { path, query, evaluatedAt };
+                    """
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
+                if path == "/esm/timeout.mjs" {
+                    // Intentionally delay the response so the runtime HTTP loader hits its request timeout.
+                    // This avoids ATS issues from testing against external plain-http URLs.
+                    var delayMs = 6500
+                    if let pair = query
+                        .split(separator: "&")
+                        .first(where: { $0.hasPrefix("delayMs=") }),
+                       let v = Int(pair.split(separator: "=").last ?? "") {
+                        delayMs = v
+                    }
+                    Thread.sleep(forTimeInterval: Double(delayMs) / 1000.0)
+
+                    let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
+                    let body = "export const evaluatedAt = \(nowMs); export default { evaluatedAt };"
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
+                startResponse("404 Not Found", [("Content-Type", "text/plain; charset=utf-8")])
+                sendBody(Data("Not Found".utf8))
+                return
+            }
+
+            // Collect Jasmine JUnit report.
+            if method == "POST" && path == "/junit_report" {
                 var buffer = Data()
                 let input = environ["swsgi.input"] as! SWSGIInput
                 var finished = false
@@ -43,7 +87,11 @@ class TestRunnerTests: XCTestCase {
                         self.runtimeUnitTestsExpectation.fulfill()
                     }
                 }
+                return
             }
+
+            startResponse("404 Not Found", [("Content-Type", "text/plain; charset=utf-8")])
+            sendBody(Data("Not Found".utf8))
         }
 
         try! server.start()
