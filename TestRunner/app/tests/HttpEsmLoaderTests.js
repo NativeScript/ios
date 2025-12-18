@@ -3,12 +3,47 @@
 
 describe("HTTP ESM Loader", function() {
 
+    function formatError(e) {
+        try {
+            if (!e) return "(no error)";
+            if (e instanceof Error) return e.message;
+            if (typeof e === "string") return e;
+            if (e && typeof e.message === "string") return e.message;
+            return JSON.stringify(e);
+        } catch (_) {
+            return String(e);
+        }
+    }
+
+    function withTimeout(promise, ms, label) {
+        return new Promise(function(resolve, reject) {
+            var timer = setTimeout(function() {
+                reject(new Error("Timeout after " + ms + "ms" + (label ? ": " + label : "")));
+            }, ms);
+
+            promise.then(function(value) {
+                clearTimeout(timer);
+                resolve(value);
+            }).catch(function(err) {
+                clearTimeout(timer);
+                reject(err);
+            });
+        });
+    }
+
     function getHostOrigin() {
         try {
             var reportUrl = NSProcessInfo.processInfo.environment.objectForKey("REPORT_BASEURL");
             if (!reportUrl) return null;
             // REPORT_BASEURL is like: http://[::1]:63846/junit_report
-            return new URL(String(reportUrl)).origin;
+            // In CI the host may be bound to IPv6 loopback; normalize to IPv4 loopback to avoid
+            // simulator connectivity issues/timeouts when importing HTTP modules.
+            var u = new URL(String(reportUrl));
+            var host = String(u.hostname);
+            if (host === "::1" || host === "localhost") {
+                u.hostname = "127.0.0.1";
+            }
+            return u.origin;
         } catch (e) {
             return null;
         }
@@ -206,7 +241,7 @@ describe("HTTP ESM Loader", function() {
                 ? [origin + "/esm/hmr/hot-data-ext.mjs", origin + "/esm/hmr/hot-data-ext.js"]
                 : ["~/tests/esm/hmr/hot-data-ext.mjs"];
 
-            Promise.all(specs.map(function (s) { return import(s); }))
+            withTimeout(Promise.all(specs.map(function (s) { return import(s); })), 5000, "import hot-data test modules")
                 .then(function (mods) {
                     var mjs = mods[0];
                     var apiMjs = mjs && typeof mjs.testHotApi === "function" ? mjs.testHotApi() : null;
@@ -227,7 +262,7 @@ describe("HTTP ESM Loader", function() {
                     done();
                 })
                 .catch(function (error) {
-                    fail("Expected hot-data test modules to import: " + (error && error.message ? error.message : String(error)));
+                    fail(new Error("Expected hot-data test modules to import: " + formatError(error)));
                     done();
                 });
         });
@@ -240,10 +275,10 @@ describe("HTTP ESM Loader", function() {
                 return;
             }
 
-            Promise.all([
+            withTimeout(Promise.all([
                 import(origin + "/esm/hmr/hot-data-ext.mjs"),
                 import(origin + "/esm/hmr/hot-data-ext.js"),
-            ])
+            ]), 5000, "import .mjs/.js hot-data modules")
                 .then(function (mods) {
                     var mjs = mods[0];
                     var js = mods[1];
@@ -270,7 +305,7 @@ describe("HTTP ESM Loader", function() {
                     done();
                 })
                 .catch(function (error) {
-                    fail("Expected hot.data sharing assertions to succeed: " + (error && error.message ? error.message : String(error)));
+                    fail(new Error("Expected hot.data sharing assertions to succeed: " + formatError(error)));
                     done();
                 });
         });
@@ -288,9 +323,9 @@ describe("HTTP ESM Loader", function() {
             var u1 = origin + "/esm/query.mjs?v=1";
             var u2 = origin + "/esm/query.mjs?v=2";
 
-            import(u1)
+            withTimeout(import(u1), 5000, "import " + u1)
                 .then(function (m1) {
-                    return import(u2).then(function (m2) {
+                    return withTimeout(import(u2), 5000, "import " + u2).then(function (m2) {
                         expect(m1.query).toContain("v=1");
                         expect(m2.query).toContain("v=2");
                         expect(m1.query).not.toBe(m2.query);
@@ -298,7 +333,7 @@ describe("HTTP ESM Loader", function() {
                     });
                 })
                 .catch(function (error) {
-                    fail("Expected host HTTP module imports to succeed: " + (error && error.message ? error.message : String(error)));
+                    fail(new Error("Expected host HTTP module imports to succeed: " + formatError(error)));
                     done();
                 });
         });
@@ -314,9 +349,9 @@ describe("HTTP ESM Loader", function() {
             var u1 = origin + "/ns/m/query.mjs?v=1";
             var u2 = origin + "/ns/m/query.mjs?v=2";
 
-            import(u1)
+            withTimeout(import(u1), 5000, "import " + u1)
                 .then(function (m1) {
-                    return import(u2).then(function (m2) {
+                    return withTimeout(import(u2), 5000, "import " + u2).then(function (m2) {
                         // With cache-buster normalization, both imports should map to the same cache key.
                         // The second import should reuse the first evaluated module.
                         expect(m2.evaluatedAt).toBe(m1.evaluatedAt);
@@ -325,7 +360,7 @@ describe("HTTP ESM Loader", function() {
                     });
                 })
                 .catch(function (error) {
-                    fail("Expected dev-endpoint HTTP module imports to succeed: " + (error && error.message ? error.message : String(error)));
+                    fail(new Error("Expected dev-endpoint HTTP module imports to succeed: " + formatError(error)));
                     done();
                 });
         });
@@ -341,16 +376,16 @@ describe("HTTP ESM Loader", function() {
             var u1 = origin + "/ns/m/query.mjs?b=2&a=1";
             var u2 = origin + "/ns/m/query.mjs?a=1&b=2";
 
-            import(u1)
+            withTimeout(import(u1), 5000, "import " + u1)
                 .then(function (m1) {
-                    return import(u2).then(function (m2) {
+                    return withTimeout(import(u2), 5000, "import " + u2).then(function (m2) {
                         expect(m2.evaluatedAt).toBe(m1.evaluatedAt);
                         expect(m2.query).toBe(m1.query);
                         done();
                     });
                 })
                 .catch(function (error) {
-                    fail("Expected dev-endpoint HTTP module imports to succeed: " + (error && error.message ? error.message : String(error)));
+                    fail(new Error("Expected dev-endpoint HTTP module imports to succeed: " + formatError(error)));
                     done();
                 });
         });
@@ -366,15 +401,15 @@ describe("HTTP ESM Loader", function() {
             var u1 = origin + "/esm/query.mjs#one";
             var u2 = origin + "/esm/query.mjs#two";
 
-            import(u1)
+            withTimeout(import(u1), 5000, "import " + u1)
                 .then(function (m1) {
-                    return import(u2).then(function (m2) {
+                    return withTimeout(import(u2), 5000, "import " + u2).then(function (m2) {
                         expect(m2.evaluatedAt).toBe(m1.evaluatedAt);
                         done();
                     });
                 })
                 .catch(function (error) {
-                    fail("Expected fragment HTTP module imports to succeed: " + (error && error.message ? error.message : String(error)));
+                    fail(new Error("Expected fragment HTTP module imports to succeed: " + formatError(error)));
                     done();
                 });
         });
