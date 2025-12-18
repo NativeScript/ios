@@ -35,14 +35,7 @@ describe("HTTP ESM Loader", function() {
         try {
             var reportUrl = NSProcessInfo.processInfo.environment.objectForKey("REPORT_BASEURL");
             if (!reportUrl) return null;
-            // REPORT_BASEURL is like: http://[::1]:63846/junit_report
-            // In CI the host may be bound to IPv6 loopback; normalize to IPv4 loopback to avoid
-            // simulator connectivity issues/timeouts when importing HTTP modules.
             var u = new URL(String(reportUrl));
-            var host = String(u.hostname);
-            if (host === "::1" || host === "localhost") {
-                u.hostname = "127.0.0.1";
-            }
             return u.origin;
         } catch (e) {
             return null;
@@ -262,7 +255,7 @@ describe("HTTP ESM Loader", function() {
                     done();
                 })
                 .catch(function (error) {
-                    fail(new Error("Expected hot-data test modules to import: " + formatError(error)));
+                    fail("Expected hot-data test modules to import: " + formatError(error));
                     done();
                 });
         });
@@ -305,7 +298,7 @@ describe("HTTP ESM Loader", function() {
                     done();
                 })
                 .catch(function (error) {
-                    fail(new Error("Expected hot.data sharing assertions to succeed: " + formatError(error)));
+                    fail("Expected hot.data sharing assertions to succeed: " + formatError(error));
                     done();
                 });
         });
@@ -333,7 +326,7 @@ describe("HTTP ESM Loader", function() {
                     });
                 })
                 .catch(function (error) {
-                    fail(new Error("Expected host HTTP module imports to succeed: " + formatError(error)));
+                    fail("Expected host HTTP module imports to succeed: " + formatError(error));
                     done();
                 });
         });
@@ -360,7 +353,7 @@ describe("HTTP ESM Loader", function() {
                     });
                 })
                 .catch(function (error) {
-                    fail(new Error("Expected dev-endpoint HTTP module imports to succeed: " + formatError(error)));
+                    fail("Expected dev-endpoint HTTP module imports to succeed: " + formatError(error));
                     done();
                 });
         });
@@ -385,7 +378,7 @@ describe("HTTP ESM Loader", function() {
                     });
                 })
                 .catch(function (error) {
-                    fail(new Error("Expected dev-endpoint HTTP module imports to succeed: " + formatError(error)));
+                    fail("Expected dev-endpoint HTTP module imports to succeed: " + formatError(error));
                     done();
                 });
         });
@@ -409,7 +402,7 @@ describe("HTTP ESM Loader", function() {
                     });
                 })
                 .catch(function (error) {
-                    fail(new Error("Expected fragment HTTP module imports to succeed: " + formatError(error)));
+                    fail("Expected fragment HTTP module imports to succeed: " + formatError(error));
                     done();
                 });
         });

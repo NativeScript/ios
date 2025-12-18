@@ -12,7 +12,7 @@ class TestRunnerTests: XCTestCase {
         runtimeUnitTestsExpectation = self.expectation(description: "Jasmine tests")
 
         loop = try! SelectorEventLoop(selector: try! KqueueSelector())
-        self.server = DefaultHTTPServer(eventLoop: loop!, port: port) {
+        self.server = DefaultHTTPServer(eventLoop: loop!, interface: "127.0.0.1", port: port) {
             (
                 environ: [String: Any],
                 startResponse: @escaping ((String, [(String, String)]) -> Void),
@@ -108,7 +108,7 @@ class TestRunnerTests: XCTestCase {
 
     func testRuntime() {
         let app = XCUIApplication()
-        app.launchEnvironment["REPORT_BASEURL"] = "http://[::1]:\(port)/junit_report"
+        app.launchEnvironment["REPORT_BASEURL"] = "http://127.0.0.1:\(port)/junit_report"
         app.launch()
 
         wait(for: [runtimeUnitTestsExpectation], timeout: 300.0, enforceOrder: true)
