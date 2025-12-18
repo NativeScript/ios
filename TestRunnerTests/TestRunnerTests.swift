@@ -63,6 +63,57 @@ class TestRunnerTests: XCTestCase {
                     return
                 }
 
+                // HMR hot.data test modules – serve the same helper code for .mjs and .js variants
+                if path == "/esm/hmr/hot-data-ext.mjs" || path == "/esm/hmr/hot-data-ext.js" {
+                    let body = """
+                    // HMR hot.data test module (served by XCTest)
+                    export function getHot() {
+                        return (typeof import.meta !== "undefined" && import.meta) ? import.meta.hot : undefined;
+                    }
+                    export function getHotData() {
+                        const hot = getHot();
+                        return hot ? hot.data : undefined;
+                    }
+                    export function setHotValue(value) {
+                        const hot = getHot();
+                        if (!hot || !hot.data) { throw new Error("import.meta.hot.data is not available"); }
+                        hot.data.value = value;
+                        return hot.data.value;
+                    }
+                    export function getHotValue() {
+                        const hot = getHot();
+                        return hot && hot.data ? hot.data.value : undefined;
+                    }
+                    export function testHotApi() {
+                        const hot = getHot();
+                        const result = {
+                            ok: false,
+                            hasHot: !!hot,
+                            hasData: !!(hot && hot.data),
+                            hasAccept: !!(hot && typeof hot.accept === "function"),
+                            hasDispose: !!(hot && typeof hot.dispose === "function"),
+                            hasDecline: !!(hot && typeof hot.decline === "function"),
+                            hasInvalidate: !!(hot && typeof hot.invalidate === "function"),
+                            pruneIsFalse: !!(hot && hot.prune === false),
+                        };
+                        try {
+                            if (hot && typeof hot.accept === "function") { hot.accept(function () {}); }
+                            if (hot && typeof hot.dispose === "function") { hot.dispose(function () {}); }
+                            if (hot && typeof hot.decline === "function") { hot.decline(); }
+                            if (hot && typeof hot.invalidate === "function") { hot.invalidate(); }
+                            result.ok = result.hasHot && result.hasData && result.hasAccept && result.hasDispose && result.hasDecline && result.hasInvalidate && result.pruneIsFalse;
+                        } catch (e) {
+                            result.error = String(e);
+                        }
+                        return result;
+                    }
+                    console.log("HMR hot.data ext module loaded (via XCTest server)");
+                    """
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
                 startResponse("404 Not Found", [("Content-Type", "text/plain; charset=utf-8")])
                 sendBody(Data("Not Found".utf8))
                 return
