@@ -96,11 +96,26 @@ static inline bool EndsWith(const std::string& value, const std::string& suffix)
   return std::equal(suffix.rbegin(), suffix.rend(), value.rbegin());
 }
 
-// Dev-only HTTP ESM loader helpers
+// HTTP ESM loader helpers
 
 static inline bool StartsWith(const std::string& s, const char* prefix) {
   size_t n = strlen(prefix);
   return s.size() >= n && s.compare(0, n, prefix) == 0;
+}
+
+// Security gate
+// In debug mode, all URLs are allowed. In production, checks security.allowRemoteModules and security.remoteModuleAllowlist
+static inline bool IsHttpUrlAllowedForLoading(const std::string& url) {
+  return IsRemoteUrlAllowed(url);
+}
+
+// Helper to create a security error message for blocked remote modules
+static std::string GetRemoteModuleBlockedMessage(const std::string& url) {
+  if (!IsRemoteModulesAllowed()) {
+    return "Remote ES modules are not allowed in production. URL: " + url +
+           ". Enable via security.allowRemoteModules in nativescript.config";
+  }
+  return "Remote URL not in security.remoteModuleAllowlist: " + url;
 }
 
 
@@ -725,8 +740,18 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
   // ── Early absolute-HTTP fast path ─────────────────────────────
   // If the specifier itself is an absolute HTTP(S) URL, resolve it immediately via
-  // the HTTP dev loader and return before any filesystem candidate logic runs.
+  // the HTTP loader and return before any filesystem candidate logic runs.
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
+    // Security check: block if remote modules not allowed
+    if (!IsHttpUrlAllowedForLoading(spec)) {
+      std::string msg = GetRemoteModuleBlockedMessage(spec);
+      if (IsScriptLoadingLogEnabled()) {
+        Log(@"[resolver][security] blocked remote module: %s", spec.c_str());
+      }
+      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
+      return v8::MaybeLocal<v8::Module>();
+    }
+    
     std::string key = CanonicalizeHttpUrlKey(spec);
     // Added instrumentation for unified phase logging
     Log(@"[http-esm][compile][begin] %s", key.c_str());
@@ -825,6 +850,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // ("./" or "../") or root-absolute ("/") specifiers should resolve against the
   // referrer's URL, not the local filesystem. Mirror browser behavior by using NSURL
   // to construct the absolute URL, then return an HTTP-loaded module immediately.
+  // Security: Gated by IsHttpUrlAllowedForLoading.
   bool referrerIsHttp = (!referrerPath.empty() && (StartsWith(referrerPath, "http://") || StartsWith(referrerPath, "https://")));
   bool specIsRootAbs = !spec.empty() && spec[0] == '/';
   if (referrerIsHttp && (specIsRelative || specIsRootAbs)) {
@@ -845,6 +871,16 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       }
     }
     if (!resolvedHttp.empty() && (StartsWith(resolvedHttp, "http://") || StartsWith(resolvedHttp, "https://"))) {
+      // Security check: block if remote modules not allowed
+      if (!IsHttpUrlAllowedForLoading(resolvedHttp)) {
+        std::string msg = GetRemoteModuleBlockedMessage(resolvedHttp);
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[resolver][security] blocked remote module (rel): %s", resolvedHttp.c_str());
+        }
+        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
+        return v8::MaybeLocal<v8::Module>();
+      }
+      
       if (IsScriptLoadingLogEnabled()) {
         Log(@"[resolver][http-rel] base=%s spec=%s -> %s", referrerPath.c_str(), spec.c_str(), resolvedHttp.c_str());
       }
@@ -1010,6 +1046,16 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
   // If the specifier is an HTTP(S) URL, fetch via HTTP loader and return
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
+    // Security check: block if remote modules not allowed
+    if (!IsHttpUrlAllowedForLoading(spec)) {
+      std::string msg = GetRemoteModuleBlockedMessage(spec);
+      if (IsScriptLoadingLogEnabled()) {
+        Log(@"[resolver][security] blocked remote module: %s", spec.c_str());
+      }
+      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
+      return v8::MaybeLocal<v8::Module>();
+    }
+    
     std::string key = CanonicalizeHttpUrlKey(spec);
     if (IsScriptLoadingLogEnabled()) {
       Log(@"[http-esm][compile][begin] %s", key.c_str());
@@ -1095,6 +1141,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     // If a candidate accidentally embeds a collapsed HTTP URL like '/app/http:/host/...',
     // reconstruct the HTTP URL and resolve via the HTTP loader instead of touching the filesystem.
+    // Security: Gated by IsHttpUrlAllowedForLoading.
     auto rerouteHttpIfEmbedded = [&](const std::string& p) -> bool {
       size_t pos1 = p.find("/http:/");
       size_t pos2 = p.find("/https:/");
@@ -1108,6 +1155,17 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         tail.insert(6, "/");
       }
       if (!(StartsWith(tail, "http://") || StartsWith(tail, "https://"))) return false;
+      
+      // Security check: block if remote modules not allowed
+      if (!IsHttpUrlAllowedForLoading(tail)) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[resolver][security] blocked embedded remote module: %s", tail.c_str());
+        }
+        std::string msg = GetRemoteModuleBlockedMessage(tail);
+        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
+        return false;
+      }
+      
       if (IsScriptLoadingLogEnabled()) { Log(@"[resolver][http-embedded] %s -> %s", p.c_str(), tail.c_str()); }
       std::string key = CanonicalizeHttpUrlKey(tail);
       auto itExisting = g_moduleRegistry.find(key);
@@ -1913,6 +1971,16 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
     // If spec is an HTTP(S) URL, try HTTP fetch+compile directly
     if (!normalizedSpec.empty() && (StartsWith(normalizedSpec, "http://") || StartsWith(normalizedSpec, "https://"))) {
+      // Security check: block if remote modules not allowed
+      if (!IsHttpUrlAllowedForLoading(normalizedSpec)) {
+        std::string msg = GetRemoteModuleBlockedMessage(normalizedSpec);
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][security] blocked remote module: %s", normalizedSpec.c_str());
+        }
+        resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, msg.c_str()))).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+      
       if (IsScriptLoadingLogEnabled()) {
         Log(@"[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());
       }
