@@ -96,8 +96,6 @@ static inline bool EndsWith(const std::string& value, const std::string& suffix)
   return std::equal(suffix.rbegin(), suffix.rend(), value.rbegin());
 }
 
-// Dev-only HTTP ESM loader helpers
-
 static inline bool StartsWith(const std::string& s, const char* prefix) {
   size_t n = strlen(prefix);
   return s.size() >= n && s.compare(0, n, prefix) == 0;
@@ -725,7 +723,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
   // ── Early absolute-HTTP fast path ─────────────────────────────
   // If the specifier itself is an absolute HTTP(S) URL, resolve it immediately via
-  // the HTTP dev loader and return before any filesystem candidate logic runs.
+  // the HTTP loader and return before any filesystem candidate logic runs.
+  // Security: HttpFetchText gates remote module access centrally.
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
     std::string key = CanonicalizeHttpUrlKey(spec);
     // Added instrumentation for unified phase logging
@@ -825,6 +824,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // ("./" or "../") or root-absolute ("/") specifiers should resolve against the
   // referrer's URL, not the local filesystem. Mirror browser behavior by using NSURL
   // to construct the absolute URL, then return an HTTP-loaded module immediately.
+  // Security: HttpFetchText gates remote module access centrally.
   bool referrerIsHttp = (!referrerPath.empty() && (StartsWith(referrerPath, "http://") || StartsWith(referrerPath, "https://")));
   bool specIsRootAbs = !spec.empty() && spec[0] == '/';
   if (referrerIsHttp && (specIsRelative || specIsRootAbs)) {
@@ -845,6 +845,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       }
     }
     if (!resolvedHttp.empty() && (StartsWith(resolvedHttp, "http://") || StartsWith(resolvedHttp, "https://"))) {
+      // Security: HttpFetchText gates remote module access centrally.
       if (IsScriptLoadingLogEnabled()) {
         Log(@"[resolver][http-rel] base=%s spec=%s -> %s", referrerPath.c_str(), spec.c_str(), resolvedHttp.c_str());
       }
@@ -1009,6 +1010,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   std::string absPath;
 
   // If the specifier is an HTTP(S) URL, fetch via HTTP loader and return
+  // Security: HttpFetchText gates remote module access centrally.
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
     std::string key = CanonicalizeHttpUrlKey(spec);
     if (IsScriptLoadingLogEnabled()) {
@@ -1095,6 +1097,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     // If a candidate accidentally embeds a collapsed HTTP URL like '/app/http:/host/...',
     // reconstruct the HTTP URL and resolve via the HTTP loader instead of touching the filesystem.
+    // Security: HttpFetchText gates remote module access centrally.
     auto rerouteHttpIfEmbedded = [&](const std::string& p) -> bool {
       size_t pos1 = p.find("/http:/");
       size_t pos2 = p.find("/https:/");
@@ -1108,6 +1111,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         tail.insert(6, "/");
       }
       if (!(StartsWith(tail, "http://") || StartsWith(tail, "https://"))) return false;
+      
       if (IsScriptLoadingLogEnabled()) { Log(@"[resolver][http-embedded] %s -> %s", p.c_str(), tail.c_str()); }
       std::string key = CanonicalizeHttpUrlKey(tail);
       auto itExisting = g_moduleRegistry.find(key);
@@ -1912,6 +1916,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     }
 
     // If spec is an HTTP(S) URL, try HTTP fetch+compile directly
+    // Security: HttpFetchText gates remote module access centrally.
     if (!normalizedSpec.empty() && (StartsWith(normalizedSpec, "http://") || StartsWith(normalizedSpec, "https://"))) {
       if (IsScriptLoadingLogEnabled()) {
         Log(@"[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());

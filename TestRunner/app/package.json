@@ -1,3 +1,11 @@
 {
-    "main": "index"
+    "main": "index",
+    "security": {
+        "allowRemoteModules": true,
+        "remoteModuleAllowlist": [
+            "https://esm.sh/",
+            "https://cdn.example.com/modules/",
+            "https://unpkg.com/"
+        ]
+    }
 }

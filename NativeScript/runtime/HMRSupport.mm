@@ -240,6 +240,16 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
 }
 
 bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status) {
+  // Security gate: check if remote module loading is allowed before any HTTP fetch.
+  // This is the single point of enforcement for all HTTP module loading.
+  if (!IsRemoteUrlAllowed(url)) {
+    status = 403; // Forbidden
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-esm][security][blocked] %s", url.c_str());
+    }
+    return false;
+  }
+  
   @autoreleasepool {
     NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
     if (!u) { status = 0; return false; }
