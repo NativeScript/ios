@@ -1,3 +1,12 @@
+## [9.0.3](https://github.com/NativeScript/ios/compare/v9.0.2...v9.0.3) (2026-01-04)
+
+
+### Features
+
+* remote module security ([#331](https://github.com/NativeScript/ios/issues/331)) ([721ceaf](https://github.com/NativeScript/ios/commit/721ceafe2606ff25786529acb9a4c727cfa84d78))
+
+
+
 ## [9.0.2](https://github.com/NativeScript/ios/compare/v9.0.1...v9.0.2) (2025-12-14)
 
 
