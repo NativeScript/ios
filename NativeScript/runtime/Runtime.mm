@@ -339,6 +339,16 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   PromiseProxy::Init(context);
   Console::Init(context);
   WeakRef::Init(context);
+  
+  // Initialize HMR event dispatcher for dev mode
+  // This provides __NS_DISPATCH_HOT_EVENT__ global for the HMR client
+  if (RuntimeConfig.IsDebug) {
+    try {
+      tns::InitializeHotEventDispatcher(isolate, context);
+    } catch (...) {
+      // Don't crash if HMR setup fails
+    }
+  }
 
   // Implement Blob per the File API spec (https://w3c.github.io/FileAPI/#blob-section)
   // This provides a complete Blob implementation with:

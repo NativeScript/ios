@@ -11,6 +11,7 @@ template <class T> class Local;
 class Object;
 class Function;
 class Context;
+class Value;
 }
 
 namespace tns {
@@ -66,5 +67,22 @@ std::string CanonicalizeHttpUrlKey(const std::string& url);
 // - contentType: Content-Type header if present
 // - status: HTTP status code
 bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status);
+
+// ─────────────────────────────────────────────────────────────
+// Custom HMR event support
+
+// Register a custom event listener (called by import.meta.hot.on())
+void RegisterHotEventListener(v8::Isolate* isolate, const std::string& event, v8::Local<v8::Function> cb);
+
+// Get all listeners for a custom event
+std::vector<v8::Local<v8::Function>> GetHotEventListeners(v8::Isolate* isolate, const std::string& event);
+
+// Dispatch a custom event to all registered listeners
+// This should be called when the HMR WebSocket receives framework-specific events
+void DispatchHotEvent(v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& event, v8::Local<v8::Value> data);
+
+// Initialize the global event dispatcher function (__NS_DISPATCH_HOT_EVENT__)
+// This exposes a JavaScript-callable function that the HMR client can use to dispatch events
+void InitializeHotEventDispatcher(v8::Isolate* isolate, v8::Local<v8::Context> context);
 
 } // namespace tns

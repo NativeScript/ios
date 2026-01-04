@@ -29,6 +29,10 @@ static std::unordered_map<std::string, v8::Global<v8::Object>> g_hotData;
 static std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>> g_hotAccept;
 static std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>> g_hotDispose;
 
+// Custom event listeners
+// Keyed by event name (global, not per-module)
+static std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>> g_hotEventListeners;
+
 v8::Local<v8::Object> GetOrCreateHotData(v8::Isolate* isolate, const std::string& key) {
   auto it = g_hotData.find(key);
   if (it != g_hotData.end()) {
@@ -71,6 +75,76 @@ std::vector<v8::Local<v8::Function>> GetHotDisposeCallbacks(v8::Isolate* isolate
     }
   }
   return out;
+}
+
+void RegisterHotEventListener(v8::Isolate* isolate, const std::string& event, v8::Local<v8::Function> cb) {
+  if (cb.IsEmpty()) return;
+  g_hotEventListeners[event].emplace_back(v8::Global<v8::Function>(isolate, cb));
+}
+
+std::vector<v8::Local<v8::Function>> GetHotEventListeners(v8::Isolate* isolate, const std::string& event) {
+  std::vector<v8::Local<v8::Function>> out;
+  auto it = g_hotEventListeners.find(event);
+  if (it != g_hotEventListeners.end()) {
+    for (auto& gfn : it->second) {
+      if (!gfn.IsEmpty()) out.push_back(gfn.Get(isolate));
+    }
+  }
+  return out;
+}
+
+void DispatchHotEvent(v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& event, v8::Local<v8::Value> data) {
+  auto callbacks = GetHotEventListeners(isolate, event);
+  for (auto& cb : callbacks) {
+    v8::TryCatch tryCatch(isolate);
+    v8::Local<v8::Value> args[] = { data };
+    v8::MaybeLocal<v8::Value> result = cb->Call(context, v8::Undefined(isolate), 1, args);
+    (void)result; // Suppress unused result warning
+    if (tryCatch.HasCaught()) {
+      // Log error but continue to other listeners
+      if (tns::IsScriptLoadingLogEnabled()) {
+        Log(@"[import.meta.hot] Error in event listener for '%s'", event.c_str());
+      }
+    }
+  }
+}
+
+void InitializeHotEventDispatcher(v8::Isolate* isolate, v8::Local<v8::Context> context) {
+  using v8::FunctionCallbackInfo;
+  using v8::Local;
+  using v8::Value;
+
+  // Create a global function __NS_DISPATCH_HOT_EVENT__(event, data)
+  // that the HMR client can call to dispatch events to registered listeners
+  auto dispatchCb = [](const FunctionCallbackInfo<Value>& info) {
+    v8::Isolate* iso = info.GetIsolate();
+    v8::Local<v8::Context> ctx = iso->GetCurrentContext();
+    
+    if (info.Length() < 1 || !info[0]->IsString()) {
+      info.GetReturnValue().Set(v8::Boolean::New(iso, false));
+      return;
+    }
+    
+    v8::String::Utf8Value eventName(iso, info[0]);
+    std::string event = *eventName ? *eventName : "";
+    if (event.empty()) {
+      info.GetReturnValue().Set(v8::Boolean::New(iso, false));
+      return;
+    }
+    
+    v8::Local<Value> data = info.Length() > 1 ? info[1] : v8::Undefined(iso).As<Value>();
+    
+    if (tns::IsScriptLoadingLogEnabled()) {
+      Log(@"[import.meta.hot] Dispatching event '%s'", event.c_str());
+    }
+    
+    DispatchHotEvent(iso, ctx, event, data);
+    info.GetReturnValue().Set(v8::Boolean::New(iso, true));
+  };
+  
+  v8::Local<v8::Object> global = context->Global();
+  v8::Local<v8::Function> dispatchFn = v8::Function::New(context, dispatchCb).ToLocalChecked();
+  global->CreateDataProperty(context, tns::ToV8String(isolate, "__NS_DISPATCH_HOT_EVENT__"), dispatchFn).Check();
 }
 
 void InitializeImportMetaHot(v8::Isolate* isolate,
@@ -194,6 +268,31 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
     info.GetReturnValue().Set(v8::Undefined(info.GetIsolate()));
   };
 
+  // on(event, cb) — register custom event listener
+  auto onCb = [](const FunctionCallbackInfo<Value>& info) {
+    v8::Isolate* iso = info.GetIsolate();
+    if (info.Length() < 2) {
+      info.GetReturnValue().Set(v8::Undefined(iso));
+      return;
+    }
+    if (!info[0]->IsString() || !info[1]->IsFunction()) {
+      info.GetReturnValue().Set(v8::Undefined(iso));
+      return;
+    }
+    v8::String::Utf8Value eventName(iso, info[0]);
+    std::string event = *eventName ? *eventName : "";
+    if (!event.empty()) {
+      RegisterHotEventListener(iso, event, info[1].As<v8::Function>());
+    }
+    info.GetReturnValue().Set(v8::Undefined(iso));
+  };
+
+  // send(event, data) — send event to server (no-op on client, could be wired to WebSocket)
+  auto sendCb = [](const FunctionCallbackInfo<Value>& info) {
+    // No-op for now - could be wired to WebSocket for client->server events
+    info.GetReturnValue().Set(v8::Undefined(info.GetIsolate()));
+  };
+
   Local<Object> hot = Object::New(isolate);
   // Stable flags
   hot->CreateDataProperty(context, tns::ToV8String(isolate, "data"),
@@ -213,6 +312,12 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "invalidate"),
       v8::Function::New(context, invalidateCb, makeKeyData(key)).ToLocalChecked()).Check();
+  hot->CreateDataProperty(
+    context, tns::ToV8String(isolate, "on"),
+      v8::Function::New(context, onCb, makeKeyData(key)).ToLocalChecked()).Check();
+  hot->CreateDataProperty(
+    context, tns::ToV8String(isolate, "send"),
+      v8::Function::New(context, sendCb, makeKeyData(key)).ToLocalChecked()).Check();
 
   // Attach to import.meta
   importMeta->CreateDataProperty(
