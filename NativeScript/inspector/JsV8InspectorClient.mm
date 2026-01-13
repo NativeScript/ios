@@ -66,8 +66,10 @@ void JsV8InspectorClient::enableInspector(int argc, char** argv) {
       NOTIFICATION("AttachRequest"), &attachRequestSubscription, dispatch_get_main_queue(),
       ^(int token) {
         in_port_t listenPort = InspectorServer::Init(
-            [this](std::function<void(std::string)> sender) { this->onFrontendConnected(sender); },
-            [this](std::string message) { this->onFrontendMessageReceived(message); });
+            [this](std::function<void(const std::string&)> sender) {
+              this->onFrontendConnected(sender);
+            },
+            [this](const std::string& message) { this->onFrontendMessageReceived(message); });
 
         LOG_DEBUGGER_PORT(listenPort);
         notify_post(NOTIFICATION("ReadyForAttach"));
@@ -99,7 +101,7 @@ void JsV8InspectorClient::enableInspector(int argc, char** argv) {
   notify_cancel(waitForDebuggerSubscription);
 }
 
-void JsV8InspectorClient::onFrontendConnected(std::function<void(std::string)> sender) {
+void JsV8InspectorClient::onFrontendConnected(std::function<void(const std::string&)> sender) {
   if (this->isWaitingForDebugger_) {
     this->isWaitingForDebugger_ = NO;
     CFRunLoopRef runloop = CFRunLoopGetMain();
@@ -118,7 +120,7 @@ void JsV8InspectorClient::onFrontendConnected(std::function<void(std::string)> s
   this->isConnected_ = true;
 }
 
-void JsV8InspectorClient::onFrontendMessageReceived(std::string message) {
+void JsV8InspectorClient::onFrontendMessageReceived(const std::string& message) {
   dispatch_sync(this->messagesQueue_, ^{
     this->messages_.push(message);
     dispatch_semaphore_signal(messageArrived_);
@@ -243,10 +245,12 @@ void JsV8InspectorClient::flushProtocolNotifications() {}
 
 void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
   StringView stringView = message->string();
-  std::string value = ToStdString(stringView);
+  notify(ToStdString(stringView));
+}
 
+void JsV8InspectorClient::notify(const std::string& message) {
   if (this->sender_) {
-    this->sender_(value);
+    this->sender_(message);
   }
 }
 
@@ -280,8 +284,9 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
 
   if (message.find("Tracing.end") != std::string::npos) {
     tracing_agent_->end();
-    std::string res = tracing_agent_->getLastTrace();
-    tracing_agent_->SendToDevtools(context, res);
+    for (const auto& traceMessage : tracing_agent_->getLastTrace()) {
+      notify(traceMessage);
+    }
     return;
   }
 

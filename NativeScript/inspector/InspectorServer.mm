@@ -6,8 +6,8 @@
 namespace v8_inspector {
 
 in_port_t InspectorServer::Init(
-    std::function<void(std::function<void(std::string)>)> onClientConnected,
-    std::function<void(std::string)> onMessage) {
+    std::function<void(std::function<void(const std::string&)>)> onClientConnected,
+    std::function<void(const std::string&)> onMessage) {
   in_port_t listenPort = 18183;
 
   int serverSocket = -1;
@@ -120,7 +120,8 @@ in_port_t InspectorServer::Init(
   return listenPort;
 }
 
-void InspectorServer::Send(dispatch_io_t channel, dispatch_queue_t queue, std::string message) {
+void InspectorServer::Send(dispatch_io_t channel, dispatch_queue_t queue,
+                           const std::string& message) {
   NSString* str = [NSString stringWithUTF8String:message.c_str()];
   NSUInteger length = [str lengthOfBytesUsingEncoding:NSUTF16LittleEndianStringEncoding];
 

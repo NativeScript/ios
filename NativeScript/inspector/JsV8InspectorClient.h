@@ -55,7 +55,7 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   dispatch_queue_t messagesQueue_;
   dispatch_queue_t messageLoopQueue_;
   dispatch_semaphore_t messageArrived_;
-  std::function<void(std::string)> sender_;
+  std::function<void(const std::string&)> sender_;
   bool isWaitingForDebugger_;
   bool hasScheduledDebugBreak_;
 
@@ -68,8 +68,9 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   void enableInspector(int argc, char** argv);
   void createInspectorSession();
   void notify(std::unique_ptr<StringBuffer> message);
-  void onFrontendConnected(std::function<void(std::string)> sender);
-  void onFrontendMessageReceived(std::string message);
+  void notify(const std::string& message);
+  void onFrontendConnected(std::function<void(const std::string&)> sender);
+  void onFrontendMessageReceived(const std::string& message);
   std::string PumpMessage();
   static void registerDomainDispatcherCallback(
       const v8::FunctionCallbackInfo<v8::Value>& args);
