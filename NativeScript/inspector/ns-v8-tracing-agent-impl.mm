@@ -74,7 +74,7 @@ TracingAgentImpl::TracingAgentImpl() {
       reinterpret_cast<TracingController*>(tns::Runtime::GetPlatform()->GetTracingController());
 }
 
-bool TracingAgentImpl::start() {
+bool TracingAgentImpl::start(const std::vector<std::string>& categories) {
   if (!tracing_) {
     tracing_ = true;
 
@@ -84,8 +84,15 @@ bool TracingAgentImpl::start() {
     tracing_controller_->Initialize(TraceBuffer::CreateTraceBufferRingBuffer(
         TraceBuffer::kRingBufferChunks, current_trace_writer_));
     // todo: create TraceConfig based on params.
-    TraceConfig* config = TraceConfig::CreateDefaultTraceConfig();
-    config->AddIncludedCategory("disabled-by-default-v8.cpu_profiler");
+    TraceConfig* config = new TraceConfig();
+    if (categories.size() > 0) {
+      for (const auto& category : categories) {
+        config->AddIncludedCategory(category.c_str());
+      }
+    } else {
+      config->AddIncludedCategory("v8");
+      config->AddIncludedCategory("disabled-by-default-v8.cpu_profiler");
+    }
     config->SetTraceRecordMode(TraceRecordMode::RECORD_CONTINUOUSLY);
     tracing_controller_->StartTracing(config);
   }

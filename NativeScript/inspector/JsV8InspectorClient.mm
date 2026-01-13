@@ -14,9 +14,11 @@
 #include "JsV8InspectorClient.h"
 #include "RuntimeConfig.h"
 #include "include/libplatform/libplatform.h"
+#include "third_party/json.hpp"
 #include "utils.h"
 
 using namespace v8;
+using json = nlohmann::json;
 
 namespace v8_inspector {
 
@@ -264,8 +266,11 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
   Local<Context> context = tns::Caches::Get(isolate)->GetContext();
   bool success;
 
+  auto json_message = json::parse(message);
+  std::string method = json_message["method"];
+
   // livesync uses the inspector socket for HMR/LiveSync...
-  if (message.find("Page.reload") != std::string::npos) {
+  if (method == "Page.reload") {
     success = tns::LiveSync(this->isolate_);
     if (!success) {
       NSLog(@"LiveSync failed");
@@ -273,16 +278,36 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     // todo: should we return here, or is it OK to pass onto a possible Page.reload domain handler?
   }
 
-  if (message.find("Tracing.start") != std::string::npos) {
-    tracing_agent_->start();
+  if (method == "Tracing.start") {
+    std::vector<std::string> categories;
 
-    // echo back the request to notify frontend the action was a success
-    // todo: send an empty response for the incoming message id instead.
-    this->sendNotification(StringBuffer::create(messageView));
+    // Support new traceConfig format
+    if (json_message.contains("params") && json_message["params"].contains("traceConfig")) {
+      auto traceConfig = json_message["params"]["traceConfig"];
+      if (traceConfig.contains("includedCategories")) {
+        for (const auto& category : traceConfig["includedCategories"]) {
+          categories.push_back(category.get<std::string>());
+        }
+      }
+    }
+    // Fall back to deprecated categories format
+    else if (json_message.contains("params") && json_message["params"].contains("categories")) {
+      for (const auto& category : json_message["params"]["categories"]) {
+        categories.push_back(category.get<std::string>());
+      }
+    }
+
+    tracing_agent_->start(categories);
+
+    json json_response = {
+        {"id", json_message["id"]},
+        {"result", json::object()},
+    };
+    this->notify(json_response.dump());
     return;
   }
 
-  if (message.find("Tracing.end") != std::string::npos) {
+  if (method == "Tracing.end") {
     tracing_agent_->end();
     for (const auto& traceMessage : tracing_agent_->getLastTrace()) {
       notify(traceMessage);
@@ -329,6 +354,17 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
 
   // if no handler handled the message successfully, fall-through to the default V8 implementation
   this->session_->dispatchProtocolMessage(messageView);
+  // if needed to test, disable the default handling and use this
+  //  json error = {
+  //    {"id", json_message["id"]},
+  //    {"error", {
+  //      {"code", -32601},
+  //      {
+  //        "message", "Method not found: " + method
+  //      }
+  //    }}
+  //  };
+  //  notify(error.dump());
 
   // TODO: check why this is needed (it should trigger automatically when script depth is 0)
   isolate->PerformMicrotaskCheckpoint();

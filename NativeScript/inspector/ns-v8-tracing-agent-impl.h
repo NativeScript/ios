@@ -50,7 +50,7 @@ class NSInMemoryTraceWriter : public TraceWriter {
 class TracingAgentImpl {
  public:
   TracingAgentImpl();
-  bool start();
+  bool start(const std::vector<std::string>& categories = {});
   bool end();
   const std::vector<std::string>& getLastTrace() { return lastTrace_; }
 
