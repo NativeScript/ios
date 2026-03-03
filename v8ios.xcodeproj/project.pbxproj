@@ -1883,7 +1883,7 @@
 			files = (
 				C27E5DB522F3206B00498ED0 /* app in Resources */,
 				C27E5DBA22F324C200498ED0 /* Default-568h@2x.png in Resources */,
-				2B5088A62BBEB92300F6EB68 /* (null) in Resources */,
+				2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
