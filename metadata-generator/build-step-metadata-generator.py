@@ -89,14 +89,10 @@ deployment_target = env(env_or_empty("DEPLOYMENT_TARGET_CLANG_ENV_NAME") or defa
 std = env("GCC_C_LANGUAGE_STANDARD")
 header_search_paths = env_or_empty("HEADER_SEARCH_PATHS")
 header_search_paths_parsed = map_and_list((lambda s: "-I" + s), shlex.split(header_search_paths))
-framework_search_paths = env_or_empty("FRAMEWORK_SEARCH_PATHS")
+framework_search_paths = shlex.split(env_or_empty("FRAMEWORK_SEARCH_PATHS"))
 # Add extra framework search path for newer Xcode versions
-extra_framework_path = os.path.join(sdk_root, "System/Library/SubFrameworks")
-if framework_search_paths:
-    framework_search_paths += " " + extra_framework_path
-else:
-    framework_search_paths = extra_framework_path
-framework_search_paths_parsed = map_and_list((lambda s: "-F" + s), shlex.split(framework_search_paths))
+framework_search_paths.append(os.path.join(sdk_root, "System/Library/SubFrameworks"))
+framework_search_paths_parsed = map_and_list((lambda s: "-F" + s), framework_search_paths)
 other_cflags = env_or_empty("OTHER_CFLAGS")
 other_cflags_parsed = shlex.split(other_cflags)
 enable_modules = env_bool("CLANG_ENABLE_MODULES")
