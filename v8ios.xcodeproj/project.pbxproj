@@ -3,11 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 70;
+	objectVersion = 55;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2B5088A62BBEB92300F6EB68 /* (null) in Resources */ = {isa = PBXBuildFile; };
+		2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */; };
 		2B5088A72BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
