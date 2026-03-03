@@ -91,7 +91,7 @@ header_search_paths = env_or_empty("HEADER_SEARCH_PATHS")
 header_search_paths_parsed = map_and_list((lambda s: "-I" + s), shlex.split(header_search_paths))
 framework_search_paths = env_or_empty("FRAMEWORK_SEARCH_PATHS")
 # Add extra framework search path for newer Xcode versions
-extra_framework_path = os.path.join(sdk_root, "System/Library/SubFrameworks")
+extra_framework_path = shlex.quote(os.path.join(sdk_root, "System/Library/SubFrameworks"))
 if framework_search_paths:
     framework_search_paths += " " + extra_framework_path
 else:
