@@ -26,14 +26,14 @@ using v8::platform::tracing::TraceRecordMode;
 using v8::platform::tracing::TraceWriter;
 using v8::platform::tracing::TracingController;
 
-int traces_per_chunk_ = 20;
+int kTracesPerChunk = 20;
 
 void NSInMemoryTraceWriter::AppendTraceEvent(TraceObject* trace_event) {
   MaybeCreateChunk();
 
   json_trace_writer_->AppendTraceEvent(trace_event);
   total_traces_++;
-  if (total_traces_ > 0 && (total_traces_ % traces_per_chunk_ == 0)) {
+  if (total_traces_ > 0 && (total_traces_ % kTracesPerChunk == 0)) {
     MaybeFinalizeChunk();
   }
 }

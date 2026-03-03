@@ -30,7 +30,7 @@ using v8::platform::tracing::TracingController;
 
 class NSInMemoryTraceWriter : public TraceWriter {
  public:
-  NSInMemoryTraceWriter(std::string prefix, std::string suffix)
+  NSInMemoryTraceWriter(const std::string& prefix, const std::string& suffix)
       : stream_(), prefix_(prefix), suffix_(suffix) {};
   void AppendTraceEvent(TraceObject* trace_event);
   void Flush();
