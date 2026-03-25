@@ -20,9 +20,14 @@ static inline bool StartsWith(const std::string& s, const char* prefix) {
 }
 
 // Per-module hot data and callbacks. Keyed by canonical module path.
-static std::unordered_map<std::string, v8::Global<v8::Object>> g_hotData;
-static std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>> g_hotAccept;
-static std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>> g_hotDispose;
+// Heap-allocated (leaky singleton) to prevent V8 crash during __cxa_finalize_ranges.
+// See g_moduleRegistry comment in ModuleInternalCallbacks.mm for full rationale.
+static auto* _g_hotData = new std::unordered_map<std::string, v8::Global<v8::Object>>();
+static auto& g_hotData = *_g_hotData;
+static auto* _g_hotAccept = new std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>>();
+static auto& g_hotAccept = *_g_hotAccept;
+static auto* _g_hotDispose = new std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>>();
+static auto& g_hotDispose = *_g_hotDispose;
 
 v8::Local<v8::Object> GetOrCreateHotData(v8::Isolate* isolate, const std::string& key) {
   auto it = g_hotData.find(key);
@@ -320,6 +325,25 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     }
     return true;
   }
+}
+
+void CleanupHMRGlobals() {
+  // Reset all v8::Global handles BEFORE the isolate is disposed.
+  // These static maps survive past isolate teardown and their destructors
+  // (__cxa_finalize_ranges) would call v8::Global::Reset() on an already-
+  // destroyed isolate, causing a crash in v8::internal::GlobalHandles::Destroy().
+  for (auto& kv : g_hotData) { kv.second.Reset(); }
+  g_hotData.clear();
+
+  for (auto& kv : g_hotAccept) {
+    for (auto& fn : kv.second) { fn.Reset(); }
+  }
+  g_hotAccept.clear();
+
+  for (auto& kv : g_hotDispose) {
+    for (auto& fn : kv.second) { fn.Reset(); }
+  }
+  g_hotDispose.clear();
 }
 
 } // namespace tns

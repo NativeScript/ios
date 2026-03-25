@@ -58,4 +58,9 @@ std::string CanonicalizeHttpUrlKey(const std::string& url);
 // - status: HTTP status code
 bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status);
 
+// Clear all HMR-related v8::Global handles (g_hotData, g_hotAccept, g_hotDispose).
+// MUST be called inside Runtime::~Runtime() before isolate disposal to prevent
+// crashes during static destructor cleanup (__cxa_finalize_ranges).
+void CleanupHMRGlobals();
+
 } // namespace tns

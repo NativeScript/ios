@@ -929,7 +929,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   logPhase("compile", "ok");
 
   // 3) Register for resolution callback
-  extern std::unordered_map<std::string, Global<Module>> g_moduleRegistry;
+  extern std::unordered_map<std::string, Global<Module>>& g_moduleRegistry;
 
   // Safe Global handle management: Clear any existing entry first
   auto it = g_moduleRegistry.find(canonicalPath);
