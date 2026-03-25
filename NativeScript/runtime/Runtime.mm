@@ -213,11 +213,19 @@ Runtime::~Runtime() {
 
     // Clear module registry before disposing other handles
     // This prevents crashes during g_moduleRegistry cleanup
-    extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
+    extern std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry;
     for (auto& kv : g_moduleRegistry) {
       kv.second.Reset();
     }
     g_moduleRegistry.clear();
+
+    // Clear HMR globals (g_hotData, g_hotAccept, g_hotDispose) before isolate
+    // disposal. These hold v8::Global handles that would crash during static
+    // destructor cleanup if the isolate is already torn down.
+    tns::CleanupHMRGlobals();
+
+    // Clear import map vendor module cache (holds v8::Global<Module> handles)
+    tns::CleanupImportMapGlobals();
 
     DisposerPHV phv(isolate_);
     isolate_->VisitHandlesWithClassIds(&phv);
@@ -339,6 +347,99 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   PromiseProxy::Init(context);
   Console::Init(context);
   WeakRef::Init(context);
+
+  // Install __nsConfigureRuntime(config) global for import map support.
+  // The entry-runtime.ts fetches /ns/import-map.json from the Vite dev server
+  // and calls this function to configure the native import map before loading
+  // any application modules. This enables deterministic module resolution
+  // without Vite-side import rewriting.
+  {
+    auto configureRuntimeCallback = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+      v8::Isolate* isolate = info.GetIsolate();
+      v8::HandleScope scope(isolate);
+      v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+
+      if (info.Length() < 1 || !info[0]->IsObject()) {
+        Log(@"[__nsConfigureRuntime] expected config object argument");
+        return;
+      }
+
+      v8::Local<v8::Object> config = info[0].As<v8::Object>();
+
+      // Process importMap: can be a JSON string or an object with { imports: {...} }
+      v8::Local<v8::String> importMapKey = tns::ToV8String(isolate, "importMap");
+      v8::Local<v8::Value> importMapVal;
+      if (config->Get(ctx, importMapKey).ToLocal(&importMapVal) && !importMapVal->IsUndefined()) {
+        std::string jsonStr;
+        if (importMapVal->IsString()) {
+          v8::String::Utf8Value utf8(isolate, importMapVal);
+          if (*utf8) jsonStr = *utf8;
+        } else if (importMapVal->IsObject()) {
+          // Serialize object to JSON string
+          v8::Local<v8::Object> jsonObj = ctx->Global()->Get(ctx,
+            tns::ToV8String(isolate, "JSON")).ToLocalChecked().As<v8::Object>();
+          v8::Local<v8::Function> stringify = jsonObj->Get(ctx,
+            tns::ToV8String(isolate, "stringify")).ToLocalChecked().As<v8::Function>();
+          v8::Local<v8::Value> args[] = { importMapVal };
+          v8::Local<v8::Value> result;
+          if (stringify->Call(ctx, jsonObj, 1, args).ToLocal(&result) && result->IsString()) {
+            v8::String::Utf8Value utf8(isolate, result);
+            if (*utf8) jsonStr = *utf8;
+          }
+        }
+        if (!jsonStr.empty()) {
+          SetImportMap(jsonStr);
+          Log(@"[__nsConfigureRuntime] import map set (%zu bytes)", jsonStr.size());
+        }
+      }
+
+      // Process volatilePatterns: array of strings
+      v8::Local<v8::String> vpKey = tns::ToV8String(isolate, "volatilePatterns");
+      v8::Local<v8::Value> vpVal;
+      if (config->Get(ctx, vpKey).ToLocal(&vpVal) && vpVal->IsArray()) {
+        v8::Local<v8::Array> arr = vpVal.As<v8::Array>();
+        std::vector<std::string> patterns;
+        for (uint32_t i = 0; i < arr->Length(); i++) {
+          v8::Local<v8::Value> elem;
+          if (arr->Get(ctx, i).ToLocal(&elem) && elem->IsString()) {
+            v8::String::Utf8Value utf8(isolate, elem);
+            if (*utf8) patterns.push_back(*utf8);
+          }
+        }
+        if (!patterns.empty()) {
+          SetVolatilePatterns(patterns);
+          Log(@"[__nsConfigureRuntime] %zu volatile patterns set", patterns.size());
+        }
+      }
+    };
+
+    v8::Local<v8::FunctionTemplate> fnTpl = v8::FunctionTemplate::New(isolate, configureRuntimeCallback);
+    v8::Local<v8::Function> fn = fnTpl->GetFunction(context).ToLocalChecked();
+    fn->SetName(tns::ToV8String(isolate, "__nsConfigureRuntime"));
+    bool setOk = context->Global()->Set(context, tns::ToV8String(isolate, "__nsConfigureRuntime"), fn).FromMaybe(false);
+    Log(@"[Runtime::Init] __nsConfigureRuntime installed on global: %s", setOk ? "YES" : "NO");
+
+    // Verify the function is actually readable from JS
+    v8::Local<v8::Value> verify;
+    if (context->Global()->Get(context, tns::ToV8String(isolate, "__nsConfigureRuntime")).ToLocal(&verify)) {
+      Log(@"[Runtime::Init] __nsConfigureRuntime verify: isFunction=%d isUndefined=%d",
+          verify->IsFunction(), verify->IsUndefined());
+    }
+
+    // Also install on globalThis explicitly via JS eval as a belt-and-suspenders approach.
+    // Some V8 embeddings have the global proxy ≠ globalThis; this ensures JS can always find it.
+    {
+      v8::Local<v8::String> src = tns::ToV8String(isolate,
+        "if (typeof globalThis !== 'undefined' && typeof globalThis.__nsConfigureRuntime !== 'function') {"
+        "  Object.defineProperty(globalThis, '__nsConfigureRuntime', { value: this.__nsConfigureRuntime, writable: true, configurable: true, enumerable: false });"
+        "}"
+      );
+      v8::Local<v8::Script> script;
+      if (v8::Script::Compile(context, src).ToLocal(&script)) {
+        script->Run(context).FromMaybe(v8::Local<v8::Value>());
+      }
+    }
+  }
 
   auto blob_methods = R"js(
     const BLOB_STORE = new Map();
