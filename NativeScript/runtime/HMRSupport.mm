@@ -220,8 +220,9 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
   };
 
   const std::string key = canonicalHotKey(modulePath);
-  if (tns::IsScriptLoadingLogEnabled() && key != modulePath) {
-    Log(@"[hmr] canonical key: %s -> %s", modulePath.c_str(), key.c_str());
+  if (tns::IsScriptLoadingLogEnabled()) {
+    bool isReload = (g_hotData.find(key) != g_hotData.end());
+    Log(@"[hmr][import.meta.hot] module=%s key=%s isReload=%d", modulePath.c_str(), key.c_str(), isReload);
   }
 
   // Helper to capture key in function data
