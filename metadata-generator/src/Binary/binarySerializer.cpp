@@ -254,7 +254,7 @@ static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
 
     if (path.getError()) {
         return path.getError();
-    } else if (path.get().endswith(".tbd")) {
+    } else if (path.get().ends_with(".tbd")) {
         return true;
     }
 

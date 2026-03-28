@@ -17,7 +17,7 @@
 
 namespace v8_inspector {
 
-using UChar = uint16_t;
+using UChar = char16_t;
 
 class String16 {
  public:

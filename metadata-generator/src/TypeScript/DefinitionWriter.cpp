@@ -583,7 +583,7 @@ std::string DefinitionWriter::writeMethod(MethodMeta* meta, BaseClassMeta* owner
         }
     }
 
-    if ((owner->type == MetaType::Protocol && methodDecl.getImplementationControl() == clang::ObjCMethodDecl::ImplementationControl::Optional) || (owner->is(MetaType::Protocol) && meta->getFlags(MethodIsInitializer))) {
+    if ((owner->type == MetaType::Protocol && methodDecl.getImplementationControl() == clang::ObjCImplementationControl::Optional) || (owner->is(MetaType::Protocol) && meta->getFlags(MethodIsInitializer))) {
         output << "?";
     }
 
