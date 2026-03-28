@@ -1,0 +1,1184 @@
+{
+  "generatedAt": "2026-03-28T18:11:35.062Z",
+  "enabled": true,
+  "reason": "generated",
+  "summary": {
+    "discovered": 53125,
+    "included": 100,
+    "excluded": 46325,
+    "exclusions": {
+      "not-included": 49713,
+      "excluded-path": 1,
+      "unsupported-feature": 1
+    },
+    "shardCount": 0,
+    "shardIndex": 0,
+    "filter": [],
+    "includePrefixes": [
+      "built-ins/Object"
+    ],
+    "curatedIncludePrefixes": [
+      "built-ins/Array",
+      "built-ins/Boolean",
+      "built-ins/Date",
+      "built-ins/Error",
+      "built-ins/Function",
+      "built-ins/JSON",
+      "built-ins/Map",
+      "built-ins/Math",
+      "built-ins/Number",
+      "built-ins/Object",
+      "built-ins/Promise",
+      "built-ins/Reflect",
+      "built-ins/RegExp",
+      "built-ins/Set",
+      "built-ins/String",
+      "built-ins/Symbol",
+      "built-ins/globalThis",
+      "built-ins/parseFloat",
+      "built-ins/parseInt",
+      "language/expressions",
+      "language/function-code",
+      "language/global-code",
+      "language/identifiers",
+      "language/literals",
+      "language/line-terminators",
+      "language/statements/block",
+      "language/statements/break",
+      "language/statements/class",
+      "language/statements/const",
+      "language/statements/continue",
+      "language/statements/debugger",
+      "language/statements/do-while",
+      "language/statements/empty",
+      "language/statements/expression",
+      "language/statements/for",
+      "language/statements/for-in",
+      "language/statements/for-of",
+      "language/statements/function",
+      "language/statements/if",
+      "language/statements/let",
+      "language/statements/return",
+      "language/statements/switch",
+      "language/statements/throw",
+      "language/statements/try",
+      "language/statements/variable",
+      "language/statements/while"
+    ],
+    "limit": 100
+  },
+  "tests": [
+    {
+      "id": "built-ins/Object/assign/assign-descriptor.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/assign-descriptor.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "propertyHelper.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/assign-descriptor.js [strict]",
+      "relativePath": "built-ins/Object/assign/assign-descriptor.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "propertyHelper.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/assign-length.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/assign-length.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "propertyHelper.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/assign-length.js [strict]",
+      "relativePath": "built-ins/Object/assign/assign-length.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "propertyHelper.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js [strict]",
+      "relativePath": "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/invoked-as-ctor.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/invoked-as-ctor.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/invoked-as-ctor.js [strict]",
+      "relativePath": "built-ins/Object/assign/invoked-as-ctor.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/name.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/name.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "propertyHelper.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/name.js [strict]",
+      "relativePath": "built-ins/Object/assign/name.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "propertyHelper.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/not-a-constructor.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/not-a-constructor.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "isConstructor.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/not-a-constructor.js [strict]",
+      "relativePath": "built-ins/Object/assign/not-a-constructor.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "isConstructor.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/ObjectOverride-sameproperty.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/ObjectOverride-sameproperty.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/ObjectOverride-sameproperty.js [strict]",
+      "relativePath": "built-ins/Object/assign/ObjectOverride-sameproperty.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/OnlyOneArgument.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/OnlyOneArgument.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/OnlyOneArgument.js [strict]",
+      "relativePath": "built-ins/Object/assign/OnlyOneArgument.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Override-notstringtarget.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Override-notstringtarget.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Override-notstringtarget.js [strict]",
+      "relativePath": "built-ins/Object/assign/Override-notstringtarget.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Override.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Override.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Override.js [strict]",
+      "relativePath": "built-ins/Object/assign/Override.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-get-attr-error.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/source-get-attr-error.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-get-attr-error.js [strict]",
+      "relativePath": "built-ins/Object/assign/source-get-attr-error.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-non-enum.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/source-non-enum.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-non-enum.js [strict]",
+      "relativePath": "built-ins/Object/assign/source-non-enum.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Source-Null-Undefined.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Source-Null-Undefined.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Source-Null-Undefined.js [strict]",
+      "relativePath": "built-ins/Object/assign/Source-Null-Undefined.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Source-Number-Boolen-Symbol.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Source-Number-Boolen-Symbol.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Source-Number-Boolen-Symbol.js [strict]",
+      "relativePath": "built-ins/Object/assign/Source-Number-Boolen-Symbol.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-own-prop-desc-missing.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/source-own-prop-desc-missing.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-own-prop-desc-missing.js [strict]",
+      "relativePath": "built-ins/Object/assign/source-own-prop-desc-missing.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-own-prop-error.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/source-own-prop-error.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-own-prop-error.js [strict]",
+      "relativePath": "built-ins/Object/assign/source-own-prop-error.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-own-prop-keys-error.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/source-own-prop-keys-error.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/source-own-prop-keys-error.js [strict]",
+      "relativePath": "built-ins/Object/assign/source-own-prop-keys-error.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Source-String.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Source-String.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Source-String.js [strict]",
+      "relativePath": "built-ins/Object/assign/Source-String.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/strings-and-symbol-order-proxy.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/strings-and-symbol-order-proxy.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "compareArray.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/strings-and-symbol-order-proxy.js [strict]",
+      "relativePath": "built-ins/Object/assign/strings-and-symbol-order-proxy.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "compareArray.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/strings-and-symbol-order.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/strings-and-symbol-order.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "compareArray.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/strings-and-symbol-order.js [strict]",
+      "relativePath": "built-ins/Object/assign/strings-and-symbol-order.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "compareArray.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-Array.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-Array.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-Array.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-Array.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Boolean.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Target-Boolean.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Boolean.js [strict]",
+      "relativePath": "built-ins/Object/assign/Target-Boolean.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-frozen-accessor-property-set-succeeds.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-is-frozen-accessor-property-set-succeeds.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-frozen-accessor-property-set-succeeds.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-is-frozen-accessor-property-set-succeeds.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-frozen-data-property-set-throws.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-is-frozen-data-property-set-throws.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-frozen-data-property-set-throws.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-is-frozen-data-property-set-throws.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-non-extensible-existing-accessor-property.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-is-non-extensible-existing-accessor-property.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-non-extensible-existing-accessor-property.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-is-non-extensible-existing-accessor-property.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-non-extensible-existing-data-property.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-is-non-extensible-existing-data-property.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-non-extensible-existing-data-property.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-is-non-extensible-existing-data-property.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-non-extensible-property-creation-throws.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-is-non-extensible-property-creation-throws.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-non-extensible-property-creation-throws.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-is-non-extensible-property-creation-throws.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-sealed-existing-accessor-property.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-is-sealed-existing-accessor-property.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-sealed-existing-accessor-property.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-is-sealed-existing-accessor-property.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-sealed-existing-data-property.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-is-sealed-existing-data-property.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-sealed-existing-data-property.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-is-sealed-existing-data-property.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-sealed-property-creation-throws.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-is-sealed-property-creation-throws.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-is-sealed-property-creation-throws.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-is-sealed-property-creation-throws.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Null.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Target-Null.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Null.js [strict]",
+      "relativePath": "built-ins/Object/assign/Target-Null.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Number.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Target-Number.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Number.js [strict]",
+      "relativePath": "built-ins/Object/assign/Target-Number.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Object.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Target-Object.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Object.js [strict]",
+      "relativePath": "built-ins/Object/assign/Target-Object.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-set-not-writable.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-set-not-writable.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-set-not-writable.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-set-not-writable.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-set-user-error.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/target-set-user-error.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/target-set-user-error.js [strict]",
+      "relativePath": "built-ins/Object/assign/target-set-user-error.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-String.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Target-String.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-String.js [strict]",
+      "relativePath": "built-ins/Object/assign/Target-String.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Symbol.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Target-Symbol.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Symbol.js [strict]",
+      "relativePath": "built-ins/Object/assign/Target-Symbol.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Undefined.js [non-strict]",
+      "relativePath": "built-ins/Object/assign/Target-Undefined.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/assign/Target-Undefined.js [strict]",
+      "relativePath": "built-ins/Object/assign/Target-Undefined.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/bigint.js [non-strict]",
+      "relativePath": "built-ins/Object/bigint.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/bigint.js [strict]",
+      "relativePath": "built-ins/Object/bigint.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-0-1.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-0-1.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-0-1.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-0-1.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-0-2.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-0-2.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-0-2.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-0-2.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1-1.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1-1.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1-1.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1-1.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1-2.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1-2.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1-2.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1-2.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1-3.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1-3.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1-3.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1-3.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1-4.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1-4.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1-4.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1-4.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-1.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-1.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-2-1.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-2-1.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-2-1.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-2-1.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-2-2.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-2-2.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-2-2.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-2-2.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-3-1.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-3-1.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-3-1.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-3-1.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-4-1.js [non-strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-4-1.js",
+      "mode": "non-strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "built-ins/Object/create/15.2.3.5-4-1.js [strict]",
+      "relativePath": "built-ins/Object/create/15.2.3.5-4-1.js",
+      "mode": "strict",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    }
+  ]
+}

@@ -43,6 +43,42 @@ Runtime initialization took 55ms
 
 If all tests pass, everything is good! At this point you can make changes to the runtime, add breakpoints and step through with the debugger. In the next section we'll see how to attach the runtime to an existing NativeScript application allowing us to debug runtime issues in actual apps.
 
+## Test262 integration
+
+The `TestRunner` target can host a filtered subset of [Test262](https://github.com/tc39/test262) inside the same Jasmine and JUnit pipeline that the existing runtime tests already use.
+
+The integration in this repo is intentionally phased:
+
+1. Test262 cases are discovered ahead of time and written to `TestRunner/app/tests/Test262/generated-manifest.json`.
+2. Each discovered case is executed in its own `Worker`, so it gets an isolated realm instead of sharing Jasmine's main global object.
+3. The generated specs are reported through the existing `TestRunner` JUnit output, so they show up in the current Xcode and CI flow.
+
+To wire in the upstream suite, add it as a submodule under the bundled test tree:
+
+```bash
+git submodule add https://github.com/tc39/test262.git TestRunner/app/tests/vendor/test262
+git submodule update --init --recursive
+```
+
+Then enable and tune `TestRunner/app/tests/Test262/config.js`. The TestRunner build now regenerates the manifest automatically by running:
+
+```bash
+node ./scripts/generate-test262-manifest.js
+```
+
+By default, enabling the suite does not try to run the whole upstream corpus. It starts from the curated prefixes in `TestRunner/app/tests/Test262/curated-prefixes.json` and caps generation at 250 entries unless you override it.
+
+Useful environment variables for local runs and CI sharding:
+
+```bash
+TEST262_FILTER=built-ins/Array
+TEST262_LIMIT=250
+TEST262_SHARD_COUNT=4
+TEST262_SHARD_INDEX=0
+```
+
+The current adapter is deliberately conservative. It skips unsupported `module` and `raw` cases by default and is disabled by default so existing CI remains unchanged until you choose a supported subset.
+
 # Attaching the runtime to a NativeScript app
 
 In the existing app, we need to prepare the Xcode project using `ns prepare ios`. This will create a folder named `platforms/ios` and in there a `<appname>.xcworkspace` (or .xcodeproject but note the following...).
