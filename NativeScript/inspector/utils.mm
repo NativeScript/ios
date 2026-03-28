@@ -35,16 +35,15 @@ std::string v8_inspector::GetMIMEType(std::string filePath) {
 }
 
 std::string v8_inspector::ToStdString(const StringView& value) {
-    std::vector<uint16_t> buffer(value.length());
+    std::u16string value16;
+    value16.resize(value.length());
     for (size_t i = 0; i < value.length(); i++) {
         if (value.is8Bit()) {
-            buffer[i] = value.characters8()[i];
+            value16[i] = static_cast<char16_t>(value.characters8()[i]);
         } else {
-            buffer[i] = value.characters16()[i];
+            value16[i] = static_cast<char16_t>(value.characters16()[i]);
         }
     }
-
-    std::u16string value16(buffer.begin(), buffer.end());
 
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     // FIXME: std::codecvt_utf8_utf16 is deprecated
