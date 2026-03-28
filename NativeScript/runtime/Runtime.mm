@@ -426,15 +426,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     v8::Local<v8::FunctionTemplate> fnTpl = v8::FunctionTemplate::New(isolate, configureRuntimeCallback);
     v8::Local<v8::Function> fn = fnTpl->GetFunction(context).ToLocalChecked();
     fn->SetName(tns::ToV8String(isolate, "__nsConfigureRuntime"));
-    bool setOk = context->Global()->Set(context, tns::ToV8String(isolate, "__nsConfigureRuntime"), fn).FromMaybe(false);
-    Log(@"[Runtime::Init] __nsConfigureRuntime installed on global: %s", setOk ? "YES" : "NO");
-
-    // Verify the function is actually readable from JS
-    v8::Local<v8::Value> verify;
-    if (context->Global()->Get(context, tns::ToV8String(isolate, "__nsConfigureRuntime")).ToLocal(&verify)) {
-      Log(@"[Runtime::Init] __nsConfigureRuntime verify: isFunction=%d isUndefined=%d",
-          verify->IsFunction(), verify->IsUndefined());
-    }
+    context->Global()->Set(context, tns::ToV8String(isolate, "__nsConfigureRuntime"), fn).FromMaybe(false);
 
     // Also install on globalThis explicitly via JS eval as a belt-and-suspenders approach.
     // Some V8 embeddings have the global proxy ≠ globalThis; this ensures JS can always find it.
