@@ -6,7 +6,7 @@ module.exports = {
     generatedManifestPath: "TestRunner/app/tests/Test262/generated-manifest.json",
     curatedIncludePathsPath: "TestRunner/app/tests/Test262/curated-prefixes.json",
     harnessDefaults: ["assert.js", "sta.js"],
-    unsupportedFlags: ["module", "raw"],
+    unsupportedFlags: ["raw"],
     unsupportedIncludes: [
         "agent.js",
         "detachArrayBuffer.js",
@@ -17,10 +17,17 @@ module.exports = {
     ],
     unsupportedFeatures: [
         "Array.fromAsync",
+        "arbitrary-module-namespace-names",
         "cross-realm",
-        "ShadowRealm"
+        "ShadowRealm",
+        "import-attributes",
+        "import-bytes",
+        "import-defer",
+        "import-text",
+        "source-phase-imports",
+        "source-phase-imports-module-source"
     ],
-    includePaths: ["built-ins/Object"],
+    includePaths: ["language/module-code"],
     excludePaths: ["built-ins/Array/from/elements-deleted-after.js"],
     timeoutMs: 4000,
     defaultLimit: 100,

@@ -137,6 +137,10 @@ function matchesAnyPrefix(relativePath, prefixes) {
 }
 
 function getModes(flags) {
+    if (flags.includes("module")) {
+        return ["module"];
+    }
+
     if (flags.includes("onlyStrict")) {
         return ["strict"];
     }

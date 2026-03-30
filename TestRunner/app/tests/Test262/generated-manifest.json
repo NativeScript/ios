@@ -1,21 +1,22 @@
 {
-  "generatedAt": "2026-03-28T18:11:35.062Z",
+  "generatedAt": "2026-03-28T23:35:54.846Z",
   "enabled": true,
   "reason": "generated",
   "summary": {
     "discovered": 53125,
     "included": 100,
-    "excluded": 46325,
+    "excluded": 52561,
     "exclusions": {
-      "not-included": 49713,
+      "not-included": 52532,
       "excluded-path": 1,
-      "unsupported-feature": 1
+      "unsupported-feature": 29,
+      "unsupported-flag": 1
     },
     "shardCount": 0,
     "shardIndex": 0,
     "filter": [],
     "includePrefixes": [
-      "built-ins/Object"
+      "language/module-code"
     ],
     "curatedIncludePrefixes": [
       "built-ins/Array",
@@ -69,1114 +70,1248 @@
   },
   "tests": [
     {
-      "id": "built-ins/Object/assign/assign-descriptor.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/assign-descriptor.js",
-      "mode": "non-strict",
+      "id": "language/module-code/ambiguous-export-bindings/error-export-from-named-as.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/error-export-from-named-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/error-export-from-named.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/error-export-from-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/error-import-named-as.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/error-import-named-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/error-import-named.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/error-import-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/import-and-export-propagates-binding.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/import-and-export-propagates-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from-and-import-star-as-and-export.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from-and-import-star-as-and-export.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/omitted-from-namespace.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/omitted-from-namespace.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/comment-multi-line-html-close.js [module]",
+      "relativePath": "language/module-code/comment-multi-line-html-close.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/comment-single-line-html-close.js [module]",
+      "relativePath": "language/module-code/comment-single-line-html-close.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/comment-single-line-html-open.js [module]",
+      "relativePath": "language/module-code/comment-single-line-html-open.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-as-star-as.js [module]",
+      "relativePath": "language/module-code/early-dup-export-as-star-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-decl.js [module]",
+      "relativePath": "language/module-code/early-dup-export-decl.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-dflt-id.js [module]",
+      "relativePath": "language/module-code/early-dup-export-dflt-id.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-dflt.js [module]",
+      "relativePath": "language/module-code/early-dup-export-dflt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-id-as.js [module]",
+      "relativePath": "language/module-code/early-dup-export-id-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-id.js [module]",
+      "relativePath": "language/module-code/early-dup-export-id.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-star-as-dflt.js [module]",
+      "relativePath": "language/module-code/early-dup-export-star-as-dflt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-lables.js [module]",
+      "relativePath": "language/module-code/early-dup-lables.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-lex.js [module]",
+      "relativePath": "language/module-code/early-dup-lex.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-top-function-async-generator.js [module]",
+      "relativePath": "language/module-code/early-dup-top-function-async-generator.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-top-function-async.js [module]",
+      "relativePath": "language/module-code/early-dup-top-function-async.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-top-function-generator.js [module]",
+      "relativePath": "language/module-code/early-dup-top-function-generator.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-top-function.js [module]",
+      "relativePath": "language/module-code/early-dup-top-function.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-export-global.js [module]",
+      "relativePath": "language/module-code/early-export-global.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-export-unresolvable.js [module]",
+      "relativePath": "language/module-code/early-export-unresolvable.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-import-arguments.js [module]",
+      "relativePath": "language/module-code/early-import-arguments.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-import-as-arguments.js [module]",
+      "relativePath": "language/module-code/early-import-as-arguments.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-import-as-eval.js [module]",
+      "relativePath": "language/module-code/early-import-as-eval.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-import-eval.js [module]",
+      "relativePath": "language/module-code/early-import-eval.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-lex-and-var.js [module]",
+      "relativePath": "language/module-code/early-lex-and-var.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-new-target.js [module]",
+      "relativePath": "language/module-code/early-new-target.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-strict-mode.js [module]",
+      "relativePath": "language/module-code/early-strict-mode.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-super.js [module]",
+      "relativePath": "language/module-code/early-super.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-undef-break.js [module]",
+      "relativePath": "language/module-code/early-undef-break.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-undef-continue.js [module]",
+      "relativePath": "language/module-code/early-undef-continue.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/eval-export-cls-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-cls-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-anon-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-anon-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-anon.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-anon.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-name-meth.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-name-meth.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-named-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-named-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-named.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-cls-anon.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-cls-anon.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-cls-name-meth.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-cls-name-meth.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-cls-named.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-cls-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-err-eval.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-err-eval.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "runtime",
+        "type": "Test262Error"
+      }
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-err-get-value.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-err-get-value.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "runtime",
+        "type": "ReferenceError"
+      }
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-fn-anon.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-fn-anon.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-fn-named.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-fn-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-gen-anon.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-gen-anon.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-gen-named.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-gen-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-in.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-in.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-fun-anon-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-fun-anon-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-fun-named-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-fun-named-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-gen-anon-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-gen-anon-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-gen-named-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-gen-named-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-fun-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-fun-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-gen-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-gen-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-indirect-trlng-comma.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-indirect-trlng-comma.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-indirect-update-as.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-indirect-update-as.js",
+      "mode": "module",
       "async": false,
       "includes": [
         "assert.js",
         "sta.js",
-        "propertyHelper.js"
+        "fnGlobalObject.js"
       ],
       "negative": null
     },
     {
-      "id": "built-ins/Object/assign/assign-descriptor.js [strict]",
-      "relativePath": "built-ins/Object/assign/assign-descriptor.js",
-      "mode": "strict",
+      "id": "language/module-code/eval-gtbndng-indirect-update-dflt.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-indirect-update-dflt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-indirect-update.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-indirect-update.js",
+      "mode": "module",
       "async": false,
       "includes": [
         "assert.js",
         "sta.js",
-        "propertyHelper.js"
+        "fnGlobalObject.js"
       ],
       "negative": null
     },
     {
-      "id": "built-ins/Object/assign/assign-length.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/assign-length.js",
-      "mode": "non-strict",
+      "id": "language/module-code/eval-gtbndng-local-bndng-cls.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-local-bndng-cls.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-local-bndng-const.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-local-bndng-const.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-local-bndng-let.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-local-bndng-let.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-local-bndng-var.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-local-bndng-var.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-rqstd-abrupt.js [module]",
+      "relativePath": "language/module-code/eval-rqstd-abrupt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "runtime",
+        "type": "TypeError"
+      }
+    },
+    {
+      "id": "language/module-code/eval-rqstd-once.js [module]",
+      "relativePath": "language/module-code/eval-rqstd-once.js",
+      "mode": "module",
       "async": false,
       "includes": [
         "assert.js",
         "sta.js",
-        "propertyHelper.js"
+        "fnGlobalObject.js"
       ],
       "negative": null
     },
     {
-      "id": "built-ins/Object/assign/assign-length.js [strict]",
-      "relativePath": "built-ins/Object/assign/assign-length.js",
-      "mode": "strict",
+      "id": "language/module-code/eval-rqstd-order.js [module]",
+      "relativePath": "language/module-code/eval-rqstd-order.js",
+      "mode": "module",
       "async": false,
       "includes": [
         "assert.js",
         "sta.js",
-        "propertyHelper.js"
+        "fnGlobalObject.js"
       ],
       "negative": null
     },
     {
-      "id": "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js",
-      "mode": "non-strict",
+      "id": "language/module-code/eval-self-abrupt.js [module]",
+      "relativePath": "language/module-code/eval-self-abrupt.js",
+      "mode": "module",
       "async": false,
       "includes": [
         "assert.js",
         "sta.js"
       ],
-      "negative": null
+      "negative": {
+        "phase": "runtime",
+        "type": "Test262Error"
+      }
     },
     {
-      "id": "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js [strict]",
-      "relativePath": "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/invoked-as-ctor.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/invoked-as-ctor.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/invoked-as-ctor.js [strict]",
-      "relativePath": "built-ins/Object/assign/invoked-as-ctor.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/name.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/name.js",
-      "mode": "non-strict",
+      "id": "language/module-code/eval-self-once.js [module]",
+      "relativePath": "language/module-code/eval-self-once.js",
+      "mode": "module",
       "async": false,
       "includes": [
         "assert.js",
         "sta.js",
-        "propertyHelper.js"
+        "fnGlobalObject.js"
       ],
       "negative": null
     },
     {
-      "id": "built-ins/Object/assign/name.js [strict]",
-      "relativePath": "built-ins/Object/assign/name.js",
-      "mode": "strict",
+      "id": "language/module-code/eval-this.js [module]",
+      "relativePath": "language/module-code/eval-this.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-default-asyncfunction-declaration-binding-exists.js [module]",
+      "relativePath": "language/module-code/export-default-asyncfunction-declaration-binding-exists.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/export-default-asyncfunction-declaration-binding.js [module]",
+      "relativePath": "language/module-code/export-default-asyncfunction-declaration-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-default-asyncgenerator-declaration-binding-exists.js [module]",
+      "relativePath": "language/module-code/export-default-asyncgenerator-declaration-binding-exists.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/export-default-asyncgenerator-declaration-binding.js [module]",
+      "relativePath": "language/module-code/export-default-asyncgenerator-declaration-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-default-function-declaration-binding-exists.js [module]",
+      "relativePath": "language/module-code/export-default-function-declaration-binding-exists.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/export-default-function-declaration-binding.js [module]",
+      "relativePath": "language/module-code/export-default-function-declaration-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-default-generator-declaration-binding-exists.js [module]",
+      "relativePath": "language/module-code/export-default-generator-declaration-binding-exists.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/export-default-generator-declaration-binding.js [module]",
+      "relativePath": "language/module-code/export-default-generator-declaration-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-star-as-dflt.js [module]",
+      "relativePath": "language/module-code/export-star-as-dflt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-cls.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-cls.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-const.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-const.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-fun.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-fun.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-gen.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-gen.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-let.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-let.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-var.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-var.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-err-circular-as.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-circular-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-circular.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-circular.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-dflt-thru-star-as.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-dflt-thru-star-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-dflt-thru-star.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-dflt-thru-star.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-not-found-as.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-not-found-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-not-found.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-not-found.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-iee-cycle.js [module]",
+      "relativePath": "language/module-code/instn-iee-iee-cycle.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-star-cycle.js [module]",
+      "relativePath": "language/module-code/instn-iee-star-cycle.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-trlng-comma.js [module]",
+      "relativePath": "language/module-code/instn-iee-trlng-comma.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-local-bndng-cls.js [module]",
+      "relativePath": "language/module-code/instn-local-bndng-cls.js",
+      "mode": "module",
       "async": false,
       "includes": [
         "assert.js",
         "sta.js",
-        "propertyHelper.js"
+        "fnGlobalObject.js"
       ],
       "negative": null
     },
     {
-      "id": "built-ins/Object/assign/not-a-constructor.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/not-a-constructor.js",
-      "mode": "non-strict",
+      "id": "language/module-code/instn-local-bndng-const.js [module]",
+      "relativePath": "language/module-code/instn-local-bndng-const.js",
+      "mode": "module",
       "async": false,
       "includes": [
         "assert.js",
         "sta.js",
-        "isConstructor.js"
+        "fnGlobalObject.js"
       ],
       "negative": null
     },
     {
-      "id": "built-ins/Object/assign/not-a-constructor.js [strict]",
-      "relativePath": "built-ins/Object/assign/not-a-constructor.js",
-      "mode": "strict",
+      "id": "language/module-code/instn-local-bndng-export-cls.js [module]",
+      "relativePath": "language/module-code/instn-local-bndng-export-cls.js",
+      "mode": "module",
       "async": false,
       "includes": [
         "assert.js",
         "sta.js",
-        "isConstructor.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/ObjectOverride-sameproperty.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/ObjectOverride-sameproperty.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/ObjectOverride-sameproperty.js [strict]",
-      "relativePath": "built-ins/Object/assign/ObjectOverride-sameproperty.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/OnlyOneArgument.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/OnlyOneArgument.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/OnlyOneArgument.js [strict]",
-      "relativePath": "built-ins/Object/assign/OnlyOneArgument.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Override-notstringtarget.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Override-notstringtarget.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Override-notstringtarget.js [strict]",
-      "relativePath": "built-ins/Object/assign/Override-notstringtarget.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Override.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Override.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Override.js [strict]",
-      "relativePath": "built-ins/Object/assign/Override.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-get-attr-error.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/source-get-attr-error.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-get-attr-error.js [strict]",
-      "relativePath": "built-ins/Object/assign/source-get-attr-error.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-non-enum.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/source-non-enum.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-non-enum.js [strict]",
-      "relativePath": "built-ins/Object/assign/source-non-enum.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Source-Null-Undefined.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Source-Null-Undefined.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Source-Null-Undefined.js [strict]",
-      "relativePath": "built-ins/Object/assign/Source-Null-Undefined.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Source-Number-Boolen-Symbol.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Source-Number-Boolen-Symbol.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Source-Number-Boolen-Symbol.js [strict]",
-      "relativePath": "built-ins/Object/assign/Source-Number-Boolen-Symbol.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-own-prop-desc-missing.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/source-own-prop-desc-missing.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-own-prop-desc-missing.js [strict]",
-      "relativePath": "built-ins/Object/assign/source-own-prop-desc-missing.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-own-prop-error.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/source-own-prop-error.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-own-prop-error.js [strict]",
-      "relativePath": "built-ins/Object/assign/source-own-prop-error.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-own-prop-keys-error.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/source-own-prop-keys-error.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/source-own-prop-keys-error.js [strict]",
-      "relativePath": "built-ins/Object/assign/source-own-prop-keys-error.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Source-String.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Source-String.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Source-String.js [strict]",
-      "relativePath": "built-ins/Object/assign/Source-String.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/strings-and-symbol-order-proxy.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/strings-and-symbol-order-proxy.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js",
-        "compareArray.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/strings-and-symbol-order-proxy.js [strict]",
-      "relativePath": "built-ins/Object/assign/strings-and-symbol-order-proxy.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js",
-        "compareArray.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/strings-and-symbol-order.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/strings-and-symbol-order.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js",
-        "compareArray.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/strings-and-symbol-order.js [strict]",
-      "relativePath": "built-ins/Object/assign/strings-and-symbol-order.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js",
-        "compareArray.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-Array.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-Array.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-Array.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-Array.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Boolean.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Target-Boolean.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Boolean.js [strict]",
-      "relativePath": "built-ins/Object/assign/Target-Boolean.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-frozen-accessor-property-set-succeeds.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-is-frozen-accessor-property-set-succeeds.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-frozen-accessor-property-set-succeeds.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-is-frozen-accessor-property-set-succeeds.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-frozen-data-property-set-throws.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-is-frozen-data-property-set-throws.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-frozen-data-property-set-throws.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-is-frozen-data-property-set-throws.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-non-extensible-existing-accessor-property.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-is-non-extensible-existing-accessor-property.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-non-extensible-existing-accessor-property.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-is-non-extensible-existing-accessor-property.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-non-extensible-existing-data-property.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-is-non-extensible-existing-data-property.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-non-extensible-existing-data-property.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-is-non-extensible-existing-data-property.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-non-extensible-property-creation-throws.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-is-non-extensible-property-creation-throws.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-non-extensible-property-creation-throws.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-is-non-extensible-property-creation-throws.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-sealed-existing-accessor-property.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-is-sealed-existing-accessor-property.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-sealed-existing-accessor-property.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-is-sealed-existing-accessor-property.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-sealed-existing-data-property.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-is-sealed-existing-data-property.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-sealed-existing-data-property.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-is-sealed-existing-data-property.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-sealed-property-creation-throws.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-is-sealed-property-creation-throws.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-is-sealed-property-creation-throws.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-is-sealed-property-creation-throws.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Null.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Target-Null.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Null.js [strict]",
-      "relativePath": "built-ins/Object/assign/Target-Null.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Number.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Target-Number.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Number.js [strict]",
-      "relativePath": "built-ins/Object/assign/Target-Number.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Object.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Target-Object.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Object.js [strict]",
-      "relativePath": "built-ins/Object/assign/Target-Object.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-set-not-writable.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-set-not-writable.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-set-not-writable.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-set-not-writable.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-set-user-error.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/target-set-user-error.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/target-set-user-error.js [strict]",
-      "relativePath": "built-ins/Object/assign/target-set-user-error.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-String.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Target-String.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-String.js [strict]",
-      "relativePath": "built-ins/Object/assign/Target-String.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Symbol.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Target-Symbol.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Symbol.js [strict]",
-      "relativePath": "built-ins/Object/assign/Target-Symbol.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Undefined.js [non-strict]",
-      "relativePath": "built-ins/Object/assign/Target-Undefined.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/assign/Target-Undefined.js [strict]",
-      "relativePath": "built-ins/Object/assign/Target-Undefined.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/bigint.js [non-strict]",
-      "relativePath": "built-ins/Object/bigint.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/bigint.js [strict]",
-      "relativePath": "built-ins/Object/bigint.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-0-1.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-0-1.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-0-1.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-0-1.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-0-2.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-0-2.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-0-2.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-0-2.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1-1.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1-1.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1-1.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1-1.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1-2.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1-2.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1-2.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1-2.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1-3.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1-3.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1-3.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1-3.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1-4.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1-4.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1-4.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1-4.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-1.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-1.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-2-1.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-2-1.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-2-1.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-2-1.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-2-2.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-2-2.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-2-2.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-2-2.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-3-1.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-3-1.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-3-1.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-3-1.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-4-1.js [non-strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-4-1.js",
-      "mode": "non-strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
-      ],
-      "negative": null
-    },
-    {
-      "id": "built-ins/Object/create/15.2.3.5-4-1.js [strict]",
-      "relativePath": "built-ins/Object/create/15.2.3.5-4-1.js",
-      "mode": "strict",
-      "async": false,
-      "includes": [
-        "assert.js",
-        "sta.js"
+        "fnGlobalObject.js"
       ],
       "negative": null
     }

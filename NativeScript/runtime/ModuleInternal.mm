@@ -56,6 +56,36 @@ static std::string NormalizePath(const std::string& path) {
   return std::string([standardized UTF8String]);
 }
 
+static bool ShouldTreatAsForcedSourceTextModule(v8::Isolate* isolate,
+                                                const std::string& path) {
+  v8::Local<v8::Context> context = isolate->GetCurrentContext();
+  v8::Local<v8::Object> global = context->Global();
+
+  v8::Local<v8::Value> enabledValue;
+  if (!global->Get(context, tns::ToV8String(isolate, "__test262ForceModule"))
+           .ToLocal(&enabledValue) ||
+      !enabledValue->BooleanValue(isolate)) {
+    return false;
+  }
+
+  v8::Local<v8::Value> rootValue;
+  if (!global->Get(context, tns::ToV8String(isolate, "__test262ModuleRoot"))
+           .ToLocal(&rootValue) ||
+      rootValue.IsEmpty() || !rootValue->IsString()) {
+    return false;
+  }
+
+  std::string root = NormalizePath(tns::ToString(isolate, rootValue));
+  std::string normalizedPath = NormalizePath(path);
+  if (root.empty() || normalizedPath.size() < root.size() ||
+      normalizedPath.compare(0, root.size(), root) != 0) {
+    return false;
+  }
+
+  return normalizedPath.size() >= 3 &&
+         normalizedPath.compare(normalizedPath.size() - 3, 3, ".js") == 0;
+}
+
 // Helper function to resolve main entry from package.json with proper extension handling
 std::string ResolveMainEntryFromPackageJson(const std::string& baseDir) {
   // Get the main value from package.json
@@ -708,7 +738,7 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
 
   if (IsESModule(canonicalPath)) {
     // Treat all .mjs files as standard ES modules.
-    return ModuleInternal::LoadESModule(isolate, canonicalPath);
+    return ModuleInternal::LoadESModule(isolate, canonicalPath, true);
   }
 
   Local<Script> script = ModuleInternal::LoadClassicScript(isolate, canonicalPath);
@@ -776,6 +806,11 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
   }
 
   return result;
+}
+
+Local<Value> ModuleInternal::LoadSourceTextModule(Isolate* isolate,
+                                                  const std::string& path) {
+  return ModuleInternal::LoadESModule(isolate, NormalizePath(path), false);
 }
 
 Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::string& path) {
@@ -848,6 +883,11 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
 }
 
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
+  return ModuleInternal::LoadESModule(isolate, path, true);
+}
+
+Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path,
+                                          bool suppressInDebug) {
   std::string canonicalPath = NormalizePath(path);
   auto context = isolate->GetCurrentContext();
 
@@ -910,7 +950,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       }
       logPhase("compile", "fail", classification);
       // V8 threw a syntax error or similar
-      if (RuntimeConfig.IsDebug) {
+      if (RuntimeConfig.IsDebug && suppressInDebug) {
         // Log the detailed JavaScript error with full stack trace
         Log(@"***** JavaScript exception occurred *****");
         Log(@"Error compiling ES module: %s", canonicalPath.c_str());
@@ -969,7 +1009,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         }
       }
       logPhase("instantiate", "fail", classification);
-      if (RuntimeConfig.IsDebug) {
+      if (RuntimeConfig.IsDebug && suppressInDebug) {
         // Log the detailed JavaScript error with full stack trace
         Log(@"***** JavaScript exception occurred *****");
         Log(@"Error instantiating module: %s", canonicalPath.c_str());
@@ -1013,7 +1053,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         }
       }
       logPhase("evaluate", "fail", classification);
-      if (RuntimeConfig.IsDebug) {
+      if (RuntimeConfig.IsDebug && suppressInDebug) {
         // Log the detailed JavaScript error with full stack trace
         Log(@"***** JavaScript exception occurred *****");
         Log(@"Error evaluating ES module: %s", canonicalPath.c_str());
@@ -1204,14 +1244,16 @@ v8::Local<v8::String> ModuleInternal::WrapModuleContent(v8::Isolate* isolate,
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   bool isWorkerContext = cache && cache->isWorker;
 
-  // Check if this is an .mjs file but NOT a .mjs.map file
-  if (IsESModule(path)) {
+  bool isForcedSourceTextModule = ShouldTreatAsForcedSourceTextModule(isolate, path);
+
+  // Check if this is an ES module path or a forced source-text module path.
+  if (IsESModule(path) || isForcedSourceTextModule) {
     // Read raw text without wrapping.
     std::string sourceText = tns::ReadText(path);
 
     // For ES modules in worker context, we need to provide access to global objects
     // since ES modules run in their own scope
-    if (isWorkerContext) {
+    if (isWorkerContext && !isForcedSourceTextModule) {
       // Prepend global declarations to make worker globals available in ES module scope
       std::string globalDeclarations = "const self = globalThis.self || globalThis;\n"
                                        "const postMessage = globalThis.postMessage;\n"

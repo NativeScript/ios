@@ -50,12 +50,32 @@ function compileScript(source, path) {
     return Function(withSourceURL(source, path));
 }
 
+function importModule(specifier) {
+    return Function("specifier", "return import(specifier);")(specifier);
+}
+
 function expectedErrorMatches(error, negative) {
     if (!negative || !negative.type) {
         return true;
     }
 
-    return error && (error.name === negative.type || (error.constructor && error.constructor.name === negative.type));
+    if (!error) {
+        return false;
+    }
+
+    if (error.name === negative.type || (error.constructor && error.constructor.name === negative.type)) {
+        return true;
+    }
+
+    var errorText = "";
+    if (error.message) {
+        errorText += error.message;
+    }
+    if (error.stack) {
+        errorText += "\n" + error.stack;
+    }
+
+    return errorText.indexOf(negative.type + ":") !== -1 || errorText.indexOf(negative.type) !== -1;
 }
 
 function makePrelude() {
@@ -77,6 +97,37 @@ function loadHarness(test262Root, includes) {
     includes.forEach(function (includeName) {
         var harnessPath = test262Root + "/harness/" + includeName;
         evalGlobal(readTextFile(harnessPath), harnessPath);
+    });
+}
+
+function isModuleMode(payload) {
+    return payload && payload.mode === "module";
+}
+
+function getTest262ModuleSpecifier(payload) {
+    return "/tests/" + payload.bundleSubmodulePath + "/test/" + payload.relativePath;
+}
+
+function runModuleCase(payload, test262Root, completeWithPass, completeWithFailure) {
+    globalThis.__test262ForceModule = true;
+    globalThis.__test262ModuleRoot = test262Root + "/test";
+
+    importModule(getTest262ModuleSpecifier(payload)).then(function () {
+        if (payload.negative) {
+            completeWithFailure(new Error("Expected module failure but evaluation succeeded"));
+            return;
+        }
+
+        if (!payload.async) {
+            completeWithPass();
+        }
+    }, function (error) {
+        if (payload.negative && expectedErrorMatches(error, payload.negative)) {
+            completeWithPass();
+            return;
+        }
+
+        completeWithFailure(error);
     });
 }
 
@@ -130,6 +181,11 @@ function runCase(payload) {
     }
 
     loadHarness(test262Root, payload.includes || []);
+
+    if (isModuleMode(payload)) {
+        runModuleCase(payload, test262Root, completeWithPass, completeWithFailure);
+        return;
+    }
 
     if (payload.negative && payload.negative.phase === "parse") {
         try {

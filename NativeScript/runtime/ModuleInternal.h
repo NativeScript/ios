@@ -13,6 +13,8 @@ class ModuleInternal {
   void RunScript(v8::Isolate* isolate, std::string script);
   static v8::Local<v8::Value> LoadScript(v8::Isolate* isolate,
                                          const std::string& path);
+  static v8::Local<v8::Value> LoadSourceTextModule(v8::Isolate* isolate,
+                                                   const std::string& path);
 
  private:
   static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -28,6 +30,9 @@ class ModuleInternal {
   // Compile/link/evaluate an ES module; returns its namespace object.
   static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate,
                                            const std::string& path);
+  static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate,
+                                           const std::string& path,
+                                           bool suppressInDebug);
   static v8::Local<v8::String> WrapModuleContent(v8::Isolate* isolate,
                                                  const std::string& path);
   v8::Local<v8::Object> LoadModule(v8::Isolate* isolate,
