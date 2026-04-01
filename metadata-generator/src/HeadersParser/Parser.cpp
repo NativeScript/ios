@@ -6,6 +6,7 @@
 #include <clang/Tooling/Tooling.h>
 #include <iostream>
 #include <sstream>
+#include <variant>
 #include <llvm/ADT/StringSwitch.h>
 #include <llvm/Support/Path.h>
 
@@ -31,9 +32,9 @@ static std::error_code addHeaderInclude(StringRef headerName, std::vector<SmallS
     return std::error_code();
 }
 
-static std::error_code addHeaderInclude(const FileEntry* header, std::vector<SmallString<256>>& includes)
+static std::error_code addHeaderInclude(FileEntryRef header, std::vector<SmallString<256>>& includes)
 {
-    return addHeaderInclude(header->getName(), includes);
+    return addHeaderInclude(header.getName(), includes);
 }
 
 static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleMap& modMap, const Module* module, std::vector<SmallString<256>>& includes)
@@ -42,17 +43,15 @@ static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleM
     if (!module->isAvailable())
         return std::error_code();
 
-    if (module->Umbrella && module->Umbrella.is<FileEntryRef>()) {
-        const FileEntry* umbrellaHeader = module->Umbrella.get<FileEntryRef>();
-        if (std::error_code err = addHeaderInclude(umbrellaHeader, includes))
+    if (const auto* umbrellaHeader = std::get_if<FileEntryRef>(&module->Umbrella)) {
+        if (std::error_code err = addHeaderInclude(*umbrellaHeader, includes))
             return err;
     }
-    else if (module->Umbrella && module->Umbrella.is<DirectoryEntryRef>()) {
-        const DirectoryEntryRef umbrellaDir = module->Umbrella.get<DirectoryEntryRef>();
+    else if (const auto* umbrellaDir = std::get_if<DirectoryEntryRef>(&module->Umbrella)) {
         // Add all of the headers we find in this subdirectory.
         std::error_code ec;
         SmallString<128> dirNative;
-        path::native(umbrellaDir.getName(), dirNative);
+        path::native(umbrellaDir->getName(), dirNative);
         for (fs::recursive_directory_iterator dir(dirNative.str(), ec), dirEnd; dir != dirEnd && !ec; dir.increment(ec)) {
             // Check whether this entry has an extension typically associated with headers.
             if (!llvm::StringSwitch<bool>(path::extension(dir->path()))
@@ -77,8 +76,8 @@ static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleM
         if (ec)
             return ec;
     } else {
-        for (auto header : module->Headers[Module::HK_Normal]) {
-            if (auto err = addHeaderInclude(header.Entry, includes))
+        for (FileEntryRef header : const_cast<Module*>(module)->getTopHeaders(fileMgr)) {
+            if (auto err = addHeaderInclude(header, includes))
                 return err;
         }
     }

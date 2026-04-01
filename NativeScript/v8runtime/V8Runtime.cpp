@@ -431,7 +431,7 @@ std::shared_ptr<const jsi::PreparedJavaScript> V8Runtime::prepareJavaScript(
 
 jsi::Value V8Runtime::evaluatePreparedJavaScript(
     const std::shared_ptr<const jsi::PreparedJavaScript>& js) {
-  return evaluateJavaScript(nullptr, nullptr);
+  return evaluateJavaScript(nullptr, "");
 }
 
 void V8Runtime::queueMicrotask(const jsi::Function& callback) {
