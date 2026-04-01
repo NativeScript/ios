@@ -277,6 +277,9 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
            this->message_.find("Cannot compile") != std::string::npos);
     }
 
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    bool isWorkerContext = cache && cache->isWorker;
+
     if (isCriticalException) {
       // Mark that a JavaScript error occurred
       jsErrorOccurred = true;
@@ -306,6 +309,14 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
       Log(@"Error on app initialization.");
       Log(@"Please fix the error and save the file to auto reload the app.");
       Log(@"======================================");
+
+      // Module-resolution failures inside workers must preserve the pending V8
+      // exception so import()/InstantiateModule can reject normally.
+      if (RuntimeConfig.IsDebug && isWorkerContext) {
+        Log(@"***** End stack trace - rethrowing to V8 for worker/module resolution *****\n");
+        isolate->ThrowException(errObj);
+        return;
+      }
 
       // In debug mode, continue execution; in release mode, terminate
       if (RuntimeConfig.IsDebug) {

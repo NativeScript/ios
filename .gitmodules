@@ -2,3 +2,6 @@
 	path = libffi
 	url = https://github.com/NativeScript/libffi.git
 	branch = darind/v8-ios
+[submodule "TestRunner/app/tests/vendor/test262"]
+	path = TestRunner/app/tests/vendor/test262
+	url = https://github.com/tc39/test262.git

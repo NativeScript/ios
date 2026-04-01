@@ -101,6 +101,45 @@ static inline bool StartsWith(const std::string& s, const char* prefix) {
   return s.size() >= n && s.compare(0, n, prefix) == 0;
 }
 
+static void ClearLastResolveException();
+static void RememberLastResolveException(v8::Isolate* isolate,
+                                         v8::Local<v8::Value> exception);
+static v8::Local<v8::Value> TakeLastResolveException(v8::Isolate* isolate);
+static v8::Local<v8::Value> CreateResolveError(v8::Isolate* isolate,
+                                               const std::string& message);
+
+static bool IsTest262ForcedModule(v8::Local<v8::Context> context,
+                                  const std::string& path) {
+  v8::Isolate* isolate = context->GetIsolate();
+  v8::Local<v8::Object> global = context->Global();
+
+  v8::Local<v8::Value> enabledValue;
+  if (!global->Get(context, tns::ToV8String(isolate, "__test262ForceModule"))
+           .ToLocal(&enabledValue) ||
+      !enabledValue->BooleanValue(isolate)) {
+    return false;
+  }
+
+  v8::Local<v8::Value> rootValue;
+  if (!global->Get(context, tns::ToV8String(isolate, "__test262ModuleRoot"))
+           .ToLocal(&rootValue) ||
+      rootValue.IsEmpty() || !rootValue->IsString()) {
+    return false;
+  }
+
+  std::string root = NormalizePath(tns::ToString(isolate, rootValue));
+  if (root.empty()) {
+    return false;
+  }
+
+  std::string normalizedPath = NormalizePath(path);
+  if (normalizedPath.size() < root.size() || normalizedPath.compare(0, root.size(), root) != 0) {
+    return false;
+  }
+
+  return EndsWith(normalizedPath, ".js") || EndsWith(normalizedPath, ".mjs");
+}
+
 
 static v8::MaybeLocal<v8::Module> CompileModuleFromSource(v8::Isolate* isolate, v8::Local<v8::Context> context,
                                                           const std::string& code, const std::string& urlStr) {
@@ -234,6 +273,10 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(v8::Isolat
         if (srcLineStr.size() > 240) srcLineStr = srcLineStr.substr(0, 240);
         Log(@"[http-esm][compile][v8-error][%s] %s line=%d col=%d..%d hash=%llx bytes=%lu msg=%s srcLine=%s snippet=%s",
             classification, urlStr.c_str(), lineNum, startCol, endCol, (unsigned long long)h, (unsigned long)code.size(), msgStr.c_str(), srcLineStr.c_str(), snippet.c_str());
+      }
+      if (tcCompile.HasCaught()) {
+        RememberLastResolveException(isolate, tcCompile.Exception());
+        isolate->ThrowException(tcCompile.Exception());
       }
       return v8::MaybeLocal<v8::Module>();
     }
@@ -419,6 +462,35 @@ static thread_local std::unordered_map<std::string, std::unordered_set<std::stri
 static thread_local std::unordered_map<std::string, std::string> g_modulePrimaryImporters;
 static thread_local std::unordered_set<std::string> g_modulesInFlight;
 static thread_local std::unordered_set<std::string> g_modulesPendingReset;
+static thread_local v8::Global<v8::Value> g_lastResolveException;
+
+static void ClearLastResolveException() {
+  g_lastResolveException.Reset();
+}
+
+static void RememberLastResolveException(v8::Isolate* isolate, v8::Local<v8::Value> exception) {
+  if (exception.IsEmpty()) {
+    return;
+  }
+
+  g_lastResolveException.Reset();
+  g_lastResolveException.Reset(isolate, exception);
+}
+
+static v8::Local<v8::Value> TakeLastResolveException(v8::Isolate* isolate) {
+  if (g_lastResolveException.IsEmpty()) {
+    return v8::Local<v8::Value>();
+  }
+
+  v8::Local<v8::Value> exception = g_lastResolveException.Get(isolate);
+  g_lastResolveException.Reset();
+  return exception;
+}
+
+static v8::Local<v8::Value> CreateResolveError(v8::Isolate* isolate,
+                                                const std::string& message) {
+  return v8::Exception::Error(tns::ToV8String(isolate, message.c_str()));
+}
 // The threshold for detecting circular dependencies during module resolution.
 // 256 was chosen as a high enough value to allow deep but legitimate module graphs,
 // but low enough to catch runaway recursion or infinite circular imports.
@@ -1302,6 +1374,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       std::string msg = "Cannot find module " + spec + " (failed to create in-memory polyfill)";
       if (RuntimeConfig.IsDebug) {
         Log(@"Debug mode - Node.js polyfill creation failed: %s", msg.c_str());
+        RememberLastResolveException(isolate, CreateResolveError(isolate, msg));
         return v8::MaybeLocal<v8::Module>();
       } else {
         isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
@@ -1345,6 +1418,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       std::string msg = "Cannot find module " + spec + " (failed to create in-memory optional placeholder)";
       if (RuntimeConfig.IsDebug) {
         Log(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
+        RememberLastResolveException(isolate, CreateResolveError(isolate, msg));
         return v8::MaybeLocal<v8::Module>();
       } else {
         isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
@@ -1355,6 +1429,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
       if (RuntimeConfig.IsDebug) {
         Log(@"Debug mode - Module not found: %s", msg.c_str());
+        RememberLastResolveException(isolate, CreateResolveError(isolate, msg));
         // Return empty instead of crashing in debug mode
         return v8::MaybeLocal<v8::Module>();
       } else {
@@ -1444,6 +1519,20 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   if (it != g_moduleRegistry.end()) {
     v8::Local<v8::Module> existing = it->second.Get(isolate);
     v8::Module::Status status = existing.IsEmpty() ? v8::Module::kErrored : existing->GetStatus();
+    bool isForcedTest262Module = IsTest262ForcedModule(context, absPath);
+
+    if (isForcedTest262Module && !existing.IsEmpty() && status != v8::Module::kErrored) {
+      if (cache->isWorker) {
+        printf("ResolveModuleCallback: Worker found cached module '%s' -> '%s'\n", spec.c_str(),
+               absPath.c_str());
+      }
+      if (IsScriptLoadingLogEnabled()) {
+        Log(@"[resolver][test262-module] reusing registered module %s (status=%s)",
+            absPath.c_str(), ModuleStatusToString(status));
+      }
+      return v8::MaybeLocal<v8::Module>(existing);
+    }
+
     bool inCurrentStack =
         std::find(g_moduleResolutionStack.begin(), g_moduleResolutionStack.end(), absPath) !=
         g_moduleResolutionStack.end();
@@ -1749,6 +1838,36 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   if (IsScriptLoadingLogEnabled()) {
     Log(@"[resolver] → LoadScript %s", absPath.c_str());
   }
+  bool isForcedTest262Module = IsTest262ForcedModule(context, absPath);
+  bool isSourceTextModule = isForcedTest262Module || EndsWith(absPath, ".mjs");
+  if (isSourceTextModule) {
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[resolver][source-text-module] compile/register only %s", absPath.c_str());
+    }
+
+    std::string sourceText = tns::ReadText(absPath);
+    if (cache->isWorker && !isForcedTest262Module) {
+      sourceText = "const self = globalThis.self || globalThis;\n"
+                   "const postMessage = globalThis.postMessage;\n"
+                   "const close = globalThis.close;\n"
+                   "const importScripts = globalThis.importScripts;\n"
+                   "const console = globalThis.console;\n\n" +
+                   sourceText;
+    }
+
+    v8::MaybeLocal<v8::Module> compiled =
+        CompileModuleForResolveRegisterOnly(isolate, context, sourceText, absPath);
+    if (compiled.IsEmpty()) {
+      if (cache->isWorker) {
+        printf("ResolveModuleCallback: Worker failed to compile module '%s' -> '%s'\n",
+               spec.c_str(), absPath.c_str());
+      }
+      return v8::MaybeLocal<v8::Module>();
+    }
+
+    return compiled;
+  }
+
   try {
     tns::ModuleInternal::LoadScript(isolate, absPath);
   } catch (NativeScriptException& ex) {
@@ -2235,6 +2354,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
     }
 
+  ClearLastResolveException();
   v8::TryCatch resolveTc(isolate);
   v8::MaybeLocal<v8::Module> maybeModule =
     ResolveModuleCallback(context, adjustedSpecifier, import_assertions, refMod);
@@ -2248,16 +2368,24 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   if (maybeModule.IsEmpty()) {
     if (resolveTc.HasCaught()) {
       // Reject the promise with the thrown exception so callers don't hang
+      ClearLastResolveException();
       resolver->Reject(context, resolveTc.Exception()).FromMaybe(false);
       return scope.Escape(resolver->GetPromise());
     } else {
-      // No exception thrown (debug path); reject with a helpful error
+      v8::Local<v8::Value> rememberedException = TakeLastResolveException(isolate);
+      if (!rememberedException.IsEmpty()) {
+        resolver->Reject(context, rememberedException).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+
+      // No exception surfaced from the resolver; reject with a helpful fallback error.
       std::string msg = "Module resolution failed for dynamic import: ";
       msg += normalizedSpec.empty() ? "<empty>" : normalizedSpec;
       resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, msg.c_str()))).FromMaybe(false);
       return scope.Escape(resolver->GetPromise());
     }
   }
+  ClearLastResolveException();
 
     // If initial resolution failed AND looks like an application module, attempt on-demand fetch via JS bridge.
     if (maybeModule.IsEmpty()) {

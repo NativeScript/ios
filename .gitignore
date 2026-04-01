@@ -56,3 +56,6 @@ v8_build
 /project-template-ios/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/
 /project-template-vision/.build_env_vars.sh
 /project-template-vision/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+
+# test262
+dist-test/

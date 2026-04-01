@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(MetadataGenerator)
 include(CheckCCompilerFlag)
+include(CheckCXXCompilerFlag)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -13,7 +14,7 @@ if (NOT LIBXML2_FOUND)
     message(FATAL_ERROR "libXML2 not found")
 endif ()
 
-get_filename_component(LLVM_ROOT "../../llvm/17.0.6" REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
+get_filename_component(LLVM_ROOT "../../llvm/17.0.7" REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.0)
 
 set(LLVM_SYSTEM_LIBS "-lz -lcurses -lm -lxml2")
@@ -34,6 +35,18 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -target ${METADATA_BINARY_ARCH}-apple-da
 check_c_compiler_flag(-Wno-unused-but-set-variable HAS_UNUSED_BUT_SET_VARIABLE)
 if (HAS_UNUSED_BUT_SET_VARIABLE)
     add_compile_options(-Wno-unused-but-set-variable)
+endif()
+
+# LLVM 17.0.7 triggers this diagnostic in Clang's own headers on newer Apple toolchains.
+# Keep warnings-as-errors for project code, but don't fail the build on this upstream warning.
+check_cxx_compiler_flag(-Wno-error=preferred-type-bitfield-enum-conversion HAS_NO_ERROR_PREFERRED_TYPE_BITFIELD_ENUM_CONVERSION)
+if (HAS_NO_ERROR_PREFERRED_TYPE_BITFIELD_ENUM_CONVERSION)
+    add_compile_options(-Wno-error=preferred-type-bitfield-enum-conversion)
+endif()
+
+check_cxx_compiler_flag(-Wno-error=unnecessary-virtual-specifier HAS_NO_ERROR_UNNECESSARY_VIRTUAL_SPECIFIER)
+if (HAS_NO_ERROR_UNNECESSARY_VIRTUAL_SPECIFIER)
+    add_compile_options(-Wno-error=unnecessary-virtual-specifier)
 endif()
 
 set(LLVM_LINKER_FLAGS "${LLVM_LINKER_FLAGS} ${LLVM_SYSTEM_LIBS} ${LLVM_LIBS}")

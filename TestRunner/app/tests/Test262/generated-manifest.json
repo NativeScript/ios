@@ -1,0 +1,1319 @@
+{
+  "generatedAt": "2026-03-28T23:35:54.846Z",
+  "enabled": true,
+  "reason": "generated",
+  "summary": {
+    "discovered": 53125,
+    "included": 100,
+    "excluded": 52561,
+    "exclusions": {
+      "not-included": 52532,
+      "excluded-path": 1,
+      "unsupported-feature": 29,
+      "unsupported-flag": 1
+    },
+    "shardCount": 0,
+    "shardIndex": 0,
+    "filter": [],
+    "includePrefixes": [
+      "language/module-code"
+    ],
+    "curatedIncludePrefixes": [
+      "built-ins/Array",
+      "built-ins/Boolean",
+      "built-ins/Date",
+      "built-ins/Error",
+      "built-ins/Function",
+      "built-ins/JSON",
+      "built-ins/Map",
+      "built-ins/Math",
+      "built-ins/Number",
+      "built-ins/Object",
+      "built-ins/Promise",
+      "built-ins/Reflect",
+      "built-ins/RegExp",
+      "built-ins/Set",
+      "built-ins/String",
+      "built-ins/Symbol",
+      "built-ins/globalThis",
+      "built-ins/parseFloat",
+      "built-ins/parseInt",
+      "language/expressions",
+      "language/function-code",
+      "language/global-code",
+      "language/identifiers",
+      "language/literals",
+      "language/line-terminators",
+      "language/statements/block",
+      "language/statements/break",
+      "language/statements/class",
+      "language/statements/const",
+      "language/statements/continue",
+      "language/statements/debugger",
+      "language/statements/do-while",
+      "language/statements/empty",
+      "language/statements/expression",
+      "language/statements/for",
+      "language/statements/for-in",
+      "language/statements/for-of",
+      "language/statements/function",
+      "language/statements/if",
+      "language/statements/let",
+      "language/statements/return",
+      "language/statements/switch",
+      "language/statements/throw",
+      "language/statements/try",
+      "language/statements/variable",
+      "language/statements/while"
+    ],
+    "limit": 100
+  },
+  "tests": [
+    {
+      "id": "language/module-code/ambiguous-export-bindings/error-export-from-named-as.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/error-export-from-named-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/error-export-from-named.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/error-export-from-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/error-import-named-as.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/error-import-named-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/error-import-named.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/error-import-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/import-and-export-propagates-binding.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/import-and-export-propagates-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from-and-import-star-as-and-export.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from-and-import-star-as-and-export.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/ambiguous-export-bindings/omitted-from-namespace.js [module]",
+      "relativePath": "language/module-code/ambiguous-export-bindings/omitted-from-namespace.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/comment-multi-line-html-close.js [module]",
+      "relativePath": "language/module-code/comment-multi-line-html-close.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/comment-single-line-html-close.js [module]",
+      "relativePath": "language/module-code/comment-single-line-html-close.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/comment-single-line-html-open.js [module]",
+      "relativePath": "language/module-code/comment-single-line-html-open.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-as-star-as.js [module]",
+      "relativePath": "language/module-code/early-dup-export-as-star-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-decl.js [module]",
+      "relativePath": "language/module-code/early-dup-export-decl.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-dflt-id.js [module]",
+      "relativePath": "language/module-code/early-dup-export-dflt-id.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-dflt.js [module]",
+      "relativePath": "language/module-code/early-dup-export-dflt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-id-as.js [module]",
+      "relativePath": "language/module-code/early-dup-export-id-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-id.js [module]",
+      "relativePath": "language/module-code/early-dup-export-id.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-export-star-as-dflt.js [module]",
+      "relativePath": "language/module-code/early-dup-export-star-as-dflt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-lables.js [module]",
+      "relativePath": "language/module-code/early-dup-lables.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-lex.js [module]",
+      "relativePath": "language/module-code/early-dup-lex.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-top-function-async-generator.js [module]",
+      "relativePath": "language/module-code/early-dup-top-function-async-generator.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-top-function-async.js [module]",
+      "relativePath": "language/module-code/early-dup-top-function-async.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-top-function-generator.js [module]",
+      "relativePath": "language/module-code/early-dup-top-function-generator.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-dup-top-function.js [module]",
+      "relativePath": "language/module-code/early-dup-top-function.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-export-global.js [module]",
+      "relativePath": "language/module-code/early-export-global.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-export-unresolvable.js [module]",
+      "relativePath": "language/module-code/early-export-unresolvable.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-import-arguments.js [module]",
+      "relativePath": "language/module-code/early-import-arguments.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-import-as-arguments.js [module]",
+      "relativePath": "language/module-code/early-import-as-arguments.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-import-as-eval.js [module]",
+      "relativePath": "language/module-code/early-import-as-eval.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-import-eval.js [module]",
+      "relativePath": "language/module-code/early-import-eval.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-lex-and-var.js [module]",
+      "relativePath": "language/module-code/early-lex-and-var.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-new-target.js [module]",
+      "relativePath": "language/module-code/early-new-target.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-strict-mode.js [module]",
+      "relativePath": "language/module-code/early-strict-mode.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-super.js [module]",
+      "relativePath": "language/module-code/early-super.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-undef-break.js [module]",
+      "relativePath": "language/module-code/early-undef-break.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/early-undef-continue.js [module]",
+      "relativePath": "language/module-code/early-undef-continue.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/eval-export-cls-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-cls-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-anon-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-anon-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-anon.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-anon.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-name-meth.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-name-meth.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-named-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-named-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-cls-named.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-cls-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-cls-anon.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-cls-anon.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-cls-name-meth.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-cls-name-meth.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-cls-named.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-cls-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-err-eval.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-err-eval.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "runtime",
+        "type": "Test262Error"
+      }
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-err-get-value.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-err-get-value.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "runtime",
+        "type": "ReferenceError"
+      }
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-fn-anon.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-fn-anon.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-fn-named.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-fn-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-gen-anon.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-gen-anon.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-gen-named.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-gen-named.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-expr-in.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-expr-in.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-fun-anon-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-fun-anon-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-fun-named-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-fun-named-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-gen-anon-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-gen-anon-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-dflt-gen-named-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-dflt-gen-named-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-fun-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-fun-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-export-gen-semi.js [module]",
+      "relativePath": "language/module-code/eval-export-gen-semi.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-indirect-trlng-comma.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-indirect-trlng-comma.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-indirect-update-as.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-indirect-update-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "fnGlobalObject.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-indirect-update-dflt.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-indirect-update-dflt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-indirect-update.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-indirect-update.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "fnGlobalObject.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-local-bndng-cls.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-local-bndng-cls.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-local-bndng-const.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-local-bndng-const.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-local-bndng-let.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-local-bndng-let.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-gtbndng-local-bndng-var.js [module]",
+      "relativePath": "language/module-code/eval-gtbndng-local-bndng-var.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-rqstd-abrupt.js [module]",
+      "relativePath": "language/module-code/eval-rqstd-abrupt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "runtime",
+        "type": "TypeError"
+      }
+    },
+    {
+      "id": "language/module-code/eval-rqstd-once.js [module]",
+      "relativePath": "language/module-code/eval-rqstd-once.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "fnGlobalObject.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-rqstd-order.js [module]",
+      "relativePath": "language/module-code/eval-rqstd-order.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "fnGlobalObject.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-self-abrupt.js [module]",
+      "relativePath": "language/module-code/eval-self-abrupt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "runtime",
+        "type": "Test262Error"
+      }
+    },
+    {
+      "id": "language/module-code/eval-self-once.js [module]",
+      "relativePath": "language/module-code/eval-self-once.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "fnGlobalObject.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/eval-this.js [module]",
+      "relativePath": "language/module-code/eval-this.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-default-asyncfunction-declaration-binding-exists.js [module]",
+      "relativePath": "language/module-code/export-default-asyncfunction-declaration-binding-exists.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/export-default-asyncfunction-declaration-binding.js [module]",
+      "relativePath": "language/module-code/export-default-asyncfunction-declaration-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-default-asyncgenerator-declaration-binding-exists.js [module]",
+      "relativePath": "language/module-code/export-default-asyncgenerator-declaration-binding-exists.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/export-default-asyncgenerator-declaration-binding.js [module]",
+      "relativePath": "language/module-code/export-default-asyncgenerator-declaration-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-default-function-declaration-binding-exists.js [module]",
+      "relativePath": "language/module-code/export-default-function-declaration-binding-exists.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/export-default-function-declaration-binding.js [module]",
+      "relativePath": "language/module-code/export-default-function-declaration-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-default-generator-declaration-binding-exists.js [module]",
+      "relativePath": "language/module-code/export-default-generator-declaration-binding-exists.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "parse",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/export-default-generator-declaration-binding.js [module]",
+      "relativePath": "language/module-code/export-default-generator-declaration-binding.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/export-star-as-dflt.js [module]",
+      "relativePath": "language/module-code/export-star-as-dflt.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-cls.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-cls.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-const.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-const.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-fun.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-fun.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-gen.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-gen.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-let.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-let.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-bndng-var.js [module]",
+      "relativePath": "language/module-code/instn-iee-bndng-var.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-err-circular-as.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-circular-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-circular.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-circular.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-dflt-thru-star-as.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-dflt-thru-star-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-dflt-thru-star.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-dflt-thru-star.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-not-found-as.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-not-found-as.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-err-not-found.js [module]",
+      "relativePath": "language/module-code/instn-iee-err-not-found.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": {
+        "phase": "resolution",
+        "type": "SyntaxError"
+      }
+    },
+    {
+      "id": "language/module-code/instn-iee-iee-cycle.js [module]",
+      "relativePath": "language/module-code/instn-iee-iee-cycle.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-star-cycle.js [module]",
+      "relativePath": "language/module-code/instn-iee-star-cycle.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-iee-trlng-comma.js [module]",
+      "relativePath": "language/module-code/instn-iee-trlng-comma.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-local-bndng-cls.js [module]",
+      "relativePath": "language/module-code/instn-local-bndng-cls.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "fnGlobalObject.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-local-bndng-const.js [module]",
+      "relativePath": "language/module-code/instn-local-bndng-const.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "fnGlobalObject.js"
+      ],
+      "negative": null
+    },
+    {
+      "id": "language/module-code/instn-local-bndng-export-cls.js [module]",
+      "relativePath": "language/module-code/instn-local-bndng-export-cls.js",
+      "mode": "module",
+      "async": false,
+      "includes": [
+        "assert.js",
+        "sta.js",
+        "fnGlobalObject.js"
+      ],
+      "negative": null
+    }
+  ]
+}

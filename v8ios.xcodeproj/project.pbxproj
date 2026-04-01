@@ -1751,6 +1751,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C2DDEB29229EA89200345BFE /* Build configuration list for PBXNativeTarget "TestRunner" */;
 			buildPhases = (
+				3CF8B98F2F8B980100A1A1A1 /* Generate Test262 manifest */,
 				C2F4CBBD22C61D480036B56F /* ShellScript */,
 				C2DDEB12229EA89000345BFE /* Sources */,
 				C2DDEB13229EA89000345BFE /* Frameworks */,
@@ -1911,6 +1912,29 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		3CF8B98F2F8B980100A1A1A1 /* Generate Test262 manifest */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/generate-test262-manifest.js",
+				"$(SRCROOT)/TestRunner/app/tests/Test262/config.js",
+				"$(SRCROOT)/TestRunner/app/tests/Test262/curated-prefixes.json",
+			);
+			name = "Generate Test262 manifest";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/TestRunner/app/tests/Test262/generated-manifest.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if command -v node >/dev/null 2>&1; then\n  cd \"${SRCROOT}\"\n  node ./scripts/generate-test262-manifest.js\nelse\n  echo \"warning: node is not available, skipping Test262 manifest generation\"\nfi\n";
+		};
 		2BFE21F02AC1B28000307752 /* Add default metadata */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
