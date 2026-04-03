@@ -1,6 +1,5 @@
 #include <Foundation/Foundation.h>
 #include <sstream>
-#include <unordered_set>
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "DictionaryAdapter.h"
@@ -8,7 +7,6 @@
 #include "Interop.h"
 #include "Helpers.h"
 #include "Runtime.h"
-#include "RuntimeConfig.h"
 
 using namespace v8;
 using namespace std;
@@ -29,27 +27,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     bool callSuper = false;
     if (instanceMethod) {
         BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
-        
-        if (wrapper == nullptr) {
-            // During fast view churn like HMR in development, JS objects can outlive their
-            // native wrappers briefly. In Debug, avoid a crash and just skip the native call.
-            // In Release, assert so crash reporting can capture unexpected cases.
-            if (RuntimeConfig.IsDebug) {
-                const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
-                const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
-                const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-                // Suppress duplicate logs: only log once per class+selector for this process.
-                static std::unordered_set<std::string> s_logged;
-                std::string key = std::string(classNameStr) + ":" + selectorStr;
-                if (s_logged.insert(key).second) {
-                    Log(@"Note: ignore method on non-native receiver (class: %s, selector: %s, jsName: %s, args: %d). Common during HMR.",
-                        classNameStr, selectorStr, jsNameStr, (int)args.Length());
-                }
-                return v8::Undefined(isolate);
-            } else {
-                tns::Assert(false, isolate);
-            }
-        }
+        tns::Assert(wrapper != nullptr, isolate);
 
         if (wrapper->Type() == WrapperType::ObjCAllocObject) {
             ObjCAllocDataWrapper* allocWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
@@ -65,21 +43,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
             // For extended classes we will call the base method
             callSuper = isMethodCallback && it != cache->ClassPrototypes.end();
         } else {
-            if (RuntimeConfig.IsDebug) {
-                const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
-                const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
-                const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-                // Suppress duplicate logs: only log once per class+selector for this process.
-                static std::unordered_set<std::string> s_logged;
-                std::string key = std::string(classNameStr) + ":" + selectorStr;
-                if (s_logged.insert(key).second) {
-                    Log(@"Note: ignore receiver wrapper type %d (class: %s, selector: %s, jsName: %s). Common during HMR.",
-                        (int)wrapper->Type(), classNameStr, selectorStr, jsNameStr);
-                }
-                return v8::Undefined(isolate);
-            } else {
-                tns::Assert(false, isolate);
-            }
+            tns::Assert(false, isolate);
         }
     }
 
@@ -914,7 +878,7 @@ void ArgConverter::IndexedPropertySetterCallback(uint32_t index, Local<Value> va
     Local<Object> thiz = args.This();
     Isolate* isolate = args.GetIsolate();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
-    if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
+    if (wrapper == nullptr && wrapper->Type() != WrapperType::ObjCObject) {
         return;
     }
 
