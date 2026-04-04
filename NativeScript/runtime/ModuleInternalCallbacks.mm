@@ -727,8 +727,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // Security: HttpFetchText gates remote module access centrally.
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
     std::string key = CanonicalizeHttpUrlKey(spec);
-    // Added instrumentation for unified phase logging
-    Log(@"[http-esm][compile][begin] %s", key.c_str());
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-esm][compile][begin] %s", key.c_str());
+    }
     // Reuse compiled module if present and healthy
     auto itExisting = g_moduleRegistry.find(key);
     if (itExisting != g_moduleRegistry.end()) {
@@ -1913,6 +1914,178 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         resolver->Resolve(context, mod->GetModuleNamespace()).FromMaybe(false);
         return scope.Escape(resolver->GetPromise());
       }
+    }
+
+    // ── Blob URL support (e.g., blob:nativescript/<uuid>) ──
+    // Also useful for HMR updates where we can load a blob URL
+    // We retrieve the blob content from the global BLOB_STORE via URL.InternalAccessor.getData()
+    // and compile/execute it as an ES module.
+    if (!normalizedSpec.empty() && StartsWith(normalizedSpec, "blob:nativescript/")) {
+      if (IsScriptLoadingLogEnabled()) {
+        Log(@"[dyn-import][blob] trying blob URL %s", normalizedSpec.c_str());
+      }
+      
+      // Call URL.InternalAccessor.getData(url) to retrieve the blob data
+      v8::TryCatch tc(isolate);
+      v8::Local<v8::Object> globalObj = context->Global();
+      
+      // Get URL constructor
+      v8::Local<v8::Value> urlCtorVal;
+      if (!globalObj->Get(context, tns::ToV8String(isolate, "URL")).ToLocal(&urlCtorVal) || !urlCtorVal->IsFunction()) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] URL constructor not found");
+        }
+        resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, "URL constructor not available"))).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+      v8::Local<v8::Object> urlCtor = urlCtorVal.As<v8::Object>();
+      
+      // Get URL.InternalAccessor
+      v8::Local<v8::Value> internalAccessorVal;
+      if (!urlCtor->Get(context, tns::ToV8String(isolate, "InternalAccessor")).ToLocal(&internalAccessorVal) || !internalAccessorVal->IsObject()) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] URL.InternalAccessor not found");
+        }
+        resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, "URL.InternalAccessor not available"))).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+      v8::Local<v8::Object> internalAccessor = internalAccessorVal.As<v8::Object>();
+      
+      // Get URL.InternalAccessor.getData function
+      v8::Local<v8::Value> getDataVal;
+      if (!internalAccessor->Get(context, tns::ToV8String(isolate, "getData")).ToLocal(&getDataVal) || !getDataVal->IsFunction()) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] URL.InternalAccessor.getData not found");
+        }
+        resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, "URL.InternalAccessor.getData not available"))).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+      v8::Local<v8::Function> getDataFn = getDataVal.As<v8::Function>();
+      
+      // Call getData(url)
+      v8::Local<v8::Value> urlArg = tns::ToV8String(isolate, normalizedSpec.c_str());
+      v8::Local<v8::Value> blobDataVal;
+      if (!getDataFn->Call(context, internalAccessor, 1, &urlArg).ToLocal(&blobDataVal) || blobDataVal->IsNullOrUndefined()) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] blob not found in BLOB_STORE: %s", normalizedSpec.c_str());
+        }
+        std::string msg = "Blob not found: " + normalizedSpec;
+        resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, msg.c_str()))).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+      
+      // blobDataVal should be {blob: Blob, type: string, ext: string}
+      // We need to get the text from the Blob
+      if (!blobDataVal->IsObject()) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] blob data is not an object");
+        }
+        resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, "Invalid blob data"))).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+      v8::Local<v8::Object> blobData = blobDataVal.As<v8::Object>();
+      
+      // Get the actual Blob object
+      v8::Local<v8::Value> blobVal;
+      if (!blobData->Get(context, tns::ToV8String(isolate, "blob")).ToLocal(&blobVal) || !blobVal->IsObject()) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] blob property not found");
+        }
+        resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, "Blob object not found"))).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+      v8::Local<v8::Object> blobObj = blobVal.As<v8::Object>();
+      
+      // Call blob.text() to get the source code as a Promise
+      v8::Local<v8::Value> textFnVal;
+      if (!blobObj->Get(context, tns::ToV8String(isolate, "text")).ToLocal(&textFnVal) || !textFnVal->IsFunction()) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] Blob.text() not available");
+        }
+        resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, "Blob.text() not available"))).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+      v8::Local<v8::Function> textFn = textFnVal.As<v8::Function>();
+      
+      v8::Local<v8::Value> textPromiseVal;
+      if (!textFn->Call(context, blobObj, 0, nullptr).ToLocal(&textPromiseVal) || !textPromiseVal->IsPromise()) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] Blob.text() did not return a Promise");
+        }
+        resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, "Blob.text() failed"))).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+      v8::Local<v8::Promise> textPromise = textPromiseVal.As<v8::Promise>();
+      
+      // Create data structure to pass to the callbacks
+      struct BlobImportData {
+        v8::Global<v8::Promise::Resolver> resolver;
+        v8::Global<v8::Context> ctx;
+        std::string blobUrl;
+      };
+      auto* data = new BlobImportData{
+        v8::Global<v8::Promise::Resolver>(isolate, resolver),
+        v8::Global<v8::Context>(isolate, context),
+        normalizedSpec
+      };
+      
+      // Success callback: compile and execute the module
+      auto onFulfilled = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        v8::Isolate* iso = info.GetIsolate();
+        v8::HandleScope hs(iso);
+        if (!info.Data()->IsExternal()) return;
+        auto* d = static_cast<BlobImportData*>(info.Data().As<v8::External>()->Value());
+        v8::Local<v8::Context> ctx = d->ctx.Get(iso);
+        v8::Local<v8::Promise::Resolver> res = d->resolver.Get(iso);
+        
+        if (info.Length() < 1 || !info[0]->IsString()) {
+          res->Reject(ctx, v8::Exception::Error(tns::ToV8String(iso, "Blob text is not a string"))).FromMaybe(false);
+          delete d;
+          return;
+        }
+        
+        v8::String::Utf8Value codeUtf8(iso, info[0]);
+        std::string code = *codeUtf8 ? *codeUtf8 : "";
+        
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] compiling blob module, code length=%zu", code.size());
+        }
+        
+        // Compile and execute the module
+        v8::MaybeLocal<v8::Module> modMaybe = CompileModuleFromSource(iso, ctx, code, d->blobUrl);
+        v8::Local<v8::Module> mod;
+        if (!modMaybe.ToLocal(&mod)) {
+          res->Reject(ctx, v8::Exception::Error(tns::ToV8String(iso, "Failed to compile blob module"))).FromMaybe(false);
+          delete d;
+          return;
+        }
+        
+        // Register the module
+        g_moduleRegistry[d->blobUrl].Reset(iso, mod);
+        
+        res->Resolve(ctx, mod->GetModuleNamespace()).FromMaybe(false);
+        delete d;
+      };
+      
+      // Error callback
+      auto onRejected = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        v8::Isolate* iso = info.GetIsolate();
+        v8::HandleScope hs(iso);
+        if (!info.Data()->IsExternal()) return;
+        auto* d = static_cast<BlobImportData*>(info.Data().As<v8::External>()->Value());
+        v8::Local<v8::Context> ctx = d->ctx.Get(iso);
+        v8::Local<v8::Promise::Resolver> res = d->resolver.Get(iso);
+        v8::Local<v8::Value> reason = info.Length() > 0 ? info[0] : v8::Exception::Error(tns::ToV8String(iso, "Blob text() failed"));
+        res->Reject(ctx, reason).FromMaybe(false);
+        delete d;
+      };
+      
+      v8::Local<v8::Function> onFulfilledFn = v8::Function::New(context, onFulfilled, v8::External::New(isolate, data)).ToLocalChecked();
+      v8::Local<v8::Function> onRejectedFn = v8::Function::New(context, onRejected, v8::External::New(isolate, data)).ToLocalChecked();
+      
+      textPromise->Then(context, onFulfilledFn, onRejectedFn).FromMaybe(v8::Local<v8::Promise>());
+      
+      return scope.Escape(resolver->GetPromise());
     }
 
     // If spec is an HTTP(S) URL, try HTTP fetch+compile directly
