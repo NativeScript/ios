@@ -1,6 +1,5 @@
 #include <Foundation/Foundation.h>
 #include <sstream>
-#include <unordered_set>
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "DictionaryAdapter.h"
@@ -32,20 +31,16 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
         
         if (wrapper == nullptr) {
             // During fast view churn like HMR in development, JS objects can outlive their
-            // native wrappers briefly. In Debug, avoid a crash and just skip the native call.
+            // native wrappers briefly. In Debug, throw a catchable JS error instead of crashing.
             // In Release, assert so crash reporting can capture unexpected cases.
             if (RuntimeConfig.IsDebug) {
                 const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
                 const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
                 const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-                // Suppress duplicate logs: only log once per class+selector for this process.
-                static std::unordered_set<std::string> s_logged;
-                std::string key = std::string(classNameStr) + ":" + selectorStr;
-                if (s_logged.insert(key).second) {
-                    Log(@"Note: ignore method on non-native receiver (class: %s, selector: %s, jsName: %s, args: %d). Common during HMR.",
-                        classNameStr, selectorStr, jsNameStr, (int)args.Length());
-                }
-                return v8::Undefined(isolate);
+                std::string errMsg = std::string("Cannot call method '") + jsNameStr +
+                    "' on a disposed native object (class: " + classNameStr +
+                    ", selector: " + selectorStr + "). This can happen during HMR or fast view churn.";
+                throw NativeScriptException(isolate, errMsg);
             } else {
                 tns::Assert(false, isolate);
             }
@@ -69,14 +64,11 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
                 const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
                 const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
                 const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-                // Suppress duplicate logs: only log once per class+selector for this process.
-                static std::unordered_set<std::string> s_logged;
-                std::string key = std::string(classNameStr) + ":" + selectorStr;
-                if (s_logged.insert(key).second) {
-                    Log(@"Note: ignore receiver wrapper type %d (class: %s, selector: %s, jsName: %s). Common during HMR.",
-                        (int)wrapper->Type(), classNameStr, selectorStr, jsNameStr);
-                }
-                return v8::Undefined(isolate);
+                std::string errMsg = std::string("Unexpected receiver wrapper type ") +
+                    std::to_string((int)wrapper->Type()) + " for method '" + jsNameStr +
+                    "' (class: " + classNameStr + ", selector: " + selectorStr +
+                    "). This can happen during HMR or fast view churn.";
+                throw NativeScriptException(isolate, errMsg);
             } else {
                 tns::Assert(false, isolate);
             }
