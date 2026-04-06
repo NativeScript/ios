@@ -40,8 +40,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
                 std::string errMsg = std::string("Cannot call method '") + jsNameStr +
                     "' on a disposed native object (class: " + classNameStr +
                     ", selector: " + selectorStr + "). This can happen during HMR or fast view churn.";
-                isolate->ThrowException(Exception::Error(tns::ToV8String(isolate, errMsg)));
-                return v8::Undefined(isolate);
+                throw NativeScriptException(isolate, errMsg);
             } else {
                 tns::Assert(false, isolate);
             }
@@ -69,8 +68,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
                     std::to_string((int)wrapper->Type()) + " for method '" + jsNameStr +
                     "' (class: " + classNameStr + ", selector: " + selectorStr +
                     "). This can happen during HMR or fast view churn.";
-                isolate->ThrowException(Exception::Error(tns::ToV8String(isolate, errMsg)));
-                return v8::Undefined(isolate);
+                throw NativeScriptException(isolate, errMsg);
             } else {
                 tns::Assert(false, isolate);
             }
