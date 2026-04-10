@@ -76,8 +76,8 @@ static std::error_code collectModuleHeaderIncludes(FileManager& fileMgr, ModuleM
         if (ec)
             return ec;
     } else {
-        for (FileEntryRef header : const_cast<Module*>(module)->getTopHeaders(fileMgr)) {
-            if (auto err = addHeaderInclude(header, includes))
+        for (auto header : module->getHeaders(Module::HK_Normal)) {
+            if (auto err = addHeaderInclude(header.Entry, includes))
                 return err;
         }
     }
