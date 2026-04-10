@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 source ./.build_env_vars.sh
 
-MODULES_DIR="$SRCROOT/internal/Swift-Modules"
-
-function DELETE_SWIFT_MODULES_DIR() {
-    rm -rf "$MODULES_DIR"
-}
-
 function getArch() {
     while [[ $# -gt 0 ]]
     do
@@ -22,6 +16,16 @@ function getArch() {
         esac
         shift
     done
+}
+
+# Workaround for ARCH being set to `undefined_arch` here. Extract it from command line arguments.
+TARGET_ARCH=$(getArch "$@")
+
+# Use per-architecture directory to avoid race conditions with parallel linker invocations
+MODULES_DIR="$SRCROOT/internal/Swift-Modules-$TARGET_ARCH"
+
+function DELETE_SWIFT_MODULES_DIR() {
+    rm -rf "$MODULES_DIR"
 }
 
 function GEN_MODULEMAP() {
@@ -52,9 +56,8 @@ function GEN_METADATA() {
     popd
 }
 
-# Workaround for ARCH being set to `undefined_arch` here. Extract it from command line arguments.
-TARGET_ARCH=$(getArch "$@")
 GEN_MODULEMAP $TARGET_ARCH
+export HEADER_SEARCH_PATHS="$HEADER_SEARCH_PATHS $MODULES_DIR"
 printf "Generating metadata..."
 GEN_METADATA $TARGET_ARCH
 DELETE_SWIFT_MODULES_DIR
