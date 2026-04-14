@@ -21,6 +21,11 @@ function getArch() {
 # Workaround for ARCH being set to `undefined_arch` here. Extract it from command line arguments.
 TARGET_ARCH=$(getArch "$@")
 
+if [ -z "$TARGET_ARCH" ]; then
+    printf '%s\n' "NSLD: Unable to determine target architecture from arguments: $*" >&2
+    exit 1
+fi
+
 # Use per-architecture directory to avoid race conditions with parallel linker invocations
 MODULES_DIR="$SRCROOT/internal/Swift-Modules-$TARGET_ARCH"
 
