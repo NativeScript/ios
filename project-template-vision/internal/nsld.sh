@@ -21,6 +21,11 @@ function getArch() {
 # Workaround for ARCH being set to `undefined_arch` here. Extract it from command line arguments.
 TARGET_ARCH=$(getArch "$@")
 
+if [ -z "$TARGET_ARCH" ]; then
+    echo "NSLD: Failed to determine target architecture from arguments: $*" >&2
+    exit 1
+fi
+
 # Use per-architecture directory to avoid race conditions with parallel linker invocations
 MODULES_DIR="$SRCROOT/internal/Swift-Modules-$TARGET_ARCH"
 
@@ -57,7 +62,7 @@ function GEN_METADATA() {
 }
 
 GEN_MODULEMAP $TARGET_ARCH
-export HEADER_SEARCH_PATHS="$HEADER_SEARCH_PATHS $MODULES_DIR"
+export HEADER_SEARCH_PATHS="${HEADER_SEARCH_PATHS:+$HEADER_SEARCH_PATHS }\"$MODULES_DIR\""
 printf "Generating metadata..."
 GEN_METADATA $TARGET_ARCH
 DELETE_SWIFT_MODULES_DIR
