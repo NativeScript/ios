@@ -994,9 +994,11 @@ std::string DefinitionWriter::tsifyType(const Type& type,
       return "any";
     }
     case TypeConstantArray:
-    case TypeExtVector:
       return "interop.Reference<" +
              tsifyType(*type.as<ConstantArrayType>().innerType) + ">";
+    case TypeExtVector:
+      return "interop.Reference<" +
+             tsifyType(*type.as<ExtVectorType>().innerType) + ">";
     case TypeIncompleteArray:
       return "interop.Reference<" +
              tsifyType(*type.as<IncompleteArrayType>().innerType) + ">";
