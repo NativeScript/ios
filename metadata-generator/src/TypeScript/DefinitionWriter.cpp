@@ -1007,7 +1007,7 @@ std::string DefinitionWriter::tsifyType(const Type& type,
                                : "interop.Pointer | interop.Reference<" +
                                      tsifyType(*pointerType.innerType) + ">";
       if (isFuncParam) {
-        result += " | ArrayBuffer | ArrayBufferView | SharedArrayBuffer";
+        result += " | ArrayBufferLike | ArrayBufferView";
       }
       return result;
     }
