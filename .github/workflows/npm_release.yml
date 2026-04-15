@@ -21,7 +21,7 @@ jobs:
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
         with:
           egress-policy: audit
-      - uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: ${{env.XCODE_VERSION}}
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -72,12 +72,12 @@ jobs:
       - name: Build
         run: npm run build-ios
       - name: Upload npm package artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: npm-package
           path: dist/nativescript-ios-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
       - name: Upload dSYMs artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: NativeScript-dSYMs
           path: dist/dSYMs
@@ -90,7 +90,7 @@ jobs:
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
         with:
           egress-policy: audit
-      - uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: ${{env.XCODE_VERSION}}
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -128,7 +128,7 @@ jobs:
           mkdir -p dist-test
           echo TEST_FOLDER=$(pwd)/dist-test >> $GITHUB_ENV
       - name: Xcode Tests
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         # try to run the tests with xcpretty. If it fails then try again without xcpretty twice for better log output
         # the xcode tests are a bit flaky and they should never fail on this step, as this step only collects the JS test results as junit xml
         with:
@@ -144,7 +144,7 @@ jobs:
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
       - name: Archive Test Result Data
         if: always()
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: test-results
           path: ${{env.TEST_FOLDER}}/test_results.xcresult
@@ -169,14 +169,16 @@ jobs:
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: npm-package
           path: dist
       - name: Update npm (required for OIDC trusted publishing)
         run: |
-          npm install -g npm@^11.5.1
-          npm --version
+          corepack enable npm
+          corepack install -g npm@11.5.1
+          test "$(npm --version)" = "11.5.1"
+          test "$(npx --version)" = "11.5.1"
       - name: Publish package (OIDC trusted publishing)
         if: ${{ vars.USE_NPM_TOKEN != 'true' }}
         run: |
@@ -220,11 +222,11 @@ jobs:
           node-version: 22
       - name: Setup
         run: npm install
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: npm-package
           path: dist
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: NativeScript-dSYMs
           path: dist/dSYMs
