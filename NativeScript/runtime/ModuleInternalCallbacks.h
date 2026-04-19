@@ -4,6 +4,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace tns {
 
@@ -16,6 +17,12 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath);
 // Keep a fallback copy of the last evaluated module so could be served while reloading if needed
 void UpdateModuleFallback(v8::Isolate* isolate, const std::string& canonicalPath,
                           v8::Local<v8::Module> module);
+
+// Drop exact URL-keyed modules from the registry.
+void InvalidateModules(const std::vector<std::string>& urls);
+
+// Diagnostics helper: returns URL-like keys currently loaded in the module registry.
+std::vector<std::string> GetLoadedModuleUrls();
 
 // Resolve callback signature (with import‑assertions slot)
 v8::MaybeLocal<v8::Module> ResolveModuleCallback(

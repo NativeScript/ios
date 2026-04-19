@@ -341,13 +341,19 @@ static bool IsVolatileUrl(const std::string& url) {
   return false;
 }
 
-// Normalize a Vite-rewritten specifier back to a bare package name.
+// Normalize a Vite-rewritten specifier into the canonical import-map key.
 // Handles two common Vite dev-server rewrite patterns:
 //   1. Prebundled deps:  "/node_modules/.vite/deps/solid-js.js?v=abc"   → "solid-js"
 //                        "/node_modules/.vite/deps/@tanstack_solid-router.js" → "@tanstack/solid-router"
-//   2. Resolved paths:   "/node_modules/@tanstack/solid-router/dist/source/index.dev.jsx"
-//                        → "@tanstack/solid-router"
-// Returns the bare package specifier or empty string if not a node_modules path.
+//   2. Explicit node_modules paths:
+//        "/node_modules/@angular/core/fesm2022/core.mjs" → "@angular/core/fesm2022/core.mjs"
+//        "/node_modules/tslib/tslib.es6.mjs"             → "tslib"
+//
+// For explicit node_modules paths we preserve non-main-entry subpaths so the
+// import map's trailing-slash HTTP prefixes can keep complex package build
+// outputs on HTTP. Only bare package roots and simple root-level main entries
+// collapse back to the package id for vendor/exact import-map resolution.
+// Returns the normalized import-map key or empty string if not a node_modules path.
 static std::string NormalizeViteSpecifier(const std::string& specifier) {
   // Pattern 1: Vite prebundled deps — /node_modules/.vite/deps/<flattened-id>.js
   {
@@ -402,28 +408,71 @@ static std::string NormalizeViteSpecifier(const std::string& specifier) {
     if (!sub.empty() && sub[0] != '.') {
       // Skip .vite/ paths (handled above)
       if (sub.compare(0, 6, ".vite/") == 0) return "";
+
+      std::string subNoQuery = sub;
+      std::string querySuffix;
+      auto subQueryPos = sub.find('?');
+      if (subQueryPos != std::string::npos) {
+        subNoQuery = sub.substr(0, subQueryPos);
+        querySuffix = sub.substr(subQueryPos);
+      }
+
       // Extract package name: @scope/name or name
       std::string pkgName;
-      if (sub[0] == '@') {
+      if (subNoQuery[0] == '@') {
         // Scoped: @scope/name
-        auto slash1 = sub.find('/');
+        auto slash1 = subNoQuery.find('/');
         if (slash1 != std::string::npos) {
-          auto slash2 = sub.find('/', slash1 + 1);
-          pkgName = (slash2 != std::string::npos) ? sub.substr(0, slash2) : sub;
+          auto slash2 = subNoQuery.find('/', slash1 + 1);
+          pkgName = (slash2 != std::string::npos) ? subNoQuery.substr(0, slash2) : subNoQuery;
         }
       } else {
         // Unscoped: name
-        auto slash = sub.find('/');
-        pkgName = (slash != std::string::npos) ? sub.substr(0, slash) : sub;
+        auto slash = subNoQuery.find('/');
+        pkgName = (slash != std::string::npos) ? subNoQuery.substr(0, slash) : subNoQuery;
       }
-      // Strip query params
-      auto qpos = pkgName.find('?');
-      if (qpos != std::string::npos) pkgName = pkgName.substr(0, qpos);
       if (!pkgName.empty()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[import-map][normalize] node_modules: %s -> %s", specifier.c_str(), pkgName.c_str());
+        std::string normalized = pkgName;
+        std::string remainder;
+        if (subNoQuery.size() > pkgName.size()) {
+          remainder = subNoQuery.substr(pkgName.size());
+          if (!remainder.empty() && remainder[0] == '/') {
+            remainder.erase(0, 1);
+          }
         }
-        return pkgName;
+
+        if (!remainder.empty()) {
+          bool preserveSubpath = remainder.find('/') != std::string::npos;
+
+          if (!preserveSubpath) {
+            const std::string pkgBaseName = pkgName.substr(pkgName.find_last_of('/') + 1);
+            std::string withoutExt = remainder;
+            auto dot = withoutExt.rfind('.');
+            if (dot != std::string::npos) {
+              withoutExt = withoutExt.substr(0, dot);
+            }
+            std::string withoutPlatform = withoutExt;
+            for (const auto& suffix : {std::string(".ios"), std::string(".android"), std::string(".visionos")}) {
+              if (EndsWith(withoutPlatform, suffix)) {
+                withoutPlatform = withoutPlatform.substr(0, withoutPlatform.size() - suffix.size());
+                break;
+              }
+            }
+            const bool isRootLevelMainEntry = withoutPlatform == "index" ||
+                                              withoutPlatform == pkgBaseName ||
+                                              withoutPlatform.rfind(pkgBaseName + ".", 0) == 0;
+            preserveSubpath = !isRootLevelMainEntry;
+          }
+
+          if (preserveSubpath) {
+            normalized = pkgName + "/" + remainder + querySuffix;
+          }
+        }
+
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[import-map][normalize] node_modules: %s -> %s", specifier.c_str(), normalized.c_str());
+        }
+        return normalized;
       }
     }
   }
@@ -704,6 +753,46 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
         (unsigned long)regPre, (unsigned long)regPost,
         (unsigned long)fbPre, (unsigned long)fbPost,
         (unsigned long)relPre, (unsigned long)relPost);
+  }
+}
+
+std::vector<std::string> GetLoadedModuleUrls() {
+  std::vector<std::string> urls;
+  urls.reserve(g_moduleRegistry.size());
+
+  for (const auto& entry : g_moduleRegistry) {
+    const std::string& key = entry.first;
+    if (key.empty()) continue;
+    if (StartsWith(key, "blob:") || key.find("://") != std::string::npos) {
+      urls.push_back(key);
+    }
+  }
+
+  std::sort(urls.begin(), urls.end());
+  urls.erase(std::unique(urls.begin(), urls.end()), urls.end());
+  return urls;
+}
+
+void InvalidateModules(const std::vector<std::string>& urls) {
+  if (urls.empty()) return;
+
+  std::unordered_set<std::string> seen;
+  std::vector<std::string> uniqueUrls;
+  uniqueUrls.reserve(urls.size());
+
+  for (const auto& url : urls) {
+    if (url.empty()) continue;
+    if (!seen.insert(url).second) continue;
+    uniqueUrls.push_back(url);
+  }
+
+  for (const auto& url : uniqueUrls) {
+    RemoveModuleFromRegistry(url);
+  }
+
+  if (IsScriptLoadingLogEnabled()) {
+    Log(@"[resolver][invalidate] invalidated %lu exact URL(s)",
+        (unsigned long)uniqueUrls.size());
   }
 }
 

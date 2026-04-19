@@ -8,7 +8,9 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <mutex>
 #include "Helpers.h"
+#include "ModuleInternalCallbacks.h"
 
 // Use centralized dev flags helper for logging
 
@@ -38,6 +40,61 @@ static auto& g_hotDispose = *_g_hotDispose;
 // Keyed by event name (global, not per-module)
 static std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>> g_hotEventListeners;
 
+// Active deterministic dev-session state.
+static DevSessionState g_activeDevSession;
+static std::mutex g_activeDevSessionMutex;
+
+static bool GetOptionalStringProperty(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                                      v8::Local<v8::Object> object, const char* key,
+                                      std::string* out) {
+  if (out == nullptr) return false;
+
+  v8::Local<v8::Value> value;
+  if (!object->Get(context, tns::ToV8String(isolate, key)).ToLocal(&value) ||
+      value->IsUndefined() || value->IsNull()) {
+    return false;
+  }
+
+  v8::Local<v8::String> stringValue;
+  if (!value->ToString(context).ToLocal(&stringValue)) {
+    return false;
+  }
+
+  v8::String::Utf8Value utf8(isolate, stringValue);
+  *out = *utf8 ? *utf8 : "";
+  return true;
+}
+
+static bool GetOptionalBooleanProperty(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                                       v8::Local<v8::Object> object, const char* key,
+                                       bool* out) {
+  if (out == nullptr) return false;
+
+  v8::Local<v8::Value> value;
+  if (!object->Get(context, tns::ToV8String(isolate, key)).ToLocal(&value) ||
+      value->IsUndefined() || value->IsNull()) {
+    return false;
+  }
+
+  *out = value->BooleanValue(isolate);
+  return true;
+}
+
+static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                             const char* key, bool value) {
+  context->Global()
+      ->Set(context, tns::ToV8String(isolate, key), v8::Boolean::New(isolate, value))
+      .FromMaybe(false);
+}
+
+static void SetStringGlobal(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                            const char* key, const std::string& value) {
+  context->Global()
+      ->Set(context, tns::ToV8String(isolate, key),
+            tns::ToV8String(isolate, value.c_str()))
+      .FromMaybe(false);
+}
+
 v8::Local<v8::Object> GetOrCreateHotData(v8::Isolate* isolate, const std::string& key) {
   auto it = g_hotData.find(key);
   if (it != g_hotData.end()) {
@@ -48,6 +105,122 @@ v8::Local<v8::Object> GetOrCreateHotData(v8::Isolate* isolate, const std::string
   v8::Local<v8::Object> obj = v8::Object::New(isolate);
   g_hotData[key].Reset(isolate, obj);
   return obj;
+}
+
+bool ReadDevSessionConfig(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                          v8::Local<v8::Object> config, DevSessionState* out,
+                          std::string* errorMessage) {
+  if (out == nullptr) {
+    if (errorMessage != nullptr) {
+      *errorMessage = "[__nsStartDevSession] output session state is required";
+    }
+    return false;
+  }
+
+  DevSessionState next;
+  next.active = true;
+  GetOptionalStringProperty(isolate, context, config, "sessionId", &next.sessionId);
+  GetOptionalStringProperty(isolate, context, config, "origin", &next.origin);
+  GetOptionalStringProperty(isolate, context, config, "entryUrl", &next.entryUrl);
+  GetOptionalStringProperty(isolate, context, config, "clientUrl", &next.clientUrl);
+  GetOptionalStringProperty(isolate, context, config, "wsUrl", &next.wsUrl);
+  GetOptionalStringProperty(isolate, context, config, "platform", &next.platform);
+
+  v8::Local<v8::Value> featuresValue;
+  if (config->Get(context, tns::ToV8String(isolate, "features"))
+          .ToLocal(&featuresValue) &&
+      featuresValue->IsObject()) {
+    v8::Local<v8::Object> features = featuresValue.As<v8::Object>();
+    GetOptionalBooleanProperty(isolate, context, features, "fullReload",
+                               &next.fullReload);
+    GetOptionalBooleanProperty(isolate, context, features, "cssHmr",
+                               &next.cssHmr);
+  }
+
+  if (next.sessionId.empty() || next.origin.empty() || next.entryUrl.empty() ||
+      next.clientUrl.empty() || next.wsUrl.empty()) {
+    if (errorMessage != nullptr) {
+      *errorMessage =
+          "[__nsStartDevSession] sessionId, origin, clientUrl, wsUrl, and entryUrl are required";
+    }
+    return false;
+  }
+
+  *out = next;
+  return true;
+}
+
+void ResetActiveDevSession() {
+  std::lock_guard<std::mutex> lock(g_activeDevSessionMutex);
+  if (IsScriptLoadingLogEnabled() && g_activeDevSession.active) {
+    Log(@"[dev-session] reset active session=%s started=%s",
+        g_activeDevSession.sessionId.c_str(),
+        g_activeDevSession.started ? "true" : "false");
+  }
+  g_activeDevSession = DevSessionState();
+}
+
+DevSessionState GetActiveDevSessionSnapshot() {
+  std::lock_guard<std::mutex> lock(g_activeDevSessionMutex);
+  return g_activeDevSession;
+}
+
+void StoreActiveDevSession(const DevSessionState& session) {
+  std::lock_guard<std::mutex> lock(g_activeDevSessionMutex);
+  g_activeDevSession = session;
+  if (IsScriptLoadingLogEnabled()) {
+    Log(@"[dev-session] stored session=%s started=%s origin=%s client=%s entry=%s",
+        session.sessionId.c_str(), session.started ? "true" : "false",
+        session.origin.c_str(), session.clientUrl.c_str(),
+        session.entryUrl.c_str());
+  }
+}
+
+bool HasDevSessionChanged(const DevSessionState& previous,
+                          const DevSessionState& next) {
+  return !previous.active || previous.sessionId != next.sessionId ||
+         previous.origin != next.origin || previous.entryUrl != next.entryUrl ||
+         previous.clientUrl != next.clientUrl || previous.wsUrl != next.wsUrl;
+}
+
+std::vector<std::string> CollectSessionModuleUrls(const DevSessionState& session) {
+  std::vector<std::string> invalidate;
+  if (!session.active || session.origin.empty()) {
+    return invalidate;
+  }
+
+  for (const auto& url : tns::GetLoadedModuleUrls()) {
+    if (!StartsWith(url, session.origin.c_str())) continue;
+    if (!session.clientUrl.empty() && url == session.clientUrl) continue;
+    invalidate.push_back(url);
+  }
+
+  return invalidate;
+}
+
+void ApplyDevSessionGlobals(v8::Isolate* isolate,
+                            v8::Local<v8::Context> context,
+                            const DevSessionState& session) {
+  SetStringGlobal(isolate, context, "__NS_HTTP_ORIGIN__", session.origin);
+  SetStringGlobal(isolate, context, "__NS_HMR_WS_URL__", session.wsUrl);
+  SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", false);
+  SetBooleanGlobal(isolate, context, "__NS_HMR_CLIENT_ACTIVE__", false);
+  SetBooleanGlobal(isolate, context, "__NS_HMR_BROWSER_RUNTIME_CLIENT_ACTIVE__", false);
+  if (IsScriptLoadingLogEnabled()) {
+    Log(@"[dev-session] globals applied session=%s origin=%s ws=%s bootComplete=false",
+        session.sessionId.c_str(), session.origin.c_str(),
+        session.wsUrl.c_str());
+  }
+}
+
+void SetDevSessionBootComplete(v8::Isolate* isolate,
+                               v8::Local<v8::Context> context,
+                               bool value) {
+  SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", value);
+  if (IsScriptLoadingLogEnabled()) {
+    Log(@"[dev-session] __NS_HMR_BOOT_COMPLETE__=%s",
+        value ? "true" : "false");
+  }
 }
 
 void RegisterHotAccept(v8::Isolate* isolate, const std::string& key, v8::Local<v8::Function> cb) {

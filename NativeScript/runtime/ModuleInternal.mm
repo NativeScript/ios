@@ -1,5 +1,6 @@
 #include "ModuleInternal.h"
 #import <Foundation/Foundation.h>
+#include <cstring>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -7,6 +8,7 @@
 #include <string>
 #include "Caches.h"
 #include "Helpers.h"
+#include "HMRSupport.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
 #include "DevFlags.h"
@@ -34,6 +36,46 @@ bool IsLikelyOptionalModule(const std::string& moduleName) {
 bool IsESModule(const std::string& path) {
   return path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0 &&
          !(path.size() >= 8 && path.compare(path.size() - 8, 8, ".mjs.map") == 0);
+}
+
+static std::string NormalizePath(const std::string& path);
+
+static inline bool StartsWith(const std::string& value, const char* prefix) {
+  size_t n = strlen(prefix);
+  return value.size() >= n && value.compare(0, n, prefix) == 0;
+}
+
+static std::string NormalizeHttpModuleUrl(const std::string& path) {
+  if (path.empty()) {
+    return path;
+  }
+
+  std::string normalized = path;
+  if (StartsWith(normalized, "file://http://") || StartsWith(normalized, "file://https://")) {
+    normalized = normalized.substr(strlen("file://"));
+  }
+
+  if (normalized.rfind("http:/", 0) == 0 && normalized.rfind("http://", 0) != 0) {
+    normalized.insert(5, "/");
+  } else if (normalized.rfind("https:/", 0) == 0 &&
+             normalized.rfind("https://", 0) != 0) {
+    normalized.insert(6, "/");
+  }
+
+  return normalized;
+}
+
+static bool IsHttpModulePath(const std::string& path) {
+  std::string normalized = NormalizeHttpModuleUrl(path);
+  return StartsWith(normalized, "http://") || StartsWith(normalized, "https://");
+}
+
+static std::string CanonicalizeModulePath(const std::string& path) {
+  if (IsHttpModulePath(path)) {
+    return CanonicalizeHttpUrlKey(NormalizeHttpModuleUrl(path));
+  }
+
+  return NormalizePath(path);
 }
 
 // Normalize file system paths to a canonical representation so lookups in
@@ -150,6 +192,7 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   Local<Context> context = cache->GetContext();
   Local<Object> globalObject = context->Global();
+  bool isHttpModule = IsHttpModulePath(path);
   // Ensure global.__dirname is defined so ESM/CommonJS shims relying on it work.
   {
     Local<Value> dirVal;
@@ -166,13 +209,20 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   }
 
   // ES module fast path
-  if (IsESModule(path)) {
+  if (IsESModule(path) || isHttpModule) {
     TryCatch tc(isolate);
     Local<Value> moduleNamespace;
+    if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+      Log(@"[run-module][http-esm][begin] %s", NormalizeHttpModuleUrl(path).c_str());
+    }
     try {
       moduleNamespace = ModuleInternal::LoadESModule(isolate, path);
     } catch (const NativeScriptException& ex) {
-      if (RuntimeConfig.IsDebug) {
+      if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+        Log(@"[run-module][http-esm][exception] %s message=%s",
+            NormalizeHttpModuleUrl(path).c_str(), ex.getMessage().c_str());
+      }
+      if (RuntimeConfig.IsDebug && !isHttpModule) {
         Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
         Log(@"Error loading ES module: %s", path.c_str());
         Log(@"Exception: %s", ex.getMessage().c_str());
@@ -184,12 +234,19 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
       }
     }
     if (moduleNamespace.IsEmpty()) {
-      if (RuntimeConfig.IsDebug) {
+      if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+        Log(@"[run-module][http-esm][empty] %s",
+            NormalizeHttpModuleUrl(path).c_str());
+      }
+      if (RuntimeConfig.IsDebug && !isHttpModule) {
         Log(@"Debug mode - ES module returned empty namespace, but telling iOS it succeeded");
         return true;
       } else {
         return false;
       }
+    }
+    if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+      Log(@"[run-module][http-esm][ok] %s", NormalizeHttpModuleUrl(path).c_str());
     }
     return true;  // ES module loaded successfully
   }
@@ -848,14 +905,53 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
 }
 
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
-  std::string canonicalPath = NormalizePath(path);
+  bool isHttpModule = IsHttpModulePath(path);
+  std::string canonicalPath = CanonicalizeModulePath(path);
+  std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
   auto context = isolate->GetCurrentContext();
 
   // 1) Prepare URL & source
-  std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
-  std::string url = "file://" + base;
-  v8::Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
-  auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
+  std::string url;
+  v8::Local<v8::String> sourceText;
+  ScriptCompiler::CachedData* cacheData = nullptr;
+  if (isHttpModule) {
+    std::string body;
+    std::string contentType;
+    int status = 0;
+    if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+      Log(@"[esm][http-fetch][begin] request=%s key=%s",
+          requestPath.c_str(), canonicalPath.c_str());
+    }
+    if (!HttpFetchText(requestPath, body, contentType, status) || body.empty()) {
+      if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+        Log(@"[esm][http-fetch][fail] request=%s key=%s status=%d bytes=%zu",
+            requestPath.c_str(), canonicalPath.c_str(), status, body.size());
+      }
+      if (RuntimeConfig.IsDebug) {
+        return Local<Value>();
+      }
+
+      std::string message = "Cannot fetch ES module ";
+      message += requestPath;
+      message += " (status=";
+      message += std::to_string(status);
+      message += ")";
+      throw NativeScriptException(message);
+    }
+
+    if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+      Log(@"[esm][http-fetch][ok] request=%s key=%s status=%d type=%s bytes=%zu",
+          requestPath.c_str(), canonicalPath.c_str(), status, contentType.c_str(), body.size());
+    }
+
+    url = requestPath;
+    sourceText = tns::ToV8String(isolate, body);
+  } else {
+    std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
+    url = "file://" + base;
+    sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
+    cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
+  }
 
   Local<v8::String> urlString;
   if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
@@ -942,7 +1038,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   g_moduleRegistry[canonicalPath].Reset(isolate, module);
 
   // 4) Save cache if first time
-  if (cacheData == nullptr) {
+  if (!isHttpModule && cacheData == nullptr) {
     Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
     auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
     ModuleInternal::SaveScriptCache(generatedCache, canonicalPath);
@@ -1036,19 +1132,35 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       TryCatch promiseTc(isolate);
       Local<Promise> promise = result.As<Promise>();
 
-      // Process microtasks to allow Promise resolution (for both worker and main contexts)
-      int maxAttempts = 100;
-      int attempts = 0;
-
-      while (attempts < maxAttempts && !promiseTc.HasCaught()) {
+      // Top-level await can depend on native async work such as fetch(), which requires
+      // both V8 microtasks and the Cocoa run loop to advance. Returning early here causes
+      // callers like __nsStartDevSession(clientUrl) to continue before bootstrap finished.
+      auto pumpAsyncProgress = [&]() {
         isolate->PerformMicrotaskCheckpoint();
+        if (isHttpModule) {
+          @autoreleasepool {
+            NSRunLoop* runLoop = [NSThread isMainThread] ? [NSRunLoop mainRunLoop] : [NSRunLoop currentRunLoop];
+            NSDate* sliceDeadline = [NSDate dateWithTimeIntervalSinceNow:0.01];
+            [runLoop runMode:NSDefaultRunLoopMode beforeDate:sliceDeadline];
+          }
+          isolate->PerformMicrotaskCheckpoint();
+        }
+      };
+
+      const NSTimeInterval timeoutSeconds = isHttpModule ? 10.0 : 1.0;
+      NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:timeoutSeconds];
+      bool settled = false;
+
+      while (!promiseTc.HasCaught()) {
+        pumpAsyncProgress();
 
         if (promiseTc.HasCaught()) {
           break;
         }
-        Promise::PromiseState state = promise->State();
 
+        Promise::PromiseState state = promise->State();
         if (state != Promise::kPending) {
+          settled = true;
           if (state == Promise::kRejected) {
             RemoveModuleFromRegistry(canonicalPath);
             logPhase("evaluate", "promise-rejected");
@@ -1140,18 +1252,36 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             }
           }
           if (IsScriptLoadingLogEnabled()) {
-            Log("LoadESModule: Promise resolved successfully\n");
+            logPhase("evaluate", "promise-resolved");
           }
           break;
         }
 
-        attempts++;
-        usleep(100);  // 0.1ms delay
-      }
-      // Timeout: continue; the host event loop will settle microtasks later
+        if ([deadline timeIntervalSinceNow] <= 0) {
+          break;
+        }
 
-      if (attempts >= maxAttempts) {
-        printf("LoadESModule: Promise resolution timeout, continuing anyway\n");
+        if (!isHttpModule) {
+          usleep(1000);  // 1ms delay for non-HTTP top-level await polling
+        }
+      }
+
+      if (!settled && promise->State() == Promise::kPending) {
+        logPhase("evaluate", "promise-timeout");
+        if (isHttpModule) {
+          RemoveModuleFromRegistry(canonicalPath);
+          if (RuntimeConfig.IsDebug) {
+            Log(@"***** JavaScript exception occurred *****");
+            Log(@"Top-level await timed out for HTTP ES module: %s", canonicalPath.c_str());
+            Log(@"***** Debug mode - continuing execution *****");
+            Log(@"Module evaluation timed out before async bootstrap completed: %s", canonicalPath.c_str());
+            return Local<Value>();
+          }
+
+          std::string timeoutMessage = "Top-level await timed out for HTTP ES module ";
+          timeoutMessage += canonicalPath;
+          throw NativeScriptException(timeoutMessage);
+        }
       }
     }
   }

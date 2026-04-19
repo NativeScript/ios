@@ -28,7 +28,7 @@
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
-#include <mutex>
+#include <vector>
 #include "HMRSupport.h"
 #include "DevFlags.h"
 
@@ -37,6 +37,65 @@
 
 using namespace v8;
 using namespace std;
+
+namespace {
+
+bool GetOptionalStringProperty(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                               v8::Local<v8::Object> object, const char* key,
+                               std::string* out) {
+  if (out == nullptr) return false;
+
+  v8::Local<v8::Value> value;
+  if (!object->Get(context, tns::ToV8String(isolate, key)).ToLocal(&value) ||
+      value->IsUndefined() || value->IsNull()) {
+    return false;
+  }
+
+  v8::Local<v8::String> stringValue;
+  if (!value->ToString(context).ToLocal(&stringValue)) {
+    return false;
+  }
+
+  v8::String::Utf8Value utf8(isolate, stringValue);
+  *out = *utf8 ? *utf8 : "";
+  return true;
+}
+
+v8::Local<v8::Promise> CreateResolvedPromise(v8::Isolate* isolate,
+                                             v8::Local<v8::Context> context) {
+  v8::Local<v8::Promise::Resolver> resolver =
+      v8::Promise::Resolver::New(context).ToLocalChecked();
+  resolver->Resolve(context, v8::Undefined(isolate)).FromMaybe(false);
+  return resolver->GetPromise();
+}
+
+v8::Local<v8::Promise> CreateRejectedPromise(v8::Local<v8::Context> context,
+                                             v8::Local<v8::Value> reason) {
+  v8::Local<v8::Promise::Resolver> resolver =
+      v8::Promise::Resolver::New(context).ToLocalChecked();
+  resolver->Reject(context, reason).FromMaybe(false);
+  return resolver->GetPromise();
+}
+
+void MirrorFunctionOnGlobalThis(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                                const char* name) {
+  std::string src =
+      "if (typeof globalThis !== 'undefined' && typeof globalThis." +
+      std::string(name) +
+      " !== 'function') {"
+      "  Object.defineProperty(globalThis, '" + std::string(name) +
+      "', { value: this." + std::string(name) +
+      ", writable: true, configurable: true, enumerable: false });"
+      "}";
+
+  v8::Local<v8::Script> script;
+  if (v8::Script::Compile(context, tns::ToV8String(isolate, src.c_str()))
+          .ToLocal(&script)) {
+    script->Run(context).FromMaybe(v8::Local<v8::Value>());
+  }
+}
+
+}  // namespace
 
 // Import meta callback to support import.meta.url
 static void InitializeImportMetaObject(Local<Context> context, Local<Module> module,
@@ -226,6 +285,7 @@ Runtime::~Runtime() {
 
     // Clear import map vendor module cache (holds v8::Global<Module> handles)
     tns::CleanupImportMapGlobals();
+    tns::ResetActiveDevSession();
 
     DisposerPHV phv(isolate_);
     isolate_->VisitHandlesWithClassIds(&phv);
@@ -358,6 +418,17 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     }
   }
 
+  auto installGlobalFunction = [&](const char* name, v8::FunctionCallback callback) {
+    v8::Local<v8::FunctionTemplate> fnTpl =
+        v8::FunctionTemplate::New(isolate, callback);
+    v8::Local<v8::Function> fn = fnTpl->GetFunction(context).ToLocalChecked();
+    fn->SetName(tns::ToV8String(isolate, name));
+    context->Global()
+        ->Set(context, tns::ToV8String(isolate, name), fn)
+        .FromMaybe(false);
+    MirrorFunctionOnGlobalThis(isolate, context, name);
+  };
+
   // Install __nsConfigureRuntime(config) global for import map support.
   // The entry-runtime.ts fetches /ns/import-map.json from the Vite dev server
   // and calls this function to configure the native import map before loading
@@ -423,24 +494,352 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
       }
     };
 
-    v8::Local<v8::FunctionTemplate> fnTpl = v8::FunctionTemplate::New(isolate, configureRuntimeCallback);
-    v8::Local<v8::Function> fn = fnTpl->GetFunction(context).ToLocalChecked();
-    fn->SetName(tns::ToV8String(isolate, "__nsConfigureRuntime"));
-    context->Global()->Set(context, tns::ToV8String(isolate, "__nsConfigureRuntime"), fn).FromMaybe(false);
+    installGlobalFunction("__nsConfigureRuntime", configureRuntimeCallback);
+  }
 
-    // Also install on globalThis explicitly via JS eval as a belt-and-suspenders approach.
-    // Some V8 embeddings have the global proxy ≠ globalThis; this ensures JS can always find it.
-    {
-      v8::Local<v8::String> src = tns::ToV8String(isolate,
-        "if (typeof globalThis !== 'undefined' && typeof globalThis.__nsConfigureRuntime !== 'function') {"
-        "  Object.defineProperty(globalThis, '__nsConfigureRuntime', { value: this.__nsConfigureRuntime, writable: true, configurable: true, enumerable: false });"
-        "}"
-      );
-      v8::Local<v8::Script> script;
-      if (v8::Script::Compile(context, src).ToLocal(&script)) {
-        script->Run(context).FromMaybe(v8::Local<v8::Value>());
+  {
+    auto startDevSessionCallback = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+      v8::Isolate* isolate = info.GetIsolate();
+      v8::HandleScope scope(isolate);
+      v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+
+      if (info.Length() < 1 || !info[0]->IsObject()) {
+        info.GetReturnValue().Set(CreateRejectedPromise(
+            ctx, v8::Exception::TypeError(
+                     tns::ToV8String(isolate,
+                                     "[__nsStartDevSession] expected config object"))));
+        return;
       }
-    }
+
+      v8::Local<v8::Object> config = info[0].As<v8::Object>();
+      tns::DevSessionState next;
+      std::string sessionError;
+      if (!tns::ReadDevSessionConfig(isolate, ctx, config, &next, &sessionError)) {
+        info.GetReturnValue().Set(CreateRejectedPromise(
+            ctx, v8::Exception::TypeError(
+                     tns::ToV8String(isolate, sessionError.c_str()))));
+        return;
+      }
+
+      tns::DevSessionState previous = tns::GetActiveDevSessionSnapshot();
+      bool sessionChanged = tns::HasDevSessionChanged(previous, next);
+      bool logScriptLoading = tns::IsScriptLoadingLogEnabled();
+
+      if (sessionChanged && previous.active) {
+        std::vector<std::string> staleUrls = tns::CollectSessionModuleUrls(previous);
+        if (logScriptLoading) {
+          Log(@"[__nsStartDevSession] session changed old=%s new=%s invalidating=%lu",
+              previous.sessionId.c_str(), next.sessionId.c_str(),
+              (unsigned long)staleUrls.size());
+        }
+        if (!staleUrls.empty()) {
+          tns::InvalidateModules(staleUrls);
+        }
+      }
+
+      if (!sessionChanged && previous.active && previous.started) {
+        if (logScriptLoading) {
+          Log(@"[__nsStartDevSession] session already active: %s",
+              next.sessionId.c_str());
+        }
+        info.GetReturnValue().Set(CreateResolvedPromise(isolate, ctx));
+        return;
+      }
+
+      tns::ApplyDevSessionGlobals(isolate, ctx, next);
+
+      tns::StoreActiveDevSession(next);
+
+      Runtime* runtime = Runtime::GetRuntime(isolate);
+      if (runtime == nullptr) {
+        if (logScriptLoading) {
+          Log(@"[__nsStartDevSession] runtime unavailable for session=%s",
+              next.sessionId.c_str());
+        }
+        info.GetReturnValue().Set(CreateRejectedPromise(
+            ctx, v8::Exception::Error(
+                     tns::ToV8String(isolate,
+                                     "[__nsStartDevSession] runtime unavailable"))));
+        return;
+      }
+
+      if (logScriptLoading) {
+        Log(@"[__nsStartDevSession] clientUrl import start session=%s url=%s",
+            next.sessionId.c_str(), next.clientUrl.c_str());
+      }
+
+      if (!runtime->RunModule(next.clientUrl)) {
+        if (logScriptLoading) {
+          Log(@"[__nsStartDevSession] clientUrl import failed session=%s url=%s",
+              next.sessionId.c_str(), next.clientUrl.c_str());
+        }
+        info.GetReturnValue().Set(CreateRejectedPromise(
+            ctx, v8::Exception::Error(
+                     tns::ToV8String(isolate,
+                                     "[__nsStartDevSession] failed to import clientUrl"))));
+        return;
+      }
+
+      if (logScriptLoading) {
+        Log(@"[__nsStartDevSession] clientUrl import complete session=%s url=%s",
+            next.sessionId.c_str(), next.clientUrl.c_str());
+        Log(@"[__nsStartDevSession] entryUrl import start session=%s url=%s",
+            next.sessionId.c_str(), next.entryUrl.c_str());
+      }
+
+      if (!runtime->RunModule(next.entryUrl)) {
+        if (logScriptLoading) {
+          Log(@"[__nsStartDevSession] entryUrl import failed session=%s url=%s",
+              next.sessionId.c_str(), next.entryUrl.c_str());
+        }
+        info.GetReturnValue().Set(CreateRejectedPromise(
+            ctx, v8::Exception::Error(
+                     tns::ToV8String(isolate,
+                                     "[__nsStartDevSession] failed to import entryUrl"))));
+        return;
+      }
+
+      next.started = true;
+      tns::StoreActiveDevSession(next);
+
+      if (logScriptLoading) {
+        Log(@"[__nsStartDevSession] entryUrl import complete session=%s url=%s",
+            next.sessionId.c_str(), next.entryUrl.c_str());
+        Log(@"[__nsStartDevSession] session=%s imports complete; waiting for real app root commit",
+            next.sessionId.c_str());
+      }
+
+      if (logScriptLoading) {
+        Log(@"[__nsStartDevSession] session=%s platform=%s origin=%s client=%s entry=%s changed=%s",
+            next.sessionId.c_str(), next.platform.c_str(), next.origin.c_str(),
+            next.clientUrl.c_str(), next.entryUrl.c_str(),
+            sessionChanged ? "true" : "false");
+      }
+
+      info.GetReturnValue().Set(CreateResolvedPromise(isolate, ctx));
+    };
+
+    installGlobalFunction("__nsStartDevSession", startDevSessionCallback);
+  }
+
+  {
+    auto invalidateModulesCallback = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+      v8::Isolate* isolate = info.GetIsolate();
+      v8::HandleScope scope(isolate);
+      v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+
+      if (info.Length() < 1 || !info[0]->IsArray()) {
+        Log(@"[__nsInvalidateModules] expected array of URL strings");
+        return;
+      }
+
+      v8::Local<v8::Array> urlsArray = info[0].As<v8::Array>();
+      std::vector<std::string> urls;
+      urls.reserve(urlsArray->Length());
+      for (uint32_t index = 0; index < urlsArray->Length(); index++) {
+        v8::Local<v8::Value> value;
+        if (!urlsArray->Get(ctx, index).ToLocal(&value) || !value->IsString()) {
+          continue;
+        }
+
+        v8::String::Utf8Value utf8(isolate, value);
+        if (*utf8) {
+          urls.emplace_back(*utf8);
+        }
+      }
+
+      tns::InvalidateModules(urls);
+    };
+
+    installGlobalFunction("__nsInvalidateModules", invalidateModulesCallback);
+  }
+
+  {
+    auto reloadDevAppCallback = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+      v8::Isolate* isolate = info.GetIsolate();
+      v8::HandleScope scope(isolate);
+      v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+      bool logScriptLoading = tns::IsScriptLoadingLogEnabled();
+
+      tns::DevSessionState session = tns::GetActiveDevSessionSnapshot();
+      if (!session.active || session.entryUrl.empty()) {
+        if (logScriptLoading) {
+          Log(@"[__nsReloadDevApp] no active dev session");
+        }
+        info.GetReturnValue().Set(CreateRejectedPromise(
+            ctx, v8::Exception::Error(
+                     tns::ToV8String(isolate,
+                                     "[__nsReloadDevApp] no active dev session"))));
+        return;
+      }
+
+      std::vector<std::string> sessionUrls = tns::CollectSessionModuleUrls(session);
+      if (logScriptLoading) {
+        Log(@"[__nsReloadDevApp] invalidating session=%s urls=%lu",
+            session.sessionId.c_str(), (unsigned long)sessionUrls.size());
+      }
+      if (!sessionUrls.empty()) {
+        tns::InvalidateModules(sessionUrls);
+      }
+
+      tns::SetDevSessionBootComplete(isolate, ctx, false);
+
+      Runtime* runtime = Runtime::GetRuntime(isolate);
+      if (runtime == nullptr) {
+        if (logScriptLoading) {
+          Log(@"[__nsReloadDevApp] runtime unavailable for session=%s",
+              session.sessionId.c_str());
+        }
+        info.GetReturnValue().Set(CreateRejectedPromise(
+            ctx, v8::Exception::Error(
+                     tns::ToV8String(isolate,
+                                     "[__nsReloadDevApp] runtime unavailable"))));
+        return;
+      }
+
+      if (logScriptLoading) {
+        Log(@"[__nsReloadDevApp] entryUrl import start session=%s url=%s",
+            session.sessionId.c_str(), session.entryUrl.c_str());
+      }
+
+      if (!runtime->RunModule(session.entryUrl)) {
+        if (logScriptLoading) {
+          Log(@"[__nsReloadDevApp] entryUrl import failed session=%s url=%s",
+              session.sessionId.c_str(), session.entryUrl.c_str());
+        }
+        info.GetReturnValue().Set(CreateRejectedPromise(
+            ctx, v8::Exception::Error(
+                     tns::ToV8String(isolate,
+                                     "[__nsReloadDevApp] failed to import entryUrl"))));
+        return;
+      }
+
+      if (logScriptLoading) {
+        Log(@"[__nsReloadDevApp] entryUrl import complete session=%s url=%s",
+            session.sessionId.c_str(), session.entryUrl.c_str());
+        Log(@"[__nsReloadDevApp] session=%s reload imports complete; waiting for real app root commit (invalidated=%lu)",
+            session.sessionId.c_str(), (unsigned long)sessionUrls.size());
+      }
+
+      info.GetReturnValue().Set(CreateResolvedPromise(isolate, ctx));
+    };
+
+    installGlobalFunction("__nsReloadDevApp", reloadDevAppCallback);
+  }
+
+  {
+    auto applyStyleUpdateCallback = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+      v8::Isolate* isolate = info.GetIsolate();
+      v8::HandleScope scope(isolate);
+      v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+
+      if (info.Length() < 1 || !info[0]->IsObject()) {
+        Log(@"[__nsApplyStyleUpdate] expected payload object");
+        return;
+      }
+
+      v8::Local<v8::Object> payload = info[0].As<v8::Object>();
+      std::string cssText;
+      std::string url;
+      GetOptionalStringProperty(isolate, ctx, payload, "cssText", &cssText);
+      GetOptionalStringProperty(isolate, ctx, payload, "url", &url);
+
+      if (cssText.empty()) {
+        Log(@"[__nsApplyStyleUpdate] missing cssText payload");
+        return;
+      }
+
+      v8::Local<v8::Value> applicationValue;
+      if (!ctx->Global()
+               ->Get(ctx, tns::ToV8String(isolate, "Application"))
+               .ToLocal(&applicationValue) ||
+          !applicationValue->IsObject()) {
+        Log(@"[__nsApplyStyleUpdate] Application is unavailable for %s",
+            url.c_str());
+        return;
+      }
+
+      v8::Local<v8::Object> applicationObject = applicationValue.As<v8::Object>();
+
+      v8::Local<v8::Value> addCssValue;
+      if (!applicationObject
+               ->Get(ctx, tns::ToV8String(isolate, "addCss"))
+               .ToLocal(&addCssValue) ||
+          !addCssValue->IsFunction()) {
+        Log(@"[__nsApplyStyleUpdate] Application.addCss is unavailable for %s",
+            url.c_str());
+        return;
+      }
+
+      v8::TryCatch tc(isolate);
+      v8::Local<v8::Value> args[] = {
+          tns::ToV8String(isolate, cssText.c_str()),
+      };
+      v8::Local<v8::Value> ignored;
+        bool addCssCalled = addCssValue.As<v8::Function>()
+                    ->Call(ctx, applicationObject, 1, args)
+                    .ToLocal(&ignored);
+
+        if (addCssCalled && !tc.HasCaught()) {
+        v8::Local<v8::Value> getRootViewValue;
+        if (applicationObject
+                ->Get(ctx, tns::ToV8String(isolate, "getRootView"))
+                .ToLocal(&getRootViewValue) &&
+            getRootViewValue->IsFunction()) {
+          v8::Local<v8::Value> rootViewValue;
+          if (getRootViewValue.As<v8::Function>()
+                  ->Call(ctx, applicationObject, 0, nullptr)
+                  .ToLocal(&rootViewValue) &&
+              rootViewValue->IsObject()) {
+            v8::Local<v8::Object> rootViewObject = rootViewValue.As<v8::Object>();
+            v8::Local<v8::Value> cssStateChangeValue;
+            if (rootViewObject
+                    ->Get(ctx, tns::ToV8String(isolate, "_onCssStateChange"))
+                    .ToLocal(&cssStateChangeValue) &&
+                cssStateChangeValue->IsFunction()) {
+              bool cssStateChanged = cssStateChangeValue.As<v8::Function>()
+                                         ->Call(ctx, rootViewObject, 0, nullptr)
+                                         .ToLocal(&ignored);
+              (void)cssStateChanged;
+            }
+          }
+        }
+      }
+
+      if (tc.HasCaught()) {
+        Log(@"[__nsApplyStyleUpdate] failed for %s", url.c_str());
+        tns::LogError(isolate, tc);
+        return;
+      }
+
+      if (RuntimeConfig.IsDebug) {
+        Log(@"[__nsApplyStyleUpdate] applied %s", url.c_str());
+      }
+    };
+
+    installGlobalFunction("__nsApplyStyleUpdate", applyStyleUpdateCallback);
+  }
+
+  {
+    auto getLoadedModuleUrlsCallback = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+      v8::Isolate* isolate = info.GetIsolate();
+      v8::HandleScope scope(isolate);
+      v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+
+      std::vector<std::string> urls = tns::GetLoadedModuleUrls();
+      v8::Local<v8::Array> result =
+          v8::Array::New(isolate, static_cast<int>(urls.size()));
+
+      for (uint32_t index = 0; index < urls.size(); index++) {
+        result
+            ->Set(ctx, index, tns::ToV8String(isolate, urls[index].c_str()))
+            .FromMaybe(false);
+      }
+
+      info.GetReturnValue().Set(result);
+    };
+
+    installGlobalFunction("__nsGetLoadedModuleUrls", getLoadedModuleUrlsCallback);
   }
 
   // URL.createObjectURL/revokeObjectURL and blob URL registry
@@ -549,11 +948,11 @@ void Runtime::RunMainScript() {
   this->moduleInternal_->RunModule(isolate, "./");
 }
 
-void Runtime::RunModule(const std::string moduleName) {
+bool Runtime::RunModule(const std::string moduleName) {
   Isolate* isolate = this->GetIsolate();
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
-  this->moduleInternal_->RunModule(isolate, moduleName);
+  return this->moduleInternal_->RunModule(isolate, moduleName);
 }
 
 void Runtime::RunScript(const std::string script) {

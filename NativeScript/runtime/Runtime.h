@@ -26,7 +26,7 @@ class Runtime {
 
   inline CFRunLoopRef RuntimeLoop() { return runtimeLoop_; }
 
-  void RunModule(const std::string moduleName);
+  bool RunModule(const std::string moduleName);
 
   void RunScript(const std::string script);
 

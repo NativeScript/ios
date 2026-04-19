@@ -21,6 +21,7 @@ namespace tns {
 // This module contains:
 // - Per-module hot data store
 // - Registration for accept/disable callbacks
+// - Active dev-session state and helpers
 // - Initializer to attach import.meta.hot to a module's import.meta
 //
 // Note: Triggering/dispatch is handled by the HMR system elsewhere.
@@ -51,6 +52,45 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
                              v8::Local<v8::Context> context,
                              v8::Local<v8::Object> importMeta,
                              const std::string& modulePath);
+
+// ─────────────────────────────────────────────────────────────
+// Dev session helpers
+
+struct DevSessionState {
+    bool active = false;
+    bool started = false;
+    std::string sessionId;
+    std::string origin;
+    std::string entryUrl;
+    std::string clientUrl;
+    std::string wsUrl;
+    std::string platform;
+    bool fullReload = false;
+    bool cssHmr = false;
+};
+
+// Read and validate the JS dev-session config object.
+bool ReadDevSessionConfig(v8::Isolate* isolate,
+                                                    v8::Local<v8::Context> context,
+                                                    v8::Local<v8::Object> config,
+                                                    DevSessionState* out,
+                                                    std::string* errorMessage);
+
+// Active dev-session storage.
+void ResetActiveDevSession();
+DevSessionState GetActiveDevSessionSnapshot();
+void StoreActiveDevSession(const DevSessionState& session);
+bool HasDevSessionChanged(const DevSessionState& previous,
+                                                    const DevSessionState& next);
+std::vector<std::string> CollectSessionModuleUrls(const DevSessionState& session);
+
+// Runtime global helpers for the deterministic dev session boot path.
+void ApplyDevSessionGlobals(v8::Isolate* isolate,
+                                                        v8::Local<v8::Context> context,
+                                                        const DevSessionState& session);
+void SetDevSessionBootComplete(v8::Isolate* isolate,
+                                                             v8::Local<v8::Context> context,
+                                                             bool value);
 
 // ─────────────────────────────────────────────────────────────
 // HTTP loader helpers (used by dev/HMR and general-purpose HTTP module loading)
