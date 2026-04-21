@@ -429,11 +429,10 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     MirrorFunctionOnGlobalThis(isolate, context, name);
   };
 
-  // Install __nsConfigureRuntime(config) global for import map support.
-  // The entry-runtime.ts fetches /ns/import-map.json from the Vite dev server
-  // and calls this function to configure the native import map before loading
-  // any application modules. This enables deterministic module resolution
-  // without Vite-side import rewriting.
+  // Install the session bootstrap runtime configuration hook for import map support.
+  // __nsConfigureDevRuntime is the explicit host-runtime surface used by the
+  // deterministic session bootstrap. __nsConfigureRuntime remains as a
+  // compatibility alias while older entry paths still exist.
   {
     auto configureRuntimeCallback = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
       v8::Isolate* isolate = info.GetIsolate();
@@ -494,7 +493,13 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
       }
     };
 
+    installGlobalFunction("__nsConfigureDevRuntime", configureRuntimeCallback);
     installGlobalFunction("__nsConfigureRuntime", configureRuntimeCallback);
+    context->Global()
+      ->CreateDataProperty(context,
+                 tns::ToV8String(isolate, "__nsSupportsRuntimeConfigUrl"),
+                 v8::Boolean::New(isolate, true))
+      .Check();
   }
 
   {
@@ -533,7 +538,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
               (unsigned long)staleUrls.size());
         }
         if (!staleUrls.empty()) {
-          tns::InvalidateModules(staleUrls);
+          tns::InvalidateModules(isolate, ctx, staleUrls);
         }
       }
 
@@ -544,6 +549,44 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
         }
         info.GetReturnValue().Set(CreateResolvedPromise(isolate, ctx));
         return;
+      }
+
+      bool nativeRuntimeConfigDelegationEnabled = false;
+      {
+        v8::Local<v8::Value> delegationFlag;
+        if (ctx->Global()
+                ->Get(ctx, tns::ToV8String(isolate, "__NS_EXPERIMENTAL_NATIVE_RUNTIME_CONFIG_URL__"))
+                .ToLocal(&delegationFlag) &&
+            !delegationFlag.IsEmpty() && !delegationFlag->IsUndefined() &&
+            !delegationFlag->IsNull()) {
+          nativeRuntimeConfigDelegationEnabled = delegationFlag->BooleanValue(isolate);
+        }
+      }
+
+      if (!next.runtimeConfigUrl.empty() && nativeRuntimeConfigDelegationEnabled) {
+        if (logScriptLoading) {
+          Log(@"[__nsStartDevSession] runtimeConfigUrl fetch start session=%s url=%s",
+              next.sessionId.c_str(), next.runtimeConfigUrl.c_str());
+        }
+        std::string runtimeConfigError;
+        if (!tns::ApplyDevRuntimeConfigFromUrl(next.runtimeConfigUrl,
+                                               &runtimeConfigError)) {
+          if (logScriptLoading) {
+            Log(@"[__nsStartDevSession] runtimeConfigUrl fetch failed session=%s url=%s",
+                next.sessionId.c_str(), next.runtimeConfigUrl.c_str());
+          }
+          info.GetReturnValue().Set(CreateRejectedPromise(
+              ctx, v8::Exception::Error(
+                       tns::ToV8String(isolate, runtimeConfigError.c_str()))));
+          return;
+        }
+        if (logScriptLoading) {
+          Log(@"[__nsStartDevSession] runtimeConfigUrl fetch complete session=%s url=%s",
+              next.sessionId.c_str(), next.runtimeConfigUrl.c_str());
+        }
+      } else if (!next.runtimeConfigUrl.empty() && logScriptLoading) {
+        Log(@"[__nsStartDevSession] runtimeConfigUrl native delegation disabled; using JS-configured runtime session=%s url=%s",
+            next.sessionId.c_str(), next.runtimeConfigUrl.c_str());
       }
 
       tns::ApplyDevSessionGlobals(isolate, ctx, next);
@@ -648,7 +691,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
         }
       }
 
-      tns::InvalidateModules(urls);
+      tns::InvalidateModules(isolate, ctx, urls);
     };
 
     installGlobalFunction("__nsInvalidateModules", invalidateModulesCallback);
@@ -679,7 +722,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
             session.sessionId.c_str(), (unsigned long)sessionUrls.size());
       }
       if (!sessionUrls.empty()) {
-        tns::InvalidateModules(sessionUrls);
+        tns::InvalidateModules(isolate, ctx, sessionUrls);
       }
 
       tns::SetDevSessionBootComplete(isolate, ctx, false);

@@ -95,6 +95,73 @@ static void SetStringGlobal(v8::Isolate* isolate, v8::Local<v8::Context> context
       .FromMaybe(false);
 }
 
+static bool IsSupportedDevSessionPlatform(const std::string& platform) {
+  return platform == "ios" || platform == "visionos";
+}
+
+static bool ApplyDevRuntimeConfigDictionary(NSDictionary* payload,
+                                            std::string* errorMessage) {
+  if (payload == nil || ![payload isKindOfClass:[NSDictionary class]]) {
+    if (errorMessage != nullptr) {
+      *errorMessage = "[__nsStartDevSession] runtime config payload must be an object";
+    }
+    return false;
+  }
+
+  id importMapValue = [payload objectForKey:@"importMap"];
+  if (importMapValue == nil || ![importMapValue isKindOfClass:[NSDictionary class]]) {
+    if (errorMessage != nullptr) {
+      *errorMessage = "[__nsStartDevSession] runtime config payload is missing importMap";
+    }
+    return false;
+  }
+
+  NSError* importMapError = nil;
+  NSData* importMapData =
+      [NSJSONSerialization dataWithJSONObject:importMapValue options:0 error:&importMapError];
+  if (importMapData == nil || importMapError != nil) {
+    if (errorMessage != nullptr) {
+      NSString* detail = importMapError.localizedDescription ?: @"unknown importMap serialization error";
+      *errorMessage = std::string("[__nsStartDevSession] failed to serialize importMap: ") +
+                      std::string([detail UTF8String] ?: "unknown importMap serialization error");
+    }
+    return false;
+  }
+
+  const void* importMapBytes = [importMapData bytes];
+  NSUInteger importMapLength = [importMapData length];
+  if (importMapBytes == nullptr || importMapLength == 0) {
+    if (errorMessage != nullptr) {
+      *errorMessage = "[__nsStartDevSession] runtime config importMap was empty";
+    }
+    return false;
+  }
+
+  std::string importMapJson(static_cast<const char*>(importMapBytes),
+                            static_cast<size_t>(importMapLength));
+  SetImportMap(importMapJson);
+
+  std::vector<std::string> patterns;
+  id volatilePatternsValue = [payload objectForKey:@"volatilePatterns"];
+  if ([volatilePatternsValue isKindOfClass:[NSArray class]]) {
+    for (id value in (NSArray*)volatilePatternsValue) {
+      if (![value isKindOfClass:[NSString class]]) {
+        continue;
+      }
+      const char* utf8 = [(NSString*)value UTF8String];
+      if (utf8 != nullptr && utf8[0] != '\0') {
+        patterns.emplace_back(utf8);
+      }
+    }
+  }
+
+  if (!patterns.empty()) {
+    SetVolatilePatterns(patterns);
+  }
+
+  return true;
+}
+
 v8::Local<v8::Object> GetOrCreateHotData(v8::Isolate* isolate, const std::string& key) {
   auto it = g_hotData.find(key);
   if (it != g_hotData.end()) {
@@ -125,6 +192,7 @@ bool ReadDevSessionConfig(v8::Isolate* isolate, v8::Local<v8::Context> context,
   GetOptionalStringProperty(isolate, context, config, "clientUrl", &next.clientUrl);
   GetOptionalStringProperty(isolate, context, config, "wsUrl", &next.wsUrl);
   GetOptionalStringProperty(isolate, context, config, "platform", &next.platform);
+  GetOptionalStringProperty(isolate, context, config, "runtimeConfigUrl", &next.runtimeConfigUrl);
 
   v8::Local<v8::Value> featuresValue;
   if (config->Get(context, tns::ToV8String(isolate, "features"))
@@ -138,10 +206,18 @@ bool ReadDevSessionConfig(v8::Isolate* isolate, v8::Local<v8::Context> context,
   }
 
   if (next.sessionId.empty() || next.origin.empty() || next.entryUrl.empty() ||
-      next.clientUrl.empty() || next.wsUrl.empty()) {
+      next.clientUrl.empty() || next.wsUrl.empty() || next.platform.empty()) {
     if (errorMessage != nullptr) {
       *errorMessage =
-          "[__nsStartDevSession] sessionId, origin, clientUrl, wsUrl, and entryUrl are required";
+          "[__nsStartDevSession] sessionId, origin, clientUrl, wsUrl, entryUrl, and platform are required";
+    }
+    return false;
+  }
+
+  if (!IsSupportedDevSessionPlatform(next.platform)) {
+    if (errorMessage != nullptr) {
+      *errorMessage =
+          "[__nsStartDevSession] platform must be ios or visionos";
     }
     return false;
   }
@@ -180,7 +256,8 @@ bool HasDevSessionChanged(const DevSessionState& previous,
                           const DevSessionState& next) {
   return !previous.active || previous.sessionId != next.sessionId ||
          previous.origin != next.origin || previous.entryUrl != next.entryUrl ||
-         previous.clientUrl != next.clientUrl || previous.wsUrl != next.wsUrl;
+    previous.clientUrl != next.clientUrl || previous.wsUrl != next.wsUrl ||
+    previous.runtimeConfigUrl != next.runtimeConfigUrl;
 }
 
 std::vector<std::string> CollectSessionModuleUrls(const DevSessionState& session) {
@@ -196,6 +273,54 @@ std::vector<std::string> CollectSessionModuleUrls(const DevSessionState& session
   }
 
   return invalidate;
+}
+
+bool ApplyDevRuntimeConfigFromUrl(const std::string& url,
+                                  std::string* errorMessage) {
+  if (url.empty()) {
+    return true;
+  }
+
+  std::string body;
+  std::string contentType;
+  int status = 0;
+  if (!HttpFetchText(url, body, contentType, status) || body.empty()) {
+    if (errorMessage != nullptr) {
+      *errorMessage = std::string("[__nsStartDevSession] failed to fetch runtimeConfigUrl: ") + url;
+    }
+    return false;
+  }
+
+  @autoreleasepool {
+    NSData* jsonData = [NSData dataWithBytes:body.data() length:body.size()];
+    if (jsonData == nil) {
+      if (errorMessage != nullptr) {
+        *errorMessage = "[__nsStartDevSession] failed to create runtime config data";
+      }
+      return false;
+    }
+
+    NSError* jsonError = nil;
+    id payload = [NSJSONSerialization JSONObjectWithData:jsonData options:kNilOptions error:&jsonError];
+    if (payload == nil || ![payload isKindOfClass:[NSDictionary class]]) {
+      if (errorMessage != nullptr) {
+        NSString* detail = jsonError.localizedDescription ?: @"unknown runtime config parse error";
+        *errorMessage = std::string("[__nsStartDevSession] failed to parse runtime config: ") +
+                        std::string([detail UTF8String] ?: "unknown runtime config parse error");
+      }
+      return false;
+    }
+
+    if (!ApplyDevRuntimeConfigDictionary((NSDictionary*)payload, errorMessage)) {
+      return false;
+    }
+  }
+
+  if (IsScriptLoadingLogEnabled()) {
+    Log(@"[dev-session] runtime config applied url=%s", url.c_str());
+  }
+
+  return true;
 }
 
 void ApplyDevSessionGlobals(v8::Isolate* isolate,
@@ -349,13 +474,23 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
       s = s.substr(strlen("file://"));
     }
 
+    const bool isHttpUrl = StartsWith(s, "http://") || StartsWith(s, "https://");
+    if (isHttpUrl) {
+      // Preserve meaningful dev-endpoint query identity (for example /ns/core?p=...)
+      // while still dropping cache-busters and canonicalizing versioned bridge URLs.
+      s = CanonicalizeHttpUrlKey(s);
+    }
+
     // Drop fragment
     size_t hashPos = s.find('#');
     if (hashPos != std::string::npos) s = s.substr(0, hashPos);
 
-    // Split query (we'll drop it for hot key stability)
-    size_t qPos = s.find('?');
-    std::string noQuery = (qPos == std::string::npos) ? s : s.substr(0, qPos);
+    std::string noQuery = s;
+    std::string suffix;
+    if (!isHttpUrl) {
+      size_t qPos = s.find('?');
+      noQuery = (qPos == std::string::npos) ? s : s.substr(0, qPos);
+    }
 
     // If it's an http(s) URL, normalize only the path portion below.
     size_t schemePos = noQuery.find("://");
@@ -366,18 +501,57 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
     }
 
     std::string origin = noQuery.substr(0, pathStart);
-    std::string path = noQuery.substr(pathStart);
+    std::string pathAndSuffix = noQuery.substr(pathStart);
+    if (isHttpUrl) {
+      size_t qPos = pathAndSuffix.find('?');
+      if (qPos != std::string::npos) {
+        suffix = pathAndSuffix.substr(qPos);
+        pathAndSuffix = pathAndSuffix.substr(0, qPos);
+      }
+    }
+    std::string path = pathAndSuffix;
 
     // Normalize NS HMR virtual module paths:
     // /ns/m/__ns_hmr__/<token>/<rest> -> /ns/m/<rest>
-    const char* hmrPrefix = "/ns/m/__ns_hmr__/";
-    size_t hmrLen = strlen(hmrPrefix);
-    if (path.compare(0, hmrLen, hmrPrefix) == 0) {
-      size_t nextSlash = path.find('/', hmrLen);
-      if (nextSlash != std::string::npos) {
-        path = std::string("/ns/m/") + path.substr(nextSlash + 1);
+    auto normalizeHmrVirtualPath = [&](const char* prefix) {
+      size_t prefixLen = strlen(prefix);
+      if (path.compare(0, prefixLen, prefix) != 0) {
+        return false;
       }
+
+      size_t nextSlash = path.find('/', prefixLen);
+      if (nextSlash == std::string::npos) {
+        return false;
+      }
+
+      path = std::string("/ns/m/") + path.substr(nextSlash + 1);
+      return true;
+    };
+
+    // Keep import.meta.hot.data stable across both live-tagged and boot-tagged HMR URLs.
+    if (!normalizeHmrVirtualPath("/ns/m/__ns_boot__/b1/__ns_hmr__/")) {
+      normalizeHmrVirtualPath("/ns/m/__ns_hmr__/");
     }
+
+    auto normalizeBridge = [&](const char* needle) {
+      size_t nlen = strlen(needle);
+      if (path.compare(0, nlen, needle) != 0) return;
+      if (path.size() == nlen) return;
+      if (path.size() <= nlen + 1 || path[nlen] != '/') return;
+
+      size_t i = nlen + 1;
+      size_t j = i;
+      while (j < path.size() && std::isdigit(static_cast<unsigned char>(path[j]))) {
+        j++;
+      }
+      if (j == i) return;
+      if (j != path.size()) return;
+
+      path = std::string(needle);
+    };
+
+    normalizeBridge("/ns/rt");
+    normalizeBridge("/ns/core");
 
     // Normalize common script extensions so `/foo` and `/foo.ts` share hot.data.
     const char* exts[] = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"};
@@ -389,7 +563,7 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
     }
 
     // Also drop `.vue`? No — SFC endpoints should stay distinct.
-    return origin + path;
+    return origin + path + suffix;
   };
 
   const std::string key = canonicalHotKey(modulePath);

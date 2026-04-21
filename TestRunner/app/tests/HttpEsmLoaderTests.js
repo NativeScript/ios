@@ -302,6 +302,99 @@ describe("HTTP ESM Loader", function() {
                     done();
                 });
         });
+
+        it("should share hot.data across canonical, live-tagged, and boot-tagged /ns/m URLs", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; cannot import host HTTP HMR aliases in this harness");
+                done();
+                return;
+            }
+
+            var canonicalUrl = origin + "/ns/m/esm/hmr/hot-data-ext.mjs";
+            var liveTaggedUrl = origin + "/ns/m/__ns_hmr__/live/esm/hmr/hot-data-ext.js";
+            var bootTaggedUrl = origin + "/ns/m/__ns_boot__/b1/__ns_hmr__/live/esm/hmr/hot-data-ext.mjs";
+
+            withTimeout(Promise.all([
+                import(canonicalUrl),
+                import(liveTaggedUrl),
+                import(bootTaggedUrl),
+            ]), 5000, "import /ns/m hot-data aliases")
+                .then(function (mods) {
+                    var canonical = mods[0];
+                    var liveTagged = mods[1];
+                    var bootTagged = mods[2];
+
+                    var hotCanonical = canonical && typeof canonical.getHot === "function" ? canonical.getHot() : null;
+                    var hotLive = liveTagged && typeof liveTagged.getHot === "function" ? liveTagged.getHot() : null;
+                    var hotBoot = bootTagged && typeof bootTagged.getHot === "function" ? bootTagged.getHot() : null;
+                    if (!hotCanonical || !hotLive || !hotBoot) {
+                        pending("import.meta.hot not available (likely release build)");
+                        done();
+                        return;
+                    }
+
+                    var dataCanonical = canonical.getHotData();
+                    var dataLive = liveTagged.getHotData();
+                    var dataBoot = bootTagged.getHotData();
+                    expect(dataCanonical).toBeDefined();
+                    expect(dataLive).toBeDefined();
+                    expect(dataBoot).toBeDefined();
+
+                    var token = "hmr_alias_" + Date.now() + "_" + Math.random();
+                    canonical.setHotValue(token);
+                    expect(liveTagged.getHotValue()).toBe(token);
+                    expect(bootTagged.getHotValue()).toBe(token);
+                    expect(dataCanonical).toBe(dataLive);
+                    expect(dataCanonical).toBe(dataBoot);
+                    done();
+                })
+                .catch(function (error) {
+                    fail("Expected /ns/m hot-data alias imports to share state: " + formatError(error));
+                    done();
+                });
+        });
+
+        it("should share hot.data across versioned and canonical /ns/core bridge URLs", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; cannot import host HTTP bridge aliases in this harness");
+                done();
+                return;
+            }
+
+            withTimeout(Promise.all([
+                import(origin + "/ns/core"),
+                import(origin + "/ns/core/42"),
+            ]), 5000, "import /ns/core bridge aliases")
+                .then(function (mods) {
+                    var canonical = mods[0];
+                    var versioned = mods[1];
+
+                    var hotCanonical = canonical && typeof canonical.getHot === "function" ? canonical.getHot() : null;
+                    var hotVersioned = versioned && typeof versioned.getHot === "function" ? versioned.getHot() : null;
+                    if (!hotCanonical || !hotVersioned) {
+                        pending("import.meta.hot not available (likely release build)");
+                        done();
+                        return;
+                    }
+
+                    var dataCanonical = canonical.getHotData();
+                    var dataVersioned = versioned.getHotData();
+                    expect(dataCanonical).toBeDefined();
+                    expect(dataVersioned).toBeDefined();
+
+                    var token = "core_bridge_" + Date.now() + "_" + Math.random();
+                    canonical.setHotValue(token);
+                    expect(versioned.getHotValue()).toBe(token);
+                    expect(dataCanonical).toBe(dataVersioned);
+                    done();
+                })
+                .catch(function (error) {
+                    fail("Expected /ns/core bridge aliases to share hot.data: " + formatError(error));
+                    done();
+                });
+        });
     });
 
     describe("URL Key Canonicalization", function () {

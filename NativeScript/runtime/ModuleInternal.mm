@@ -909,61 +909,50 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   std::string canonicalPath = CanonicalizeModulePath(path);
   std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
   auto context = isolate->GetCurrentContext();
+  extern std::unordered_map<std::string, Global<Module>>& g_moduleRegistry;
 
-  // 1) Prepare URL & source
-  std::string url;
-  v8::Local<v8::String> sourceText;
-  ScriptCompiler::CachedData* cacheData = nullptr;
-  if (isHttpModule) {
-    std::string body;
-    std::string contentType;
-    int status = 0;
-    if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-      Log(@"[esm][http-fetch][begin] request=%s key=%s",
-          requestPath.c_str(), canonicalPath.c_str());
+  auto describeModuleStatus = [](Module::Status status) -> const char* {
+    switch (status) {
+      case Module::kUninstantiated:
+        return "uninstantiated";
+      case Module::kInstantiating:
+        return "instantiating";
+      case Module::kInstantiated:
+        return "instantiated";
+      case Module::kEvaluating:
+        return "evaluating";
+      case Module::kEvaluated:
+        return "evaluated";
+      case Module::kErrored:
+        return "errored";
     }
-    if (!HttpFetchText(requestPath, body, contentType, status) || body.empty()) {
+
+    return "unknown";
+  };
+
+  auto existingIt = g_moduleRegistry.find(canonicalPath);
+  if (existingIt != g_moduleRegistry.end()) {
+    Local<Module> existing = existingIt->second.Get(isolate);
+    if (existing.IsEmpty()) {
       if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-        Log(@"[esm][http-fetch][fail] request=%s key=%s status=%d bytes=%zu",
-            requestPath.c_str(), canonicalPath.c_str(), status, body.size());
+        Log(@"[esm][cache] dropping empty registry entry %s", canonicalPath.c_str());
       }
-      if (RuntimeConfig.IsDebug) {
-        return Local<Value>();
+      RemoveModuleFromRegistry(canonicalPath);
+    } else {
+      Module::Status existingStatus = existing->GetStatus();
+      if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+        Log(@"[esm][cache] hit %s status=%s", canonicalPath.c_str(),
+            describeModuleStatus(existingStatus));
       }
-
-      std::string message = "Cannot fetch ES module ";
-      message += requestPath;
-      message += " (status=";
-      message += std::to_string(status);
-      message += ")";
-      throw NativeScriptException(message);
+      if (existingStatus == Module::kErrored) {
+        RemoveModuleFromRegistry(canonicalPath);
+      } else if (existingStatus == Module::kEvaluated) {
+        UpdateModuleFallback(isolate, canonicalPath, existing);
+        return existing->GetModuleNamespace();
+      }
     }
-
-    if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-      Log(@"[esm][http-fetch][ok] request=%s key=%s status=%d type=%s bytes=%zu",
-          requestPath.c_str(), canonicalPath.c_str(), status, contentType.c_str(), body.size());
-    }
-
-    url = requestPath;
-    sourceText = tns::ToV8String(isolate, body);
-  } else {
-    std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
-    url = "file://" + base;
-    sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
-    cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
   }
 
-  Local<v8::String> urlString;
-  if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
-    throw NativeScriptException(isolate, "Failed to create URL string for ES module " + canonicalPath);
-  }
-
-  ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, Local<Value>(), false, false,
-                      true  // ← is_module
-  );
-  ScriptCompiler::Source source(sourceText, origin, cacheData);
-
-  // 2) Compile with its own TryCatch
   // Phase diagnostics helper (local lambda) – only active in debug builds when logScriptLoading is enabled
   auto logPhase = [&](const char* phase, const char* status, const char* classification = "", const char* extra = "") {
     if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
@@ -982,66 +971,100 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       }
     }
   };
-  logPhase("compile", "begin");
   Local<Module> module;
-  {
-    TryCatch tcCompile(isolate);
-    MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
-        isolate, &source,
-        cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
-
+  ScriptCompiler::CachedData* cacheData = nullptr;
+  if (isHttpModule) {
+    logPhase("compile", "delegate-http");
+    MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
     if (!maybeMod.ToLocal(&module)) {
-      // Attempt classification heuristics
-      const char* classification = "unknown";
-      if (tcCompile.HasCaught()) {
-        Local<Message> msg = tcCompile.Message();
-        if (!msg.IsEmpty()) {
-          v8::String::Utf8Value w(isolate, msg->Get());
-          if (*w) {
-            std::string m(*w);
-            if (m.find("Unexpected token") != std::string::npos || m.find("SyntaxError") != std::string::npos) classification = "syntax";
-            else if (m.find("Cannot use import statement outside a module") != std::string::npos) classification = "not-a-module";
+      logPhase("compile", "fail", "http-loader");
+      if (RuntimeConfig.IsDebug) {
+        return Local<Value>();
+      }
+      throw NativeScriptException("Cannot load ES module " + canonicalPath);
+    }
+    logPhase("compile", "ok", "http-loader");
+
+    if (module->GetStatus() == Module::kEvaluated) {
+      UpdateModuleFallback(isolate, canonicalPath, module);
+      return module->GetModuleNamespace();
+    }
+  } else {
+    std::string url;
+    std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
+    url = "file://" + base;
+    v8::Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
+    cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
+
+    Local<v8::String> urlString;
+    if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
+      throw NativeScriptException(isolate, "Failed to create URL string for ES module " + canonicalPath);
+    }
+
+    ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, Local<Value>(), false, false,
+                        true  // ← is_module
+    );
+    ScriptCompiler::Source source(sourceText, origin, cacheData);
+
+    logPhase("compile", "begin");
+    {
+      TryCatch tcCompile(isolate);
+      MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
+          isolate, &source,
+          cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
+
+      if (!maybeMod.ToLocal(&module)) {
+        // Attempt classification heuristics
+        const char* classification = "unknown";
+        if (tcCompile.HasCaught()) {
+          Local<Message> msg = tcCompile.Message();
+          if (!msg.IsEmpty()) {
+            v8::String::Utf8Value w(isolate, msg->Get());
+            if (*w) {
+              std::string m(*w);
+              if (m.find("Unexpected token") != std::string::npos || m.find("SyntaxError") != std::string::npos) classification = "syntax";
+              else if (m.find("Cannot use import statement outside a module") != std::string::npos) classification = "not-a-module";
+            }
           }
         }
-      }
-      logPhase("compile", "fail", classification);
-      // V8 threw a syntax error or similar
-      if (RuntimeConfig.IsDebug) {
-        // Log the detailed JavaScript error with full stack trace
-        Log(@"***** JavaScript exception occurred *****");
-        Log(@"Error compiling ES module: %s", canonicalPath.c_str());
-        if (tcCompile.HasCaught()) {
-          tns::LogError(isolate, tcCompile);
+        logPhase("compile", "fail", classification);
+        // V8 threw a syntax error or similar
+        if (RuntimeConfig.IsDebug) {
+          // Log the detailed JavaScript error with full stack trace
+          Log(@"***** JavaScript exception occurred *****");
+          Log(@"Error compiling ES module: %s", canonicalPath.c_str());
+          if (tcCompile.HasCaught()) {
+            tns::LogError(isolate, tcCompile);
+          }
+          Log(@"***** Debug mode - continuing execution *****");
+          Log(@"ES module compilation failed: %s", canonicalPath.c_str());
+          // Return empty to prevent crashes
+          return Local<Value>();
+        } else {
+          throw NativeScriptException(isolate, tcCompile, "Cannot compile ES module " + canonicalPath);
         }
-        Log(@"***** Debug mode - continuing execution *****");
-        Log(@"ES module compilation failed: %s", canonicalPath.c_str());
-        // Return empty to prevent crashes
-        return Local<Value>();
-      } else {
-        throw NativeScriptException(isolate, tcCompile, "Cannot compile ES module " + canonicalPath);
       }
     }
-  }
-  logPhase("compile", "ok");
+    logPhase("compile", "ok");
 
-  // 3) Register for resolution callback
-  extern std::unordered_map<std::string, Global<Module>>& g_moduleRegistry;
+    // Register for resolution callback
+    auto it = g_moduleRegistry.find(canonicalPath);
+    if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled() &&
+        (requestPath != canonicalPath || path != canonicalPath)) {
+      Log(@"[esm][register] raw=%s request=%s canonical=%s url=%s existing=%s",
+          path.c_str(), requestPath.c_str(), canonicalPath.c_str(), url.c_str(),
+          it != g_moduleRegistry.end() ? "yes" : "no");
+    }
+    if (it != g_moduleRegistry.end()) {
+      it->second.Reset();
+    }
+    g_moduleRegistry[canonicalPath].Reset(isolate, module);
 
-  // Safe Global handle management: Clear any existing entry first
-  auto it = g_moduleRegistry.find(canonicalPath);
-  if (it != g_moduleRegistry.end()) {
-    // Clear the existing Global handle before replacing it
-    it->second.Reset();
-  }
-
-  // Now safely set the new module handle
-  g_moduleRegistry[canonicalPath].Reset(isolate, module);
-
-  // 4) Save cache if first time
-  if (!isHttpModule && cacheData == nullptr) {
-    Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
-    auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
-    ModuleInternal::SaveScriptCache(generatedCache, canonicalPath);
+    if (cacheData == nullptr) {
+      Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
+      auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
+      ModuleInternal::SaveScriptCache(generatedCache, canonicalPath);
+    }
   }
 
   // 5) Instantiate (link) with its own TryCatch

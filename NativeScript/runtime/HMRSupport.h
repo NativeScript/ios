@@ -65,6 +65,7 @@ struct DevSessionState {
     std::string clientUrl;
     std::string wsUrl;
     std::string platform;
+    std::string runtimeConfigUrl;
     bool fullReload = false;
     bool cssHmr = false;
 };
@@ -83,6 +84,8 @@ void StoreActiveDevSession(const DevSessionState& session);
 bool HasDevSessionChanged(const DevSessionState& previous,
                                                     const DevSessionState& next);
 std::vector<std::string> CollectSessionModuleUrls(const DevSessionState& session);
+bool ApplyDevRuntimeConfigFromUrl(const std::string& url,
+                                  std::string* errorMessage);
 
 // Runtime global helpers for the deterministic dev session boot path.
 void ApplyDevSessionGlobals(v8::Isolate* isolate,
