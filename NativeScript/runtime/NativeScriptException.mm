@@ -345,6 +345,32 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
     if (RuntimeConfig.IsDebug) {
       // Be gentle, state case in logs and allow developer to continue
       Log(@"Debug mode - suppressing throw to continue: %s", this->message_.c_str());
+
+      // Without a stack it's very hard to know which JS call triggered this throw (the
+      // ArgConverter/ObjectManager code paths build exceptions without capturing one). Emit a
+      // best-effort JS stack so developers can locate the offending call site.
+      std::string stack = this->stackTrace_;
+      if (stack.empty() && !errObj.IsEmpty() && errObj->IsObject()) {
+        // V8 attaches a stack to freshly-created Error objects; prefer that.
+        Local<Value> stackVal;
+        if (errObj.As<Object>()
+                ->Get(context, tns::ToV8String(isolate, "stack"))
+                .ToLocal(&stackVal) &&
+            stackVal->IsString()) {
+          stack = tns::ToString(isolate, stackVal.As<v8::String>());
+        }
+      }
+      if (stack.empty()) {
+        // Fall back to the current JS call stack.
+        stack = tns::GetStackTrace(isolate);
+      }
+      if (!stack.empty()) {
+        std::string remapped = tns::RemapStackTraceIfAvailable(isolate, stack);
+        if (!remapped.empty()) {
+          stack = remapped;
+        }
+        Log(@"  at:\n%s", stack.c_str());
+      }
     } else {
       // just re-throw normally
       isolate->ThrowException(errObj);
