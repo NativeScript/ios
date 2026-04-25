@@ -1104,7 +1104,8 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
       g_fetchSyncSlow.fetch_add(1, std::memory_order_relaxed);
     }
     const size_t syncCount = g_fetchSyncCount.fetch_add(1, std::memory_order_relaxed) + 1;
-    if (syncCount > 0 && syncCount % kFetchSyncSummaryEvery == 0) {
+    if (syncCount > 0 && syncCount % kFetchSyncSummaryEvery == 0 &&
+        IsScriptLoadingLogEnabled()) {
       const size_t fast = g_fetchSyncFast.load(std::memory_order_relaxed);
       const size_t medium = g_fetchSyncMedium.load(std::memory_order_relaxed);
       const size_t slow = g_fetchSyncSlow.load(std::memory_order_relaxed);
@@ -1449,12 +1450,16 @@ static bool IsHttpModulePrefetchEnabled() {
         s_enabled = [value boolValue];
       }
     }
-    // Always-on startup banner.
+    // Startup banner. Gated on the logScriptLoading flag so it stays
+    // silent by default — flip the flag in nativescript.config.ts when
+    // diagnosing why prefetch is or isn't engaging.
     //
     //   [http-loader] prefetch=disabled   ← expected default
     //   [http-loader] prefetch=enabled    ← only if config opt-in
-    Log(@"[http-loader] prefetch=%s shared-session=on hmr-kickstart=on",
-        s_enabled ? "enabled" : "disabled");
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-loader] prefetch=%s shared-session=on hmr-kickstart=on",
+          s_enabled ? "enabled" : "disabled");
+    }
   });
   return s_enabled;
 }
@@ -1479,16 +1484,19 @@ static bool IsHttpFetchUrlLogEnabled() {
         s_enabled = [value boolValue];
       }
     }
-    Log(@"[http-loader] fetch-url-log=%s",
-        s_enabled ? "enabled" : "disabled");
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-loader] fetch-url-log=%s",
+          s_enabled ? "enabled" : "disabled");
+    }
   });
   return s_enabled;
 }
 
-// Periodic always-on summary of prefetcher counters. Logs once every
+// Periodic summary of prefetcher counters. Logs once every
 // kPrefetchSummaryEvery hits+misses+satisfied+failed events, plus
-// on the trailing edge of cache cleanup. Always-on (no flag gating)
-// because we cannot diagnose this subsystem without it.
+// on the trailing edge of cache cleanup. Gated on the logScriptLoading
+// flag so it stays silent by default — flip the flag when diagnosing
+// prefetch behavior.
 static void MaybeLogPrefetchSummary(const char* trigger) {
   size_t hits = g_prefetchHits.load(std::memory_order_relaxed);
   size_t misses = g_prefetchMisses.load(std::memory_order_relaxed);
@@ -1499,6 +1507,7 @@ static void MaybeLogPrefetchSummary(const char* trigger) {
   size_t total = hits + misses;
   if (total == 0) return;
   if (total % kPrefetchSummaryEvery != 0) return;
+  if (!IsScriptLoadingLogEnabled()) return;
 
   size_t cacheSize = 0;
   size_t inflight = 0;
@@ -1508,7 +1517,6 @@ static void MaybeLogPrefetchSummary(const char* trigger) {
     inflight = g_prefetchInflight.size();
   }
 
-  // Hit rate as integer percent. Avoid divide-by-zero handled above.
   size_t hitPct = total ? (hits * 100 / total) : 0;
   Log(@"[http-loader][prefetch][summary] trigger=%s totalAsks=%lu hits=%lu (%lu%%) misses=%lu scheduled=%lu satisfied=%lu failed=%lu skipped=%lu cache=%lu inflight=%lu",
       trigger,

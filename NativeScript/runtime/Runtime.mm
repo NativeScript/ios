@@ -905,8 +905,18 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
       v8::HandleScope scope(isolate);
       v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
+      // All [__nsApplyStyleUpdate] log surfaces below are gated on the
+      // logScriptLoading flag (DevFlags::IsScriptLoadingLogEnabled). This
+      // path runs on every CSS HMR apply, so we keep it silent unless the
+      // developer opts in via nativescript.config.ts. Real V8 exceptions
+      // are still surfaced via tns::LogError unconditionally so HMR
+      // failures are never swallowed.
+      const bool logEnabled = tns::IsScriptLoadingLogEnabled();
+
       if (info.Length() < 1 || !info[0]->IsObject()) {
-        Log(@"[__nsApplyStyleUpdate] expected payload object");
+        if (logEnabled) {
+          Log(@"[__nsApplyStyleUpdate] expected payload object");
+        }
         return;
       }
 
@@ -917,7 +927,9 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
       GetOptionalStringProperty(isolate, ctx, payload, "url", &url);
 
       if (cssText.empty()) {
-        Log(@"[__nsApplyStyleUpdate] missing cssText payload");
+        if (logEnabled) {
+          Log(@"[__nsApplyStyleUpdate] missing cssText payload");
+        }
         return;
       }
 
@@ -926,8 +938,10 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
                ->Get(ctx, tns::ToV8String(isolate, "Application"))
                .ToLocal(&applicationValue) ||
           !applicationValue->IsObject()) {
-        Log(@"[__nsApplyStyleUpdate] Application is unavailable for %s",
-            url.c_str());
+        if (logEnabled) {
+          Log(@"[__nsApplyStyleUpdate] Application is unavailable for %s",
+              url.c_str());
+        }
         return;
       }
 
@@ -938,8 +952,10 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
                ->Get(ctx, tns::ToV8String(isolate, "addCss"))
                .ToLocal(&addCssValue) ||
           !addCssValue->IsFunction()) {
-        Log(@"[__nsApplyStyleUpdate] Application.addCss is unavailable for %s",
-            url.c_str());
+        if (logEnabled) {
+          Log(@"[__nsApplyStyleUpdate] Application.addCss is unavailable for %s",
+              url.c_str());
+        }
         return;
       }
 
@@ -979,12 +995,14 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
       }
 
       if (tc.HasCaught()) {
-        Log(@"[__nsApplyStyleUpdate] failed for %s", url.c_str());
+        if (logEnabled) {
+          Log(@"[__nsApplyStyleUpdate] failed for %s", url.c_str());
+        }
         tns::LogError(isolate, tc);
         return;
       }
 
-      if (RuntimeConfig.IsDebug) {
+      if (logEnabled) {
         Log(@"[__nsApplyStyleUpdate] applied %s", url.c_str());
       }
     };
