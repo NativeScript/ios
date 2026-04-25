@@ -388,12 +388,27 @@ void MetaFactory::createFromMethod(const clang::ObjCMethodDecl& method, MethodMe
     methodMeta.setFlags(MetaFlags::MethodIsNullTerminatedVariadic, isNullTerminatedVariadic);
 
     // set MethodHasErrorOutParameter flag
+    //
+    // Modern iOS SDK headers annotate out-error parameters as
+    // `NSError * _Nullable * _Nullable`, which TypeFactory wraps in `NullableType`
+    // nodes (see `TypeFactory::createFromAttributedType`). The previous
+    // implementation only checked for a raw `PointerType(InterfaceType("NSError"))`
+    // and therefore missed the vast majority of NSError**-returning Objective-C
+    // selectors (createDirectoryAtPath:...:error:, removeItemAtPath:error:,
+    // moveItemAtPath:toPath:error:, etc.). Unwrap `NullableType` at both levels
+    // so the flag is set correctly whether or not the SDK annotates nullability.
     if (method.parameters().size() > 0) {
         clang::ParmVarDecl* lastParameter = method.parameters()[method.parameters().size() - 1];
         Type* type = _typeFactory.create(lastParameter->getType()).get();
-        if (type->is(TypeType::TypePointer)) {
+        if (type != nullptr && type->is(TypeType::TypeNullable)) {
+            type = type->as<NullableType>().innerType;
+        }
+        if (type != nullptr && type->is(TypeType::TypePointer)) {
             Type* innerType = type->as<PointerType>().innerType;
-            if (innerType->is(TypeType::TypeInterface) && innerType->as<InterfaceType>().interface->jsName == "NSError") {
+            if (innerType != nullptr && innerType->is(TypeType::TypeNullable)) {
+                innerType = innerType->as<NullableType>().innerType;
+            }
+            if (innerType != nullptr && innerType->is(TypeType::TypeInterface) && innerType->as<InterfaceType>().interface->jsName == "NSError") {
                 methodMeta.setFlags(MetaFlags::MethodHasErrorOutParameter, true);
             }
         }
