@@ -873,17 +873,17 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     RemoveModuleFromRegistry(url);
   }
 
-  // alpha.64 — Drop stale HTTP bodies from the speculative-prefetch
-  // cache for every URL we just invalidated. Without this, the next
+  // Drop stale HTTP bodies from the speculative-prefetch cache for
+  // every URL we just invalidated. Without this, the next
   // `HttpFetchText` for an evicted URL would happily return a stale
   // body the previous wave (or kickstart) left in the cache, and V8
-  // would compile that stale source — producing the user-visible
-  // "1 cycle behind" lag for `.ts` edits with many transitive
-  // importers (e.g. constants files). The registry eviction above
-  // alone is necessary but not sufficient: V8 calls into the loader
-  // for any module no longer in the registry, and the loader's
-  // first stop is `g_prefetchCache`. Both caches must be cleared
-  // for the next compile to see fresh source.
+  // would compile that stale source — producing the "1 cycle behind"
+  // lag for `.ts` edits with many transitive importers (e.g.
+  // constants files). The registry eviction above alone is necessary
+  // but not sufficient: V8 calls into the loader for any module no
+  // longer in the registry, and the loader's first stop is
+  // `g_prefetchCache`. Both caches must be cleared for the next
+  // compile to see fresh source.
   EvictHttpModulePrefetchCacheUrls(uniqueUrls);
 
   if (IsScriptLoadingLogEnabled()) {

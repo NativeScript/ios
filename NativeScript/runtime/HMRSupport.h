@@ -122,15 +122,14 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 // where the dev server has indicated a graph version bump.
 void ClearHttpModulePrefetchCache();
 
-// alpha.64 — Drop a specific URL set from the speculative-prefetch
-// cache. Safe to call from any thread; missing keys are silently
-// ignored. Used by `InvalidateModules` so that an HMR eviction also
-// purges any stale HTTP body the previous prefetch wave (or
-// kickstart) left behind. Without this the kickstart's
-// "skip if URL already cached" early-out, plus `HttpFetchText`'s
-// destructive-read fast path, would happily serve V8 a stale body
-// from the prior save — visible to the user as a 1-cycle lag
-// between save and visual update.
+// Drop a specific URL set from the speculative-prefetch cache. Safe
+// to call from any thread; missing keys are silently ignored. Used by
+// `InvalidateModules` so that an HMR eviction also purges any stale
+// HTTP body the previous prefetch wave (or kickstart) left behind.
+// Without this, the kickstart's "skip if URL already cached"
+// early-out, plus `HttpFetchText`'s destructive-read fast path, would
+// happily serve V8 a stale body from the prior save — visible to the
+// user as a 1-cycle lag between save and visual update.
 void EvictHttpModulePrefetchCacheUrls(const std::vector<std::string>& urls);
 
 // Kickstart an HMR-driven module prefetch
@@ -158,9 +157,9 @@ bool KickstartHmrPrefetchSync(const std::string& seedUrl,
                               size_t* outFetchedCount,
                               uint64_t* outElapsedMs);
 
-// alpha.63 — Multi-URL kickstart for HMR cycles. Unlike the legacy
-// seed-rooted variant above, this one fetches ONLY the explicit URL
-// list it was given (no body scanning, no BFS recursion).
+// Multi-URL kickstart for HMR cycles. Unlike the legacy seed-rooted
+// variant above, this one fetches ONLY the explicit URL list it was
+// given (no body scanning, no BFS recursion).
 //
 // This is the right shape for HMR: the dev server's
 // `collectAngularEvictionUrls` already computed the inverse-dep

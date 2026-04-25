@@ -918,8 +918,8 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   }
 
   const bool prefetchEnabled = IsHttpModulePrefetchEnabled();
-  // Round-ten phase A — diagnostic. Hoist the flag once per call so the
-  // two success branches below pay one TLS read instead of two.
+  // Hoist the URL-log flag once per call so the two success branches
+  // below pay one TLS read instead of two.
   const bool urlLogEnabled = IsHttpFetchUrlLogEnabled();
 
   // the prefetch CACHE READ is always-on,
@@ -945,9 +945,9 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
       Log(@"[http-loader][prefetch][hit] %s (%lu bytes)", url.c_str(), (unsigned long)out.size());
     }
     if (urlLogEnabled) {
-      // Round-ten phase A — per-URL diagnostic. Distinguish prefetch-cache
-      // hits from network fetches so we can attribute who actually paid
-      // for each module body. ms is omitted because the cache lookup is
+      // Per-URL diagnostic. Distinguish prefetch-cache hits from
+      // network fetches so we can attribute who actually paid for
+      // each module body. ms is omitted because the cache lookup is
       // effectively instantaneous compared to network I/O.
       Log(@"[http-loader][fetch][prefetch] %s bytes=%lu",
           url.c_str(), (unsigned long)out.size());
@@ -966,11 +966,11 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   if (prefetchEnabled) {
     g_prefetchMisses.fetch_add(1, std::memory_order_relaxed);
   }
-  // Round-ten phase A — diagnostic. Time the network branch end-to-end so
-  // the per-URL log can attribute milliseconds to each fetch. We measure
-  // here (not inside PerformHttpFetchOnceSync) so the retry interval gets
-  // billed to the URL too — which is what the user sees as "this URL was
-  // slow".
+  // Time the network branch end-to-end so the per-URL log can
+  // attribute milliseconds to each fetch. We measure here (not
+  // inside PerformHttpFetchOnceSync) so the retry interval gets
+  // billed to the URL too — which is what the user sees as "this
+  // URL was slow".
   const uint64_t netStartUs = urlLogEnabled
       ? (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0)
       : 0ull;
@@ -1137,10 +1137,10 @@ static bool TryGetPrefetchedSource(const std::string& url, std::string& out) {
   return true;
 }
 
-// alpha.64 — Drop a specific URL set from `g_prefetchCache`. Used by
+// Drop a specific URL set from `g_prefetchCache`. Used by
 // `InvalidateModules` so an HMR eviction purges any stale HTTP body
 // the previous prefetch wave left behind. See the doc comment in
-// HMRSupport.h for the off-by-one this fixes.
+// HMRSupport.h for the cache-poisoning case this fixes.
 void EvictHttpModulePrefetchCacheUrls(const std::vector<std::string>& urls) {
   if (urls.empty()) return;
   size_t dropped = 0;
@@ -1573,10 +1573,10 @@ struct KickstartContext {
   dispatch_group_t group = nullptr;
   dispatch_queue_t queue = nullptr;
   dispatch_semaphore_t concurrency = nullptr;
-  // alpha.63 — When `recursive == true` (default, legacy behavior),
-  // the kickstart BFS scans every fetched body for static imports and
-  // schedules those URLs too. When `recursive == false`, the scheduler
-  // fetches ONLY the explicit URLs it was given.
+  // When `recursive == true` (default, legacy behavior), the
+  // kickstart BFS scans every fetched body for static imports and
+  // schedules those URLs too. When `recursive == false`, the
+  // scheduler fetches ONLY the explicit URLs it was given.
   //
   // The non-recursive mode is the right shape for HMR-driven kickstart:
   // the dev server already computed the inverse-dep closure
@@ -1627,24 +1627,24 @@ static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
     }
     if (!fresh) continue;
 
-    // alpha.63 — In recursive (cold-boot BFS) mode, if a previous wave
-    // (or an opt-in speculative prefetch) already landed this body,
-    // treat the URL as covered — no point spinning up a fetch we'd
-    // discard anyway.
+    // In recursive (cold-boot BFS) mode, if a previous wave (or an
+    // opt-in speculative prefetch) already landed this body, treat
+    // the URL as covered — no point spinning up a fetch we'd discard
+    // anyway.
     //
-    // alpha.64 — In HMR (non-recursive) mode this guard is *toxic*:
-    // the caller has explicitly told us "these URLs are stale, please
-    // refetch", and any body sitting in `g_prefetchCache` is a
-    // leftover from the previous wave that V8 didn't consume. Honoring
-    // the cache here would feed V8 the stale body on the next walk —
-    // exactly the user-visible "1 cycle behind" symptom we just
-    // diagnosed for `.ts` edits with many transitive importers. So we
-    // skip this short-circuit entirely when `recursive == false`. The
-    // emplace-vs-overwrite decision below is also tightened for the
-    // same reason. (`InvalidateModules` now pre-clears the cache for
-    // the eviction set, so this is defense-in-depth — but the kick-
-    // start may also be invoked manually for diagnostics, and we want
-    // it to be correct in isolation.)
+    // In HMR (non-recursive) mode this guard is *toxic*: the caller
+    // has explicitly told us "these URLs are stale, please refetch",
+    // and any body sitting in `g_prefetchCache` is a leftover from
+    // the previous wave that V8 didn't consume. Honoring the cache
+    // here would feed V8 the stale body on the next walk — the
+    // "1 cycle behind" symptom for `.ts` edits with many transitive
+    // importers. So we skip this short-circuit entirely when
+    // `recursive == false`. The emplace-vs-overwrite decision below
+    // is also tightened for the same reason. (`InvalidateModules`
+    // now pre-clears the cache for the eviction set, so this is
+    // defense-in-depth — but the kickstart may also be invoked
+    // manually for diagnostics, and we want it to be correct in
+    // isolation.)
     if (ctx->recursive) {
       std::lock_guard<std::mutex> lock(g_prefetchMutex);
       if (g_prefetchCache.find(urlRef) != g_prefetchCache.end()) continue;
@@ -1663,18 +1663,18 @@ static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
 
       if (ok && status >= 200 && status < 300 && !body.empty()) {
         size_t bodySize = body.size();
-        // alpha.63 (recursive) — Insert (do not overwrite). Another
+        // Recursive (cold-boot) — Insert (do not overwrite). Another
         // path may have already landed the same URL via the
         // speculative prefetcher; honor whichever copy got there
         // first to avoid wastefully clobbering an already-valid
         // cache entry.
         //
-        // alpha.64 (HMR) — When the caller is the HMR kickstart, the
-        // *fresh* body we just fetched is by definition the
-        // authoritative copy; any older entry in the cache is stale
-        // by construction (the dev server has just told us so). So
-        // overwrite unconditionally for HMR. The recursive cold-boot
-        // path keeps its emplace semantics.
+        // HMR (non-recursive) — When the caller is the HMR
+        // kickstart, the *fresh* body we just fetched is by
+        // definition the authoritative copy; any older entry in the
+        // cache is stale by construction (the dev server has just
+        // told us so). So overwrite unconditionally for HMR. The
+        // recursive cold-boot path keeps its emplace semantics.
         std::string scanSource;
         {
           std::lock_guard<std::mutex> lock(g_prefetchMutex);
@@ -1696,11 +1696,11 @@ static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
         ctx->fetchedCount.fetch_add(1, std::memory_order_relaxed);
         ctx->bytes.fetch_add(bodySize, std::memory_order_relaxed);
 
-        // alpha.63 — Only walk the dep graph when the caller asked for
-        // BFS. HMR kickstart drives this with a precomputed
-        // inverse-dep closure (`evictPaths`) and sets recursive=false
-        // to skip a full graph re-scan that would only re-discover the
-        // set we already have.
+        // Only walk the dep graph when the caller asked for BFS.
+        // HMR kickstart drives this with a precomputed inverse-dep
+        // closure (`evictPaths`) and sets recursive=false to skip a
+        // full graph re-scan that would only re-discover the set we
+        // already have.
         if (ctx->recursive) {
           // Recurse: scan the body for static imports, resolve each
           // specifier against this URL, and schedule any new URLs.
@@ -1725,8 +1725,8 @@ static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
   }
 }
 
-// alpha.63 — Internal multi-URL kickstart. Both the legacy single-seed
-// `KickstartHmrPrefetchSync` and the new HMR-driven
+// Internal multi-URL kickstart. Both the legacy single-seed
+// `KickstartHmrPrefetchSync` and the HMR-driven
 // `KickstartHmrPrefetchUrlsSync` funnel through here so the two
 // callers share one validated, instrumented code path.
 //
@@ -1783,24 +1783,26 @@ static bool KickstartRunSync(std::vector<std::string> urls,
   // The legacy single-seed log line lives on for cold-boot / legacy
   // callers. The HMR multi-URL path emits a slightly different shape
   // so users can distinguish the two waves at a glance.
-  if (recursive) {
-    Log(@"[hmr-kickstart][%s] seed=%s fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
-        logLabel ? logLabel : "bfs",
-        diagSeed.c_str(),
-        (unsigned long)fetched,
-        (unsigned long)bytes,
-        (unsigned long long)elapsedMs,
-        timedOut == 0 ? "drained" : "timeout",
-        maxConcurrent);
-  } else {
-    Log(@"[hmr-kickstart][%s] urls=%lu fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
-        logLabel ? logLabel : "list",
-        (unsigned long)urls.size(),
-        (unsigned long)fetched,
-        (unsigned long)bytes,
-        (unsigned long long)elapsedMs,
-        timedOut == 0 ? "drained" : "timeout",
-        maxConcurrent);
+  if (IsScriptLoadingLogEnabled()) {
+    if (recursive) {
+      Log(@"[hmr-kickstart][%s] seed=%s fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
+          logLabel ? logLabel : "bfs",
+          diagSeed.c_str(),
+          (unsigned long)fetched,
+          (unsigned long)bytes,
+          (unsigned long long)elapsedMs,
+          timedOut == 0 ? "drained" : "timeout",
+          maxConcurrent);
+    } else {
+      Log(@"[hmr-kickstart][%s] urls=%lu fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
+          logLabel ? logLabel : "list",
+          (unsigned long)urls.size(),
+          (unsigned long)fetched,
+          (unsigned long)bytes,
+          (unsigned long long)elapsedMs,
+          timedOut == 0 ? "drained" : "timeout",
+          maxConcurrent);
+    }
   }
 
   return timedOut == 0;

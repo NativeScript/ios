@@ -722,7 +722,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     //      dep-tree walk hits memory instead of the network on every
     //      module — turning a ~3s 200-fetch refresh into ~150–250ms.
     //
-    //   2. `urls: string[]` — alpha.63 HMR shape. The dev server already
+    //   2. `urls: string[]` — HMR shape. The dev server already
     //      computed the inverse-dep closure of the changed file
     //      (`evictPaths` in the `ns:angular-update` payload). This form
     //      fetches *only* that exact set in parallel — no body scanning,
@@ -750,12 +750,12 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
         info.GetReturnValue().Set(result);
       };
 
-      // alpha.63 — Accept either a string seed (legacy BFS-from-seed
-      // shape, kept for cold-boot / legacy callers) or a string[] of
-      // URLs (HMR cycle: dev server precomputed the inverse-dep
-      // closure; we just need to fetch that exact set in parallel).
-      // Anything else is a contract violation by the caller; log and
-      // return early.
+      // Accept either a string seed (BFS-from-seed shape, kept for
+      // cold-boot / legacy callers) or a string[] of URLs (HMR
+      // cycle: dev server precomputed the inverse-dep closure; we
+      // just need to fetch that exact set in parallel). Anything
+      // else is a contract violation by the caller; log and return
+      // early.
       if (info.Length() < 1 || (!info[0]->IsString() && !info[0]->IsArray())) {
         Log(@"[__nsKickstartHmrPrefetch] expected (seedUrl: string, options?) or (urls: string[], options?)");
         buildResult(false, 0, 0);
