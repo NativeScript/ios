@@ -122,6 +122,17 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 // where the dev server has indicated a graph version bump.
 void ClearHttpModulePrefetchCache();
 
+// alpha.64 — Drop a specific URL set from the speculative-prefetch
+// cache. Safe to call from any thread; missing keys are silently
+// ignored. Used by `InvalidateModules` so that an HMR eviction also
+// purges any stale HTTP body the previous prefetch wave (or
+// kickstart) left behind. Without this the kickstart's
+// "skip if URL already cached" early-out, plus `HttpFetchText`'s
+// destructive-read fast path, would happily serve V8 a stale body
+// from the prior save — visible to the user as a 1-cycle lag
+// between save and visual update.
+void EvictHttpModulePrefetchCacheUrls(const std::vector<std::string>& urls);
+
 // Kickstart an HMR-driven module prefetch
 // rooted at `seedUrl`. Walks the static-import graph in parallel (up to
 // `maxConcurrent` simultaneous HTTP fetches), storing every reachable
@@ -146,6 +157,30 @@ bool KickstartHmrPrefetchSync(const std::string& seedUrl,
                               double timeoutSeconds,
                               size_t* outFetchedCount,
                               uint64_t* outElapsedMs);
+
+// alpha.63 — Multi-URL kickstart for HMR cycles. Unlike the legacy
+// seed-rooted variant above, this one fetches ONLY the explicit URL
+// list it was given (no body scanning, no BFS recursion).
+//
+// This is the right shape for HMR: the dev server's
+// `collectAngularEvictionUrls` already computed the inverse-dep
+// closure of the changed file; re-discovering it via in-process
+// scanning would just duplicate that work and re-fetch modules V8
+// has already compiled. By feeding the precomputed list directly we
+// turn N sequential `LoadHttpModuleForUrl` calls (the importer chain
+// during V8's ResolveModuleCallback walk) into a single parallel
+// wave that completes before V8 starts walking.
+//
+// Same semantics as `KickstartHmrPrefetchSync` for everything else:
+// blocks the calling thread until the wave drains or `timeoutSeconds`
+// elapses; cleared/blocked URLs are filtered up front; partial
+// success is reported as success (the V8 walk falls back to
+// per-module HttpFetchText for anything we couldn't pre-fill).
+bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls,
+                                  int maxConcurrent,
+                                  double timeoutSeconds,
+                                  size_t* outFetchedCount,
+                                  uint64_t* outElapsedMs);
 
 // Clear all HMR-related v8::Global handles (g_hotData, g_hotAccept, g_hotDispose).
 // MUST be called inside Runtime::~Runtime() before isolate disposal to prevent

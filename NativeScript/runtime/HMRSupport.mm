@@ -1137,6 +1137,30 @@ static bool TryGetPrefetchedSource(const std::string& url, std::string& out) {
   return true;
 }
 
+// alpha.64 — Drop a specific URL set from `g_prefetchCache`. Used by
+// `InvalidateModules` so an HMR eviction purges any stale HTTP body
+// the previous prefetch wave left behind. See the doc comment in
+// HMRSupport.h for the off-by-one this fixes.
+void EvictHttpModulePrefetchCacheUrls(const std::vector<std::string>& urls) {
+  if (urls.empty()) return;
+  size_t dropped = 0;
+  {
+    std::lock_guard<std::mutex> lock(g_prefetchMutex);
+    for (const auto& url : urls) {
+      if (url.empty()) continue;
+      auto it = g_prefetchCache.find(url);
+      if (it != g_prefetchCache.end()) {
+        g_prefetchCache.erase(it);
+        ++dropped;
+      }
+    }
+  }
+  if (dropped > 0 && IsScriptLoadingLogEnabled()) {
+    Log(@"[http-loader][prefetch][evict] dropped=%lu of %lu",
+        (unsigned long)dropped, (unsigned long)urls.size());
+  }
+}
+
 static bool IsIdentifierChar(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$';
 }
@@ -1549,6 +1573,28 @@ struct KickstartContext {
   dispatch_group_t group = nullptr;
   dispatch_queue_t queue = nullptr;
   dispatch_semaphore_t concurrency = nullptr;
+  // alpha.63 — When `recursive == true` (default, legacy behavior),
+  // the kickstart BFS scans every fetched body for static imports and
+  // schedules those URLs too. When `recursive == false`, the scheduler
+  // fetches ONLY the explicit URLs it was given.
+  //
+  // The non-recursive mode is the right shape for HMR-driven kickstart:
+  // the dev server already computed the inverse-dep closure
+  // (`evictPaths`), so re-discovering it via in-process scanning is
+  // pure overhead. Skipping the recursion saves roughly:
+  //
+  //   - one round trip per BFS level (typically 3-5 for a real graph),
+  //   - the body-scan CPU cost per fetched module,
+  //   - redundant fetches for non-evicted modules that V8 already has
+  //     compiled in `g_moduleRegistry` (the BFS would happily re-fetch
+  //     them; HttpFetchText would land them in g_prefetchCache; V8
+  //     would never read them because g_moduleRegistry hits short-
+  //     circuit the loader entirely).
+  //
+  // The cold-boot speculative prefetcher (`SchedulePrefetchForDeps`)
+  // and the legacy single-seed kickstart still want recursion — they
+  // don't have a precomputed graph to lean on.
+  bool recursive = true;
 
   ~KickstartContext() {
     // MRC NOTE: HMRSupport.mm is compiled with ARC disabled, so
@@ -1581,16 +1627,32 @@ static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
     }
     if (!fresh) continue;
 
-    // If a previous wave (or an opt-in speculative prefetch) already
-    // landed this body, treat the URL as covered — no point spinning
-    // up a fetch we'd discard anyway.
-    {
+    // alpha.63 — In recursive (cold-boot BFS) mode, if a previous wave
+    // (or an opt-in speculative prefetch) already landed this body,
+    // treat the URL as covered — no point spinning up a fetch we'd
+    // discard anyway.
+    //
+    // alpha.64 — In HMR (non-recursive) mode this guard is *toxic*:
+    // the caller has explicitly told us "these URLs are stale, please
+    // refetch", and any body sitting in `g_prefetchCache` is a
+    // leftover from the previous wave that V8 didn't consume. Honoring
+    // the cache here would feed V8 the stale body on the next walk —
+    // exactly the user-visible "1 cycle behind" symptom we just
+    // diagnosed for `.ts` edits with many transitive importers. So we
+    // skip this short-circuit entirely when `recursive == false`. The
+    // emplace-vs-overwrite decision below is also tightened for the
+    // same reason. (`InvalidateModules` now pre-clears the cache for
+    // the eviction set, so this is defense-in-depth — but the kick-
+    // start may also be invoked manually for diagnostics, and we want
+    // it to be correct in isolation.)
+    if (ctx->recursive) {
       std::lock_guard<std::mutex> lock(g_prefetchMutex);
       if (g_prefetchCache.find(urlRef) != g_prefetchCache.end()) continue;
     }
 
     dispatch_group_enter(ctx->group);
     std::string urlCopy = urlRef;
+    const bool hmrMode = !ctx->recursive;
     dispatch_async(ctx->queue, ^{
       dispatch_semaphore_wait(ctx->concurrency, DISPATCH_TIME_FOREVER);
 
@@ -1601,36 +1663,58 @@ static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
 
       if (ok && status >= 200 && status < 300 && !body.empty()) {
         size_t bodySize = body.size();
-        // Insert (do not overwrite). Another path may have already
-        // landed the same URL via the speculative prefetcher; honor
-        // whichever copy got there first to avoid wastefully clobbering
-        // an already-valid cache entry.
+        // alpha.63 (recursive) — Insert (do not overwrite). Another
+        // path may have already landed the same URL via the
+        // speculative prefetcher; honor whichever copy got there
+        // first to avoid wastefully clobbering an already-valid
+        // cache entry.
+        //
+        // alpha.64 (HMR) — When the caller is the HMR kickstart, the
+        // *fresh* body we just fetched is by definition the
+        // authoritative copy; any older entry in the cache is stale
+        // by construction (the dev server has just told us so). So
+        // overwrite unconditionally for HMR. The recursive cold-boot
+        // path keeps its emplace semantics.
         std::string scanSource;
         {
           std::lock_guard<std::mutex> lock(g_prefetchMutex);
-          auto inserted = g_prefetchCache.emplace(urlCopy, std::move(body));
-          if (inserted.second) {
-            scanSource = inserted.first->second;  // take a copy for off-lock scanning
+          if (hmrMode) {
+            auto& slot = g_prefetchCache[urlCopy];
+            slot = std::move(body);
+            scanSource = slot;
+            bodySize = slot.size();
           } else {
-            scanSource = inserted.first->second;
-            bodySize = inserted.first->second.size();
+            auto inserted = g_prefetchCache.emplace(urlCopy, std::move(body));
+            if (inserted.second) {
+              scanSource = inserted.first->second;  // take a copy for off-lock scanning
+            } else {
+              scanSource = inserted.first->second;
+              bodySize = inserted.first->second.size();
+            }
           }
         }
         ctx->fetchedCount.fetch_add(1, std::memory_order_relaxed);
         ctx->bytes.fetch_add(bodySize, std::memory_order_relaxed);
 
-        // Recurse: scan the body for static imports, resolve each
-        // specifier against this URL, and schedule any new URLs.
-        std::vector<std::string> specs = ScanStaticImportSpecifiers(scanSource, kPrefetchMaxImportsPerModule);
-        if (!specs.empty()) {
-          std::vector<std::string> nextUrls;
-          nextUrls.reserve(specs.size());
-          for (const std::string& spec : specs) {
-            std::string absUrl = ResolveImportSpecifierAgainstUrl(spec, urlCopy);
-            if (!absUrl.empty()) nextUrls.push_back(std::move(absUrl));
-          }
-          if (!nextUrls.empty()) {
-            KickstartScheduleUrls(ctx, std::move(nextUrls));
+        // alpha.63 — Only walk the dep graph when the caller asked for
+        // BFS. HMR kickstart drives this with a precomputed
+        // inverse-dep closure (`evictPaths`) and sets recursive=false
+        // to skip a full graph re-scan that would only re-discover the
+        // set we already have.
+        if (ctx->recursive) {
+          // Recurse: scan the body for static imports, resolve each
+          // specifier against this URL, and schedule any new URLs.
+          std::vector<std::string> specs = ScanStaticImportSpecifiers(scanSource, kPrefetchMaxImportsPerModule);
+          if (!specs.empty()) {
+            std::vector<std::string> nextUrls;
+            nextUrls.reserve(specs.size());
+            for (const std::string& spec : specs) {
+              std::string absUrl = ResolveImportSpecifierAgainstUrl(spec, urlCopy);
+              if (!absUrl.empty()) nextUrls.push_back(std::move(absUrl));
+            }
+            if (!nextUrls.empty()) {
+              KickstartScheduleUrls(ctx, std::move(nextUrls));
+            }
           }
         }
       }
@@ -1641,13 +1725,36 @@ static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
   }
 }
 
-bool KickstartHmrPrefetchSync(const std::string& seedUrl,
-                              int maxConcurrent,
-                              double timeoutSeconds,
-                              size_t* outFetchedCount,
-                              uint64_t* outElapsedMs) {
-  if (seedUrl.empty()) return false;
-  if (!IsRemoteUrlAllowed(seedUrl)) return false;
+// alpha.63 — Internal multi-URL kickstart. Both the legacy single-seed
+// `KickstartHmrPrefetchSync` and the new HMR-driven
+// `KickstartHmrPrefetchUrlsSync` funnel through here so the two
+// callers share one validated, instrumented code path.
+//
+// `recursive=true`  → seed-rooted BFS over static imports (cold boot,
+//                     legacy callers).
+// `recursive=false` → fetch the provided list and stop (HMR cycle:
+//                     server already gave us the inverse-dep closure).
+static bool KickstartRunSync(std::vector<std::string> urls,
+                             int maxConcurrent,
+                             double timeoutSeconds,
+                             bool recursive,
+                             const char* logLabel,
+                             const std::string& diagSeed,
+                             size_t* outFetchedCount,
+                             uint64_t* outElapsedMs) {
+  if (urls.empty()) return false;
+  // Drop empty / non-allowlisted URLs up front. We still want a
+  // truthy result even if some entries get filtered, because partial
+  // success is strictly better than the pre-kickstart baseline.
+  std::vector<std::string> filtered;
+  filtered.reserve(urls.size());
+  for (auto& u : urls) {
+    if (u.empty()) continue;
+    if (!IsRemoteUrlAllowed(u)) continue;
+    filtered.push_back(std::move(u));
+  }
+  if (filtered.empty()) return false;
+
   if (maxConcurrent <= 0) maxConcurrent = 16;
   if (timeoutSeconds <= 0.0) timeoutSeconds = 10.0;
 
@@ -1657,8 +1764,9 @@ bool KickstartHmrPrefetchSync(const std::string& seedUrl,
   ctx->group = dispatch_group_create();
   ctx->queue = dispatch_queue_create("com.nativescript.hmr.kickstart", DISPATCH_QUEUE_CONCURRENT);
   ctx->concurrency = dispatch_semaphore_create(maxConcurrent);
+  ctx->recursive = recursive;
 
-  KickstartScheduleUrls(ctx, std::vector<std::string>{seedUrl});
+  KickstartScheduleUrls(ctx, std::move(filtered));
 
   dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW,
                                             (int64_t)(timeoutSeconds * NSEC_PER_SEC));
@@ -1672,15 +1780,75 @@ bool KickstartHmrPrefetchSync(const std::string& seedUrl,
   if (outFetchedCount) *outFetchedCount = fetched;
   if (outElapsedMs) *outElapsedMs = elapsedMs;
 
-  Log(@"[hmr-kickstart] seed=%s fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
-      seedUrl.c_str(),
-      (unsigned long)fetched,
-      (unsigned long)bytes,
-      (unsigned long long)elapsedMs,
-      timedOut == 0 ? "drained" : "timeout",
-      maxConcurrent);
+  // The legacy single-seed log line lives on for cold-boot / legacy
+  // callers. The HMR multi-URL path emits a slightly different shape
+  // so users can distinguish the two waves at a glance.
+  if (recursive) {
+    Log(@"[hmr-kickstart][%s] seed=%s fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
+        logLabel ? logLabel : "bfs",
+        diagSeed.c_str(),
+        (unsigned long)fetched,
+        (unsigned long)bytes,
+        (unsigned long long)elapsedMs,
+        timedOut == 0 ? "drained" : "timeout",
+        maxConcurrent);
+  } else {
+    Log(@"[hmr-kickstart][%s] urls=%lu fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
+        logLabel ? logLabel : "list",
+        (unsigned long)urls.size(),
+        (unsigned long)fetched,
+        (unsigned long)bytes,
+        (unsigned long long)elapsedMs,
+        timedOut == 0 ? "drained" : "timeout",
+        maxConcurrent);
+  }
 
   return timedOut == 0;
+}
+
+bool KickstartHmrPrefetchSync(const std::string& seedUrl,
+                              int maxConcurrent,
+                              double timeoutSeconds,
+                              size_t* outFetchedCount,
+                              uint64_t* outElapsedMs) {
+  if (seedUrl.empty()) return false;
+  if (!IsRemoteUrlAllowed(seedUrl)) return false;
+
+  std::vector<std::string> seeds{seedUrl};
+  return KickstartRunSync(std::move(seeds),
+                          maxConcurrent,
+                          timeoutSeconds,
+                          /*recursive=*/true,
+                          /*logLabel=*/"bfs",
+                          seedUrl,
+                          outFetchedCount,
+                          outElapsedMs);
+}
+
+bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls,
+                                  int maxConcurrent,
+                                  double timeoutSeconds,
+                                  size_t* outFetchedCount,
+                                  uint64_t* outElapsedMs) {
+  if (urls.empty()) return false;
+
+  // Diagnostic seed — we record the first URL purely so the log line
+  // has a recognizable anchor when the user is correlating with their
+  // server-side `[hmr-ws][update] file=...` line.
+  std::string diagSeed;
+  for (const auto& u : urls) {
+    if (!u.empty()) { diagSeed = u; break; }
+  }
+
+  std::vector<std::string> copy = urls;
+  return KickstartRunSync(std::move(copy),
+                          maxConcurrent,
+                          timeoutSeconds,
+                          /*recursive=*/false,
+                          /*logLabel=*/"list",
+                          diagSeed,
+                          outFetchedCount,
+                          outElapsedMs);
 }
 
 void CleanupHMRGlobals() {

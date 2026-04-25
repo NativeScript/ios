@@ -706,17 +706,29 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
 
   {
     //
-    // `__nsKickstartHmrPrefetch(seedUrl, options?)` lets HMR client tell 
-    // the runtime "the next re-import will walk this dep tree — please pre-fill the loader
-    // cache with every reachable module body before V8 starts walking".
+    // `__nsKickstartHmrPrefetch(seedUrlOrUrls, options?)` lets HMR client
+    // tell the runtime "the next re-import will walk this dep tree — please
+    // pre-fill the loader cache with every reachable module body before V8
+    // starts walking".
     //
-    // The native side runs a 16-way parallel BFS over the static
-    // imports of `seedUrl`, blocks the calling JS thread until the
-    // walk drains (or `timeoutMs` elapses), and stores every body in
-    // the speculative-prefetch cache. By the time the JS thread
-    // unblocks and triggers `import(seedUrl)`, V8's synchronous
-    // dep-tree walk hits memory instead of the network on every
-    // module — turning a ~3s 200-fetch refresh into ~150–250ms.
+    // Two argument shapes are accepted:
+    //
+    //   1. `seedUrl: string` — Legacy / cold-boot. The native side runs a
+    //      16-way parallel BFS over the static imports of `seedUrl`,
+    //      blocks the calling JS thread until the walk drains (or
+    //      `timeoutMs` elapses), and stores every body in the
+    //      speculative-prefetch cache. By the time the JS thread
+    //      unblocks and triggers `import(seedUrl)`, V8's synchronous
+    //      dep-tree walk hits memory instead of the network on every
+    //      module — turning a ~3s 200-fetch refresh into ~150–250ms.
+    //
+    //   2. `urls: string[]` — alpha.63 HMR shape. The dev server already
+    //      computed the inverse-dep closure of the changed file
+    //      (`evictPaths` in the `ns:angular-update` payload). This form
+    //      fetches *only* that exact set in parallel — no body scanning,
+    //      no recursion. Skipping the BFS saves one round trip per graph
+    //      level and avoids re-fetching modules V8 still has compiled.
+    //      This is the shape the Angular HMR client uses on every save.
     //
     // Returns an object `{ ok, fetched, ms }` so JS can log the
     // result alongside the existing `[ns-hmr][angular] ok ...` line.
@@ -738,18 +750,17 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
         info.GetReturnValue().Set(result);
       };
 
-      if (info.Length() < 1 || !info[0]->IsString()) {
-        Log(@"[__nsKickstartHmrPrefetch] expected (seedUrl: string, options?: { maxConcurrent?: number, timeoutMs?: number })");
+      // alpha.63 — Accept either a string seed (legacy BFS-from-seed
+      // shape, kept for cold-boot / legacy callers) or a string[] of
+      // URLs (HMR cycle: dev server precomputed the inverse-dep
+      // closure; we just need to fetch that exact set in parallel).
+      // Anything else is a contract violation by the caller; log and
+      // return early.
+      if (info.Length() < 1 || (!info[0]->IsString() && !info[0]->IsArray())) {
+        Log(@"[__nsKickstartHmrPrefetch] expected (seedUrl: string, options?) or (urls: string[], options?)");
         buildResult(false, 0, 0);
         return;
       }
-
-      v8::String::Utf8Value seedUtf8(isolate, info[0]);
-      if (!*seedUtf8) {
-        buildResult(false, 0, 0);
-        return;
-      }
-      std::string seedUrl(*seedUtf8);
 
       int maxConcurrent = 16;
       double timeoutSeconds = 10.0;
@@ -773,6 +784,41 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
 
       size_t fetched = 0;
       uint64_t elapsedMs = 0;
+
+      if (info[0]->IsArray()) {
+        // Multi-URL form — non-recursive parallel fetch of the
+        // server-provided eviction closure.
+        v8::Local<v8::Array> arr = info[0].As<v8::Array>();
+        const uint32_t len = arr->Length();
+        std::vector<std::string> urls;
+        urls.reserve(len);
+        for (uint32_t i = 0; i < len; i++) {
+          v8::Local<v8::Value> elem;
+          if (!arr->Get(ctx, i).ToLocal(&elem)) continue;
+          if (!elem->IsString()) continue;
+          v8::String::Utf8Value u8(isolate, elem);
+          if (!*u8) continue;
+          std::string s(*u8);
+          if (s.empty()) continue;
+          urls.push_back(std::move(s));
+        }
+        if (urls.empty()) {
+          buildResult(false, 0, 0);
+          return;
+        }
+        bool ok = tns::KickstartHmrPrefetchUrlsSync(urls, maxConcurrent, timeoutSeconds, &fetched, &elapsedMs);
+        buildResult(ok, fetched, elapsedMs);
+        return;
+      }
+
+      // Single-string form — legacy BFS-from-seed.
+      v8::String::Utf8Value seedUtf8(isolate, info[0]);
+      if (!*seedUtf8) {
+        buildResult(false, 0, 0);
+        return;
+      }
+      std::string seedUrl(*seedUtf8);
+
       bool ok = tns::KickstartHmrPrefetchSync(seedUrl, maxConcurrent, timeoutSeconds, &fetched, &elapsedMs);
       buildResult(ok, fetched, elapsedMs);
     };
