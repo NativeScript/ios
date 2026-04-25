@@ -5,12 +5,15 @@
 #include <cstring>
 #include "DevFlags.h"
 
+#include <atomic>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <string>
 #include <mutex>
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"
+#include "Runtime.h"
 
 // Use centralized dev flags helper for logging
 
@@ -739,6 +742,43 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     normalizeBridge("/ns/core");
   }
 
+  //
+  // This block here is the runtime's
+  // defense-in-depth layer: even if the server (or any future tooling)
+  // emits a versioned or boot-tagged URL, the cache identity collapses to
+  // the canonical `/ns/m/<rest>` shape so V8 deduplicates correctly.
+  //
+  // The prefixes are stripped in fixed order — boot first (it's a static
+  // outermost wrapper), then hmr (one path segment whose tag may be
+  // `v<digits>`, `n<digits>`, `live`, or any alphanumeric value emitted by
+  // `formatNsMHmrServeTag`). The strip is idempotent: applying it twice
+  // yields the same result as applying it once.
+  {
+    std::string pathOnly = originAndPath.substr(pathStart);
+    bool changed = false;
+
+    static constexpr const char kBootPrefix[] = "/ns/m/__ns_boot__/b1/";
+    static constexpr size_t kBootPrefixLen = sizeof(kBootPrefix) - 1;
+    if (StartsWith(pathOnly, kBootPrefix)) {
+      pathOnly = std::string("/ns/m/") + pathOnly.substr(kBootPrefixLen);
+      changed = true;
+    }
+
+    static constexpr const char kHmrPrefix[] = "/ns/m/__ns_hmr__/";
+    static constexpr size_t kHmrPrefixLen = sizeof(kHmrPrefix) - 1;
+    if (StartsWith(pathOnly, kHmrPrefix)) {
+      size_t tagEnd = pathOnly.find('/', kHmrPrefixLen);
+      if (tagEnd != std::string::npos && tagEnd > kHmrPrefixLen) {
+        pathOnly = std::string("/ns/m/") + pathOnly.substr(tagEnd + 1);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      originAndPath = originAndPath.substr(0, pathStart) + pathOnly;
+    }
+  }
+
   // IMPORTANT: This function is used as an HTTP module registry/cache key.
   // For general-purpose HTTP module loading (public internet), the query string
   // can be part of the module's identity (auth, content versioning, routing, etc).
@@ -784,6 +824,88 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   return rebuilt;
 }
 
+// ============================================================================
+// Speculative module-source prefetcher
+// ============================================================================
+//
+// V8 10.3.22 only exposes a synchronous ResolveModuleCallback for static
+// imports. Each call into HttpFetchText() blocks the JS thread on a
+// semaphore until that one HTTP response arrives, which forces serial
+// fetching from the JS thread's perspective. Server-side telemetry
+// shows this as `maxConcurrent=1` for the entire cold boot.
+//
+// This block speculatively prefetches a module's static imports the
+// instant the parent's body arrives, before V8 has even started
+// compiling the parent. Prefetches run on a concurrent GCD queue capped
+// at kPrefetchMaxConcurrent and write into a thread-safe in-memory
+// cache keyed by full URL. By the time V8 calls ResolveModuleCallback
+// for a sibling, the source is already in cache and HttpFetchText
+// returns instantly without touching the network. Effective parallelism
+// goes from 1 → ~K where K = kPrefetchMaxConcurrent.
+//
+// Correctness invariants:
+//   1. Cache reads consume (one-shot). A second HttpFetchText for the
+//      same URL after a cache hit triggers a fresh network fetch — this
+//      is the right behavior for HMR where re-fetching means we got a
+//      newer version of the module.
+//   2. Every prefetch goes through IsRemoteUrlAllowed() exactly the
+//      same way HttpFetchText does. The security gate is preserved.
+//   3. The scanner is best-effort. False positives just trigger one
+//      extra HTTP fetch the device might not need. False negatives just
+//      cost us K=1 for that one module — same as before this change.
+//   4. Recursion happens via dispatch_async; the C++ stack never grows.
+
+static constexpr int kPrefetchMaxConcurrent = 4;
+static constexpr size_t kPrefetchMaxImportsPerModule = 256;
+static constexpr size_t kPrefetchSummaryEvery = 100;
+static constexpr size_t kPrefetchMaxScanBytes = 256 * 1024; // skip very large bodies
+
+// Forward declarations — these helpers are defined below their first use,
+// matching the existing convention in this file.
+static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, std::string& contentType, int& status);
+static std::vector<std::string> ScanStaticImportSpecifiers(const std::string& source, size_t maxResults);
+static std::string ResolveImportSpecifierAgainstUrl(const std::string& specifier, const std::string& parentUrl);
+static bool LooksLikeJsSourceUrl(const std::string& url);
+static void SchedulePrefetchForDeps(const std::string& parentUrl, const std::string& source);
+static void SchedulePrefetchForDepsAsync(const std::string& parentUrl, const std::string& source);
+static bool TryGetPrefetchedSource(const std::string& url, std::string& out);
+static bool IsHttpModulePrefetchEnabled();
+static bool IsHttpFetchUrlLogEnabled();
+static void MaybeLogPrefetchSummary(const char* trigger);
+
+static std::mutex g_prefetchMutex;
+static std::unordered_map<std::string, std::string> g_prefetchCache;
+static std::unordered_set<std::string> g_prefetchInflight;
+static dispatch_queue_t g_prefetchQueue = dispatch_queue_create("com.nativescript.module.prefetch", DISPATCH_QUEUE_CONCURRENT);
+static dispatch_semaphore_t g_prefetchConcurrencyLimit = dispatch_semaphore_create(kPrefetchMaxConcurrent);
+
+// Always-on diagnostic counters. These intentionally do NOT gate behind
+// IsScriptLoadingLogEnabled() — without this signal we cannot tell a
+// helping prefetcher from a hurting one.
+static std::atomic<size_t> g_prefetchHits{0};            // V8 asked for a URL we had cached
+static std::atomic<size_t> g_prefetchMisses{0};          // V8 asked for a URL we did not have
+static std::atomic<size_t> g_prefetchScheduled{0};       // background fetches we kicked off
+static std::atomic<size_t> g_prefetchSatisfied{0};       // background fetches that landed bytes in the cache
+static std::atomic<size_t> g_prefetchFailed{0};          // background fetches that returned non-2xx or empty
+static std::atomic<size_t> g_prefetchSkipped{0};         // candidates rejected (already cached/inflight, bare specifier, non-JS, blocked)
+
+// synchronous-fetch timing histogram.
+//
+// The histogram is intentionally coarse —
+// just three buckets — and we log a summary once per kFetchSyncSummaryEvery
+// completions. That keeps the noise low (one line per ~100 fetches) while
+// still surfacing tail behavior. The "fast" bucket means a request landed
+// in <10ms (typical for a kept-alive HTTP/1.1 connection on loopback);
+// "slow" means >100ms (which usually means a fresh TCP/TLS handshake or
+// a large response body). If most fetches are "fast", keep-alive is
+// working. If most are "slow", we still have churn to track down.
+static std::atomic<size_t> g_fetchSyncCount{0};
+static std::atomic<uint64_t> g_fetchSyncTotalMs{0};
+static std::atomic<size_t> g_fetchSyncFast{0};   // <10ms
+static std::atomic<size_t> g_fetchSyncMedium{0}; // 10–99ms
+static std::atomic<size_t> g_fetchSyncSlow{0};   // >=100ms
+static constexpr size_t kFetchSyncSummaryEvery = 100;
+
 bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status) {
   // Security gate: check if remote module loading is allowed before any HTTP fetch.
   // This is the single point of enforcement for all HTTP module loading.
@@ -794,7 +916,146 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     }
     return false;
   }
-  
+
+  const bool prefetchEnabled = IsHttpModulePrefetchEnabled();
+  // Round-ten phase A — diagnostic. Hoist the flag once per call so the
+  // two success branches below pay one TLS read instead of two.
+  const bool urlLogEnabled = IsHttpFetchUrlLogEnabled();
+
+  // the prefetch CACHE READ is always-on,
+  // independent of `httpModulePrefetch`. HMR client kicks
+  // off a synchronous BFS prefetch (`KickstartHmrPrefetchSync`) right
+  // before re-evaluating the entry module; that path populates
+  // `g_prefetchCache` regardless of whether speculative cold-boot
+  // prefetching is enabled. Gating the read here on `prefetchEnabled`
+  // would discard those bodies and force V8 back to the network on
+  // every save — defeating the entire purpose of kickstart.
+  //
+  // Speculative WRITES (`SchedulePrefetchForDepsAsync`) remain gated
+  // on the flag below, so cold-boot behaviour is unchanged for users
+  // who have not opted into `httpModulePrefetch: true`.
+  //
+  // Cache reads are one-shot; consuming the entry guarantees that a
+  // re-fetch (e.g. after HMR) goes back to the network for fresh source.
+  if (TryGetPrefetchedSource(url, out)) {
+    contentType = "application/javascript"; // best effort — same as the dev server returns
+    status = 200;
+    g_prefetchHits.fetch_add(1, std::memory_order_relaxed);
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-loader][prefetch][hit] %s (%lu bytes)", url.c_str(), (unsigned long)out.size());
+    }
+    if (urlLogEnabled) {
+      // Round-ten phase A — per-URL diagnostic. Distinguish prefetch-cache
+      // hits from network fetches so we can attribute who actually paid
+      // for each module body. ms is omitted because the cache lookup is
+      // effectively instantaneous compared to network I/O.
+      Log(@"[http-loader][fetch][prefetch] %s bytes=%lu",
+          url.c_str(), (unsigned long)out.size());
+    }
+    MaybeLogPrefetchSummary("hit");
+    // Chain the wave: scan the cached body for its own imports and
+    // schedule those prefetches off the JS thread. The scan itself is
+    // CPU work; running it inline on every cache hit was burning the
+    // very thread we are trying to unblock.
+    SchedulePrefetchForDepsAsync(url, out);
+    return true;
+  }
+
+  // Slow path: cache miss → synchronous fetch with one retry on failure.
+  // This preserves the original HttpFetchText behavior exactly.
+  if (prefetchEnabled) {
+    g_prefetchMisses.fetch_add(1, std::memory_order_relaxed);
+  }
+  // Round-ten phase A — diagnostic. Time the network branch end-to-end so
+  // the per-URL log can attribute milliseconds to each fetch. We measure
+  // here (not inside PerformHttpFetchOnceSync) so the retry interval gets
+  // billed to the URL too — which is what the user sees as "this URL was
+  // slow".
+  const uint64_t netStartUs = urlLogEnabled
+      ? (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0)
+      : 0ull;
+  bool ok = PerformHttpFetchOnceSync(url, out, contentType, status);
+  if (!ok) {
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-loader] retrying %s after initial fetch error", url.c_str());
+    }
+    usleep(120 * 1000);
+    ok = PerformHttpFetchOnceSync(url, out, contentType, status);
+  }
+  if (!ok || status < 200 || status >= 300) {
+    return false;
+  }
+  if (out.empty()) return false;
+  if (IsScriptLoadingLogEnabled()) {
+    unsigned long long blen = (unsigned long long)out.size();
+    const char* ctstr = contentType.empty() ? "<none>" : contentType.c_str();
+    Log(@"[http-loader] fetched status=%d content-type=%s bytes=%llu", status, ctstr, blen);
+  }
+  if (urlLogEnabled) {
+    const uint64_t netEndUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+    const uint64_t netMs = netEndUs > netStartUs ? (netEndUs - netStartUs) / 1000ull : 0ull;
+    Log(@"[http-loader][fetch][network] %s bytes=%lu ms=%llu",
+        url.c_str(), (unsigned long)out.size(), (unsigned long long)netMs);
+  }
+
+  // Speculative prefetch: kick off async fetches for this module's
+  // static imports. By the time V8 walks the dep tree on the JS thread,
+  // those bodies are already in g_prefetchCache.
+  if (prefetchEnabled) {
+    SchedulePrefetchForDepsAsync(url, out);
+  }
+  MaybeLogPrefetchSummary("miss");
+  return true;
+}
+
+// shared NSURLSession for HTTP keep-alive.
+//
+// A single process-wide NSURLSession (created once on first call) keeps
+// connections open via standard HTTP/1.1 keep-alive — and on dev servers
+// that negotiate HTTP/2, NSURLSession multiplexes all requests over one
+// connection. NSURLSession is documented thread-safe for `dataTaskWithURL`
+// and `resume`, so the JS thread and the prefetcher GCD queue can both
+// share it without locking. We never invalidate it — the session's
+// lifetime is tied to the runtime process, just like our V8 isolate.
+//
+// MRC NOTE: HMRSupport.mm is compiled with ARC disabled (the v8ios
+// `NativeScript` target sets CLANG_ENABLE_OBJC_ARC = NO). That means
+// `+sessionWithConfiguration:` returns an autoreleased instance and the
+// surrounding `@autoreleasepool` drains it the moment we exit this
+// `std::call_once` callback — leaving `g_httpSharedSession` dangling
+// for every subsequent `[session dataTaskWithURL:…]` call (the original
+// Without this, runtime can crash in `objc_msgSend` on app boot.
+// We explicitly `[…retain]` the session so it lives for
+// the runtime's lifetime; matching that, we never `[release]` it, so
+// there's no double-free risk.
+static NSURLSession* g_httpSharedSession = nil;
+static std::once_flag g_httpSharedSessionOnce;
+
+static NSURLSession* GetSharedHttpSession() {
+  std::call_once(g_httpSharedSessionOnce, []() {
+    @autoreleasepool {
+      NSURLSessionConfiguration* cfg = [NSURLSessionConfiguration defaultSessionConfiguration];
+      cfg.HTTPAdditionalHeaders = @{ @"Accept": @"application/javascript, text/javascript, */*;q=0.1",
+                                     @"Accept-Encoding": @"identity" };
+      cfg.timeoutIntervalForRequest = 5.0;
+      cfg.timeoutIntervalForResource = 5.0;
+      // Generous per-host max so the prefetcher's K=4 background fetches
+      // don't get queued behind V8's foreground fetches. Apple's default
+      // (4 on iOS) is exactly the number we configure for K — leave room.
+      cfg.HTTPMaximumConnectionsPerHost = 16;
+      // Disable URL cache: HMR depends on always seeing the freshest body
+      // for the requested URL. We rely on Vite's `t`/`v` cache busters and
+      // our own canonicalization for module identity, not the OS cache.
+      cfg.URLCache = nil;
+      cfg.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+      // Explicit retain — see MRC NOTE above.
+      g_httpSharedSession = [[NSURLSession sessionWithConfiguration:cfg] retain];
+    }
+  });
+  return g_httpSharedSession;
+}
+
+static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, std::string& contentType, int& status) {
   @autoreleasepool {
     NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
     if (!u) { status = 0; return false; }
@@ -804,67 +1065,622 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     __block std::string contentTypeLocal;
     __block std::string bodyLocal;
 
-    auto fetchOnce = ^BOOL(NSURL* reqUrl) {
-      bodyLocal.clear();
-      err = nil;
-      httpStatusLocal = 0;
-      contentTypeLocal.clear();
-      NSURLSessionConfiguration* cfg = [NSURLSessionConfiguration defaultSessionConfiguration];
-      cfg.HTTPAdditionalHeaders = @{ @"Accept": @"application/javascript, text/javascript, */*;q=0.1",
-                                     @"Accept-Encoding": @"identity" };
-      // Note: this could be made configurable if needed
-      cfg.timeoutIntervalForRequest = 5.0;
-      cfg.timeoutIntervalForResource = 5.0;
-      NSURLSession* session = [NSURLSession sessionWithConfiguration:cfg];
-      dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-      NSURLSessionDataTask* task = [session dataTaskWithURL:reqUrl
-                                          completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
-        @autoreleasepool {
-          err = error;
-          if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-            httpStatusLocal = ((NSHTTPURLResponse*)response).statusCode;
-            NSString* ct = ((NSHTTPURLResponse*)response).allHeaderFields[@"Content-Type"];
-            if (ct) { contentTypeLocal = std::string([ct UTF8String] ?: ""); }
-          }
-          if (data) {
-            const void* bytes = [data bytes];
-            NSUInteger len = [data length];
-            if (bytes && len > 0) {
-              bodyLocal.assign(static_cast<const char*>(bytes), static_cast<size_t>(len));
-            }
+    NSURLSession* session = GetSharedHttpSession();
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    const auto fetchStartUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+    NSURLSessionDataTask* task = [session dataTaskWithURL:u
+                                        completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
+      @autoreleasepool {
+        err = error;
+        if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+          httpStatusLocal = ((NSHTTPURLResponse*)response).statusCode;
+          NSString* ct = ((NSHTTPURLResponse*)response).allHeaderFields[@"Content-Type"];
+          if (ct) { contentTypeLocal = std::string([ct UTF8String] ?: ""); }
+        }
+        if (data) {
+          const void* bytes = [data bytes];
+          NSUInteger len = [data length];
+          if (bytes && len > 0) {
+            bodyLocal.assign(static_cast<const char*>(bytes), static_cast<size_t>(len));
           }
         }
-        dispatch_semaphore_signal(sema);
-      }];
-      [task resume];
-      dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC));
-      dispatch_semaphore_wait(sema, timeout);
-      [session finishTasksAndInvalidate];
-      return err == nil && !bodyLocal.empty();
-    };
+      }
+      dispatch_semaphore_signal(sema);
+    }];
+    [task resume];
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC));
+    dispatch_semaphore_wait(sema, timeout);
+    // IMPORTANT: do NOT call finishTasksAndInvalidate on g_httpSharedSession.
+    // We want the connection pool to stay alive for the next fetch.
 
-    BOOL ok = fetchOnce(u);
-    if (!ok) {
-      if (tns::IsScriptLoadingLogEnabled()) { Log(@"[http-loader] retrying %s after initial fetch error", url.c_str()); }
-      usleep(120 * 1000);
-      ok = fetchOnce(u);
+    const auto fetchEndUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+    const uint64_t fetchMs = fetchEndUs > fetchStartUs ? (fetchEndUs - fetchStartUs) / 1000ull : 0ull;
+    g_fetchSyncTotalMs.fetch_add(fetchMs, std::memory_order_relaxed);
+    if (fetchMs < 10) {
+      g_fetchSyncFast.fetch_add(1, std::memory_order_relaxed);
+    } else if (fetchMs < 100) {
+      g_fetchSyncMedium.fetch_add(1, std::memory_order_relaxed);
+    } else {
+      g_fetchSyncSlow.fetch_add(1, std::memory_order_relaxed);
+    }
+    const size_t syncCount = g_fetchSyncCount.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (syncCount > 0 && syncCount % kFetchSyncSummaryEvery == 0) {
+      const size_t fast = g_fetchSyncFast.load(std::memory_order_relaxed);
+      const size_t medium = g_fetchSyncMedium.load(std::memory_order_relaxed);
+      const size_t slow = g_fetchSyncSlow.load(std::memory_order_relaxed);
+      const uint64_t totalMs = g_fetchSyncTotalMs.load(std::memory_order_relaxed);
+      const uint64_t avgMs = syncCount ? totalMs / (uint64_t)syncCount : 0;
+      Log(@"[http-loader][fetch-sync][summary] count=%lu avg=%llums fast(<10ms)=%lu medium=%lu slow(>=100ms)=%lu",
+          (unsigned long)syncCount,
+          (unsigned long long)avgMs,
+          (unsigned long)fast,
+          (unsigned long)medium,
+          (unsigned long)slow);
     }
 
     status = (int)httpStatusLocal;
     contentType = contentTypeLocal;
-    if (!ok || status < 200 || status >= 300) {
+    if (err != nil || bodyLocal.empty()) {
       return false;
     }
-
     out.swap(bodyLocal);
-    if (out.empty()) return false;
-    if (tns::IsScriptLoadingLogEnabled()) {
-      unsigned long long blen = (unsigned long long)out.size();
-      const char* ctstr = contentType.empty() ? "<none>" : contentType.c_str();
-      Log(@"[http-loader] fetched status=%ld content-type=%s bytes=%llu", (long)status, ctstr, blen);
-    }
     return true;
   }
+}
+
+static bool TryGetPrefetchedSource(const std::string& url, std::string& out) {
+  std::lock_guard<std::mutex> lock(g_prefetchMutex);
+  auto it = g_prefetchCache.find(url);
+  if (it == g_prefetchCache.end()) return false;
+  out = std::move(it->second);
+  g_prefetchCache.erase(it);
+  return true;
+}
+
+static bool IsIdentifierChar(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$';
+}
+
+static bool IsHorizontalWs(char c) { return c == ' ' || c == '\t'; }
+
+// Walks back over horizontal whitespace and returns the previous
+// non-whitespace character, or 0 if we reached the start of the file.
+static char PreviousNonHwsChar(const std::string& source, size_t hit) {
+  if (hit == 0) return 0;
+  ssize_t i = (ssize_t)hit - 1;
+  while (i >= 0 && IsHorizontalWs(source[i])) i--;
+  if (i < 0) return 0;
+  return source[i];
+}
+
+// Tighter import scanner
+//
+// What we accept:
+//   `} from "..."`              named-import block
+//   `*  from "..."`             wildcard re-export
+//   `<id> from "..."`           default import / `as Foo from`
+//   `<line-start> import "..."` side-effect import
+//   `<line-start> export ... from "..."` (caught by the `from` rule)
+//
+// What we explicitly reject:
+//   `.from("...")`              member access (Array.from, etc.)
+//   `.import("...")`            member access on dynamic-import-shaped APIs
+//   `import("...")`             dynamic imports — they almost never run
+//                               at boot for Angular and the speculative
+//                               wave on lazy chunks blew the budget.
+//   matches inside template / string literals where the previous non-WS
+//   char is a quote character (best-effort guard).
+//
+// False positives still possible inside multi-line string literals or
+// comments containing the literal token sequences above; those are
+// rare in real code and just cost one redundant HTTP fetch.
+static std::vector<std::string> ScanStaticImportSpecifiers(const std::string& source, size_t maxResults) {
+  std::vector<std::string> result;
+  if (source.size() > kPrefetchMaxScanBytes) {
+    return result; // skip very large bodies; we'd have nothing useful to prefetch anyway
+  }
+  std::unordered_set<std::string> seen;
+  result.reserve(16);
+
+  auto captureSpecAfter = [&](size_t cursor) -> ssize_t {
+    // Skip whitespace before the quote.
+    while (cursor < source.size()) {
+      char c = source[cursor];
+      if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+        cursor++;
+        continue;
+      }
+      break;
+    }
+    if (cursor >= source.size()) return -1;
+    char quote = source[cursor];
+    if (quote != '"' && quote != '\'' && quote != '`') return -1;
+    size_t end = source.find(quote, cursor + 1);
+    if (end == std::string::npos) return -1;
+    std::string spec = source.substr(cursor + 1, end - cursor - 1);
+    if (!spec.empty() && spec.find('\n') == std::string::npos && seen.insert(spec).second) {
+      result.push_back(std::move(spec));
+    }
+    return (ssize_t)(end + 1);
+  };
+
+  // ── Pass 1: `from "..."` ──────────────────────────────────────────
+  // Accept only when the char immediately preceding `from` (after
+  // optional horizontal whitespace) is `}`, `*`, or an identifier
+  // character. Reject `.from(...)`.
+  {
+    const char* needle = "from";
+    const size_t needleLen = 4;
+    size_t pos = 0;
+    while (pos < source.size() && result.size() < maxResults) {
+      size_t hit = source.find(needle, pos);
+      if (hit == std::string::npos) break;
+      if (hit > 0 && IsIdentifierChar(source[hit - 1])) { pos = hit + 1; continue; }
+      size_t after = hit + needleLen;
+      if (after < source.size() && IsIdentifierChar(source[after])) { pos = hit + 1; continue; }
+      char prev = PreviousNonHwsChar(source, hit);
+      // Accept import-context predecessors only.
+      bool ok = (prev == '}' || prev == '*' || prev == ',' || IsIdentifierChar(prev));
+      if (!ok) { pos = hit + 1; continue; }
+      ssize_t adv = captureSpecAfter(after);
+      if (adv < 0) { pos = hit + 1; continue; }
+      pos = (size_t)adv;
+    }
+  }
+
+  // ── Pass 2: side-effect `import "..."` ────────────────────────────
+  // Accept only when `import` is at the start of a statement: the
+  // previous non-horizontal-whitespace character must be a newline,
+  // `;`, `}`, or 0 (start of file). Reject member access (`.import`)
+  // and dynamic imports (`import(...)`) — both cause more harm than
+  // good for the cold-boot wave.
+  {
+    const char* needle = "import";
+    const size_t needleLen = 6;
+    size_t pos = 0;
+    while (pos < source.size() && result.size() < maxResults) {
+      size_t hit = source.find(needle, pos);
+      if (hit == std::string::npos) break;
+      if (hit > 0 && IsIdentifierChar(source[hit - 1])) { pos = hit + 1; continue; }
+      size_t after = hit + needleLen;
+      if (after < source.size() && IsIdentifierChar(source[after])) { pos = hit + 1; continue; }
+      char prev = PreviousNonHwsChar(source, hit);
+      bool atStmtStart = (prev == 0 || prev == '\n' || prev == '\r' || prev == ';' || prev == '}');
+      if (!atStmtStart) { pos = hit + 1; continue; }
+      // Distinguish `import "..."` (static) from `import(...)` and
+      // `import X from "..."` (handled by Pass 1).
+      // After `import`, skip horizontal whitespace and look at the
+      // first non-whitespace character.
+      size_t cursor = after;
+      while (cursor < source.size() && IsHorizontalWs(source[cursor])) cursor++;
+      if (cursor >= source.size()) break;
+      char next = source[cursor];
+      if (next == '(') { pos = hit + 1; continue; }       // dynamic — skip
+      if (next != '"' && next != '\'' && next != '`') { pos = hit + 1; continue; } // `import X from` — Pass 1 handles
+      ssize_t adv = captureSpecAfter(cursor);
+      if (adv < 0) { pos = hit + 1; continue; }
+      pos = (size_t)adv;
+    }
+  }
+
+  return result;
+}
+
+static std::string ResolveImportSpecifierAgainstUrl(const std::string& specifier, const std::string& parentUrl) {
+  if (specifier.empty()) return "";
+
+  // Already absolute.
+  if (StartsWith(specifier, "http://") || StartsWith(specifier, "https://")) {
+    return specifier;
+  }
+
+  // Skip bare specifiers (need an import map we don't replicate here).
+  bool isRelative = StartsWith(specifier, "./") || StartsWith(specifier, "../");
+  bool isRootAbs = !specifier.empty() && specifier[0] == '/';
+  if (!isRelative && !isRootAbs) return "";
+
+  @autoreleasepool {
+    NSString* parent = [NSString stringWithUTF8String:parentUrl.c_str()];
+    NSString* spec = [NSString stringWithUTF8String:specifier.c_str()];
+    if (!parent || !spec) return "";
+    NSURL* baseUrl = [NSURL URLWithString:parent];
+    if (!baseUrl) return "";
+    NSURL* resolved = [NSURL URLWithString:spec relativeToURL:baseUrl];
+    if (!resolved) return "";
+    NSURL* abs = [resolved absoluteURL];
+    NSString* result = abs ? [abs absoluteString] : nil;
+    if (!result) return "";
+    const char* utf8 = [result UTF8String];
+    return utf8 ? std::string(utf8) : std::string();
+  }
+}
+
+static bool LooksLikeJsSourceUrl(const std::string& url) {
+  // Strip query string for extension check.
+  size_t qpos = url.find('?');
+  std::string path = (qpos == std::string::npos) ? url : url.substr(0, qpos);
+
+  // Skip non-JS resource types that V8 either won't request through this
+  // path or that would break our content-type assumption on cache hit.
+  if (EndsWith(path, ".css") || EndsWith(path, ".scss") || EndsWith(path, ".sass") || EndsWith(path, ".less")) return false;
+  if (EndsWith(path, ".png") || EndsWith(path, ".jpg") || EndsWith(path, ".jpeg") || EndsWith(path, ".gif") || EndsWith(path, ".svg") || EndsWith(path, ".webp") || EndsWith(path, ".ico")) return false;
+  if (EndsWith(path, ".json")) return false;
+  if (EndsWith(path, ".html") || EndsWith(path, ".htm")) return false;
+  if (EndsWith(path, ".woff") || EndsWith(path, ".woff2") || EndsWith(path, ".ttf") || EndsWith(path, ".otf") || EndsWith(path, ".eot")) return false;
+  if (EndsWith(path, ".mp4") || EndsWith(path, ".webm") || EndsWith(path, ".mp3") || EndsWith(path, ".wav")) return false;
+  return true;
+}
+
+static void SchedulePrefetchForDeps(const std::string& parentUrl, const std::string& source) {
+  std::vector<std::string> specifiers = ScanStaticImportSpecifiers(source, kPrefetchMaxImportsPerModule);
+  if (specifiers.empty()) return;
+
+  std::vector<std::string> toFetch;
+  toFetch.reserve(specifiers.size());
+
+  for (const std::string& spec : specifiers) {
+    std::string absUrl = ResolveImportSpecifierAgainstUrl(spec, parentUrl);
+    if (absUrl.empty()) {
+      g_prefetchSkipped.fetch_add(1, std::memory_order_relaxed);
+      continue;
+    }
+    if (!StartsWith(absUrl, "http://") && !StartsWith(absUrl, "https://")) {
+      g_prefetchSkipped.fetch_add(1, std::memory_order_relaxed);
+      continue;
+    }
+    if (!LooksLikeJsSourceUrl(absUrl)) {
+      g_prefetchSkipped.fetch_add(1, std::memory_order_relaxed);
+      continue;
+    }
+    if (!IsRemoteUrlAllowed(absUrl)) {
+      g_prefetchSkipped.fetch_add(1, std::memory_order_relaxed);
+      continue;
+    }
+
+    std::lock_guard<std::mutex> lock(g_prefetchMutex);
+    if (g_prefetchCache.find(absUrl) != g_prefetchCache.end()) {
+      g_prefetchSkipped.fetch_add(1, std::memory_order_relaxed);
+      continue;
+    }
+    if (!g_prefetchInflight.insert(absUrl).second) {
+      g_prefetchSkipped.fetch_add(1, std::memory_order_relaxed);
+      continue;
+    }
+    toFetch.push_back(absUrl);
+  }
+
+  if (toFetch.empty()) return;
+
+  for (const std::string& url : toFetch) {
+    g_prefetchScheduled.fetch_add(1, std::memory_order_relaxed);
+    std::string urlCopy = url;
+    dispatch_async(g_prefetchQueue, ^{
+      // Concurrency gate — never more than kPrefetchMaxConcurrent
+      // simultaneous network fetches in flight from the prefetcher.
+      dispatch_semaphore_wait(g_prefetchConcurrencyLimit, DISPATCH_TIME_FOREVER);
+
+      std::string body;
+      std::string contentType;
+      int status = 0;
+      bool ok = PerformHttpFetchOnceSync(urlCopy, body, contentType, status);
+
+      if (ok && status >= 200 && status < 300 && !body.empty()) {
+        {
+          std::lock_guard<std::mutex> lock(g_prefetchMutex);
+          g_prefetchCache[urlCopy] = body;
+          g_prefetchInflight.erase(urlCopy);
+        }
+        g_prefetchSatisfied.fetch_add(1, std::memory_order_relaxed);
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[http-loader][prefetch] cached %s (%lu bytes)", urlCopy.c_str(), (unsigned long)body.size());
+        }
+        // Recursively prefetch this module's deps. Recursion is via
+        // dispatch_async, so the C++ stack never grows; depth is
+        // implicitly bounded by the dep graph plus the dedupe set.
+        SchedulePrefetchForDeps(urlCopy, body);
+      } else {
+        g_prefetchFailed.fetch_add(1, std::memory_order_relaxed);
+        std::lock_guard<std::mutex> lock(g_prefetchMutex);
+        g_prefetchInflight.erase(urlCopy);
+      }
+
+      dispatch_semaphore_signal(g_prefetchConcurrencyLimit);
+    });
+  }
+}
+
+// Schedule prefetch on a background thread. The actual scan + URL
+// resolution is the part we want OFF the JS thread — that is where we
+// were burning cycles on every cache hit. Capturing source by value
+// costs one std::string copy (small); we pay it once per HttpFetchText
+// success and recover much more time on the JS thread.
+static void SchedulePrefetchForDepsAsync(const std::string& parentUrl, const std::string& source) {
+  if (source.empty()) return;
+  std::string urlCopy = parentUrl;
+  std::string sourceCopy = source;
+  dispatch_async(g_prefetchQueue, ^{
+    SchedulePrefetchForDeps(urlCopy, sourceCopy);
+  });
+}
+
+// Reads `httpModulePrefetch` from app config (default: DISABLED).
+//
+// Apps that want to opt in for testing can set:
+//
+//   // nativescript.config.ts
+//   export default {
+//     httpModulePrefetch: true,
+//   } as NativeScriptConfig;
+//
+// Returning false here
+// short-circuits both the cache lookup and the prefetch wave in
+// HttpFetchText, restoring the pre-prefetcher behavior bit-for-bit.
+static bool IsHttpModulePrefetchEnabled() {
+  static std::once_flag s_initFlag;
+  static bool s_enabled = false;
+  std::call_once(s_initFlag, []() {
+    @autoreleasepool {
+      id value = Runtime::GetAppConfigValue("httpModulePrefetch");
+      if (value && [value respondsToSelector:@selector(boolValue)]) {
+        s_enabled = [value boolValue];
+      }
+    }
+    // Always-on startup banner.
+    //
+    //   [http-loader] prefetch=disabled   ← expected default
+    //   [http-loader] prefetch=enabled    ← only if config opt-in
+    Log(@"[http-loader] prefetch=%s shared-session=on hmr-kickstart=on",
+        s_enabled ? "enabled" : "disabled");
+  });
+  return s_enabled;
+}
+
+//
+// Default OFF because the volume is high (one line per fetch, hundreds
+// per cold boot, hundreds per HMR refresh). Opt in via
+// `nativescript.config.ts`:
+//
+//     export default {
+//       httpFetchUrlLog: true,   // turn on for diagnosis only
+//       …
+//     };
+//
+static bool IsHttpFetchUrlLogEnabled() {
+  static std::once_flag s_initFlag;
+  static bool s_enabled = false;
+  std::call_once(s_initFlag, []() {
+    @autoreleasepool {
+      id value = Runtime::GetAppConfigValue("httpFetchUrlLog");
+      if (value && [value respondsToSelector:@selector(boolValue)]) {
+        s_enabled = [value boolValue];
+      }
+    }
+    Log(@"[http-loader] fetch-url-log=%s",
+        s_enabled ? "enabled" : "disabled");
+  });
+  return s_enabled;
+}
+
+// Periodic always-on summary of prefetcher counters. Logs once every
+// kPrefetchSummaryEvery hits+misses+satisfied+failed events, plus
+// on the trailing edge of cache cleanup. Always-on (no flag gating)
+// because we cannot diagnose this subsystem without it.
+static void MaybeLogPrefetchSummary(const char* trigger) {
+  size_t hits = g_prefetchHits.load(std::memory_order_relaxed);
+  size_t misses = g_prefetchMisses.load(std::memory_order_relaxed);
+  size_t scheduled = g_prefetchScheduled.load(std::memory_order_relaxed);
+  size_t satisfied = g_prefetchSatisfied.load(std::memory_order_relaxed);
+  size_t failed = g_prefetchFailed.load(std::memory_order_relaxed);
+  size_t skipped = g_prefetchSkipped.load(std::memory_order_relaxed);
+  size_t total = hits + misses;
+  if (total == 0) return;
+  if (total % kPrefetchSummaryEvery != 0) return;
+
+  size_t cacheSize = 0;
+  size_t inflight = 0;
+  {
+    std::lock_guard<std::mutex> lock(g_prefetchMutex);
+    cacheSize = g_prefetchCache.size();
+    inflight = g_prefetchInflight.size();
+  }
+
+  // Hit rate as integer percent. Avoid divide-by-zero handled above.
+  size_t hitPct = total ? (hits * 100 / total) : 0;
+  Log(@"[http-loader][prefetch][summary] trigger=%s totalAsks=%lu hits=%lu (%lu%%) misses=%lu scheduled=%lu satisfied=%lu failed=%lu skipped=%lu cache=%lu inflight=%lu",
+      trigger,
+      (unsigned long)total,
+      (unsigned long)hits, (unsigned long)hitPct,
+      (unsigned long)misses,
+      (unsigned long)scheduled,
+      (unsigned long)satisfied,
+      (unsigned long)failed,
+      (unsigned long)skipped,
+      (unsigned long)cacheSize,
+      (unsigned long)inflight);
+}
+
+void ClearHttpModulePrefetchCache() {
+  std::lock_guard<std::mutex> lock(g_prefetchMutex);
+  g_prefetchCache.clear();
+  g_prefetchInflight.clear();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// HMR-driven kickstart prefetch.
+//
+// `g_moduleRegistry` cannot reuse cached compiled modules across
+// `__ns_hmr__/v<N>` boundaries: the dev server bumps `graphVersion`
+// on every save, and the URL prefix is part of V8's cache key. So
+// every save effectively starts cold from V8's perspective even
+// though the bodies on disk are identical to the previous save.
+//
+// The kickstart side-steps this by populating our process-wide
+// `g_prefetchCache` with every reachable body BEFORE V8 walks. The
+// Angular HMR client invokes `__nsKickstartHmrPrefetch(seedUrl)`
+// just before `refreshAngularBootstrapOptions` does its dynamic
+// import — the kickstart blocks the JS thread while a 16-way
+// parallel BFS over `NSURLSession` (kept-alive) primes the cache.
+// When V8 then walks the tree, every `HttpFetchText` call hits the
+// cache (~microseconds) instead of the network (~10ms), turning
+// 200 × 10ms = 2000ms into one parallel wave that takes ~150–250ms.
+//
+// Why dispatch_group + a per-call queue. We need ground-truth
+// "BFS fully drained" semantics: cleanly transition from parallel
+// fetching to V8 module walking with no in-flight fetches that
+// could race or duplicate work. dispatch_group_wait gives us
+// exactly that. A per-call queue keeps the kickstart's work
+// isolated from `g_prefetchQueue` so other HMR cycles or shutdown
+// can't accidentally drain the wrong group.
+//
+// Why we still touch g_prefetchCache (the speculative cache) and
+// not a kickstart-only map. `HttpFetchText`'s read path already
+// consults `g_prefetchCache`, and that read is destructive — V8 consumes
+// each entry exactly once during the walk. Reusing the same map
+// guarantees that opt-in speculative `httpModulePrefetch=true`
+// users and kickstart-only users share one code path on the read
+// side, with no duplicate cache logic to drift.
+namespace {
+
+struct KickstartContext {
+  std::mutex mutex;
+  std::unordered_set<std::string> visited;
+  std::atomic<size_t> fetchedCount{0};
+  std::atomic<size_t> bytes{0};
+  dispatch_group_t group = nullptr;
+  dispatch_queue_t queue = nullptr;
+  dispatch_semaphore_t concurrency = nullptr;
+
+  ~KickstartContext() {
+    // MRC NOTE: HMRSupport.mm is compiled with ARC disabled, so
+    // dispatch_release is required for objects we created via
+    // dispatch_*_create. By the time the shared_ptr that owns this
+    // context goes to zero, dispatch_group_wait has long since
+    // returned and every block we scheduled has completed and
+    // released its capture of the shared_ptr — so nothing is in
+    // flight that could touch these objects after release.
+    if (group) dispatch_release(group);
+    if (queue) dispatch_release(queue);
+    if (concurrency) dispatch_release(concurrency);
+  }
+};
+
+}  // anonymous namespace
+
+static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
+                                  std::vector<std::string> urls) {
+  for (const std::string& urlRef : urls) {
+    if (urlRef.empty()) continue;
+    if (!StartsWith(urlRef, "http://") && !StartsWith(urlRef, "https://")) continue;
+    if (!LooksLikeJsSourceUrl(urlRef)) continue;
+    if (!IsRemoteUrlAllowed(urlRef)) continue;
+
+    bool fresh;
+    {
+      std::lock_guard<std::mutex> lock(ctx->mutex);
+      fresh = ctx->visited.insert(urlRef).second;
+    }
+    if (!fresh) continue;
+
+    // If a previous wave (or an opt-in speculative prefetch) already
+    // landed this body, treat the URL as covered — no point spinning
+    // up a fetch we'd discard anyway.
+    {
+      std::lock_guard<std::mutex> lock(g_prefetchMutex);
+      if (g_prefetchCache.find(urlRef) != g_prefetchCache.end()) continue;
+    }
+
+    dispatch_group_enter(ctx->group);
+    std::string urlCopy = urlRef;
+    dispatch_async(ctx->queue, ^{
+      dispatch_semaphore_wait(ctx->concurrency, DISPATCH_TIME_FOREVER);
+
+      std::string body;
+      std::string contentType;
+      int status = 0;
+      bool ok = PerformHttpFetchOnceSync(urlCopy, body, contentType, status);
+
+      if (ok && status >= 200 && status < 300 && !body.empty()) {
+        size_t bodySize = body.size();
+        // Insert (do not overwrite). Another path may have already
+        // landed the same URL via the speculative prefetcher; honor
+        // whichever copy got there first to avoid wastefully clobbering
+        // an already-valid cache entry.
+        std::string scanSource;
+        {
+          std::lock_guard<std::mutex> lock(g_prefetchMutex);
+          auto inserted = g_prefetchCache.emplace(urlCopy, std::move(body));
+          if (inserted.second) {
+            scanSource = inserted.first->second;  // take a copy for off-lock scanning
+          } else {
+            scanSource = inserted.first->second;
+            bodySize = inserted.first->second.size();
+          }
+        }
+        ctx->fetchedCount.fetch_add(1, std::memory_order_relaxed);
+        ctx->bytes.fetch_add(bodySize, std::memory_order_relaxed);
+
+        // Recurse: scan the body for static imports, resolve each
+        // specifier against this URL, and schedule any new URLs.
+        std::vector<std::string> specs = ScanStaticImportSpecifiers(scanSource, kPrefetchMaxImportsPerModule);
+        if (!specs.empty()) {
+          std::vector<std::string> nextUrls;
+          nextUrls.reserve(specs.size());
+          for (const std::string& spec : specs) {
+            std::string absUrl = ResolveImportSpecifierAgainstUrl(spec, urlCopy);
+            if (!absUrl.empty()) nextUrls.push_back(std::move(absUrl));
+          }
+          if (!nextUrls.empty()) {
+            KickstartScheduleUrls(ctx, std::move(nextUrls));
+          }
+        }
+      }
+
+      dispatch_semaphore_signal(ctx->concurrency);
+      dispatch_group_leave(ctx->group);
+    });
+  }
+}
+
+bool KickstartHmrPrefetchSync(const std::string& seedUrl,
+                              int maxConcurrent,
+                              double timeoutSeconds,
+                              size_t* outFetchedCount,
+                              uint64_t* outElapsedMs) {
+  if (seedUrl.empty()) return false;
+  if (!IsRemoteUrlAllowed(seedUrl)) return false;
+  if (maxConcurrent <= 0) maxConcurrent = 16;
+  if (timeoutSeconds <= 0.0) timeoutSeconds = 10.0;
+
+  const uint64_t startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+
+  auto ctx = std::make_shared<KickstartContext>();
+  ctx->group = dispatch_group_create();
+  ctx->queue = dispatch_queue_create("com.nativescript.hmr.kickstart", DISPATCH_QUEUE_CONCURRENT);
+  ctx->concurrency = dispatch_semaphore_create(maxConcurrent);
+
+  KickstartScheduleUrls(ctx, std::vector<std::string>{seedUrl});
+
+  dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW,
+                                            (int64_t)(timeoutSeconds * NSEC_PER_SEC));
+  long timedOut = dispatch_group_wait(ctx->group, deadline);
+
+  const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+  const uint64_t elapsedMs = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
+  const size_t fetched = ctx->fetchedCount.load(std::memory_order_relaxed);
+  const size_t bytes = ctx->bytes.load(std::memory_order_relaxed);
+
+  if (outFetchedCount) *outFetchedCount = fetched;
+  if (outElapsedMs) *outElapsedMs = elapsedMs;
+
+  Log(@"[hmr-kickstart] seed=%s fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
+      seedUrl.c_str(),
+      (unsigned long)fetched,
+      (unsigned long)bytes,
+      (unsigned long long)elapsedMs,
+      timedOut == 0 ? "drained" : "timeout",
+      maxConcurrent);
+
+  return timedOut == 0;
 }
 
 void CleanupHMRGlobals() {
@@ -884,6 +1700,12 @@ void CleanupHMRGlobals() {
     for (auto& fn : kv.second) { fn.Reset(); }
   }
   g_hotDispose.clear();
+
+  // Drop any speculatively-prefetched module sources. These are plain
+  // std::string buffers (no v8::Global), but flushing them on teardown
+  // prevents stale source from leaking into a re-launched runtime in
+  // the same process.
+  ClearHttpModulePrefetchCache();
 }
 
 } // namespace tns

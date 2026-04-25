@@ -438,9 +438,12 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
       v8::Isolate* isolate = info.GetIsolate();
       v8::HandleScope scope(isolate);
       v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+      bool logScriptLoading = tns::IsScriptLoadingLogEnabled();
 
       if (info.Length() < 1 || !info[0]->IsObject()) {
-        Log(@"[__nsConfigureRuntime] expected config object argument");
+        if (logScriptLoading) {
+          Log(@"[__nsConfigureRuntime] expected config object argument");
+        }
         return;
       }
 
@@ -469,7 +472,9 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
         }
         if (!jsonStr.empty()) {
           SetImportMap(jsonStr);
-          Log(@"[__nsConfigureRuntime] import map set (%zu bytes)", jsonStr.size());
+          if (logScriptLoading) {
+            Log(@"[__nsConfigureRuntime] import map set (%zu bytes)", jsonStr.size());
+          }
         }
       }
 
@@ -488,7 +493,9 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
         }
         if (!patterns.empty()) {
           SetVolatilePatterns(patterns);
-          Log(@"[__nsConfigureRuntime] %zu volatile patterns set", patterns.size());
+          if (logScriptLoading) {
+            Log(@"[__nsConfigureRuntime] %zu volatile patterns set", patterns.size());
+          }
         }
       }
     };
@@ -695,6 +702,82 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     };
 
     installGlobalFunction("__nsInvalidateModules", invalidateModulesCallback);
+  }
+
+  {
+    //
+    // `__nsKickstartHmrPrefetch(seedUrl, options?)` lets HMR client tell 
+    // the runtime "the next re-import will walk this dep tree — please pre-fill the loader
+    // cache with every reachable module body before V8 starts walking".
+    //
+    // The native side runs a 16-way parallel BFS over the static
+    // imports of `seedUrl`, blocks the calling JS thread until the
+    // walk drains (or `timeoutMs` elapses), and stores every body in
+    // the speculative-prefetch cache. By the time the JS thread
+    // unblocks and triggers `import(seedUrl)`, V8's synchronous
+    // dep-tree walk hits memory instead of the network on every
+    // module — turning a ~3s 200-fetch refresh into ~150–250ms.
+    //
+    // Returns an object `{ ok, fetched, ms }` so JS can log the
+    // result alongside the existing `[ns-hmr][angular] ok ...` line.
+    // On failure (empty seed, URL blocked by remote-loading
+    // security gate, or BFS timeout) `ok` is false; callers should
+    // treat that as "no kickstart speedup this round" and fall
+    // back to V8's normal synchronous walk, which always succeeds
+    // independently.
+    auto kickstartHmrPrefetchCallback = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+      v8::Isolate* isolate = info.GetIsolate();
+      v8::HandleScope scope(isolate);
+      v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+
+      auto buildResult = [&](bool ok, size_t fetched, uint64_t elapsedMs) {
+        v8::Local<v8::Object> result = v8::Object::New(isolate);
+        result->Set(ctx, tns::ToV8String(isolate, "ok"), v8::Boolean::New(isolate, ok)).Check();
+        result->Set(ctx, tns::ToV8String(isolate, "fetched"), v8::Integer::NewFromUnsigned(isolate, (uint32_t)fetched)).Check();
+        result->Set(ctx, tns::ToV8String(isolate, "ms"), v8::Number::New(isolate, (double)elapsedMs)).Check();
+        info.GetReturnValue().Set(result);
+      };
+
+      if (info.Length() < 1 || !info[0]->IsString()) {
+        Log(@"[__nsKickstartHmrPrefetch] expected (seedUrl: string, options?: { maxConcurrent?: number, timeoutMs?: number })");
+        buildResult(false, 0, 0);
+        return;
+      }
+
+      v8::String::Utf8Value seedUtf8(isolate, info[0]);
+      if (!*seedUtf8) {
+        buildResult(false, 0, 0);
+        return;
+      }
+      std::string seedUrl(*seedUtf8);
+
+      int maxConcurrent = 16;
+      double timeoutSeconds = 10.0;
+      if (info.Length() >= 2 && info[1]->IsObject()) {
+        v8::Local<v8::Object> options = info[1].As<v8::Object>();
+
+        v8::Local<v8::Value> mcVal;
+        if (options->Get(ctx, tns::ToV8String(isolate, "maxConcurrent")).ToLocal(&mcVal) &&
+            !mcVal.IsEmpty() && mcVal->IsNumber()) {
+          double mc = mcVal->NumberValue(ctx).FromMaybe(16.0);
+          if (mc >= 1.0 && mc <= 64.0) maxConcurrent = (int)mc;
+        }
+
+        v8::Local<v8::Value> toVal;
+        if (options->Get(ctx, tns::ToV8String(isolate, "timeoutMs")).ToLocal(&toVal) &&
+            !toVal.IsEmpty() && toVal->IsNumber()) {
+          double ms = toVal->NumberValue(ctx).FromMaybe(10000.0);
+          if (ms >= 100.0 && ms <= 60000.0) timeoutSeconds = ms / 1000.0;
+        }
+      }
+
+      size_t fetched = 0;
+      uint64_t elapsedMs = 0;
+      bool ok = tns::KickstartHmrPrefetchSync(seedUrl, maxConcurrent, timeoutSeconds, &fetched, &elapsedMs);
+      buildResult(ok, fetched, elapsedMs);
+    };
+
+    installGlobalFunction("__nsKickstartHmrPrefetch", kickstartHmrPrefetchCallback);
   }
 
   {

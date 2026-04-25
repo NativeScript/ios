@@ -109,7 +109,43 @@ std::string CanonicalizeHttpUrlKey(const std::string& url);
 // - out: response body
 // - contentType: Content-Type header if present
 // - status: HTTP status code
+//
+// On a fast path, returns from the in-memory speculative-prefetch cache
+// without touching the network. On the slow path, performs a synchronous
+// fetch and additionally schedules background prefetches for the body's
+// static imports so subsequent HttpFetchText calls hit the cache. See
+// the prefetcher block in HMRSupport.mm for full design notes.
 bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status);
+
+// Drop all entries in the speculative-prefetch cache. Safe to call from
+// any thread. Used by Runtime teardown and by HMR cache-poison scenarios
+// where the dev server has indicated a graph version bump.
+void ClearHttpModulePrefetchCache();
+
+// Kickstart an HMR-driven module prefetch
+// rooted at `seedUrl`. Walks the static-import graph in parallel (up to
+// `maxConcurrent` simultaneous HTTP fetches), storing every reachable
+// module body in the speculative-prefetch cache. Blocks the calling
+// thread until the BFS has fully drained or `timeoutSeconds` elapses.
+//
+// Designed to be invoked from JS (via `__nsKickstartHmrPrefetch`)
+// immediately before the Angular HMR client re-imports the entry —
+// by the time V8 walks the dep tree, every reachable body is already
+// in `g_prefetchCache` and the walk runs at memory speed instead of
+// network speed (turning a ~3s 200-fetch refresh into ~250ms).
+//
+// Returns `true` when the BFS drained cleanly. On timeout or seed
+// fetch failure returns `false`; callers should treat that as "no
+// kickstart speedup this round" and fall back to V8's normal
+// synchronous walk, which always succeeds independently.
+//
+// `outFetchedCount` (optional) receives the number of distinct URLs
+// fetched. `outElapsedMs` (optional) receives wall-clock time.
+bool KickstartHmrPrefetchSync(const std::string& seedUrl,
+                              int maxConcurrent,
+                              double timeoutSeconds,
+                              size_t* outFetchedCount,
+                              uint64_t* outElapsedMs);
 
 // Clear all HMR-related v8::Global handles (g_hotData, g_hotAccept, g_hotDispose).
 // MUST be called inside Runtime::~Runtime() before isolate disposal to prevent
