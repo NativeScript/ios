@@ -868,7 +868,21 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     uniqueUrls.push_back(registryKey);
   }
 
+  const bool logScriptLoading = IsScriptLoadingLogEnabled();
+  size_t hits = 0, misses = 0;
   for (const auto& url : uniqueUrls) {
+    bool present = g_moduleRegistry.find(url) != g_moduleRegistry.end();
+    if (present) {
+      hits++;
+    } else {
+      misses++;
+    }
+    if (logScriptLoading) {
+      Log(@"[ns-hmr-diag][ios-invalidate] %s key=%s",
+          present ? "HIT " : "MISS",
+          url.c_str());
+    }
+
     RejectAndClearInvalidatedModuleState(isolate, context, url);
     RemoveModuleFromRegistry(url);
   }
@@ -886,9 +900,12 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
   // compile to see fresh source.
   EvictHttpModulePrefetchCacheUrls(uniqueUrls);
 
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[resolver][invalidate] invalidated %lu exact URL(s)",
-        (unsigned long)uniqueUrls.size());
+  if (logScriptLoading) {
+    Log(@"[ns-hmr-diag][ios-invalidate] summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
+        (unsigned long)uniqueUrls.size(),
+        (unsigned long)hits,
+        (unsigned long)misses,
+        (unsigned long)g_moduleRegistry.size());
   }
 }
 
@@ -2926,7 +2943,15 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       if (itExisting != g_moduleRegistry.end()) {
         v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
         if (!existing.IsEmpty()) {
+          // Diagnostic: surface every HTTP dynamic-import cache hit so
+          // we can verify the runtime *did* drop the entry on
+          // invalidate. Filtered to angular component-shaped URLs to
+          // avoid spam from vendor chunks.
           if (IsScriptLoadingLogEnabled()) {
+            if (key.find("ns/m/") != std::string::npos || key.find(".component") != std::string::npos) {
+              Log(@"[ns-hmr-diag][ios-dyn-cache] HIT %s status=%s",
+                  key.c_str(), ModuleStatusToString(existing->GetStatus()));
+            }
             Log(@"[dyn-import][http-cache] hit %s", key.c_str());
             Log(@"  ↳ status=%s", ModuleStatusToString(existing->GetStatus()));
           }
@@ -3034,6 +3059,14 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // mark in-flight before starting network fetch
       g_modulesInFlight.insert(key);
       g_httpDynamicWaiters[key].emplace_back(isolate, resolver);
+      // Diagnostic: surface fresh fetches so we can confirm that
+      // post-invalidation, the next dynamic import does NOT re-use the
+      // cache and DOES go to the network. Filtered to component shapes
+      // to avoid vendor-chunk noise.
+      if (IsScriptLoadingLogEnabled() &&
+          (key.find("ns/m/") != std::string::npos || key.find(".component") != std::string::npos)) {
+        Log(@"[ns-hmr-diag][ios-dyn-cache] FRESH-FETCH %s", key.c_str());
+      }
       v8::MaybeLocal<v8::Module> modMaybe = LoadHttpModuleForUrl(isolate, context, normalizedSpec);
       if (!modMaybe.IsEmpty()) {
         v8::Local<v8::Module> mod;

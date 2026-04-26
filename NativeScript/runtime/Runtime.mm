@@ -698,6 +698,24 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
         }
       }
 
+      // Diagnostic: surface every URL the runtime is asked to drop, plus
+      // a sample of currently-loaded module registry keys so we can
+      // correlate "asked to evict X" against "actually had X loaded as
+      // Y" when canonicalization differs (e.g. http://localhost vs
+      // file:// or http:// with port).
+      if (tns::IsScriptLoadingLogEnabled()) {
+        Log(@"[ns-hmr-diag][ios-invalidate] called urls.count=%zu", urls.size());
+        size_t shown = 0;
+        for (const auto& u : urls) {
+          if (shown >= 32) break;
+          Log(@"[ns-hmr-diag][ios-invalidate] url[%zu]=%s", shown, u.c_str());
+          shown++;
+        }
+        if (urls.size() > shown) {
+          Log(@"[ns-hmr-diag][ios-invalidate] (hidden %zu more URL(s))", urls.size() - shown);
+        }
+      }
+
       tns::InvalidateModules(isolate, ctx, urls);
     };
 
