@@ -1008,90 +1008,82 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   return true;
 }
 
-// shared NSURLSession for HTTP keep-alive.
+// Synchronous HTTP fetcher implementation.
 //
-// A single process-wide NSURLSession (created once on first call) keeps
-// connections open via standard HTTP/1.1 keep-alive — and on dev servers
-// that negotiate HTTP/2, NSURLSession multiplexes all requests over one
-// connection. NSURLSession is documented thread-safe for `dataTaskWithURL`
-// and `resume`, so the JS thread and the prefetcher GCD queue can both
-// share it without locking. We never invalidate it — the session's
-// lifetime is tied to the runtime process, just like our V8 isolate.
+// We use `+[NSURLConnection sendSynchronousRequest:returningResponse:error:]`
+// (deprecated but functional on every shipping iOS version) instead of
+// the modern NSURLSession API. NSURLSession exhibits a deadlock when the
+// JS thread is the iOS main thread (post-Angular bootstrap):
 //
-// MRC NOTE: HMRSupport.mm is compiled with ARC disabled (the v8ios
-// `NativeScript` target sets CLANG_ENABLE_OBJC_ARC = NO). That means
-// `+sessionWithConfiguration:` returns an autoreleased instance and the
-// surrounding `@autoreleasepool` drains it the moment we exit this
-// `std::call_once` callback — leaving `g_httpSharedSession` dangling
-// for every subsequent `[session dataTaskWithURL:…]` call (the original
-// Without this, runtime can crash in `objc_msgSend` on app boot.
-// We explicitly `[…retain]` the session so it lives for
-// the runtime's lifetime; matching that, we never `[release]` it, so
-// there's no double-free risk.
-static NSURLSession* g_httpSharedSession = nil;
-static std::once_flag g_httpSharedSessionOnce;
-
-static NSURLSession* GetSharedHttpSession() {
-  std::call_once(g_httpSharedSessionOnce, []() {
-    @autoreleasepool {
-      NSURLSessionConfiguration* cfg = [NSURLSessionConfiguration defaultSessionConfiguration];
-      cfg.HTTPAdditionalHeaders = @{ @"Accept": @"application/javascript, text/javascript, */*;q=0.1",
-                                     @"Accept-Encoding": @"identity" };
-      cfg.timeoutIntervalForRequest = 5.0;
-      cfg.timeoutIntervalForResource = 5.0;
-      // Generous per-host max so the prefetcher's K=4 background fetches
-      // don't get queued behind V8's foreground fetches. Apple's default
-      // (4 on iOS) is exactly the number we configure for K — leave room.
-      cfg.HTTPMaximumConnectionsPerHost = 16;
-      // Disable URL cache: HMR depends on always seeing the freshest body
-      // for the requested URL. We rely on Vite's `t`/`v` cache busters and
-      // our own canonicalization for module identity, not the OS cache.
-      cfg.URLCache = nil;
-      cfg.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-      // Explicit retain — see MRC NOTE above.
-      g_httpSharedSession = [[NSURLSession sessionWithConfiguration:cfg] retain];
-    }
-  });
-  return g_httpSharedSession;
-}
-
+//   - JS calls `import('foo')` (dynamic import).
+//   - The runtime sync-fetches `foo`'s body on the main thread, blocking
+//     on `dispatch_semaphore_wait`. This first fetch lands normally
+//     (e.g. `hmr/client/index.js` arrives in ~60ms).
+//   - V8 then synchronously calls `InstantiateModule`, which invokes our
+//     `ResolveModuleCallback` for each static dependency. That callback
+//     issues another sync fetch (e.g. `hmr/client/utils.js`).
+//   - For this second sync fetch, NSURLSessionDataTask transitions to
+//     NSURLSessionTaskStateRunning, but the completion handler **never
+//     fires** within 6 seconds. NSURLSession's own
+//     `timeoutIntervalForRequest` does not trip either — `task.error`
+//     stays nil. The task remains stuck in Running state. Cancelling
+//     it synchronously does not produce a completion-handler callback.
+//
+// The deadlock reproduces with both an implicit delegate queue and an
+// explicit non-main `NSOperationQueue`. It also reproduces with
+// `httpModulePrefetch` disabled, ruling out prefetcher contention.
+// Boot-time sync fetches (thousands of them) succeed because they happen
+// before the iOS main thread becomes the JS executor.
+//
+// `NSURLConnection.sendSynchronousRequest` uses CFNetwork directly,
+// bypassing NSURLSession's task lifecycle, and returns the NSURLResponse
+// so we can read HTTP status and Content-Type. The deprecation warning
+// is suppressed locally because every published Apple SDK still ships
+// a working implementation, and there is currently no non-deprecated
+// API that gives us a runloop-independent synchronous fetch with a
+// real HTTP status code.
 static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, std::string& contentType, int& status) {
   @autoreleasepool {
     NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
     if (!u) { status = 0; return false; }
 
-    __block NSError* err = nil;
-    __block NSInteger httpStatusLocal = 0;
-    __block std::string contentTypeLocal;
-    __block std::string bodyLocal;
+    NSError* err = nil;
+    NSInteger httpStatusLocal = 0;
+    std::string contentTypeLocal;
+    std::string bodyLocal;
 
-    NSURLSession* session = GetSharedHttpSession();
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
     const auto fetchStartUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
-    NSURLSessionDataTask* task = [session dataTaskWithURL:u
-                                        completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
-      @autoreleasepool {
-        err = error;
-        if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-          httpStatusLocal = ((NSHTTPURLResponse*)response).statusCode;
-          NSString* ct = ((NSHTTPURLResponse*)response).allHeaderFields[@"Content-Type"];
-          if (ct) { contentTypeLocal = std::string([ct UTF8String] ?: ""); }
-        }
-        if (data) {
-          const void* bytes = [data bytes];
-          NSUInteger len = [data length];
-          if (bytes && len > 0) {
-            bodyLocal.assign(static_cast<const char*>(bytes), static_cast<size_t>(len));
-          }
-        }
+
+    NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:u];
+    [request setHTTPMethod:@"GET"];
+    [request setValue:@"application/javascript, text/javascript, */*;q=0.1"
+   forHTTPHeaderField:@"Accept"];
+    [request setValue:@"identity" forHTTPHeaderField:@"Accept-Encoding"];
+    [request setTimeoutInterval:5.0];
+
+    NSURLResponse* response = nil;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    NSData* data = [NSURLConnection sendSynchronousRequest:request
+                                         returningResponse:&response
+                                                     error:&err];
+#pragma clang diagnostic pop
+
+    if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+      NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
+      httpStatusLocal = [httpResp statusCode];
+      NSString* ct = [httpResp allHeaderFields][@"Content-Type"];
+      if (ct) {
+        const char* utf8 = [ct UTF8String];
+        if (utf8) contentTypeLocal = std::string(utf8);
       }
-      dispatch_semaphore_signal(sema);
-    }];
-    [task resume];
-    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC));
-    dispatch_semaphore_wait(sema, timeout);
-    // IMPORTANT: do NOT call finishTasksAndInvalidate on g_httpSharedSession.
-    // We want the connection pool to stay alive for the next fetch.
+    }
+
+    if (data && [data length] > 0) {
+      const void* bytes = [data bytes];
+      NSUInteger len = [data length];
+      bodyLocal.assign(static_cast<const char*>(bytes), static_cast<size_t>(len));
+    }
 
     const auto fetchEndUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
     const uint64_t fetchMs = fetchEndUs > fetchStartUs ? (fetchEndUs - fetchStartUs) / 1000ull : 0ull;
@@ -1122,6 +1114,18 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
     status = (int)httpStatusLocal;
     contentType = contentTypeLocal;
     if (err != nil || bodyLocal.empty()) {
+      if (IsScriptLoadingLogEnabled()) {
+        NSString* desc = err.localizedDescription ?: @"<no description>";
+        NSString* domain = err.domain ?: @"<no domain>";
+        Log(@"[http-loader][fetch-error] url=%s domain=%@ code=%ld desc=%@ status=%ld bodyEmpty=%d ms=%llu",
+            url.c_str(),
+            domain,
+            (long)err.code,
+            desc,
+            (long)httpStatusLocal,
+            bodyLocal.empty() ? 1 : 0,
+            (unsigned long long)fetchMs);
+      }
       return false;
     }
     out.swap(bodyLocal);
