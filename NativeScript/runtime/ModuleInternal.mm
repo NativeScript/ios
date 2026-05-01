@@ -909,7 +909,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   std::string canonicalPath = CanonicalizeModulePath(path);
   std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
   auto context = isolate->GetCurrentContext();
-  extern std::unordered_map<std::string, Global<Module>>& g_moduleRegistry;
+  extern thread_local std::unordered_map<std::string, Global<Module>>& g_moduleRegistry;
 
   auto describeModuleStatus = [](Module::Status status) -> const char* {
     switch (status) {

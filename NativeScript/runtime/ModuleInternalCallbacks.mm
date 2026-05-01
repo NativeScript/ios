@@ -207,25 +207,61 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(v8::Isolat
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Simple in-process registry: maps absolute file paths → compiled Module handles.
+// Per-isolate (thread-local) module registries: map absolute file paths /
+// canonical URLs → compiled v8::Module handles for the *current* isolate.
 //
-// CRITICAL: All maps holding v8::Global handles use the "leaky singleton"
-// pattern — heap-allocated via `new`, intentionally never deleted by static
-// destructors. This prevents the V8 crash during __cxa_finalize_ranges:
-// when exit() runs, C++ static destructors would call v8::Global::Reset()
-// on an already-torn-down V8 isolate → SIGSEGV/SIGBUS. By using `new`,
-// the pointer's destructor is a no-op. The Runtime destructor properly
-// clears all handles via CleanupImportMapGlobals() before isolate disposal.
+// Why thread_local: NS Worker creates a separate v8::Isolate on its own
+// thread (see Worker::ConstructorCallback in Worker.mm). v8::Global<T>
+// handles are bound to the isolate that created them; reading their
+// internal state from a different isolate is undefined behaviour. A
+// previous design held these registries as a single, process-global map,
+// which under HMR (where the worker fetches the SAME `/ns/m/` URLs the
+// main thread already loaded) caused the worker isolate to receive a
+// Module compiled by the main isolate. V8's linker then read the cross-
+// isolate Module's export table and emitted bogus errors like:
+//   SyntaxError: The requested module 'X' does not provide an export named 'Y'
+// even though the served source clearly declared `Y`. Making the
+// registry thread_local keeps each NS runtime/worker walking its own
+// fresh, valid handle graph.
 //
-// The reference aliases below keep all existing code unchanged (no & needed).
-static auto* _g_moduleRegistry = new std::unordered_map<std::string, v8::Global<v8::Module>>();
-std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry = *_g_moduleRegistry;
+// Why the leaky-pointer pattern (heap-allocated, never deleted by the
+// thread-exit destructor): a `thread_local std::unordered_map<...,
+// v8::Global<...>>` would, on thread exit, run the map's destructor —
+// which iterates and calls v8::Global::Reset() on each handle. If the
+// owning isolate was already torn down, those Resets blow up with the
+// `__cxa_finalize_ranges` SIGSEGV/SIGBUS that the original comment
+// warned about. By holding a thread_local *pointer* to a heap-allocated
+// map, the variable's per-thread destructor is a no-op (it just drops
+// a pointer); cleanup of the actual handles is handled explicitly by
+// the Runtime destructor (Runtime.mm) and CleanupImportMapGlobals()
+// below, which run *before* the isolate is disposed.
+//
+// The reference aliases below keep all existing access sites unchanged
+// (no `()` or `->` rewrites needed across ~100+ call sites). On each
+// thread's first use of e.g. `g_moduleRegistry`, the initializer below
+// runs once per thread to bind the reference to that thread's map.
+namespace {
+using ModuleHandleMap = std::unordered_map<std::string, v8::Global<v8::Module>>;
 
-static auto* _g_moduleFallbackRegistry = new std::unordered_map<std::string, v8::Global<v8::Module>>();
-static std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleFallbackRegistry = *_g_moduleFallbackRegistry;
+ModuleHandleMap& MakePerIsolateModuleRegistry() {
+	thread_local auto* p = new ModuleHandleMap();
+	return *p;
+}
 
-static auto* _g_moduleFallbackByRelative = new std::unordered_map<std::string, v8::Global<v8::Module>>();
-static std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleFallbackByRelative = *_g_moduleFallbackByRelative;
+ModuleHandleMap& MakePerIsolateModuleFallbackRegistry() {
+	thread_local auto* p = new ModuleHandleMap();
+	return *p;
+}
+
+ModuleHandleMap& MakePerIsolateModuleFallbackByRelative() {
+	thread_local auto* p = new ModuleHandleMap();
+	return *p;
+}
+}  // namespace
+
+thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry = MakePerIsolateModuleRegistry();
+static thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleFallbackRegistry = MakePerIsolateModuleFallbackRegistry();
+static thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleFallbackByRelative = MakePerIsolateModuleFallbackByRelative();
 
 // ────────────────────────────────────────────────────────────────────────────
 // Import map: bare specifier → resolved URL (populated by __nsConfigureRuntime)
@@ -241,9 +277,17 @@ static std::vector<std::string> g_volatilePatterns;
 
 // Vendor module registry: maps vendor specifier → evaluated v8::Module.
 // Populated when ns-vendor:// modules are first resolved via SyntheticModule.
-// Heap-allocated (leaky singleton) — see g_moduleRegistry comment above.
-static auto* _g_vendorModuleCache = new std::unordered_map<std::string, v8::Global<v8::Module>>();
-static std::unordered_map<std::string, v8::Global<v8::Module>>& g_vendorModuleCache = *_g_vendorModuleCache;
+// Per-isolate (thread_local) for the same reason as g_moduleRegistry above —
+// vendor SyntheticModules are isolate-bound and reusing one across isolates
+// breaks the linker's export-table check.
+namespace {
+std::unordered_map<std::string, v8::Global<v8::Module>>& MakePerIsolateVendorModuleCache() {
+	thread_local auto* p = new std::unordered_map<std::string, v8::Global<v8::Module>>();
+	return *p;
+}
+}  // namespace
+
+static thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_vendorModuleCache = MakePerIsolateVendorModuleCache();
 
 static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string& registryKey) {
   if (rawKey != registryKey) {

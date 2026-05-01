@@ -270,9 +270,12 @@ Runtime::~Runtime() {
   {
     v8::Locker lock(isolate_);
 
-    // Clear module registry before disposing other handles
-    // This prevents crashes during g_moduleRegistry cleanup
-    extern std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry;
+    // Clear module registry before disposing other handles.
+    // This prevents crashes during g_moduleRegistry cleanup. The registry is
+    // `thread_local` (each NS isolate has its own per-thread map; see
+    // ModuleInternalCallbacks.mm for rationale), so this loop walks ONLY the
+    // entries that this destructor's thread/isolate created.
+    extern thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry;
     for (auto& kv : g_moduleRegistry) {
       kv.second.Reset();
     }

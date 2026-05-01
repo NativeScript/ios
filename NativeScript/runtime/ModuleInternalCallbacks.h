@@ -8,8 +8,12 @@
 
 namespace tns {
 
-// Export our registry so both LoadESModule and the callback see the same data:
-extern std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry;
+// Export our registry so both LoadESModule and the callback see the same data.
+// `thread_local`: each NS isolate (main thread + each Worker thread) gets its
+// own per-thread map, because v8::Global<Module> handles are isolate-bound.
+// See the long-form comment above the definition in ModuleInternalCallbacks.mm
+// for the cross-isolate-handle bug this prevents.
+extern thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry;
 
 // Utility to drop modules from the registry when compilation/instantiation fails
 void RemoveModuleFromRegistry(const std::string& canonicalPath);
