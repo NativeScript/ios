@@ -281,14 +281,33 @@ Runtime::~Runtime() {
     }
     g_moduleRegistry.clear();
 
-    // Clear HMR globals (g_hotData, g_hotAccept, g_hotDispose) before isolate
-    // disposal. These hold v8::Global handles that would crash during static
-    // destructor cleanup if the isolate is already torn down.
-    tns::CleanupHMRGlobals();
-
-    // Clear import map vendor module cache (holds v8::Global<Module> handles)
-    tns::CleanupImportMapGlobals();
-    tns::ResetActiveDevSession();
+    // Clear HMR + import-map globals (`g_importMap`, `g_hotData`,
+    // `g_hotAccept`, `g_hotDispose`, `g_hotPrune`, `g_hotEventListeners`,
+    // `g_hotDeclined`, `g_vendorModuleCache`, etc.) before isolate disposal.
+    // These hold v8::Global handles that would crash during static destructor
+    // cleanup if the isolate is already torn down.
+    //
+    // CRITICAL: these globals are PROCESS-WIDE, not per-isolate. They live
+    // in the main isolate's address space but every Runtime destructor would
+    // clear them. That's wrong for worker-isolate teardown: when a worker
+    // dies (e.g. via `__nsTerminateAllWorkers` during an HMR cycle), its
+    // Runtime destructor MUST NOT wipe the main isolate's import map and
+    // hot-state — doing so silently breaks the next HMR cycle's bare-
+    // specifier resolution (vendor packages fall back to filesystem and
+    // fail with `Cannot find module @scope/pkg`).
+    //
+    // Worker isolates have their own `g_moduleRegistry` (thread_local,
+    // cleared above), but they SHARE the static globals with the main
+    // isolate. So we gate this cleanup on "this is the main isolate" —
+    // worker teardown leaves the shared globals intact and the main
+    // isolate continues serving HMR cycles uninterrupted. Real
+    // process-teardown still routes through the main isolate's
+    // destructor, so the cleanup eventually fires.
+    if (!IsRuntimeWorker()) {
+      tns::CleanupHMRGlobals();
+      tns::CleanupImportMapGlobals();
+      tns::ResetActiveDevSession();
+    }
 
     DisposerPHV phv(isolate_);
     isolate_->VisitHandlesWithClassIds(&phv);

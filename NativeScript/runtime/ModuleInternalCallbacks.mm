@@ -1551,6 +1551,35 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       if (IsScriptLoadingLogEnabled()) {
         Log(@"[resolver][import-map] rewrite: %s -> %s", spec.c_str(), mapped.c_str());
       }
+    } else {
+      // Diagnostic: bare-looking specifier (no scheme, no '/' prefix, not a
+      // relative path) that the import map didn't match. 
+      // If we hit this path, the runtime is about to fall back
+      // to filesystem resolution and almost certainly fail with
+      // `Cannot find module ...` for vendor packages — surface it loudly
+      // so a missing import map entry shows up in the dev terminal
+      // BEFORE the more cryptic `Cannot find module` follow-on.
+      bool looksBare = !spec.empty() && spec[0] != '/' && spec[0] != '.' &&
+                       spec.find("://") == std::string::npos &&
+                       spec.find('\\') == std::string::npos;
+      if (looksBare && IsScriptLoadingLogEnabled()) {
+        // Snapshot a few entry counts so we can tell at a glance whether
+        // `g_importMap` is intact (typical: 200-500 entries) or empty.
+        Log(@"[resolver][import-map][miss] bare='%s' importMap.size=%lu importMap.empty=%d",
+            spec.c_str(),
+            (unsigned long)g_importMap.size(),
+            g_importMap.empty() ? 1 : 0);
+      }
+    }
+  } else if (IsScriptLoadingLogEnabled()) {
+    // Map was completely empty — distinct from "map populated but no entry".
+    // This branch firing means `SetImportMap("")` was called or the map
+    // was never populated at all. Either is a bug; surface it.
+    bool looksBare = !spec.empty() && spec[0] != '/' && spec[0] != '.' &&
+                     spec.find("://") == std::string::npos &&
+                     spec.find('\\') == std::string::npos;
+    if (looksBare) {
+      Log(@"[resolver][import-map][empty] bare='%s' — g_importMap is EMPTY (was it ever configured? expected ~200-500 entries)", spec.c_str());
     }
   }
 
