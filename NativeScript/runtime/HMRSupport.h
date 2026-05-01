@@ -33,21 +33,36 @@ v8::Local<v8::Object> GetOrCreateHotData(v8::Isolate* isolate, const std::string
 void RegisterHotAccept(v8::Isolate* isolate, const std::string& key, v8::Local<v8::Function> cb);
 void RegisterHotDispose(v8::Isolate* isolate, const std::string& key, v8::Local<v8::Function> cb);
 
+// Register prune callbacks for a module key. Per Vite spec these fire when
+// the module is removed from the dependency graph (NOT on every update — that
+// is dispose). Today the NS HMR pipeline does wholesale reboots rather than
+// per-module pruning, so the registry is plumbed end-to-end but only fires
+// when a future per-module HMR client explicitly drains it.
+void RegisterHotPrune(v8::Isolate* isolate, const std::string& key, v8::Local<v8::Function> cb);
+
 // Optional: expose read helpers (may be useful for debugging/integration)
 std::vector<v8::Local<v8::Function>> GetHotAcceptCallbacks(v8::Isolate* isolate, const std::string& key);
 std::vector<v8::Local<v8::Function>> GetHotDisposeCallbacks(v8::Isolate* isolate, const std::string& key);
+std::vector<v8::Local<v8::Function>> GetHotPruneCallbacks(v8::Isolate* isolate, const std::string& key);
 
-// `import.meta.hot` implementation
-// Provides:
-// - `hot.data` (per-module persistent object across HMR updates)
-// - `hot.accept(...)` (deps argument currently ignored; registers callback if provided)
-// - `hot.dispose(cb)` (registers disposer)
-// - `hot.decline()` / `hot.invalidate()` (currently no-ops)
-// - `hot.prune` (currently always false)
+// `import.meta.hot` implementation — Vite-spec compliant API surface.
 //
-// Notes/limitations:
-// - Event APIs (`hot.on/off`), messaging (`hot.send`), and status handling are not implemented.
-// - `modulePath` is used to derive the per-module key for `hot.data` and callbacks.
+// Per-module API exposed on every imported module:
+// - `hot.data`             — per-module persistent object across HMR updates
+// - `hot.accept(deps?, cb?)` — register a self-accepting handler (deps arg accepted but currently ignored)
+// - `hot.dispose(cb)`      — register a cleanup callback fired when this module is replaced
+// - `hot.prune(cb)`        — register a callback fired when this module is removed from the dep graph
+// - `hot.decline()`        — opt this module out of HMR (next update touching it triggers full reload)
+// - `hot.invalidate(msg?)` — request a full app reload from this module (delegates to `__nsReloadDevApp`)
+// - `hot.on(event, cb)`    — listen to HMR events (Vite standard `vite:beforeUpdate` / `vite:afterUpdate` /
+//                            `vite:beforeFullReload` / `vite:beforePrune` / `vite:invalidate` / `vite:error`,
+//                            plus custom events the HMR client dispatches via `__NS_DISPATCH_HOT_EVENT__`)
+// - `hot.off(event, cb)`   — unregister a listener previously added with `hot.on`
+// - `hot.send(event, data)` — send a custom message to the dev server; delegated to a JS-installed
+//                            `globalThis.__nsHmrSendToServer(event, data)` so the WebSocket-owning JS layer
+//                            keeps sole responsibility for the transport (runtime stays transport-agnostic)
+//
+// `modulePath` is used to derive the per-module canonical key for `hot.data` and callback registries.
 void InitializeImportMetaHot(v8::Isolate* isolate,
                              v8::Local<v8::Context> context,
                              v8::Local<v8::Object> importMeta,
@@ -191,6 +206,13 @@ void CleanupHMRGlobals();
 // Register a custom event listener (called by import.meta.hot.on())
 void RegisterHotEventListener(v8::Isolate* isolate, const std::string& event, v8::Local<v8::Function> cb);
 
+// Unregister a listener previously added with `RegisterHotEventListener`. The
+// callback is matched by V8 strict equality (same `Function` reference). If
+// `cb` matches multiple registered listeners (the same closure was registered
+// twice), every match is removed — mirrors `EventTarget.removeEventListener`
+// semantics for repeated registrations.
+void RemoveHotEventListener(v8::Isolate* isolate, const std::string& event, v8::Local<v8::Function> cb);
+
 // Get all listeners for a custom event
 std::vector<v8::Local<v8::Function>> GetHotEventListeners(v8::Isolate* isolate, const std::string& event);
 
@@ -201,5 +223,78 @@ void DispatchHotEvent(v8::Isolate* isolate, v8::Local<v8::Context> context, cons
 // Initialize the global event dispatcher function (__NS_DISPATCH_HOT_EVENT__)
 // This exposes a JavaScript-callable function that the HMR client can use to dispatch events
 void InitializeHotEventDispatcher(v8::Isolate* isolate, v8::Local<v8::Context> context);
+
+// Drain and execute `import.meta.hot.dispose(cb)` callbacks for the given module
+// keys. If `keys` is empty, drains every registered callback across every module
+// (the right behaviour for whole-app HMR reboots like Angular's
+// `__reboot_ng_modules__`, where the entire JS realm's side effects are being
+// thrown away). Each callback is invoked with that module's `hot.data` object so
+// users can persist state across the reload (matches Vite spec).
+//
+// Callbacks are removed from the registry after execution so a second drain in
+// the same cycle is a clean no-op. Per-callback failures are logged (when
+// script-loading logs are enabled) but never propagate — one bad disposer must
+// not break the HMR cycle for everyone else.
+//
+// Returns the number of callbacks successfully executed.
+int RunHotDisposeCallbacks(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                           const std::vector<std::string>& keys);
+
+// Initialize the global `__nsRunHmrDispose([keys?])` function so the HMR client
+// (e.g. @nativescript/vite's Angular HMR client) can drain dispose callbacks
+// from JS. Mirrors the `InitializeHotEventDispatcher` pattern. Should be called
+// once per main isolate during runtime init, gated on dev mode.
+//
+// JS signature: `__nsRunHmrDispose(keys?: string[]) => number`
+//   - `keys` omitted / null / undefined / empty array → drain everything.
+//   - `keys` non-empty → drain only the listed module keys.
+//   - Returns: count of callbacks executed.
+void InitializeHotDisposeRunner(v8::Isolate* isolate, v8::Local<v8::Context> context);
+
+// Drain `import.meta.hot.prune(cb)` callbacks for the given module keys (or
+// every registered module if `keys` is empty). Same snapshot/swap semantics as
+// `RunHotDisposeCallbacks` — callbacks fire exactly once per drain, the
+// registry is cleared atomically per key, and per-callback failures are logged
+// but never propagate.
+//
+// Returns the number of callbacks successfully executed.
+int RunHotPruneCallbacks(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                         const std::vector<std::string>& keys);
+
+// Initialize the global `__nsRunHmrPrune([keys?])` function. Symmetric with
+// `__nsRunHmrDispose` but for `prune` callbacks. The Angular HMR client does
+// NOT call this today (its wholesale `__reboot_ng_modules__` model has no
+// per-module prune step), but the runner is plumbed end-to-end so future
+// per-module HMR clients have the entry point ready.
+//
+// JS signature: `__nsRunHmrPrune(keys?: string[]) => number`
+void InitializeHotPruneRunner(v8::Isolate* isolate, v8::Local<v8::Context> context);
+
+// `decline()` support. When user code calls `import.meta.hot.decline()`, the
+// module's canonical key is added to a process-wide declined set. The HMR
+// client checks `IsAnyModuleDeclined(updatedKeys)` before applying an update —
+// if any updated key is declined, the update is converted into a full reload
+// (matches Vite spec: "If the module triggers HMR, full reload occurs").
+void MarkHotDeclined(const std::string& key);
+
+// Returns true if the given key is in the declined set. Used by the
+// `__nsHasDeclinedModule` JS helper below.
+bool IsHotDeclined(const std::string& key);
+
+// Returns true if ANY of the supplied keys are in the declined set, OR if
+// the declined set is non-empty AND `keys` is empty (caller is asking
+// "is anything declined at all?"). The runtime canonicalizes its registry
+// keys via `canonicalHotKey` (strips fragments, normalizes script extensions,
+// rewrites NS HMR virtual prefixes); the HMR client should pass canonical
+// URLs straight from `evictPaths` for accurate matching.
+bool IsAnyModuleDeclined(const std::vector<std::string>& keys);
+
+// Initialize the global `__nsHasDeclinedModule([keys?])` function. Returns
+// `true` if any of the listed keys is declined (or if the declined set is
+// non-empty AND no keys were passed). The Angular HMR client calls this with
+// `evictPaths` before reboot; on `true` it falls back to `__nsReloadDevApp()`.
+//
+// JS signature: `__nsHasDeclinedModule(keys?: string[]) => boolean`
+void InitializeHotDeclinedHelper(v8::Isolate* isolate, v8::Local<v8::Context> context);
 
 } // namespace tns

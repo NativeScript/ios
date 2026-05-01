@@ -411,11 +411,22 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   Console::Init(context);
   WeakRef::Init(context);
   
-  // Initialize HMR event dispatcher for dev mode
-  // This provides __NS_DISPATCH_HOT_EVENT__ global for the HMR client
+  // Initialize HMR runtime helpers for dev mode. These collectively expose
+  // the JS-callable globals the @nativescript/vite HMR client uses to drain
+  // per-module callbacks and check declined-module state before each reboot:
+  //   - __NS_DISPATCH_HOT_EVENT__   — fire registered import.meta.hot.on() listeners
+  //   - __nsRunHmrDispose            — drain import.meta.hot.dispose() callbacks
+  //   - __nsRunHmrPrune              — drain import.meta.hot.prune() callbacks
+  //   - __nsHasDeclinedModule        — check g_hotDeclined for full-reload fallback
+  // All four installations share one try/catch — they have identical risk
+  // profiles (single V8 function registration each) and a failure in any
+  // one of them shouldn't abort the rest of runtime init.
   if (RuntimeConfig.IsDebug) {
     try {
       tns::InitializeHotEventDispatcher(isolate, context);
+      tns::InitializeHotDisposeRunner(isolate, context);
+      tns::InitializeHotPruneRunner(isolate, context);
+      tns::InitializeHotDeclinedHelper(isolate, context);
     } catch (...) {
       // Don't crash if HMR setup fails
     }

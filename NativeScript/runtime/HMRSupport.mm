@@ -38,10 +38,24 @@ static auto* _g_hotAccept = new std::unordered_map<std::string, std::vector<v8::
 static auto& g_hotAccept = *_g_hotAccept;
 static auto* _g_hotDispose = new std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>>();
 static auto& g_hotDispose = *_g_hotDispose;
+// Per-module prune callbacks (`import.meta.hot.prune(cb)`). Symmetric with
+// `g_hotDispose` — separate registry because Vite spec semantics differ:
+// `dispose` fires on every replacement (every HMR cycle), `prune` fires
+// only when the module is removed from the dependency graph entirely.
+static auto* _g_hotPrune = new std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>>();
+static auto& g_hotPrune = *_g_hotPrune;
 
 // Custom event listeners
 // Keyed by event name (global, not per-module)
 static std::unordered_map<std::string, std::vector<v8::Global<v8::Function>>> g_hotEventListeners;
+
+// Set of canonical module keys that called `import.meta.hot.decline()`.
+// The HMR client checks this set before applying an update — if any update
+// touches a declined key, the update converts to a full reload. No V8
+// handles to clean up (just strings), so this lives in a plain set with
+// its own mutex for thread safety.
+static std::unordered_set<std::string> g_hotDeclined;
+static std::mutex g_hotDeclinedMutex;
 
 // Active deterministic dev-session state.
 static DevSessionState g_activeDevSession;
@@ -361,6 +375,11 @@ void RegisterHotDispose(v8::Isolate* isolate, const std::string& key, v8::Local<
   g_hotDispose[key].emplace_back(v8::Global<v8::Function>(isolate, cb));
 }
 
+void RegisterHotPrune(v8::Isolate* isolate, const std::string& key, v8::Local<v8::Function> cb) {
+  if (cb.IsEmpty()) return;
+  g_hotPrune[key].emplace_back(v8::Global<v8::Function>(isolate, cb));
+}
+
 std::vector<v8::Local<v8::Function>> GetHotAcceptCallbacks(v8::Isolate* isolate, const std::string& key) {
   std::vector<v8::Local<v8::Function>> out;
   auto it = g_hotAccept.find(key);
@@ -383,9 +402,67 @@ std::vector<v8::Local<v8::Function>> GetHotDisposeCallbacks(v8::Isolate* isolate
   return out;
 }
 
+std::vector<v8::Local<v8::Function>> GetHotPruneCallbacks(v8::Isolate* isolate, const std::string& key) {
+  std::vector<v8::Local<v8::Function>> out;
+  auto it = g_hotPrune.find(key);
+  if (it != g_hotPrune.end()) {
+    for (auto& gfn : it->second) {
+      if (!gfn.IsEmpty()) out.push_back(gfn.Get(isolate));
+    }
+  }
+  return out;
+}
+
 void RegisterHotEventListener(v8::Isolate* isolate, const std::string& event, v8::Local<v8::Function> cb) {
   if (cb.IsEmpty()) return;
   g_hotEventListeners[event].emplace_back(v8::Global<v8::Function>(isolate, cb));
+}
+
+void RemoveHotEventListener(v8::Isolate* isolate, const std::string& event, v8::Local<v8::Function> cb) {
+  if (cb.IsEmpty()) return;
+  auto it = g_hotEventListeners.find(event);
+  if (it == g_hotEventListeners.end()) return;
+  auto& listeners = it->second;
+  // V8 strict equality — same Function reference. A user that registered
+  // the same closure twice gets BOTH copies removed; matches
+  // `EventTarget.removeEventListener` semantics for repeated registrations.
+  for (auto i = listeners.begin(); i != listeners.end();) {
+    if (!i->IsEmpty() && i->Get(isolate) == cb) {
+      i->Reset();
+      i = listeners.erase(i);
+    } else {
+      ++i;
+    }
+  }
+  if (listeners.empty()) {
+    g_hotEventListeners.erase(it);
+  }
+}
+
+void MarkHotDeclined(const std::string& key) {
+  if (key.empty()) return;
+  std::lock_guard<std::mutex> lock(g_hotDeclinedMutex);
+  g_hotDeclined.insert(key);
+}
+
+bool IsHotDeclined(const std::string& key) {
+  if (key.empty()) return false;
+  std::lock_guard<std::mutex> lock(g_hotDeclinedMutex);
+  return g_hotDeclined.find(key) != g_hotDeclined.end();
+}
+
+bool IsAnyModuleDeclined(const std::vector<std::string>& keys) {
+  std::lock_guard<std::mutex> lock(g_hotDeclinedMutex);
+  if (g_hotDeclined.empty()) return false;
+  if (keys.empty()) {
+    // "Is anything declined?" — yes if the set is non-empty (already
+    // checked above).
+    return true;
+  }
+  for (const auto& k : keys) {
+    if (g_hotDeclined.find(k) != g_hotDeclined.end()) return true;
+  }
+  return false;
 }
 
 std::vector<v8::Local<v8::Function>> GetHotEventListeners(v8::Isolate* isolate, const std::string& event) {
@@ -451,6 +528,285 @@ void InitializeHotEventDispatcher(v8::Isolate* isolate, v8::Local<v8::Context> c
   v8::Local<v8::Object> global = context->Global();
   v8::Local<v8::Function> dispatchFn = v8::Function::New(context, dispatchCb).ToLocalChecked();
   global->CreateDataProperty(context, tns::ToV8String(isolate, "__NS_DISPATCH_HOT_EVENT__"), dispatchFn).Check();
+}
+
+int RunHotDisposeCallbacks(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                           const std::vector<std::string>& keys) {
+  using v8::Function;
+  using v8::Global;
+  using v8::HandleScope;
+  using v8::Local;
+  using v8::Object;
+  using v8::TryCatch;
+  using v8::Value;
+
+  // Snapshot the keys we'll drain so callers passing an empty list get
+  // every registered module. We snapshot first (rather than iterating the
+  // map directly) so the registry can be safely mutated mid-drain — both
+  // when we erase entries below, and if a dispose callback itself decides
+  // to register a new accept/dispose for the same module (which is legal
+  // per Vite spec and lets users implement hot-data persistence).
+  std::vector<std::string> targetKeys;
+  if (keys.empty()) {
+    targetKeys.reserve(g_hotDispose.size());
+    for (const auto& kv : g_hotDispose) {
+      targetKeys.push_back(kv.first);
+    }
+  } else {
+    targetKeys = keys;
+  }
+
+  if (targetKeys.empty()) {
+    return 0;
+  }
+
+  HandleScope handleScope(isolate);
+  int executed = 0;
+
+  for (const auto& key : targetKeys) {
+    auto it = g_hotDispose.find(key);
+    if (it == g_hotDispose.end() || it->second.empty()) {
+      continue;
+    }
+
+    // Move callbacks out of the registry BEFORE invoking. This prevents:
+    //   * Re-entrant drain calls from re-firing the same callbacks.
+    //   * Callbacks that call `import.meta.hot.dispose()` again from
+    //     racing with our iteration (their newly-registered cb lands in
+    //     the now-empty bucket and survives until the next drain — the
+    //     correct Vite-spec behaviour for a module that re-installs
+    //     side-effects after running cleanup).
+    std::vector<Global<Function>> callbacks;
+    callbacks.swap(it->second);
+    g_hotDispose.erase(it);
+
+    // The user-visible callback signature is `(data) => void`. Pass the
+    // module's `hot.data` so users can stash state across the reload —
+    // matches Vite's contract documented at:
+    //   https://vite.dev/guide/api-hmr#hot-dispose-cb
+    Local<Object> data = GetOrCreateHotData(isolate, key);
+    Local<Value> args[] = { data };
+
+    for (auto& gfn : callbacks) {
+      if (gfn.IsEmpty()) continue;
+      Local<Function> cb = gfn.Get(isolate);
+      if (cb.IsEmpty()) continue;
+
+      TryCatch tryCatch(isolate);
+      v8::MaybeLocal<Value> result = cb->Call(context, v8::Undefined(isolate), 1, args);
+      (void)result;
+      if (tryCatch.HasCaught()) {
+        // One bad disposer must NEVER take down the HMR cycle for
+        // everyone else. Log under the existing script-loading flag so
+        // the user has a way to enable diagnostic visibility without
+        // recompiling, and continue.
+        if (tns::IsScriptLoadingLogEnabled()) {
+          Local<Value> ex = tryCatch.Exception();
+          v8::String::Utf8Value msg(isolate, ex);
+          Log(@"[import.meta.hot.dispose] callback threw for key=%s: %s",
+              key.c_str(), *msg ? *msg : "(unknown)");
+        }
+        // Don't ReThrow — swallow per-callback failures so subsequent
+        // disposers (and the reboot itself) still run.
+        continue;
+      }
+      ++executed;
+    }
+  }
+
+  return executed;
+}
+
+void InitializeHotDisposeRunner(v8::Isolate* isolate, v8::Local<v8::Context> context) {
+  using v8::FunctionCallbackInfo;
+  using v8::Local;
+  using v8::Value;
+
+  // Global JS-callable: `__nsRunHmrDispose(keys?: string[]) => number`.
+  // Mirrors `InitializeHotEventDispatcher`'s exposure pattern. Used by
+  // `@nativescript/vite`'s Angular HMR client to drain `import.meta.hot.dispose`
+  // callbacks immediately before `__reboot_ng_modules__`.
+  //
+  // The `keys` argument lets future HMR clients drain only specific modules
+  // (e.g. for per-module hot replacement). Today's Angular client passes no
+  // arg so the runtime drains everything — accurate to the wholesale-reboot
+  // semantics of `__reboot_ng_modules__` (the entire JS realm's side-effect
+  // tree is being torn down).
+  auto runDisposeCb = [](const FunctionCallbackInfo<Value>& info) {
+    v8::Isolate* iso = info.GetIsolate();
+    v8::Local<v8::Context> ctx = iso->GetCurrentContext();
+
+    std::vector<std::string> keys;
+    if (info.Length() >= 1 && info[0]->IsArray()) {
+      v8::Local<v8::Array> arr = info[0].As<v8::Array>();
+      uint32_t length = arr->Length();
+      keys.reserve(length);
+      for (uint32_t i = 0; i < length; ++i) {
+        v8::Local<Value> entry;
+        if (!arr->Get(ctx, i).ToLocal(&entry)) continue;
+        if (!entry->IsString()) continue;
+        v8::String::Utf8Value s(iso, entry);
+        if (*s) keys.emplace_back(*s);
+      }
+    }
+    // info[0] is null/undefined/missing/non-array → empty `keys` → drain all.
+
+    int executed = RunHotDisposeCallbacks(iso, ctx, keys);
+    info.GetReturnValue().Set(static_cast<int32_t>(executed));
+  };
+
+  v8::Local<v8::Object> global = context->Global();
+  v8::Local<v8::Function> fn = v8::Function::New(context, runDisposeCb).ToLocalChecked();
+  global->CreateDataProperty(context,
+                             tns::ToV8String(isolate, "__nsRunHmrDispose"),
+                             fn).Check();
+}
+
+int RunHotPruneCallbacks(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                         const std::vector<std::string>& keys) {
+  // Identical structure to `RunHotDisposeCallbacks` — see that function's
+  // comments for the snapshot/swap rationale (re-entrancy safety, mid-drain
+  // re-registration, per-callback try/catch). The only differences are the
+  // registry we drain (`g_hotPrune` instead of `g_hotDispose`) and the log
+  // tag.
+  using v8::Function;
+  using v8::Global;
+  using v8::HandleScope;
+  using v8::Local;
+  using v8::Object;
+  using v8::TryCatch;
+  using v8::Value;
+
+  std::vector<std::string> targetKeys;
+  if (keys.empty()) {
+    targetKeys.reserve(g_hotPrune.size());
+    for (const auto& kv : g_hotPrune) {
+      targetKeys.push_back(kv.first);
+    }
+  } else {
+    targetKeys = keys;
+  }
+
+  if (targetKeys.empty()) return 0;
+
+  HandleScope handleScope(isolate);
+  int executed = 0;
+
+  for (const auto& key : targetKeys) {
+    auto it = g_hotPrune.find(key);
+    if (it == g_hotPrune.end() || it->second.empty()) continue;
+
+    std::vector<Global<Function>> callbacks;
+    callbacks.swap(it->second);
+    g_hotPrune.erase(it);
+
+    Local<Object> data = GetOrCreateHotData(isolate, key);
+    Local<Value> args[] = { data };
+
+    for (auto& gfn : callbacks) {
+      if (gfn.IsEmpty()) continue;
+      Local<Function> cb = gfn.Get(isolate);
+      if (cb.IsEmpty()) continue;
+
+      TryCatch tryCatch(isolate);
+      v8::MaybeLocal<Value> result = cb->Call(context, v8::Undefined(isolate), 1, args);
+      (void)result;
+      if (tryCatch.HasCaught()) {
+        if (tns::IsScriptLoadingLogEnabled()) {
+          Local<Value> ex = tryCatch.Exception();
+          v8::String::Utf8Value msg(isolate, ex);
+          Log(@"[import.meta.hot.prune] callback threw for key=%s: %s",
+              key.c_str(), *msg ? *msg : "(unknown)");
+        }
+        continue;
+      }
+      ++executed;
+    }
+  }
+
+  return executed;
+}
+
+void InitializeHotPruneRunner(v8::Isolate* isolate, v8::Local<v8::Context> context) {
+  using v8::FunctionCallbackInfo;
+  using v8::Local;
+  using v8::Value;
+
+  // Global JS-callable: `__nsRunHmrPrune(keys?: string[]) => number`.
+  // Symmetric with `__nsRunHmrDispose`. The Angular HMR client doesn't call
+  // this today (its wholesale `__reboot_ng_modules__` model has no per-module
+  // prune step), but the runner is plumbed end-to-end so future per-module
+  // HMR clients can drain prune callbacks at the right moment.
+  auto runPruneCb = [](const FunctionCallbackInfo<Value>& info) {
+    v8::Isolate* iso = info.GetIsolate();
+    v8::Local<v8::Context> ctx = iso->GetCurrentContext();
+
+    std::vector<std::string> keys;
+    if (info.Length() >= 1 && info[0]->IsArray()) {
+      v8::Local<v8::Array> arr = info[0].As<v8::Array>();
+      uint32_t length = arr->Length();
+      keys.reserve(length);
+      for (uint32_t i = 0; i < length; ++i) {
+        v8::Local<Value> entry;
+        if (!arr->Get(ctx, i).ToLocal(&entry)) continue;
+        if (!entry->IsString()) continue;
+        v8::String::Utf8Value s(iso, entry);
+        if (*s) keys.emplace_back(*s);
+      }
+    }
+
+    int executed = RunHotPruneCallbacks(iso, ctx, keys);
+    info.GetReturnValue().Set(static_cast<int32_t>(executed));
+  };
+
+  v8::Local<v8::Object> global = context->Global();
+  v8::Local<v8::Function> fn = v8::Function::New(context, runPruneCb).ToLocalChecked();
+  global->CreateDataProperty(context,
+                             tns::ToV8String(isolate, "__nsRunHmrPrune"),
+                             fn).Check();
+}
+
+void InitializeHotDeclinedHelper(v8::Isolate* isolate, v8::Local<v8::Context> context) {
+  using v8::FunctionCallbackInfo;
+  using v8::Local;
+  using v8::Value;
+
+  // Global JS-callable: `__nsHasDeclinedModule(keys?: string[]) => boolean`.
+  // The Angular HMR client passes the eviction-set (`msg.evictPaths`) here
+  // before applying an update; on `true` it falls back to a full reload via
+  // `__nsReloadDevApp` instead of the per-cycle reboot.
+  //
+  // No-arg form ("is anything declined at all?") returns `true` if any
+  // module ever called `import.meta.hot.decline()`. Useful as a coarse
+  // pre-check: if the answer is `false` the client can skip the more
+  // expensive per-key check below.
+  auto hasDeclinedCb = [](const FunctionCallbackInfo<Value>& info) {
+    v8::Isolate* iso = info.GetIsolate();
+    v8::Local<v8::Context> ctx = iso->GetCurrentContext();
+
+    std::vector<std::string> keys;
+    if (info.Length() >= 1 && info[0]->IsArray()) {
+      v8::Local<v8::Array> arr = info[0].As<v8::Array>();
+      uint32_t length = arr->Length();
+      keys.reserve(length);
+      for (uint32_t i = 0; i < length; ++i) {
+        v8::Local<Value> entry;
+        if (!arr->Get(ctx, i).ToLocal(&entry)) continue;
+        if (!entry->IsString()) continue;
+        v8::String::Utf8Value s(iso, entry);
+        if (*s) keys.emplace_back(*s);
+      }
+    }
+
+    bool declined = IsAnyModuleDeclined(keys);
+    info.GetReturnValue().Set(declined);
+  };
+
+  v8::Local<v8::Object> global = context->Global();
+  v8::Local<v8::Function> fn = v8::Function::New(context, hasDeclinedCb).ToLocalChecked();
+  global->CreateDataProperty(context,
+                             tns::ToV8String(isolate, "__nsHasDeclinedModule"),
+                             fn).Check();
 }
 
 void InitializeImportMetaHot(v8::Isolate* isolate,
@@ -614,14 +970,117 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
     info.GetReturnValue().Set(v8::Undefined(iso));
   };
 
-  // decline() — mark declined (no-op for now)
-  auto declineCb = [](const FunctionCallbackInfo<Value>& info) {
-    info.GetReturnValue().Set(v8::Undefined(info.GetIsolate()));
+  // prune(cb) — register a callback that fires when this module is removed
+  // from the dep graph (NOT on every replacement — that's `dispose`). Today
+  // the NS HMR pipeline does wholesale reboots so prune callbacks rarely
+  // fire, but the registry is plumbed end-to-end so a future per-module
+  // HMR client can drain `g_hotPrune` via `__nsRunHmrPrune`.
+  auto pruneCb = [](const FunctionCallbackInfo<Value>& info) {
+    v8::Isolate* iso = info.GetIsolate();
+    Local<Value> data = info.Data();
+    std::string key;
+    if (!data.IsEmpty()) { v8::String::Utf8Value s(iso, data); key = *s ? *s : ""; }
+    if (info.Length() >= 1 && info[0]->IsFunction()) {
+      RegisterHotPrune(iso, key, info[0].As<v8::Function>());
+    }
+    info.GetReturnValue().Set(v8::Undefined(iso));
   };
 
-  // invalidate() — no-op for now
+  // decline() — mark this module as not hot-updateable (Vite spec). Adds the
+  // canonical key to `g_hotDeclined`; the HMR client checks this set via
+  // `__nsHasDeclinedModule(updatedKeys)` before applying an update and
+  // converts the cycle into a full reload (`__nsReloadDevApp`) on a hit.
+  auto declineCb = [](const FunctionCallbackInfo<Value>& info) {
+    v8::Isolate* iso = info.GetIsolate();
+    Local<Value> data = info.Data();
+    std::string key;
+    if (!data.IsEmpty()) { v8::String::Utf8Value s(iso, data); key = *s ? *s : ""; }
+    if (!key.empty()) {
+      MarkHotDeclined(key);
+      if (tns::IsScriptLoadingLogEnabled()) {
+        Log(@"[import.meta.hot.decline] key=%s", key.c_str());
+      }
+    }
+    info.GetReturnValue().Set(v8::Undefined(iso));
+  };
+
+  // invalidate(message?) — request a full app reload. Per Vite spec this
+  // notifies the dev server; in NS we short-circuit to the runtime's
+  // `__nsReloadDevApp` global (which already does the right invalidate +
+  // re-import dance). The optional `message` argument is logged for the
+  // common Analog HMR fallback case (`'Component HMR failed, reloading'`),
+  // which used to silently no-op.
+  //
+  // We invoke `__nsReloadDevApp` from a microtask so the user's current
+  // execution stack (which contains the `invalidate()` call site) finishes
+  // before the runtime tears down for reload — calling synchronously would
+  // try to re-bootstrap from inside an in-flight callback.
   auto invalidateCb = [](const FunctionCallbackInfo<Value>& info) {
-    info.GetReturnValue().Set(v8::Undefined(info.GetIsolate()));
+    v8::Isolate* iso = info.GetIsolate();
+    Local<Value> data = info.Data();
+    std::string key;
+    if (!data.IsEmpty()) { v8::String::Utf8Value s(iso, data); key = *s ? *s : ""; }
+
+    std::string message;
+    if (info.Length() >= 1 && info[0]->IsString()) {
+      v8::String::Utf8Value m(iso, info[0]);
+      if (*m) message = *m;
+    }
+    if (tns::IsScriptLoadingLogEnabled()) {
+      Log(@"[import.meta.hot.invalidate] key=%s message=%s",
+          key.c_str(), message.empty() ? "(none)" : message.c_str());
+    }
+
+    v8::Local<v8::Context> ctx = iso->GetCurrentContext();
+    v8::Local<v8::Object> global = ctx->Global();
+    v8::Local<Value> reloadVal;
+    if (!global->Get(ctx, tns::ToV8String(iso, "__nsReloadDevApp")).ToLocal(&reloadVal)) {
+      info.GetReturnValue().Set(v8::Undefined(iso));
+      return;
+    }
+    if (!reloadVal->IsFunction()) {
+      // Older runtime / non-dev mode — silently no-op. Nothing else
+      // we can usefully do here.
+      info.GetReturnValue().Set(v8::Undefined(iso));
+      return;
+    }
+
+    // Defer the call via a resolved-promise microtask so we exit the
+    // current call stack before the reload tears the runtime down. Using
+    // microtasks rather than `setTimeout` keeps the deferral inside the
+    // same V8 microtask checkpoint — no event-loop delay, no UI hitch.
+    v8::Local<v8::Function> reloadFn = reloadVal.As<v8::Function>();
+    v8::Local<v8::Promise::Resolver> resolver;
+    if (v8::Promise::Resolver::New(ctx).ToLocal(&resolver)) {
+      v8::Local<v8::Function> deferred =
+          v8::Function::New(ctx, [](const FunctionCallbackInfo<Value>& innerInfo) {
+            v8::Isolate* innerIso = innerInfo.GetIsolate();
+            v8::Local<v8::Context> innerCtx = innerIso->GetCurrentContext();
+            v8::Local<v8::Object> innerGlobal = innerCtx->Global();
+            v8::Local<Value> reloadVal;
+            if (!innerGlobal->Get(innerCtx, tns::ToV8String(innerIso, "__nsReloadDevApp")).ToLocal(&reloadVal)) return;
+            if (!reloadVal->IsFunction()) return;
+            v8::Local<v8::Function> reloadFn = reloadVal.As<v8::Function>();
+            v8::TryCatch tc(innerIso);
+            (void)reloadFn->Call(innerCtx, v8::Undefined(innerIso), 0, nullptr);
+            // Reload is a fire-and-forget Promise on its own. Per-call
+            // failures aren't surfaced — they're not actionable from
+            // user code.
+          }).ToLocalChecked();
+      v8::Local<v8::Promise> p = resolver->GetPromise();
+      v8::MaybeLocal<v8::Promise> chained = p->Then(ctx, deferred);
+      (void)chained;
+      (void)resolver->Resolve(ctx, v8::Undefined(iso));
+    } else {
+      // Promise machinery unavailable — fall back to a synchronous call.
+      // The user's current call stack will be torn down mid-execution
+      // but the user already requested a full reload, so that's
+      // acceptable.
+      v8::TryCatch tc(iso);
+      (void)reloadFn->Call(ctx, v8::Undefined(iso), 0, nullptr);
+    }
+
+    info.GetReturnValue().Set(v8::Undefined(iso));
   };
 
   // on(event, cb) — register custom event listener
@@ -643,18 +1102,71 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
     info.GetReturnValue().Set(v8::Undefined(iso));
   };
 
-  // send(event, data) — send event to server (no-op on client, could be wired to WebSocket)
+  // off(event, cb) — counterpart to `on`. Removes a previously-registered
+  // listener (matched by V8 strict equality on the Function reference).
+  auto offCb = [](const FunctionCallbackInfo<Value>& info) {
+    v8::Isolate* iso = info.GetIsolate();
+    if (info.Length() < 2) {
+      info.GetReturnValue().Set(v8::Undefined(iso));
+      return;
+    }
+    if (!info[0]->IsString() || !info[1]->IsFunction()) {
+      info.GetReturnValue().Set(v8::Undefined(iso));
+      return;
+    }
+    v8::String::Utf8Value eventName(iso, info[0]);
+    std::string event = *eventName ? *eventName : "";
+    if (!event.empty()) {
+      RemoveHotEventListener(iso, event, info[1].As<v8::Function>());
+    }
+    info.GetReturnValue().Set(v8::Undefined(iso));
+  };
+
+  // send(event, data) — send a custom message to the dev server. The runtime
+  // intentionally does not own a WebSocket; it delegates to a JS-installed
+  // `globalThis.__nsHmrSendToServer(event, data)` so the WebSocket-owning
+  // JS layer (typically @nativescript/vite's HMR client) keeps sole
+  // responsibility for transport. If no JS-side handler is installed (older
+  // HMR clients, non-dev mode) this is a clean no-op.
   auto sendCb = [](const FunctionCallbackInfo<Value>& info) {
-    // No-op for now - could be wired to WebSocket for client->server events
-    info.GetReturnValue().Set(v8::Undefined(info.GetIsolate()));
+    v8::Isolate* iso = info.GetIsolate();
+    v8::Local<v8::Context> ctx = iso->GetCurrentContext();
+    v8::Local<v8::Object> global = ctx->Global();
+    v8::Local<Value> handlerVal;
+    if (!global->Get(ctx, tns::ToV8String(iso, "__nsHmrSendToServer")).ToLocal(&handlerVal)) {
+      info.GetReturnValue().Set(v8::Undefined(iso));
+      return;
+    }
+    if (!handlerVal->IsFunction()) {
+      info.GetReturnValue().Set(v8::Undefined(iso));
+      return;
+    }
+    v8::Local<v8::Function> handler = handlerVal.As<v8::Function>();
+
+    // Forward `(event, data)` exactly as called. We don't enforce types on
+    // `event` (Vite spec only specifies the first arg as a string but
+    // implementations let it be coerced) and we pass `data` through
+    // verbatim — JS-side serialization is the transport's concern.
+    int argc = info.Length();
+    if (argc > 2) argc = 2;
+    std::vector<v8::Local<Value>> args;
+    args.reserve(argc);
+    for (int i = 0; i < argc; ++i) args.push_back(info[i]);
+
+    v8::TryCatch tc(iso);
+    (void)handler->Call(ctx, v8::Undefined(iso), argc, args.data());
+    if (tc.HasCaught() && tns::IsScriptLoadingLogEnabled()) {
+      v8::Local<Value> ex = tc.Exception();
+      v8::String::Utf8Value m(iso, ex);
+      Log(@"[import.meta.hot.send] handler threw: %s", *m ? *m : "(unknown)");
+    }
+    info.GetReturnValue().Set(v8::Undefined(iso));
   };
 
   Local<Object> hot = Object::New(isolate);
   // Stable flags
   hot->CreateDataProperty(context, tns::ToV8String(isolate, "data"),
                           GetOrCreateHotData(isolate, key)).Check();
-  hot->CreateDataProperty(context, tns::ToV8String(isolate, "prune"),
-                          v8::Boolean::New(isolate, false)).Check();
   // Methods
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "accept"),
@@ -662,6 +1174,9 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "dispose"),
       v8::Function::New(context, disposeCb, makeKeyData(key)).ToLocalChecked()).Check();
+  hot->CreateDataProperty(
+    context, tns::ToV8String(isolate, "prune"),
+      v8::Function::New(context, pruneCb, makeKeyData(key)).ToLocalChecked()).Check();
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "decline"),
       v8::Function::New(context, declineCb, makeKeyData(key)).ToLocalChecked()).Check();
@@ -671,6 +1186,9 @@ void InitializeImportMetaHot(v8::Isolate* isolate,
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "on"),
       v8::Function::New(context, onCb, makeKeyData(key)).ToLocalChecked()).Check();
+  hot->CreateDataProperty(
+    context, tns::ToV8String(isolate, "off"),
+      v8::Function::New(context, offCb, makeKeyData(key)).ToLocalChecked()).Check();
   hot->CreateDataProperty(
     context, tns::ToV8String(isolate, "send"),
       v8::Function::New(context, sendCb, makeKeyData(key)).ToLocalChecked()).Check();
@@ -1882,6 +2400,24 @@ void CleanupHMRGlobals() {
     for (auto& fn : kv.second) { fn.Reset(); }
   }
   g_hotDispose.clear();
+
+  for (auto& kv : g_hotPrune) {
+    for (auto& fn : kv.second) { fn.Reset(); }
+  }
+  g_hotPrune.clear();
+
+  for (auto& kv : g_hotEventListeners) {
+    for (auto& fn : kv.second) { fn.Reset(); }
+  }
+  g_hotEventListeners.clear();
+
+  {
+    // `g_hotDeclined` holds plain strings — no v8::Global handles — but
+    // we still clear it under its own mutex on teardown so a re-launched
+    // runtime in the same process starts with a clean slate.
+    std::lock_guard<std::mutex> lock(g_hotDeclinedMutex);
+    g_hotDeclined.clear();
+  }
 
   // Drop any speculatively-prefetched module sources. These are plain
   // std::string buffers (no v8::Global), but flushing them on teardown
