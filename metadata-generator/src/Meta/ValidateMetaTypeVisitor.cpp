@@ -171,3 +171,10 @@ bool ValidateMetaTypeVisitor::visitNullable(const NullableType& typeDetails) {
 
   return true;
 }
+
+bool ValidateMetaTypeVisitor::visitNonNullable(
+    const NonNullableType& typeDetails) {
+  typeDetails.innerType->visit(*this);
+
+  return true;
+}

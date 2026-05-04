@@ -93,6 +93,8 @@ class ValidateMetaTypeVisitor : public TypeVisitor<bool> {
 
   virtual bool visitNullable(const ::Meta::NullableType& type);
 
+  virtual bool visitNonNullable(const ::Meta::NonNullableType& type);
+
  private:
   MetaFactory& _metaFactory;
 };

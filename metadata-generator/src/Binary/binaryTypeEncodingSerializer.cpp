@@ -293,6 +293,12 @@ binary::BinaryTypeEncodingSerializer::visitNullable(
 }
 
 unique_ptr<binary::TypeEncoding>
+binary::BinaryTypeEncodingSerializer::visitNonNullable(
+    const ::Meta::NonNullableType& type) {
+  return type.innerType->visit(*this);
+}
+
+unique_ptr<binary::TypeEncoding>
 binary::BinaryTypeEncodingSerializer::serializeRecordEncoding(
     const binary::BinaryTypeEncodingType encodingType,
     const std::vector< ::Meta::RecordField>& fields) {
