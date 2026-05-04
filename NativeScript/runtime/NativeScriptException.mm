@@ -4,13 +4,13 @@
 #if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #endif
+#include <TargetConditionals.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
-#include <TargetConditionals.h>
-#include <sstream>
-#include <mutex>
-#include <limits>
 #include <algorithm>
+#include <limits>
+#include <mutex>
+#include <sstream>
 #include "Caches.h"
 #include "Helpers.h"
 #include "Runtime.h"
@@ -39,7 +39,7 @@ static std::mutex gErrorDisplayMutex;
 static PendingErrorDisplay gPendingErrorDisplay;
 static uint64_t gNextErrorTicket = 1;
 
-}
+}  // namespace
 
 namespace tns {
 
@@ -50,8 +50,7 @@ extern bool isErrorDisplayShowing;
 static void UpdateDisplayedStackText(const std::string& stackText);
 static void RenderErrorModalUI(v8::Isolate* isolate, const std::string& title,
                                const std::string& message, const std::string& stackText);
-static void ShowErrorModalSynchronously(const std::string& title,
-                                        const std::string& message,
+static void ShowErrorModalSynchronously(const std::string& title, const std::string& message,
                                         const std::string& stackTrace);
 static void ScheduleFallbackPresentation(uint64_t ticket);
 static void PresentFallbackIfNeeded(uint64_t ticket);
@@ -217,11 +216,7 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
     }
   } @catch (NSException* exception) {
     Log(@"OnUncaughtError: Caught exception during error handling: %@", exception);
-    if (RuntimeConfig.IsDebug) {
-      Log(@"Debug mode - suppressing crash and continuing");
-    } else {
-      @throw exception;  // Re-throw in release mode
-    }
+    @throw exception;
   }
 }
 
@@ -341,21 +336,10 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
       }
     }
 
-    // For non-critical exceptions:
-    if (RuntimeConfig.IsDebug) {
-      // Be gentle, state case in logs and allow developer to continue
-      Log(@"Debug mode - suppressing throw to continue: %s", this->message_.c_str());
-    } else {
-      // just re-throw normally
-      isolate->ThrowException(errObj);
-    }
+    isolate->ThrowException(errObj);
   } @catch (NSException* exception) {
     Log(@"ReThrowToV8: Caught exception during error handling: %@", exception);
-    if (RuntimeConfig.IsDebug) {
-      Log(@"Debug mode - suppressing crash and continuing");
-    } else {
-      @throw exception;  // Re-throw in release mode
-    }
+    @throw exception;
   }
 }
 
@@ -486,7 +470,8 @@ void NativeScriptException::ShowErrorModal(Isolate* isolate, const std::string& 
   {
     std::lock_guard<std::mutex> lock(gErrorDisplayMutex);
 
-    // If the console already presented this error (console-first scenario), just enrich the context.
+    // If the console already presented this error (console-first scenario), just enrich the
+    // context.
     if (gPendingErrorDisplay.ticket != 0 && !gPendingErrorDisplay.contextCaptured &&
         gPendingErrorDisplay.modalPresented) {
       gPendingErrorDisplay.contextCaptured = true;
@@ -519,7 +504,8 @@ void NativeScriptException::ShowErrorModal(Isolate* isolate, const std::string& 
   }
 }
 
-void NativeScriptException::SubmitConsoleErrorPayload(Isolate* isolate, const std::string& payload) {
+void NativeScriptException::SubmitConsoleErrorPayload(Isolate* isolate,
+                                                      const std::string& payload) {
   if (!RuntimeConfig.IsDebug) {
     return;
   }
@@ -587,19 +573,19 @@ void NativeScriptException::SubmitConsoleErrorPayload(Isolate* isolate, const st
   }
 
   if (presentNow) {
-    std::string displayStack = stateSnapshot.canonicalStack.empty()
-                                    ? (stateSnapshot.consolePayload.empty()
-                                           ? ResolveDisplayStack(stateSnapshot)
-                                           : stateSnapshot.consolePayload)
-                                    : stateSnapshot.canonicalStack;
+    std::string displayStack =
+        stateSnapshot.canonicalStack.empty()
+            ? (stateSnapshot.consolePayload.empty() ? ResolveDisplayStack(stateSnapshot)
+                                                    : stateSnapshot.consolePayload)
+            : stateSnapshot.canonicalStack;
     RenderErrorModalUI(stateSnapshot.isolate, stateSnapshot.title, stateSnapshot.message,
                        displayStack);
   } else if (updateExisting) {
     std::string displayStack = gPendingErrorDisplay.canonicalStack.empty()
-                                    ? (gPendingErrorDisplay.consolePayload.empty()
-                                           ? ResolveDisplayStack(gPendingErrorDisplay)
-                                           : gPendingErrorDisplay.consolePayload)
-                                    : gPendingErrorDisplay.canonicalStack;
+                                   ? (gPendingErrorDisplay.consolePayload.empty()
+                                          ? ResolveDisplayStack(gPendingErrorDisplay)
+                                          : gPendingErrorDisplay.consolePayload)
+                                   : gPendingErrorDisplay.canonicalStack;
     UpdateDisplayedStackText(displayStack);
   }
 }
@@ -743,7 +729,10 @@ static void RenderErrorModalUI(v8::Isolate* isolate, const std::string& title,
     for (UIScene* scene in app.connectedScenes) {
       if ([scene isKindOfClass:[UIWindowScene class]]) {
         UIWindowScene* ws = (UIWindowScene*)scene;
-        if (ws.windows.count > 0) { hasAnyWindows = YES; break; }
+        if (ws.windows.count > 0) {
+          hasAnyWindows = YES;
+          break;
+        }
       }
     }
   }
@@ -782,8 +771,7 @@ static void RenderErrorModalUI(v8::Isolate* isolate, const std::string& title,
   }
 }
 
-static void ShowErrorModalSynchronously(const std::string& title,
-                                        const std::string& message,
+static void ShowErrorModalSynchronously(const std::string& title, const std::string& message,
                                         const std::string& stackTrace) {
   // Use static variables to keep strong references and prevent deallocation
   static UIWindow* __attribute__((unused)) foundationWindowRef =
@@ -800,7 +788,10 @@ static void ShowErrorModalSynchronously(const std::string& title,
   if (@available(iOS 13.0, *)) {
     for (UIScene* scene in sharedApp.connectedScenes) {
       if ([scene isKindOfClass:[UIWindowScene class]]) {
-        if (((UIWindowScene*)scene).windows.count > 0) { appHasWindows = YES; break; }
+        if (((UIWindowScene*)scene).windows.count > 0) {
+          appHasWindows = YES;
+          break;
+        }
       }
     }
   }
@@ -863,14 +854,16 @@ static void ShowErrorModalSynchronously(const std::string& title,
       // Give iOS a moment to process the new window hierarchy (we're already on main queue)
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
 
-
       // Detailed window hierarchy inspection
       BOOL appHasWindowsAfterBootstrap = NO;
 #if TARGET_OS_VISION
       if (@available(iOS 13.0, *)) {
         for (UIScene* scene in sharedApp.connectedScenes) {
           if ([scene isKindOfClass:[UIWindowScene class]]) {
-            if (((UIWindowScene*)scene).windows.count > 0) { appHasWindowsAfterBootstrap = YES; break; }
+            if (((UIWindowScene*)scene).windows.count > 0) {
+              appHasWindowsAfterBootstrap = YES;
+              break;
+            }
           }
         }
       }
@@ -1069,7 +1062,6 @@ static void ShowErrorModalSynchronously(const std::string& title,
   [stackTraceContainer addSubview:stackTraceTextView];
   gErrorStackTextView = stackTraceTextView;
 
-
   // Hot-reload indicator
   UILabel* hotReloadLabel = [[UILabel alloc] init];
   hotReloadLabel.text = @"Fix the error and save your changes to continue.";
@@ -1174,7 +1166,6 @@ static void ShowErrorModalSynchronously(const std::string& title,
     // Log(@"Error window in app windows: %@", windowInHierarchy ? @"YES" : @"NO");
 
     if (!windowInHierarchy) {
-
       // Aggressive fix 1: Try to force the window to be key and make it the only visible window
       Log(@"Total app windows before fix: %lu", (unsigned long)windows.count);
 
