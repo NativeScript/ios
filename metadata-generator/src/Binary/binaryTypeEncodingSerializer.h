@@ -118,5 +118,8 @@ class BinaryTypeEncodingSerializer
 
   virtual unique_ptr<TypeEncoding> visitNullable(
       const ::Meta::NullableType& type) override;
+
+  virtual unique_ptr<TypeEncoding> visitNonNullable(
+      const ::Meta::NonNullableType& type) override;
 };
 }  // namespace binary

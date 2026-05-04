@@ -99,6 +99,8 @@ class NameRetrieverVisitor : public ::Meta::TypeVisitor<std::string> {
 
   virtual std::string visitNullable(const ::Meta::NullableType& type);
 
+  virtual std::string visitNonNullable(const ::Meta::NonNullableType& type);
+
  private:
   NameRetrieverVisitor(bool tsNames) : tsNames(tsNames) {}
 

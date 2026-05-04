@@ -50,7 +50,8 @@ enum TypeType {
   TypeEnum,
   TypeTypeArgument,
   TypeExtVector,
-  TypeNullable
+  TypeNullable,
+  TypeNonNullable
 };
 
 class Type {
@@ -150,6 +151,8 @@ class Type {
         return visitor.visitExtVector(as<ExtVectorType>());
       case TypeNullable:
         return visitor.visitNullable(as<NullableType>());
+      case TypeNonNullable:
+        return visitor.visitNonNullable(as<NonNullableType>());
     }
   }
 
@@ -321,6 +324,14 @@ class NullableType : public Type {
  public:
   NullableType(Type* innerType)
       : Type(TypeType::TypeNullable), innerType(innerType) {}
+
+  Type* innerType;
+};
+
+class NonNullableType : public Type {
+ public:
+  NonNullableType(Type* innerType)
+      : Type(TypeType::TypeNonNullable), innerType(innerType) {}
 
   Type* innerType;
 };

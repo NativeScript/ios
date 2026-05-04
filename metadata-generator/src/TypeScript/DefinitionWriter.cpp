@@ -949,7 +949,8 @@ bool DefinitionWriter::hasClosedGenerics(const Type& type) {
 }
 
 std::string DefinitionWriter::tsifyType(const Type& type,
-                                        const bool isFuncParam) {
+                                        const bool isFuncParam,
+                                        const bool suppressNull) {
   switch (type.getType()) {
     case TypeVoid:
       return "void";
@@ -1010,6 +1011,9 @@ std::string DefinitionWriter::tsifyType(const Type& type,
                                      tsifyType(*pointerType.innerType) + ">";
       if (isFuncParam) {
         result += " | ArrayBufferLike | ArrayBufferView";
+      }
+      if (!suppressNull) {
+        result += " | null";
       }
       return result;
     }
@@ -1130,7 +1134,15 @@ std::string DefinitionWriter::tsifyType(const Type& type,
       return type.as<TypeArgumentType>().name;
     case TypeNullable: {
       const NullableType& nullableType = type.as<NullableType>();
+      if (nullableType.innerType->is(TypePointer)) {
+        return tsifyType(*nullableType.innerType, isFuncParam);
+      }
       return tsifyType(*nullableType.innerType, isFuncParam) + " | null";
+    }
+    case TypeNonNullable: {
+      const NonNullableType& nonNullType = type.as<NonNullableType>();
+      bool suppress = isFuncParam;
+      return tsifyType(*nonNullType.innerType, isFuncParam, suppress);
     }
     case TypeVaList:
     case TypeInstancetype:
