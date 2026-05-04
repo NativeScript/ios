@@ -7,6 +7,7 @@
 #include "Helpers.h"
 #include "InlineFunctions.h"
 #include "Interop.h"
+#include "MethodCallProfiler.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -748,6 +749,10 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   CacheItem<MethodMeta>* item =
       static_cast<CacheItem<MethodMeta>*>(info.Data().As<External>()->Value());
 
+  if (MethodCallProfiler::IsEnabled()) {
+    MethodCallProfiler::RecordCall(item->className_, item->meta_);
+  }
+
   bool instanceMethod = info.This()->InternalFieldCount() > 0;
   V8FunctionCallbackArgs args(info);
 
@@ -787,6 +792,10 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& 
     Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Property is not readable."));
     isolate->ThrowException(error);
     return;
+  }
+
+  if (MethodCallProfiler::IsEnabled()) {
+    MethodCallProfiler::RecordCall(item->className_, item->meta_->getter());
   }
 
   V8EmptyValueArgs args;
