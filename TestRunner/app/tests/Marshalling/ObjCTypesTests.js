@@ -397,4 +397,23 @@ describe(module.id, function () {
         expect(typeof array.firstObject).toEqual("boolean");
         expect(array.firstObject).toEqual(bool);
     });
+
+    it("NSErrorOutParameterWithNullabilityAnnotations", function () {
+        expect(function () {
+            TNSApi.new().methodNullableError(0);
+        }).not.toThrow();
+
+        var isThrown = false;
+        try {
+            TNSApi.new().methodNullableError(1);
+        } catch (e) {
+            isThrown = true;
+            expect(e.stack).toEqual(jasmine.any(String));
+        }
+        expect(isThrown).toBe(true);
+
+        var errorRef = new interop.Reference();
+        TNSApi.new().methodNullableError(1, errorRef);
+        expect(errorRef.value instanceof NSError).toBe(true);
+    });
 });
