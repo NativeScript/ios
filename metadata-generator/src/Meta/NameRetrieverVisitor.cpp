@@ -178,6 +178,11 @@ std::string NameRetrieverVisitor::visitNullable(
   return type.innerType->visit(*this);
 }
 
+std::string NameRetrieverVisitor::visitNonNullable(
+    const ::Meta::NonNullableType& type) {
+  return type.innerType->visit(*this);
+}
+
 std::string NameRetrieverVisitor::generateFixedArray(const Type* el_type,
                                                      size_t size) {
   std::stringstream ss(el_type->visit(*this));

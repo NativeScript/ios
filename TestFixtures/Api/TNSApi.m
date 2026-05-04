@@ -3,46 +3,57 @@
 NSString* const TNSConstant = @"TNSConstant";
 
 void functionThrowsException() {
-    @throw [NSException exceptionWithName:NSGenericException reason:@"No reason" userInfo:nil];
+  @throw [NSException exceptionWithName:NSGenericException reason:@"No reason" userInfo:nil];
 }
 
 @implementation TNSApi {
-    int _property;
+  int _property;
 }
 
 - (int)customGetter {
-    return _property;
+  return _property;
 }
 - (void)customSetter:(int)value {
-    _property = value;
+  _property = value;
 }
 
 + (void)methodThrowsException {
-    @throw [NSException exceptionWithName:NSGenericException reason:@"No reason" userInfo:nil];
+  @throw [NSException exceptionWithName:NSGenericException reason:@"No reason" userInfo:nil];
 }
 
 - (void)methodThrowsException {
-    @throw [NSException exceptionWithName:NSGenericException reason:@"No reason" userInfo:nil];
+  @throw [NSException exceptionWithName:NSGenericException reason:@"No reason" userInfo:nil];
 }
 
 - (void)methodCalledInDealloc {
-    // TODO
-    //    [TNSGetOutput() appendString:@"methodCalledInDealloc called"];
+  // TODO
+  //    [TNSGetOutput() appendString:@"methodCalledInDealloc called"];
 }
 
 - (void)dealloc {
-    [self methodCalledInDealloc];
+  [self methodCalledInDealloc];
 }
 
 - (BOOL)method:(NSInteger)errorCode error:(NSError**)outError {
-    if (outError) {
-        if (errorCode != 0) {
-            *outError = [NSError errorWithDomain:@"TNSErrorDomain" code:errorCode userInfo:nil];
-        } else {
-            *outError = nil;
-        }
+  if (outError) {
+    if (errorCode != 0) {
+      *outError = [NSError errorWithDomain:@"TNSErrorDomain" code:errorCode userInfo:nil];
+    } else {
+      *outError = nil;
     }
-    return errorCode == 0;
+  }
+  return errorCode == 0;
+}
+
+- (BOOL)methodNullable:(NSInteger)errorCode error:(NSError* _Nullable* _Nullable)outError {
+  if (outError) {
+    if (errorCode != 0) {
+      *outError = [NSError errorWithDomain:@"TNSErrorDomain" code:errorCode userInfo:nil];
+    } else {
+      *outError = nil;
+    }
+  }
+  return errorCode == 0;
 }
 
 @end
@@ -56,19 +67,19 @@ void functionThrowsException() {
 
 @implementation TNSConflictingSelectorTypes2
 + (id)method:(id)x {
-    return nil;
+  return nil;
 }
 - (id)method:(id)x {
-    return nil;
+  return nil;
 }
 @end
 
 @implementation TNSSwizzleKlass
 + (int)staticMethod:(int)x {
-    return x;
+  return x;
 }
 - (int)instanceMethod:(int)x {
-    return x;
+  return x;
 }
 @end
 
@@ -79,7 +90,7 @@ void functionThrowsException() {
 @implementation RectClass
 
 - (CGRect)getRect {
-    return CGRectMake(1, 2, 3, 4);
+  return CGRectMake(1, 2, 3, 4);
 }
 
 @end

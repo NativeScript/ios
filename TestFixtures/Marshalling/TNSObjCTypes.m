@@ -115,6 +115,15 @@ CFTypeRef TNSFunctionWithCreateCFTypeRefReturn() {
     return data;
 }
 
+- (NSMutableData*)methodWithNSMutableData:(NSMutableData*)data {
+    if (data.length > 0) {
+        uint8_t* bytes = (uint8_t*)data.mutableBytes;
+        bytes[0] = 'A';
+    }
+
+    return data;
+}
+
 - (NSDecimalNumber*)methodWithNSDecimalNumber:(NSDecimalNumber*)number {
     TNSLog([number stringValue]);
     return number;

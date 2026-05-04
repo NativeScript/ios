@@ -19,6 +19,7 @@ class EnumType;
 class TypeArgumentType;
 class ExtVectorType;
 class NullableType;
+class NonNullableType;
 
 /*
  * \class TypeVisitor<T>
@@ -107,5 +108,7 @@ class TypeVisitor {
   virtual T_RESULT visitTypeArgument(const ::Meta::TypeArgumentType& type) = 0;
 
   virtual T_RESULT visitNullable(const ::Meta::NullableType& type) = 0;
+
+  virtual T_RESULT visitNonNullable(const ::Meta::NonNullableType& type) = 0;
 };
 }  // namespace Meta

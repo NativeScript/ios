@@ -508,6 +508,8 @@ shared_ptr<Type> TypeFactory::createFromAttributedType(
   if (auto nullability = type->getImmediateNullability()) {
     if (*nullability == clang::NullabilityKind::Nullable) {
       return make_shared<NullableType>(innerType.get());
+    } else if (*nullability == clang::NullabilityKind::NonNull) {
+      return make_shared<NonNullableType>(innerType.get());
     }
   }
   return innerType;
