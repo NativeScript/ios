@@ -41,8 +41,12 @@ using namespace v8;
 
     Local<ArrayBufferView> bufferView = obj.As<ArrayBufferView>();
     if (bufferView->HasBuffer()) {
-        void* data = bufferView->Buffer()->GetBackingStore()->Data();
-        return data;
+        uint8_t* data = static_cast<uint8_t*>(bufferView->Buffer()->GetBackingStore()->Data());
+        if (data == nullptr) {
+            return nullptr;
+        }
+
+        return data + bufferView->ByteOffset();
     }
 
     size_t length = bufferView->ByteLength();

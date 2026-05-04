@@ -36,6 +36,7 @@ typedef int (^NumberReturner)(int, int, int);
 - (id)methodWithNSArrayWrappingDictionary:(id)array;
 - (NSDictionary*)methodWithNSDictionary:(NSDictionary*)dictionary;
 - (NSData*)methodWithNSData:(NSData*)data;
+- (NSMutableData*)methodWithNSMutableData:(NSMutableData*)data;
 - (NSDecimalNumber*)methodWithNSDecimalNumber:(NSDecimalNumber*)number;
 - (NSNumber*)methodWithNSCFBool;
 - (NSNull*)methodWithNSNull;

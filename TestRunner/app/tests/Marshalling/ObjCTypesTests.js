@@ -263,6 +263,31 @@ describe(module.id, function () {
         TNSClearOutput();
     });
 
+    it("should respect ArrayBufferView byteOffset when wrapping in NSData", function () {
+        var source = new Uint8Array([48, 49, 50, 51, 52, 53]);
+        var view = new Uint8Array(source.buffer, 1, 4);
+
+        var wrappedArrayBufferViewData = TNSObjCTypes.alloc().init().methodWithNSData(view);
+
+        expect(TNSGetOutput()).toBe('1234');
+        expect(wrappedArrayBufferViewData).toBe(view);
+        TNSClearOutput();
+    });
+
+    it("should respect ArrayBufferView byteOffset when mutating NSMutableData", function () {
+        var source = new Uint8Array([48, 49, 50, 51, 52]);
+        var view = new Uint8Array(source.buffer, 2, 2);
+
+        var wrappedArrayBufferViewData = TNSObjCTypes.alloc().init().methodWithNSMutableData(view);
+
+        expect(wrappedArrayBufferViewData).toBe(view);
+        expect(source[0]).toEqual(48);
+        expect(source[1]).toEqual(49);
+        expect(source[2]).toEqual(65);
+        expect(source[3]).toEqual(51);
+        expect(source[4]).toEqual(52);
+    });
+
     it("should be possible to wrap NSData in an ArrayBuffer", function () {
         var data = NSString.stringWithString("test").dataUsingEncoding(NSUTF8StringEncoding);
 
