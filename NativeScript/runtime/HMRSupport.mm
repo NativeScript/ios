@@ -1562,7 +1562,40 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 // real HTTP status code.
 static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, std::string& contentType, int& status) {
   @autoreleasepool {
-    NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
+    // One-time: replace the shared NSURLCache with a zero-capacity one
+    // so CFNetwork has no on-disk store to satisfy fetches from. Per-
+    // request cache policy + `removeCachedResponseForRequest:` were
+    // empirically insufficient on iOS 18+/26+ Simulator — fsCachedData
+    // would still serve a previous save's body for a tagged HMR URL.
+    static dispatch_once_t s_cacheDisableOnce;
+    dispatch_once(&s_cacheDisableOnce, ^{
+      NSURLCache* nullCache = [[NSURLCache alloc] initWithMemoryCapacity:0
+                                                            diskCapacity:0
+                                                            directoryURL:nil];
+      [NSURLCache setSharedURLCache:nullCache];
+    });
+
+    // For HMR re-fetch URLs (`/ns/m/__ns_hmr__/<tag>/...`), append a
+    // unique nonce query parameter so CFNetwork sees a different URL
+    // every time and cannot satisfy from any cache. Vite ignores
+    // unknown query params on these routes, so the response body is
+    // unchanged. Scoped to HMR URLs only because some Vite virtual
+    // routes (e.g. `/@nativescript/vendor.mjs`) require exact-match
+    // URLs and 404 on unknown query params. Boot fetches don't need
+    // cache busting — first-touch by definition.
+    std::string fetchUrl = url;
+    if (url.find("__ns_hmr__") != std::string::npos) {
+      static std::atomic<uint64_t> s_fetchSeq{0};
+      const uint64_t seq = s_fetchSeq.fetch_add(1, std::memory_order_relaxed);
+      const uint64_t nowMs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0);
+      fetchUrl += (url.find('?') == std::string::npos) ? '?' : '&';
+      fetchUrl += "__ns_dev_nonce=";
+      fetchUrl += std::to_string(nowMs);
+      fetchUrl += "-";
+      fetchUrl += std::to_string(seq);
+    }
+
+    NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:fetchUrl.c_str()]];
     if (!u) { status = 0; return false; }
 
     NSError* err = nil;
@@ -1578,6 +1611,23 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
    forHTTPHeaderField:@"Accept"];
     [request setValue:@"identity" forHTTPHeaderField:@"Accept-Encoding"];
     [request setTimeoutInterval:5.0];
+    // CRITICAL for HMR: layered defense to bypass CFNetwork's URL cache.
+    // `setCachePolicy:` alone is insufficient on iOS 18+/26+ Simulator —
+    // CFNetwork still serves a previous save's body for a tagged HMR
+    // URL from fsCachedData. Combined with the zero-capacity
+    // sharedURLCache and per-request URL nonce above, these give us a
+    // reliable "always go to origin" path for the dev runtime.
+    [request setValue:@"no-cache, no-store, max-age=0"
+   forHTTPHeaderField:@"Cache-Control"];
+    [request setValue:@"no-cache" forHTTPHeaderField:@"Pragma"];
+    // Force a fresh TCP connection per fetch. CFNetwork has been
+    // observed to serve a body buffered on a kept-alive HTTP/1.1
+    // connection for a prior fetch when a new fetch reuses it.
+    [request setValue:@"close" forHTTPHeaderField:@"Connection"];
+    [request setCachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData];
+    [request setHTTPShouldHandleCookies:NO];
+    [request setHTTPShouldUsePipelining:NO];
+    [[NSURLCache sharedURLCache] removeCachedResponseForRequest:request];
 
     NSURLResponse* response = nil;
 #pragma clang diagnostic push
@@ -1586,6 +1636,10 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
                                          returningResponse:&response
                                                      error:&err];
 #pragma clang diagnostic pop
+
+    // Drop any response sendSynchronousRequest: implicitly stored so it
+    // cannot poison a later fetch of the same URL.
+    [[NSURLCache sharedURLCache] removeCachedResponseForRequest:request];
 
     if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
       NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
