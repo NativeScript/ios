@@ -281,7 +281,7 @@ def gen_method_stub(method):
     else:
         super_call = build_super_call(cls, sel, ret, args)
         lines.append("    if (callSuper) {")
-        lines.append(f"        objc_super sup = {{target, [{cls} class]}};")
+        lines.append("        objc_super sup = {target, class_getSuperclass(object_getClass(target))};")
         if is_void:
             lines.append(f"        {super_call};")
         else:
@@ -793,9 +793,8 @@ def gen_external_method_stub(method, swift_classes):
     else:
         objc_call = build_objc_call(cls, sel, args, is_static=False, class_var=cvar, ret=ret)
         super_call = build_super_call(cls, sel, ret, args, struct_tag=True)
-        cls_ref = cvar if is_swift else f"[{cls} class]"
         lines.append("    if (callSuper) {")
-        lines.append(f"        struct objc_super sup = {{target, {cls_ref}}};")
+        lines.append("        struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};")
         if is_void:
             lines.append(f"        {super_call};")
         else:
@@ -847,6 +846,7 @@ _EXTERNAL_PREAMBLE_HEADER = """\
 
 _EXTERNAL_PREAMBLE_TAIL = """\
 #import <objc/message.h>
+#import <objc/runtime.h>
 
 """
 

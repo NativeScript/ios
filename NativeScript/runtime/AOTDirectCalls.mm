@@ -112,7 +112,7 @@ static void AOT_NSObject_respondsToSelector(const FunctionCallbackInfo<Value>& i
 
   BOOL result;
   if (callSuper) {
-    objc_super sup = {target, [NSObject class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((BOOL (*)(objc_super*, SEL, SEL))objc_msgSendSuper)(
         &sup, @selector(respondsToSelector:), arg0);
   } else {
@@ -137,7 +137,7 @@ static void AOT_NSObject_isKindOfClass(const FunctionCallbackInfo<Value>& info) 
 
   BOOL result;
   if (callSuper) {
-    objc_super sup = {target, [NSObject class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((BOOL (*)(objc_super*, SEL, Class))objc_msgSendSuper)(&sup, @selector(isKindOfClass:),
                                                                     arg0);
   } else {
@@ -158,7 +158,7 @@ static void AOT_NSObject_isEqual(const FunctionCallbackInfo<Value>& info) {
 
   BOOL result;
   if (callSuper) {
-    objc_super sup = {target, [NSObject class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((BOOL (*)(objc_super*, SEL, id))objc_msgSendSuper)(&sup, @selector(isEqual:), arg0);
   } else {
     result = [(NSObject*)target isEqual:arg0];
@@ -177,7 +177,7 @@ static void AOT_NSObject_description(const FunctionCallbackInfo<Value>& info) {
 
   id result;
   if (callSuper) {
-    objc_super sup = {target, [NSObject class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((id (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(description));
   } else {
     result = [(NSObject*)target description];
@@ -195,7 +195,7 @@ static void AOT_NSObject_hash(const FunctionCallbackInfo<Value>& info) {
 
   unsigned long result;
   if (callSuper) {
-    objc_super sup = {target, [NSObject class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(hash));
   } else {
     result = [(NSObject*)target hash];
@@ -212,7 +212,7 @@ static void AOT_NSMutableArray_removeAllObjects(const FunctionCallbackInfo<Value
   if (target == nil) return;
 
   if (callSuper) {
-    objc_super sup = {target, [NSMutableArray class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     ((void (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(removeAllObjects));
   } else {
     [(NSMutableArray*)target removeAllObjects];
@@ -229,7 +229,7 @@ static void AOT_NSMutableArray_addObject(const FunctionCallbackInfo<Value>& info
   id arg0 = AOTToObject(context, info[0]);
 
   if (callSuper) {
-    objc_super sup = {target, [NSMutableArray class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     ((void (*)(objc_super*, SEL, id))objc_msgSendSuper)(&sup, @selector(addObject:), arg0);
   } else {
     [(NSMutableArray*)target addObject:arg0];
@@ -247,7 +247,7 @@ static void AOT_NSMutableArray_objectAtIndex(const FunctionCallbackInfo<Value>& 
 
   id result;
   if (callSuper) {
-    objc_super sup = {target, [NSMutableArray class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((id (*)(objc_super*, SEL, unsigned long))objc_msgSendSuper)(
         &sup, @selector(objectAtIndex:), arg0);
   } else {
@@ -266,7 +266,7 @@ static void AOT_NSMutableArray_count(const FunctionCallbackInfo<Value>& info) {
 
   unsigned long result;
   if (callSuper) {
-    objc_super sup = {target, [NSMutableArray class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(count));
   } else {
     result = [(NSMutableArray*)target count];
@@ -286,7 +286,7 @@ static void AOT_NSMutableArray_insertObject_atIndex(const FunctionCallbackInfo<V
   unsigned long arg1 = (unsigned long)tns::ToNumber(isolate, info[1]);
 
   if (callSuper) {
-    objc_super sup = {target, [NSMutableArray class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     ((void (*)(objc_super*, SEL, id, unsigned long))objc_msgSendSuper)(
         &sup, @selector(insertObject:atIndex:), arg0, arg1);
   } else {
@@ -303,7 +303,7 @@ static void AOT_NSMutableArray_removeObjectAtIndex(const FunctionCallbackInfo<Va
   unsigned long arg0 = (unsigned long)tns::ToNumber(isolate, info[0]);
 
   if (callSuper) {
-    objc_super sup = {target, [NSMutableArray class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     ((void (*)(objc_super*, SEL, unsigned long))objc_msgSendSuper)(
         &sup, @selector(removeObjectAtIndex:), arg0);
   } else {
@@ -322,7 +322,7 @@ static void AOT_NSArray_objectAtIndex(const FunctionCallbackInfo<Value>& info) {
 
   id result;
   if (callSuper) {
-    objc_super sup = {target, [NSArray class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((id (*)(objc_super*, SEL, unsigned long))objc_msgSendSuper)(
         &sup, @selector(objectAtIndex:), arg0);
   } else {
@@ -341,7 +341,7 @@ static void AOT_NSArray_count(const FunctionCallbackInfo<Value>& info) {
 
   unsigned long result;
   if (callSuper) {
-    objc_super sup = {target, [NSArray class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(count));
   } else {
     result = [(NSArray*)target count];
@@ -361,7 +361,7 @@ static void AOT_NSDictionary_objectForKeyedSubscript(const FunctionCallbackInfo<
 
   id result;
   if (callSuper) {
-    objc_super sup = {target, [NSDictionary class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((id (*)(objc_super*, SEL, id))objc_msgSendSuper)(
         &sup, @selector(objectForKeyedSubscript:), arg0);
   } else {
@@ -380,7 +380,7 @@ static void AOT_NSDictionary_count(const FunctionCallbackInfo<Value>& info) {
 
   unsigned long result;
   if (callSuper) {
-    objc_super sup = {target, [NSDictionary class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(count));
   } else {
     result = [(NSDictionary*)target count];
@@ -400,7 +400,7 @@ static void AOT_NSMutableDictionary_setObject_forKey(const FunctionCallbackInfo<
   id arg1 = AOTToObject(context, info[1]);
 
   if (callSuper) {
-    objc_super sup = {target, [NSMutableDictionary class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     ((void (*)(objc_super*, SEL, id, id))objc_msgSendSuper)(&sup, @selector(setObject:forKey:),
                                                             arg0, arg1);
   } else {
@@ -418,7 +418,7 @@ static void AOT_NSMutableDictionary_removeObjectForKey(const FunctionCallbackInf
   id arg0 = AOTToObject(context, info[0]);
 
   if (callSuper) {
-    objc_super sup = {target, [NSMutableDictionary class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     ((void (*)(objc_super*, SEL, id))objc_msgSendSuper)(&sup, @selector(removeObjectForKey:), arg0);
   } else {
     [(NSMutableDictionary*)target removeObjectForKey:arg0];
@@ -434,7 +434,7 @@ static void AOT_NSString_length(const FunctionCallbackInfo<Value>& info) {
 
   unsigned long result;
   if (callSuper) {
-    objc_super sup = {target, [NSString class]};
+    objc_super sup = {target, class_getSuperclass(object_getClass(target))};
     result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(length));
   } else {
     result = [(NSString*)target length];

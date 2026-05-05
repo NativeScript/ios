@@ -1,5 +1,6 @@
 #include <Foundation/Foundation.h>
 #include <dlfcn.h>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include "ArgConverter.h"
@@ -39,11 +40,14 @@ v8::FunctionCallback GetExternalAOTCall(const char* className, const char* selec
 }
 
 void DiscoverExternalAOTStubs() {
-  typedef void (*RegistrarFn)(void (*)(const char*, const char*, bool, NSAOTCallHandler));
-  auto registrar = reinterpret_cast<RegistrarFn>(dlsym(RTLD_DEFAULT, "__ns_register_aot_calls"));
-  if (registrar) {
-    registrar(__ns_aot_register);
-  }
+  static std::once_flag flag;
+  std::call_once(flag, [] {
+    typedef void (*RegistrarFn)(void (*)(const char*, const char*, bool, NSAOTCallHandler));
+    auto registrar = reinterpret_cast<RegistrarFn>(dlsym(RTLD_DEFAULT, "__ns_register_aot_calls"));
+    if (registrar) {
+      registrar(__ns_aot_register);
+    }
+  });
 }
 
 }  // namespace tns
