@@ -109,6 +109,7 @@ class FFICall : public BaseCall {
                                   const TypeEncoding* fieldEncoding,
                                   const String* fieldNames,
                                   std::string structName = "");
+  static StructInfo* FindCachedStructInfo(const std::string& name);
 
   inline void* ArgumentBuffer(unsigned index) {
     return this->argsArray_[index];

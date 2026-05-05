@@ -137,6 +137,10 @@ class Interop {
     static JSBlockDescriptor kJSBlockDescriptor;
   } JSBlock;
 
+  static v8::Local<v8::Value> StructToValue(
+      v8::Local<v8::Context> context, void* result, StructInfo structInfo,
+      std::shared_ptr<v8::Persistent<v8::Value>> parentStruct);
+
  private:
   static void ExecuteWriteValueDebugValidationsIfInDebug(
       v8::Local<v8::Context> context, const TypeEncoding* typeEncoding,
@@ -181,9 +185,6 @@ class Interop {
   static bool isRefTypeEqual(const TypeEncoding* typeEncoding,
                              const char* clazz);
   static v8::Local<v8::Array> ToArray(v8::Local<v8::Object> object);
-  static v8::Local<v8::Value> StructToValue(
-      v8::Local<v8::Context> context, void* result, StructInfo structInfo,
-      std::shared_ptr<v8::Persistent<v8::Value>> parentStruct);
   static const TypeEncoding* CreateEncoding(BinaryTypeEncodingType type);
   static v8::Local<v8::Value> HandleOf(v8::Local<v8::Context> context,
                                        v8::Local<v8::Value> value);

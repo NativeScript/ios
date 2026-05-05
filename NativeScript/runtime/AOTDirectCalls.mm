@@ -40,19 +40,57 @@ static inline id AOTExtractTarget(Isolate* isolate, Local<Object> receiver, bool
   return target;
 }
 
-static inline Local<Value> AOTWrapId(Local<Context> context, id result) {
+__unused static inline Local<Value> AOTWrapId(Local<Context> context, id result) {
   Isolate* isolate = context->GetIsolate();
   if (result == nil) return Null(isolate);
 
-  if ([result isKindOfClass:[NSString class]]) {
-    return tns::ToV8String(isolate, [(NSString*)result UTF8String]);
-  }
   if ([result isKindOfClass:[NSNull class]]) {
     return Null(isolate);
+  }
+  if ([result isKindOfClass:[NSString class]] && ![result isKindOfClass:[NSMutableString class]]) {
+    return tns::ToV8String(isolate, (NSString*)result);
   }
   if ([result isKindOfClass:[NSNumber class]] && ![result isKindOfClass:[NSDecimalNumber class]]) {
     return Number::New(isolate, [(NSNumber*)result doubleValue]);
   }
+
+  auto* wrapper = new ObjCDataWrapper(result);
+  Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
+  tns::DeleteWrapperIfUnused(isolate, jsResult, wrapper);
+  return jsResult;
+}
+
+__unused static inline id AOTToObject(Local<Context> context, Local<Value> arg) {
+  Isolate* isolate = context->GetIsolate();
+  if (!arg.IsEmpty() && arg->IsObject()) {
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
+    if (wrapper) {
+      switch (wrapper->Type()) {
+        case WrapperType::ObjCObject:
+        case WrapperType::ObjCClass:
+        case WrapperType::ObjCProtocol:
+          break;
+        case WrapperType::ObjCAllocObject:
+          return [static_cast<ObjCAllocDataWrapper*>(wrapper)->Klass() alloc];
+        case WrapperType::Pointer:
+          return (id) static_cast<PointerWrapper*>(wrapper)->Data();
+        default:
+          return nil;
+      }
+    }
+  }
+  return Interop::ToObject(context, arg);
+}
+
+__unused static inline Local<Value> AOTWrapString(Local<Context> context, id result) {
+  Isolate* isolate = context->GetIsolate();
+  if (result == nil) return Null(isolate);
+  return tns::ToV8String(isolate, (NSString*)result);
+}
+
+__unused static inline Local<Value> AOTWrapObject(Local<Context> context, id result) {
+  Isolate* isolate = context->GetIsolate();
+  if (result == nil) return Null(isolate);
 
   auto* wrapper = new ObjCDataWrapper(result);
   Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
@@ -66,489 +104,343 @@ static inline Local<Value> AOTWrapId(Local<Context> context, id result) {
 
 // NSObject -[respondsToSelector:]
 static void AOT_NSObject_respondsToSelector(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    SEL arg0 = sel_registerName(tns::ToString(isolate, info[0]).c_str());
+  Isolate* isolate = info.GetIsolate();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  SEL arg0 = sel_registerName(tns::ToString(isolate, info[0]).c_str());
 
-    BOOL result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSObject class]};
-        result = ((BOOL (*)(objc_super*, SEL, SEL))objc_msgSendSuper)(
-            &sup, @selector(respondsToSelector:), arg0);
-      } else {
-        result = [(NSObject*)target respondsToSelector:arg0];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(v8::Boolean::New(isolate, result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  BOOL result;
+  if (callSuper) {
+    objc_super sup = {target, [NSObject class]};
+    result = ((BOOL (*)(objc_super*, SEL, SEL))objc_msgSendSuper)(
+        &sup, @selector(respondsToSelector:), arg0);
+  } else {
+    result = [(NSObject*)target respondsToSelector:arg0];
   }
+
+  info.GetReturnValue().Set(v8::Boolean::New(isolate, result));
 }
 
 // NSObject -[isKindOfClass:]
 static void AOT_NSObject_isKindOfClass(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    Class arg0 = nil;
-    BaseDataWrapper* argW0 = tns::GetValue(isolate, info[0]);
-    if (argW0 != nullptr && argW0->Type() == WrapperType::ObjCClass)
-      arg0 = static_cast<ObjCClassWrapper*>(argW0)->Klass();
-    else if (tns::IsString(info[0]))
-      arg0 = objc_getClass(tns::ToString(isolate, info[0]).c_str());
+  Isolate* isolate = info.GetIsolate();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  Class arg0 = nil;
+  BaseDataWrapper* argW0 = tns::GetValue(isolate, info[0]);
+  if (argW0 != nullptr && argW0->Type() == WrapperType::ObjCClass)
+    arg0 = static_cast<ObjCClassWrapper*>(argW0)->Klass();
+  else if (tns::IsString(info[0]))
+    arg0 = objc_getClass(tns::ToString(isolate, info[0]).c_str());
 
-    BOOL result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSObject class]};
-        result = ((BOOL (*)(objc_super*, SEL, Class))objc_msgSendSuper)(
-            &sup, @selector(isKindOfClass:), arg0);
-      } else {
-        result = [(NSObject*)target isKindOfClass:arg0];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(v8::Boolean::New(isolate, result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  BOOL result;
+  if (callSuper) {
+    objc_super sup = {target, [NSObject class]};
+    result = ((BOOL (*)(objc_super*, SEL, Class))objc_msgSendSuper)(&sup, @selector(isKindOfClass:),
+                                                                    arg0);
+  } else {
+    result = [(NSObject*)target isKindOfClass:arg0];
   }
+
+  info.GetReturnValue().Set(v8::Boolean::New(isolate, result));
 }
 
 // NSObject -[isEqual:]
 static void AOT_NSObject_isEqual(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    id arg0 = Interop::ToObject(context, info[0]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  id arg0 = AOTToObject(context, info[0]);
 
-    BOOL result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSObject class]};
-        result =
-            ((BOOL (*)(objc_super*, SEL, id))objc_msgSendSuper)(&sup, @selector(isEqual:), arg0);
-      } else {
-        result = [(NSObject*)target isEqual:arg0];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(v8::Boolean::New(isolate, result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  BOOL result;
+  if (callSuper) {
+    objc_super sup = {target, [NSObject class]};
+    result = ((BOOL (*)(objc_super*, SEL, id))objc_msgSendSuper)(&sup, @selector(isEqual:), arg0);
+  } else {
+    result = [(NSObject*)target isEqual:arg0];
   }
+
+  info.GetReturnValue().Set(v8::Boolean::New(isolate, result));
 }
 
 // NSObject -[description]
 static void AOT_NSObject_description(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
 
-    id result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSObject class]};
-        result = ((id (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(description));
-      } else {
-        result = [(NSObject*)target description];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(AOTWrapId(context, result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  id result;
+  if (callSuper) {
+    objc_super sup = {target, [NSObject class]};
+    result = ((id (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(description));
+  } else {
+    result = [(NSObject*)target description];
   }
+
+  info.GetReturnValue().Set(AOTWrapId(context, result));
 }
 
 // NSObject -[hash]
 static void AOT_NSObject_hash(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
+  Isolate* isolate = info.GetIsolate();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
 
-    unsigned long result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSObject class]};
-        result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(hash));
-      } else {
-        result = [(NSObject*)target hash];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(Number::New(isolate, (double)result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  unsigned long result;
+  if (callSuper) {
+    objc_super sup = {target, [NSObject class]};
+    result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(hash));
+  } else {
+    result = [(NSObject*)target hash];
   }
+
+  info.GetReturnValue().Set(Number::New(isolate, (double)result));
 }
 
 // NSMutableArray -[removeAllObjects]
 static void AOT_NSMutableArray_removeAllObjects(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
+  Isolate* isolate = info.GetIsolate();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
 
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSMutableArray class]};
-        ((void (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(removeAllObjects));
-      } else {
-        [(NSMutableArray*)target removeAllObjects];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  if (callSuper) {
+    objc_super sup = {target, [NSMutableArray class]};
+    ((void (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(removeAllObjects));
+  } else {
+    [(NSMutableArray*)target removeAllObjects];
   }
 }
 
 // NSMutableArray -[addObject:]
 static void AOT_NSMutableArray_addObject(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    id arg0 = Interop::ToObject(context, info[0]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  id arg0 = AOTToObject(context, info[0]);
 
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSMutableArray class]};
-        ((void (*)(objc_super*, SEL, id))objc_msgSendSuper)(&sup, @selector(addObject:), arg0);
-      } else {
-        [(NSMutableArray*)target addObject:arg0];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  if (callSuper) {
+    objc_super sup = {target, [NSMutableArray class]};
+    ((void (*)(objc_super*, SEL, id))objc_msgSendSuper)(&sup, @selector(addObject:), arg0);
+  } else {
+    [(NSMutableArray*)target addObject:arg0];
   }
 }
 
 // NSMutableArray -[objectAtIndex:]
 static void AOT_NSMutableArray_objectAtIndex(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    unsigned long arg0 = (unsigned long)tns::ToNumber(isolate, info[0]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  unsigned long arg0 = (unsigned long)tns::ToNumber(isolate, info[0]);
 
-    id result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSMutableArray class]};
-        result = ((id (*)(objc_super*, SEL, unsigned long))objc_msgSendSuper)(
-            &sup, @selector(objectAtIndex:), arg0);
-      } else {
-        result = [(NSMutableArray*)target objectAtIndex:arg0];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(AOTWrapId(context, result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  id result;
+  if (callSuper) {
+    objc_super sup = {target, [NSMutableArray class]};
+    result = ((id (*)(objc_super*, SEL, unsigned long))objc_msgSendSuper)(
+        &sup, @selector(objectAtIndex:), arg0);
+  } else {
+    result = [(NSMutableArray*)target objectAtIndex:arg0];
   }
+
+  info.GetReturnValue().Set(AOTWrapId(context, result));
 }
 
 // NSMutableArray -[count]
 static void AOT_NSMutableArray_count(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
+  Isolate* isolate = info.GetIsolate();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
 
-    unsigned long result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSMutableArray class]};
-        result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(count));
-      } else {
-        result = [(NSMutableArray*)target count];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(Number::New(isolate, (double)result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  unsigned long result;
+  if (callSuper) {
+    objc_super sup = {target, [NSMutableArray class]};
+    result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(count));
+  } else {
+    result = [(NSMutableArray*)target count];
   }
+
+  info.GetReturnValue().Set(Number::New(isolate, (double)result));
 }
 
 // NSMutableArray -[insertObject:atIndex:]
 static void AOT_NSMutableArray_insertObject_atIndex(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    id arg0 = Interop::ToObject(context, info[0]);
-    unsigned long arg1 = (unsigned long)tns::ToNumber(isolate, info[1]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  id arg0 = AOTToObject(context, info[0]);
+  unsigned long arg1 = (unsigned long)tns::ToNumber(isolate, info[1]);
 
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSMutableArray class]};
-        ((void (*)(objc_super*, SEL, id, unsigned long))objc_msgSendSuper)(
-            &sup, @selector(insertObject:atIndex:), arg0, arg1);
-      } else {
-        [(NSMutableArray*)target insertObject:arg0 atIndex:arg1];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  if (callSuper) {
+    objc_super sup = {target, [NSMutableArray class]};
+    ((void (*)(objc_super*, SEL, id, unsigned long))objc_msgSendSuper)(
+        &sup, @selector(insertObject:atIndex:), arg0, arg1);
+  } else {
+    [(NSMutableArray*)target insertObject:arg0 atIndex:arg1];
   }
 }
 
 // NSMutableArray -[removeObjectAtIndex:]
 static void AOT_NSMutableArray_removeObjectAtIndex(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    unsigned long arg0 = (unsigned long)tns::ToNumber(isolate, info[0]);
+  Isolate* isolate = info.GetIsolate();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  unsigned long arg0 = (unsigned long)tns::ToNumber(isolate, info[0]);
 
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSMutableArray class]};
-        ((void (*)(objc_super*, SEL, unsigned long))objc_msgSendSuper)(
-            &sup, @selector(removeObjectAtIndex:), arg0);
-      } else {
-        [(NSMutableArray*)target removeObjectAtIndex:arg0];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  if (callSuper) {
+    objc_super sup = {target, [NSMutableArray class]};
+    ((void (*)(objc_super*, SEL, unsigned long))objc_msgSendSuper)(
+        &sup, @selector(removeObjectAtIndex:), arg0);
+  } else {
+    [(NSMutableArray*)target removeObjectAtIndex:arg0];
   }
 }
 
 // NSArray -[objectAtIndex:]
 static void AOT_NSArray_objectAtIndex(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    unsigned long arg0 = (unsigned long)tns::ToNumber(isolate, info[0]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  unsigned long arg0 = (unsigned long)tns::ToNumber(isolate, info[0]);
 
-    id result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSArray class]};
-        result = ((id (*)(objc_super*, SEL, unsigned long))objc_msgSendSuper)(
-            &sup, @selector(objectAtIndex:), arg0);
-      } else {
-        result = [(NSArray*)target objectAtIndex:arg0];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(AOTWrapId(context, result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  id result;
+  if (callSuper) {
+    objc_super sup = {target, [NSArray class]};
+    result = ((id (*)(objc_super*, SEL, unsigned long))objc_msgSendSuper)(
+        &sup, @selector(objectAtIndex:), arg0);
+  } else {
+    result = [(NSArray*)target objectAtIndex:arg0];
   }
+
+  info.GetReturnValue().Set(AOTWrapId(context, result));
 }
 
 // NSArray -[count]
 static void AOT_NSArray_count(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
+  Isolate* isolate = info.GetIsolate();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
 
-    unsigned long result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSArray class]};
-        result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(count));
-      } else {
-        result = [(NSArray*)target count];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(Number::New(isolate, (double)result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  unsigned long result;
+  if (callSuper) {
+    objc_super sup = {target, [NSArray class]};
+    result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(count));
+  } else {
+    result = [(NSArray*)target count];
   }
+
+  info.GetReturnValue().Set(Number::New(isolate, (double)result));
 }
 
 // NSDictionary -[objectForKeyedSubscript:]
 static void AOT_NSDictionary_objectForKeyedSubscript(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    id arg0 = Interop::ToObject(context, info[0]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  id arg0 = AOTToObject(context, info[0]);
 
-    id result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSDictionary class]};
-        result = ((id (*)(objc_super*, SEL, id))objc_msgSendSuper)(
-            &sup, @selector(objectForKeyedSubscript:), arg0);
-      } else {
-        result = [(NSDictionary*)target objectForKeyedSubscript:arg0];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(AOTWrapId(context, result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  id result;
+  if (callSuper) {
+    objc_super sup = {target, [NSDictionary class]};
+    result = ((id (*)(objc_super*, SEL, id))objc_msgSendSuper)(
+        &sup, @selector(objectForKeyedSubscript:), arg0);
+  } else {
+    result = [(NSDictionary*)target objectForKeyedSubscript:arg0];
   }
+
+  info.GetReturnValue().Set(AOTWrapId(context, result));
 }
 
 // NSDictionary -[count]
 static void AOT_NSDictionary_count(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
+  Isolate* isolate = info.GetIsolate();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
 
-    unsigned long result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSDictionary class]};
-        result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(count));
-      } else {
-        result = [(NSDictionary*)target count];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(Number::New(isolate, (double)result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  unsigned long result;
+  if (callSuper) {
+    objc_super sup = {target, [NSDictionary class]};
+    result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(count));
+  } else {
+    result = [(NSDictionary*)target count];
   }
+
+  info.GetReturnValue().Set(Number::New(isolate, (double)result));
 }
 
 // NSMutableDictionary -[setObject:forKey:]
 static void AOT_NSMutableDictionary_setObject_forKey(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    id arg0 = Interop::ToObject(context, info[0]);
-    id arg1 = Interop::ToObject(context, info[1]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  id arg0 = AOTToObject(context, info[0]);
+  id arg1 = AOTToObject(context, info[1]);
 
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSMutableDictionary class]};
-        ((void (*)(objc_super*, SEL, id, id))objc_msgSendSuper)(&sup, @selector(setObject:forKey:),
-                                                                arg0, arg1);
-      } else {
-        [(NSMutableDictionary*)target setObject:arg0 forKey:arg1];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  if (callSuper) {
+    objc_super sup = {target, [NSMutableDictionary class]};
+    ((void (*)(objc_super*, SEL, id, id))objc_msgSendSuper)(&sup, @selector(setObject:forKey:),
+                                                            arg0, arg1);
+  } else {
+    [(NSMutableDictionary*)target setObject:arg0 forKey:arg1];
   }
 }
 
 // NSMutableDictionary -[removeObjectForKey:]
 static void AOT_NSMutableDictionary_removeObjectForKey(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
-    id arg0 = Interop::ToObject(context, info[0]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
+  id arg0 = AOTToObject(context, info[0]);
 
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSMutableDictionary class]};
-        ((void (*)(objc_super*, SEL, id))objc_msgSendSuper)(&sup, @selector(removeObjectForKey:),
-                                                            arg0);
-      } else {
-        [(NSMutableDictionary*)target removeObjectForKey:arg0];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  if (callSuper) {
+    objc_super sup = {target, [NSMutableDictionary class]};
+    ((void (*)(objc_super*, SEL, id))objc_msgSendSuper)(&sup, @selector(removeObjectForKey:), arg0);
+  } else {
+    [(NSMutableDictionary*)target removeObjectForKey:arg0];
   }
 }
 
 // NSString -[length]
 static void AOT_NSString_length(const FunctionCallbackInfo<Value>& info) {
-  try {
-    Isolate* isolate = info.GetIsolate();
-    bool callSuper;
-    id target = AOTExtractTarget(isolate, info.This(), callSuper);
-    if (target == nil) return;
+  Isolate* isolate = info.GetIsolate();
+  bool callSuper;
+  id target = AOTExtractTarget(isolate, info.This(), callSuper);
+  if (target == nil) return;
 
-    unsigned long result;
-    @try {
-      if (callSuper) {
-        objc_super sup = {target, [NSString class]};
-        result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(length));
-      } else {
-        result = [(NSString*)target length];
-      }
-    } @catch (NSException* e) {
-      throw NativeScriptException([[e description] UTF8String]);
-    }
-
-    info.GetReturnValue().Set(Number::New(isolate, (double)result));
-  } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(info.GetIsolate());
+  unsigned long result;
+  if (callSuper) {
+    objc_super sup = {target, [NSString class]};
+    result = ((unsigned long (*)(objc_super*, SEL))objc_msgSendSuper)(&sup, @selector(length));
+  } else {
+    result = [(NSString*)target length];
   }
+
+  info.GetReturnValue().Set(Number::New(isolate, (double)result));
 }
 
 // ---------------------------------------------------------------------------
@@ -934,9 +826,7 @@ AOTBlockInvokeFunc GetAOTBlockInvoke(const TypeEncoding* typeEncoding, int argsC
       return (AOTBlockInvokeFunc)AOTBlockInvoke_void_noargs;
     if (retType == BinaryTypeEncodingType::BoolEncoding)
       return (AOTBlockInvokeFunc)AOTBlockInvoke_BOOL_noargs;
-    if ((retType == BinaryTypeEncodingType::IdEncoding ||
-         retType == BinaryTypeEncodingType::InstanceTypeEncoding ||
-         retType == BinaryTypeEncodingType::InterfaceDeclarationReference))
+    if (retType == BinaryTypeEncodingType::IdEncoding)
       return (AOTBlockInvokeFunc)AOTBlockInvoke_id_noargs;
     return nullptr;
   }
@@ -946,9 +836,7 @@ AOTBlockInvokeFunc GetAOTBlockInvoke(const TypeEncoding* typeEncoding, int argsC
     pEnc = pEnc->next();
     BinaryTypeEncodingType p0Type = pEnc->type;
     if (retType == BinaryTypeEncodingType::VoidEncoding &&
-        (p0Type == BinaryTypeEncodingType::IdEncoding ||
-         p0Type == BinaryTypeEncodingType::InstanceTypeEncoding ||
-         p0Type == BinaryTypeEncodingType::InterfaceDeclarationReference))
+        p0Type == BinaryTypeEncodingType::IdEncoding)
       return (AOTBlockInvokeFunc)AOTBlockInvoke_void_id;
     if (retType == BinaryTypeEncodingType::VoidEncoding &&
         p0Type == BinaryTypeEncodingType::BoolEncoding)
@@ -960,16 +848,10 @@ AOTBlockInvokeFunc GetAOTBlockInvoke(const TypeEncoding* typeEncoding, int argsC
         p0Type == BinaryTypeEncodingType::ULongEncoding)
       return (AOTBlockInvokeFunc)AOTBlockInvoke_void_ulong;
     if (retType == BinaryTypeEncodingType::BoolEncoding &&
-        (p0Type == BinaryTypeEncodingType::IdEncoding ||
-         p0Type == BinaryTypeEncodingType::InstanceTypeEncoding ||
-         p0Type == BinaryTypeEncodingType::InterfaceDeclarationReference))
+        p0Type == BinaryTypeEncodingType::IdEncoding)
       return (AOTBlockInvokeFunc)AOTBlockInvoke_BOOL_id;
-    if ((retType == BinaryTypeEncodingType::IdEncoding ||
-         retType == BinaryTypeEncodingType::InstanceTypeEncoding ||
-         retType == BinaryTypeEncodingType::InterfaceDeclarationReference) &&
-        (p0Type == BinaryTypeEncodingType::IdEncoding ||
-         p0Type == BinaryTypeEncodingType::InstanceTypeEncoding ||
-         p0Type == BinaryTypeEncodingType::InterfaceDeclarationReference))
+    if (retType == BinaryTypeEncodingType::IdEncoding &&
+        p0Type == BinaryTypeEncodingType::IdEncoding)
       return (AOTBlockInvokeFunc)AOTBlockInvoke_id_id;
     return nullptr;
   }
@@ -981,12 +863,8 @@ AOTBlockInvokeFunc GetAOTBlockInvoke(const TypeEncoding* typeEncoding, int argsC
     pEnc = pEnc->next();
     BinaryTypeEncodingType p1Type = pEnc->type;
     if (retType == BinaryTypeEncodingType::VoidEncoding &&
-        (p0Type == BinaryTypeEncodingType::IdEncoding ||
-         p0Type == BinaryTypeEncodingType::InstanceTypeEncoding ||
-         p0Type == BinaryTypeEncodingType::InterfaceDeclarationReference) &&
-        (p1Type == BinaryTypeEncodingType::IdEncoding ||
-         p1Type == BinaryTypeEncodingType::InstanceTypeEncoding ||
-         p1Type == BinaryTypeEncodingType::InterfaceDeclarationReference))
+        p0Type == BinaryTypeEncodingType::IdEncoding &&
+        p1Type == BinaryTypeEncodingType::IdEncoding)
       return (AOTBlockInvokeFunc)AOTBlockInvoke_void_id_id;
     return nullptr;
   }
@@ -1000,9 +878,7 @@ AOTBlockInvokeFunc GetAOTBlockInvoke(const TypeEncoding* typeEncoding, int argsC
     pEnc = pEnc->next();
     BinaryTypeEncodingType p2Type = pEnc->type;
     if (retType == BinaryTypeEncodingType::BoolEncoding &&
-        (p0Type == BinaryTypeEncodingType::IdEncoding ||
-         p0Type == BinaryTypeEncodingType::InstanceTypeEncoding ||
-         p0Type == BinaryTypeEncodingType::InterfaceDeclarationReference) &&
+        p0Type == BinaryTypeEncodingType::IdEncoding &&
         p1Type == BinaryTypeEncodingType::ULongEncoding &&
         p2Type == BinaryTypeEncodingType::BoolEncoding)
       return (AOTBlockInvokeFunc)AOTBlockInvoke_BOOL_id_ulong_BOOL;

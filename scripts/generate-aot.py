@@ -11,6 +11,13 @@ Usage:
 Defaults:
     config  = aot-config.json (project root)
     output  = NativeScript/runtime/
+
+The config JSON may contain an optional "imports" array of framework names
+(e.g. ["UIKit", "CoreData"]). These are emitted as #import <F/F.h> directives.
+Foundation is always included and should not be listed.
+
+Use scripts/resolve-aot-imports.py to auto-populate the "imports" field by
+scanning metadata YAML output from the metadata generator.
 """
 
 import json
@@ -34,9 +41,25 @@ TYPES = {
     },
     "id": {
         "c_type": "id",
-        "to_native": "Interop::ToObject(context, {arg})",
+        "to_native": "AOTToObject(context, {arg})",
         "needs_context": True,
         "is_id": True,
+        "native_to_v8": None,
+    },
+    "instancetype": {
+        "c_type": "id",
+        "to_native": "AOTToObject(context, {arg})",
+        "needs_context": True,
+        "is_id": True,
+        "is_instancetype": True,
+        "native_to_v8": None,
+    },
+    "NSString": {
+        "c_type": "id",
+        "to_native": "AOTToObject(context, {arg})",
+        "needs_context": True,
+        "is_id": True,
+        "is_nsstring": True,
         "native_to_v8": None,
     },
     "SEL": {
@@ -152,17 +175,37 @@ def method_stub_name(cls, sel):
     return f"AOT_{cls}_{sanitize_selector(sel)}"
 
 
-def build_objc_call(cls, sel, args, target="target"):
+def build_objc_call(cls, sel, args, target="target", is_static=False, class_var=None, ret=None):
+    if class_var:
+        return _build_msgsend_call(class_var if is_static else target, sel, ret or "id", args)
+    if is_static:
+        receiver = cls
+    else:
+        receiver = f"({cls}*){target}"
     if not args:
-        return f"[({cls}*){target} {sel}]"
+        return f"[{receiver} {sel}]"
     parts = [p for p in sel.split(":") if p]
     expr = " ".join(f"{p}:arg{i}" for i, p in enumerate(parts))
-    return f"[({cls}*){target} {expr}]"
+    return f"[{receiver} {expr}]"
 
 
-def build_super_call(cls, sel, ret, args):
-    c_ret = TYPES[ret]["c_type"]
-    c_args = ["objc_super*", "SEL"] + [TYPES[a]["c_type"] for a in args]
+def _c_type(t):
+    return t if t not in TYPES else TYPES[t]["c_type"]
+
+
+def _build_msgsend_call(receiver, sel, ret, args):
+    c_ret = _c_type(ret)
+    c_args = ["id", "SEL"] + [_c_type(a) for a in args]
+    cast = f"(({c_ret}(*)({', '.join(c_args)}))objc_msgSend)"
+    arg_str = ", ".join(f"arg{i}" for i in range(len(args)))
+    suffix = f", {arg_str}" if arg_str else ""
+    return f"{cast}((id){receiver}, @selector({sel}){suffix})"
+
+
+def build_super_call(cls, sel, ret, args, struct_tag=False):
+    prefix = "struct " if struct_tag else ""
+    c_ret = _c_type(ret)
+    c_args = [f"{prefix}objc_super*", "SEL"] + [_c_type(a) for a in args]
     cast = f"(({c_ret}(*)({', '.join(c_args)}))"
     arg_str = ", ".join(f"arg{i}" for i in range(len(args)))
     suffix = f", {arg_str}" if arg_str else ""
@@ -187,73 +230,79 @@ def gen_method_stub(method):
     sel = method["selector"]
     ret = method["ret"]
     args = method["args"]
+    is_static = method.get("static", False)
     name = method_stub_name(cls, sel)
     ret_info = TYPES[ret]
     is_void = ret == "void"
     ret_is_id = is_id(ret)
     want_context = needs_context(ret, args)
 
+    sign = "+" if is_static else "-"
     lines = []
-    lines.append(f"// {cls} -[{sel}]")
+    lines.append(f"// {cls} {sign}[{sel}]")
     lines.append(f"static void {name}(const FunctionCallbackInfo<Value>& info) {{")
-    lines.append("    try {")
-    lines.append("        Isolate* isolate = info.GetIsolate();")
+    lines.append("    Isolate* isolate = info.GetIsolate();")
     if want_context:
-        lines.append("        Local<Context> context = isolate->GetCurrentContext();")
-    lines.append("        bool callSuper;")
-    lines.append("        id target = AOTExtractTarget(isolate, info.This(), callSuper);")
-    lines.append("        if (target == nil) return;")
+        lines.append("    Local<Context> context = isolate->GetCurrentContext();")
+
+    if is_static:
+        lines.append("    (void)info.This();")
+    else:
+        lines.append("    bool callSuper;")
+        lines.append("    id target = AOTExtractTarget(isolate, info.This(), callSuper);")
+        lines.append("    if (target == nil) return;")
 
     # Convert arguments
     for i, arg in enumerate(args):
         arg_info = TYPES[arg]
         if arg == "Class":
-            lines.append(f"        Class arg{i} = nil;")
-            lines.append(f"        BaseDataWrapper* argW{i} = tns::GetValue(isolate, info[{i}]);")
-            lines.append(f"        if (argW{i} != nullptr && argW{i}->Type() == WrapperType::ObjCClass)")
-            lines.append(f"            arg{i} = static_cast<ObjCClassWrapper*>(argW{i})->Klass();")
-            lines.append(f"        else if (tns::IsString(info[{i}]))")
-            lines.append(f"            arg{i} = objc_getClass(tns::ToString(isolate, info[{i}]).c_str());")
+            lines.append(f"    Class arg{i} = nil;")
+            lines.append(f"    BaseDataWrapper* argW{i} = tns::GetValue(isolate, info[{i}]);")
+            lines.append(f"    if (argW{i} != nullptr && argW{i}->Type() == WrapperType::ObjCClass)")
+            lines.append(f"        arg{i} = static_cast<ObjCClassWrapper*>(argW{i})->Klass();")
+            lines.append(f"    else if (tns::IsString(info[{i}]))")
+            lines.append(f"        arg{i} = objc_getClass(tns::ToString(isolate, info[{i}]).c_str());")
         else:
             conv = arg_info["to_native"].format(arg=f"info[{i}]")
-            lines.append(f"        {arg_info['c_type']} arg{i} = {conv};")
+            lines.append(f"    {arg_info['c_type']} arg{i} = {conv};")
 
     # The call
-    objc_call = build_objc_call(cls, sel, args)
-    super_call = build_super_call(cls, sel, ret, args)
+    objc_call = build_objc_call(cls, sel, args, is_static=is_static)
 
     lines.append("")
     if not is_void:
-        lines.append(f"        {ret_info['c_type']} result;")
-    lines.append("        @try {")
-    lines.append("            if (callSuper) {")
-    lines.append(f"                objc_super sup = {{target, [{cls} class]}};")
-    if is_void:
-        lines.append(f"                {super_call};")
+        lines.append(f"    {ret_info['c_type']} result;")
+
+    if is_static:
+        if is_void:
+            lines.append(f"    {objc_call};")
+        else:
+            lines.append(f"    result = {objc_call};")
     else:
-        lines.append(f"                result = {super_call};")
-    lines.append("            } else {")
-    if is_void:
-        lines.append(f"                {objc_call};")
-    else:
-        lines.append(f"                result = {objc_call};")
-    lines.append("            }")
-    lines.append("        } @catch (NSException* e) {")
-    lines.append("            throw NativeScriptException([[e description] UTF8String]);")
-    lines.append("        }")
+        super_call = build_super_call(cls, sel, ret, args)
+        lines.append("    if (callSuper) {")
+        lines.append(f"        objc_super sup = {{target, [{cls} class]}};")
+        if is_void:
+            lines.append(f"        {super_call};")
+        else:
+            lines.append(f"        result = {super_call};")
+        lines.append("    } else {")
+        if is_void:
+            lines.append(f"        {objc_call};")
+        else:
+            lines.append(f"        result = {objc_call};")
+        lines.append("    }")
 
     # Return value
     if not is_void:
         lines.append("")
         if ret_is_id:
-            lines.append("        info.GetReturnValue().Set(AOTWrapId(context, result));")
+            wrap_fn = "AOTWrapObject" if ret_info.get("is_instancetype") else "AOTWrapString" if ret_info.get("is_nsstring") else "AOTWrapId"
+            lines.append(f"    info.GetReturnValue().Set({wrap_fn}(context, result));")
         else:
             to_v8 = ret_info["to_v8"].format(result="result")
-            lines.append(f"        info.GetReturnValue().Set({to_v8});")
+            lines.append(f"    info.GetReturnValue().Set({to_v8});")
 
-    lines.append("    } catch (NativeScriptException& ex) {")
-    lines.append("        ex.ReThrowToV8(info.GetIsolate());")
-    lines.append("    }")
     lines.append("}")
     return "\n".join(lines)
 
@@ -352,8 +401,6 @@ def gen_block_invoke(ret, args):
 def gen_method_matcher(methods):
     by_class = {}
     for m in methods:
-        if m.get("static"):
-            continue
         by_class.setdefault(m["class"], []).append(m)
 
     lines = []
@@ -375,7 +422,8 @@ def gen_method_matcher(methods):
 ENCODING_MAP = {
     "void": ["VoidEncoding"],
     "BOOL": ["BoolEncoding"],
-    "id": ["IdEncoding", "InstanceTypeEncoding", "InterfaceDeclarationReference"],
+    "id": ["IdEncoding"],
+    "instancetype": ["InstanceTypeEncoding"],
     "SEL": ["SelectorEncoding"],
     "Class": ["ClassEncoding"],
     "int": ["IntEncoding"],
@@ -460,6 +508,12 @@ namespace tns {
 
 v8::FunctionCallback GetAOTDirectCall(const char* className, const char* selectorName);
 
+v8::FunctionCallback GetExternalAOTCall(const char* className,
+                                        const char* selectorName,
+                                        bool isStatic,
+                                        void** outHandler);
+void DiscoverExternalAOTStubs();
+
 typedef void* AOTBlockInvokeFunc;
 AOTBlockInvokeFunc GetAOTBlockInvoke(const TypeEncoding* typeEncoding, int argsCount);
 
@@ -468,9 +522,12 @@ AOTBlockInvokeFunc GetAOTBlockInvoke(const TypeEncoding* typeEncoding, int argsC
 #endif /* AOTDirectCalls_h */
 """
 
-PREAMBLE = """\
+_PREAMBLE_HEADER = """\
 // AUTO-GENERATED by scripts/generate-aot.py — do not edit manually.
 #include <Foundation/Foundation.h>
+"""
+
+_PREAMBLE_TAIL = """\
 #include <objc/message.h>
 #include "AOTDirectCalls.h"
 #include "ArgConverter.h"
@@ -511,15 +568,15 @@ static inline id AOTExtractTarget(Isolate* isolate, Local<Object> receiver,
     return target;
 }
 
-static inline Local<Value> AOTWrapId(Local<Context> context, id result) {
+__unused static inline Local<Value> AOTWrapId(Local<Context> context, id result) {
     Isolate* isolate = context->GetIsolate();
     if (result == nil) return Null(isolate);
 
-    if ([result isKindOfClass:[NSString class]]) {
-        return tns::ToV8String(isolate, [(NSString*)result UTF8String]);
-    }
     if ([result isKindOfClass:[NSNull class]]) {
         return Null(isolate);
+    }
+    if ([result isKindOfClass:[NSString class]] && ![result isKindOfClass:[NSMutableString class]]) {
+        return tns::ToV8String(isolate, (NSString*)result);
     }
     if ([result isKindOfClass:[NSNumber class]] && ![result isKindOfClass:[NSDecimalNumber class]]) {
         return Number::New(isolate, [(NSNumber*)result doubleValue]);
@@ -531,15 +588,69 @@ static inline Local<Value> AOTWrapId(Local<Context> context, id result) {
     return jsResult;
 }
 
+__unused static inline id AOTToObject(Local<Context> context, Local<Value> arg) {
+    Isolate* isolate = context->GetIsolate();
+    if (!arg.IsEmpty() && arg->IsObject()) {
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
+        if (wrapper) {
+            switch (wrapper->Type()) {
+                case WrapperType::ObjCObject:
+                case WrapperType::ObjCClass:
+                case WrapperType::ObjCProtocol:
+                    break;
+                case WrapperType::ObjCAllocObject:
+                    return [static_cast<ObjCAllocDataWrapper*>(wrapper)->Klass() alloc];
+                case WrapperType::Pointer:
+                    return (id)static_cast<PointerWrapper*>(wrapper)->Data();
+                default:
+                    return nil;
+            }
+        }
+    }
+    return Interop::ToObject(context, arg);
+}
+
+__unused static inline Local<Value> AOTWrapString(Local<Context> context, id result) {
+    Isolate* isolate = context->GetIsolate();
+    if (result == nil) return Null(isolate);
+    return tns::ToV8String(isolate, (NSString*)result);
+}
+
+__unused static inline Local<Value> AOTWrapObject(Local<Context> context, id result) {
+    Isolate* isolate = context->GetIsolate();
+    if (result == nil) return Null(isolate);
+
+    auto* wrapper = new ObjCDataWrapper(result);
+    Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper);
+    tns::DeleteWrapperIfUnused(isolate, jsResult, wrapper);
+    return jsResult;
+}
+
 """
+
+
+
+def _sort_imports(imports):
+    """Sort so #import <...> (framework) comes before #import "..." (local/Swift)."""
+    return sorted(imports, key=lambda i: (0 if "<" in i else 1, i))
+
+
+def make_preamble(extra_imports=None):
+    parts = [_PREAMBLE_HEADER]
+    if extra_imports:
+        for imp in _sort_imports(extra_imports):
+            parts.append(imp + "\n")
+    parts.append(_PREAMBLE_TAIL)
+    return "".join(parts)
 
 
 def generate(config_path, output_dir):
     with open(config_path) as f:
         config = json.load(f)
 
-    methods = config.get("methods", [])
+    methods = _dedup_methods(config.get("methods", []))
     block_patterns = config.get("blockPatterns", [])
+    imports = config.get("imports", [])
 
     # --- Header ---
     header_path = os.path.join(output_dir, "AOTDirectCalls.h")
@@ -547,15 +658,18 @@ def generate(config_path, output_dir):
         f.write(HEADER)
     print(f"  wrote {header_path}")
 
+    extra_imports = [i if i.startswith("#") else f"#import <{i}/{i}.h>" for i in imports]
+    if extra_imports:
+        print(f"  extra imports: {', '.join(extra_imports)}")
+
     # --- Implementation ---
     impl_path = os.path.join(output_dir, "AOTDirectCalls.mm")
-    parts = [PREAMBLE]
+    parts = [make_preamble(extra_imports)]
 
-    instance_methods = [m for m in methods if not m.get("static")]
     parts.append("// ---------------------------------------------------------------------------")
-    parts.append(f"// Per-method stubs ({len(instance_methods)} methods)")
+    parts.append(f"// Per-method stubs ({len(methods)} methods)")
     parts.append("// ---------------------------------------------------------------------------\n")
-    for m in instance_methods:
+    for m in methods:
         parts.append(gen_method_stub(m))
         parts.append("")
 
@@ -581,7 +695,211 @@ def generate(config_path, output_dir):
         f.write("\n".join(parts))
     print(f"  wrote {impl_path}")
 
-    print(f"\n  {len(instance_methods)} method stubs, {len(block_patterns)} block invoke stubs generated.")
+    print(f"\n  {len(methods)} method stubs, {len(block_patterns)} block invoke stubs generated.")
+
+
+# ---------------------------------------------------------------------------
+# External stub generator (C bridge API for user apps)
+# ---------------------------------------------------------------------------
+
+EXTERNAL_ARG = {
+    "id": "__ns_aot_arg_object(info, {i})",
+    "NSString": "__ns_aot_arg_object(info, {i})",
+    "BOOL": "__ns_aot_arg_bool(info, {i})",
+    "SEL": "__ns_aot_arg_selector(info, {i})",
+    "Class": "__ns_aot_arg_class(info, {i})",
+}
+
+EXTERNAL_RET = {
+    "id": "__ns_aot_return_id(info, {result})",
+    "NSString": "__ns_aot_return_string(info, {result})",
+    "instancetype": "__ns_aot_return_object(info, {result})",
+    "BOOL": "__ns_aot_return_bool(info, {result})",
+    "Class": "__ns_aot_return_id(info, (id){result})",
+}
+
+
+def external_arg_expr(arg_type, i):
+    if arg_type in EXTERNAL_ARG:
+        return EXTERNAL_ARG[arg_type].format(i=i)
+    if arg_type in TYPES:
+        return f"({TYPES[arg_type]['c_type']})__ns_aot_arg_double(info, {i})"
+    return None
+
+
+def is_struct_type(ret_type):
+    return ret_type not in TYPES and ret_type not in EXTERNAL_RET
+
+
+def external_ret_call(ret_type, result_var):
+    if ret_type == "void":
+        return None
+    if ret_type in EXTERNAL_RET:
+        return EXTERNAL_RET[ret_type].format(result=result_var)
+    if is_struct_type(ret_type):
+        return f'__ns_aot_return_struct(info, &{result_var}, "{ret_type}")'
+    return f"__ns_aot_return_double(info, (double){result_var})"
+
+
+def class_var_name(cls):
+    return f"_cls_{cls}"
+
+
+def gen_external_method_stub(method, swift_classes):
+    cls = method["class"]
+    sel = method["selector"]
+    ret = method["ret"]
+    args = method["args"]
+    is_static = method.get("static", False)
+    name = method_stub_name(cls, sel)
+    is_void = ret == "void"
+    is_struct = is_struct_type(ret)
+    c_ret_type = ret if is_struct else TYPES[ret]["c_type"]
+    is_swift = cls in swift_classes
+    cvar = class_var_name(cls) if is_swift else None
+
+    sign = "+" if is_static else "-"
+    lines = []
+    lines.append(f"// {cls} {sign}[{sel}]")
+    lines.append(f"static void {name}(NSAOTCallInfo info) {{")
+
+    if is_static:
+        lines.append("    Class _cls = __ns_aot_get_static_class(info);")
+        lines.append("    if (_cls == nil) return;")
+    else:
+        lines.append("    bool callSuper;")
+        lines.append("    id target = __ns_aot_get_target(info, &callSuper);")
+        lines.append("    if (target == nil) return;")
+
+    for i, arg in enumerate(args):
+        expr = external_arg_expr(arg, i)
+        if expr is not None:
+            c_type = TYPES[arg]['c_type'] if arg in TYPES else arg
+            lines.append(f"    {c_type} arg{i} = {expr};")
+        else:
+            lines.append(f"    {arg} arg{i};")
+            lines.append(f'    __ns_aot_arg_struct(info, {i}, &arg{i}, "{arg}");')
+
+    lines.append("")
+    if not is_void:
+        lines.append(f"    {c_ret_type} result;")
+
+    if is_static:
+        static_call = _build_msgsend_call("_cls", sel, ret, args)
+        if is_void:
+            lines.append(f"    {static_call};")
+        else:
+            lines.append(f"    result = {static_call};")
+    else:
+        objc_call = build_objc_call(cls, sel, args, is_static=False, class_var=cvar, ret=ret)
+        super_call = build_super_call(cls, sel, ret, args, struct_tag=True)
+        cls_ref = cvar if is_swift else f"[{cls} class]"
+        lines.append("    if (callSuper) {")
+        lines.append(f"        struct objc_super sup = {{target, {cls_ref}}};")
+        if is_void:
+            lines.append(f"        {super_call};")
+        else:
+            lines.append(f"        result = {super_call};")
+        lines.append("    } else {")
+        if is_void:
+            lines.append(f"        {objc_call};")
+        else:
+            lines.append(f"        result = {objc_call};")
+        lines.append("    }")
+
+    ret_call = external_ret_call(ret, "result")
+    if ret_call:
+        lines.append(f"    {ret_call};")
+
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def gen_external_class_cache(swift_classes):
+    if not swift_classes:
+        return ""
+    return "\n".join(f"static Class {class_var_name(c)} = nil;" for c in sorted(swift_classes))
+
+
+def gen_external_registration(methods, swift_classes):
+    lines = []
+    lines.append("__attribute__((visibility(\"default\")))")
+    lines.append("void __ns_register_aot_calls(void (*reg)(const char*, const char*, bool, NSAOTCallHandler)) {")
+    if swift_classes:
+        for c in sorted(swift_classes):
+            lines.append(f'    {class_var_name(c)} = objc_getClass("{c}");')
+        lines.append("")
+    for m in methods:
+        is_static = m.get("static", False)
+        name = method_stub_name(m["class"], m["selector"])
+        static_str = "true" if is_static else "false"
+        lines.append(f'    reg("{m["class"]}", "{m["selector"]}", {static_str}, {name});')
+    lines.append("}")
+    return "\n".join(lines)
+
+
+_EXTERNAL_PREAMBLE_HEADER = """\
+// AUTO-GENERATED by scripts/generate-aot.py --external — do not edit manually.
+// These stubs use the NativeScript AOT C bridge and are compiled at app build time.
+#import <NativeScript/NativeScriptAOT.h>
+#import <Foundation/Foundation.h>
+"""
+
+_EXTERNAL_PREAMBLE_TAIL = """\
+#import <objc/message.h>
+
+"""
+
+
+def make_external_preamble(extra_imports=None):
+    parts = [_EXTERNAL_PREAMBLE_HEADER]
+    if extra_imports:
+        for imp in _sort_imports(extra_imports):
+            parts.append(imp + "\n")
+    parts.append(_EXTERNAL_PREAMBLE_TAIL)
+    return "".join(parts)
+
+
+def _dedup_methods(methods):
+    seen = set()
+    result = []
+    for m in methods:
+        key = (m["class"], m["selector"])
+        if key not in seen:
+            seen.add(key)
+            result.append(m)
+    return result
+
+
+def generate_external(config_path, output_path):
+    with open(config_path) as f:
+        config = json.load(f)
+
+    methods = _dedup_methods(config.get("methods", []))
+    imports = config.get("imports", [])
+    swift_classes = set(config.get("swiftClasses", []))
+
+    extra_imports = [i if i.startswith("#") else f"#import <{i}/{i}.h>" for i in imports]
+    if extra_imports:
+        print(f"  extra imports: {', '.join(extra_imports)}")
+
+    parts = [make_external_preamble(extra_imports)]
+    cache = gen_external_class_cache(swift_classes)
+    if cache:
+        parts.append(cache)
+        parts.append("")
+
+    for m in methods:
+        parts.append(gen_external_method_stub(m, swift_classes))
+        parts.append("")
+
+    parts.append(gen_external_registration(methods, swift_classes))
+    parts.append("")
+
+    with open(output_path, "w") as f:
+        f.write("\n".join(parts))
+    print(f"  wrote {output_path}")
+    print(f"\n  {len(methods)} external method stubs generated.")
 
 
 # ---------------------------------------------------------------------------
@@ -592,9 +910,18 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
 
-    config_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(project_root, "aot-config.json")
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join(project_root, "NativeScript", "runtime")
+    external_mode = "--external" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--external"]
 
-    print(f"Generating AOT stubs from {config_path}...")
-    generate(config_path, output_dir)
+    config_path = args[0] if len(args) > 0 else os.path.join(project_root, "aot-config.json")
+
+    if external_mode:
+        output_path = args[1] if len(args) > 1 else os.path.join(project_root, "NativeScriptAOTStubs.m")
+        print(f"Generating external AOT stubs from {config_path}...")
+        generate_external(config_path, output_path)
+    else:
+        output_dir = args[1] if len(args) > 1 else os.path.join(project_root, "NativeScript", "runtime")
+        print(f"Generating AOT stubs from {config_path}...")
+        generate(config_path, output_dir)
+
     print("Done.")

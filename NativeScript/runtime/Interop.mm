@@ -54,7 +54,9 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
               }
             }
             delete wrapper;
-            ffi_closure_free(block->ffiClosure);
+            if (block->ffiClosure != nullptr) {
+              ffi_closure_free(block->ffiClosure);
+            }
             block->~JSBlock();
           }
         }};

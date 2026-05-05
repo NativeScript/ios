@@ -42,6 +42,10 @@ class MetadataBuilder {
     void* userData_;
   };
 
+  static std::pair<ffi_type*, void*> GetStructData(
+      v8::Local<v8::Context> context, v8::Local<v8::Object> initializer,
+      StructInfo structInfo);
+
  private:
   static v8::Local<v8::FunctionTemplate>
   GetOrCreateConstructorFunctionTemplateInternal(
@@ -76,10 +80,6 @@ class MetadataBuilder {
       const v8::FunctionCallbackInfo<v8::Value>& info);
   static void ToStringFunctionCallback(
       const v8::FunctionCallbackInfo<v8::Value>& info);
-  static std::pair<ffi_type*, void*> GetStructData(
-      v8::Local<v8::Context> context, v8::Local<v8::Object> initializer,
-      StructInfo structInfo);
-
   static v8::Local<v8::Value> InvokeMethod(v8::Local<v8::Context> context,
                                            const MethodMeta* meta,
                                            v8::Local<v8::Object> receiver,

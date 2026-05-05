@@ -1,6 +1,7 @@
 #include "Runtime.h"
 #include <chrono>
 #include <string>
+#include "AOTDirectCalls.h"
 #include "ArgConverter.h"
 #include "Caches.h"
 #include "Console.h"
@@ -318,6 +319,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   ObjectManager::Init(isolate, globalTemplate);
   //    SetTimeout::Init(isolate, globalTemplate);
   MethodCallProfiler::RegisterJSAPI(isolate, globalTemplate);
+  DiscoverExternalAOTStubs();
   MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
   isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);

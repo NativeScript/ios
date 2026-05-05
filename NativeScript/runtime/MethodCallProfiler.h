@@ -16,7 +16,8 @@ class MethodCallProfiler {
   static void Enable();
   static void Disable();
   static void Reset();
-  static void RecordCall(const std::string& className, const MethodMeta* meta);
+  static void RecordCall(const std::string& className, const MethodMeta* meta,
+                         bool isStatic = false);
   static void RegisterJSAPI(v8::Isolate* isolate,
                             v8::Local<v8::ObjectTemplate> globalTemplate);
 

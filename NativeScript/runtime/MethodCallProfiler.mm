@@ -18,21 +18,24 @@ struct MethodProfile {
   std::string returnType;
   std::vector<std::string> argTypes;
   uint64_t count = 0;
+  bool isStatic = false;
 };
 
 static std::mutex sProfileMutex;
 static std::unordered_map<std::string, MethodProfile> sProfiles;
 
-static const char* EncodingToTypeName(BinaryTypeEncodingType type) {
-  switch (type) {
+static std::string EncodingToTypeName(const TypeEncoding* enc) {
+  switch (enc->type) {
     case BinaryTypeEncodingType::VoidEncoding:
       return "void";
     case BinaryTypeEncodingType::BoolEncoding:
       return "BOOL";
     case BinaryTypeEncodingType::IdEncoding:
-    case BinaryTypeEncodingType::InstanceTypeEncoding:
-    case BinaryTypeEncodingType::InterfaceDeclarationReference:
       return "id";
+    case BinaryTypeEncodingType::InterfaceDeclarationReference:
+      return enc->details.interfaceDeclarationReference.name.valuePtr();
+    case BinaryTypeEncodingType::InstanceTypeEncoding:
+      return "instancetype";
     case BinaryTypeEncodingType::SelectorEncoding:
       return "SEL";
     case BinaryTypeEncodingType::ClassEncoding:
@@ -61,8 +64,21 @@ static const char* EncodingToTypeName(BinaryTypeEncodingType type) {
       return "short";
     case BinaryTypeEncodingType::UShortEncoding:
       return "ushort";
+    case BinaryTypeEncodingType::UnicharEncoding:
+      return "ushort";
+    case BinaryTypeEncodingType::StructDeclarationReference:
+      return enc->details.declarationReference.name.valuePtr();
+    case BinaryTypeEncodingType::PointerEncoding:
+    case BinaryTypeEncodingType::CStringEncoding:
+    case BinaryTypeEncodingType::IncompleteArrayEncoding:
+      return "pointer";
+    case BinaryTypeEncodingType::BlockEncoding:
+    case BinaryTypeEncodingType::FunctionPointerEncoding:
+      return "block";
+    case BinaryTypeEncodingType::ProtocolEncoding:
+      return "id";
     default:
-      return nullptr;
+      return "";
   }
 }
 
@@ -75,9 +91,10 @@ void MethodCallProfiler::Reset() {
   sProfiles.clear();
 }
 
-void MethodCallProfiler::RecordCall(const std::string& className, const MethodMeta* meta) {
+void MethodCallProfiler::RecordCall(const std::string& className, const MethodMeta* meta,
+                                    bool isStatic) {
   const char* sel = meta->selectorAsString();
-  std::string key = className + "\t" + sel;
+  std::string key = className + "\t" + (isStatic ? "+" : "-") + "\t" + sel;
 
   std::lock_guard<std::mutex> lock(sProfileMutex);
   auto it = sProfiles.find(key);
@@ -90,17 +107,18 @@ void MethodCallProfiler::RecordCall(const std::string& className, const MethodMe
   profile.className = className;
   profile.selectorName = sel;
   profile.count = 1;
+  profile.isStatic = isStatic;
 
   const auto* encodings = meta->encodings();
   const TypeEncoding* enc = encodings->first();
-  const char* retName = EncodingToTypeName(enc->type);
-  profile.returnType = retName ? retName : "?";
+  std::string retName = EncodingToTypeName(enc);
+  profile.returnType = retName.empty() ? "?" : retName;
 
   int paramCount = encodings->count - 1;
   for (int i = 0; i < paramCount; i++) {
     enc = enc->next();
-    const char* argName = EncodingToTypeName(enc->type);
-    profile.argTypes.push_back(argName ? argName : "?");
+    std::string argName = EncodingToTypeName(enc);
+    profile.argTypes.push_back(argName.empty() ? "?" : argName);
   }
 
   sProfiles.emplace(key, std::move(profile));
@@ -140,8 +158,8 @@ void MethodCallProfiler::JSReport(const FunctionCallbackInfo<Value>& info) {
   out << "Top " << sorted.size() << " method calls:\n";
   for (size_t i = 0; i < sorted.size(); i++) {
     const auto& p = *sorted[i];
-    out << "  " << (i + 1) << ". " << p.className << " -[" << p.selectorName << "] " << p.returnType
-        << "(";
+    out << "  " << (i + 1) << ". " << p.className << " " << (p.isStatic ? "+" : "-") << "["
+        << p.selectorName << "] " << p.returnType << "(";
     for (size_t j = 0; j < p.argTypes.size(); j++) {
       if (j > 0) out << ", ";
       out << p.argTypes[j];
@@ -166,9 +184,12 @@ void MethodCallProfiler::JSAOTConfig(const FunctionCallbackInfo<Value>& info) {
   out << "[\n";
   bool first = true;
   for (const auto* p : sorted) {
-    bool hasUnknownType = (p->returnType == "?");
+    auto isUnsupported = [](const std::string& t) {
+      return t == "?" || t == "pointer" || t == "block";
+    };
+    bool hasUnknownType = isUnsupported(p->returnType);
     for (const auto& a : p->argTypes) {
-      if (a == "?") hasUnknownType = true;
+      if (isUnsupported(a)) hasUnknownType = true;
     }
     if (hasUnknownType) continue;
 
@@ -181,7 +202,11 @@ void MethodCallProfiler::JSAOTConfig(const FunctionCallbackInfo<Value>& info) {
       if (j > 0) out << ", ";
       out << "\"" << p->argTypes[j] << "\"";
     }
-    out << "] }";
+    out << "]";
+    if (p->isStatic) {
+      out << ", \"static\": true";
+    }
+    out << " }";
   }
   out << "\n]";
 

@@ -10,6 +10,11 @@ namespace tns {
 v8::FunctionCallback GetAOTDirectCall(const char* className,
                                       const char* selectorName);
 
+v8::FunctionCallback GetExternalAOTCall(const char* className,
+                                        const char* selectorName, bool isStatic,
+                                        void** outHandler);
+void DiscoverExternalAOTStubs();
+
 typedef void* AOTBlockInvokeFunc;
 AOTBlockInvokeFunc GetAOTBlockInvoke(const TypeEncoding* typeEncoding,
                                      int argsCount);

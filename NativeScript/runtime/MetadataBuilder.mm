@@ -505,7 +505,14 @@ void MetadataBuilder::RegisterInstanceMethods(
       v8::FunctionCallback callback =
           GetAOTDirectCall(meta->name(), sel_getName(methodMeta->selector()));
       if (!callback) {
-        callback = MethodCallback;
+        void* externalHandler = nullptr;
+        callback = GetExternalAOTCall(meta->name(), sel_getName(methodMeta->selector()), false,
+                                      &externalHandler);
+        if (callback) {
+          item->userData_ = externalHandler;
+        } else {
+          callback = MethodCallback;
+        }
       }
       Local<FunctionTemplate> instanceMethodTemplate =
           FunctionTemplate::New(isolate, callback, ext);
@@ -546,6 +553,13 @@ void MetadataBuilder::RegisterInstanceProperties(
       if (propMeta->hasGetter()) {
         v8::FunctionCallback aotGetter =
             GetAOTDirectCall(className.c_str(), sel_getName(propMeta->getter()->selector()));
+        if (!aotGetter) {
+          void* externalHandler = nullptr;
+          aotGetter =
+              GetExternalAOTCall(className.c_str(), sel_getName(propMeta->getter()->selector()),
+                                 false, &externalHandler);
+          if (aotGetter) item->userData_ = externalHandler;
+        }
         if (aotGetter) getterCb = aotGetter;
       }
       Local<FunctionTemplate> getter = FunctionTemplate::New(isolate, getterCb, ext);
@@ -618,8 +632,21 @@ void MetadataBuilder::RegisterStaticMethods(
       CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name());
       Caches::Get(isolate)->registerCacheBoundObject(item);
       Local<External> ext = External::New(isolate, item);
-      Local<FunctionTemplate> staticMethodTemplate =
-          FunctionTemplate::New(isolate, MethodCallback, ext);
+
+      v8::FunctionCallback callback =
+          GetAOTDirectCall(meta->name(), sel_getName(methodMeta->selector()));
+      if (!callback) {
+        void* externalHandler = nullptr;
+        callback = GetExternalAOTCall(meta->name(), sel_getName(methodMeta->selector()), true,
+                                      &externalHandler);
+        if (callback) {
+          item->userData_ = externalHandler;
+        } else {
+          callback = MethodCallback;
+        }
+      }
+
+      Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate, callback, ext);
       Local<v8::Function> staticMethod;
       if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
         tns::Assert(false, isolate);
@@ -749,11 +776,12 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   CacheItem<MethodMeta>* item =
       static_cast<CacheItem<MethodMeta>*>(info.Data().As<External>()->Value());
 
+  bool instanceMethod = info.This()->InternalFieldCount() > 0;
+
   if (MethodCallProfiler::IsEnabled()) {
-    MethodCallProfiler::RecordCall(item->className_, item->meta_);
+    MethodCallProfiler::RecordCall(item->className_, item->meta_, !instanceMethod);
   }
 
-  bool instanceMethod = info.This()->InternalFieldCount() > 0;
   V8FunctionCallbackArgs args(info);
 
   std::string className = item->className_;
