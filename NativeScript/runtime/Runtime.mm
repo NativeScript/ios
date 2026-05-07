@@ -98,6 +98,25 @@ void MirrorFunctionOnGlobalThis(v8::Isolate* isolate, v8::Local<v8::Context> con
 }  // namespace
 
 // Import meta callback to support import.meta.url
+//
+// `g_moduleRegistry` keys are normalized by `CanonicalizeRegistryKey`
+// (in ModuleInternalCallbacks.mm) to one of:
+//
+//   1. HTTP / HTTPS URL — `http://host:port/path` or `https://...`.
+//      The URL IS the module identity;
+//      `import.meta.url` should be the URL verbatim.
+//
+//   2. Custom scheme — `ns-vendor://...`, `node:fs`, `blob:...`,
+//      `optional:...`. Synthetic / built-in modules that aren't backed
+//      by the local filesystem. Their identity is the scheme + body
+//      itself; `import.meta.url` keeps that string unchanged.
+//
+//   3. Absolute filesystem path — `/Users/.../app/src/foo.js`. The
+//      historical production / non-HMR dev shape. Strip the runtime
+//      base dir to recover the legacy "/app/<rel>" shape JS consumers
+//      have always seen, then prepend `file://` so the result is a
+//      well-formed URL.
+//
 static void InitializeImportMetaObject(Local<Context> context, Local<Module> module,
                                        Local<Object> meta) {
   Isolate* isolate = context->GetIsolate();
@@ -123,23 +142,31 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
     modulePath = "";  // Will use fallback path
   }
 
-  // Debug logging
-  // NSLog(@"[import.meta] Module lookup: found path = %s",
-  //       modulePath.empty() ? "(empty)" : modulePath.c_str());
-  // NSLog(@"[import.meta] Registry size: %zu", tns::g_moduleRegistry.size());
+  auto hasUrlScheme = [](const std::string& s) -> bool {
+    if (s.empty()) return false;
+    size_t colonPos = s.find(':');
+    if (colonPos == 0 || colonPos == std::string::npos) return false;
+    size_t slashPos = s.find('/');
+    if (slashPos != std::string::npos && slashPos < colonPos) return false;
+    for (size_t i = 0; i < colonPos; i++) {
+      char c = s[i];
+      const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                      (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.';
+      if (!ok) return false;
+    }
+    return true;
+  };
 
-  // Convert file path to file:// URL
+  // Compute import.meta.url.
   std::string moduleUrl;
-  if (!modulePath.empty()) {
-    // Remove base directory and create file:// URL
+  if (modulePath.empty()) {
+    moduleUrl = "file:///app/";
+  } else if (hasUrlScheme(modulePath)) {
+    moduleUrl = modulePath;
+  } else {
     std::string base = tns::ReplaceAll(modulePath, RuntimeConfig.BaseDir, "");
     moduleUrl = "file://" + base;
-  } else {
-    // Fallback URL if module not found in registry
-    moduleUrl = "file:///app/";
   }
-
-  // NSLog(@"[import.meta] Final URL: %s", moduleUrl.c_str());
 
   Local<String> url =
       String::NewFromUtf8(isolate, moduleUrl.c_str(), NewStringType::kNormal).ToLocalChecked();
@@ -150,17 +177,42 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
           url)
       .Check();
 
-  // Add import.meta.dirname support (extract directory from path)
+  // Compute import.meta.dirname.
+  //
+  // Spec (Node.js): `import.meta.dirname` is the OS-path of the
+  // directory containing the module — equivalent to `path.dirname(
+  // fileURLToPath(import.meta.url))`. It only makes sense for modules
+  // backed by the local filesystem.
+  //
+  // For URL-backed modules (HTTP, ns-vendor, blob, etc.) there is no
+  // filesystem directory. We return the URL with the final segment
+  // stripped — a best-effort answer that's stable across cycles and
+  // useful for log lines / source maps. Consumers that genuinely need
+  // a filesystem path should already be guarding on `meta.url`'s
+  // scheme before using `meta.dirname`.
   std::string dirname;
-  if (!modulePath.empty()) {
+  if (modulePath.empty()) {
+    dirname = "/app";
+  } else if (hasUrlScheme(modulePath)) {
+    size_t schemeEnd = modulePath.find("://");
+    size_t pathStart = (schemeEnd == std::string::npos) ? std::string::npos
+                                                        : modulePath.find('/', schemeEnd + 3);
+    size_t lastSlash = modulePath.find_last_of('/');
+    if (pathStart != std::string::npos && lastSlash != std::string::npos &&
+        lastSlash > pathStart) {
+      dirname = modulePath.substr(0, lastSlash);
+    } else {
+      // No path beyond the host (`http://host`) or scheme without `//`
+      // (`node:fs`, `blob:abc`). Keep the identity intact.
+      dirname = modulePath;
+    }
+  } else {
     size_t lastSlash = modulePath.find_last_of("/\\");
     if (lastSlash != std::string::npos) {
       dirname = modulePath.substr(0, lastSlash);
     } else {
       dirname = "/app";  // fallback
     }
-  } else {
-    dirname = "/app";  // fallback
   }
 
   Local<String> dirnameStr =
