@@ -693,8 +693,8 @@ private:
     std::atomic<bool> isRunning_;
     std::atomic<bool> isClosing_;
     std::atomic<bool> isTerminating_;
-    bool isDisposed_;
-    bool isWeak_;
+    std::atomic<bool> isDisposed_;
+    std::atomic<bool> isWeak_;
     std::function<void (v8::Isolate*, v8::Local<v8::Object> thiz, std::shared_ptr<worker::Message>)> onMessage_;
     std::shared_ptr<v8::Persistent<v8::Value>> poWorker_;
     ConcurrentQueue queue_;

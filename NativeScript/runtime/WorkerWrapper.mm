@@ -109,7 +109,18 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
 
   this->isDisposed_ = true;
   Runtime* runtime = Runtime::GetCurrentRuntime();
-  delete runtime;
+  if (runtime != nullptr) {
+    delete runtime;
+  } else {
+    // Runtime was never created (worker terminated before initialization).
+    // The runtime destructor normally handles this cleanup, so do it here.
+    int workerId = this->workerId_;
+    bool found;
+    auto state = Caches::Workers->Get(workerId, found);
+    if (found) {
+      Caches::Workers->Remove(workerId);
+    }
+  }
 }
 
 void WorkerWrapper::Close() { this->isClosing_ = true; }
