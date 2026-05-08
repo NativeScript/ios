@@ -1,0 +1,35 @@
+{
+  "methods": [
+    { "class": "NSObject", "selector": "respondsToSelector:", "ret": "BOOL", "args": ["SEL"] },
+    { "class": "NSObject", "selector": "isKindOfClass:", "ret": "BOOL", "args": ["Class"] },
+    { "class": "NSObject", "selector": "isEqual:", "ret": "BOOL", "args": ["id"] },
+    { "class": "NSObject", "selector": "description", "ret": "id", "args": [] },
+    { "class": "NSObject", "selector": "hash", "ret": "ulong", "args": [] },
+    { "class": "NSMutableArray", "selector": "removeAllObjects", "ret": "void", "args": [] },
+    { "class": "NSMutableArray", "selector": "addObject:", "ret": "void", "args": ["id"] },
+    { "class": "NSMutableArray", "selector": "objectAtIndex:", "ret": "id", "args": ["ulong"] },
+    { "class": "NSMutableArray", "selector": "count", "ret": "ulong", "args": [] },
+    { "class": "NSMutableArray", "selector": "insertObject:atIndex:", "ret": "void", "args": ["id", "ulong"] },
+    { "class": "NSMutableArray", "selector": "removeObjectAtIndex:", "ret": "void", "args": ["ulong"] },
+    { "class": "NSArray", "selector": "objectAtIndex:", "ret": "id", "args": ["ulong"] },
+    { "class": "NSArray", "selector": "count", "ret": "ulong", "args": [] },
+    { "class": "NSDictionary", "selector": "objectForKeyedSubscript:", "ret": "id", "args": ["id"] },
+    { "class": "NSDictionary", "selector": "count", "ret": "ulong", "args": [] },
+    { "class": "NSMutableDictionary", "selector": "setObject:forKey:", "ret": "void", "args": ["id", "id"] },
+    { "class": "NSMutableDictionary", "selector": "removeObjectForKey:", "ret": "void", "args": ["id"] },
+    { "class": "NSString", "selector": "length", "ret": "ulong", "args": [] }
+  ],
+  "blockPatterns": [
+    { "ret": "void",   "args": [] },
+    { "ret": "void",   "args": ["id"] },
+    { "ret": "void",   "args": ["id", "id"] },
+    { "ret": "void",   "args": ["BOOL"] },
+    { "ret": "void",   "args": ["long"] },
+    { "ret": "void",   "args": ["ulong"] },
+    { "ret": "BOOL",   "args": [] },
+    { "ret": "BOOL",   "args": ["id"] },
+    { "ret": "BOOL",   "args": ["id", "ulong", "BOOL"] },
+    { "ret": "id",     "args": [] },
+    { "ret": "id",     "args": ["id"] }
+  ]
+}

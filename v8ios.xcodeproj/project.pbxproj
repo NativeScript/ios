@@ -283,6 +283,12 @@
 		C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB65229EAC8100345BFE /* Interop.h */; };
 		C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB66229EAC8100345BFE /* ArgConverter.h */; };
 		C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */; };
+		CFCFC461946160EDD42B2C8B /* AOTDirectCalls.h in Headers */ = {isa = PBXBuildFile; fileRef = 5E7EEEF53D2575788F33B520 /* AOTDirectCalls.h */; };
+		1465A61ACE30B5029013B847 /* AOTDirectCalls.mm in Sources */ = {isa = PBXBuildFile; fileRef = ADD755B4B7D89343B5900C60 /* AOTDirectCalls.mm */; };
+		A1B2C3D4E5F60001PROFHDR /* MethodCallProfiler.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60003PROFHDR /* MethodCallProfiler.h */; };
+		A1B2C3D4E5F60002PROFSRC /* MethodCallProfiler.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60004PROFSRC /* MethodCallProfiler.mm */; };
+		B1A2C3D4E5F60001AOTHDR /* NativeScriptAOT.h in Headers */ = {isa = PBXBuildFile; fileRef = B1A2C3D4E5F60003AOTHDR /* NativeScriptAOT.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		B1A2C3D4E5F60002AOTSRC /* NativeScriptAOTBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = B1A2C3D4E5F60004AOTSRC /* NativeScriptAOTBridge.mm */; };
 		C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB68229EAC8100345BFE /* FFICall.cpp */; };
 		C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB69229EAC8100345BFE /* WeakRef.cpp */; };
 		C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */; };
@@ -789,6 +795,12 @@
 		C2DDEB65229EAC8100345BFE /* Interop.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Interop.h; sourceTree = "<group>"; };
 		C2DDEB66229EAC8100345BFE /* ArgConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArgConverter.h; sourceTree = "<group>"; };
 		C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MetadataBuilder.h; sourceTree = "<group>"; };
+		5E7EEEF53D2575788F33B520 /* AOTDirectCalls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AOTDirectCalls.h; sourceTree = "<group>"; };
+		ADD755B4B7D89343B5900C60 /* AOTDirectCalls.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = AOTDirectCalls.mm; sourceTree = "<group>"; };
+		A1B2C3D4E5F60003PROFHDR /* MethodCallProfiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MethodCallProfiler.h; sourceTree = "<group>"; };
+		A1B2C3D4E5F60004PROFSRC /* MethodCallProfiler.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MethodCallProfiler.mm; sourceTree = "<group>"; };
+		B1A2C3D4E5F60003AOTHDR /* NativeScriptAOT.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptAOT.h; sourceTree = "<group>"; };
+		B1A2C3D4E5F60004AOTSRC /* NativeScriptAOTBridge.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptAOTBridge.mm; sourceTree = "<group>"; };
 		C2DDEB68229EAC8100345BFE /* FFICall.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FFICall.cpp; sourceTree = "<group>"; };
 		C2DDEB69229EAC8100345BFE /* WeakRef.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WeakRef.cpp; sourceTree = "<group>"; };
 		C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ArgConverter.mm; sourceTree = "<group>"; };
@@ -1456,6 +1468,12 @@
 				C2DDEB70229EAC8200345BFE /* Metadata.mm */,
 				C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */,
 				C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */,
+				5E7EEEF53D2575788F33B520 /* AOTDirectCalls.h */,
+				ADD755B4B7D89343B5900C60 /* AOTDirectCalls.mm */,
+				A1B2C3D4E5F60003PROFHDR /* MethodCallProfiler.h */,
+				A1B2C3D4E5F60004PROFSRC /* MethodCallProfiler.mm */,
+				B1A2C3D4E5F60003AOTHDR /* NativeScriptAOT.h */,
+				B1A2C3D4E5F60004AOTSRC /* NativeScriptAOTBridge.mm */,
 				C2DDEB89229EAC8300345BFE /* ModuleInternal.h */,
 				AA8C47AF2E27114300649BF5 /* ModuleInternalCallbacks.h */,
 				AA8C47B02E27114300649BF5 /* ModuleInternalCallbacks.mm */,
@@ -1611,6 +1629,9 @@
 				C247C17022F82842001D2CA2 /* libffi.h in Headers */,
 				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
 				C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */,
+				CFCFC461946160EDD42B2C8B /* AOTDirectCalls.h in Headers */,
+				A1B2C3D4E5F60001PROFHDR /* MethodCallProfiler.h in Headers */,
+				B1A2C3D4E5F60001AOTHDR /* NativeScriptAOT.h in Headers */,
 				C266569F22B282BA00EE15CC /* FunctionReference.h in Headers */,
 				C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */,
 				C2DDEBA1229EAC8300345BFE /* FFICall.h in Headers */,
@@ -2242,6 +2263,9 @@
 				C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
+				1465A61ACE30B5029013B847 /* AOTDirectCalls.mm in Sources */,
+				A1B2C3D4E5F60002PROFSRC /* MethodCallProfiler.mm in Sources */,
+				B1A2C3D4E5F60002AOTSRC /* NativeScriptAOTBridge.mm in Sources */,
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
 				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */,
