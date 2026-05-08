@@ -690,8 +690,8 @@ public:
 private:
     v8::Isolate* mainIsolate_;
     v8::Isolate* workerIsolate_;
-    bool isRunning_;
-    bool isClosing_;
+    std::atomic<bool> isRunning_;
+    std::atomic<bool> isClosing_;
     std::atomic<bool> isTerminating_;
     bool isDisposed_;
     bool isWeak_;

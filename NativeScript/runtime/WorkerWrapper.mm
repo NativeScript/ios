@@ -40,7 +40,7 @@ const bool WorkerWrapper::IsClosing() { return this->isClosing_; }
 const int WorkerWrapper::WorkerId() { return this->workerId_; }
 
 void WorkerWrapper::PostMessage(std::shared_ptr<worker::Message> message) {
-  if (!this->isTerminating_) {
+  if (!this->isTerminating_ && !this->isClosing_) {
     this->queue_.Push(message);
   }
 }
@@ -66,7 +66,7 @@ void WorkerWrapper::DrainPendingTasks() {
   Local<Object> global = context->Global();
 
   for (std::shared_ptr<worker::Message> message : messages) {
-    if (this->isTerminating_) {
+    if (this->isTerminating_ || this->isClosing_) {
       break;
     }
     TryCatch tc(this->workerIsolate_);
@@ -74,6 +74,14 @@ void WorkerWrapper::DrainPendingTasks() {
 
     if (tc.HasCaught()) {
       this->CallOnErrorHandlers(tc);
+    }
+  }
+
+  if (this->isClosing_) {
+    bool wasTerminating = this->isTerminating_.exchange(true);
+    if (!wasTerminating) {
+      this->queue_.Terminate();
+      this->isRunning_ = false;
     }
   }
 }

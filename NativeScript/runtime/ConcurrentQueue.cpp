@@ -54,14 +54,19 @@ void ConcurrentQueue::SignalAndWakeUp() {
 void ConcurrentQueue::Terminate() {
     std::unique_lock<std::mutex> lock(initializationMutex_);
     terminated = true;
-    if (this->runLoop_) {
-        CFRunLoopStop(this->runLoop_);
+    CFRunLoopRef runLoop = this->runLoop_;
+    CFRunLoopSourceRef source = this->runLoopTasksSource_;
+    this->runLoopTasksSource_ = nullptr;
+    this->runLoop_ = nullptr;
+
+    if (runLoop) {
+        CFRunLoopStop(runLoop);
     }
 
-    if (this->runLoopTasksSource_) {
-        CFRunLoopRemoveSource(this->runLoop_, this->runLoopTasksSource_, kCFRunLoopCommonModes);
-        CFRunLoopSourceInvalidate(this->runLoopTasksSource_);
-        CFRelease(this->runLoopTasksSource_);
+    if (source) {
+        CFRunLoopRemoveSource(runLoop, source, kCFRunLoopCommonModes);
+        CFRunLoopSourceInvalidate(source);
+        CFRelease(source);
     }
 }
 
