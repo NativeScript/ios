@@ -381,6 +381,28 @@ describe("TNS Workers", () => {
         }, DEFAULT_TIMEOUT_BEFORE_ASSERT);
     });
 
+    it("Worker should fully shut down after close() without needing terminate()", (done) => {
+        var worker = new Worker("./tests/shared/Workers/EvalWorker.js");
+
+        worker.postMessage({
+            eval: "close(); postMessage('closing');"
+        });
+
+        var responseCounter = 0;
+        worker.onmessage = (msg) => {
+            responseCounter++;
+        };
+
+        setTimeout(() => {
+            worker.postMessage({ eval: "postMessage('should not arrive');" });
+        }, 500);
+
+        setTimeout(() => {
+            expect(responseCounter).toBe(1);
+            done();
+        }, DEFAULT_TIMEOUT_BEFORE_ASSERT + 1000);
+    });
+
     it("Test onerror invoked for a script that has invalid syntax", (done) => {
         var worker = new Worker("./tests/shared/Workers/WorkerInvalidSyntax.js");
 

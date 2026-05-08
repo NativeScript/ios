@@ -198,8 +198,6 @@ Runtime::~Runtime() {
   }
   this->isolate_->TerminateExecution();
 
-  // TODO: fix race condition on workers where a queue can leak (maybe calling Terminate before
-  // Initialize?)
   Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
     auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
     if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
