@@ -478,17 +478,58 @@ std::vector<v8::Local<v8::Function>> GetHotEventListeners(v8::Isolate* isolate, 
 
 void DispatchHotEvent(v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& event, v8::Local<v8::Value> data) {
   auto callbacks = GetHotEventListeners(isolate, event);
+  const bool verbose = tns::IsScriptLoadingLogEnabled();
+
+  // Single dispatch loop. Always observes `tryCatch.HasCaught()` and
+  // `result.ToLocal(...)` regardless of verbose mode — these mirror the
+  // dispose/prune dispatcher patterns elsewhere in this file (lines 664,
+  // 780) and the original pre-session `DispatchHotEvent` behavior. The
+  // round-7 fast-path variant that skipped these calls broke HMR even
+  // though `~TryCatch` resets state on destruction; preserving the
+  // observation pattern is the safest contract.
+  //
+  // All `Log()` calls are gated behind `verbose` so default-mode dev
+  // sessions are quiet; the per-listener int counters are practically
+  // free and feed the verbose-only summary line. Reproducing the verbose
+  // output requires `logScriptLoading: true` in `nativescript.config.ts`.
+  // The summary collapses "did any listener match?" into one line — the
+  // single most informative signal during HMR triage (see round 7 in
+  // `LATEST-05-07-2026-HMR_ANGULAR_DEBUG_SESSION.md`).
+  int matched = 0;   // returned undefined OR a truthy non-bool (Promise/object)
+  int falsey = 0;    // returned literal `false`
+  int threw = 0;     // listener threw synchronously
+  int idx = 0;
   for (auto& cb : callbacks) {
     v8::TryCatch tryCatch(isolate);
     v8::Local<v8::Value> args[] = { data };
     v8::MaybeLocal<v8::Value> result = cb->Call(context, v8::Undefined(isolate), 1, args);
-    (void)result; // Suppress unused result warning
     if (tryCatch.HasCaught()) {
-      // Log error but continue to other listeners
-      if (tns::IsScriptLoadingLogEnabled()) {
-        Log(@"[import.meta.hot] Error in event listener for '%s'", event.c_str());
+      threw++;
+      if (verbose) {
+        v8::Local<v8::Value> ex = tryCatch.Exception();
+        v8::String::Utf8Value m(isolate, ex);
+        Log(@"[import.meta.hot] Listener #%d for '%s' threw: %s", idx, event.c_str(), *m ? *m : "(unknown)");
+      }
+    } else {
+      v8::Local<v8::Value> ret;
+      if (result.ToLocal(&ret)) {
+        if (ret->IsBoolean() && !ret->BooleanValue(isolate)) {
+          falsey++;
+        } else {
+          matched++;
+          if (verbose && !ret->IsUndefined()) {
+            v8::String::Utf8Value rstr(isolate, ret);
+            std::string s = *rstr ? *rstr : "(unknown)";
+            Log(@"[import.meta.hot] Listener #%d for '%s' returned: %s", idx, event.c_str(), s.c_str());
+          }
+        }
       }
     }
+    idx++;
+  }
+  if (verbose) {
+    Log(@"[import.meta.hot] dispatch summary event='%s' total=%d matched=%d falsey=%d threw=%d",
+        event.c_str(), (int)callbacks.size(), matched, falsey, threw);
   }
 }
 
@@ -498,36 +539,61 @@ void InitializeHotEventDispatcher(v8::Isolate* isolate, v8::Local<v8::Context> c
   using v8::Value;
 
   // Create a global function __NS_DISPATCH_HOT_EVENT__(event, data)
-  // that the HMR client can call to dispatch events to registered listeners
+  // that the HMR client can call to dispatch events to registered listeners.
+  // Returns the number of listeners that were invoked so callers can detect
+  // "no-listener" scenarios (which would otherwise look identical to a
+  // successful dispatch from the JS side).
   auto dispatchCb = [](const FunctionCallbackInfo<Value>& info) {
     v8::Isolate* iso = info.GetIsolate();
     v8::Local<v8::Context> ctx = iso->GetCurrentContext();
     
     if (info.Length() < 1 || !info[0]->IsString()) {
-      info.GetReturnValue().Set(v8::Boolean::New(iso, false));
+      info.GetReturnValue().Set(v8::Integer::New(iso, -1));
       return;
     }
     
     v8::String::Utf8Value eventName(iso, info[0]);
     std::string event = *eventName ? *eventName : "";
     if (event.empty()) {
-      info.GetReturnValue().Set(v8::Boolean::New(iso, false));
+      info.GetReturnValue().Set(v8::Integer::New(iso, -1));
       return;
     }
     
     v8::Local<Value> data = info.Length() > 1 ? info[1] : v8::Undefined(iso).As<Value>();
-    
+
+    auto callbacks = GetHotEventListeners(iso, event);
+
     if (tns::IsScriptLoadingLogEnabled()) {
-      Log(@"[import.meta.hot] Dispatching event '%s'", event.c_str());
+      Log(@"[import.meta.hot] Dispatching event '%s' to %d listener(s)", event.c_str(), (int)callbacks.size());
     }
     
     DispatchHotEvent(iso, ctx, event, data);
-    info.GetReturnValue().Set(v8::Boolean::New(iso, true));
+    info.GetReturnValue().Set(v8::Integer::New(iso, (int)callbacks.size()));
+  };
+
+  // __nsListHotEventListeners() — returns an object mapping every registered
+  // event name to its current listener count. Diagnostic helper for HMR
+  // dispatch issues so JS code can verify whether a given event has any
+  // listeners attached at the time of dispatch (the typical failure mode is
+  // a custom event being dispatched before the user's compiled component
+  // module has executed its `import.meta.hot.on(...)` registration).
+  auto listCb = [](const FunctionCallbackInfo<Value>& info) {
+    v8::Isolate* iso = info.GetIsolate();
+    v8::Local<v8::Context> ctx = iso->GetCurrentContext();
+    v8::Local<v8::Object> result = v8::Object::New(iso);
+    for (const auto& kv : g_hotEventListeners) {
+      v8::Local<v8::String> name = tns::ToV8String(iso, kv.first.c_str());
+      v8::Local<v8::Integer> count = v8::Integer::New(iso, (int)kv.second.size());
+      (void)result->CreateDataProperty(ctx, name, count);
+    }
+    info.GetReturnValue().Set(result);
   };
   
   v8::Local<v8::Object> global = context->Global();
   v8::Local<v8::Function> dispatchFn = v8::Function::New(context, dispatchCb).ToLocalChecked();
   global->CreateDataProperty(context, tns::ToV8String(isolate, "__NS_DISPATCH_HOT_EVENT__"), dispatchFn).Check();
+  v8::Local<v8::Function> listFn = v8::Function::New(context, listCb).ToLocalChecked();
+  global->CreateDataProperty(context, tns::ToV8String(isolate, "__nsListHotEventListeners"), listFn).Check();
 }
 
 int RunHotDisposeCallbacks(v8::Isolate* isolate, v8::Local<v8::Context> context,
@@ -1302,8 +1368,34 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // can be part of the module's identity (auth, content versioning, routing, etc).
   // Therefore we only apply query normalization (sorting/dropping) for known
   // NativeScript dev endpoints where `t`/`v`/`import` are purely cache busters.
+  //
+  // Special cases that LOOK like dev endpoints but aren't normalized:
+  //
+  //   `/@ng/component` (Angular HMR component-update endpoint)
+  //     The `t` (timestamp) parameter is the WHOLE POINT of the URL — it
+  //     identifies a specific recompile of the component's metadata after
+  //     a `.html`/style edit. Stripping it would collapse every HMR fetch
+  //     to the same cache key (the boot-time call uses `Date.now()` and
+  //     each subsequent save uses a new `Date.now()`), and the second
+  //     `__ns_import(...)` would hit V8's module cache, resolve the
+  //     boot-time `_UpdateMetadata` default export, and call
+  //     `ɵɵreplaceMetadata` with stale instructions. Result: server logs
+  //     `(client) hmr update`, the listener fires, but the visual never
+  //     changes because the runtime swapped the live view's metadata
+  //     with the same metadata it already had. Treat the path as a
+  //     non-dev endpoint and preserve the query verbatim so each
+  //     timestamped fetch is a distinct registry entry.
+  //
+  // Apply the special-case check BEFORE the dev-endpoint short-circuit so
+  // it covers paths under `/ns/m/<componentDir>/@ng/component` (the
+  // resolved URL Angular's compiler produces relative to the component's
+  // `import.meta.url`).
   {
     std::string pathOnly = originAndPath.substr(pathStart);
+    if (pathOnly.find("/@ng/component") != std::string::npos) {
+      // Preserve query as-is — `t` is the version discriminator.
+      return noHash;
+    }
     const bool isDevEndpoint =
       StartsWith(pathOnly, "/ns/") ||
       StartsWith(pathOnly, "/node_modules/.vite/") ||

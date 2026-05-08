@@ -922,7 +922,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
       misses++;
     }
     if (logScriptLoading) {
-      Log(@"[ns-hmr-diag][ios-invalidate] %s key=%s",
+      Log(@"[ns-hmr][ios-invalidate] %s key=%s",
           present ? "HIT " : "MISS",
           url.c_str());
     }
@@ -945,7 +945,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
   EvictHttpModulePrefetchCacheUrls(uniqueUrls);
 
   if (logScriptLoading) {
-    Log(@"[ns-hmr-diag][ios-invalidate] summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
+    Log(@"[ns-hmr][ios-invalidate] summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
         (unsigned long)uniqueUrls.size(),
         (unsigned long)hits,
         (unsigned long)misses,
@@ -2993,6 +2993,22 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         bool isSfcVariant = specIsSfc && (specHasTypeScript || specHasTypeTemplate || specHasTypeStyle);
         isVolatile = (specIsSfc && !isSfcVariant) || specIsAsm;
       }
+      // Angular HMR component-update endpoint (`/@ng/component?c=<id>&t=<ts>`) is
+      // inherently volatile: each save produces fresh metadata that the runtime
+      // must re-fetch and re-compile so `ɵɵreplaceMetadata` sees the new
+      // template instructions. The `t` parameter discriminates versions, but
+      // even with `CanonicalizeHttpUrlKey` preserving it, every save would
+      // otherwise leave a stale module entry behind in `g_moduleRegistry`,
+      // accumulating one entry per save for the entire dev session. Marking it
+      // as volatile evicts the previous entry on every re-import so the cache
+      // stays bounded AND we always serve fresh metadata to
+      // `ɵɵreplaceMetadata`. Without this evict, the boot-time call's
+      // resolved module would shadow any subsequent fetch on a path-only
+      // canonicalization regression and surface as "first save's metadata
+      // permanently stuck on screen" — exactly the symptom this fixes.
+      if (!isVolatile && normalizedSpec.find("/@ng/component") != std::string::npos) {
+        isVolatile = true;
+      }
       if (isVolatile) {
         auto ex = g_moduleRegistry.find(key);
         if (ex != g_moduleRegistry.end()) {
@@ -3016,13 +3032,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       if (itExisting != g_moduleRegistry.end()) {
         v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
         if (!existing.IsEmpty()) {
-          // Diagnostic: surface every HTTP dynamic-import cache hit so
-          // we can verify the runtime *did* drop the entry on
-          // invalidate. Filtered to angular component-shaped URLs to
-          // avoid spam from vendor chunks.
+          // Permanent observability: surface every HTTP dynamic-import
+          // cache hit so we can verify the runtime *did* drop the entry
+          // on invalidate. Filtered to angular component-shaped URLs to
+          // avoid spam from vendor chunks. Verbose-gated.
           if (IsScriptLoadingLogEnabled()) {
             if (key.find("ns/m/") != std::string::npos || key.find(".component") != std::string::npos) {
-              Log(@"[ns-hmr-diag][ios-dyn-cache] HIT %s status=%s",
+              Log(@"[ns-hmr][ios-dyn-cache] HIT %s status=%s",
                   key.c_str(), ModuleStatusToString(existing->GetStatus()));
             }
             Log(@"[dyn-import][http-cache] hit %s", key.c_str());
@@ -3132,13 +3148,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // mark in-flight before starting network fetch
       g_modulesInFlight.insert(key);
       g_httpDynamicWaiters[key].emplace_back(isolate, resolver);
-      // Diagnostic: surface fresh fetches so we can confirm that
-      // post-invalidation, the next dynamic import does NOT re-use the
-      // cache and DOES go to the network. Filtered to component shapes
-      // to avoid vendor-chunk noise.
+      // Permanent observability: surface fresh fetches so we can confirm
+      // that post-invalidation, the next dynamic import does NOT re-use
+      // the cache and DOES go to the network. Filtered to component
+      // shapes to avoid vendor-chunk noise. Verbose-gated.
       if (IsScriptLoadingLogEnabled() &&
           (key.find("ns/m/") != std::string::npos || key.find(".component") != std::string::npos)) {
-        Log(@"[ns-hmr-diag][ios-dyn-cache] FRESH-FETCH %s", key.c_str());
+        Log(@"[ns-hmr][ios-dyn-cache] FRESH-FETCH %s", key.c_str());
       }
       v8::MaybeLocal<v8::Module> modMaybe = LoadHttpModuleForUrl(isolate, context, normalizedSpec);
       if (!modMaybe.IsEmpty()) {
