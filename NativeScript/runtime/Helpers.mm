@@ -21,7 +21,7 @@ namespace {
 const int BUFFER_SIZE = 1024 * 1024;
 char* Buffer = new char[BUFFER_SIZE];
 uint8_t* BinBuffer = new uint8_t[BUFFER_SIZE];
-}
+}  // namespace
 
 std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
   std::string valueStr = tns::ToString(isolate, value);
@@ -310,25 +310,39 @@ bool tns::IsArrayOrArrayLike(Isolate* isolate, const Local<Value>& value) {
 void* tns::TryGetBufferFromArrayBuffer(const v8::Local<v8::Value>& value, bool& isArrayBuffer) {
   isArrayBuffer = false;
 
-  if (value.IsEmpty() || (!value->IsArrayBuffer() && !value->IsArrayBufferView())) {
+  if (value.IsEmpty() ||
+      (!value->IsArrayBuffer() && !value->IsArrayBufferView() && !value->IsSharedArrayBuffer())) {
     return nullptr;
   }
 
-  Local<ArrayBuffer> buffer;
+  std::shared_ptr<BackingStore> backingStore;
+  size_t byteOffset = 0;
   if (value->IsArrayBufferView()) {
     isArrayBuffer = true;
-    buffer = value.As<ArrayBufferView>()->Buffer();
+    auto view = value.As<ArrayBufferView>();
+    byteOffset = view->ByteOffset();
+    auto buffer = view->Buffer();
+    if (!buffer.IsEmpty()) {
+      backingStore = buffer->GetBackingStore();
+    }
   } else if (value->IsArrayBuffer()) {
     isArrayBuffer = true;
-    buffer = value.As<ArrayBuffer>();
+    backingStore = value.As<ArrayBuffer>()->GetBackingStore();
+  } else if (value->IsSharedArrayBuffer()) {
+    isArrayBuffer = true;
+    backingStore = value.As<SharedArrayBuffer>()->GetBackingStore();
   }
 
-  if (buffer.IsEmpty()) {
+  if (!backingStore) {
     return nullptr;
   }
 
-  void* data = buffer->GetBackingStore()->Data();
-  return data;
+  uint8_t* data = static_cast<uint8_t*>(backingStore->Data());
+  if (data == nullptr) {
+    return nullptr;
+  }
+
+  return data + byteOffset;
 }
 
 struct LockAndCV {
@@ -337,27 +351,27 @@ struct LockAndCV {
 };
 
 void tns::ExecuteOnRunLoop(CFRunLoopRef queue, void (^func)(void), bool async) {
-    if(!async) {
-        bool __block finished = false;
-        auto v = new LockAndCV;
-        std::unique_lock<std::mutex> lock(v->m);
-        CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, ^(void) {
-            func();
-            {
-                std::unique_lock lk(v->m);
-                finished = true;
-            }
-            v->cv.notify_all();
-        });
-        CFRunLoopWakeUp(queue);
-        while(!finished) {
-            v->cv.wait(lock);
-        }
-        delete v;
-    } else {
-        CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, func);
-        CFRunLoopWakeUp(queue);
+  if (!async) {
+    bool __block finished = false;
+    auto v = new LockAndCV;
+    std::unique_lock<std::mutex> lock(v->m);
+    CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, ^(void) {
+      func();
+      {
+        std::unique_lock lk(v->m);
+        finished = true;
+      }
+      v->cv.notify_all();
+    });
+    CFRunLoopWakeUp(queue);
+    while (!finished) {
+      v->cv.wait(lock);
     }
+    delete v;
+  } else {
+    CFRunLoopPerformBlock(queue, kCFRunLoopCommonModes, func);
+    CFRunLoopWakeUp(queue);
+  }
 }
 
 void tns::ExecuteOnDispatchQueue(dispatch_queue_t queue, std::function<void()> func, bool async) {
@@ -532,7 +546,9 @@ void tns::LogBacktrace(int skip) {
         demangled = abi::__cxa_demangle(info.dli_sname, NULL, 0, &status);
       }
       snprintf(buf, sizeof(buf), "%-3d %*p %s + %zd\n", i, int(2 + sizeof(void*) * 2), callstack[i],
-               status == 0 ? demangled : info.dli_sname == 0 ? symbols[i] : info.dli_sname,
+               status == 0           ? demangled
+               : info.dli_sname == 0 ? symbols[i]
+                                     : info.dli_sname,
                (char*)callstack[i] - (char*)info.dli_saddr);
       free(demangled);
     } else {
@@ -938,4 +954,4 @@ void SetConstructorFunction(Isolate* isolate, Local<Template> that, Local<v8::St
   if (flag == SetConstructorFunctionFlag::SET_CLASS_NAME) tmpl->SetClassName(name);
   that->Set(name, tmpl);
 }
-};
+};  // namespace tns

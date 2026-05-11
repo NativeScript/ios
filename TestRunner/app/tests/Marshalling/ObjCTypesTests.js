@@ -288,6 +288,33 @@ describe(module.id, function () {
         expect(source[4]).toEqual(52);
     });
 
+    it("should wrap a SharedArrayBuffer in NSData", function () {
+        var sab = new SharedArrayBuffer(4);
+        var view = new Uint8Array(sab);
+        view[0] = 49; view[1] = 50; view[2] = 51; view[3] = 52;
+
+        var result = TNSObjCTypes.alloc().init().methodWithNSData(sab);
+
+        expect(TNSGetOutput()).toBe('1234');
+        expect(result).toBe(sab);
+        TNSClearOutput();
+    });
+
+    it("should mutate a SharedArrayBuffer via NSMutableData", function () {
+        var sab = new SharedArrayBuffer(4);
+        var view = new Uint8Array(sab);
+        view[0] = 48; view[1] = 49; view[2] = 50; view[3] = 51;
+
+        var result = TNSObjCTypes.alloc().init().methodWithNSMutableData(sab);
+
+        expect(result).toBe(sab);
+        var after = new Uint8Array(sab);
+        expect(after[0]).toEqual(65);
+        expect(after[1]).toEqual(49);
+        expect(after[2]).toEqual(50);
+        expect(after[3]).toEqual(51);
+    });
+
     it("should be possible to wrap NSData in an ArrayBuffer", function () {
         var data = NSString.stringWithString("test").dataUsingEncoding(NSUTF8StringEncoding);
 
@@ -302,6 +329,35 @@ describe(module.id, function () {
         var arr = new ArrayBuffer(5);
         data.getBytes(arr);
         const actual = new Uint8Array(arr);
+        expect(actual[0]).toEqual(49);
+        expect(actual[1]).toEqual(50);
+        expect(actual[2]).toEqual(51);
+        expect(actual[3]).toEqual(52);
+        expect(actual[4]).toEqual(53);
+    });
+
+    it("should respect ArrayBufferView byteOffset when marshalling as void* parameter", () => {
+        var data = NSData.alloc().initWithBase64EncodedStringOptions("MTIzNDU=", NSDataBase64DecodingIgnoreUnknownCharacters);
+        var arr = new ArrayBuffer(7);
+        var prefill = new Uint8Array(arr);
+        prefill[0] = 65; prefill[5] = 66; prefill[6] = 67;
+        var view = new Uint8Array(arr, 1, 5);
+        data.getBytesLength(view, 5);
+        var result = new Uint8Array(arr);
+        expect(result[0]).toEqual(65);
+        expect(result[1]).toEqual(49);
+        expect(result[2]).toEqual(50);
+        expect(result[3]).toEqual(51);
+        expect(result[4]).toEqual(52);
+        expect(result[5]).toEqual(53);
+        expect(result[6]).toEqual(67);
+    });
+
+    it("should marshal a SharedArrayBuffer as void* parameter", () => {
+        var data = NSData.alloc().initWithBase64EncodedStringOptions("MTIzNDU=", NSDataBase64DecodingIgnoreUnknownCharacters);
+        var sab = new SharedArrayBuffer(5);
+        data.getBytes(sab);
+        var actual = new Uint8Array(sab);
         expect(actual[0]).toEqual(49);
         expect(actual[1]).toEqual(50);
         expect(actual[2]).toEqual(51);
