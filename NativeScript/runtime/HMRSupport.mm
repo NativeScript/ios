@@ -340,6 +340,15 @@ bool ApplyDevRuntimeConfigFromUrl(const std::string& url,
   return true;
 }
 
+// Native-side mirror of `__NS_HMR_BOOT_COMPLETE__`. Read by the
+// runloop pump in `MaybePumpJSThreadDuringBoot` so its gate is a
+// single relaxed atomic load on the HMR-time hot path.
+static std::atomic<bool> g_devSessionBootComplete{false};
+
+static inline bool IsDevSessionBootComplete() {
+  return g_devSessionBootComplete.load(std::memory_order_relaxed);
+}
+
 void ApplyDevSessionGlobals(v8::Isolate* isolate,
                             v8::Local<v8::Context> context,
                             const DevSessionState& session) {
@@ -348,6 +357,7 @@ void ApplyDevSessionGlobals(v8::Isolate* isolate,
   SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", false);
   SetBooleanGlobal(isolate, context, "__NS_HMR_CLIENT_ACTIVE__", false);
   SetBooleanGlobal(isolate, context, "__NS_HMR_BROWSER_RUNTIME_CLIENT_ACTIVE__", false);
+  g_devSessionBootComplete.store(false, std::memory_order_relaxed);
   if (IsScriptLoadingLogEnabled()) {
     Log(@"[dev-session] globals applied session=%s origin=%s ws=%s bootComplete=false",
         session.sessionId.c_str(), session.origin.c_str(),
@@ -359,6 +369,7 @@ void SetDevSessionBootComplete(v8::Isolate* isolate,
                                v8::Local<v8::Context> context,
                                bool value) {
   SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", value);
+  g_devSessionBootComplete.store(value, std::memory_order_relaxed);
   if (IsScriptLoadingLogEnabled()) {
     Log(@"[dev-session] __NS_HMR_BOOT_COMPLETE__=%s",
         value ? "true" : "false");
@@ -1482,6 +1493,7 @@ static bool TryGetPrefetchedSource(const std::string& url, std::string& out);
 static bool IsHttpModulePrefetchEnabled();
 static bool IsHttpFetchUrlLogEnabled();
 static void MaybeLogPrefetchSummary(const char* trigger);
+static void MaybePumpJSThreadDuringBoot();
 
 static std::mutex g_prefetchMutex;
 static std::unordered_map<std::string, std::string> g_prefetchCache;
@@ -1568,6 +1580,9 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     // CPU work; running it inline on every cache hit was burning the
     // very thread we are trying to unblock.
     SchedulePrefetchForDepsAsync(url, out);
+    // Yield to the placeholder heartbeat between cache hits — without
+    // this the runloop is starved by back-to-back HttpFetchText calls.
+    MaybePumpJSThreadDuringBoot();
     return true;
   }
 
@@ -1615,6 +1630,9 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     SchedulePrefetchForDepsAsync(url, out);
   }
   MaybeLogPrefetchSummary("miss");
+  // Yield to the placeholder heartbeat after the 10–60ms sync fetch
+  // block so the bar can repaint before V8 calls us again.
+  MaybePumpJSThreadDuringBoot();
   return true;
 }
 
@@ -2199,46 +2217,69 @@ static void MaybeLogPrefetchSummary(const char* trigger) {
       (unsigned long)inflight);
 }
 
+// Cold-boot JS-thread runloop pump.
+//
+// Synchronous `HttpFetchText` calls during V8's static-import walk park
+// the JS thread inside `+sendSynchronousRequest:`, starving the
+// `setInterval` heartbeat that drives the placeholder progress bar.
+// Between fetches we run one short CFRunLoop slice in default mode so
+// any due `CFRunLoopTimer` (the heartbeat) fires once before we return.
+// Microtask checkpoints bracket the slice to flush V8 promise queues
+// either side of the timer callback. v8::Locker is recursive, so nested
+// acquisition by the timer callback is safe.
+//
+// Gated to JS-thread + cold-boot only:
+//   - `Runtime::GetCurrentRuntime()` is thread_local; null on GCD
+//     prefetch threads, so they never pump someone else's runloop.
+//   - `IsDevSessionBootComplete()` short-circuits once Angular has
+//     committed its first stable view — no placeholder to repaint, and
+//     HMR-time fetches must not pay the pump cost.
+//   - The runloop identity check survives any future change that
+//     decouples the runtime's captured runloop from the current thread.
+static void MaybePumpJSThreadDuringBoot() {
+  Runtime* runtime = Runtime::GetCurrentRuntime();
+  if (runtime == nullptr) return;
+  if (IsDevSessionBootComplete()) return;
+
+  v8::Isolate* isolate = runtime->GetIsolate();
+  if (isolate == nullptr) return;
+
+  CFRunLoopRef rl = runtime->RuntimeLoop();
+  if (rl == nullptr || rl != CFRunLoopGetCurrent()) return;
+
+  isolate->PerformMicrotaskCheckpoint();
+  @autoreleasepool {
+    // 1ms slice: long enough to cover the placeholder's 250ms-cadence
+    // heartbeat when overdue, short enough that ~200 boot fetches add
+    // <200ms of pump overhead total.
+    NSRunLoop* runLoop = [NSRunLoop currentRunLoop];
+    NSDate* sliceDeadline = [NSDate dateWithTimeIntervalSinceNow:0.001];
+    [runLoop runMode:NSDefaultRunLoopMode beforeDate:sliceDeadline];
+  }
+  isolate->PerformMicrotaskCheckpoint();
+}
+
 void ClearHttpModulePrefetchCache() {
   std::lock_guard<std::mutex> lock(g_prefetchMutex);
   g_prefetchCache.clear();
   g_prefetchInflight.clear();
 }
 
-// ─────────────────────────────────────────────────────────────────────
 // HMR-driven kickstart prefetch.
 //
-// `g_moduleRegistry` cannot reuse cached compiled modules across
-// `__ns_hmr__/v<N>` boundaries: the dev server bumps `graphVersion`
-// on every save, and the URL prefix is part of V8's cache key. So
-// every save effectively starts cold from V8's perspective even
-// though the bodies on disk are identical to the previous save.
+// `__ns_hmr__/v<N>` URL prefixes are part of V8's cache key, so the
+// dev server bumping `graphVersion` on each save makes every save look
+// cold to V8. The kickstart pre-populates `g_prefetchCache` via a
+// parallel BFS over `NSURLSession` (kept-alive) before V8 walks, so
+// each `HttpFetchText` resolves from the cache (~microseconds) instead
+// of the network (~10ms).
 //
-// The kickstart side-steps this by populating our process-wide
-// `g_prefetchCache` with every reachable body BEFORE V8 walks. The
-// Angular HMR client invokes `__nsKickstartHmrPrefetch(seedUrl)`
-// just before `refreshAngularBootstrapOptions` does its dynamic
-// import — the kickstart blocks the JS thread while a 16-way
-// parallel BFS over `NSURLSession` (kept-alive) primes the cache.
-// When V8 then walks the tree, every `HttpFetchText` call hits the
-// cache (~microseconds) instead of the network (~10ms), turning
-// 200 × 10ms = 2000ms into one parallel wave that takes ~150–250ms.
-//
-// Why dispatch_group + a per-call queue. We need ground-truth
-// "BFS fully drained" semantics: cleanly transition from parallel
-// fetching to V8 module walking with no in-flight fetches that
-// could race or duplicate work. dispatch_group_wait gives us
-// exactly that. A per-call queue keeps the kickstart's work
-// isolated from `g_prefetchQueue` so other HMR cycles or shutdown
-// can't accidentally drain the wrong group.
-//
-// Why we still touch g_prefetchCache (the speculative cache) and
-// not a kickstart-only map. `HttpFetchText`'s read path already
-// consults `g_prefetchCache`, and that read is destructive — V8 consumes
-// each entry exactly once during the walk. Reusing the same map
-// guarantees that opt-in speculative `httpModulePrefetch=true`
-// users and kickstart-only users share one code path on the read
-// side, with no duplicate cache logic to drift.
+// `dispatch_group_wait` provides clean "BFS fully drained" semantics
+// before V8 starts walking; the per-call queue isolates this group
+// from other HMR cycles. We deliberately reuse `g_prefetchCache`
+// (rather than a kickstart-only map) so the read path in
+// `HttpFetchText` stays single-source — speculative-prefetch and
+// kickstart consumers share the same destructive-read code.
 namespace {
 
 struct KickstartContext {
@@ -2249,37 +2290,17 @@ struct KickstartContext {
   dispatch_group_t group = nullptr;
   dispatch_queue_t queue = nullptr;
   dispatch_semaphore_t concurrency = nullptr;
-  // When `recursive == true` (default, legacy behavior), the
-  // kickstart BFS scans every fetched body for static imports and
-  // schedules those URLs too. When `recursive == false`, the
-  // scheduler fetches ONLY the explicit URLs it was given.
-  //
-  // The non-recursive mode is the right shape for HMR-driven kickstart:
-  // the dev server already computed the inverse-dep closure
-  // (`evictPaths`), so re-discovering it via in-process scanning is
-  // pure overhead. Skipping the recursion saves roughly:
-  //
-  //   - one round trip per BFS level (typically 3-5 for a real graph),
-  //   - the body-scan CPU cost per fetched module,
-  //   - redundant fetches for non-evicted modules that V8 already has
-  //     compiled in `g_moduleRegistry` (the BFS would happily re-fetch
-  //     them; HttpFetchText would land them in g_prefetchCache; V8
-  //     would never read them because g_moduleRegistry hits short-
-  //     circuit the loader entirely).
-  //
-  // The cold-boot speculative prefetcher (`SchedulePrefetchForDeps`)
-  // and the legacy single-seed kickstart still want recursion — they
-  // don't have a precomputed graph to lean on.
+  // `recursive == true`: BFS scans each fetched body for static
+  // imports (cold-boot speculative prefetcher and the legacy
+  // single-seed kickstart). `recursive == false`: fetch only the
+  // explicit URLs given (HMR-driven kickstart, where the dev server
+  // already computed the inverse-dep closure in `evictPaths`).
   bool recursive = true;
 
+  // ARC-disabled file: dispatch_release is required. By the time the
+  // shared_ptr owning this context drops to zero, dispatch_group_wait
+  // has returned and every scheduled block has released its capture.
   ~KickstartContext() {
-    // MRC NOTE: HMRSupport.mm is compiled with ARC disabled, so
-    // dispatch_release is required for objects we created via
-    // dispatch_*_create. By the time the shared_ptr that owns this
-    // context goes to zero, dispatch_group_wait has long since
-    // returned and every block we scheduled has completed and
-    // released its capture of the shared_ptr — so nothing is in
-    // flight that could touch these objects after release.
     if (group) dispatch_release(group);
     if (queue) dispatch_release(queue);
     if (concurrency) dispatch_release(concurrency);
@@ -2444,9 +2465,34 @@ static bool KickstartRunSync(std::vector<std::string> urls,
 
   KickstartScheduleUrls(ctx, std::move(filtered));
 
-  dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW,
-                                            (int64_t)(timeoutSeconds * NSEC_PER_SEC));
-  long timedOut = dispatch_group_wait(ctx->group, deadline);
+  // Cold-boot caller (JS thread, pre-bootstrap): poll `dispatch_group_wait`
+  // in 50ms slices and pump the runloop between them so the placeholder
+  // heartbeat keeps ticking. HMR-refresh caller (post-bootstrap or
+  // off-thread): plain blocking wait — no bar to animate and the wait
+  // is short. Pump cost on a 21s cold-boot kickstart: ~600 syscalls +
+  // ~600ms of CFRunLoop slices, in exchange for ~85 heartbeat ticks.
+  long timedOut;
+  Runtime* coldBootRuntime = Runtime::GetCurrentRuntime();
+  const bool useColdBootPumpWait = coldBootRuntime != nullptr && !IsDevSessionBootComplete();
+  if (useColdBootPumpWait) {
+    const int64_t sliceNs = 50LL * NSEC_PER_MSEC;
+    const uint64_t timeoutUs = (uint64_t)(timeoutSeconds * 1000.0 * 1000.0);
+    timedOut = 1;
+    while (true) {
+      const long sliceResult = dispatch_group_wait(ctx->group, dispatch_time(DISPATCH_TIME_NOW, sliceNs));
+      if (sliceResult == 0) {
+        timedOut = 0;
+        break;
+      }
+      const uint64_t nowUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+      if (nowUs - startUs >= timeoutUs) break;
+      MaybePumpJSThreadDuringBoot();
+    }
+  } else {
+    const dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW,
+                                                   (int64_t)(timeoutSeconds * NSEC_PER_SEC));
+    timedOut = dispatch_group_wait(ctx->group, deadline);
+  }
 
   const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
   const uint64_t elapsedMs = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
@@ -2456,9 +2502,8 @@ static bool KickstartRunSync(std::vector<std::string> urls,
   if (outFetchedCount) *outFetchedCount = fetched;
   if (outElapsedMs) *outElapsedMs = elapsedMs;
 
-  // The legacy single-seed log line lives on for cold-boot / legacy
-  // callers. The HMR multi-URL path emits a slightly different shape
-  // so users can distinguish the two waves at a glance.
+  // BFS (cold-boot seed) and list (HMR multi-URL) emit distinct shapes
+  // so the two waves are distinguishable in logs at a glance.
   if (IsScriptLoadingLogEnabled()) {
     if (recursive) {
       Log(@"[hmr-kickstart][%s] seed=%s fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
