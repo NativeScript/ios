@@ -22,15 +22,15 @@
 #include "DisposerPHV.h"
 #include "IsolateWrapper.h"
 
+#include <mutex>
 #include <unordered_map>
+#include "DevFlags.h"
+#include "HMRSupport.h"
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
-#include <mutex>
-#include "HMRSupport.h"
-#include "DevFlags.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -128,7 +128,7 @@ namespace tns {
 std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
-static std::unordered_map<std::string, id> AppConfigCache; // generic cache for app config values
+static std::unordered_map<std::string, id> AppConfigCache;  // generic cache for app config values
 static std::mutex AppConfigCacheMutex;
 
 // Global flag to track when JavaScript errors occur during execution
@@ -185,6 +185,12 @@ Runtime::Runtime() {
 }
 
 Runtime::~Runtime() {
+  if (messageLoopObserver_) {
+    CFRunLoopObserverInvalidate(messageLoopObserver_);
+    CFRelease(messageLoopObserver_);
+    messageLoopObserver_ = nullptr;
+  }
+
   auto currentIsolate = this->isolate_;
   {
     // make sure we remove the isolate from the list of active isolates first
@@ -299,8 +305,8 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   DefineDrainMicrotaskMethod(isolate, globalTemplate);
   // queueMicrotask(callback) per spec
   {
-    Local<FunctionTemplate> qmtTemplate = FunctionTemplate::New(
-        isolate, [](const FunctionCallbackInfo<Value>& info) {
+    Local<FunctionTemplate> qmtTemplate =
+        FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
           auto* isolate = info.GetIsolate();
           if (info.Length() < 1 || !info[0]->IsFunction()) {
             isolate->ThrowException(Exception::TypeError(
@@ -425,6 +431,27 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   cache->SetContext(context);
 
   this->isolate_ = isolate;
+
+  // Pump V8's foreground task queue on each CFRunLoop iteration.
+  // FinalizationRegistry cleanup callbacks are posted as foreground tasks by V8
+  // during GC — without this, they never execute.
+  CFRunLoopObserverContext obsCtx = {0, this, nullptr, nullptr, nullptr};
+  messageLoopObserver_ = CFRunLoopObserverCreate(
+      kCFAllocatorDefault, kCFRunLoopBeforeWaiting, true, 0,
+      [](CFRunLoopObserverRef observer, CFRunLoopActivity activity, void* info) {
+        auto* runtime = static_cast<Runtime*>(info);
+        auto* isolate = runtime->GetIsolate();
+        if (!IsAlive(isolate)) {
+          return;
+        }
+        v8::Locker locker(isolate);
+        while (v8::platform::PumpMessageLoop(platform_.get(), isolate,
+                                             v8::platform::MessageLoopBehavior::kDoNotWait)) {
+          continue;
+        }
+      },
+      &obsCtx);
+  CFRunLoopAddObserver(runtimeLoop_, messageLoopObserver_, kCFRunLoopCommonModes);
 }
 
 void Runtime::RunMainScript() {
@@ -486,7 +513,8 @@ id Runtime::GetAppConfigValue(std::string key) {
     result = AppPackageJson[nsKey];
   }
 
-  // Store in cache (can cache nil as NSNull to differentiate presence if desired; for now, cache as-is)
+  // Store in cache (can cache nil as NSNull to differentiate presence if desired; for now, cache
+  // as-is)
   {
     std::lock_guard<std::mutex> lock(AppConfigCacheMutex);
     AppConfigCache[key] = result;
