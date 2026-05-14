@@ -324,6 +324,109 @@ describe(module.id, function () {
         //expect(interop.handleof(buffer)).toBe(data.bytes);
     });
 
+    it("interop.bufferFromData keeps NSData alive across autorelease drain + GC", function (done) {
+        // The bug requires a MALLOC_LARGE allocation (>= 32 KB on iOS): tiny
+        // allocations retain their bytes after free, so a stale pointer would
+        // happen to read valid content. 64 KB plaintext -> ~87 KB base64 puts
+        // enc squarely in the libmalloc large cache, which deterministically
+        // reuses freed regions for a matching-size next allocation.
+        var inputSize = 1 << 16;
+        var plaintext = new Uint8Array(inputSize);
+        for (var i = 0; i < inputSize; i++) plaintext[i] = i & 0xff;
+
+        // base64 of [0, 1, 2, 3, 4, 5] starts with "AAECAwQF" (ASCII).
+        var expectedPrefix = [0x41, 0x41, 0x45, 0x43, 0x41, 0x77, 0x51, 0x46];
+
+        var view;
+        (function () {
+            var src = NSData.alloc().initWithBytesLength(plaintext, inputSize);
+            // base64EncodedDataWithOptions returns an autoreleased NSData.
+            var enc = src.base64EncodedDataWithOptions(0);
+            view = new Uint8Array(interop.bufferFromData(enc));
+            // src and enc are pure IIFE locals — no closure captures them — so
+            // their JS wrappers become unreachable when this function returns.
+        })();
+
+        // One yield is enough to drain the autorelease pool (removes enc's
+        // autorelease +1); the gc() then finalizes the src/enc JS wrappers
+        // (removes their wrapper +1, see ArgConverter::CreateJsWrapper).
+        // Without the bufferFromData fix, enc is now freed.
+        setTimeout(function () {
+            gc();
+
+            // Allocate a same-sized NSData filled with a sentinel to push the
+            // libmalloc large cache into reusing enc's freed VM region.
+            var fillerSize = view.byteLength;
+            var sentinel = new Uint8Array(fillerSize);
+            sentinel.fill(0xab);
+            var reused = NSData.alloc().initWithBytesLength(sentinel, fillerSize);
+
+            // byteLength lives on the ArrayBuffer record, not via the data
+            // pointer, so it stays correct even with a stale pointer.
+            expect(view.byteLength).toBe(Math.ceil(inputSize / 3) * 4);
+            // Reading bytes dereferences the data pointer. Pre-fix this reads
+            // 0xab (sentinel content that landed in enc's freed slot); post-fix
+            // the BackingStore deleter keeps enc alive and we read the
+            // original base64 bytes.
+            for (var i = 0; i < expectedPrefix.length; i++) {
+                expect(view[i]).toBe(expectedPrefix[i]);
+            }
+            // Spot-check a byte the sentinel would have stamped over.
+            expect(view[fillerSize - 1]).not.toBe(0xab);
+
+            void reused; // keep referenced so its wrapper doesn't GC mid-spec
+            done();
+        }, 0);
+    });
+
+    it("interop.bufferFromData survives repeated alloc/yield/GC cycles", function (done) {
+        // Same MALLOC_LARGE shape as the single-shot repro above.
+        var inputSize = 1 << 16;
+        var plaintext = new Uint8Array(inputSize);
+        for (var i = 0; i < inputSize; i++) plaintext[i] = i & 0xff;
+
+        // Production bug surfaced in <4s; with explicit gc() forcing wrapper
+        // finalization every iteration, a handful of cycles is plenty to
+        // catch a regression.
+        var iterations = 4;
+        var i = 0;
+        var pending = null;
+
+        // Scope ns/enc inside this helper so they become unreachable when it
+        // returns; the next yield + gc() then finalizes their wrappers.
+        function alloc() {
+            var ns = NSData.alloc().initWithBytesLength(plaintext, inputSize);
+            var enc = ns.base64EncodedDataWithOptions(0);
+            return new Uint8Array(interop.bufferFromData(enc));
+        }
+
+        function step() {
+            if (pending !== null) {
+                // Previous setTimeout drained the autorelease pool; finalize
+                // the ns/enc wrappers. Without the fix, enc is now freed.
+                gc();
+
+                // First-byte check is enough — a stale pointer post-recycle
+                // reads the sentinel/new-alloc bytes which won't be 0x41.
+                expect(pending[0]).toBe(0x41);
+                expect(pending[pending.byteLength - 1]).not.toBe(0);
+                pending = null;
+            }
+
+            if (i >= iterations) {
+                expect(i).toBe(iterations);
+                done();
+                return;
+            }
+
+            pending = alloc();
+            i++;
+            setTimeout(step, 0);
+        }
+
+        step();
+    });
+
     it("should be possible to marshal an ArrayBuffer as void* parameter", () => {
         var data = NSData.alloc().initWithBase64EncodedStringOptions("MTIzNDU=", NSDataBase64DecodingIgnoreUnknownCharacters);
         var arr = new ArrayBuffer(5);
