@@ -9,7 +9,10 @@ class TestRunnerTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
 
-        runtimeUnitTestsExpectation = self.expectation(description: "Jasmine tests")
+        // Standalone (not via self.expectation(...)) so we can drive it through
+        // XCTWaiter alongside the crash watchdog without tripping the
+        // XCTestCase "must waitForExpectations" rule.
+        runtimeUnitTestsExpectation = XCTestExpectation(description: "Jasmine tests")
 
         loop = try! SelectorEventLoop(selector: try! KqueueSelector())
         self.server = DefaultHTTPServer(eventLoop: loop!, port: port) {
@@ -58,11 +61,45 @@ class TestRunnerTests: XCTestCase {
         loop.stop()
     }
 
-    func testRuntime() {
+    func testRuntime() { 
+        let jasmineTestsTimeout: TimeInterval = 300
+
         let app = XCUIApplication()
         app.launchEnvironment["REPORT_BASEURL"] = "http://[::1]:\(port)/junit_report"
         app.launch()
 
-        wait(for: [runtimeUnitTestsExpectation], timeout: 300.0, enforceOrder: true)
+        // Watchdog: if the runtime crashes (e.g. EXC_BAD_ACCESS) it never
+        // POSTs results, and a plain `wait(for:)` would sit out the full
+        // timeout. Fulfill the same expectation from the watchdog when the
+        // app process leaves the running state, and track the crash via a
+        // flag so we can still distinguish the two outcomes after the wait.
+        var didCrash = false
+        let crashWatchdog = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            if app.state == .notRunning {
+                didCrash = true
+                self.runtimeUnitTestsExpectation.fulfill()
+            }
+        }
+        // The XCUITest run loop spins in default mode during wait(for:); add
+        // the timer to common modes too in case anything switches it.
+        RunLoop.main.add(crashWatchdog, forMode: .common)
+
+        let result = XCTWaiter().wait(
+            for: [runtimeUnitTestsExpectation],
+            timeout: jasmineTestsTimeout
+        )
+        crashWatchdog.invalidate()
+
+        switch result {
+        case .completed:
+            if didCrash {
+                XCTFail("TestRunner exited before reporting Jasmine results (likely crashed). Check ~/Library/Logs/DiagnosticReports/TestRunner-*.ips for the stack.")
+            }
+            return
+        case .timedOut:
+            XCTFail("Asynchronous wait failed: exceeded \(Int(jasmineTestsTimeout)) seconds with unfulfilled \"Jasmine tests\" expectation")
+        default:
+            XCTFail("Unexpected XCTWaiter result: \(result.rawValue)")
+        }
     }
 }
