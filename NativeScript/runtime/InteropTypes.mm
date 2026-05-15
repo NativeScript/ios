@@ -191,8 +191,19 @@ void Interop::RegisterBufferFromDataFunction(Local<Context> context, Local<Objec
         size_t length = [obj length];
         void* data = const_cast<void*>([obj bytes]);
 
-        std::unique_ptr<v8::BackingStore> backingStore =
-            ArrayBuffer::NewBackingStore(data, length, [](void*, size_t, void*) {}, nullptr);
+        // Take a +1 retain so the NSData outlives autorelease pool drains while
+        // the ArrayBuffer is alive. The deleter below releases this retain when
+        // V8 finalises the BackingStore (i.e. the ArrayBuffer is GC'd / detached).
+        [obj retain];
+
+        std::unique_ptr<v8::BackingStore> backingStore = ArrayBuffer::NewBackingStore(
+            data, length,
+            [](void* /*data*/, size_t /*length*/, void* deleter_data) {
+              if (deleter_data != nullptr) {
+                [(id)deleter_data release];
+              }
+            },
+            obj);
 
         Local<ArrayBuffer> result = ArrayBuffer::New(isolate, std::move(backingStore));
         info.GetReturnValue().Set(result);
