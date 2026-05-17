@@ -885,11 +885,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
           if (state == Promise::kRejected) {
             RemoveModuleFromRegistry(canonicalPath);
             logPhase("evaluate", "promise-rejected");
-            if (!promiseTc.HasCaught()) {
+            if (promiseTc.HasCaught()) {
+              throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
+            } else {
               Local<Value> reason = promise->Result();
               isolate->ThrowException(reason);
+              throw NativeScriptException(isolate, "Module evaluation promise rejected");
             }
-            throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
           }
           if (IsScriptLoadingLogEnabled()) {
             Log("LoadESModule: Promise resolved successfully\n");
