@@ -47,7 +47,7 @@ __unused static inline Local<Value> AOTWrapId(Local<Context> context, id result)
   if ([result isKindOfClass:[NSNull class]]) {
     return Null(isolate);
   }
-  if ([result isKindOfClass:[NSString class]] && ![result isKindOfClass:[NSMutableString class]]) {
+  if ([result isKindOfClass:[NSString class]]) {
     return tns::ToV8String(isolate, (NSString*)result);
   }
   if ([result isKindOfClass:[NSNumber class]] && ![result isKindOfClass:[NSDecimalNumber class]]) {

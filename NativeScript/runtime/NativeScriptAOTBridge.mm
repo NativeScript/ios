@@ -209,7 +209,7 @@ void __ns_aot_return_id(NSAOTCallInfo _info, id value) {
     info.GetReturnValue().Set(Null(isolate));
     return;
   }
-  if ([value isKindOfClass:[NSString class]] && ![value isKindOfClass:[NSMutableString class]]) {
+  if ([value isKindOfClass:[NSString class]]) {
     info.GetReturnValue().Set(tns::ToV8String(isolate, (NSString*)value));
     return;
   }

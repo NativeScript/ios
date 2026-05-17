@@ -62,6 +62,14 @@ TYPES = {
         "is_nsstring": True,
         "native_to_v8": None,
     },
+    "NSMutableString": {
+        "c_type": "id",
+        "to_native": "AOTToObject(context, {arg})",
+        "needs_context": True,
+        "is_id": True,
+        "is_instancetype": True,
+        "native_to_v8": None,
+    },
     "SEL": {
         "c_type": "SEL",
         "to_native": "sel_registerName(tns::ToString(isolate, {arg}).c_str())",
@@ -579,7 +587,7 @@ __unused static inline Local<Value> AOTWrapId(Local<Context> context, id result)
     if ([result isKindOfClass:[NSNull class]]) {
         return Null(isolate);
     }
-    if ([result isKindOfClass:[NSString class]] && ![result isKindOfClass:[NSMutableString class]]) {
+    if ([result isKindOfClass:[NSString class]]) {
         return tns::ToV8String(isolate, (NSString*)result);
     }
     if ([result isKindOfClass:[NSNumber class]] && ![result isKindOfClass:[NSDecimalNumber class]]) {
@@ -717,6 +725,7 @@ EXTERNAL_ARG = {
 EXTERNAL_RET = {
     "id": "__ns_aot_return_id(info, {result})",
     "NSString": "__ns_aot_return_string(info, {result})",
+    "NSMutableString": "__ns_aot_return_object(info, {result})",
     "instancetype": "__ns_aot_return_object(info, {result})",
     "BOOL": "__ns_aot_return_bool(info, {result})",
     "Class": "__ns_aot_return_class(info, {result})",
