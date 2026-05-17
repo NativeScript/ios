@@ -168,11 +168,12 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
     Local<Value> moduleNamespace;
     try {
       moduleNamespace = ModuleInternal::LoadESModule(isolate, path);
-    } catch (const NativeScriptException& ex) {
+    } catch (NativeScriptException& ex) {
       if (RuntimeConfig.IsDebug) {
         Log(@"Error loading ES module: %s", path.c_str());
         Log(@"Exception: %s", ex.getMessage().c_str());
       }
+      ex.ReThrowToV8(isolate);
       return false;
     }
     return true;
@@ -201,6 +202,9 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
       if (tc.HasCaught()) {
         tns::LogError(isolate, tc);
       }
+    }
+    if (tc.HasCaught()) {
+      tc.ReThrow();
     }
     return false;
   }
