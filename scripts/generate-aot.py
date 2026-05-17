@@ -175,9 +175,9 @@ def method_stub_name(cls, sel):
     return f"AOT_{cls}_{sanitize_selector(sel)}"
 
 
-def build_objc_call(cls, sel, args, target="target", is_static=False, class_var=None, ret=None):
+def build_objc_call(cls, sel, args, target="target", is_static=False, class_var=None, ret=None, object_types=frozenset()):
     if class_var:
-        return _build_msgsend_call(class_var if is_static else target, sel, ret or "id", args)
+        return _build_msgsend_call(class_var if is_static else target, sel, ret or "id", args, object_types)
     if is_static:
         receiver = cls
     else:
@@ -189,23 +189,27 @@ def build_objc_call(cls, sel, args, target="target", is_static=False, class_var=
     return f"[{receiver} {expr}]"
 
 
-def _c_type(t):
-    return t if t not in TYPES else TYPES[t]["c_type"]
+def _c_type(t, object_types=frozenset()):
+    if t in TYPES:
+        return TYPES[t]["c_type"]
+    if t in object_types:
+        return "id"
+    return t
 
 
-def _build_msgsend_call(receiver, sel, ret, args):
-    c_ret = _c_type(ret)
-    c_args = ["id", "SEL"] + [_c_type(a) for a in args]
+def _build_msgsend_call(receiver, sel, ret, args, object_types=frozenset()):
+    c_ret = _c_type(ret, object_types)
+    c_args = ["id", "SEL"] + [_c_type(a, object_types) for a in args]
     cast = f"(({c_ret}(*)({', '.join(c_args)}))objc_msgSend)"
     arg_str = ", ".join(f"arg{i}" for i in range(len(args)))
     suffix = f", {arg_str}" if arg_str else ""
     return f"{cast}((id){receiver}, @selector({sel}){suffix})"
 
 
-def build_super_call(cls, sel, ret, args, struct_tag=False):
+def build_super_call(cls, sel, ret, args, struct_tag=False, object_types=frozenset()):
     prefix = "struct " if struct_tag else ""
-    c_ret = _c_type(ret)
-    c_args = [f"{prefix}objc_super*", "SEL"] + [_c_type(a) for a in args]
+    c_ret = _c_type(ret, object_types)
+    c_args = [f"{prefix}objc_super*", "SEL"] + [_c_type(a, object_types) for a in args]
     cast = f"(({c_ret}(*)({', '.join(c_args)}))"
     arg_str = ", ".join(f"arg{i}" for i in range(len(args)))
     suffix = f", {arg_str}" if arg_str else ""
@@ -715,28 +719,32 @@ EXTERNAL_RET = {
     "NSString": "__ns_aot_return_string(info, {result})",
     "instancetype": "__ns_aot_return_object(info, {result})",
     "BOOL": "__ns_aot_return_bool(info, {result})",
-    "Class": "__ns_aot_return_id(info, (id){result})",
+    "Class": "__ns_aot_return_class(info, {result})",
 }
 
 
-def external_arg_expr(arg_type, i):
+def external_arg_expr(arg_type, i, object_types=frozenset()):
     if arg_type in EXTERNAL_ARG:
         return EXTERNAL_ARG[arg_type].format(i=i)
+    if arg_type in object_types:
+        return EXTERNAL_ARG["id"].format(i=i)
     if arg_type in TYPES:
         return f"({TYPES[arg_type]['c_type']})__ns_aot_arg_double(info, {i})"
     return None
 
 
-def is_struct_type(ret_type):
-    return ret_type not in TYPES and ret_type not in EXTERNAL_RET
+def is_struct_type(ret_type, object_types=frozenset()):
+    return ret_type not in TYPES and ret_type not in EXTERNAL_RET and ret_type not in object_types
 
 
-def external_ret_call(ret_type, result_var):
+def external_ret_call(ret_type, result_var, object_types=frozenset()):
     if ret_type == "void":
         return None
     if ret_type in EXTERNAL_RET:
         return EXTERNAL_RET[ret_type].format(result=result_var)
-    if is_struct_type(ret_type):
+    if ret_type in object_types:
+        return EXTERNAL_RET["id"].format(result=result_var)
+    if is_struct_type(ret_type, object_types):
         return f'__ns_aot_return_struct(info, &{result_var}, "{ret_type}")'
     return f"__ns_aot_return_double(info, (double){result_var})"
 
@@ -745,7 +753,7 @@ def class_var_name(cls):
     return f"_cls_{cls}"
 
 
-def gen_external_method_stub(method, swift_classes):
+def gen_external_method_stub(method, object_types=frozenset(), protocol_types=frozenset(), swift_classes=frozenset()):
     cls = method["class"]
     sel = method["selector"]
     ret = method["ret"]
@@ -753,10 +761,10 @@ def gen_external_method_stub(method, swift_classes):
     is_static = method.get("static", False)
     name = method_stub_name(cls, sel)
     is_void = ret == "void"
-    is_struct = is_struct_type(ret)
-    c_ret_type = ret if is_struct else TYPES[ret]["c_type"]
-    is_swift = cls in swift_classes
-    cvar = class_var_name(cls) if is_swift else None
+    is_obj = ret in object_types
+    is_struct = is_struct_type(ret, object_types)
+    c_ret_type = "id" if is_obj else (ret if is_struct else TYPES[ret]["c_type"])
+    needs_msgsend = cls in protocol_types or cls in swift_classes
 
     sign = "+" if is_static else "-"
     lines = []
@@ -772,9 +780,9 @@ def gen_external_method_stub(method, swift_classes):
         lines.append("    if (target == nil) return;")
 
     for i, arg in enumerate(args):
-        expr = external_arg_expr(arg, i)
+        expr = external_arg_expr(arg, i, object_types)
         if expr is not None:
-            c_type = TYPES[arg]['c_type'] if arg in TYPES else arg
+            c_type = "id" if arg in object_types else (TYPES[arg]['c_type'] if arg in TYPES else arg)
             lines.append(f"    {c_type} arg{i} = {expr};")
         else:
             lines.append(f"    {arg} arg{i};")
@@ -785,14 +793,17 @@ def gen_external_method_stub(method, swift_classes):
         lines.append(f"    {c_ret_type} result;")
 
     if is_static:
-        static_call = _build_msgsend_call("_cls", sel, ret, args)
+        static_call = _build_msgsend_call("_cls", sel, ret, args, object_types)
         if is_void:
             lines.append(f"    {static_call};")
         else:
             lines.append(f"    result = {static_call};")
     else:
-        objc_call = build_objc_call(cls, sel, args, is_static=False, class_var=cvar, ret=ret)
-        super_call = build_super_call(cls, sel, ret, args, struct_tag=True)
+        if needs_msgsend:
+            objc_call = _build_msgsend_call("target", sel, ret, args, object_types)
+        else:
+            objc_call = build_objc_call(cls, sel, args, is_static=False, ret=ret, object_types=object_types)
+        super_call = build_super_call(cls, sel, ret, args, struct_tag=True, object_types=object_types)
         lines.append("    if (callSuper) {")
         lines.append("        struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};")
         if is_void:
@@ -806,7 +817,7 @@ def gen_external_method_stub(method, swift_classes):
             lines.append(f"        result = {objc_call};")
         lines.append("    }")
 
-    ret_call = external_ret_call(ret, "result")
+    ret_call = external_ret_call(ret, "result", object_types)
     if ret_call:
         lines.append(f"    {ret_call};")
 
@@ -878,6 +889,8 @@ def generate_external(config_path, output_path):
     methods = _dedup_methods(config.get("methods", []))
     imports = config.get("imports", [])
     swift_classes = set(config.get("swiftClasses", []))
+    object_types = frozenset(config.get("objectTypes", []))
+    protocol_types = frozenset(config.get("protocolTypes", []))
 
     extra_imports = [i if i.startswith("#") else f"#import <{i}/{i}.h>" for i in imports]
     if extra_imports:
@@ -890,7 +903,7 @@ def generate_external(config_path, output_path):
         parts.append("")
 
     for m in methods:
-        parts.append(gen_external_method_stub(m, swift_classes))
+        parts.append(gen_external_method_stub(m, object_types, protocol_types, swift_classes))
         parts.append("")
 
     parts.append(gen_external_registration(methods, swift_classes))

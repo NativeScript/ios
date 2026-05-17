@@ -261,6 +261,27 @@ void __ns_aot_return_struct(NSAOTCallInfo _info, const void* data, const char* s
   info.GetReturnValue().Set(result);
 }
 
+void __ns_aot_return_class(NSAOTCallInfo _info, Class value) {
+  auto& info = *reinterpret_cast<const FunctionCallbackInfo<Value>*>(_info);
+  Isolate* isolate = info.GetIsolate();
+  if (value == nil) {
+    info.GetReturnValue().Set(Null(isolate));
+    return;
+  }
+  auto cache = tns::Caches::Get(isolate);
+  Class klass = value;
+  while (klass != nil) {
+    std::string name = class_getName(klass);
+    auto it = cache->CtorFuncs.find(name);
+    if (it != cache->CtorFuncs.end()) {
+      info.GetReturnValue().Set(it->second->Get(isolate));
+      return;
+    }
+    klass = class_getSuperclass(klass);
+  }
+  info.GetReturnValue().Set(Null(isolate));
+}
+
 void __ns_aot_throw_exception(NSAOTCallInfo _info, id exception) {
   auto& info = *reinterpret_cast<const FunctionCallbackInfo<Value>*>(_info);
   Isolate* isolate = info.GetIsolate();

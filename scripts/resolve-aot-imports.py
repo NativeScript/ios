@@ -210,25 +210,74 @@ def parse_json_file(json_path):
     return module
 
 
+def _collect_protocol_names_json(json_path):
+    """Extract Protocol names from a metadata JSON file."""
+    names = set()
+    with open(json_path) as f:
+        data = json.load(f)
+    for item in data.get("Items", []):
+        if item.get("Type") == "Protocol":
+            names.add(item.get("Name", ""))
+            js = item.get("JsName", "")
+            if js:
+                names.add(js)
+    names.discard("")
+    return names
+
+
+def _collect_protocol_names_yaml(yaml_path):
+    """Extract Protocol names from a metadata YAML file."""
+    names = set()
+    current_name = None
+    current_js_name = None
+    with open(yaml_path, errors="replace") as f:
+        for line in f:
+            m = re.match(r"^  - Name:\s+(.+)$", line)
+            if m:
+                current_name = m.group(1).strip().strip("'\"")
+                current_js_name = None
+                continue
+            if current_name is not None:
+                m = re.match(r"^    JsName:\s+(.+)$", line)
+                if m:
+                    current_js_name = m.group(1).strip().strip("'\"")
+                    continue
+                m = re.match(r"^    Type:\s+(\S+)", line)
+                if m:
+                    if m.group(1) == "Protocol":
+                        names.add(current_name)
+                        if current_js_name:
+                            names.add(current_js_name)
+                    current_name = None
+                    current_js_name = None
+                    continue
+    return names
+
+
 def scan_metadata_dir(metadata_dir):
     """Build lookup maps from all JSON or YAML files.
 
     Prefers JSON files when present; falls back to YAML.
 
     Returns:
+        (name_to_entries, protocol_names)
         name_to_entries: dict mapping Name or JsName → [(ModuleInfo, InterfaceInfo), ...]
+        protocol_names: set of protocol type names
     """
     name_to_entries = {}
+    protocol_names = set()
 
     json_files = sorted(glob.glob(os.path.join(metadata_dir, "*.json")))
     yaml_files = sorted(glob.glob(os.path.join(metadata_dir, "*.yaml")))
 
     if json_files:
         files_and_parser = [(p, parse_json_file) for p in json_files]
+        proto_collector = _collect_protocol_names_json
     elif yaml_files:
         files_and_parser = [(p, parse_yaml) for p in yaml_files]
+        proto_collector = _collect_protocol_names_yaml
     else:
-        return name_to_entries
+        return name_to_entries, protocol_names
 
     for path, parser in files_and_parser:
         if os.path.basename(path).startswith("metadata-generation"):
@@ -241,8 +290,9 @@ def scan_metadata_dir(metadata_dir):
             name_to_entries.setdefault(iface.name, []).append(entry)
             if iface.js_name != iface.name:
                 name_to_entries.setdefault(iface.js_name, []).append(entry)
+        protocol_names.update(proto_collector(path))
 
-    return name_to_entries
+    return name_to_entries, protocol_names
 
 
 def pick_module(cls, entries):
@@ -297,6 +347,22 @@ def import_for_swift(iface):
     return None
 
 
+def import_for_framework(mod, iface):
+    """Derive the framework import for an interface.
+
+    For non-system frameworks, uses the specific header from the Filename field
+    (e.g. #import <TNSListView/TKCollectionView.h>) since they may not have an
+    umbrella header. System frameworks always use the umbrella header.
+    """
+    if mod.is_system:
+        return f"#import <{mod.name}/{mod.name}.h>"
+    if iface.filename:
+        m = re.search(r'\.framework/Headers/(.+\.h)$', iface.filename)
+        if m:
+            return f"#import <{mod.name}/{m.group(1)}>"
+    return f"#import <{mod.name}/{mod.name}.h>"
+
+
 def resolve(config_path, yaml_dir):
     with open(config_path) as f:
         config = json.load(f)
@@ -320,7 +386,7 @@ def resolve(config_path, yaml_dir):
         return
 
     print(f"Scanning {yaml_dir} for {len(class_names)} classes...")
-    name_to_entries = scan_metadata_dir(yaml_dir)
+    name_to_entries, protocol_names = scan_metadata_dir(yaml_dir)
 
     needed_imports = set()
     unresolved = []
@@ -344,8 +410,9 @@ def resolve(config_path, yaml_dir):
         elif mod.is_system and not mod.is_framework:
             print(f"  {cls} → {mod.name} (non-framework system, covered by Foundation)")
         elif mod.is_framework:
-            needed_imports.add(f"#import <{mod.name}/{mod.name}.h>")
-            print(f"  {cls} → {mod.name}")
+            imp = import_for_framework(mod, iface)
+            needed_imports.add(imp)
+            print(f"  {cls} → {mod.name} ({imp})")
         else:
             needed_imports.add(f"#import <{mod.name}.h>")
             print(f"  {cls} → {mod.name} (non-framework)")
@@ -354,6 +421,30 @@ def resolve(config_path, yaml_dir):
         print(f"\n  Warning: could not find these classes in metadata YAML:")
         for cls in unresolved:
             print(f"    - {cls}")
+
+    # Detect ObjC object types used in args/ret that aren't primitives.
+    # Types found as Interface in metadata are objects (passed as id),
+    # everything else unknown is treated as a struct by the generator.
+    PRIMITIVE_TYPES = {
+        "void", "BOOL", "id", "instancetype", "NSString", "SEL", "Class",
+        "int", "uint", "long", "ulong", "longlong", "ulonglong",
+        "float", "double", "char", "uchar", "short", "ushort",
+    }
+    all_types = set()
+    for m in methods:
+        all_types.add(m["ret"])
+        all_types.update(m["args"])
+    unknown_types = all_types - PRIMITIVE_TYPES
+    object_types = set()
+    for t in sorted(unknown_types):
+        if t in name_to_entries:
+            object_types.add(t)
+    if object_types:
+        print(f"\n  Object types (not structs): {', '.join(sorted(object_types))}")
+
+    used_protocols = set(c for c in class_names if c in protocol_names)
+    if used_protocols:
+        print(f"\n  Protocol types (use objc_msgSend): {', '.join(sorted(used_protocols))}")
 
     # Detect static methods
     changed = False
@@ -391,6 +482,24 @@ def resolve(config_path, yaml_dir):
             config["swiftClasses"] = swift_list
         elif "swiftClasses" in config:
             del config["swiftClasses"]
+        changed = True
+
+    obj_list = sorted(object_types)
+    existing_obj = sorted(config.get("objectTypes", []))
+    if obj_list != existing_obj:
+        if obj_list:
+            config["objectTypes"] = obj_list
+        elif "objectTypes" in config:
+            del config["objectTypes"]
+        changed = True
+
+    proto_list = sorted(used_protocols)
+    existing_proto = sorted(config.get("protocolTypes", []))
+    if proto_list != existing_proto:
+        if proto_list:
+            config["protocolTypes"] = proto_list
+        elif "protocolTypes" in config:
+            del config["protocolTypes"]
         changed = True
 
     if not changed:

@@ -38,6 +38,7 @@ void __ns_aot_return_bool(NSAOTCallInfo info, BOOL value);
 void __ns_aot_return_double(NSAOTCallInfo info, double value);
 void __ns_aot_return_struct(NSAOTCallInfo info, const void* data,
                             const char* structName);
+void __ns_aot_return_class(NSAOTCallInfo info, Class value);
 
 // --- Exception handling ---
 void __ns_aot_throw_exception(NSAOTCallInfo info, id exception);
