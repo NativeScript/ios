@@ -10,10 +10,7 @@
 using namespace v8;
 using namespace tns;
 
-namespace tns {
-// External flag from Runtime.mm to track JavaScript errors
-extern bool jsErrorOccurred;
-}
+namespace tns {}
 
 @implementation Config
 
@@ -44,19 +41,6 @@ std::unique_ptr<Runtime> runtime_;
 - (void)runMainApplication {
   runtime_->RunMainScript();
 
-  // In debug mode, if JavaScript errors occurred, keep the app alive indefinitely
-  // This prevents iOS from terminating the app and allows hot-reload to work
-  if (RuntimeConfig.IsDebug && jsErrorOccurred) {
-    // Log(@"Debug mode - JavaScript errors detected, entering infinite run loop to prevent app termination");
-
-    while (true) {
-      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, true);
-      tns::Tasks::Drain();
-    }
-    // Note: This line is never reached in debug mode with errors
-  }
-
-  // Normal execution path (no errors or release mode)
   CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
   tns::Tasks::Drain();
 }
