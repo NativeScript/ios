@@ -763,21 +763,11 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       }
       logPhase("compile", "fail", classification);
       // V8 threw a syntax error or similar
-      if (RuntimeConfig.IsDebug) {
-        // Log the detailed JavaScript error with full stack trace
-        Log(@"***** JavaScript exception occurred *****");
+      if (RuntimeConfig.IsDebug && tcCompile.HasCaught()) {
         Log(@"Error compiling ES module: %s", canonicalPath.c_str());
-        if (tcCompile.HasCaught()) {
-          tns::LogError(isolate, tcCompile);
-        }
-        Log(@"***** Debug mode - continuing execution *****");
-        Log(@"ES module compilation failed: %s", canonicalPath.c_str());
-        // Return empty to prevent crashes
-        return Local<Value>();
-      } else {
-        throw NativeScriptException(isolate, tcCompile,
-                                    "Cannot compile ES module " + canonicalPath);
+        tns::LogError(isolate, tcCompile);
       }
+      throw NativeScriptException(isolate, tcCompile, "Cannot compile ES module " + canonicalPath);
     }
   }
   logPhase("compile", "ok");
@@ -826,24 +816,14 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         }
       }
       logPhase("instantiate", "fail", classification);
-      if (RuntimeConfig.IsDebug) {
-        // Log the detailed JavaScript error with full stack trace
-        Log(@"***** JavaScript exception occurred *****");
+      if (RuntimeConfig.IsDebug && tcLink.HasCaught()) {
         Log(@"Error instantiating module: %s", canonicalPath.c_str());
-        if (tcLink.HasCaught()) {
-          tns::LogError(isolate, tcLink);
-        }
-        Log(@"***** Debug mode - continuing execution *****");
-        Log(@"Module instantiation failed: %s", canonicalPath.c_str());
-        return Local<Value>();
+        tns::LogError(isolate, tcLink);
+      }
+      if (tcLink.HasCaught()) {
+        throw NativeScriptException(isolate, tcLink, "Cannot instantiate module " + canonicalPath);
       } else {
-        if (tcLink.HasCaught()) {
-          throw NativeScriptException(isolate, tcLink,
-                                      "Cannot instantiate module " + canonicalPath);
-        } else {
-          // V8 gave no exception object—throw plain text
-          throw NativeScriptException(isolate, "Cannot instantiate module " + canonicalPath);
-        }
+        throw NativeScriptException(isolate, "Cannot instantiate module " + canonicalPath);
       }
     }
   }
@@ -874,19 +854,11 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         }
       }
       logPhase("evaluate", "fail", classification);
-      if (RuntimeConfig.IsDebug) {
-        // Log the detailed JavaScript error with full stack trace
-        Log(@"***** JavaScript exception occurred *****");
+      if (RuntimeConfig.IsDebug && tcEval.HasCaught()) {
         Log(@"Error evaluating ES module: %s", canonicalPath.c_str());
-        if (tcEval.HasCaught()) {
-          tns::LogError(isolate, tcEval);
-        }
-        Log(@"***** Debug mode - continuing execution *****");
-        Log(@"Module evaluation failed: %s", canonicalPath.c_str());
-        return Local<Value>();
-      } else {
-        throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + canonicalPath);
+        tns::LogError(isolate, tcEval);
       }
+      throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + canonicalPath);
     }
     logPhase("evaluate", "ok");
 
