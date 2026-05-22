@@ -63,6 +63,15 @@ var TerminalReporter = require('../jasmine-reporters/terminal_reporter').Termina
       return env.pending();
     },
 
+    fail: function(error) {
+      // Jasmine 2.0 fail() – mark current spec as failed with given message
+      var message = error;
+      if (error && typeof error === 'object') {
+        message = error.message || String(error);
+      }
+      throw new Error(message);
+    },
+
     spyOn: function(obj, methodName) {
       return env.spyOn(obj, methodName);
     },

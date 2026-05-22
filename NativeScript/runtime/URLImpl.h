@@ -20,6 +20,13 @@ class URLImpl {
   static void Init(v8::Isolate* isolate,
                    v8::Local<v8::ObjectTemplate> globalTemplate);
 
+  // Installs `URL.createObjectURL` / `URL.revokeObjectURL`, the in-process
+  // blob registry (`URL.InternalAccessor`) used by the HMR loader, and the
+  // `URL.prototype.searchParams` accessor. Must be called once per realm,
+  // after `Init()` has installed `URL` and after `URLSearchParamsImpl::Init()`
+  // has installed `URLSearchParams`.
+  static void InstallBlobMethods(v8::Local<v8::Context> context);
+
   static URLImpl* GetPointer(v8::Local<v8::Object> object);
 
   static v8::Local<v8::FunctionTemplate> GetCtor(v8::Isolate* isolate);
