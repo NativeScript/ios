@@ -9,26 +9,118 @@ class TestRunnerTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
 
-        // Standalone (not via self.expectation(...)) so we can drive it through
-        // XCTWaiter alongside the crash watchdog without tripping the
-        // XCTestCase "must waitForExpectations" rule.
-        runtimeUnitTestsExpectation = XCTestExpectation(description: "Jasmine tests")
+        runtimeUnitTestsExpectation = self.expectation(description: "Jasmine tests")
 
         loop = try! SelectorEventLoop(selector: try! KqueueSelector())
-        self.server = DefaultHTTPServer(eventLoop: loop!, port: port) {
+        self.server = DefaultHTTPServer(eventLoop: loop!, interface: "127.0.0.1", port: port) {
             (
                 environ: [String: Any],
                 startResponse: @escaping ((String, [(String, String)]) -> Void),
                 sendBody: @escaping ((Data) -> Void)
             ) in
+            let method = (environ["REQUEST_METHOD"] as? String) ?? ""
+            let path = (environ["PATH_INFO"] as? String) ?? "/"
+            let query = (environ["QUERY_STRING"] as? String) ?? ""
 
-            let method: String? = environ["REQUEST_METHOD"] as! String?
-            if method != "POST" {
-                XCTFail("invalid request method")
-                startResponse("204 No Content", [])
-                sendBody(Data())
-                self.runtimeUnitTestsExpectation.fulfill()
-            } else {
+            // Serve tiny ESM modules for runtime HTTP loader tests.
+            if method == "GET" {
+                if path == "/esm/query.mjs" || path == "/ns/m/query.mjs" {
+                    func jsStringLiteral(_ s: String) -> String {
+                        return s
+                            .replacingOccurrences(of: "\\", with: "\\\\")
+                            .replacingOccurrences(of: "\"", with: "\\\"")
+                            .replacingOccurrences(of: "\n", with: "\\n")
+                            .replacingOccurrences(of: "\r", with: "\\r")
+                    }
+                    let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
+                    let body = """
+                    export const path = \"\(jsStringLiteral(path))\";
+                    export const query = \"\(jsStringLiteral(query))\";
+                    export const evaluatedAt = \(nowMs);
+                    export default { path, query, evaluatedAt };
+                    """
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
+                if path == "/esm/timeout.mjs" {
+                    // Intentionally delay the response so the runtime HTTP loader hits its request timeout.
+                    // This avoids ATS issues from testing against external plain-http URLs.
+                    var delayMs = 6500
+                    if let pair = query
+                        .split(separator: "&")
+                        .first(where: { $0.hasPrefix("delayMs=") }),
+                       let v = Int(pair.split(separator: "=").last ?? "") {
+                        delayMs = v
+                    }
+                    Thread.sleep(forTimeInterval: Double(delayMs) / 1000.0)
+
+                    let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
+                    let body = "export const evaluatedAt = \(nowMs); export default { evaluatedAt };"
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
+                // HMR hot.data test modules – serve the same helper code for .mjs and .js variants
+                if path == "/esm/hmr/hot-data-ext.mjs" || path == "/esm/hmr/hot-data-ext.js" {
+                    let body = """
+                    // HMR hot.data test module (served by XCTest)
+                    export function getHot() {
+                        return (typeof import.meta !== "undefined" && import.meta) ? import.meta.hot : undefined;
+                    }
+                    export function getHotData() {
+                        const hot = getHot();
+                        return hot ? hot.data : undefined;
+                    }
+                    export function setHotValue(value) {
+                        const hot = getHot();
+                        if (!hot || !hot.data) { throw new Error("import.meta.hot.data is not available"); }
+                        hot.data.value = value;
+                        return hot.data.value;
+                    }
+                    export function getHotValue() {
+                        const hot = getHot();
+                        return hot && hot.data ? hot.data.value : undefined;
+                    }
+                    export function testHotApi() {
+                        const hot = getHot();
+                        const result = {
+                            ok: false,
+                            hasHot: !!hot,
+                            hasData: !!(hot && hot.data),
+                            hasAccept: !!(hot && typeof hot.accept === "function"),
+                            hasDispose: !!(hot && typeof hot.dispose === "function"),
+                            hasDecline: !!(hot && typeof hot.decline === "function"),
+                            hasInvalidate: !!(hot && typeof hot.invalidate === "function"),
+                            pruneIsFalse: !!(hot && hot.prune === false),
+                        };
+                        try {
+                            if (hot && typeof hot.accept === "function") { hot.accept(function () {}); }
+                            if (hot && typeof hot.dispose === "function") { hot.dispose(function () {}); }
+                            if (hot && typeof hot.decline === "function") { hot.decline(); }
+                            if (hot && typeof hot.invalidate === "function") { hot.invalidate(); }
+                            result.ok = result.hasHot && result.hasData && result.hasAccept && result.hasDispose && result.hasDecline && result.hasInvalidate && result.pruneIsFalse;
+                        } catch (e) {
+                            result.error = String(e);
+                        }
+                        return result;
+                    }
+                    console.log("HMR hot.data ext module loaded (via XCTest server)");
+                    """
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
+                startResponse("404 Not Found", [("Content-Type", "text/plain; charset=utf-8")])
+                sendBody(Data("Not Found".utf8))
+                return
+            }
+
+            // Collect Jasmine JUnit report.
+            if method == "POST" && path == "/junit_report" {
                 var buffer = Data()
                 let input = environ["swsgi.input"] as! SWSGIInput
                 var finished = false
@@ -46,7 +138,11 @@ class TestRunnerTests: XCTestCase {
                         self.runtimeUnitTestsExpectation.fulfill()
                     }
                 }
+                return
             }
+
+            startResponse("404 Not Found", [("Content-Type", "text/plain; charset=utf-8")])
+            sendBody(Data("Not Found".utf8))
         }
 
         try! server.start()
@@ -62,50 +158,16 @@ class TestRunnerTests: XCTestCase {
     }
 
     func testRuntime() {
+        let app = XCUIApplication()
+        app.launchEnvironment["REPORT_BASEURL"] = "http://127.0.0.1:\(port)/junit_report"
+        app.launch()
+
         // Headroom for CI: some specs (HttpEsmLoaderTests, RemoteModuleSecurityTests)
         // perform live network I/O against intentionally-unreachable/slow hosts
         // (e.g. 192.0.2.1 timeout-test, esm.sh). Each can burn up to NSURLSession's
         // ~60s request timeout, so under slower CI networks the full suite can run
         // past a 300s budget and never POST results -> false timeout. 600s avoids
         // that while still failing fast on a genuine hang.
-        let jasmineTestsTimeout: TimeInterval = 600
-
-        let app = XCUIApplication()
-        app.launchEnvironment["REPORT_BASEURL"] = "http://[::1]:\(port)/junit_report"
-        app.launch()
-
-        // Watchdog: if the runtime crashes (e.g. EXC_BAD_ACCESS) it never
-        // POSTs results, and a plain `wait(for:)` would sit out the full
-        // timeout. Fulfill the same expectation from the watchdog when the
-        // app process leaves the running state, and track the crash via a
-        // flag so we can still distinguish the two outcomes after the wait.
-        var didCrash = false
-        let crashWatchdog = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-            if app.state == .notRunning {
-                didCrash = true
-                self.runtimeUnitTestsExpectation.fulfill()
-            }
-        }
-        // The XCUITest run loop spins in default mode during wait(for:); add
-        // the timer to common modes too in case anything switches it.
-        RunLoop.main.add(crashWatchdog, forMode: .common)
-
-        let result = XCTWaiter().wait(
-            for: [runtimeUnitTestsExpectation],
-            timeout: jasmineTestsTimeout
-        )
-        crashWatchdog.invalidate()
-
-        switch result {
-        case .completed:
-            if didCrash {
-                XCTFail("TestRunner exited before reporting Jasmine results (likely crashed). Check ~/Library/Logs/DiagnosticReports/TestRunner-*.ips for the stack.")
-            }
-            return
-        case .timedOut:
-            XCTFail("Asynchronous wait failed: exceeded \(Int(jasmineTestsTimeout)) seconds with unfulfilled \"Jasmine tests\" expectation")
-        default:
-            XCTFail("Unexpected XCTWaiter result: \(result.rawValue)")
-        }
+        wait(for: [runtimeUnitTestsExpectation], timeout: 600.0, enforceOrder: true)
     }
 }

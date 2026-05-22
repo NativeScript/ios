@@ -17,7 +17,16 @@ namespace tns {
         url_aggregator *GetURL();
         
         static void Init(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
-        
+
+        // Compiles and runs the JS polyfill that installs
+        // `URL.createObjectURL` / `URL.revokeObjectURL`, the in-process blob
+        // registry (`URL.InternalAccessor`) used by the HMR loader, and the
+        // `URL.prototype.searchParams` accessor. Must be called once per
+        // realm AFTER `Init()` has installed the `URL` constructor and AFTER
+        // `URLSearchParamsImpl::Init()` has installed `URLSearchParams`.
+        // Equivalent to running the same script literal that used to live
+        // inline in `Runtime::Init`; behavior is bit-for-bit identical.
+        static void InstallBlobMethods(v8::Local<v8::Context> context);
 
         static URLImpl *GetPointer(v8::Local<v8::Object> object);
 

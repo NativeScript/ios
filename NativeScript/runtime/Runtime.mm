@@ -31,6 +31,9 @@
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
+#include <vector>
+#include "HMRSupport.h"
+#include "DevFlags.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -39,6 +42,25 @@ using namespace v8;
 using namespace std;
 
 // Import meta callback to support import.meta.url
+//
+// `g_moduleRegistry` keys are normalized by `CanonicalizeRegistryKey`
+// (in ModuleInternalCallbacks.mm) to one of:
+//
+//   1. HTTP / HTTPS URL — `http://host:port/path` or `https://...`.
+//      The URL IS the module identity;
+//      `import.meta.url` should be the URL verbatim.
+//
+//   2. Custom scheme — `ns-vendor://...`, `node:fs`, `blob:...`,
+//      `optional:...`. Synthetic / built-in modules that aren't backed
+//      by the local filesystem. Their identity is the scheme + body
+//      itself; `import.meta.url` keeps that string unchanged.
+//
+//   3. Absolute filesystem path — `/Users/.../app/src/foo.js`. The
+//      historical production / non-HMR dev shape. Strip the runtime
+//      base dir to recover the legacy "/app/<rel>" shape JS consumers
+//      have always seen, then prepend `file://` so the result is a
+//      well-formed URL.
+//
 static void InitializeImportMetaObject(Local<Context> context, Local<Module> module,
                                        Local<Object> meta) {
   Isolate* isolate = context->GetIsolate();
@@ -64,23 +86,31 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
     modulePath = "";  // Will use fallback path
   }
 
-  // Debug logging
-  // NSLog(@"[import.meta] Module lookup: found path = %s",
-  //       modulePath.empty() ? "(empty)" : modulePath.c_str());
-  // NSLog(@"[import.meta] Registry size: %zu", tns::g_moduleRegistry.size());
+  auto hasUrlScheme = [](const std::string& s) -> bool {
+    if (s.empty()) return false;
+    size_t colonPos = s.find(':');
+    if (colonPos == 0 || colonPos == std::string::npos) return false;
+    size_t slashPos = s.find('/');
+    if (slashPos != std::string::npos && slashPos < colonPos) return false;
+    for (size_t i = 0; i < colonPos; i++) {
+      char c = s[i];
+      const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                      (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.';
+      if (!ok) return false;
+    }
+    return true;
+  };
 
-  // Convert file path to file:// URL
+  // Compute import.meta.url.
   std::string moduleUrl;
-  if (!modulePath.empty()) {
-    // Remove base directory and create file:// URL
+  if (modulePath.empty()) {
+    moduleUrl = "file:///app/";
+  } else if (hasUrlScheme(modulePath)) {
+    moduleUrl = modulePath;
+  } else {
     std::string base = tns::ReplaceAll(modulePath, RuntimeConfig.BaseDir, "");
     moduleUrl = "file://" + base;
-  } else {
-    // Fallback URL if module not found in registry
-    moduleUrl = "file:///app/";
   }
-
-  // NSLog(@"[import.meta] Final URL: %s", moduleUrl.c_str());
 
   Local<String> url =
       String::NewFromUtf8(isolate, moduleUrl.c_str(), NewStringType::kNormal).ToLocalChecked();
@@ -91,17 +121,42 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
           url)
       .Check();
 
-  // Add import.meta.dirname support (extract directory from path)
+  // Compute import.meta.dirname.
+  //
+  // Spec (Node.js): `import.meta.dirname` is the OS-path of the
+  // directory containing the module — equivalent to `path.dirname(
+  // fileURLToPath(import.meta.url))`. It only makes sense for modules
+  // backed by the local filesystem.
+  //
+  // For URL-backed modules (HTTP, ns-vendor, blob, etc.) there is no
+  // filesystem directory. We return the URL with the final segment
+  // stripped — a best-effort answer that's stable across cycles and
+  // useful for log lines / source maps. Consumers that genuinely need
+  // a filesystem path should already be guarding on `meta.url`'s
+  // scheme before using `meta.dirname`.
   std::string dirname;
-  if (!modulePath.empty()) {
+  if (modulePath.empty()) {
+    dirname = "/app";
+  } else if (hasUrlScheme(modulePath)) {
+    size_t schemeEnd = modulePath.find("://");
+    size_t pathStart = (schemeEnd == std::string::npos) ? std::string::npos
+                                                        : modulePath.find('/', schemeEnd + 3);
+    size_t lastSlash = modulePath.find_last_of('/');
+    if (pathStart != std::string::npos && lastSlash != std::string::npos &&
+        lastSlash > pathStart) {
+      dirname = modulePath.substr(0, lastSlash);
+    } else {
+      // No path beyond the host (`http://host`) or scheme without `//`
+      // (`node:fs`, `blob:abc`). Keep the identity intact.
+      dirname = modulePath;
+    }
+  } else {
     size_t lastSlash = modulePath.find_last_of("/\\");
     if (lastSlash != std::string::npos) {
       dirname = modulePath.substr(0, lastSlash);
     } else {
       dirname = "/app";  // fallback
     }
-  } else {
-    dirname = "/app";  // fallback
   }
 
   Local<String> dirnameStr =
@@ -196,6 +251,8 @@ Runtime::~Runtime() {
   }
   this->isolate_->TerminateExecution();
 
+  // TODO: fix race condition on workers where a queue can leak (maybe calling Terminate before
+  // Initialize?)
   Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
     auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
     if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
@@ -207,13 +264,43 @@ Runtime::~Runtime() {
   {
     v8::Locker lock(isolate_);
 
-    // Clear module registry before disposing other handles
-    // This prevents crashes during g_moduleRegistry cleanup
-    extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
+    // Clear module registry before disposing other handles.
+    // This prevents crashes during g_moduleRegistry cleanup. The registry is
+    // `thread_local` (each NS isolate has its own per-thread map; see
+    // ModuleInternalCallbacks.mm for rationale), so this loop walks ONLY the
+    // entries that this destructor's thread/isolate created.
     for (auto& kv : g_moduleRegistry) {
       kv.second.Reset();
     }
     g_moduleRegistry.clear();
+
+    // Clear HMR + import-map globals (`g_importMap`, `g_hotData`,
+    // `g_hotAccept`, `g_hotDispose`, `g_hotPrune`, `g_hotEventListeners`,
+    // `g_hotDeclined`, `g_vendorModuleCache`, etc.) before isolate disposal.
+    // These hold v8::Global handles that would crash during static destructor
+    // cleanup if the isolate is already torn down.
+    //
+    // CRITICAL: these globals are PROCESS-WIDE, not per-isolate. They live
+    // in the main isolate's address space but every Runtime destructor would
+    // clear them. That's wrong for worker-isolate teardown: when a worker
+    // dies (e.g. via `__nsTerminateAllWorkers` during an HMR cycle), its
+    // Runtime destructor MUST NOT wipe the main isolate's import map and
+    // hot-state — doing so silently breaks the next HMR cycle's bare-
+    // specifier resolution (vendor packages fall back to filesystem and
+    // fail with `Cannot find module @scope/pkg`).
+    //
+    // Worker isolates have their own `g_moduleRegistry` (thread_local,
+    // cleared above), but they SHARE the static globals with the main
+    // isolate. So we gate this cleanup on "this is the main isolate" —
+    // worker teardown leaves the shared globals intact and the main
+    // isolate continues serving HMR cycles uninterrupted. Real
+    // process-teardown still routes through the main isolate's
+    // destructor, so the cleanup eventually fires.
+    if (!IsRuntimeWorker()) {
+      tns::CleanupHMRGlobals();
+      tns::CleanupImportMapGlobals();
+      tns::ResetActiveDevSession();
+    }
 
     DisposerPHV phv(isolate_);
     isolate_->VisitHandlesWithClassIds(&phv);
@@ -336,75 +423,14 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   Console::Init(context);
   WeakRef::Init(context);
 
-  auto blob_methods = R"js(
-    const BLOB_STORE = new Map();
-    URL.createObjectURL = function (object, options = null) {
-        try {
-            if (object instanceof Blob || object instanceof File) {
-                const id = NSUUID.UUID().UUIDString.toLowerCase();
-                const ret = `blob:nativescript/${id}`;
-                BLOB_STORE.set(ret, {
-                    blob: object,
-                    type: object?.type,
-                    ext: options?.ext,
-                });
-                return ret;
-            }
-        } catch (error) {
-            return null;
-        }
-        return null;
-    };
-    URL.revokeObjectURL = function (url) {
-        BLOB_STORE.delete(url);
-    };
-    const InternalAccessor = class {};
-    InternalAccessor.getData = function (url) {
-        return BLOB_STORE.get(url);
-    };
-    URL.InternalAccessor = InternalAccessor;
-    Object.defineProperty(URL.prototype, 'searchParams', {
-        get() {
-            if (this._searchParams == null) {
-                this._searchParams = new URLSearchParams(this.search);
-                Object.defineProperty(this._searchParams, '_url', {
-                    enumerable: false,
-                    writable: false,
-                    value: this,
-                });
-                this._searchParams._append = this._searchParams.append;
-                this._searchParams.append = function (name, value) {
-                    this._append(name, value);
-                    this._url.search = this.toString();
-                };
-                this._searchParams._delete = this._searchParams.delete;
-                this._searchParams.delete = function (name) {
-                    this._delete(name);
-                    this._url.search = this.toString();
-                };
-                this._searchParams._set = this._searchParams.set;
-                this._searchParams.set = function (name, value) {
-                    this._set(name, value);
-                    this._url.search = this.toString();
-                };
-                this._searchParams._sort = this._searchParams.sort;
-                this._searchParams.sort = function () {
-                    this._sort();
-                    this._url.search = this.toString();
-                };
-            }
-            return this._searchParams;
-        },
-    });
-    )js";
+  // Install every JS-callable HMR + dev-session global the
+  // @nativescript/vite HMR client and deterministic dev-session bootstrap
+  // depend on. Previously inline lambdas here (~650 lines); see
+  // `InitializeHmrDevGlobals` in HMRSupport.mm for the full list and the
+  // try/catch-gated dev-only entry points.
+  tns::InitializeHmrDevGlobals(isolate, context);
 
-  v8::Local<v8::Script> script;
-  auto done = v8::Script::Compile(context, ToV8String(isolate, blob_methods)).ToLocal(&script);
-
-  v8::Local<v8::Value> outVal;
-  if (done) {
-    done = script->Run(context).ToLocal(&outVal);
-  }
+  URLImpl::InstallBlobMethods(context);
 
   this->moduleInternal_ = std::make_unique<ModuleInternal>(context);
 
@@ -433,11 +459,12 @@ void Runtime::RunMainScript() {
   this->moduleInternal_->RunModule(isolate, "./");
 }
 
-void Runtime::RunModule(const std::string moduleName) {
+bool Runtime::RunModule(const std::string moduleName,
+                        std::string* outErrorMessage) {
   Isolate* isolate = this->GetIsolate();
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
-  this->moduleInternal_->RunModule(isolate, moduleName);
+  return this->moduleInternal_->RunModule(isolate, moduleName, outErrorMessage);
 }
 
 void Runtime::RunScript(const std::string script) {
