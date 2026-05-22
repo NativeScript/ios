@@ -29,6 +29,27 @@ void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool i
     Local<FunctionTemplate> closeTemplate =
         FunctionTemplate::New(isolate, Worker::CloseWorkerCallback);
     globalTemplate->Set(tns::ToV8String(isolate, "close"), closeTemplate);
+  } else {
+    // Main-thread-only: HMR helper that terminates every live worker.
+    //
+    // Exposes `globalThis.__nsTerminateAllWorkers()` so HMR runtimes
+    // (e.g. @nativescript/vite) can drop every worker in a single call
+    // before re-bootstrapping the JS app. Without this, every HMR cycle
+    // that re-runs a constructor (or any JS scope that creates a
+    // worker) leaks a live worker into the iOS dispatch table — workers
+    // pile up across cycles, all delivering postMessages in parallel.
+    //
+    // The runtime is the single source of truth here: `Caches::Workers`
+    // already tracks every worker for lifecycle reasons, so the JS side
+    // doesn't need to mirror that state. Worker threads do NOT receive
+    // this global — a stuck worker shouldn't be able to take down its
+    // peers. See `Worker::TerminateAllWorkersCallback` for the snapshot
+    // semantics that keep iteration safe across concurrent worker
+    // teardown.
+    Local<FunctionTemplate> terminateAllTemplate =
+        FunctionTemplate::New(isolate, Worker::TerminateAllWorkersCallback);
+    globalTemplate->Set(tns::ToV8String(isolate, "__nsTerminateAllWorkers"),
+                        terminateAllTemplate);
   }
   // Register functions in the main thread
   Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback);
@@ -433,6 +454,59 @@ void Worker::TerminateCallback(const FunctionCallbackInfo<Value>& info) {
 
   WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
   worker->Terminate();
+}
+
+void Worker::TerminateAllWorkersCallback(const FunctionCallbackInfo<Value>& info) {
+  // Snapshot the current worker set BEFORE terminating, holding a
+  // shared_ptr to each `WorkerState` so the underlying `WorkerWrapper`
+  // can't be deleted out from under us while we iterate.
+  //
+  // `Caches::Workers` is a `ConcurrentMap` that protects insert/remove
+  // with a mutex, but `ForEach` holds the lock for its full duration —
+  // any concurrent worker-thread teardown that tries to call `Remove`
+  // would block. To avoid stalling teardown (and to keep `Terminate`
+  // calls outside the map's critical section), we copy the values into
+  // a local vector and iterate it after the lock is released.
+  //
+  // `WorkerWrapper::Terminate()` is atomic and idempotent — it uses
+  // `isTerminating_.exchange(true)` to guard against double-termination
+  // — so even if a worker is mid-shutdown when we call it, the call is
+  // a no-op. We still wrap each call in try/catch as defence-in-depth:
+  // a single misbehaving worker should never abort the HMR cycle that
+  // triggered this callback.
+  std::vector<std::shared_ptr<Caches::WorkerState>> snapshot;
+  Caches::Workers->ForEach([&snapshot](int& /* id */,
+                                       std::shared_ptr<Caches::WorkerState>& state) -> bool {
+    if (state) {
+      snapshot.push_back(state);
+    }
+    return false;  // continue iteration over every entry
+  });
+
+  int32_t terminatedCount = 0;
+  for (auto& state : snapshot) {
+    auto* worker = static_cast<WorkerWrapper*>(state->UserData());
+    if (worker == nullptr) {
+      continue;
+    }
+    if (!worker->IsRunning() || worker->IsClosing()) {
+      // Already torn down or in the process of closing. Counting these
+      // would inflate the diagnostic count returned to JS; skip.
+      continue;
+    }
+    try {
+      worker->Terminate();
+      ++terminatedCount;
+    } catch (...) {
+      // Swallow per-worker failures. The HMR caller cares about
+      // "terminate everything you can" semantics, not strict
+      // all-or-nothing.
+    }
+  }
+
+  // Return the count of workers we actually terminated so the JS HMR
+  // client can include it in diagnostic logs.
+  info.GetReturnValue().Set(terminatedCount);
 }
 
 Local<v8::String> Worker::Serialize(Isolate* isolate, Local<Value> value, Local<Value>& error) {
