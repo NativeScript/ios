@@ -30,13 +30,17 @@ class StringUtil {
   }
 
   static String fromUTF16LE(const uint16_t* data, size_t length) {
-    return String16::fromUTF16LE(data, length);
+    // V8 inspector protocol passes `uint16_t*` over its public API but
+    // `String16` is now backed by `std::u16string` (UChar = char16_t).
+    // The two are bit-identical 16-bit codepoints, so a reinterpret_cast
+    // is sound at the API boundary.
+    return String16::fromUTF16LE(reinterpret_cast<const UChar*>(data), length);
   }
 
   static const uint8_t* CharactersLatin1(const String& s) { return nullptr; }
   static const uint8_t* CharactersUTF8(const String& s) { return nullptr; }
   static const uint16_t* CharactersUTF16(const String& s) {
-    return s.characters16();
+    return reinterpret_cast<const uint16_t*>(s.characters16());
   }
   static size_t CharacterCount(const String& s) { return s.length(); }
 };

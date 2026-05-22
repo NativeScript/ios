@@ -35,16 +35,21 @@ std::string v8_inspector::GetMIMEType(std::string filePath) {
 }
 
 std::string v8_inspector::ToStdString(const StringView& value) {
-    std::vector<uint16_t> buffer(value.length());
+    // Build the std::u16string directly. The previous version went via
+    // std::vector<uint16_t> + a copy-construct into u16string, which on
+    // Xcode 26.x's libc++ tripped the `char_traits<unsigned short>`
+    // deprecation through the construct-from-iterator path. Writing
+    // char16_t straight into the destination avoids the
+    // non-standard char-traits specialization entirely.
+    std::u16string value16;
+    value16.resize(value.length());
     for (size_t i = 0; i < value.length(); i++) {
         if (value.is8Bit()) {
-            buffer[i] = value.characters8()[i];
+            value16[i] = static_cast<char16_t>(value.characters8()[i]);
         } else {
-            buffer[i] = value.characters16()[i];
+            value16[i] = static_cast<char16_t>(value.characters16()[i]);
         }
     }
-
-    std::u16string value16(buffer.begin(), buffer.end());
 
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     // FIXME: std::codecvt_utf8_utf16 is deprecated
