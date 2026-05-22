@@ -1,5 +1,6 @@
 #include "ModuleInternal.h"
 #import <Foundation/Foundation.h>
+#include <cstring>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -7,6 +8,7 @@
 #include <string>
 #include "Caches.h"
 #include "Helpers.h"
+#include "HMRSupport.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
 #include "DevFlags.h"
@@ -34,6 +36,46 @@ bool IsLikelyOptionalModule(const std::string& moduleName) {
 bool IsESModule(const std::string& path) {
   return path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0 &&
          !(path.size() >= 8 && path.compare(path.size() - 8, 8, ".mjs.map") == 0);
+}
+
+static std::string NormalizePath(const std::string& path);
+
+static inline bool StartsWith(const std::string& value, const char* prefix) {
+  size_t n = strlen(prefix);
+  return value.size() >= n && value.compare(0, n, prefix) == 0;
+}
+
+static std::string NormalizeHttpModuleUrl(const std::string& path) {
+  if (path.empty()) {
+    return path;
+  }
+
+  std::string normalized = path;
+  if (StartsWith(normalized, "file://http://") || StartsWith(normalized, "file://https://")) {
+    normalized = normalized.substr(strlen("file://"));
+  }
+
+  if (normalized.rfind("http:/", 0) == 0 && normalized.rfind("http://", 0) != 0) {
+    normalized.insert(5, "/");
+  } else if (normalized.rfind("https:/", 0) == 0 &&
+             normalized.rfind("https://", 0) != 0) {
+    normalized.insert(6, "/");
+  }
+
+  return normalized;
+}
+
+static bool IsHttpModulePath(const std::string& path) {
+  std::string normalized = NormalizeHttpModuleUrl(path);
+  return StartsWith(normalized, "http://") || StartsWith(normalized, "https://");
+}
+
+static std::string CanonicalizeModulePath(const std::string& path) {
+  if (IsHttpModulePath(path)) {
+    return CanonicalizeHttpUrlKey(NormalizeHttpModuleUrl(path));
+  }
+
+  return NormalizePath(path);
 }
 
 // Normalize file system paths to a canonical representation so lookups in
@@ -146,10 +188,23 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   }
 }
 
-bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
+// Forward `message` into the caller's optional out-param. The caller
+// is responsible for any "missing message" presentation; this helper
+// writes the raw value (which may be empty) when an out-param was
+// supplied, and is a no-op otherwise.
+static inline void SetOutErrorMessage(std::string* outErrorMessage,
+                                      const std::string& message) {
+  if (outErrorMessage != nullptr) {
+    *outErrorMessage = message;
+  }
+}
+
+bool ModuleInternal::RunModule(Isolate* isolate, std::string path,
+                               std::string* outErrorMessage) {
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   Local<Context> context = cache->GetContext();
   Local<Object> globalObject = context->Global();
+  bool isHttpModule = IsHttpModulePath(path);
   // Ensure global.__dirname is defined so ESM/CommonJS shims relying on it work.
   {
     Local<Value> dirVal;
@@ -166,13 +221,20 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   }
 
   // ES module fast path
-  if (IsESModule(path)) {
+  if (IsESModule(path) || isHttpModule) {
     TryCatch tc(isolate);
     Local<Value> moduleNamespace;
+    if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+      Log(@"[run-module][http-esm][begin] %s", NormalizeHttpModuleUrl(path).c_str());
+    }
     try {
       moduleNamespace = ModuleInternal::LoadESModule(isolate, path);
     } catch (const NativeScriptException& ex) {
-      if (RuntimeConfig.IsDebug) {
+      if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+        Log(@"[run-module][http-esm][exception] %s message=%s",
+            NormalizeHttpModuleUrl(path).c_str(), ex.getMessage().c_str());
+      }
+      if (RuntimeConfig.IsDebug && !isHttpModule) {
         Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
         Log(@"Error loading ES module: %s", path.c_str());
         Log(@"Exception: %s", ex.getMessage().c_str());
@@ -180,16 +242,40 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
         Log(@"Debug mode - ES module loading failed, but telling iOS it succeeded to prevent app termination");
         return true;  // avoid termination in debug
       } else {
+        // Surface the inner exception's message so callers passing
+        // `outErrorMessage` see the real cause instead of just a
+        // false return.
+        SetOutErrorMessage(outErrorMessage, ex.getMessage());
         return false;
       }
     }
     if (moduleNamespace.IsEmpty()) {
-      if (RuntimeConfig.IsDebug) {
+      if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+        Log(@"[run-module][http-esm][empty] %s",
+            NormalizeHttpModuleUrl(path).c_str());
+      }
+      if (RuntimeConfig.IsDebug && !isHttpModule) {
         Log(@"Debug mode - ES module returned empty namespace, but telling iOS it succeeded");
         return true;
       } else {
+        // `LoadESModule` returned an empty value without throwing —
+        // typically a HTTP TLA timeout / rejection swallowed by the
+        // debug-modal path. Provide a directional hint so the JS
+        // rejection isn't empty; this is the only case where we
+        // *don't* have the actual reason text (see the rejection
+        // throw additions in `LoadESModule` to surface real causes
+        // when possible).
+        SetOutErrorMessage(
+            outErrorMessage,
+            std::string("ES module returned empty namespace for ") + path +
+                " — likely top-level await timeout or rejection swallowed by "
+                "debug error modal; check the device console for the matching "
+                "[esm][evaluate][promise-rejected:detail] or [esm][evaluate][promise-timeout] entry.");
         return false;
       }
+    }
+    if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+      Log(@"[run-module][http-esm][ok] %s", NormalizeHttpModuleUrl(path).c_str());
     }
     return true;  // ES module loaded successfully
   }
@@ -199,6 +285,8 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
   if (!success || !requireObj->IsFunction()) {
     Log(@"Warning: Failed to get require function from global object");
+    SetOutErrorMessage(outErrorMessage,
+                       "require function unavailable on globalThis");
     return false;
   }
   Local<v8::Function> requireFunc = requireObj.As<v8::Function>();
@@ -233,7 +321,28 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
 
       return true;  // LIE TO iOS - return success to prevent app termination
     } else {
-      // In release mode, still fail as before
+      // Best-effort extract the V8 exception text so the rejection
+      // upstream isn't empty. Leaves the out-param empty when the
+      // TryCatch has no exception to stringify; callers that need a
+      // placeholder string are expected to substitute one themselves.
+      std::string requireFailureMessage;
+      if (tc.HasCaught()) {
+        Local<Value> ex = tc.Exception();
+        if (!ex.IsEmpty()) {
+          v8::Local<v8::String> exStr;
+          if (ex->ToString(context).ToLocal(&exStr)) {
+            v8::String::Utf8Value utf8(isolate, exStr);
+            if (*utf8) {
+              requireFailureMessage.assign(*utf8, utf8.length());
+            }
+          }
+        }
+      }
+      if (requireFailureMessage.empty()) {
+        requireFailureMessage =
+            std::string("require() failed for module ") + path;
+      }
+      SetOutErrorMessage(outErrorMessage, requireFailureMessage);
       return false;
     }
   }
@@ -848,26 +957,53 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
 }
 
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
-  std::string canonicalPath = NormalizePath(path);
+  bool isHttpModule = IsHttpModulePath(path);
+  std::string canonicalPath = CanonicalizeModulePath(path);
+  std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
   auto context = isolate->GetCurrentContext();
 
-  // 1) Prepare URL & source
-  std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
-  std::string url = "file://" + base;
-  v8::Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
-  auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
+  auto describeModuleStatus = [](Module::Status status) -> const char* {
+    switch (status) {
+      case Module::kUninstantiated:
+        return "uninstantiated";
+      case Module::kInstantiating:
+        return "instantiating";
+      case Module::kInstantiated:
+        return "instantiated";
+      case Module::kEvaluating:
+        return "evaluating";
+      case Module::kEvaluated:
+        return "evaluated";
+      case Module::kErrored:
+        return "errored";
+    }
 
-  Local<v8::String> urlString;
-  if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
-    throw NativeScriptException(isolate, "Failed to create URL string for ES module " + canonicalPath);
+    return "unknown";
+  };
+
+  auto existingIt = g_moduleRegistry.find(canonicalPath);
+  if (existingIt != g_moduleRegistry.end()) {
+    Local<Module> existing = existingIt->second.Get(isolate);
+    if (existing.IsEmpty()) {
+      if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+        Log(@"[esm][cache] dropping empty registry entry %s", canonicalPath.c_str());
+      }
+      RemoveModuleFromRegistry(canonicalPath);
+    } else {
+      Module::Status existingStatus = existing->GetStatus();
+      if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
+        Log(@"[esm][cache] hit %s status=%s", canonicalPath.c_str(),
+            describeModuleStatus(existingStatus));
+      }
+      if (existingStatus == Module::kErrored) {
+        RemoveModuleFromRegistry(canonicalPath);
+      } else if (existingStatus == Module::kEvaluated) {
+        UpdateModuleFallback(isolate, canonicalPath, existing);
+        return existing->GetModuleNamespace();
+      }
+    }
   }
 
-  ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, Local<Value>(), false, false,
-                      true  // ← is_module
-  );
-  ScriptCompiler::Source source(sourceText, origin, cacheData);
-
-  // 2) Compile with its own TryCatch
   // Phase diagnostics helper (local lambda) – only active in debug builds when logScriptLoading is enabled
   auto logPhase = [&](const char* phase, const char* status, const char* classification = "", const char* extra = "") {
     if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
@@ -886,66 +1022,100 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       }
     }
   };
-  logPhase("compile", "begin");
   Local<Module> module;
-  {
-    TryCatch tcCompile(isolate);
-    MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
-        isolate, &source,
-        cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
-
+  ScriptCompiler::CachedData* cacheData = nullptr;
+  if (isHttpModule) {
+    logPhase("compile", "delegate-http");
+    MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
     if (!maybeMod.ToLocal(&module)) {
-      // Attempt classification heuristics
-      const char* classification = "unknown";
-      if (tcCompile.HasCaught()) {
-        Local<Message> msg = tcCompile.Message();
-        if (!msg.IsEmpty()) {
-          v8::String::Utf8Value w(isolate, msg->Get());
-          if (*w) {
-            std::string m(*w);
-            if (m.find("Unexpected token") != std::string::npos || m.find("SyntaxError") != std::string::npos) classification = "syntax";
-            else if (m.find("Cannot use import statement outside a module") != std::string::npos) classification = "not-a-module";
+      logPhase("compile", "fail", "http-loader");
+      if (RuntimeConfig.IsDebug) {
+        return Local<Value>();
+      }
+      throw NativeScriptException("Cannot load ES module " + canonicalPath);
+    }
+    logPhase("compile", "ok", "http-loader");
+
+    if (module->GetStatus() == Module::kEvaluated) {
+      UpdateModuleFallback(isolate, canonicalPath, module);
+      return module->GetModuleNamespace();
+    }
+  } else {
+    std::string url;
+    std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
+    url = "file://" + base;
+    v8::Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
+    cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
+
+    Local<v8::String> urlString;
+    if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
+      throw NativeScriptException(isolate, "Failed to create URL string for ES module " + canonicalPath);
+    }
+
+    ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, Local<Value>(), false, false,
+                        true  // ← is_module
+    );
+    ScriptCompiler::Source source(sourceText, origin, cacheData);
+
+    logPhase("compile", "begin");
+    {
+      TryCatch tcCompile(isolate);
+      MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
+          isolate, &source,
+          cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
+
+      if (!maybeMod.ToLocal(&module)) {
+        // Attempt classification heuristics
+        const char* classification = "unknown";
+        if (tcCompile.HasCaught()) {
+          Local<Message> msg = tcCompile.Message();
+          if (!msg.IsEmpty()) {
+            v8::String::Utf8Value w(isolate, msg->Get());
+            if (*w) {
+              std::string m(*w);
+              if (m.find("Unexpected token") != std::string::npos || m.find("SyntaxError") != std::string::npos) classification = "syntax";
+              else if (m.find("Cannot use import statement outside a module") != std::string::npos) classification = "not-a-module";
+            }
           }
         }
-      }
-      logPhase("compile", "fail", classification);
-      // V8 threw a syntax error or similar
-      if (RuntimeConfig.IsDebug) {
-        // Log the detailed JavaScript error with full stack trace
-        Log(@"***** JavaScript exception occurred *****");
-        Log(@"Error compiling ES module: %s", canonicalPath.c_str());
-        if (tcCompile.HasCaught()) {
-          tns::LogError(isolate, tcCompile);
+        logPhase("compile", "fail", classification);
+        // V8 threw a syntax error or similar
+        if (RuntimeConfig.IsDebug) {
+          // Log the detailed JavaScript error with full stack trace
+          Log(@"***** JavaScript exception occurred *****");
+          Log(@"Error compiling ES module: %s", canonicalPath.c_str());
+          if (tcCompile.HasCaught()) {
+            tns::LogError(isolate, tcCompile);
+          }
+          Log(@"***** Debug mode - continuing execution *****");
+          Log(@"ES module compilation failed: %s", canonicalPath.c_str());
+          // Return empty to prevent crashes
+          return Local<Value>();
+        } else {
+          throw NativeScriptException(isolate, tcCompile, "Cannot compile ES module " + canonicalPath);
         }
-        Log(@"***** Debug mode - continuing execution *****");
-        Log(@"ES module compilation failed: %s", canonicalPath.c_str());
-        // Return empty to prevent crashes
-        return Local<Value>();
-      } else {
-        throw NativeScriptException(isolate, tcCompile, "Cannot compile ES module " + canonicalPath);
       }
     }
-  }
-  logPhase("compile", "ok");
+    logPhase("compile", "ok");
 
-  // 3) Register for resolution callback
-  extern std::unordered_map<std::string, Global<Module>> g_moduleRegistry;
+    // Register for resolution callback
+    auto it = g_moduleRegistry.find(canonicalPath);
+    if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled() &&
+        (requestPath != canonicalPath || path != canonicalPath)) {
+      Log(@"[esm][register] raw=%s request=%s canonical=%s url=%s existing=%s",
+          path.c_str(), requestPath.c_str(), canonicalPath.c_str(), url.c_str(),
+          it != g_moduleRegistry.end() ? "yes" : "no");
+    }
+    if (it != g_moduleRegistry.end()) {
+      it->second.Reset();
+    }
+    g_moduleRegistry[canonicalPath].Reset(isolate, module);
 
-  // Safe Global handle management: Clear any existing entry first
-  auto it = g_moduleRegistry.find(canonicalPath);
-  if (it != g_moduleRegistry.end()) {
-    // Clear the existing Global handle before replacing it
-    it->second.Reset();
-  }
-
-  // Now safely set the new module handle
-  g_moduleRegistry[canonicalPath].Reset(isolate, module);
-
-  // 4) Save cache if first time
-  if (cacheData == nullptr) {
-    Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
-    auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
-    ModuleInternal::SaveScriptCache(generatedCache, canonicalPath);
+    if (cacheData == nullptr) {
+      Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
+      auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
+      ModuleInternal::SaveScriptCache(generatedCache, canonicalPath);
+    }
   }
 
   // 5) Instantiate (link) with its own TryCatch
@@ -1036,19 +1206,35 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       TryCatch promiseTc(isolate);
       Local<Promise> promise = result.As<Promise>();
 
-      // Process microtasks to allow Promise resolution (for both worker and main contexts)
-      int maxAttempts = 100;
-      int attempts = 0;
-
-      while (attempts < maxAttempts && !promiseTc.HasCaught()) {
+      // Top-level await can depend on native async work such as fetch(), which requires
+      // both V8 microtasks and the Cocoa run loop to advance. Returning early here causes
+      // callers like __nsStartDevSession(clientUrl) to continue before bootstrap finished.
+      auto pumpAsyncProgress = [&]() {
         isolate->PerformMicrotaskCheckpoint();
+        if (isHttpModule) {
+          @autoreleasepool {
+            NSRunLoop* runLoop = [NSThread isMainThread] ? [NSRunLoop mainRunLoop] : [NSRunLoop currentRunLoop];
+            NSDate* sliceDeadline = [NSDate dateWithTimeIntervalSinceNow:0.01];
+            [runLoop runMode:NSDefaultRunLoopMode beforeDate:sliceDeadline];
+          }
+          isolate->PerformMicrotaskCheckpoint();
+        }
+      };
+
+      const NSTimeInterval timeoutSeconds = isHttpModule ? 10.0 : 1.0;
+      NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:timeoutSeconds];
+      bool settled = false;
+
+      while (!promiseTc.HasCaught()) {
+        pumpAsyncProgress();
 
         if (promiseTc.HasCaught()) {
           break;
         }
-        Promise::PromiseState state = promise->State();
 
+        Promise::PromiseState state = promise->State();
         if (state != Promise::kPending) {
+          settled = true;
           if (state == Promise::kRejected) {
             RemoveModuleFromRegistry(canonicalPath);
             logPhase("evaluate", "promise-rejected");
@@ -1128,7 +1314,25 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
               NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
               logPhase("evaluate", "promise-rejected-handled");
 
-              // In debug mode, don't throw any exceptions - just return empty value
+              // For HTTP modules we throw even in debug so the
+              // rejection reason can propagate back through
+              // `ModuleInternal::RunModule`'s catch handler into the
+              // caller's `outErrorMessage`; otherwise the caller sees
+              // only a generic failure with no detail. For non-HTTP
+              // debug we preserve the historical "show modal + return
+              // empty namespace" behavior — `RunModule`'s
+              // empty-namespace branch then returns true so the app
+              // keeps running.
+              if (isHttpModule) {
+                std::string detail = std::string("HTTP module evaluation promise rejected: ") + canonicalPath;
+                if (!errorMessage.empty()) {
+                  detail += " — ";
+                  detail += errorMessage;
+                }
+                throw NativeScriptException(detail);
+              }
+
+              // Non-HTTP debug: don't throw, just return empty.
               return Local<Value>();
             } else {
               // Release mode - throw exceptions as before
@@ -1140,18 +1344,40 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             }
           }
           if (IsScriptLoadingLogEnabled()) {
-            Log("LoadESModule: Promise resolved successfully\n");
+            logPhase("evaluate", "promise-resolved");
           }
           break;
         }
 
-        attempts++;
-        usleep(100);  // 0.1ms delay
-      }
-      // Timeout: continue; the host event loop will settle microtasks later
+        if ([deadline timeIntervalSinceNow] <= 0) {
+          break;
+        }
 
-      if (attempts >= maxAttempts) {
-        printf("LoadESModule: Promise resolution timeout, continuing anyway\n");
+        if (!isHttpModule) {
+          usleep(1000);  // 1ms delay for non-HTTP top-level await polling
+        }
+      }
+
+      if (!settled && promise->State() == Promise::kPending) {
+        logPhase("evaluate", "promise-timeout");
+        if (isHttpModule) {
+          RemoveModuleFromRegistry(canonicalPath);
+          // Throw even in debug so the TLA timeout reason flows
+          // through `ModuleInternal::RunModule`'s catch handler and
+          // into `__nsStartDevSession`'s JS-side rejection. Pre-fix
+          // the debug path returned an empty namespace silently,
+          // which the dev session reported as a generic "failed to
+          // import" with no clue that TLA had timed out.
+          if (RuntimeConfig.IsDebug) {
+            Log(@"***** JavaScript exception occurred *****");
+            Log(@"Top-level await timed out for HTTP ES module: %s", canonicalPath.c_str());
+            Log(@"***** Debug mode - surfacing as exception so HMR dev session sees the reason *****");
+          }
+
+          std::string timeoutMessage = "Top-level await timed out for HTTP ES module ";
+          timeoutMessage += canonicalPath;
+          throw NativeScriptException(timeoutMessage);
+        }
       }
     }
   }

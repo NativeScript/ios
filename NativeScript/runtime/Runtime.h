@@ -26,7 +26,10 @@ class Runtime {
 
   inline CFRunLoopRef RuntimeLoop() { return runtimeLoop_; }
 
-  void RunModule(const std::string moduleName);
+  // Forwards `outErrorMessage` to `ModuleInternal::RunModule(...)` so
+  // callers can capture the failure cause on a false return.
+  bool RunModule(const std::string moduleName,
+                 std::string* outErrorMessage = nullptr);
 
   void RunScript(const std::string script);
 
