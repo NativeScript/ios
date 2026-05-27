@@ -112,15 +112,15 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
           IsString(iosPriorityVal)) {
         std::string priority = ToString(isolate, iosPriorityVal);
         if (priority == "userInteractive") {
-          qos = 0x21;  // NSQualityOfServiceUserInteractive
+          qos = NSQualityOfServiceUserInteractive;
         } else if (priority == "userInitiated") {
-          qos = 0x19;  // NSQualityOfServiceUserInitiated
+          qos = NSQualityOfServiceUserInitiated;
         } else if (priority == "default") {
-          qos = 0x15;  // NSQualityOfServiceDefault
+          qos = NSQualityOfServiceDefault;
         } else if (priority == "utility") {
-          qos = 0x11;  // NSQualityOfServiceUtility
+          qos = NSQualityOfServiceUtility;
         } else if (priority == "background") {
-          qos = 0x09;  // NSQualityOfServiceBackground
+          qos = NSQualityOfServiceBackground;
         }
       }
     }
