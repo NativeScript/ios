@@ -128,6 +128,18 @@ void JsV8InspectorClient::onFrontendMessageReceived(const std::string& message) 
     dispatch_semaphore_signal(messageArrived_);
   });
 
+  // Debugger.pause needs to interrupt V8 even if the main thread is busy
+  // executing JS. RequestInterrupt fires at the next safe bytecode boundary.
+  auto parsed = json::parse(message, nullptr, false);
+  if (!parsed.is_discarded() && parsed.contains("method") && parsed["method"] == "Debugger.pause") {
+    isolate_->RequestInterrupt(
+        [](Isolate* isolate, void* data) {
+          auto client = static_cast<JsV8InspectorClient*>(data);
+          client->session_->schedulePauseOnNextStatement({}, {});
+        },
+        this);
+  }
+
   tns::ExecuteOnMainThread([this, message]() {
     dispatch_sync(this->messageLoopQueue_, ^{
       // prevent execution if we're already pumping messages
