@@ -22,6 +22,20 @@ using json = nlohmann::json;
 
 namespace v8_inspector {
 
+namespace {
+// Build an 8-bit `StringView` directly over a `std::string`'s storage.
+// V8 inspector messages on this side are ASCII/UTF-8 JSON, so the
+// previous `std::string -> std::vector<uint16_t> -> StringView` path
+// inflated each byte to two and then handed it to a 16-bit constructor.
+// Going straight through the 8-bit constructor avoids that doubling AND
+// dodges the libc++ deprecation that prompted the inspector's
+// `UChar = uint16_t -> char16_t` switch.
+StringView Make8BitStringView(const std::string& value) {
+  return StringView(reinterpret_cast<const uint8_t*>(value.data()),
+                    value.size());
+}
+}  // namespace
+
 #define NOTIFICATION(name)                                 \
   [[NSString stringWithFormat:@"%@:NativeScript.Debug.%s", \
                               [[NSBundle mainBundle] bundleIdentifier], name] UTF8String]
@@ -257,8 +271,7 @@ void JsV8InspectorClient::notify(const std::string& message) {
 }
 
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
-  std::vector<uint16_t> vector = tns::ToVector(message);
-  StringView messageView(vector.data(), vector.size());
+  StringView messageView = Make8BitStringView(message);
   Isolate* isolate = isolate_;
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
@@ -343,8 +356,7 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
       auto returnString = GetReturnMessageFromDomainHandlerResult(result, requestId);
 
       if (returnString.size() > 0) {
-        std::vector<uint16_t> vector = tns::ToVector(returnString);
-        StringView messageView(vector.data(), vector.size());
+        StringView messageView = Make8BitStringView(returnString);
         auto msg = StringBuffer::create(messageView);
         this->sendNotification(std::move(msg));
       }
@@ -486,8 +498,7 @@ void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<
   Local<v8::String> arg = args[0].As<v8::String>();
   std::string message = tns::ToString(isolate, arg);
 
-  std::vector<uint16_t> vector = tns::ToVector(message);
-  StringView messageView(vector.data(), vector.size());
+  StringView messageView = Make8BitStringView(message);
   auto msg = StringBuffer::create(messageView);
   client->sendNotification(std::move(msg));
 }

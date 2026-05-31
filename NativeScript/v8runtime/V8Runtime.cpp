@@ -431,7 +431,12 @@ std::shared_ptr<const jsi::PreparedJavaScript> V8Runtime::prepareJavaScript(
 
 jsi::Value V8Runtime::evaluatePreparedJavaScript(
     const std::shared_ptr<const jsi::PreparedJavaScript>& js) {
-  return evaluateJavaScript(nullptr, nullptr);
+  // The second arg is a `std::string` sourceURL; newer Clang (Xcode 26.x)
+  // enforces `-Wnonnull` on its non-null `const char*` constructor, so we
+  // can no longer pass `nullptr`. Empty string is the documented "unknown
+  // source URL" value and matches the existing `prepareJavaScript` no-op
+  // (which already returns nullptr above).
+  return evaluateJavaScript(nullptr, "");
 }
 
 void V8Runtime::queueMicrotask(const jsi::Function& callback) {

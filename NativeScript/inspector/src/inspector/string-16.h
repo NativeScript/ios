@@ -17,7 +17,13 @@
 
 namespace v8_inspector {
 
-using UChar = uint16_t;
+// Xcode 26.x libc++ deprecates `std::basic_string<unsigned short>`
+// (and any `char_traits<T>` specialization for non-standard char types).
+// Switch to `char16_t` so `std::basic_string<UChar>` resolves to the
+// fully supported `std::u16string`. The V8 inspector public API still
+// takes `uint16_t*`, so call sites that cross that boundary now use
+// `reinterpret_cast` (see string-util.h).
+using UChar = char16_t;
 
 class String16 {
  public:
