@@ -46,13 +46,19 @@ void WorkerWrapper::PostMessage(std::shared_ptr<worker::Message> message) {
 }
 
 void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
-                          std::function<Isolate*()> func) {
+                          std::function<Isolate*()> func, int qualityOfService) {
   this->poWorker_ = poWorker;
   this->workerId_ = nextId_.fetch_add(1, std::memory_order_relaxed) + 1;
 
-  [workers_ addOperationWithBlock:^{
+  NSBlockOperation* op = [NSBlockOperation blockOperationWithBlock:^{
     this->BackgroundLooper(func);
   }];
+
+  if (qualityOfService >= 0) {
+    op.qualityOfService = static_cast<NSQualityOfService>(qualityOfService);
+  }
+
+  [workers_ addOperation:op];
 
   this->isRunning_ = true;
 }
@@ -248,7 +254,10 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context
       async);
 }
 
-void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(const std::string& message, const std::string& source, const std::string& stackTrace, int lineNumber, bool async) {
+void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(const std::string& message,
+                                                          const std::string& source,
+                                                          const std::string& stackTrace,
+                                                          int lineNumber, bool async) {
   auto runtime = static_cast<Runtime*>(mainIsolate_->GetData(Constants::RUNTIME_SLOT));
   if (runtime == nullptr) {
     return;
@@ -269,7 +278,8 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(const std::string& mes
 
         if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
           Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
-          Local<Object> arg = this->ConstructErrorObject(context, message, source, stackTrace, lineNumber);
+          Local<Object> arg =
+              this->ConstructErrorObject(context, message, source, stackTrace, lineNumber);
           Local<Value> args[1] = {arg};
           Local<Value> result;
           TryCatch tc(this->mainIsolate_);
@@ -316,4 +326,4 @@ Local<Object> WorkerWrapper::ConstructErrorObject(Local<Context> context, std::s
 
 std::atomic<int> WorkerWrapper::nextId_(0);
 
-}
+}  // namespace tns
