@@ -1,6 +1,7 @@
 #ifndef Metadata_h
 #define Metadata_h
 
+#include <cstring>
 #include <stack>
 #include <string>
 #include <type_traits>
@@ -748,7 +749,37 @@ public:
     }
 
     inline bool hasErrorOutParameter() const {
-        return this->flag(MetaFlags::MethodHasErrorOutParameter);
+        if (this->flag(MetaFlags::MethodHasErrorOutParameter)) {
+            return true;
+        }
+
+        // Fallback: The MethodHasErrorOutParameter flag is set by the metadata
+        // generator via a type-tree walk that historically missed methods whose
+        // last parameter uses `_Nullable` nullability (e.g.
+        // `NSError * _Nullable * _Nullable` on modern iOS SDK headers).
+        // The *binary* encoding does preserve the underlying shape (NullableType
+        // is unwrapped during serialization), so we can recover the missing
+        // signal by inspecting the last parameter encoding directly. This keeps
+        // apps built against older/buggy metadata working with the auto-error
+        // handling in Interop::CallFunctionInternal and ArgConverter::Invoke.
+        const TypeEncodingsList<ArrayCount>* enc = this->encodings();
+        if (enc == nullptr || enc->count < 2) {
+            return false;
+        }
+        // TypeEncodingsList layout: [returnType, param1, param2, ..., lastParam]
+        const TypeEncoding* cur = enc->first();
+        for (int i = 0; i < enc->count - 1; i++) {
+            cur = cur->next();
+        }
+        if (cur == nullptr || cur->type != BinaryTypeEncodingType::PointerEncoding) {
+            return false;
+        }
+        const TypeEncoding* innerEnc = cur->details.pointer.getInnerType();
+        if (innerEnc == nullptr || innerEnc->type != BinaryTypeEncodingType::InterfaceDeclarationReference) {
+            return false;
+        }
+        const char* innerName = innerEnc->details.interfaceDeclarationReference.name.valuePtr();
+        return innerName != nullptr && strcmp(innerName, "NSError") == 0;
     }
 
     inline bool isInitializer() const {

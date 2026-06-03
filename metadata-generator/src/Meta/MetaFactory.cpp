@@ -490,6 +490,17 @@ void MetaFactory::createFromMethod(const clang::ObjCMethodDecl& method,
                       isNullTerminatedVariadic);
 
   // set MethodHasErrorOutParameter flag
+  //
+  // Modern iOS SDK headers annotate out-error parameters as
+  // `NSError * _Nullable * _Nullable`, which TypeFactory wraps in
+  // `NullableType`/`NonNullableType` nodes (see
+  // `TypeFactory::createFromAttributedType`). The original implementation only
+  // checked for a raw `PointerType(InterfaceType("NSError"))` and therefore
+  // missed the vast majority of NSError**-returning Objective-C selectors
+  // (createDirectoryAtPath:...:error:, removeItemAtPath:error:, etc.). Unwrap
+  // the nullability wrapper at both the outer pointer and inner interface
+  // levels so the flag is set correctly whether or not the SDK annotates
+  // nullability.
   if (method.parameters().size() > 0) {
     clang::ParmVarDecl* lastParameter =
         method.parameters()[method.parameters().size() - 1];

@@ -104,9 +104,24 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
   if ((!meta->hasErrorOutParameter() && args.Length() != argsCount) ||
       (meta->hasErrorOutParameter() && args.Length() != argsCount &&
        args.Length() != argsCount - 1)) {
+    // NOTE: The message used to read "Actual arguments count: <expected>. Expected: <actual>.",
+    // which had the two numbers swapped. This made the log impossible to act on without reading
+    // the runtime source. We now spell it out (with swap corrected) and include the call site.
+    const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
+    const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
+    const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
+    const char* methodKindStr = instanceMethod ? "instance" : "static";
+
     std::ostringstream errorStream;
-    errorStream << "Actual arguments count: \"" << argsCount << ". Expected: \"" << args.Length()
-                << "\".";
+    errorStream << "Actual arguments count: \"" << args.Length() << "\". Expected: \"" << argsCount
+                << "\"";
+    if (meta && meta->hasErrorOutParameter()) {
+      errorStream << " (or \"" << (argsCount - 1)
+                  << "\" if omitting the trailing NSError** out-parameter)";
+    }
+    errorStream << " for " << methodKindStr << " method \"" << jsNameStr << "\" on class \""
+                << classNameStr << "\" (selector: -[" << classNameStr << " " << selectorStr
+                << "]).";
     std::string errorMessage = errorStream.str();
     throw NativeScriptException(errorMessage);
   }

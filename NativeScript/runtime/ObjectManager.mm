@@ -176,7 +176,8 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
 
     if (info.Length() != 1) {
         std::ostringstream errorStream;
-        errorStream << "Actual arguments count: \"" << info.Length() << "\". Expected: \"1\".";
+        errorStream << "Actual arguments count: \"" << info.Length() << "\". Expected: \"1\"."
+                    << " (function: __releaseNativeCounterpart(nativeObject))";
         std::string errorMessage = errorStream.str();
         Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
         isolate->ThrowException(error);
