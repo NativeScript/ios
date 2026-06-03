@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(MetadataGenerator)
 include(CheckCCompilerFlag)
+include(CheckCXXCompilerFlag)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -34,6 +35,23 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -target ${METADATA_BINARY_ARCH}-apple-da
 check_c_compiler_flag(-Wno-unused-but-set-variable HAS_UNUSED_BUT_SET_VARIABLE)
 if (HAS_UNUSED_BUT_SET_VARIABLE)
     add_compile_options(-Wno-unused-but-set-variable)
+endif()
+
+# Newer Apple toolchains (Xcode 26.x with Clang 17+) emit two diagnostics
+# inside LLVM 17.0.6's own headers (e.g. `-Wunnecessary-virtual-specifier`
+# on `virtual void anchor()` in classes declared `final` in
+# `clang/AST/Decl.h`, and `-Wpreferred-type-bitfield-enum-conversion` on
+# bitfield-to-enum stores). These are upstream-known issues that don't
+# affect generator behavior. Keep `-Werror` for *our* code, but downgrade
+# these two to warnings so the build succeeds without bumping LLVM.
+check_cxx_compiler_flag(-Wno-error=preferred-type-bitfield-enum-conversion HAS_NO_ERROR_PREFERRED_TYPE_BITFIELD_ENUM_CONVERSION)
+if (HAS_NO_ERROR_PREFERRED_TYPE_BITFIELD_ENUM_CONVERSION)
+    add_compile_options(-Wno-error=preferred-type-bitfield-enum-conversion)
+endif()
+
+check_cxx_compiler_flag(-Wno-error=unnecessary-virtual-specifier HAS_NO_ERROR_UNNECESSARY_VIRTUAL_SPECIFIER)
+if (HAS_NO_ERROR_UNNECESSARY_VIRTUAL_SPECIFIER)
+    add_compile_options(-Wno-error=unnecessary-virtual-specifier)
 endif()
 
 set(LLVM_LINKER_FLAGS "${LLVM_LINKER_FLAGS} ${LLVM_SYSTEM_LIBS} ${LLVM_LIBS}")

@@ -102,9 +102,28 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       throw NativeScriptException("Worker constructor expects a string URL or URL object.");
     }
 
-    // TODO: Handle options parameter (info[1]) if provided
-    // For now, we ignore the options parameter to maintain compatibility
     // TODO: Validate worker path and call worker.onerror if the script does not exist
+
+    int qos = -1;
+    if (info.Length() >= 2 && info[1]->IsObject()) {
+      Local<Object> options = info[1].As<Object>();
+      Local<Value> iosPriorityVal;
+      if (options->Get(context, tns::ToV8String(isolate, "iosPriority")).ToLocal(&iosPriorityVal) &&
+          IsString(iosPriorityVal)) {
+        std::string priority = ToString(isolate, iosPriorityVal);
+        if (priority == "userInteractive") {
+          qos = NSQualityOfServiceUserInteractive;
+        } else if (priority == "userInitiated") {
+          qos = NSQualityOfServiceUserInitiated;
+        } else if (priority == "default") {
+          qos = NSQualityOfServiceDefault;
+        } else if (priority == "utility") {
+          qos = NSQualityOfServiceUtility;
+        } else if (priority == "background") {
+          qos = NSQualityOfServiceBackground;
+        }
+      }
+    }
 
     WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
     tns::SetValue(isolate, thiz, worker);
@@ -158,11 +177,11 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         std::string src = resolvedPath;
         std::string stackTrace = "";
         int lineNumber = 1;
-         // Dispatch asynchronously so the main thread can attach handlers
-         worker->PassUncaughtExceptionFromWorkerToMain(message, src, stackTrace, lineNumber, true);
-            // Clear the global flag to avoid duplicate reporting
-            jsErrorOccurred = false;
-          }
+        // Dispatch asynchronously so the main thread can attach handlers
+        worker->PassUncaughtExceptionFromWorkerToMain(message, src, stackTrace, lineNumber, true);
+        // Clear the global flag to avoid duplicate reporting
+        jsErrorOccurred = false;
+      }
 
       if (tc.HasCaught()) {
         Isolate::Scope isolate_scope(isolate);
@@ -177,18 +196,18 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
           // printf("Worker: Exception: %s\n", *error_str);
         }
 
-  // Ensure we dispatch the error asynchronously to the main thread so
-  // the caller has a chance to attach `worker.onerror` immediately
-  // after construction. Delivering synchronously can race with the
-  // test which sets the handler right after `new Worker(...)`.
-  worker->PassUncaughtExceptionFromWorkerToMain(context, tc, true);
+        // Ensure we dispatch the error asynchronously to the main thread so
+        // the caller has a chance to attach `worker.onerror` immediately
+        // after construction. Delivering synchronously can race with the
+        // test which sets the handler right after `new Worker(...)`.
+        worker->PassUncaughtExceptionFromWorkerToMain(context, tc, true);
         worker->Terminate();
       }
 
       return isolate;
     });
 
-    worker->Start(poWorker, func);
+    worker->Start(poWorker, func, qos);
 
     std::shared_ptr<Caches::WorkerState> state =
         std::make_shared<Caches::WorkerState>(isolate, poWorker, worker);
@@ -417,6 +436,6 @@ int Worker::GetWorkerId(Isolate* isolate, Local<Object> global) {
   return number->Value();
 }
 
-}
+}  // namespace tns
 
 NODE_BINDING_PER_ISOLATE_INIT_OBJ(worker, tns::Worker::Init)
