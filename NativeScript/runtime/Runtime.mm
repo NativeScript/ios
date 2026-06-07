@@ -375,6 +375,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   tns::binding::CreateInternalBindingTemplates(isolate, globalTemplateFunction);
   Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
   DefineNativeScriptVersion(isolate, globalTemplate);
+  DefineNativeScriptRuntime(isolate, globalTemplate);
 
   // Worker::Init(isolate, globalTemplate, isWorker);
   DefinePerformanceObject(isolate, globalTemplate);
@@ -595,6 +596,41 @@ void Runtime::DefineNativeScriptVersion(Isolate* isolate, Local<ObjectTemplate> 
       static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
   globalTemplate->Set(ToV8String(isolate, "__runtimeVersion"),
                       ToV8String(isolate, STRINGIZE_VALUE_OF(NATIVESCRIPT_VERSION)), readOnlyFlags);
+}
+
+static ReloadApplicationHook reloadApplicationHook_;
+
+void SetReloadApplicationHook(ReloadApplicationHook hook) {
+  reloadApplicationHook_ = std::move(hook);
+}
+
+bool InvokeReloadApplicationHook(const std::string& baseDir) {
+  if (!reloadApplicationHook_) {
+    return false;
+  }
+  return reloadApplicationHook_(baseDir);
+}
+
+// API to trigger application reload from JS without restarting the application process.
+// Exposes `global.NativeScriptRuntime.reloadApplication(baseDir?)` to JS.
+// `NativeScriptRuntime` class is part of the runtime framework and
+// is intentionally excluded from metadata generation, so it is not reachable
+// from JS on its own.
+void Runtime::DefineNativeScriptRuntime(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+  Local<ObjectTemplate> runtimeTemplate = ObjectTemplate::New(isolate);
+
+  Local<FunctionTemplate> reloadTemplate =
+      FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        std::string baseDir;
+        if (info.Length() > 0 && info[0]->IsString()) {
+          baseDir = tns::ToString(isolate, info[0]);
+        }
+        info.GetReturnValue().Set(tns::InvokeReloadApplicationHook(baseDir));
+      });
+  runtimeTemplate->Set(ToV8String(isolate, "reloadApplication"), reloadTemplate);
+
+  globalTemplate->Set(ToV8String(isolate, "NativeScriptRuntime"), runtimeTemplate);
 }
 
 void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate) {
