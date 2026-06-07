@@ -26,3 +26,10 @@
 - (bool)liveSync;
 
 @end
+
+@interface NativeScriptRuntime : NSObject
+
++ (BOOL)reloadApplication;
++ (BOOL)reloadApplication:(NSString*)baseDir;
+
+@end
