@@ -14,6 +14,7 @@
 #include "InspectorServer.h"
 #include "JsV8InspectorClient.h"
 #include "RuntimeConfig.h"
+#include "WorkerInspectorClient.h"
 #include "include/libplatform/libplatform.h"
 #include "third_party/json.hpp"
 #include "utils.h"
@@ -133,7 +134,10 @@ JsV8InspectorClient::JsV8InspectorClient(tns::Runtime* runtime)
   this->messageLoopQueue_ =
       dispatch_queue_create("NativeScript.v8.inspector.message_loop_queue", DISPATCH_QUEUE_SERIAL);
   this->messageArrived_ = dispatch_semaphore_create(0);
+  instance_ = this;
 }
+
+JsV8InspectorClient* JsV8InspectorClient::GetInstance() { return instance_; }
 
 void JsV8InspectorClient::enableInspector(int argc, char** argv) {
   int waitForDebuggerSubscription;
@@ -210,7 +214,10 @@ void JsV8InspectorClient::onFrontendConnected(std::function<void(const std::stri
     CFRunLoopWakeUp(runloop);
   }
 
-  this->sender_ = sender;
+  {
+    std::lock_guard<std::mutex> lock(this->senderMutex_);
+    this->sender_ = sender;
+  }
 
   // this triggers a reconnection from the devtools so Debugger.scriptParsed etc. are all fired
   // again
@@ -219,6 +226,64 @@ void JsV8InspectorClient::onFrontendConnected(std::function<void(const std::stri
 }
 
 void JsV8InspectorClient::onFrontendMessageReceived(const std::string& message) {
+  // Single parse, on the socket thread, used for routing and fast paths.
+  auto parsed = json::parse(message, nullptr, false);
+  std::string sessionId;
+  std::string method;
+  long long msgId = -1;
+  if (!parsed.is_discarded() && parsed.is_object()) {
+    if (parsed.contains("sessionId") && parsed["sessionId"].is_string()) {
+      sessionId = parsed["sessionId"].get<std::string>();
+    }
+    if (parsed.contains("method") && parsed["method"].is_string()) {
+      method = parsed["method"].get<std::string>();
+    }
+    if (parsed.contains("id") && parsed["id"].is_number()) {
+      msgId = parsed["id"].get<long long>();
+    }
+  }
+
+  // Network.loadNetworkResource and IO.read/IO.close are filesystem-only and
+  // session-agnostic (DevTools sends them on whichever session owns the
+  // script whose source map it wants). Serve them right here so they work
+  // for any session — even while the main isolate is paused.
+  if (method == "Network.loadNetworkResource") {
+    std::string url;
+    if (parsed.contains("params") && parsed["params"].contains("url")) {
+      url = parsed["params"]["url"].get<std::string>();
+    }
+    this->HandleLoadNetworkResource(static_cast<int>(msgId), url, sessionId);
+    return;
+  }
+
+  if (method == "IO.read" || method == "IO.close") {
+    std::string handle;
+    int size = 0;
+    if (parsed.contains("params")) {
+      const auto& params = parsed["params"];
+      if (params.contains("handle")) {
+        handle = params["handle"].get<std::string>();
+      }
+      if (params.contains("size")) {
+        size = params["size"].get<int>();
+      }
+    }
+
+    if (method == "IO.read") {
+      this->HandleIORead(static_cast<int>(msgId), handle, size, sessionId);
+    } else {
+      this->HandleIOClose(static_cast<int>(msgId), handle, sessionId);
+    }
+    return;
+  }
+
+  // Messages carrying a sessionId belong to a worker target (flat-session
+  // protocol); route them to the worker's own thread.
+  if (!sessionId.empty()) {
+    this->RouteToWorker(sessionId, method, msgId, message);
+    return;
+  }
+
   dispatch_sync(this->messagesQueue_, ^{
     this->messages_.push(message);
     dispatch_semaphore_signal(messageArrived_);
@@ -226,8 +291,7 @@ void JsV8InspectorClient::onFrontendMessageReceived(const std::string& message) 
 
   // Debugger.pause needs to interrupt V8 even if the main thread is busy
   // executing JS. RequestInterrupt fires at the next safe bytecode boundary.
-  auto parsed = json::parse(message, nullptr, false);
-  if (!parsed.is_discarded() && parsed.contains("method") && parsed["method"] == "Debugger.pause") {
+  if (method == "Debugger.pause") {
     isolate_->RequestInterrupt(
         [](Isolate* isolate, void* data) {
           auto client = static_cast<JsV8InspectorClient*>(data);
@@ -253,6 +317,33 @@ void JsV8InspectorClient::onFrontendMessageReceived(const std::string& message) 
   });
 }
 
+void JsV8InspectorClient::RouteToWorker(const std::string& sessionId, const std::string& method,
+                                        long long msgId, const std::string& message) {
+  std::lock_guard<std::mutex> lock(this->workerTargetsMutex_);
+  auto it = this->workerTargets_.find(sessionId);
+  if (it == this->workerTargets_.end()) {
+    // The worker died (Target.detachedFromTarget was sent) or never existed.
+    if (msgId >= 0) {
+      json error = {{"id", msgId},
+                    {"sessionId", sessionId},
+                    {"error", {{"code", -32001}, {"message", "Session not found"}}}};
+      this->SendToFrontend(error.dump());
+    }
+    return;
+  }
+
+  WorkerInspectorClient* client = it->second.client;
+
+  // Same fast path as the main session: pause a worker that is busy
+  // executing JS. The worker isolate is guaranteed alive while we hold the
+  // registry lock (teardown unregisters before disposing it).
+  if (method == "Debugger.pause") {
+    client->RequestPauseInterrupt();
+  }
+
+  client->PushMessage(message);
+}
+
 void JsV8InspectorClient::init() {
   if (inspector_ != nullptr) {
     return;
@@ -264,8 +355,11 @@ void JsV8InspectorClient::init() {
 
   inspector_ = V8Inspector::create(isolate, this);
 
-  inspector_->contextCreated(
-      v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, {}));
+  // Named so the DevTools console context selector has a label for the main
+  // isolate alongside the worker contexts (which are named by script url).
+  static const std::string mainContextName = "main";
+  inspector_->contextCreated(v8_inspector::V8ContextInfo(
+      context, JsV8InspectorClient::contextGroupId, Make8BitStringView(mainContextName)));
 
   context_.Reset(isolate, context);
 
@@ -284,6 +378,13 @@ void JsV8InspectorClient::createInspectorSession() {
 }
 
 void JsV8InspectorClient::disconnect() {
+  // Resource stream handles only have meaning to the frontend that opened
+  // them, so drop any streams it never closed via IO.close.
+  {
+    std::lock_guard<std::mutex> lock(this->resourceStreamsMutex_);
+    this->resourceStreams_.clear();
+  }
+
   Isolate* isolate = isolate_;
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
@@ -295,6 +396,18 @@ void JsV8InspectorClient::disconnect() {
   this->isConnected_ = false;
 
   this->createInspectorSession();
+
+  // Reset worker sessions too: resume any paused worker and recreate its
+  // session so the (re)connecting frontend gets a clean slate, then forget
+  // the auto-attach state until it sends Target.setAutoAttach again.
+  {
+    std::lock_guard<std::mutex> lock(this->workerTargetsMutex_);
+    this->autoAttach_ = false;
+    for (auto& entry : this->workerTargets_) {
+      entry.second.announced = false;
+      entry.second.client->PushMessage(WorkerInspectorClient::kResetSessionMessage);
+    }
+  }
 }
 
 void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
@@ -358,9 +471,16 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
   notify(ToStdString(stringView));
 }
 
-void JsV8InspectorClient::notify(const std::string& message) {
-  if (this->sender_) {
-    this->sender_(MaybeRewriteSourceMapURL(message));
+void JsV8InspectorClient::notify(const std::string& message) { this->SendToFrontend(message); }
+
+void JsV8InspectorClient::SendToFrontend(const std::string& message) {
+  std::function<void(const std::string&)> sender;
+  {
+    std::lock_guard<std::mutex> lock(this->senderMutex_);
+    sender = this->sender_;
+  }
+  if (sender) {
+    sender(MaybeRewriteSourceMapURL(message));
   }
 }
 
@@ -422,37 +542,38 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
     return;
   }
 
-  // Chrome DevTools fetches source maps through the target: it sends
-  // Network.loadNetworkResource for the resolved sourceMappingURL and reads
-  // the returned stream with IO.read/IO.close. Neither domain is implemented
-  // by V8's inspector, so handle them here.
-  if (method == "Network.loadNetworkResource") {
-    std::string url;
-    if (json_message.contains("params") && json_message["params"].contains("url")) {
-      url = json_message["params"]["url"].get<std::string>();
+  // Note: Network.loadNetworkResource and IO.read/IO.close are handled
+  // earlier, in onFrontendMessageReceived, so they also work for worker
+  // sessions and while this (main) isolate is paused.
+
+  // Chrome DevTools discovers worker targets through the Target domain: its
+  // ChildTargetManager sends Target.setAutoAttach {flatten: true} right
+  // after connecting and expects Target.attachedToTarget events for every
+  // worker. V8's inspector doesn't implement this embedder domain.
+  if (method == "Target.setAutoAttach") {
+    bool autoAttach = json_message.contains("params") &&
+                      json_message["params"].contains("autoAttach") &&
+                      json_message["params"]["autoAttach"].get<bool>();
+    {
+      std::lock_guard<std::mutex> lock(this->workerTargetsMutex_);
+      this->autoAttach_ = autoAttach;
     }
-    this->HandleLoadNetworkResource(json_message["id"].get<int>(), url);
+
+    json response = {{"id", json_message["id"]}, {"result", json::object()}};
+    this->notify(response.dump());
+
+    if (autoAttach) {
+      this->AnnounceWorkerTargets();
+    }
     return;
   }
 
-  if (method == "IO.read" || method == "IO.close") {
-    std::string handle;
-    int size = 0;
-    if (json_message.contains("params")) {
-      const auto& params = json_message["params"];
-      if (params.contains("handle")) {
-        handle = params["handle"].get<std::string>();
-      }
-      if (params.contains("size")) {
-        size = params["size"].get<int>();
-      }
-    }
-
-    if (method == "IO.read") {
-      this->HandleIORead(json_message["id"].get<int>(), handle, size);
-    } else {
-      this->HandleIOClose(json_message["id"].get<int>(), handle);
-    }
+  // Ack the rest of the Target methods DevTools may send so they don't
+  // produce method-not-found errors from the V8 session.
+  if (method == "Target.setDiscoverTargets" || method == "Target.setRemoteLocations" ||
+      method == "Target.detachFromTarget") {
+    json response = {{"id", json_message["id"]}, {"result", json::object()}};
+    this->notify(response.dump());
     return;
   }
 
@@ -510,7 +631,19 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
   isolate->PerformMicrotaskCheckpoint();
 }
 
-void JsV8InspectorClient::HandleLoadNetworkResource(int msgId, const std::string& url) {
+namespace {
+// Echo the flat-protocol sessionId so the frontend routes the reply to the
+// right (worker) session; root-session messages carry none.
+json WithSessionId(json message, const std::string& sessionId) {
+  if (!sessionId.empty()) {
+    message["sessionId"] = sessionId;
+  }
+  return message;
+}
+}  // namespace
+
+void JsV8InspectorClient::HandleLoadNetworkResource(int msgId, const std::string& url,
+                                                    const std::string& sessionId) {
   std::string path;
   if (url.rfind(kSourceMapScheme, 0) == 0) {
     path = url.substr(strlen(kSourceMapScheme));
@@ -522,7 +655,7 @@ void JsV8InspectorClient::HandleLoadNetworkResource(int msgId, const std::string
     // pre-existing behavior for http(s) urls.
     json error = {{"id", msgId},
                   {"error", {{"code", -32000}, {"message", "Unsupported URL scheme"}}}};
-    this->notify(error.dump());
+    this->SendToFrontend(WithSessionId(error, sessionId).dump());
     return;
   }
 
@@ -561,8 +694,12 @@ void JsV8InspectorClient::HandleLoadNetworkResource(int msgId, const std::string
 
   json resource;
   if (loaded) {
-    std::string handle = "ns-network-resource-" + std::to_string(++lastStreamId_);
-    resourceStreams_[handle] = {std::move(content), 0};
+    std::string handle;
+    {
+      std::lock_guard<std::mutex> lock(this->resourceStreamsMutex_);
+      handle = "ns-network-resource-" + std::to_string(++lastStreamId_);
+      resourceStreams_[handle] = {std::move(content), 0};
+    }
     resource = {{"success", true}, {"httpStatusCode", 200}, {"stream", handle}};
   } else {
     resource = {{"success", false},
@@ -572,45 +709,130 @@ void JsV8InspectorClient::HandleLoadNetworkResource(int msgId, const std::string
   }
 
   json response = {{"id", msgId}, {"result", {{"resource", resource}}}};
-  this->notify(response.dump());
+  this->SendToFrontend(WithSessionId(response, sessionId).dump());
 }
 
-void JsV8InspectorClient::HandleIORead(int msgId, const std::string& handle, int size) {
-  auto it = resourceStreams_.find(handle);
-  if (it == resourceStreams_.end()) {
-    json error = {{"id", msgId},
-                  {"error", {{"code", -32602}, {"message", "Invalid stream handle"}}}};
-    this->notify(error.dump());
-    return;
-  }
-
-  ResourceStream& stream = it->second;
-  constexpr size_t kDefaultChunkSize = 1024 * 1024;
-  size_t chunkSize = size > 0 ? static_cast<size_t>(size) : kDefaultChunkSize;
-  size_t remaining = stream.data.size() - stream.offset;
-  chunkSize = std::min(chunkSize, remaining);
-
+void JsV8InspectorClient::HandleIORead(int msgId, const std::string& handle, int size,
+                                       const std::string& sessionId) {
   json result;
-  if (chunkSize == 0) {
-    // DevTools ignores any data sent alongside eof, so only signal it once
-    // the whole stream has been delivered.
-    result = {{"data", ""}, {"eof", true}, {"base64Encoded", false}};
-  } else {
-    // Base64 keeps arbitrary file bytes intact through the JSON transport.
-    NSData* chunk = [NSData dataWithBytes:stream.data.data() + stream.offset length:chunkSize];
-    NSString* encoded = [chunk base64EncodedStringWithOptions:0];
-    stream.offset += chunkSize;
-    result = {{"data", [encoded UTF8String]}, {"eof", false}, {"base64Encoded", true}};
+  {
+    std::lock_guard<std::mutex> lock(this->resourceStreamsMutex_);
+    auto it = resourceStreams_.find(handle);
+    if (it == resourceStreams_.end()) {
+      json error = {{"id", msgId},
+                    {"error", {{"code", -32602}, {"message", "Invalid stream handle"}}}};
+      this->SendToFrontend(WithSessionId(error, sessionId).dump());
+      return;
+    }
+
+    ResourceStream& stream = it->second;
+    constexpr size_t kDefaultChunkSize = 1024 * 1024;
+    size_t chunkSize = size > 0 ? static_cast<size_t>(size) : kDefaultChunkSize;
+    size_t remaining = stream.data.size() - stream.offset;
+    chunkSize = std::min(chunkSize, remaining);
+
+    if (chunkSize == 0) {
+      // DevTools ignores any data sent alongside eof, so only signal it once
+      // the whole stream has been delivered.
+      result = {{"data", ""}, {"eof", true}, {"base64Encoded", false}};
+    } else {
+      // Base64 keeps arbitrary file bytes intact through the JSON transport.
+      NSData* chunk = [NSData dataWithBytes:stream.data.data() + stream.offset length:chunkSize];
+      NSString* encoded = [chunk base64EncodedStringWithOptions:0];
+      stream.offset += chunkSize;
+      result = {{"data", [encoded UTF8String]}, {"eof", false}, {"base64Encoded", true}};
+    }
   }
 
   json response = {{"id", msgId}, {"result", result}};
-  this->notify(response.dump());
+  this->SendToFrontend(WithSessionId(response, sessionId).dump());
 }
 
-void JsV8InspectorClient::HandleIOClose(int msgId, const std::string& handle) {
-  resourceStreams_.erase(handle);
+void JsV8InspectorClient::HandleIOClose(int msgId, const std::string& handle,
+                                        const std::string& sessionId) {
+  {
+    std::lock_guard<std::mutex> lock(this->resourceStreamsMutex_);
+    resourceStreams_.erase(handle);
+  }
   json response = {{"id", msgId}, {"result", json::object()}};
-  this->notify(response.dump());
+  this->SendToFrontend(WithSessionId(response, sessionId).dump());
+}
+
+void JsV8InspectorClient::RegisterWorkerTarget(int workerId, WorkerInspectorClient* client) {
+  std::lock_guard<std::mutex> lock(this->workerTargetsMutex_);
+  WorkerTarget target{workerId, client, false};
+
+  if (this->isConnected_ && this->autoAttach_) {
+    target.announced = true;
+    json attached = {{"method", "Target.attachedToTarget"},
+                     {"params",
+                      {{"sessionId", client->SessionId()},
+                       {"targetInfo",
+                        {{"targetId", client->TargetId()},
+                         {"type", "worker"},
+                         {"title", client->Url()},
+                         {"url", client->Url()},
+                         {"attached", true},
+                         {"canAccessOpener", false}}},
+                       {"waitingForDebugger", false}}}};
+    this->SendToFrontend(attached.dump());
+  }
+
+  this->workerTargets_.emplace(client->SessionId(), target);
+}
+
+void JsV8InspectorClient::UnregisterWorkerTarget(int workerId) {
+  std::lock_guard<std::mutex> lock(this->workerTargetsMutex_);
+  for (auto it = this->workerTargets_.begin(); it != this->workerTargets_.end(); ++it) {
+    if (it->second.workerId != workerId) {
+      continue;
+    }
+
+    if (it->second.announced && this->isConnected_) {
+      json detached = {{"method", "Target.detachedFromTarget"},
+                       {"params",
+                        {{"sessionId", it->second.client->SessionId()},
+                         {"targetId", it->second.client->TargetId()}}}};
+      this->SendToFrontend(detached.dump());
+    }
+
+    this->workerTargets_.erase(it);
+    return;
+  }
+}
+
+void JsV8InspectorClient::AnnounceWorkerTargets() {
+  std::lock_guard<std::mutex> lock(this->workerTargetsMutex_);
+  for (auto& entry : this->workerTargets_) {
+    WorkerTarget& target = entry.second;
+    if (target.announced) {
+      continue;
+    }
+    target.announced = true;
+
+    json attached = {{"method", "Target.attachedToTarget"},
+                     {"params",
+                      {{"sessionId", target.client->SessionId()},
+                       {"targetInfo",
+                        {{"targetId", target.client->TargetId()},
+                         {"type", "worker"},
+                         {"title", target.client->Url()},
+                         {"url", target.client->Url()},
+                         {"attached", true},
+                         {"canAccessOpener", false}}},
+                       {"waitingForDebugger", false}}}};
+    this->SendToFrontend(attached.dump());
+  }
+}
+
+void JsV8InspectorClient::SchedulePauseInWorker(int workerId) {
+  std::lock_guard<std::mutex> lock(this->workerTargetsMutex_);
+  for (auto& entry : this->workerTargets_) {
+    if (entry.second.workerId == workerId) {
+      entry.second.client->SchedulePauseFromInterrupt();
+      return;
+    }
+  }
 }
 
 Local<Context> JsV8InspectorClient::ensureDefaultContextInGroup(int contextGroupId) {
@@ -741,16 +963,33 @@ void JsV8InspectorClient::inspectorTimestampCallback(const FunctionCallbackInfo<
 
 void JsV8InspectorClient::consoleLog(v8::Isolate* isolate, ConsoleAPIType method,
                                      const std::vector<v8::Local<v8::Value>>& args) {
-  if (!isConnected_) {
-    return;
-  }
-
   // Note, here we access private API
   auto* impl = reinterpret_cast<v8_inspector::V8InspectorImpl*>(inspector_.get());
-  auto* session = reinterpret_cast<v8_inspector::V8InspectorSessionImpl*>(session_.get());
 
   if (impl->isolate() != isolate) {
-    // we don't currently support logging from a worker thread/isolate
+    // Logging from a worker isolate: forward to that worker's own inspector.
+    // We're on the worker's thread here (console.* runs where it's called),
+    // which is also the only thread that deletes the client — so the pointer
+    // obtained under the registry lock stays valid for the call.
+    tns::Runtime* runtime = tns::Runtime::GetRuntime(isolate);
+    if (runtime == nullptr) {
+      return;
+    }
+
+    WorkerInspectorClient* client = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(this->workerTargetsMutex_);
+      for (auto& entry : this->workerTargets_) {
+        if (entry.second.workerId == runtime->WorkerId()) {
+          client = entry.second.client;
+          break;
+        }
+      }
+    }
+
+    if (client != nullptr) {
+      client->consoleLog(method, args);
+    }
     return;
   }
 
@@ -766,7 +1005,10 @@ void JsV8InspectorClient::consoleLog(v8::Isolate* isolate, ConsoleAPIType method
                                                           currentTimeMS(), method, args, String16{},
                                                           std::move(stackImpl));
 
-  session->runtimeAgent()->messageAdded(msg.get());
+  // Going through the message storage both reports to enabled sessions and
+  // keeps the message for replay on Runtime.enable, so anything logged
+  // before the frontend attaches shows up as console history.
+  impl->ensureConsoleMessageStorage(contextGroupId)->addMessage(std::move(msg));
 }
 
 bool JsV8InspectorClient::CallDomainHandlerFunction(Local<Context> context,
@@ -860,5 +1102,7 @@ std::string JsV8InspectorClient::GetReturnMessageFromDomainHandlerResult(
 }
 
 std::map<std::string, Persistent<Object>*> JsV8InspectorClient::Domains;
+
+JsV8InspectorClient* JsV8InspectorClient::instance_ = nullptr;
 
 }  // namespace v8_inspector

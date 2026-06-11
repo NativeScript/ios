@@ -147,6 +147,11 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       int workerId = worker->WorkerId();
       Worker::SetWorkerId(isolate, workerId);
 
+      // Expose this worker to an attached Chrome DevTools frontend as a
+      // child target (no-op in release builds). Created before RunModule so
+      // the worker's scripts are visible to the debugger from the start.
+      worker->CreateInspector(isolate, resolvedPath);
+
       TryCatch tc(isolate);
 
       // Debug: Log worker execution

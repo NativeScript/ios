@@ -2,12 +2,17 @@
 #define DataWrapper_h
 
 #include <functional>
+#include <mutex>
 #include <thread>
 
 #include "Common.h"
 #include "ConcurrentQueue.h"
 #include "Metadata.h"
 #include "libffi.h"
+
+namespace v8_inspector {
+class WorkerInspectorClient;
+}
 
 namespace tns {
 
@@ -500,6 +505,12 @@ class WorkerWrapper : public BaseDataWrapper {
                                    std::shared_ptr<worker::Message>)>
                     onMessage);
 
+  // Debugger support (no-ops in release builds). CreateInspector runs on the
+  // worker thread after the worker Runtime is initialized; DestroyInspector
+  // runs on the worker thread during teardown, before the Runtime is deleted.
+  void CreateInspector(v8::Isolate* isolate, const std::string& scriptPath);
+  void DestroyInspector();
+
   void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker,
              std::function<v8::Isolate*()> func, int qualityOfService = -1);
   void CallOnErrorHandlers(v8::TryCatch& tc);
@@ -543,6 +554,10 @@ class WorkerWrapper : public BaseDataWrapper {
   ConcurrentQueue queue_;
   static std::atomic<int> nextId_;
   int workerId_;
+  // Owned by the worker thread; inspectorMutex_ makes Terminate() (main
+  // thread) and DestroyInspector() (worker thread) agree on liveness.
+  v8_inspector::WorkerInspectorClient* inspector_ = nullptr;
+  std::mutex inspectorMutex_;
 
   void BackgroundLooper(std::function<v8::Isolate*()> func);
   void DrainPendingTasks();

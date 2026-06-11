@@ -338,6 +338,8 @@
 		F1F30E8C2B58FE28006A62C0 /* ada.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E882B58FE28006A62C0 /* ada.cpp */; };
 		F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */; };
 		F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */; };
+		A1B2C3D40000000000000003 /* WorkerInspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000001 /* WorkerInspectorClient.h */; };
+		A1B2C3D40000000000000004 /* WorkerInspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000002 /* WorkerInspectorClient.mm */; };
 		F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA929C0FCE7003F588F /* InspectorServer.h */; };
 		F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AAA29C0FCE7003F588F /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		F6191AB629C0FF87003F588F /* utils.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AB429C0FF86003F588F /* utils.h */; };
@@ -848,6 +850,8 @@
 		F1F30E882B58FE28006A62C0 /* ada.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ada.cpp; sourceTree = "<group>"; };
 		F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JsV8InspectorClient.h; sourceTree = "<group>"; };
 		F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = JsV8InspectorClient.mm; sourceTree = "<group>"; };
+		A1B2C3D40000000000000001 /* WorkerInspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WorkerInspectorClient.h; sourceTree = "<group>"; };
+		A1B2C3D40000000000000002 /* WorkerInspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WorkerInspectorClient.mm; sourceTree = "<group>"; };
 		F6191AA929C0FCE7003F588F /* InspectorServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorServer.h; sourceTree = "<group>"; };
 		F6191AAA29C0FCE7003F588F /* InspectorServer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorServer.mm; sourceTree = "<group>"; };
 		F6191AB429C0FF86003F588F /* utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
@@ -1552,6 +1556,8 @@
 				F6191AB529C0FF86003F588F /* utils.mm */,
 				F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */,
 				F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */,
+				A1B2C3D40000000000000001 /* WorkerInspectorClient.h */,
+				A1B2C3D40000000000000002 /* WorkerInspectorClient.mm */,
 				F6191AA929C0FCE7003F588F /* InspectorServer.h */,
 				F6191AAA29C0FCE7003F588F /* InspectorServer.mm */,
 				91B25A0829DAC83D00E3CE04 /* ns-v8-tracing-agent-impl.mm */,
@@ -1592,6 +1598,7 @@
 				C22536B5241A318900192740 /* ffitarget.h in Headers */,
 				F1F30E772B58FC74006A62C0 /* URLImpl.h in Headers */,
 				F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */,
+				A1B2C3D40000000000000003 /* WorkerInspectorClient.h in Headers */,
 				6573B9D0291FE29F00B0ED7C /* JSIV8ValueConverter.h in Headers */,
 				C20AB5E726E1015300E2B41D /* OneByteStringResource.h in Headers */,
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
@@ -2225,6 +2232,7 @@
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
 				AA5DBFD82EC19216008D12F9 /* DevFlags.mm in Sources */,
 				F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */,
+				A1B2C3D40000000000000004 /* WorkerInspectorClient.mm in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
 				C266569322AFFF7E00EE15CC /* Pointer.cpp in Sources */,
 				F1CB51832D5C37100042555E /* URLPatternImpl.cpp in Sources */,
