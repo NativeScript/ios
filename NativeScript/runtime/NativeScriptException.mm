@@ -43,8 +43,6 @@ static uint64_t gNextErrorTicket = 1;
 
 namespace tns {
 
-// External flag from Runtime.mm to track JavaScript errors
-extern bool jsErrorOccurred;
 extern bool isErrorDisplayShowing;
 
 static void UpdateDisplayedStackText(const std::string& stackText);
@@ -157,59 +155,10 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
     }
 
     if (!isDiscarded) {
-      NSString* reasonStr = [NSString stringWithUTF8String:fullMessage.c_str()];
-      if (reasonStr == nil) {
-        reasonStr = @"(invalid UTF-8 message from JS)";
-      }
-
-      NSString* name = @"NativeScriptUncaughtJSException";
-
-      // In debug mode, show error modal instead of crashing
-      if (RuntimeConfig.IsDebug) {
-        // Mark that a JavaScript error occurred
-        jsErrorOccurred = true;
-        Log(@"***** JavaScript exception occurred "
-            @"in debug mode *****\n");
-        Log(@"%s", fullMessage.c_str());
+      Log(@"***** Fatal JavaScript exception *****\n");
+      Log(@"%s", fullMessage.c_str());
+      if (!stackTrace.empty()) {
         Log(@"%s", stackTrace.c_str());
-        // Log(@"🎨 CALLING ShowErrorModal for OnUncaughtError - should display branded modal");
-
-        // Show the error modal with same message as terminal
-        std::string errorTitle = "Uncaught JavaScript Exception";
-
-        // Extract just the error type/message (first line) for cleaner display
-        std::string errorMessage = "JavaScript error occurred";
-        if (reasonStr) {
-          std::string fullMsg = [reasonStr UTF8String];
-          size_t firstNewline = fullMsg.find('\n');
-          if (firstNewline != std::string::npos) {
-            errorMessage = fullMsg.substr(0, firstNewline);
-          } else {
-            errorMessage = fullMsg;
-          }
-        }
-
-        Log(@"***** End stack trace - Fix error to continue *****\n");
-
-        ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
-
-        // Don't crash in debug mode - just return
-        return;
-      }
-
-      // In release mode, crash as before - BUT NEVER IN DEBUG MODE
-      if (!RuntimeConfig.IsDebug) {
-        // we throw the exception on main thread so all meta-data is captured
-        dispatch_async(dispatch_get_main_queue(), ^(void) {
-          NSException* objcException =
-              [NSException exceptionWithName:name
-                                      reason:reasonStr
-                                    userInfo:@{@"sender" : @"onUncaughtError"}];
-
-          Log(@"***** Fatal JavaScript exception - application has been terminated. *****\n");
-          Log(@"%@", objcException);
-          @throw objcException;
-        });
       }
     } else {
       Log(@"NativeScript discarding uncaught JS exception!");
@@ -257,83 +206,6 @@ void NativeScriptException::ReThrowToV8(Isolate* isolate) {
     } else {
       errObj = Exception::Error(
           tns::ToV8String(isolate, "No javascript exception or message provided."));
-    }
-
-    // For critical exceptions (like module loading failures), provide detailed error reporting
-    bool isCriticalException = false;
-
-    // Check if this is a critical exception that should show detailed error info
-    if (!this->message_.empty()) {
-      // Module-related errors should show detailed stack traces
-      isCriticalException =
-          (this->message_.find("Error calling module function") != std::string::npos ||
-           this->message_.find("Cannot evaluate module") != std::string::npos ||
-           this->message_.find("Cannot instantiate module") != std::string::npos ||
-           this->message_.find("Cannot compile") != std::string::npos);
-    }
-
-    if (isCriticalException) {
-      // Mark that a JavaScript error occurred
-      jsErrorOccurred = true;
-
-      // Create detailed error message similar to OnUncaughtError
-      std::string stackTrace = this->stackTrace_;
-      std::string fullMessage;
-
-      if (!this->fullMessage_.empty()) {
-        fullMessage = this->fullMessage_;
-      } else {
-        fullMessage = this->message_ + "\n at \n" + stackTrace;
-      }
-
-      // Always log the detailed error for critical exceptions (both debug and release)
-      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****\n");
-      Log(@"NativeScript encountered an error:");
-      NSString* errorStr = [NSString stringWithUTF8String:fullMessage.c_str()];
-      if (errorStr != nil) {
-        Log(@"%@", errorStr);
-      } else {
-        Log(@"(error message contained invalid UTF-8)");
-      }
-
-      // Additional guidance after the stack trace for boot/init errors
-      Log(@"\n======================================");
-      Log(@"Error on app initialization.");
-      Log(@"Please fix the error and save the file to auto reload the app.");
-      Log(@"======================================");
-
-      // In debug mode, continue execution; in release mode, terminate
-      if (RuntimeConfig.IsDebug) {
-        Log(@"***** End stack trace - showing error modal and continuing execution *****\n");
-
-        // Show error modal in debug mode
-        std::string errorTitle = "JavaScript Error";
-
-        // Extract just the error message (first line) for the title
-        std::string errorMessage = this->message_;
-        size_t firstNewline = errorMessage.find('\n');
-        if (firstNewline != std::string::npos) {
-          errorMessage = errorMessage.substr(0, firstNewline);
-        }
-
-        // Prefer a clean stack for the modal
-        std::string displayStack = stackTrace;
-        if (displayStack.empty()) {
-          displayStack = fullMessage;  // last resort
-        }
-        ShowErrorModal(isolate, errorTitle, errorMessage, displayStack);
-
-        // In debug mode, DON'T throw the exception - just return to prevent crash
-        // The error modal will be shown and the app will continue running
-        Log(@"***** Error handled gracefully - app continues without crash *****\n");
-        return;
-      } else {
-        Log(@"***** End stack trace - terminating application *****\n");
-        // In release mode, create proper message and call OnUncaughtError for termination
-        Local<v8::Message> message = Exception::CreateMessage(isolate, errObj);
-        OnUncaughtError(message, errObj);
-        return;  // OnUncaughtError will terminate, so we don't continue
-      }
     }
 
     isolate->ThrowException(errObj);

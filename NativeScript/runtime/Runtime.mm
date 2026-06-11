@@ -22,15 +22,15 @@
 #include "DisposerPHV.h"
 #include "IsolateWrapper.h"
 
+#include <mutex>
 #include <unordered_map>
+#include "DevFlags.h"
+#include "HMRSupport.h"
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
-#include <mutex>
-#include "HMRSupport.h"
-#include "DevFlags.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -128,11 +128,9 @@ namespace tns {
 std::atomic<int> Runtime::nextIsolateId{0};
 SimpleAllocator allocator_;
 NSDictionary* AppPackageJson = nil;
-static std::unordered_map<std::string, id> AppConfigCache; // generic cache for app config values
+static std::unordered_map<std::string, id> AppConfigCache;  // generic cache for app config values
 static std::mutex AppConfigCacheMutex;
 
-// Global flag to track when JavaScript errors occur during execution
-bool jsErrorOccurred = false;
 // Global flag to track if error display is currently showing
 bool isErrorDisplayShowing = false;
 
@@ -299,8 +297,8 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   DefineDrainMicrotaskMethod(isolate, globalTemplate);
   // queueMicrotask(callback) per spec
   {
-    Local<FunctionTemplate> qmtTemplate = FunctionTemplate::New(
-        isolate, [](const FunctionCallbackInfo<Value>& info) {
+    Local<FunctionTemplate> qmtTemplate =
+        FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
           auto* isolate = info.GetIsolate();
           if (info.Length() < 1 || !info[0]->IsFunction()) {
             isolate->ThrowException(Exception::TypeError(
@@ -486,7 +484,8 @@ id Runtime::GetAppConfigValue(std::string key) {
     result = AppPackageJson[nsKey];
   }
 
-  // Store in cache (can cache nil as NSNull to differentiate presence if desired; for now, cache as-is)
+  // Store in cache (can cache nil as NSNull to differentiate presence if desired; for now, cache
+  // as-is)
   {
     std::lock_guard<std::mutex> lock(AppConfigCacheMutex);
     AppConfigCache[key] = result;
