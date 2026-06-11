@@ -1,9 +1,9 @@
 // Inform the test results runner that the runtime is up.
 console.log('Application Start!');
 
-require("./Infrastructure/timers");
-require("./Infrastructure/simulator");
-global.utf8 = require("./Infrastructure/utf8")
+require("../Infrastructure/timers");
+require("../Infrastructure/simulator");
+global.utf8 = require("../Infrastructure/utf8")
 
 global.UNUSED = function (param) {
 };
@@ -37,7 +37,7 @@ global.__JUnitSaveResults = function (text) {
 
 global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
 
-require("./Infrastructure/Jasmine/jasmine-2.0.1/boot");
+require("../Infrastructure/Jasmine/jasmine-2.0.1/boot");
 
 require("./Marshalling/Primitives/Function");
 require("./Marshalling/Primitives/Static");
@@ -96,8 +96,8 @@ require("./NodeBuiltinsAndOptionalModulesTests.mjs");
 // Exception handling tests
 require("./ExceptionHandlingTests");
 
-// Tests common for all runtimes.
-require("./shared/index").runAllTests();
+// Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
+require("../shared/index").runAllTests();
 
 // (Optional) Custom testing for various optional sdk's and frameworks
 // These can be turned on manually to verify if needed anytime

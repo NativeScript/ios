@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          submodules: true
+          persist-credentials: false # disable to prevent leaking credentials to build scripts
       - name: LLVM cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -70,6 +72,9 @@ jobs:
         with:
           xcode-version: ${{env.XCODE_VERSION}}
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: true
+          persist-credentials: false # disable to prevent leaking credentials to build scripts
       - name: LLVM cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
