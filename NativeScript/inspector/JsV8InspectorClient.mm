@@ -378,6 +378,13 @@ void JsV8InspectorClient::createInspectorSession() {
 }
 
 void JsV8InspectorClient::disconnect() {
+  // Resource stream handles only have meaning to the frontend that opened
+  // them, so drop any streams it never closed via IO.close.
+  {
+    std::lock_guard<std::mutex> lock(this->resourceStreamsMutex_);
+    this->resourceStreams_.clear();
+  }
+
   Isolate* isolate = isolate_;
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
