@@ -61,6 +61,16 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
 
   std::unique_ptr<tns::inspector::TracingAgentImpl> tracing_agent_;
 
+  // Streams backing Network.loadNetworkResource responses, read by the
+  // frontend through IO.read/IO.close (how Chrome DevTools fetches source
+  // maps from the target). Only touched from dispatchMessage (main thread).
+  struct ResourceStream {
+    std::string data;
+    size_t offset = 0;
+  };
+  std::map<std::string, ResourceStream> resourceStreams_;
+  int lastStreamId_ = 0;
+
   // Override of V8InspectorClient
   v8::Local<v8::Context> ensureDefaultContextInGroup(
       int contextGroupId) override;
@@ -78,6 +88,12 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
       const v8::FunctionCallbackInfo<v8::Value>& args);
   static void inspectorTimestampCallback(
       const v8::FunctionCallbackInfo<v8::Value>& args);
+
+  // Source map delivery to Chrome DevTools (Network.loadNetworkResource + IO
+  // domain). V8's inspector doesn't implement these embedder domains.
+  void HandleLoadNetworkResource(int msgId, const std::string& url);
+  void HandleIORead(int msgId, const std::string& handle, int size);
+  void HandleIOClose(int msgId, const std::string& handle);
 
   // {N} specific helpers
   bool CallDomainHandlerFunction(v8::Local<v8::Context> context,
