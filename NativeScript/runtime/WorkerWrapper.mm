@@ -4,6 +4,9 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "Runtime.h"
+#include "RuntimeConfig.h"
+#include "inspector/JsV8InspectorClient.h"
+#include "inspector/WorkerInspectorClient.h"
 
 using namespace v8;
 
@@ -113,6 +116,10 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
     }
   }
 
+  // The inspector must be gone before the Runtime (and with it the isolate)
+  // is deleted below.
+  this->DestroyInspector();
+
   this->isDisposed_ = true;
   Runtime* runtime = Runtime::GetCurrentRuntime();
   if (runtime != nullptr) {
@@ -138,9 +145,65 @@ void WorkerWrapper::Terminate() {
     if (this->workerIsolate_ != nullptr) {
       this->workerIsolate_->TerminateExecution();
     }
+    {
+      // A worker paused at a breakpoint sits in the inspector's nested pause
+      // loop, not in the CFRunLoop — kick it loose so TerminateExecution and
+      // the runloop stop below can take effect.
+      std::lock_guard<std::mutex> lock(this->inspectorMutex_);
+      if (this->inspector_ != nullptr) {
+        this->inspector_->NotifyTerminating();
+      }
+    }
     this->queue_.Terminate();
     this->isRunning_ = false;
   }
+}
+
+void WorkerWrapper::CreateInspector(Isolate* isolate, const std::string& scriptPath) {
+  if (!RuntimeConfig.IsDebug) {
+    return;
+  }
+
+  v8_inspector::JsV8InspectorClient* root = v8_inspector::JsV8InspectorClient::GetInstance();
+  if (root == nullptr) {
+    return;
+  }
+
+  // Same url scheme the module loader reports in Debugger.scriptParsed.
+  std::string url = "file://" + ReplaceAll(scriptPath, RuntimeConfig.BaseDir, "");
+
+  auto* client =
+      new v8_inspector::WorkerInspectorClient(this->workerId_, isolate, CFRunLoopGetCurrent(), url);
+  {
+    std::lock_guard<std::mutex> lock(this->inspectorMutex_);
+    this->inspector_ = client;
+  }
+
+  // Only register once the client is fully constructed: registration makes
+  // it reachable from the socket thread.
+  root->RegisterWorkerTarget(this->workerId_, client);
+}
+
+void WorkerWrapper::DestroyInspector() {
+  v8_inspector::WorkerInspectorClient* client = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(this->inspectorMutex_);
+    client = this->inspector_;
+    this->inspector_ = nullptr;
+  }
+
+  if (client == nullptr) {
+    return;
+  }
+
+  // Unregister first: after this returns no other thread can reach the
+  // client (routing holds the registry lock while pushing messages).
+  v8_inspector::JsV8InspectorClient* root = v8_inspector::JsV8InspectorClient::GetInstance();
+  if (root != nullptr) {
+    root->UnregisterWorkerTarget(this->workerId_);
+  }
+
+  delete client;
 }
 
 void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
