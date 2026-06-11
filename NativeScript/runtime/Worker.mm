@@ -102,7 +102,49 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       throw NativeScriptException("Worker constructor expects a string URL or URL object.");
     }
 
-    // TODO: Validate worker path and call worker.onerror if the script does not exist
+    // Relative worker paths are resolved against the calling module's directory,
+    // matching the Android runtime and the legacy JSC iOS runtime. If no file is
+    // found there, fall back to app-root-relative resolution, which is what this
+    // runtime historically did.
+    if (workerPath.rfind("./", 0) == 0 || workerPath.rfind("../", 0) == 0) {
+      Local<StackTrace> stack = StackTrace::CurrentStackTrace(isolate, 1);
+      if (!stack.IsEmpty() && stack->GetFrameCount() > 0) {
+        Local<v8::String> scriptName = stack->GetFrame(isolate, 0)->GetScriptName();
+        if (!scriptName.IsEmpty()) {
+          std::string callerScript = ToString(isolate, scriptName);
+          const std::string filePrefix = "file://";
+          if (callerScript.rfind(filePrefix, 0) == 0) {
+            callerScript = callerScript.substr(filePrefix.size());
+          }
+          // Script origins are relative to the app bundle root (BaseDir)
+          if (!callerScript.empty() && callerScript[0] == '/' &&
+              callerScript.rfind(RuntimeConfig.BaseDir, 0) != 0) {
+            callerScript = RuntimeConfig.BaseDir + callerScript;
+          }
+          if (!callerScript.empty() && callerScript[0] == '/') {
+            NSString* callerDir = [[NSString stringWithUTF8String:callerScript.c_str()]
+                stringByDeletingLastPathComponent];
+            NSString* candidate = [[callerDir
+                stringByAppendingPathComponent:[NSString stringWithUTF8String:workerPath.c_str()]]
+                stringByStandardizingPath];
+            if (tns::Exists([candidate fileSystemRepresentation]) ||
+                tns::Exists(
+                    [[candidate stringByAppendingPathExtension:@"js"] fileSystemRepresentation]) ||
+                tns::Exists([[candidate stringByAppendingPathComponent:@"index.js"]
+                    fileSystemRepresentation])) {
+              workerPath = [candidate UTF8String];
+            }
+          }
+        }
+      }
+
+      if (workerPath.rfind("./", 0) == 0 || workerPath.rfind("../", 0) == 0) {
+        NSString* fallback = [[[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()]
+            stringByAppendingPathComponent:[NSString stringWithUTF8String:workerPath.c_str()]]
+            stringByStandardizingPath];
+        workerPath = [fallback UTF8String];
+      }
+    }
 
     int qos = -1;
     if (info.Length() >= 2 && info[1]->IsObject()) {
@@ -148,6 +190,19 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       Worker::SetWorkerId(isolate, workerId);
 
       TryCatch tc(isolate);
+
+      // If the script can be determined missing up-front, report it through
+      // worker.onerror instead of running (and let the caller terminate us).
+      if (!resolvedPath.empty() && resolvedPath[0] == '/' && !tns::Exists(resolvedPath.c_str())) {
+        NSString* path = [NSString stringWithUTF8String:resolvedPath.c_str()];
+        if (!tns::Exists([[path stringByAppendingPathExtension:@"js"] fileSystemRepresentation]) &&
+            !tns::Exists(
+                [[path stringByAppendingPathComponent:@"index.js"] fileSystemRepresentation])) {
+          worker->PassUncaughtExceptionFromWorkerToMain(
+              "Worker script does not exist: " + resolvedPath, resolvedPath, "", 1, true);
+          return isolate;
+        }
+      }
 
       // Debug: Log worker execution
       // printf("Worker: About to run module: %s\n", resolvedPath.c_str());
