@@ -24,6 +24,12 @@ void URLSearchParamsImpl::Init(v8::Isolate* isolate,
 
 URLSearchParamsImpl* URLSearchParamsImpl::GetPointer(
     v8::Local<v8::Object> object) {
+  // A foreign receiver (e.g. entries.call({})) has no internal field, and
+  // reading one that is not there is undefined behavior, so check first
+  // and report not-a-URLSearchParams instead.
+  if (object->InternalFieldCount() < 1) {
+    return nullptr;
+  }
   auto ptr = object->GetAlignedPointerFromInternalField(0);
   if (ptr == nullptr) {
     return nullptr;
@@ -122,6 +128,7 @@ enum IteratorKind { ITER_KEYS = 0, ITER_VALUES = 1, ITER_ENTRIES = 2 };
 const char* const kStateSource = "src";
 const char* const kStateIndex = "idx";
 const char* const kStateKind = "knd";
+const char* const kStateIterator = "itr";
 
 void IteratorSelf(const v8::FunctionCallbackInfo<v8::Value>& args) {
   // An iterator is itself iterable (iterator[@@iterator]() === iterator),
@@ -133,6 +140,17 @@ void IteratorNext(const v8::FunctionCallbackInfo<v8::Value>& args) {
   auto isolate = args.GetIsolate();
   auto context = isolate->GetCurrentContext();
   auto state = args.Data().As<v8::Object>();
+
+  // WebIDL brand check: next() must be invoked on the iterator it was
+  // created on, so a detached next() throws instead of advancing the
+  // captured state.
+  v8::Local<v8::Value> iteratorValue;
+  if (!state->Get(context, ToV8String(isolate, kStateIterator))
+           .ToLocal(&iteratorValue) ||
+      !iteratorValue->StrictEquals(args.This())) {
+    ThrowTypeError(isolate, "Illegal invocation");
+    return;
+  }
 
   auto indexKey = ToV8String(isolate, kStateIndex);
   v8::Local<v8::Value> sourceValue;
@@ -192,6 +210,13 @@ void ReturnLiveIterator(const v8::FunctionCallbackInfo<v8::Value>& args,
   auto isolate = args.GetIsolate();
   auto context = isolate->GetCurrentContext();
 
+  // WebIDL brand check: entries()/keys()/values() require a genuine
+  // URLSearchParams receiver, so e.g. entries.call({}) throws.
+  if (URLSearchParamsImpl::GetPointer(args.This()) == nullptr) {
+    ThrowTypeError(isolate, "Illegal invocation");
+    return;
+  }
+
   auto state = v8::Object::New(isolate);
   state->Set(context, ToV8String(isolate, kStateSource), args.This()).Check();
   state
@@ -211,6 +236,8 @@ void ReturnLiveIterator(const v8::FunctionCallbackInfo<v8::Value>& args,
   }
 
   auto iterator = v8::Object::New(isolate);
+  // Recorded in the hidden state so next() can brand-check its receiver.
+  state->Set(context, ToV8String(isolate, kStateIterator), iterator).Check();
   iterator->Set(context, ToV8String(isolate, "next"), nextFn).Check();
   iterator->Set(context, v8::Symbol::GetIterator(isolate), selfFn).Check();
   iterator
@@ -565,7 +592,13 @@ void URLSearchParamsImpl::Delete(
     return;
   }
   auto isolate = args.GetIsolate();
-  auto key = tns::ToString(isolate, args[0].As<v8::String>());
+  // The name is a USVString (url.bs:3861): coerce it like the optional
+  // value below instead of assuming a string (a Symbol or throwing
+  // toString leaves the pending exception and aborts).
+  std::string key;
+  if (!ValueToString(isolate->GetCurrentContext(), args[0], key)) {
+    return;
+  }
   // Spec delete(name, value): when the value argument is given, remove only
   // tuples matching BOTH name and value (url.bs:4000). The value is a
   // USVString, so coerce via ValueToString (number/boolean -> string; a Symbol
@@ -633,8 +666,13 @@ void URLSearchParamsImpl::Get(const v8::FunctionCallbackInfo<v8::Value>& args) {
     args.GetReturnValue().SetUndefined();
     return;
   }
-  auto key = args[0].As<v8::String>();
-  auto value = ptr->GetURLSearchParams()->get(tns::ToString(isolate, key));
+  // The name is a USVString (url.bs:3862); a Symbol or throwing toString
+  // leaves the pending exception and aborts.
+  std::string key;
+  if (!ValueToString(isolate->GetCurrentContext(), args[0], key)) {
+    return;
+  }
+  auto value = ptr->GetURLSearchParams()->get(key);
   if (value.has_value()) {
     auto ret = ToV8String(isolate, std::string(value.value()));
     args.GetReturnValue().Set(ret);
@@ -654,8 +692,13 @@ void URLSearchParamsImpl::GetAll(
     args.GetReturnValue().Set(v8::Array::New(isolate));
     return;
   }
-  auto key = args[0].As<v8::String>();
-  auto values = ptr->GetURLSearchParams()->get_all(tns::ToString(isolate, key));
+  // The name is a USVString (url.bs:3863); a Symbol or throwing toString
+  // leaves the pending exception and aborts.
+  std::string key;
+  if (!ValueToString(context, args[0], key)) {
+    return;
+  }
+  auto values = ptr->GetURLSearchParams()->get_all(key);
   auto ret = v8::Array::New(isolate, (int)values.size());
   int i = 0;
   for (auto item : values) {
@@ -673,7 +716,13 @@ void URLSearchParamsImpl::Has(const v8::FunctionCallbackInfo<v8::Value>& args) {
     return;
   }
   auto isolate = args.GetIsolate();
-  auto key = args[0].As<v8::String>();
+  // The name is a USVString (url.bs:3864): coerce it like the optional
+  // value below instead of assuming a string (a Symbol or throwing
+  // toString leaves the pending exception and aborts).
+  std::string key;
+  if (!ValueToString(isolate->GetCurrentContext(), args[0], key)) {
+    return;
+  }
   // Spec has(name, value): when the value argument is given, return true
   // only for a tuple matching BOTH name and value (url.bs:4028). The value
   // is a USVString, so coerce via ValueToString (number/boolean -> string;
@@ -687,9 +736,9 @@ void URLSearchParamsImpl::Has(const v8::FunctionCallbackInfo<v8::Value>& args) {
     if (!ValueToString(isolate->GetCurrentContext(), args[1], filter)) {
       return;  // coercion threw (Symbol / throwing toString)
     }
-    value = ptr->GetURLSearchParams()->has(tns::ToString(isolate, key), filter);
+    value = ptr->GetURLSearchParams()->has(key, filter);
   } else {
-    value = ptr->GetURLSearchParams()->has(tns::ToString(isolate, key));
+    value = ptr->GetURLSearchParams()->has(key);
   }
 
   args.GetReturnValue().Set(value);
