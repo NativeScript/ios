@@ -329,6 +329,12 @@ struct MappingTraits<Meta::Type*> {
         }
         break;
       }
+      case Meta::TypeType::TypeExtVector: {
+        Meta::ExtVectorType& concreteType = type->as<Meta::ExtVectorType>();
+        io.mapRequired("ArrayType", concreteType.innerType);
+        io.mapRequired("Size", concreteType.size);
+        break;
+      }
       case Meta::TypeType::TypeNullable: {
         Meta::NullableType& concreteType = type->as<Meta::NullableType>();
         io.mapRequired("InnerType", concreteType.innerType);
