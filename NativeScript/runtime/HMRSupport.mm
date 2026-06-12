@@ -527,20 +527,19 @@ void DispatchHotEvent(v8::Isolate* isolate, v8::Local<v8::Context> context, cons
   const bool verbose = tns::IsScriptLoadingLogEnabled();
 
   // Single dispatch loop. Always observes `tryCatch.HasCaught()` and
-  // `result.ToLocal(...)` regardless of verbose mode — these mirror the
-  // dispose/prune dispatcher patterns elsewhere in this file (lines 664,
-  // 780) and the original pre-session `DispatchHotEvent` behavior. The
-  // round-7 fast-path variant that skipped these calls broke HMR even
-  // though `~TryCatch` resets state on destruction; preserving the
-  // observation pattern is the safest contract.
+  // `result.ToLocal(...)` regardless of verbose mode, mirroring the
+  // dispose/prune drainer (`DrainHotCallbacks`) and the original
+  // pre-session `DispatchHotEvent` behavior. A previous variant that
+  // skipped these observations on the quiet path broke HMR dispatch even
+  // though `~TryCatch` resets state on destruction; treat the observation
+  // pattern as the contract.
   //
   // All `Log()` calls are gated behind `verbose` so default-mode dev
   // sessions are quiet; the per-listener int counters are practically
   // free and feed the verbose-only summary line. Reproducing the verbose
   // output requires `logScriptLoading: true` in `nativescript.config.ts`.
   // The summary collapses "did any listener match?" into one line — the
-  // single most informative signal during HMR triage (see round 7 in
-  // `LATEST-05-07-2026-HMR_ANGULAR_DEBUG_SESSION.md`).
+  // single most informative signal when triaging HMR dispatch.
   int matched = 0;   // returned undefined OR a truthy non-bool (Promise/object)
   int falsey = 0;    // returned literal `false`
   int threw = 0;     // listener threw synchronously
@@ -754,15 +753,15 @@ void InitializeHotDisposeRunner(v8::Isolate* isolate, v8::Local<v8::Context> con
   using v8::Value;
 
   // Global JS-callable: `__nsRunHmrDispose(keys?: string[]) => number`.
-  // Mirrors `InitializeHotEventDispatcher`'s exposure pattern. Used by
-  // `@nativescript/vite`'s Angular HMR client to drain `import.meta.hot.dispose`
-  // callbacks immediately before `__reboot_ng_modules__`.
+  // Mirrors `InitializeHotEventDispatcher`'s exposure pattern. HMR clients
+  // that perform whole-realm reboots (e.g. @nativescript/vite's) call this
+  // to drain `import.meta.hot.dispose` callbacks immediately before
+  // re-importing the application entry.
   //
-  // The `keys` argument lets future HMR clients drain only specific modules
-  // (e.g. for per-module hot replacement). Today's Angular client passes no
-  // arg so the runtime drains everything — accurate to the wholesale-reboot
-  // semantics of `__reboot_ng_modules__` (the entire JS realm's side-effect
-  // tree is being torn down).
+  // The `keys` argument lets per-module HMR clients drain only specific
+  // modules. Omitting it drains everything — the right semantics for a
+  // wholesale reboot, where the entire JS realm's side-effect tree is
+  // being torn down.
   auto runDisposeCb = [](const FunctionCallbackInfo<Value>& info) {
     v8::Isolate* iso = info.GetIsolate();
     v8::Local<v8::Context> ctx = iso->GetCurrentContext();
@@ -805,10 +804,10 @@ void InitializeHotPruneRunner(v8::Isolate* isolate, v8::Local<v8::Context> conte
   using v8::Value;
 
   // Global JS-callable: `__nsRunHmrPrune(keys?: string[]) => number`.
-  // Symmetric with `__nsRunHmrDispose`. The Angular HMR client doesn't call
-  // this today (its wholesale `__reboot_ng_modules__` model has no per-module
-  // prune step), but the runner is plumbed end-to-end so future per-module
-  // HMR clients can drain prune callbacks at the right moment.
+  // Symmetric with `__nsRunHmrDispose`. Clients with per-module update
+  // models call this when modules leave the import graph; wholesale-reboot
+  // clients have no prune step. Plumbed end-to-end so the entry point is
+  // ready for either model.
   auto runPruneCb = [](const FunctionCallbackInfo<Value>& info) {
     v8::Isolate* iso = info.GetIsolate();
     v8::Local<v8::Context> ctx = iso->GetCurrentContext();
@@ -844,9 +843,9 @@ void InitializeHotDeclinedHelper(v8::Isolate* isolate, v8::Local<v8::Context> co
   using v8::Value;
 
   // Global JS-callable: `__nsHasDeclinedModule(keys?: string[]) => boolean`.
-  // The Angular HMR client passes the eviction-set (`msg.evictPaths`) here
-  // before applying an update; on `true` it falls back to a full reload via
-  // `__nsReloadDevApp` instead of the per-cycle reboot.
+  // HMR clients pass the update's eviction set here before applying an
+  // update; on `true` they fall back to a full reload via `__nsReloadDevApp`
+  // instead of the per-cycle reboot.
   //
   // No-arg form ("is anything declined at all?") returns `true` if any
   // module ever called `import.meta.hot.decline()`. Useful as a coarse
@@ -1370,44 +1369,30 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   }
 
   // IMPORTANT: This function is used as an HTTP module registry/cache key.
-  // For general-purpose HTTP module loading (public internet), the query string
-  // can be part of the module's identity (auth, content versioning, routing, etc).
-  // Therefore we only apply query normalization (sorting/dropping) for known
-  // NativeScript dev endpoints where `t`/`v`/`import` are purely cache busters.
+  // For general-purpose HTTP module loading (public internet), the query
+  // string can be part of the module's identity (auth, content versioning,
+  // routing, etc), so it is preserved verbatim. Query normalization
+  // (sorting, dropping `t`/`v`/`import` cache busters) applies only to:
   //
-  // Special cases that LOOK like dev endpoints but aren't normalized:
-  //
-  //   `/@ng/component` (Angular HMR component-update endpoint)
-  //     The `t` (timestamp) parameter is the WHOLE POINT of the URL — it
-  //     identifies a specific recompile of the component's metadata after
-  //     a `.html`/style edit. Stripping it would collapse every HMR fetch
-  //     to the same cache key (the boot-time call uses `Date.now()` and
-  //     each subsequent save uses a new `Date.now()`), and the second
-  //     `__ns_import(...)` would hit V8's module cache, resolve the
-  //     boot-time `_UpdateMetadata` default export, and call
-  //     `ɵɵreplaceMetadata` with stale instructions. Result: server logs
-  //     `(client) hmr update`, the listener fires, but the visual never
-  //     changes because the runtime swapped the live view's metadata
-  //     with the same metadata it already had. Treat the path as a
-  //     non-dev endpoint and preserve the query verbatim so each
-  //     timestamped fetch is a distinct registry entry.
-  //
-  // Apply the special-case check BEFORE the dev-endpoint short-circuit so
-  // it covers paths under `/ns/m/<componentDir>/@ng/component` (the
-  // resolved URL Angular's compiler produces relative to the component's
-  // `import.meta.url`).
+  //   - Known dev-server endpoints, where those params are purely cache
+  //     busters.
+  //   - Volatile URLs (see `IsVolatileUrl`): endpoints whose response
+  //     changes on every save (e.g. component-update endpoints, where each
+  //     save's fetch carries a fresh `t=Date.now()`). Their registry key
+  //     must stay STABLE across saves — the version discriminator lives in
+  //     the fetch URL, never in the key — so the dynamic-import path's
+  //     evict-before-import finds and replaces the previous save's entry.
+  //     Per-save keys here would turn that evict into a no-op and leak one
+  //     compiled module per save for the life of the dev session, while a
+  //     stale boot-time entry kept serving old bodies to re-imports.
   {
     std::string pathOnly = originAndPath.substr(pathStart);
-    if (pathOnly.find("/@ng/component") != std::string::npos) {
-      // Preserve query as-is — `t` is the version discriminator.
-      return noHash;
-    }
     const bool isDevEndpoint =
       StartsWith(pathOnly, "/ns/") ||
       StartsWith(pathOnly, "/node_modules/.vite/") ||
       StartsWith(pathOnly, "/@id/") ||
       StartsWith(pathOnly, "/@fs/");
-    if (!isDevEndpoint) {
+    if (!isDevEndpoint && !IsVolatileUrl(noHash)) {
       // Preserve query as-is (fragment already removed).
       return noHash;
     }
@@ -1605,6 +1590,74 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     usleep(120 * 1000);
     ok = PerformHttpFetchOnceSync(url, out, contentType, status);
   }
+  // Cold-boot connection recovery. status == 0 means the request died at
+  // the connection level — no HTTP response at all. During a dev-session
+  // cold boot the dominant cause is iOS local-network privacy: the app's
+  // first fetch to a LAN dev server raises the system's Local Network
+  // alert and is denied immediately, before the user can respond. Apple's
+  // guidance (TN3179) for APIs without waitsForConnectivity is to add
+  // retry logic. Without it, boot is unrecoverably dead the instant the
+  // alert appears and the user must approve + manually relaunch; with it,
+  // the flow becomes alert → Allow → next retry succeeds → boot
+  // continues. Also covers a dev server that is still starting up when
+  // the app launches.
+  //
+  // HARD BUDGET: dev boots run before UIApplicationMain, so the whole
+  // wait sits inside the process-launch transaction and the launch
+  // watchdog kills the app at 20s wall-clock from exec (0x8BADF00D,
+  // verified via device crash report when this window was 30s). The
+  // window must leave the first failed attempt + give-up path well clear
+  // of that line, so the app can still fail soft like it did before.
+  //
+  // While waiting we *run the main runloop* rather than sleep: a blocked
+  // main thread starves whatever chance the system has to present the
+  // Local Network alert while the app is frontmost, and starves any boot
+  // UI of frames.
+  //
+  // Scope guards keep this strictly a debug-build cold-boot JS-thread
+  // affordance:
+  //   - Debug builds only. Release apps that opt into remote modules
+  //     (`allowRemoteModules: true`) must keep the fast-fail import
+  //     semantics they had before this loop existed —
+  //     `IsDevSessionBootComplete()` is permanently false in release
+  //     (no dev session ever applies), so without this gate every
+  //     connection-level import failure there would stall the JS
+  //     thread for the full window.
+  //   - `GetCurrentRuntime()` is thread_local (null on GCD prefetch
+  //     workers), so background fetches keep failing fast.
+  //   - HMR-time fetches (boot complete) keep failing fast.
+  //   - HTTP error statuses (404/500) keep failing fast: only
+  //     connection-level failures retry.
+  if (!ok && status == 0 && RuntimeConfig.IsDebug &&
+      Runtime::GetCurrentRuntime() != nullptr &&
+      !IsDevSessionBootComplete()) {
+    constexpr double kBootConnRetryWindowSec = 12.0;
+    const CFAbsoluteTime giveUpAt =
+        CFAbsoluteTimeGetCurrent() + kBootConnRetryWindowSec;
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-loader][boot-recovery] dev server unreachable (status=0); "
+           "retrying %s for up to %.0fs (local network permission pending "
+           "or server starting)",
+          url.c_str(), kBootConnRetryWindowSec);
+    }
+    int attempts = 0;
+    while (!ok && status == 0 && CFAbsoluteTimeGetCurrent() < giveUpAt) {
+      if (NSThread.isMainThread) {
+        // Service the runloop for the whole backoff so system alert
+        // presentation and frame commits can happen while we wait.
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.5, false);
+      } else {
+        usleep(500 * 1000);
+      }
+      ok = PerformHttpFetchOnceSync(url, out, contentType, status);
+      attempts++;
+    }
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-loader][boot-recovery] %s after %d attempt%s url=%s status=%d",
+          ok ? "recovered" : "gave up", attempts, attempts == 1 ? "" : "s",
+          url.c_str(), status);
+    }
+  }
   if (!ok || status < 200 || status >= 300) {
     return false;
   }
@@ -1638,8 +1691,9 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 //
 // We use `+[NSURLConnection sendSynchronousRequest:returningResponse:error:]`
 // (deprecated but functional on every shipping iOS version) instead of
-// the modern NSURLSession API. NSURLSession exhibits a deadlock when the
-// JS thread is the iOS main thread (post-Angular bootstrap):
+// the modern NSURLSession API. NSURLSession exhibits a deadlock on the
+// JS thread (the iOS main thread — dev sessions execute JS on the UI
+// thread) once app bootstrap has completed:
 //
 //   - JS calls `import('foo')` (dynamic import).
 //   - The runtime sync-fetches `foo`'s body on the main thread, blocking
@@ -1658,8 +1712,11 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 // The deadlock reproduces with both an implicit delegate queue and an
 // explicit non-main `NSOperationQueue`. It also reproduces with
 // `httpModulePrefetch` disabled, ruling out prefetcher contention.
-// Boot-time sync fetches (thousands of them) succeed because they happen
-// before the iOS main thread becomes the JS executor.
+// Boot-time sync fetches (thousands of them) never tripped it; only
+// dynamic-import fetches issued after bootstrap completed did. Both run
+// on the iOS main thread (dev sessions execute JS on the UI thread), so
+// thread identity alone does not explain the difference — the trigger
+// is the nested resolve-callback fetch pattern described above.
 //
 // `NSURLConnection.sendSynchronousRequest` uses CFNetwork directly,
 // bypassing NSURLSession's task lifecycle, and returns the NSURLResponse
@@ -1668,50 +1725,32 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 // a working implementation, and there is currently no non-deprecated
 // API that gives us a runloop-independent synchronous fetch with a
 // real HTTP status code.
-static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, std::string& contentType, int& status) {
+
+// Marshaling type for one fetch attempt: plain C++ values only, so no
+// ObjC object ownership crosses the GCD hop in PerformHttpFetchOnceSync
+// (everything ObjC lives and dies inside HttpFetchOnceLoad's
+// autorelease pool).
+struct HttpFetchOnceResult {
+  NSInteger status = 0;
+  bool badUrl = false;
+  bool hasError = false;
+  long errCode = 0;
+  std::string errDomain;
+  std::string errDesc;
+  std::string contentType;
+  std::string body;
+};
+
+// The CFNetwork load itself: build the request, send it synchronously,
+// marshal the response. Runnable on any thread; owns no shared state.
+static HttpFetchOnceResult HttpFetchOnceLoad(const std::string& fetchUrl, bool isHmrRefetch) {
+  HttpFetchOnceResult result;
   @autoreleasepool {
-    // One-time: replace the shared NSURLCache with a zero-capacity one
-    // so CFNetwork has no on-disk store to satisfy fetches from. Per-
-    // request cache policy + `removeCachedResponseForRequest:` were
-    // empirically insufficient on iOS 18+/26+ Simulator — fsCachedData
-    // would still serve a previous save's body for a tagged HMR URL.
-    static dispatch_once_t s_cacheDisableOnce;
-    dispatch_once(&s_cacheDisableOnce, ^{
-      NSURLCache* nullCache = [[NSURLCache alloc] initWithMemoryCapacity:0
-                                                            diskCapacity:0
-                                                            directoryURL:nil];
-      [NSURLCache setSharedURLCache:nullCache];
-    });
-
-    // For HMR re-fetch URLs (`/ns/m/__ns_hmr__/<tag>/...`), append a
-    // unique nonce query parameter so CFNetwork sees a different URL
-    // every time and cannot satisfy from any cache. Vite ignores
-    // unknown query params on these routes, so the response body is
-    // unchanged. Scoped to HMR URLs only because some Vite virtual
-    // routes (e.g. `/@nativescript/vendor.mjs`) require exact-match
-    // URLs and 404 on unknown query params. Boot fetches don't need
-    // cache busting — first-touch by definition.
-    std::string fetchUrl = url;
-    if (url.find("__ns_hmr__") != std::string::npos) {
-      static std::atomic<uint64_t> s_fetchSeq{0};
-      const uint64_t seq = s_fetchSeq.fetch_add(1, std::memory_order_relaxed);
-      const uint64_t nowMs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0);
-      fetchUrl += (url.find('?') == std::string::npos) ? '?' : '&';
-      fetchUrl += "__ns_dev_nonce=";
-      fetchUrl += std::to_string(nowMs);
-      fetchUrl += "-";
-      fetchUrl += std::to_string(seq);
-    }
-
     NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:fetchUrl.c_str()]];
-    if (!u) { status = 0; return false; }
-
-    NSError* err = nil;
-    NSInteger httpStatusLocal = 0;
-    std::string contentTypeLocal;
-    std::string bodyLocal;
-
-    const auto fetchStartUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+    if (!u) {
+      result.badUrl = true;
+      return result;
+    }
 
     NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:u];
     [request setHTTPMethod:@"GET"];
@@ -1723,15 +1762,23 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
     // `setCachePolicy:` alone is insufficient on iOS 18+/26+ Simulator —
     // CFNetwork still serves a previous save's body for a tagged HMR
     // URL from fsCachedData. Combined with the zero-capacity
-    // sharedURLCache and per-request URL nonce above, these give us a
-    // reliable "always go to origin" path for the dev runtime.
+    // sharedURLCache and per-request URL nonce in the caller, these give
+    // us a reliable "always go to origin" path for the dev runtime.
     [request setValue:@"no-cache, no-store, max-age=0"
    forHTTPHeaderField:@"Cache-Control"];
     [request setValue:@"no-cache" forHTTPHeaderField:@"Pragma"];
-    // Force a fresh TCP connection per fetch. CFNetwork has been
-    // observed to serve a body buffered on a kept-alive HTTP/1.1
-    // connection for a prior fetch when a new fetch reuses it.
-    [request setValue:@"close" forHTTPHeaderField:@"Connection"];
+    if (isHmrRefetch) {
+      // Force a fresh TCP connection for HMR RE-fetches only.
+      // CFNetwork has been observed to serve a body buffered on a
+      // kept-alive HTTP/1.1 connection for a prior fetch of the SAME
+      // logical module when a re-fetch reuses the connection. Boot
+      // fetches are first-touch URLs with fully-consumed responses,
+      // so they keep connection reuse — on a physical device over
+      // Wi-Fi, a fresh TCP handshake per module fetch multiplied by
+      // thousands of boot modules is the difference between booting
+      // in seconds and being killed by the launch watchdog.
+      [request setValue:@"close" forHTTPHeaderField:@"Connection"];
+    }
     [request setCachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData];
     [request setHTTPShouldHandleCookies:NO];
     // `setHTTPShouldUsePipelining:` is deprecated on visionOS 2.4+ (classic
@@ -1744,6 +1791,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
 #pragma clang diagnostic pop
     [[NSURLCache sharedURLCache] removeCachedResponseForRequest:request];
 
+    NSError* err = nil;
     NSURLResponse* response = nil;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -1758,66 +1806,148 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
 
     if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
       NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
-      httpStatusLocal = [httpResp statusCode];
+      result.status = [httpResp statusCode];
       NSString* ct = [httpResp allHeaderFields][@"Content-Type"];
       if (ct) {
         const char* utf8 = [ct UTF8String];
-        if (utf8) contentTypeLocal = std::string(utf8);
+        if (utf8) result.contentType = std::string(utf8);
       }
     }
 
     if (data && [data length] > 0) {
       const void* bytes = [data bytes];
       NSUInteger len = [data length];
-      bodyLocal.assign(static_cast<const char*>(bytes), static_cast<size_t>(len));
+      result.body.assign(static_cast<const char*>(bytes), static_cast<size_t>(len));
     }
 
-    const auto fetchEndUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
-    const uint64_t fetchMs = fetchEndUs > fetchStartUs ? (fetchEndUs - fetchStartUs) / 1000ull : 0ull;
-    g_fetchSyncTotalMs.fetch_add(fetchMs, std::memory_order_relaxed);
-    if (fetchMs < 10) {
-      g_fetchSyncFast.fetch_add(1, std::memory_order_relaxed);
-    } else if (fetchMs < 100) {
-      g_fetchSyncMedium.fetch_add(1, std::memory_order_relaxed);
-    } else {
-      g_fetchSyncSlow.fetch_add(1, std::memory_order_relaxed);
+    if (err != nil) {
+      result.hasError = true;
+      result.errCode = (long)err.code;
+      const char* domain = err.domain ? [err.domain UTF8String] : nullptr;
+      if (domain) result.errDomain = domain;
+      const char* desc = err.localizedDescription ? [err.localizedDescription UTF8String] : nullptr;
+      if (desc) result.errDesc = desc;
     }
-    const size_t syncCount = g_fetchSyncCount.fetch_add(1, std::memory_order_relaxed) + 1;
-    if (syncCount > 0 && syncCount % kFetchSyncSummaryEvery == 0 &&
-        IsScriptLoadingLogEnabled()) {
-      const size_t fast = g_fetchSyncFast.load(std::memory_order_relaxed);
-      const size_t medium = g_fetchSyncMedium.load(std::memory_order_relaxed);
-      const size_t slow = g_fetchSyncSlow.load(std::memory_order_relaxed);
-      const uint64_t totalMs = g_fetchSyncTotalMs.load(std::memory_order_relaxed);
-      const uint64_t avgMs = syncCount ? totalMs / (uint64_t)syncCount : 0;
-      Log(@"[http-loader][fetch-sync][summary] count=%lu avg=%llums fast(<10ms)=%lu medium=%lu slow(>=100ms)=%lu",
-          (unsigned long)syncCount,
-          (unsigned long long)avgMs,
-          (unsigned long)fast,
-          (unsigned long)medium,
-          (unsigned long)slow);
-    }
-
-    status = (int)httpStatusLocal;
-    contentType = contentTypeLocal;
-    if (err != nil || bodyLocal.empty()) {
-      if (IsScriptLoadingLogEnabled()) {
-        NSString* desc = err.localizedDescription ?: @"<no description>";
-        NSString* domain = err.domain ?: @"<no domain>";
-        Log(@"[http-loader][fetch-error] url=%s domain=%@ code=%ld desc=%@ status=%ld bodyEmpty=%d ms=%llu",
-            url.c_str(),
-            domain,
-            (long)err.code,
-            desc,
-            (long)httpStatusLocal,
-            bodyLocal.empty() ? 1 : 0,
-            (unsigned long long)fetchMs);
-      }
-      return false;
-    }
-    out.swap(bodyLocal);
-    return true;
   }
+  return result;
+}
+
+static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, std::string& contentType, int& status) {
+  // One-time: replace the shared NSURLCache with a zero-capacity one
+  // so CFNetwork has no on-disk store to satisfy fetches from. Per-
+  // request cache policy + `removeCachedResponseForRequest:` were
+  // empirically insufficient on iOS 18+/26+ Simulator — fsCachedData
+  // would still serve a previous save's body for a tagged HMR URL.
+  static dispatch_once_t s_cacheDisableOnce;
+  dispatch_once(&s_cacheDisableOnce, ^{
+    @autoreleasepool {
+      NSURLCache* nullCache = [[NSURLCache alloc] initWithMemoryCapacity:0
+                                                            diskCapacity:0
+                                                            directoryURL:nil];
+      [NSURLCache setSharedURLCache:nullCache];
+    }
+  });
+
+  // For HMR re-fetch URLs (`/ns/m/__ns_hmr__/<tag>/...`), append a
+  // unique nonce query parameter so CFNetwork sees a different URL
+  // every time and cannot satisfy from any cache. Vite ignores
+  // unknown query params on these routes, so the response body is
+  // unchanged. Scoped to HMR URLs only because some Vite virtual
+  // routes (e.g. `/@nativescript/vendor.mjs`) require exact-match
+  // URLs and 404 on unknown query params. Boot fetches don't need
+  // cache busting — first-touch by definition.
+  const bool isHmrRefetch = url.find("__ns_hmr__") != std::string::npos;
+  std::string fetchUrl = url;
+  if (isHmrRefetch) {
+    static std::atomic<uint64_t> s_fetchSeq{0};
+    const uint64_t seq = s_fetchSeq.fetch_add(1, std::memory_order_relaxed);
+    const uint64_t nowMs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0);
+    fetchUrl += (url.find('?') == std::string::npos) ? '?' : '&';
+    fetchUrl += "__ns_dev_nonce=";
+    fetchUrl += std::to_string(nowMs);
+    fetchUrl += "-";
+    fetchUrl += std::to_string(seq);
+  }
+
+  const auto fetchStartUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+
+  // Main-thread offload: dev sessions execute JS on the iOS main thread,
+  // so V8's synchronous resolve callbacks land here on main. The caller
+  // must block for the full fetch either way (the callbacks are
+  // synchronous; there is no avoiding that), but hopping the load onto a
+  // GCD worker keeps the synchronous URL load itself off the main
+  // thread, which silences Foundation's per-fetch "Synchronous URL
+  // loading ... should not occur on this application's main thread"
+  // warning — thousands of them per cold boot.
+  //
+  // The hop must be `dispatch_async` + semaphore wait: `dispatch_sync`
+  // to a global queue runs the block on the CALLING thread (GCD's
+  // documented optimization for everything except the main queue), which
+  // would leave the load on the main pthread and change nothing.
+  //
+  // QoS note: semaphore waits don't donate priority, so main can briefly
+  // wait behind USER_INITIATED work. Acceptable for this dev-only path —
+  // the wait is bounded by the request's 5s timeout.
+  __block HttpFetchOnceResult result;
+  if (NSThread.isMainThread) {
+    dispatch_semaphore_t done = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+      result = HttpFetchOnceLoad(fetchUrl, isHmrRefetch);
+      dispatch_semaphore_signal(done);
+    });
+    dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
+    dispatch_release(done);  // ARC-disabled file
+  } else {
+    result = HttpFetchOnceLoad(fetchUrl, isHmrRefetch);
+  }
+
+  if (result.badUrl) { status = 0; return false; }
+
+  const auto fetchEndUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+  const uint64_t fetchMs = fetchEndUs > fetchStartUs ? (fetchEndUs - fetchStartUs) / 1000ull : 0ull;
+  g_fetchSyncTotalMs.fetch_add(fetchMs, std::memory_order_relaxed);
+  if (fetchMs < 10) {
+    g_fetchSyncFast.fetch_add(1, std::memory_order_relaxed);
+  } else if (fetchMs < 100) {
+    g_fetchSyncMedium.fetch_add(1, std::memory_order_relaxed);
+  } else {
+    g_fetchSyncSlow.fetch_add(1, std::memory_order_relaxed);
+  }
+  const size_t syncCount = g_fetchSyncCount.fetch_add(1, std::memory_order_relaxed) + 1;
+  if (syncCount > 0 && syncCount % kFetchSyncSummaryEvery == 0 &&
+      IsScriptLoadingLogEnabled()) {
+    const size_t fast = g_fetchSyncFast.load(std::memory_order_relaxed);
+    const size_t medium = g_fetchSyncMedium.load(std::memory_order_relaxed);
+    const size_t slow = g_fetchSyncSlow.load(std::memory_order_relaxed);
+    const uint64_t totalMs = g_fetchSyncTotalMs.load(std::memory_order_relaxed);
+    const uint64_t avgMs = syncCount ? totalMs / (uint64_t)syncCount : 0;
+    Log(@"[http-loader][fetch-sync][summary] count=%lu avg=%llums fast(<10ms)=%lu medium=%lu slow(>=100ms)=%lu",
+        (unsigned long)syncCount,
+        (unsigned long long)avgMs,
+        (unsigned long)fast,
+        (unsigned long)medium,
+        (unsigned long)slow);
+  }
+
+  status = (int)result.status;
+  contentType = std::move(result.contentType);
+  if (result.hasError || result.body.empty()) {
+    if (IsScriptLoadingLogEnabled()) {
+      const char* desc = result.errDesc.empty() ? "<no description>" : result.errDesc.c_str();
+      const char* domain = result.errDomain.empty() ? "<no domain>" : result.errDomain.c_str();
+      Log(@"[http-loader][fetch-error] url=%s domain=%s code=%ld desc=%s status=%ld bodyEmpty=%d ms=%llu",
+          url.c_str(),
+          domain,
+          result.errCode,
+          desc,
+          (long)result.status,
+          result.body.empty() ? 1 : 0,
+          (unsigned long long)fetchMs);
+    }
+    return false;
+  }
+  out = std::move(result.body);
+  return true;
 }
 
 static bool TryGetPrefetchedSource(const std::string& url, std::string& out) {
@@ -1881,9 +2011,9 @@ static char PreviousNonHwsChar(const std::string& source, size_t hit) {
 // What we explicitly reject:
 //   `.from("...")`              member access (Array.from, etc.)
 //   `.import("...")`            member access on dynamic-import-shaped APIs
-//   `import("...")`             dynamic imports — they almost never run
-//                               at boot for Angular and the speculative
-//                               wave on lazy chunks blew the budget.
+//   `import("...")`             dynamic imports — lazy chunks rarely run
+//                               at boot, and the speculative wave on
+//                               them blew the budget.
 //   matches inside template / string literals where the previous non-WS
 //   char is a quote character (best-effort guard).
 //
@@ -2172,9 +2302,9 @@ static void MaybeLogPrefetchSummary(const char* trigger) {
 // Gated to JS-thread + cold-boot only:
 //   - `Runtime::GetCurrentRuntime()` is thread_local; null on GCD
 //     prefetch threads, so they never pump someone else's runloop.
-//   - `IsDevSessionBootComplete()` short-circuits once Angular has
-//     committed its first stable view — no placeholder to repaint, and
-//     HMR-time fetches must not pay the pump cost.
+//   - `IsDevSessionBootComplete()` short-circuits once the dev-session
+//     boot has committed its first stable view — no placeholder to
+//     repaint, and HMR-time fetches must not pay the pump cost.
 //   - The runloop identity check survives any future change that
 //     decouples the runtime's captured runloop from the current thread.
 static void MaybePumpJSThreadDuringBoot() {
@@ -2911,9 +3041,9 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
 // starts walking". Two argument shapes:
 //
 //   1. `seedUrl: string`  — legacy cold-boot BFS from a single seed.
-//   2. `urls: string[]`   — HMR: dev server already precomputed the
-//      inverse-dep closure (`evictPaths` in the `ns:angular-update`
-//      payload); fetch that exact set in parallel with no body scan.
+//   2. `urls: string[]`   — HMR: the dev server already precomputed the
+//      inverse-dep closure (the update payload's eviction set); fetch
+//      that exact set in parallel with no body scan.
 //
 // Returns `{ ok, fetched, ms }` so JS can log the result. On failure
 // callers should fall back to V8's normal synchronous walk.
