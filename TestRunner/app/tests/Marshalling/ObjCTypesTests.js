@@ -575,4 +575,23 @@ describe(module.id, function () {
         TNSApi.new().methodNullableError(1, errorRef);
         expect(errorRef.value instanceof NSError).toBe(true);
     });
+
+    it("NSErrorOutParameterWithNullabilityCarryingTypedef", function () {
+        expect(function () {
+            TNSApi.new().methodTypedefNullableError(0);
+        }).not.toThrow();
+
+        var isThrown = false;
+        try {
+            TNSApi.new().methodTypedefNullableError(1);
+        } catch (e) {
+            isThrown = true;
+            expect(e.stack).toEqual(jasmine.any(String));
+        }
+        expect(isThrown).toBe(true);
+
+        var errorRef = new interop.Reference();
+        TNSApi.new().methodTypedefNullableError(1, errorRef);
+        expect(errorRef.value instanceof NSError).toBe(true);
+    });
 });

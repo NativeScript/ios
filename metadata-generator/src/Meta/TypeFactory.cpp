@@ -506,10 +506,14 @@ shared_ptr<Type> TypeFactory::createFromAttributedType(
     const clang::AttributedType* type) {
   auto innerType = this->create(type->getModifiedType());
   if (auto nullability = type->getImmediateNullability()) {
+    // Strip any nullability wrapper the inner type may already carry (e.g. a
+    // typedef that has its own annotation) so wrappers never nest and the
+    // outermost annotation wins. The stripped type stays alive in _cache.
+    Type* unwrapped = innerType->stripNullability();
     if (*nullability == clang::NullabilityKind::Nullable) {
-      return make_shared<NullableType>(innerType.get());
+      return make_shared<NullableType>(unwrapped);
     } else if (*nullability == clang::NullabilityKind::NonNull) {
-      return make_shared<NonNullableType>(innerType.get());
+      return make_shared<NonNullableType>(unwrapped);
     }
   }
   return innerType;

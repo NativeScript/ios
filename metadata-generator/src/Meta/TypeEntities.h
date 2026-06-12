@@ -74,6 +74,15 @@ class Type {
 
   bool is(TypeType type) const { return this->type == type; }
 
+  // Returns the underlying type with any NullableType/NonNullableType wrappers
+  // removed (handles arbitrarily nested wrappers). Use this before inspecting
+  // the structure of a type (e.g. is(TypePointer), as<InterfaceType>()), since
+  // nullability annotations are represented as wrapper nodes in the type tree.
+  Type* stripNullability();
+  const Type* stripNullability() const {
+    return const_cast<Type*>(this)->stripNullability();
+  }
+
   template <class T>
   T visit(TypeVisitor<T>& visitor) const {
     switch (this->type) {
@@ -335,4 +344,20 @@ class NonNullableType : public Type {
 
   Type* innerType;
 };
+
+inline Type* Type::stripNullability() {
+  Type* current = this;
+  while (true) {
+    Type* inner = nullptr;
+    if (current->is(TypeType::TypeNullable)) {
+      inner = current->as<NullableType>().innerType;
+    } else if (current->is(TypeType::TypeNonNullable)) {
+      inner = current->as<NonNullableType>().innerType;
+    }
+    if (inner == nullptr) {
+      return current;
+    }
+    current = inner;
+  }
+}
 }  // namespace Meta

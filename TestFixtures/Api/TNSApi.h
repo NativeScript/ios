@@ -34,6 +34,12 @@ typedef UIColor NIKColor;
 
 - (BOOL)method:(NSInteger)errorCode error:(NSError**)outError;
 - (BOOL)methodNullable:(NSInteger)errorCode error:(NSError* _Nullable* _Nullable)outError;
+
+// The typedef carries its own nullability, so the parameter type ends up with
+// nested nullability annotations (like BNNSFilterCreateLayerPadding in the SDK)
+typedef NSError* _Nullable TNSNullableError;
+- (BOOL)methodTypedefNullable:(NSInteger)errorCode
+                        error:(TNSNullableError _Nullable* _Nullable)outError;
 @end
 
 @interface TNSConflictingSelectorTypes1 : NSObject

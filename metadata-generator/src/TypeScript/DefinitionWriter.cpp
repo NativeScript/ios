@@ -140,7 +140,7 @@ void DefinitionWriter::visit(InterfaceMeta* meta) {
                                nullptr);
   for (auto& methodPair : inheritedStaticMethods) {
     MethodMeta* method = methodPair.second.second;
-    if (!method->signature[0]->is(TypeInstancetype)) {
+    if (!method->signature[0]->stripNullability()->is(TypeInstancetype)) {
       continue;
     }
     if (compoundStaticMethods.find(method->jsName) !=
@@ -561,7 +561,8 @@ std::string DefinitionWriter::writeConstructor(
   return output.str();
 }
 
-void getClosedGenericsIfAny(Type& type, std::vector<Type*>& params) {
+void getClosedGenericsIfAny(Type& typeIn, std::vector<Type*>& params) {
+  Type& type = *typeIn.stripNullability();
   if (type.is(TypeInterface)) {
     const InterfaceType& interfaceType = type.as<InterfaceType>();
     for (size_t i = 0; i < interfaceType.typeArguments.size(); i++) {
@@ -634,7 +635,7 @@ std::string DefinitionWriter::writeMethod(MethodMeta* meta,
   const Type* retType = meta->signature[0];
 
   if (!methodDecl.isInstanceMethod() && owner->is(MetaType::Interface)) {
-    if ((retType->is(TypeInstancetype) ||
+    if ((retType->stripNullability()->is(TypeInstancetype) ||
          DefinitionWriter::hasClosedGenerics(*retType)) &&
         !skipGenerics) {
       output << getTypeParametersStringOrEmpty(
@@ -726,7 +727,8 @@ std::string DefinitionWriter::writeMethod(
   bool implementsProtocol =
       protocols.find(static_cast<ProtocolMeta*>(memberOwner)) !=
       protocols.end();
-  bool returnsInstanceType = method->signature[0]->is(TypeInstancetype);
+  bool returnsInstanceType =
+      method->signature[0]->stripNullability()->is(TypeInstancetype);
 
   if (isOwnMethod || implementsProtocol || returnsInstanceType) {
     output << writeMethod(method, owner, canUseThisType);
@@ -939,7 +941,8 @@ std::string DefinitionWriter::localizeReference(const ::Meta::Meta& meta) {
   return localizeReference(meta.jsName, meta.module->getFullModuleName());
 }
 
-bool DefinitionWriter::hasClosedGenerics(const Type& type) {
+bool DefinitionWriter::hasClosedGenerics(const Type& typeIn) {
+  const Type& type = *typeIn.stripNullability();
   if (type.is(TypeInterface)) {
     const InterfaceType& interfaceType = type.as<InterfaceType>();
     return interfaceType.typeArguments.size();
@@ -1005,10 +1008,11 @@ std::string DefinitionWriter::tsifyType(const Type& type,
              tsifyType(*type.as<IncompleteArrayType>().innerType) + ">";
     case TypePointer: {
       const PointerType& pointerType = type.as<PointerType>();
-      std::string result = (pointerType.innerType->is(TypeVoid))
-                               ? "interop.Pointer | interop.Reference<any>"
-                               : "interop.Pointer | interop.Reference<" +
-                                     tsifyType(*pointerType.innerType) + ">";
+      std::string result =
+          (pointerType.innerType->stripNullability()->is(TypeVoid))
+              ? "interop.Pointer | interop.Reference<any>"
+              : "interop.Pointer | interop.Reference<" +
+                    tsifyType(*pointerType.innerType) + ">";
       if (isFuncParam) {
         result += " | ArrayBufferLike | ArrayBufferView";
       }
@@ -1134,7 +1138,7 @@ std::string DefinitionWriter::tsifyType(const Type& type,
       return type.as<TypeArgumentType>().name;
     case TypeNullable: {
       const NullableType& nullableType = type.as<NullableType>();
-      if (nullableType.innerType->is(TypePointer)) {
+      if (nullableType.innerType->stripNullability()->is(TypePointer)) {
         return tsifyType(*nullableType.innerType, isFuncParam);
       }
       return tsifyType(*nullableType.innerType, isFuncParam) + " | null";
@@ -1157,7 +1161,7 @@ std::string DefinitionWriter::tsifyType(const Type& type,
 std::string DefinitionWriter::computeMethodReturnType(
     const Type* retType, const BaseClassMeta* owner, bool instanceMember) {
   std::ostringstream output;
-  if (retType->is(TypeInstancetype)) {
+  if (retType->stripNullability()->is(TypeInstancetype)) {
     if (instanceMember) {
       output << "this";
     } else {

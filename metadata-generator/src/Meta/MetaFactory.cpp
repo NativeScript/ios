@@ -269,7 +269,7 @@ void MetaFactory::createFromFunction(const clang::FunctionDecl& function,
   // Clang doesn't handle The Create Rule automatically like for methods, so we
   // have to do it manually
   if (!(returnsRetained || returnsNotRetained) &&
-      functionMeta.signature[0]->is(TypeBridgedInterface)) {
+      functionMeta.signature[0]->stripNullability()->is(TypeBridgedInterface)) {
     if (function.hasAttr<clang::CFAuditedTransferAttr>()) {
       std::string functionName = function.getNameAsString();
       if (functionName.find("Create") != string::npos ||
@@ -490,23 +490,19 @@ void MetaFactory::createFromMethod(const clang::ObjCMethodDecl& method,
                       isNullTerminatedVariadic);
 
   // set MethodHasErrorOutParameter flag
+  // Nullability annotations (`NSError * _Nullable * _Nullable`) are wrapper
+  // nodes in the type tree, so strip them before inspecting the structure.
   if (method.parameters().size() > 0) {
     clang::ParmVarDecl* lastParameter =
         method.parameters()[method.parameters().size() - 1];
     Type* type = _typeFactory.create(lastParameter->getType()).get();
-    if (type != nullptr && (type->is(TypeType::TypeNullable) ||
-                            type->is(TypeType::TypeNonNullable))) {
-      type = type->is(TypeType::TypeNullable)
-                 ? type->as<NullableType>().innerType
-                 : type->as<NonNullableType>().innerType;
+    if (type != nullptr) {
+      type = type->stripNullability();
     }
     if (type != nullptr && type->is(TypeType::TypePointer)) {
       Type* innerType = type->as<PointerType>().innerType;
-      if (innerType != nullptr && (innerType->is(TypeType::TypeNullable) ||
-                                   innerType->is(TypeType::TypeNonNullable))) {
-        innerType = innerType->is(TypeType::TypeNullable)
-                        ? innerType->as<NullableType>().innerType
-                        : innerType->as<NonNullableType>().innerType;
+      if (innerType != nullptr) {
+        innerType = innerType->stripNullability();
       }
       if (innerType != nullptr && innerType->is(TypeType::TypeInterface) &&
           innerType->as<InterfaceType>().interface->jsName == "NSError") {
