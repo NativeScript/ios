@@ -579,10 +579,16 @@ void URLSearchParamsImpl::Append(
   if (ptr == nullptr) {
     return;
   }
-  auto isolate = args.GetIsolate();
-  auto key = tns::ToString(isolate, args[0].As<v8::String>());
-  auto value = tns::ToString(isolate, args[1].As<v8::String>());
-  ptr->GetURLSearchParams()->append(key.c_str(), value.c_str());
+  // Both arguments are USVStrings (url.bs:3860); a Symbol or throwing
+  // toString leaves the pending exception and aborts.
+  auto context = args.GetIsolate()->GetCurrentContext();
+  std::string key;
+  std::string value;
+  if (!ValueToString(context, args[0], key) ||
+      !ValueToString(context, args[1], value)) {
+    return;
+  }
+  ptr->GetURLSearchParams()->append(key, value);
 }
 
 void URLSearchParamsImpl::Delete(
@@ -755,12 +761,16 @@ void URLSearchParamsImpl::Set(const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (ptr == nullptr) {
     return;
   }
-  auto key = args[0].As<v8::String>();
-  auto value = args[1].As<v8::String>();
-
-  auto isolate = args.GetIsolate();
-  ptr->GetURLSearchParams()->set(tns::ToString(isolate, key),
-                                 tns::ToString(isolate, value));
+  // Both arguments are USVStrings (url.bs:3865); a Symbol or throwing
+  // toString leaves the pending exception and aborts.
+  auto context = args.GetIsolate()->GetCurrentContext();
+  std::string key;
+  std::string value;
+  if (!ValueToString(context, args[0], key) ||
+      !ValueToString(context, args[1], value)) {
+    return;
+  }
+  ptr->GetURLSearchParams()->set(key, value);
 }
 
 void URLSearchParamsImpl::GetSize(
