@@ -72,6 +72,20 @@ describe(module.id, function () {
         expect(res[0].constructor.name).toEqual("NSURL");
     });
 
+    it("indexed access works for non-NSArray indexable collections", function () {
+        // NSOrderedSet is not an NSArray but responds to count + objectAtIndex:,
+        // so obj[i] should resolve the same elements as objectAtIndex(i).
+        const set = NSOrderedSet.orderedSetWithArray(['a', 'b', 'c']);
+        expect(set.count).toBe(3);
+        expect(set[0]).toBe(set.objectAtIndex(0));
+        expect(set[1]).toBe(set.objectAtIndex(1));
+        expect(set[2]).toBe(set.objectAtIndex(2));
+        expect(set[0]).toBe('a');
+        expect(set[2]).toBe('c');
+        // Out-of-range index returns undefined instead of throwing.
+        expect(set[3]).toBeUndefined();
+    });
+
     it("MethodCalledInDealloc", function () {
         expect(function () {
             (function () {
