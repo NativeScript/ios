@@ -1131,16 +1131,18 @@ Intercepted ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
 
   ObjCDataWrapper* objcDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
   id target = objcDataWrapper->Data();
-  if (![target isKindOfClass:[NSArray class]]) {
+  // Treat anything that can report a count and return elements by index as
+  // indexable, not just NSArray (e.g. PHFetchResult, NSOrderedSet).
+  if (![target respondsToSelector:@selector(count)] ||
+      ![target respondsToSelector:@selector(objectAtIndex:)]) {
     return v8::Intercepted::kNo;
   }
 
-  NSArray* array = (NSArray*)target;
-  if (index >= [array count]) {
+  if (index >= [target count]) {
     return v8::Intercepted::kNo;
   }
 
-  id obj = [array objectAtIndex:index];
+  id obj = [target objectAtIndex:index];
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   auto it = cache->Instances.find(obj);
