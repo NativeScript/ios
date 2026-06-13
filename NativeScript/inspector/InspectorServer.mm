@@ -47,7 +47,7 @@ in_port_t InspectorServer::Init(
         dispatch_io_t channel =
             dispatch_io_create(DISPATCH_IO_STREAM, clientSocket, q, ^(int error) {
               if (error) {
-                NSLog(@"Error: %s", strerror(error));
+                NSLog(@"InspectorServer channel cleanup error: %s", strerror(error));
               }
               close(clientSocket);
             });
@@ -56,11 +56,12 @@ in_port_t InspectorServer::Init(
 
         __block dispatch_io_handler_t receiver = ^(bool done, dispatch_data_t data, int error) {
           if (error) {
-            NSLog(@"Error: %s", strerror(error));
+            NSLog(@"InspectorServer read message header error: %s", strerror(error));
           }
 
           const void* bytes = [(NSData*)data bytes];
           if (!bytes) {
+            dispatch_io_close(channel, DISPATCH_IO_STOP);
             return;
           }
 
@@ -73,7 +74,7 @@ in_port_t InspectorServer::Init(
           dispatch_io_read(channel, 0, length, q, ^(bool done, dispatch_data_t data, int error) {
             BOOL close = NO;
             if (error) {
-              NSLog(@"Error: %s", strerror(error));
+              NSLog(@"InspectorServer read message body error: %s", strerror(error));
               close = YES;
             }
 
@@ -102,7 +103,7 @@ in_port_t InspectorServer::Init(
           dispatch_io_read(channel, 0, 4, q, receiver);
         }
       } else {
-        NSLog(@"accept() failed;\n");
+        NSLog(@"InspectorServer accept() failed");
       }
     }
   });
@@ -143,7 +144,7 @@ void InspectorServer::Send(dispatch_io_t channel, dispatch_queue_t queue,
 
   dispatch_io_write(channel, 0, data, queue, ^(bool done, dispatch_data_t data, int error) {
     if (error) {
-      NSLog(@"Error: %s", strerror(error));
+      NSLog(@"InspectorServer::Send error: %s", strerror(error));
     }
   });
 }
