@@ -294,7 +294,8 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
   } else if (value->IsString()) {
     if (type == BinaryTypeEncodingType::IdEncoding ||
         type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-      id data = tns::ToNSString(isolate, value);
+      std::u16string strValue = tns::ToUtf16String(isolate, value);
+      id data = [NSString stringWithCharacters:(const unichar*)strValue.data() length:strValue.size()];
       // this feels wrong but follows the other CFBridgingRetain calls
       // and also solves a leak
       auto ref = CFBridgingRetain(data);
@@ -929,8 +930,8 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
   }
 
   if ([obj isKindOfClass:[NSString class]]) {
-    const char* str = [obj UTF8String];
-    args.GetReturnValue().Set(tns::ToV8String(isolate, str));
+    NSString* nativeStr = (NSString*)obj;
+    args.GetReturnValue().Set(tns::ToV8String(isolate, nativeStr));
     return;
   }
 
