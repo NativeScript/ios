@@ -1734,7 +1734,14 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
     [request setValue:@"close" forHTTPHeaderField:@"Connection"];
     [request setCachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData];
     [request setHTTPShouldHandleCookies:NO];
+    // `setHTTPShouldUsePipelining:` is deprecated on visionOS 2.4+ (classic
+    // loader only). Passing NO matches the default — pipelining is already
+    // off — so this is intent-preserving on every platform; suppress the
+    // deprecation so the -Werror visionOS build keeps compiling.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [request setHTTPShouldUsePipelining:NO];
+#pragma clang diagnostic pop
     [[NSURLCache sharedURLCache] removeCachedResponseForRequest:request];
 
     NSURLResponse* response = nil;
