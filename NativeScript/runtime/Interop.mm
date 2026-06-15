@@ -324,8 +324,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
   } else if (argHelper.isString() &&
              (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
               typeEncoding->type == BinaryTypeEncodingType::IdEncoding)) {
-    std::u16string str = tns::ToUtf16String(isolate, arg);
-    NSString* result = [NSString stringWithCharacters:(const unichar*)str.data() length:str.size()];
+    NSString* result = tns::ToNSString(isolate, arg);
     Interop::SetValue(dest, result);
   } else if (Interop::IsNumbericType(typeEncoding->type) || tns::IsNumber(arg)) {
     double value = tns::ToNumber(isolate, arg);
@@ -687,8 +686,7 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
     return nil;
   } else if (tns::IsString(arg)) {
-    std::u16string value = tns::ToUtf16String(isolate, arg);
-    NSString* result = [NSString stringWithCharacters:(const unichar*)value.data() length:value.size()];
+    NSString* result = tns::ToNSString(isolate, arg);
     return result;
   } else if (tns::IsNumber(arg)) {
     double value = tns::ToNumber(isolate, arg);

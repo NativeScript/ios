@@ -294,8 +294,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
   } else if (value->IsString()) {
     if (type == BinaryTypeEncodingType::IdEncoding ||
         type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-      std::u16string strValue = tns::ToUtf16String(isolate, value);
-      id data = [NSString stringWithCharacters:(const unichar*)strValue.data() length:strValue.size()];
+      id data = tns::ToNSString(isolate, value);
       // this feels wrong but follows the other CFBridgingRetain calls
       // and also solves a leak
       auto ref = CFBridgingRetain(data);

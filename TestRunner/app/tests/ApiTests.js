@@ -45,6 +45,23 @@ describe(module.id, function () {
         expect(codeUnit).toBe(0xDC00); // 0xFFFD (65533) after a lossy UTF-8 round-trip
     });
 
+    it("preserves an embedded NUL when bridging a JS string to NSString", function () {
+        // U+0000 is a valid JS code unit but terminates a C string, so a bridge
+        // that went through char* would cut "a\0b" down to "a". Faithful UTF-16
+        // bridging keeps all three units. Read the NUL unit straight out of the
+        // NSString's buffer so the check does not lean on a native-to-JS conversion.
+        var withNul = "a" + String.fromCharCode(0) + "b";
+        var ns = NSString.stringWithString(withNul);
+        expect(ns.length).toBe(3);
+
+        var buffer = interop.alloc(interop.sizeof(interop.types.uint16));
+        ns.getCharactersRange(buffer, NSMakeRange(1, 1));
+        var codeUnit = new interop.Reference(interop.types.uint16, buffer).value;
+        interop.free(buffer);
+
+        expect(codeUnit).toBe(0x0000); // a char* bridge would have stopped before this
+    });
+
     it("NSArray from native (uncached) array access", function () {
         const res = TNSObjCTypes.new().getNSArrayOfNSURLs();
         console.log(res);
