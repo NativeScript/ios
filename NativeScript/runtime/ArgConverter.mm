@@ -1210,6 +1210,17 @@ Intercepted ArgConverter::IndexedPropertySetterCallback(
   ObjCDataWrapper* objcDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
   id target = objcDataWrapper->Data();
   if (![target isKindOfClass:[NSMutableArray class]]) {
+    // Indexed assignment is only supported for NSMutableArray. Other indexable
+    // collections (e.g. NSOrderedSet, PHFetchResult) reject the write so it can't be
+    // silently dropped into an unreachable JS property on the wrapper. NSArray is
+    // excluded from the throw and falls through to a silent no-op.
+    if ([target respondsToSelector:@selector(count)] &&
+        [target respondsToSelector:@selector(objectAtIndex:)] &&
+        ![target isKindOfClass:[NSArray class]]) {
+      isolate->ThrowException(Exception::TypeError(
+          tns::ToV8String(isolate, "Indexed assignment is only supported for NSMutableArray")));
+      return v8::Intercepted::kYes;
+    }
     return v8::Intercepted::kNo;
   }
 
