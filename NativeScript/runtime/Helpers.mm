@@ -24,13 +24,26 @@ uint8_t* BinBuffer = new uint8_t[BUFFER_SIZE];
 }  // namespace
 
 std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
-  std::string valueStr = tns::ToString(isolate, value);
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-  // FIXME: std::codecvt_utf8_utf16 is deprecated
-  std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-  std::u16string value16 = convert.from_bytes(valueStr);
+  // Read the V8 string's native UTF-16 buffer directly instead of round-tripping
+  // through UTF-8, which corrupts lone surrogates (replaced with U+FFFD) and is
+  // slower. This also drops the deprecated std::codecvt_utf8_utf16.
+  if (value.IsEmpty()) {
+    return std::u16string();
+  }
 
-  return value16;
+  if (value->IsStringObject()) {
+    Local<v8::String> obj = value.As<StringObject>()->ValueOf();
+    return tns::ToUtf16String(isolate, obj);
+  }
+
+  v8::String::Value result(isolate, value);
+
+  uint16_t* val = *result;
+  if (val == nullptr) {
+    return std::u16string();
+  }
+
+  return std::u16string((char16_t*)val, result.length());
 }
 
 std::vector<uint16_t> tns::ToVector(const std::string& value) {
