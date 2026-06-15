@@ -86,6 +86,31 @@ describe(module.id, function () {
         expect(set[3]).toBeUndefined();
     });
 
+    it("indexed assignment throws for read-only indexable collections", function () {
+        const set = NSOrderedSet.orderedSetWithArray(['a', 'b', 'c']);
+        // NSOrderedSet is indexable but not writable, so indexed assignment throws.
+        // The index is irrelevant; the whole collection rejects writes.
+        expect(function () { set[0] = 'ghost'; }).toThrowError(TypeError, /Indexed assignment is only supported for NSMutableArray/);
+        expect(function () { set[5] = 'ghost'; }).toThrowError(TypeError);
+        // The rejected out-of-range write left no stray JS property behind, the native
+        // collection is untouched, and reads still resolve native elements.
+        expect(Object.prototype.hasOwnProperty.call(set, '5')).toBe(false);
+        expect(set.count).toBe(3);
+        expect(set[0]).toBe('a');
+        expect(set[5]).toBeUndefined();
+    });
+
+    it("indexed assignment still works for NSMutableArray", function () {
+        const first = NSObject.new();
+        const arr = NSMutableArray.arrayWithArray([first, NSObject.new()]);
+        const replacement = NSObject.new();
+
+        arr[0] = replacement;
+        expect(arr.count).toBe(2);
+        expect(arr.objectAtIndex(0)).toBe(replacement);
+        expect(arr[0]).toBe(replacement);
+    });
+
     it("MethodCalledInDealloc", function () {
         expect(function () {
             (function () {
