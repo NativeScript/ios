@@ -502,4 +502,54 @@ describe("HTTP ESM Loader", function() {
     });
 });
 
+// Focused, deterministic coverage for the native HTTP canonical-key function.
+// These run only in debug builds, where HMRSupport.mm installs the
+// `__nsCanonicalizeHttpUrlKey` diagnostic global; in release they self-skip via
+// pending(). They require no HTTP host — they pin pure string identity behavior.
+describe("HTTP canonical key (native __nsCanonicalizeHttpUrlKey)", function () {
+    function getCanon() {
+        return (typeof global !== "undefined") ? global.__nsCanonicalizeHttpUrlKey : undefined;
+    }
+
+    function checkKey(input, expected) {
+        var canon = getCanon();
+        if (typeof canon !== "function") {
+            pending("__nsCanonicalizeHttpUrlKey not installed (release build)");
+            return;
+        }
+        expect(canon(input)).toBe(expected);
+    }
+
+    it("is installed as a function in debug builds", function () {
+        var canon = getCanon();
+        if (typeof canon !== "function") {
+            pending("__nsCanonicalizeHttpUrlKey not installed (release build)");
+            return;
+        }
+        expect(typeof canon).toBe("function");
+    });
+
+    it("drops dev cache-busters (t/v/import) but keeps real query params", function () {
+        checkKey("http://h/ns/core?p=x&t=123&v=9&import=1", "http://h/ns/core?p=x");
+    });
+
+    it("leaves public (non-dev, non-volatile) URLs untouched", function () {
+        checkKey("https://cdn.example.com/lib.js?token=abc", "https://cdn.example.com/lib.js?token=abc");
+    });
+
+    it("strips boot and hmr tags to the canonical /ns/m path", function () {
+        checkKey("http://h/ns/m/__ns_boot__/b1/foo.js", "http://h/ns/m/foo.js");
+        checkKey("http://h/ns/m/__ns_hmr__/v7/foo.js", "http://h/ns/m/foo.js");
+    });
+
+    it("collapses versioned bridge endpoints to their base path", function () {
+        checkKey("http://h/ns/rt/42", "http://h/ns/rt");
+        checkKey("http://h/ns/core/13", "http://h/ns/core");
+    });
+
+    it("ignores URL fragments for dev endpoints", function () {
+        checkKey("http://h/ns/m/foo.js#frag", "http://h/ns/m/foo.js");
+    });
+});
+
 console.log("HTTP ESM Loader tests loaded");
