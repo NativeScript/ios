@@ -32,8 +32,6 @@
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
 #include <vector>
-#include "HMRSupport.h"
-#include "DevFlags.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
