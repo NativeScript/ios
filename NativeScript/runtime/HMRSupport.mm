@@ -3209,6 +3209,31 @@ void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> contex
       InitializeHotDisposeRunner(isolate, context);
       InitializeHotPruneRunner(isolate, context);
       InitializeHotDeclinedHelper(isolate, context);
+
+      // Debug-only diagnostic: expose the HTTP canonical-key function to JS so
+      // the test harness can pin its identity behavior across cache-busters,
+      // boot/hmr tags, and versioned bridge endpoints. This is NOT part of the
+      // HMR client API surface and is never installed in release builds.
+      {
+        auto canonicalizeCb = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+          v8::Isolate* iso = info.GetIsolate();
+          if (info.Length() < 1 || !info[0]->IsString()) {
+            info.GetReturnValue().SetEmptyString();
+            return;
+          }
+          v8::String::Utf8Value u(iso, info[0]);
+          std::string key =
+              CanonicalizeHttpUrlKey(*u ? std::string(*u) : std::string());
+          info.GetReturnValue().Set(tns::ToV8String(iso, key.c_str()));
+        };
+        v8::Local<v8::Function> fn =
+            v8::Function::New(context, canonicalizeCb).ToLocalChecked();
+        context->Global()
+            ->CreateDataProperty(
+                context, tns::ToV8String(isolate, "__nsCanonicalizeHttpUrlKey"),
+                fn)
+            .Check();
+      }
     } catch (...) {
       // Don't crash if HMR setup fails
     }
