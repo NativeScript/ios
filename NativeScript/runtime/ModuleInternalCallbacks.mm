@@ -456,12 +456,40 @@ void SetVolatilePatterns(const std::vector<std::string>& patterns) {
   }
 }
 
-// Check if a URL matches any volatile pattern (should bypass cache).
-static bool IsVolatileUrl(const std::string& url) {
+// Single owner of the "must bypass the module-registry cache" policy.
+// Sources, in order:
+//
+//   1. Configured patterns (`volatilePatterns` from the dev-session boot
+//      payload or `__nsConfigureRuntime`) — substring match.
+//   2. Built-in default: component-update endpoints (`/@ng/component`) are
+//      inherently volatile — every save produces fresh metadata that must
+//      be re-fetched and re-compiled. Kept as a built-in (not config-only)
+//      until the supported @nativescript/vite floor ships it in
+//      `volatilePatterns`; then it can become plain config data too.
+//   3. Legacy fallback when no patterns are configured: SFC/ASM dev
+//      endpoints, with SFC `type=` sub-resource variants excluded —
+//      variants must stay cacheable within one import cycle so static
+//      resolution of a just-stored variant preserves module identity.
+bool IsVolatileUrl(const std::string& url) {
   for (const auto& pat : g_volatilePatterns) {
     if (url.find(pat) != std::string::npos) return true;
   }
+  if (url.find("/@ng/component") != std::string::npos) return true;
+  if (g_volatilePatterns.empty()) {
+    const bool isSfc = url.find("/@ns/sfc/") != std::string::npos;
+    const bool isAsm = url.find("/@ns/asm/") != std::string::npos;
+    const bool hasTypeVariant = url.find("type=script") != std::string::npos ||
+                                url.find("type=template") != std::string::npos ||
+                                url.find("type=style") != std::string::npos;
+    return (isSfc && !hasTypeVariant) || isAsm;
+  }
   return false;
+}
+
+// Log-filter for HMR cache diagnostics: app-module URLs (`ns/m/`) and
+// volatile endpoints are the interesting ones; vendor chunks are noise.
+static bool IsHmrCacheLogInterestingKey(const std::string& key) {
+  return key.find("ns/m/") != std::string::npos || IsVolatileUrl(key);
 }
 
 // Normalize a Vite-rewritten specifier into the canonical import-map key.
@@ -3052,37 +3080,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         Log(@"[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());
       }
       std::string key = CanonicalizeHttpUrlKey(normalizedSpec);
-      // Volatile pattern check: if the URL matches any configured volatile pattern,
-      // evict the cached module so we always re-fetch. This replaces the hardcoded
-      // /@ns/sfc/ and /@ns/asm/ checks with a configurable system.
+      // Volatile URLs bypass the registry: evict any cached entry so each
+      // dynamic import recompiles a fresh body. `IsVolatileUrl` owns the
+      // policy (configured patterns + built-in defaults). The registry key
+      // for volatile URLs is cache-buster-stripped (see
+      // CanonicalizeHttpUrlKey), so this evict really does replace the
+      // previous save's entry instead of missing it by timestamp.
       bool isVolatile = IsVolatileUrl(normalizedSpec);
-      // Backward compatibility: if no volatile patterns configured, fall back to
-      // hardcoded SFC/ASM detection
-      if (!isVolatile && g_volatilePatterns.empty()) {
-        bool specIsSfc = normalizedSpec.find("/@ns/sfc/") != std::string::npos;
-        bool specIsAsm = normalizedSpec.find("/@ns/asm/") != std::string::npos;
-        bool specHasTypeScript = normalizedSpec.find("type=script") != std::string::npos;
-        bool specHasTypeTemplate = normalizedSpec.find("type=template") != std::string::npos;
-        bool specHasTypeStyle = normalizedSpec.find("type=style") != std::string::npos;
-        bool isSfcVariant = specIsSfc && (specHasTypeScript || specHasTypeTemplate || specHasTypeStyle);
-        isVolatile = (specIsSfc && !isSfcVariant) || specIsAsm;
-      }
-      // Angular HMR component-update endpoint (`/@ng/component?c=<id>&t=<ts>`) is
-      // inherently volatile: each save produces fresh metadata that the runtime
-      // must re-fetch and re-compile so `ɵɵreplaceMetadata` sees the new
-      // template instructions. The `t` parameter discriminates versions, but
-      // even with `CanonicalizeHttpUrlKey` preserving it, every save would
-      // otherwise leave a stale module entry behind in `g_moduleRegistry`,
-      // accumulating one entry per save for the entire dev session. Marking it
-      // as volatile evicts the previous entry on every re-import so the cache
-      // stays bounded AND we always serve fresh metadata to
-      // `ɵɵreplaceMetadata`. Without this evict, the boot-time call's
-      // resolved module would shadow any subsequent fetch on a path-only
-      // canonicalization regression and surface as "first save's metadata
-      // permanently stuck on screen" — exactly the symptom this fixes.
-      if (!isVolatile && normalizedSpec.find("/@ng/component") != std::string::npos) {
-        isVolatile = true;
-      }
       if (isVolatile) {
         auto ex = g_moduleRegistry.find(key);
         if (ex != g_moduleRegistry.end()) {
@@ -3108,10 +3112,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         if (!existing.IsEmpty()) {
           // Permanent observability: surface every HTTP dynamic-import
           // cache hit so we can verify the runtime *did* drop the entry
-          // on invalidate. Filtered to angular component-shaped URLs to
+          // on invalidate. Filtered to app-module and volatile URLs to
           // avoid spam from vendor chunks. Verbose-gated.
           if (IsScriptLoadingLogEnabled()) {
-            if (key.find("ns/m/") != std::string::npos || key.find(".component") != std::string::npos) {
+            if (IsHmrCacheLogInterestingKey(key)) {
               Log(@"[ns-hmr][ios-dyn-cache] HIT %s status=%s",
                   key.c_str(), ModuleStatusToString(existing->GetStatus()));
             }
@@ -3224,10 +3228,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       g_httpDynamicWaiters[key].emplace_back(isolate, resolver);
       // Permanent observability: surface fresh fetches so we can confirm
       // that post-invalidation, the next dynamic import does NOT re-use
-      // the cache and DOES go to the network. Filtered to component
-      // shapes to avoid vendor-chunk noise. Verbose-gated.
-      if (IsScriptLoadingLogEnabled() &&
-          (key.find("ns/m/") != std::string::npos || key.find(".component") != std::string::npos)) {
+      // the cache and DOES go to the network. Filtered to app-module and
+      // volatile URLs to avoid vendor-chunk noise. Verbose-gated.
+      if (IsScriptLoadingLogEnabled() && IsHmrCacheLogInterestingKey(key)) {
         Log(@"[ns-hmr][ios-dyn-cache] FRESH-FETCH %s", key.c_str());
       }
       v8::MaybeLocal<v8::Module> modMaybe = LoadHttpModuleForUrl(isolate, context, normalizedSpec);

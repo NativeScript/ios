@@ -16,13 +16,24 @@ bool IsScriptLoadingLogEnabled() {
 
 // HTTP module loader flags
 
-// Reads `httpModulePrefetch` from app config (default: DISABLED).
+// Reads `httpModulePrefetch` from app config (default: ENABLED in debug
+// builds, disabled in release — release never uses the HTTP module
+// loader anyway).
 //
-// Apps that want to opt in for testing can set:
+// Why default-on for debug: the speculative prefetcher is what gives the
+// cold boot K-way fetch parallelism (see HMRSupport.mm). On the iOS
+// Simulator the serial fallback is tolerable (loopback fetches are
+// sub-millisecond), but on a PHYSICAL device fetching over Wi-Fi the
+// serial path multiplies real network round-trips by thousands of boot
+// modules — enough to blow past the ~20s launch watchdog, which then
+// kills the app before boot completes (works from Xcode only because
+// lldb disables the watchdog).
+//
+// Apps can still force it either way:
 //
 //   // nativescript.config.ts
 //   export default {
-//     httpModulePrefetch: true,
+//     httpModulePrefetch: false,   // explicit opt-out (or true to force on)
 //   } as NativeScriptConfig;
 //
 // Returning false here short-circuits both the cache lookup and the prefetch
@@ -31,21 +42,26 @@ bool IsHttpModulePrefetchEnabled() {
   static std::once_flag s_initFlag;
   static bool s_enabled = false;
   std::call_once(s_initFlag, []() {
+    const char* source = "build-default";
     @autoreleasepool {
       id value = Runtime::GetAppConfigValue("httpModulePrefetch");
       if (value && [value respondsToSelector:@selector(boolValue)]) {
         s_enabled = [value boolValue];
+        source = "config";
+      } else {
+        s_enabled = RuntimeConfig.IsDebug;
       }
     }
     // Startup banner. Gated on the logScriptLoading flag so it stays silent
     // by default — flip the flag in nativescript.config.ts when diagnosing
     // why prefetch is or isn't engaging.
     //
-    //   [http-loader] prefetch=disabled   ← expected default
-    //   [http-loader] prefetch=enabled    ← only if config opt-in
+    //   [http-loader] prefetch=enabled source=build-default   ← expected debug default
+    //   [http-loader] prefetch=disabled source=build-default  ← expected release default
+    //   [http-loader] prefetch=... source=config              ← explicit config override
     if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-loader] prefetch=%s shared-session=on hmr-kickstart=on",
-          s_enabled ? "enabled" : "disabled");
+      Log(@"[http-loader] prefetch=%s source=%s shared-session=on hmr-kickstart=on",
+          s_enabled ? "enabled" : "disabled", source);
     }
   });
   return s_enabled;

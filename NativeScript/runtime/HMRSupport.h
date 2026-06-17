@@ -168,9 +168,9 @@ void EvictHttpModulePrefetchCacheUrls(const std::vector<std::string>& urls);
 // thread until the BFS has fully drained or `timeoutSeconds` elapses.
 //
 // Designed to be invoked from JS (via `__nsKickstartHmrPrefetch`)
-// immediately before the Angular HMR client re-imports the entry —
-// by the time V8 walks the dep tree, every reachable body is already
-// in `g_prefetchCache` and the walk runs at memory speed instead of
+// immediately before the HMR client re-imports the entry — by the
+// time V8 walks the dep tree, every reachable body is already in
+// `g_prefetchCache` and the walk runs at memory speed instead of
 // network speed (turning a ~3s 200-fetch refresh into ~250ms).
 //
 // Returns `true` when the BFS drained cleanly. On timeout or seed
@@ -190,14 +190,14 @@ bool KickstartHmrPrefetchSync(const std::string& seedUrl,
 // variant above, this one fetches ONLY the explicit URL list it was
 // given (no body scanning, no BFS recursion).
 //
-// This is the right shape for HMR: the dev server's
-// `collectAngularEvictionUrls` already computed the inverse-dep
-// closure of the changed file; re-discovering it via in-process
-// scanning would just duplicate that work and re-fetch modules V8
-// has already compiled. By feeding the precomputed list directly we
-// turn N sequential `LoadHttpModuleForUrl` calls (the importer chain
-// during V8's ResolveModuleCallback walk) into a single parallel
-// wave that completes before V8 starts walking.
+// This is the right shape for HMR: the dev server already computed
+// the inverse-dep closure of the changed file (the update payload's
+// eviction set); re-discovering it via in-process scanning would just
+// duplicate that work and re-fetch modules V8 has already compiled.
+// By feeding the precomputed list directly we turn N sequential
+// `LoadHttpModuleForUrl` calls (the importer chain during V8's
+// ResolveModuleCallback walk) into a single parallel wave that
+// completes before V8 starts walking.
 //
 // Same semantics as `KickstartHmrPrefetchSync` for everything else:
 // blocks the calling thread until the wave drains or `timeoutSeconds`
@@ -240,10 +240,10 @@ void InitializeHotEventDispatcher(v8::Isolate* isolate, v8::Local<v8::Context> c
 
 // Drain and execute `import.meta.hot.dispose(cb)` callbacks for the given module
 // keys. If `keys` is empty, drains every registered callback across every module
-// (the right behaviour for whole-app HMR reboots like Angular's
-// `__reboot_ng_modules__`, where the entire JS realm's side effects are being
-// thrown away). Each callback is invoked with that module's `hot.data` object so
-// users can persist state across the reload (matches Vite spec).
+// (the right behaviour for whole-app HMR reboots, where the entire JS realm's
+// side effects are being thrown away). Each callback is invoked with that
+// module's `hot.data` object so users can persist state across the reload
+// (matches Vite spec).
 //
 // Callbacks are removed from the registry after execution so a second drain in
 // the same cycle is a clean no-op. Per-callback failures are logged (when
@@ -254,10 +254,10 @@ void InitializeHotEventDispatcher(v8::Isolate* isolate, v8::Local<v8::Context> c
 int RunHotDisposeCallbacks(v8::Isolate* isolate, v8::Local<v8::Context> context,
                            const std::vector<std::string>& keys);
 
-// Initialize the global `__nsRunHmrDispose([keys?])` function so the HMR client
-// (e.g. @nativescript/vite's Angular HMR client) can drain dispose callbacks
-// from JS. Mirrors the `InitializeHotEventDispatcher` pattern. Should be called
-// once per main isolate during runtime init, gated on dev mode.
+// Initialize the global `__nsRunHmrDispose([keys?])` function so HMR clients
+// (e.g. @nativescript/vite's) can drain dispose callbacks from JS. Mirrors the
+// `InitializeHotEventDispatcher` pattern. Should be called once per main
+// isolate during runtime init, gated on dev mode.
 //
 // JS signature: `__nsRunHmrDispose(keys?: string[]) => number`
 //   - `keys` omitted / null / undefined / empty array → drain everything.
@@ -276,10 +276,10 @@ int RunHotPruneCallbacks(v8::Isolate* isolate, v8::Local<v8::Context> context,
                          const std::vector<std::string>& keys);
 
 // Initialize the global `__nsRunHmrPrune([keys?])` function. Symmetric with
-// `__nsRunHmrDispose` but for `prune` callbacks. The Angular HMR client does
-// NOT call this today (its wholesale `__reboot_ng_modules__` model has no
-// per-module prune step), but the runner is plumbed end-to-end so future
-// per-module HMR clients have the entry point ready.
+// `__nsRunHmrDispose` but for `prune` callbacks. Clients with per-module
+// update models call this when modules leave the import graph;
+// wholesale-reboot clients have no prune step. Plumbed end-to-end so the
+// entry point is ready for either model.
 //
 // JS signature: `__nsRunHmrPrune(keys?: string[]) => number`
 void InitializeHotPruneRunner(v8::Isolate* isolate, v8::Local<v8::Context> context);
@@ -305,8 +305,9 @@ bool IsAnyModuleDeclined(const std::vector<std::string>& keys);
 
 // Initialize the global `__nsHasDeclinedModule([keys?])` function. Returns
 // `true` if any of the listed keys is declined (or if the declined set is
-// non-empty AND no keys were passed). The Angular HMR client calls this with
-// `evictPaths` before reboot; on `true` it falls back to `__nsReloadDevApp()`.
+// non-empty AND no keys were passed). HMR clients call this with the update's
+// eviction set (the wire payload's `evictPaths`) before applying; on `true`
+// they fall back to `__nsReloadDevApp()`.
 //
 // JS signature: `__nsHasDeclinedModule(keys?: string[]) => boolean`
 void InitializeHotDeclinedHelper(v8::Isolate* isolate, v8::Local<v8::Context> context);

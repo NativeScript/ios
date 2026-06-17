@@ -55,6 +55,15 @@ void SetImportMap(const std::string& json);
 // Set URL patterns that should bypass module cache (e.g. "/@ns/sfc/", "?v=")
 void SetVolatilePatterns(const std::vector<std::string>& patterns);
 
+// Returns true when `url` must bypass the module-registry cache: the
+// dynamic-import path evicts any cached entry before re-importing, so every
+// import recompiles a fresh body. Matches the configured volatile patterns
+// plus built-in defaults for dev-server endpoints whose response changes on
+// every save. Also consulted by `CanonicalizeHttpUrlKey`: volatile URLs get
+// the cache-buster-stripped registry key so the evict-before-import finds
+// and replaces the previous save's entry instead of missing it by timestamp.
+bool IsVolatileUrl(const std::string& url);
+
 // Clear import map state and vendor module cache. Must be called before isolate disposal.
 void CleanupImportMapGlobals();
 
