@@ -409,33 +409,40 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
 
 void SetImportMap(const std::string& json) {
   g_importMap.clear();
-  // Minimal JSON parser for {"imports": {"key": "value", ...}} shape.
-  // We avoid pulling in a full JSON library; the import map is simple flat key-value.
-  size_t importsPos = json.find("\"imports\"");
-  if (importsPos == std::string::npos) return;
-  size_t braceOpen = json.find('{', importsPos + 9);
-  if (braceOpen == std::string::npos) return;
-  size_t braceClose = json.find('}', braceOpen + 1);
-  if (braceClose == std::string::npos) return;
-
-  std::string inner = json.substr(braceOpen + 1, braceClose - braceOpen - 1);
-  // Parse "key": "value" pairs
-  size_t pos = 0;
-  while (pos < inner.size()) {
-    size_t keyStart = inner.find('"', pos);
-    if (keyStart == std::string::npos) break;
-    size_t keyEnd = inner.find('"', keyStart + 1);
-    if (keyEnd == std::string::npos) break;
-    std::string key = inner.substr(keyStart + 1, keyEnd - keyStart - 1);
-
-    size_t valStart = inner.find('"', keyEnd + 1);
-    if (valStart == std::string::npos) break;
-    size_t valEnd = inner.find('"', valStart + 1);
-    if (valEnd == std::string::npos) break;
-    std::string val = inner.substr(valStart + 1, valEnd - valStart - 1);
-
-    g_importMap[key] = val;
-    pos = valEnd + 1;
+  // The import map is a small, flat {"imports": {"specifier": "target", ...}}
+  // object. Parse it with Foundation's JSON reader rather than a hand-rolled
+  // scanner so escapes, nesting, and malformed input are handled correctly and
+  // can't desync key/value pairing.
+  @autoreleasepool {
+    NSData* data = [NSData dataWithBytes:json.data() length:json.size()];
+    if (data == nil || data.length == 0) {
+      return;
+    }
+    NSError* err = nil;
+    id parsed = [NSJSONSerialization JSONObjectWithData:data
+                                                options:kNilOptions
+                                                  error:&err];
+    if (parsed == nil || ![parsed isKindOfClass:[NSDictionary class]]) {
+      if (IsScriptLoadingLogEnabled()) {
+        NSString* detail = err.localizedDescription ?: @"not an object";
+        Log(@"[import-map] parse failed: %s", [detail UTF8String] ?: "unknown");
+      }
+      return;
+    }
+    id imports = [(NSDictionary*)parsed objectForKey:@"imports"];
+    if (![imports isKindOfClass:[NSDictionary class]]) {
+      return;  // no "imports" object → empty map, same as the prior parser
+    }
+    for (id key in (NSDictionary*)imports) {
+      if (![key isKindOfClass:[NSString class]]) continue;
+      id value = [(NSDictionary*)imports objectForKey:key];
+      if (![value isKindOfClass:[NSString class]]) continue;  // skip non-string targets
+      const char* k = [(NSString*)key UTF8String];
+      const char* v = [(NSString*)value UTF8String];
+      if (k != nullptr && v != nullptr) {
+        g_importMap[std::string(k)] = std::string(v);
+      }
+    }
   }
   if (IsScriptLoadingLogEnabled()) {
     Log(@"[import-map] loaded %lu entries", (unsigned long)g_importMap.size());
