@@ -661,6 +661,35 @@ describe(module.id, function () {
         expect(TNSReturnsRetained.newNSObjectMethod().retainCount()).toBe(1);
     });
 
+    it("takes ownership of +0 stack blocks returned from native", function () {
+        // Regression for the native-block ownership bug. blockCapturing: returns a
+        // +0 __NSStackBlock__ capturing its argument. A correct runtime Block_copy's
+        // each one into its own distinct heap block. The buggy CFRetain path does
+        // NOT promote a stack block to the heap, so all three wrappers are left
+        // pointing at the same (reused) stack slot and alias each other - reading
+        // whichever value was written last (and a later CFRelease would fault on
+        // the dead frame). See Interop::GetResult and ObjectManager::DisposeValue.
+        var b1 = TNSReturnsRetained.blockCapturing(11);
+        var b2 = TNSReturnsRetained.blockCapturing(22);
+        var b3 = TNSReturnsRetained.blockCapturing(33);
+
+        // On the fixed runtime each block is an independent heap copy.
+        expect(b1()).toBe(11);
+        expect(b2()).toBe(22);
+        expect(b3()).toBe(33);
+
+        // The wrappers must also be safely releasable on GC (Block_release of a
+        // heap copy vs. CFRelease of a dead stack frame).
+        b1 = b2 = b3 = null;
+        __collect();
+        var sink = 0;
+        for (var i = 0; i < 100000; i++) {
+            sink += i % 7;
+        }
+        __collect();
+        expect(sink).toBeGreaterThan(0);
+    });
+
     it("unmanaged", function () {
         var unmanaged = functionReturnsUnmanaged();
         expect('takeRetainedValue' in unmanaged).toBe(true);

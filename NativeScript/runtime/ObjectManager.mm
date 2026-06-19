@@ -1,4 +1,5 @@
 #include "ObjectManager.h"
+#include <Block.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <sstream>
 #include "Caches.h"
@@ -108,10 +109,12 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
     case WrapperType::Block: {
       BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
       if (blockWrapper->OwnsBlock()) {
-        // Balance the CFRetain taken when a native block was wrapped for JS
-        // (see Interop::GetResult). This runs the block's dispose helper if
-        // we held the last reference.
-        CFRelease(blockWrapper->Block());
+        // Balance the Block_copy taken when a native block was wrapped for JS
+        // (see Interop::GetResult). Block_release is the correct counterpart to
+        // Block_copy and runs the block's dispose helper once we drop the last
+        // reference. (Using CFRelease here over-released stack blocks that were
+        // never promoted to the heap, crashing in objc_release during GC.)
+        Block_release(blockWrapper->Block());
       }
       // Blocks created from JS callbacks (OwnsBlock() == false) are owned by
       // the native code they were handed to (e.g. NSNotificationCenter);
