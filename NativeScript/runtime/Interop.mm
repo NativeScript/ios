@@ -1055,11 +1055,17 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
       return callback;
     }
 
-    BlockWrapper* blockWrapper = new BlockWrapper(block, typeEncoding, true);
+    // Take ownership of the returned block. Block_copy (not CFRetain) is the
+    // correct primitive here: a block returned by a native method is +0 and may
+    // still be a stack block. CFRetain does not promote a stack block to the
+    // heap, so releasing it later (during GC, on a different stack) would touch a
+    // dead frame and crash in objc_release. Block_copy moves it to the heap (or
+    // just bumps the refcount when it is already a heap/global block); the
+    // matching Block_release runs in ObjectManager::DisposeValue.
+    JSBlock* ownedBlock = reinterpret_cast<JSBlock*>(Block_copy(block));
+    BlockWrapper* blockWrapper = new BlockWrapper(ownedBlock, typeEncoding, true);
     Local<External> ext = External::New(isolate, blockWrapper);
     Local<v8::Function> callback;
-
-    CFRetain(block);
 
     bool success =
         v8::Function::New(
