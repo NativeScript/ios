@@ -929,8 +929,8 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
   }
 
   if ([obj isKindOfClass:[NSString class]]) {
-    const char* str = [obj UTF8String];
-    args.GetReturnValue().Set(tns::ToV8String(isolate, str));
+    NSString* nativeStr = (NSString*)obj;
+    args.GetReturnValue().Set(tns::ToV8String(isolate, nativeStr));
     return;
   }
 

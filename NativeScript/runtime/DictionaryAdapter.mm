@@ -116,8 +116,7 @@ using namespace tns;
         bool success = properties->Get(context, (uint)self->index_).ToLocal(&value);
         tns::Assert(success, isolate);
         self->index_++;
-        std::string result = tns::ToString(isolate, value);
-        return [NSString stringWithUTF8String:result.c_str()];
+        return tns::ToNSString(isolate, value);
     }
 
     return nil;
@@ -139,8 +138,7 @@ using namespace tns;
         Local<Value> value;
         bool success = properties->Get(context, i).ToLocal(&value);
         tns::Assert(success, isolate);
-        std::string result = tns::ToString(isolate, value);
-        [array addObject:[NSString stringWithUTF8String:result.c_str()]];
+        [array addObject:tns::ToNSString(isolate, value)];
     }
 
     return array;
@@ -214,7 +212,7 @@ using namespace tns;
         bool success = obj->Get(context, key).ToLocal(&value);
         tns::Assert(success, isolate);
     } else if ([aKey isKindOfClass:[NSString class]]) {
-        const char* key = [aKey UTF8String];
+        NSString* key = (NSString*)aKey;
         Local<v8::String> keyV8Str = tns::ToV8String(isolate, key);
 
         if (obj->IsMap()) {

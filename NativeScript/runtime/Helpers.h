@@ -106,8 +106,8 @@ inline NSString* ToNSString(const std::string& v) {
                                    length:v.length()
                                  encoding:NSUTF8StringEncoding] S_AUTORELEASE];
 }
-// this method is a copy of ToString to avoid needless std::string<->NSString
-// conversions
+// Reads the V8 string's native UTF-16 buffer directly so lone surrogates and
+// embedded NUL survive the bridge; a UTF-8 round-trip loses both.
 inline NSString* ToNSString(v8::Isolate* isolate,
                             const v8::Local<v8::Value>& value) {
   if (value.IsEmpty()) {
@@ -119,16 +119,15 @@ inline NSString* ToNSString(v8::Isolate* isolate,
     return ToNSString(isolate, obj);
   }
 
-  v8::String::Utf8Value result(isolate, value);
+  v8::String::Value result(isolate, value);
 
-  const char* val = *result;
+  const uint16_t* val = *result;
   if (val == nullptr) {
     return @"";
   }
 
-  return [[[NSString alloc] initWithBytes:*result
-                                   length:result.length()
-                                 encoding:NSUTF8StringEncoding] S_AUTORELEASE];
+  return [NSString stringWithCharacters:(const unichar*)val
+                                 length:result.length()];
 }
 #endif
 std::u16string ToUtf16String(v8::Isolate* isolate,

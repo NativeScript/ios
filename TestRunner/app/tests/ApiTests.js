@@ -12,6 +12,56 @@ describe(module.id, function () {
         expect(object.hash).toBe(3);
     });
 
+    it("preserves a lone high surrogate when bridging a JS string to NSString", function () {
+        // A lone high surrogate (U+D834, range U+D800-U+DBFF) is a valid JS string
+        // code unit but has no UTF-8 encoding. The old UTF-8 round-trip replaced it
+        // with U+FFFD; faithful UTF-16 bridging keeps it. Read the code unit straight
+        // out of the bridged string's UTF-16 buffer as a number: reading it back as a
+        // JS string would re-corrupt a lone surrogate, and converting it to UTF-8 to
+        // measure it is not reliable across OS versions.
+        var ns = NSString.stringWithString("\uD834");
+        expect(ns.length).toBe(1);
+
+        var buffer = interop.alloc(interop.sizeof(interop.types.uint16));
+        ns.getCharactersRange(buffer, NSMakeRange(0, 1));
+        var codeUnit = new interop.Reference(interop.types.uint16, buffer).value;
+        interop.free(buffer);
+
+        expect(codeUnit).toBe(0xD834); // 0xFFFD (65533) after a lossy UTF-8 round-trip
+    });
+
+    it("preserves a lone low surrogate when bridging a JS string to NSString", function () {
+        // The low surrogate range (U+DC00-U+DFFF) is a different bit pattern that also
+        // has no UTF-8 encoding and must survive the bridge intact; observed the same
+        // way as the high-surrogate case above.
+        var ns = NSString.stringWithString("\uDC00");
+        expect(ns.length).toBe(1);
+
+        var buffer = interop.alloc(interop.sizeof(interop.types.uint16));
+        ns.getCharactersRange(buffer, NSMakeRange(0, 1));
+        var codeUnit = new interop.Reference(interop.types.uint16, buffer).value;
+        interop.free(buffer);
+
+        expect(codeUnit).toBe(0xDC00); // 0xFFFD (65533) after a lossy UTF-8 round-trip
+    });
+
+    it("preserves an embedded NUL when bridging a JS string to NSString", function () {
+        // U+0000 is a valid JS code unit but terminates a C string, so a bridge
+        // that went through char* would cut "a\0b" down to "a". Faithful UTF-16
+        // bridging keeps all three units. Read the NUL unit straight out of the
+        // NSString's buffer so the check does not lean on a native-to-JS conversion.
+        var withNul = "a" + String.fromCharCode(0) + "b";
+        var ns = NSString.stringWithString(withNul);
+        expect(ns.length).toBe(3);
+
+        var buffer = interop.alloc(interop.sizeof(interop.types.uint16));
+        ns.getCharactersRange(buffer, NSMakeRange(1, 1));
+        var codeUnit = new interop.Reference(interop.types.uint16, buffer).value;
+        interop.free(buffer);
+
+        expect(codeUnit).toBe(0x0000); // a char* bridge would have stopped before this
+    });
+
     it("NSArray from native (uncached) array access", function () {
         const res = TNSObjCTypes.new().getNSArrayOfNSURLs();
         console.log(res);
