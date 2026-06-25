@@ -1,13 +1,25 @@
 on:
   push:
     branches:
-      - main
+      - main # -> prerelease published under the "next" dist-tag
     tags:
-      - "v*"
+      - "v*" # -> release published under the "latest" dist-tag
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to cut, e.g. 9.1.0 (creates tag v<version> and publishes 'latest'). Leave empty for a manual 'next' build."
+        required: false
+        default: ""
 
 env:
   NPM_TAG: "next"
   XCODE_VERSION: "^15.0"
+
+# Minimal default token permissions for every job. Jobs that need more declare it
+# locally (github-release: contents:write; publish: id-token:write). Cross-repo
+# writes to ios-spm use a GitHub App token, not GITHUB_TOKEN.
+permissions:
+  contents: read
 
 # The runtime xcframeworks are no longer shipped inside the npm packages. Each
 # build publishes them as GitHub Release assets and points the SwiftPM manifest
@@ -16,6 +28,12 @@ env:
 #
 # Flow: setup → build (ios, visionos) → test → github-release (assets) →
 #       spm-update (stamp + tag ios-spm) → publish (npm) → verify-spm
+#
+# The release half (github-release, spm-update, publish, verify-spm) is gated on
+# repo variable ENABLE_SPM_RELEASE. Until it is 'true' (and the ios-spm App
+# credentials are set), the workflow runs setup/build/test only and publishes NOTHING — so the
+# slim package can never ship before its matching ios-spm tag exists. Turn the
+# variable on as part of the cutover.
 jobs:
   setup:
     name: Resolve version
@@ -39,10 +57,24 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Compute version and tag
         id: out
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          NPM_VERSION=$(node -e "console.log(require('./package.json').version);")
-          if [ "${GITHUB_REF#refs/tags/}" = "$GITHUB_REF" ]; then
-            # not a tag build -> dev/prerelease version
+          if [ -n "$INPUT_VERSION" ]; then
+            # manual release: cut tag v<input> and publish (latest unless prerelease)
+            NPM_VERSION="${INPUT_VERSION#v}"
+          elif [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            # tag push (v*): the tag is authoritative. Strip the leading 'v' and
+            # assert it matches package.json so the release can't drift from its tag.
+            NPM_VERSION="${GITHUB_REF#refs/tags/}"
+            NPM_VERSION="${NPM_VERSION#v}"
+            PKG_VERSION=$(node -e "console.log(require('./package.json').version);")
+            if [ "$NPM_VERSION" != "$PKG_VERSION" ]; then
+              echo "::error::Tag v$NPM_VERSION does not match package.json version $PKG_VERSION. Bump package.json before tagging." >&2
+              exit 1
+            fi
+          else
+            # branch push (main) or manual run without a version -> "next" prerelease
             NPM_VERSION=$(node ./scripts/get-next-version.js)
           fi
           NPM_TAG=$(NPM_VERSION=$NPM_VERSION node ./scripts/get-npm-tag.js)
@@ -196,6 +228,10 @@ jobs:
   github-release:
     name: GitHub Release (SPM assets)
     runs-on: ubuntu-latest
+    # Master switch for the SPM release flow. When unset, the workflow runs
+    # setup/build/test only — nothing is released or published, so landing this
+    # on main before the token is configured is a no-op for consumers.
+    if: ${{ vars.ENABLE_SPM_RELEASE == 'true' }}
     permissions:
       contents: write
     needs:
@@ -246,12 +282,15 @@ jobs:
           allowUpdates: true
 
   # Stamp + tag github.com/NativeScript/ios-spm to point at this release's assets.
-  # Requires a cross-repo token (GITHUB_TOKEN cannot write to ios-spm). Enable by
-  # setting repo variable ENABLE_SPM_UPDATE=true and secret IOS_SPM_TOKEN.
+  # Cross-repo write uses a short-lived GitHub App installation token, minted per
+  # run and scoped to ios-spm only (no long-lived PAT to rotate). Enable by setting
+  # repo variable ENABLE_SPM_RELEASE=true plus the App credentials
+  # (variable APP_CLIENT_ID + secret APP_PRIVATE_KEY); the App must be installed on
+  # NativeScript/ios-spm with Contents: Read and write.
   spm-update:
     name: Update ios-spm manifest
     runs-on: ubuntu-latest
-    if: ${{ vars.ENABLE_SPM_UPDATE == 'true' }}
+    if: ${{ vars.ENABLE_SPM_RELEASE == 'true' }}
     needs:
       - setup
       - build
@@ -265,6 +304,15 @@ jobs:
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
+      - name: Mint ios-spm App token (short-lived, scoped to ios-spm)
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: NativeScript
+          repositories: ios-spm
+          permission-contents: write
       - name: Checkout ios (for stamping script)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -274,8 +322,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: NativeScript/ios-spm
-          token: ${{ secrets.IOS_SPM_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           path: ios-spm
+          persist-credentials: false
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
@@ -300,23 +349,32 @@ jobs:
             $CHECKSUM_ARGS $STRICT
       - name: Commit and tag ios-spm
         working-directory: ios-spm
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           git config user.name "NativeScript Bot"
           git config user.email "oss@nativescript.org"
+          # persist-credentials:false keeps the token out of .git/config; push to a
+          # token-authenticated URL instead (the App token is masked in logs).
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/NativeScript/ios-spm.git"
           git add Package.swift
           git commit -m "release: $NPM_VERSION" || echo "no changes to commit"
           git tag -f "$NPM_VERSION"
-          git push origin HEAD:main
-          git push -f origin "refs/tags/$NPM_VERSION"
+          git push "$REMOTE" HEAD:main
+          git push -f "$REMOTE" "refs/tags/$NPM_VERSION"
 
   publish:
     name: Publish ${{ matrix.target }}
     runs-on: ubuntu-latest
     environment: npm-publish
+    # Gated + ordered after spm-update so a slim package is never published before
+    # its matching ios-spm tag exists (which would make it unresolvable).
+    if: ${{ vars.ENABLE_SPM_RELEASE == 'true' }}
     needs:
       - setup
       - build
       - test
+      - spm-update
     permissions:
       contents: read
       id-token: write
@@ -373,7 +431,7 @@ jobs:
   verify-spm:
     name: Verify SPM resolution
     runs-on: macos-14
-    if: ${{ vars.ENABLE_SPM_UPDATE == 'true' }}
+    if: ${{ vars.ENABLE_SPM_RELEASE == 'true' }}
     needs:
       - setup
       - spm-update

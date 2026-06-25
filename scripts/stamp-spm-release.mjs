@@ -42,6 +42,7 @@ if (!opts.package || !opts.version) {
   process.exit(1);
 }
 
+const SHA256_RE = /^[0-9a-f]{64}$/;
 const checksums = {};
 for (const file of opts.checksums) {
   const text = fs.readFileSync(file, "utf8");
@@ -52,7 +53,17 @@ for (const file of opts.checksums) {
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
     const value = trimmed.slice(eq + 1).trim();
-    if (key) checksums[key] = value;
+    if (!key) continue;
+    // A binaryTarget checksum must be a 64-char lowercase hex SHA-256. Reject
+    // anything else now (empty/truncated/uppercase) so we can't stamp a manifest
+    // that resolves to a checksum mismatch later.
+    if (key.startsWith("NS_CHECKSUM_") && !SHA256_RE.test(value)) {
+      console.error(
+        `ERROR: ${key} in ${file} is not a valid SHA-256 checksum: "${value}"`
+      );
+      process.exit(1);
+    }
+    checksums[key] = value;
   }
 }
 
