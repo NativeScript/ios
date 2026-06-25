@@ -89,7 +89,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ios, visionos]
+        # `target` is the package identity (artifact names, @nativescript/<target>);
+        # `script` is the npm script that builds it (note: the vision script is build-vision).
+        include:
+          - target: ios
+            script: build-ios
+          - target: visionos
+            script: build-vision
     env:
       NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
     steps:
@@ -134,7 +140,7 @@ jobs:
       - name: Set package version
         run: npm version $NPM_VERSION --no-git-tag-version --allow-same-version
       - name: Build (${{ matrix.target }})
-        run: npm run build-${{ matrix.target }}
+        run: npm run ${{ matrix.script }}
       - name: Upload npm package artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
