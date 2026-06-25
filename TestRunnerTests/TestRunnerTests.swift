@@ -61,8 +61,14 @@ class TestRunnerTests: XCTestCase {
         loop.stop()
     }
 
-    func testRuntime() { 
-        let jasmineTestsTimeout: TimeInterval = 300
+    func testRuntime() {
+        // Headroom for CI: some specs (HttpEsmLoaderTests, RemoteModuleSecurityTests)
+        // perform live network I/O against intentionally-unreachable/slow hosts
+        // (e.g. 192.0.2.1 timeout-test, esm.sh). Each can burn up to NSURLSession's
+        // ~60s request timeout, so under slower CI networks the full suite can run
+        // past a 300s budget and never POST results -> false timeout. 600s avoids
+        // that while still failing fast on a genuine hang.
+        let jasmineTestsTimeout: TimeInterval = 600
 
         let app = XCUIApplication()
         app.launchEnvironment["REPORT_BASEURL"] = "http://[::1]:\(port)/junit_report"
