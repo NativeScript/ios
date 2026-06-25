@@ -7,4 +7,5 @@ rm -rf ./dist
 ./build_nativescript.sh --no-vision
 ./build_tklivesync.sh --no-vision
 ./prepare_dSYMs.sh
+./build_spm_artifacts.sh ios
 ./build_npm_ios.sh
