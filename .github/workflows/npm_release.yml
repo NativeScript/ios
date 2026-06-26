@@ -41,6 +41,7 @@ jobs:
     outputs:
       npm_version: ${{ steps.out.outputs.NPM_VERSION }}
       npm_tag: ${{ steps.out.outputs.NPM_TAG }}
+      build_matrix: ${{ steps.out.outputs.BUILD_MATRIX }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -80,7 +81,18 @@ jobs:
           NPM_TAG=$(NPM_VERSION=$NPM_VERSION node ./scripts/get-npm-tag.js)
           echo "NPM_VERSION=$NPM_VERSION" >> $GITHUB_OUTPUT
           echo "NPM_TAG=$NPM_TAG" >> $GITHUB_OUTPUT
-          echo "Resolved $NPM_VERSION (tag: $NPM_TAG)"
+          # Target matrix: ios always builds/publishes. visionos is built and
+          # published ONLY for real releases (a v* tag push, or a manual dispatch
+          # with a version), never for the rolling "next" channel that every push
+          # to main produces. The discriminator is the resolved dist-tag: pushes
+          # to main (and dispatch without a version) -> "next" -> ios only.
+          if [ "$NPM_TAG" = "next" ]; then
+            BUILD_MATRIX='{"include":[{"target":"ios","script":"build-ios"}]}'
+          else
+            BUILD_MATRIX='{"include":[{"target":"ios","script":"build-ios"},{"target":"visionos","script":"build-vision"}]}'
+          fi
+          echo "BUILD_MATRIX=$BUILD_MATRIX" >> $GITHUB_OUTPUT
+          echo "Resolved $NPM_VERSION (tag: $NPM_TAG); build targets: $BUILD_MATRIX"
 
   build:
     name: Build ${{ matrix.target }}
@@ -88,14 +100,11 @@ jobs:
     needs: setup
     strategy:
       fail-fast: false
-      matrix:
-        # `target` is the package identity (artifact names, @nativescript/<target>);
-        # `script` is the npm script that builds it (note: the vision script is build-vision).
-        include:
-          - target: ios
-            script: build-ios
-          - target: visionos
-            script: build-vision
+      # Computed in `setup`: ios always; visionos only for real releases
+      # (npm_tag != "next"), never for the rolling "next" channel. Each entry
+      # carries `target` (package identity, @nativescript/<target>) and `script`
+      # (the npm build script; note the vision script is build-vision).
+      matrix: ${{ fromJSON(needs.setup.outputs.build_matrix) }}
     env:
       NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
     steps:
@@ -388,8 +397,10 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      matrix:
-        target: [ios, visionos]
+      # Same targets as the build matrix (computed in `setup`): visionos is
+      # published only for real releases, never for the "next" channel. The
+      # unused `script` key on each entry is harmless here.
+      matrix: ${{ fromJSON(needs.setup.outputs.build_matrix) }}
     env:
       NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
       NPM_TAG: ${{ needs.setup.outputs.npm_tag }}
