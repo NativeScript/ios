@@ -18,16 +18,28 @@
 // - With allowlist: Only URLs matching a prefix in remoteModuleAllowlist are allowed
 
 describe("Remote Module Security", function() {
-    
+
+    // Hermetic by design: never touch live external hosts (esm.sh, TEST-NET
+    // 192.0.2.1, example.com). HTTP module fetches are SYNCHRONOUS on the JS
+    // thread (HMRSupport.mm: NSURLConnection sendSynchronousRequest), so a slow
+    // or transitively-fanning remote import (e.g. esm.sh pulling a graph of
+    // sub-modules) blocks the event loop and, accumulated, runs the whole suite
+    // past its timeout on CI -> false "hang". A closed local port fails fast
+    // with a connection-refused *network* error, which is exactly what every
+    // debug-mode spec below asserts: the security gate lets the request through
+    // (so it's NOT a security error) and the fetch then fails on the network.
+    var DEAD_HTTP = "http://127.0.0.1:59999";
+    var DEAD_HTTPS = "https://127.0.0.1:59999";
+
     describe("Debug Mode Behavior", function() {
         // In debug mode (test environment), all remote modules should be allowed
         // regardless of security configuration
         
         it("should allow HTTP module imports in debug mode", function(done) {
-            // This test uses a known unreachable IP to trigger the HTTP loading path
-            // In debug mode, the security check passes and we get a network error
-            // (not a security error)
-            import("http://192.0.2.1:5173/test-module.js").then(function(module) {
+            // Uses a closed local port to trigger the HTTP loading path and fail
+            // fast. In debug mode the security check passes and we get a network
+            // error (connection refused), NOT a security error.
+            import(DEAD_HTTP + "/test-module.js").then(function(module) {
                 // If we somehow succeed, that's fine too
                 expect(module).toBeDefined();
                 done();
@@ -42,8 +54,8 @@ describe("Remote Module Security", function() {
         });
         
         it("should allow HTTPS module imports in debug mode", function(done) {
-            // Test HTTPS URL - should be allowed in debug mode
-            import("https://192.0.2.1:5173/test-module.js").then(function(module) {
+            // Test HTTPS URL - should be allowed in debug mode (closed local port -> fast network error)
+            import(DEAD_HTTPS + "/test-module.js").then(function(module) {
                 expect(module).toBeDefined();
                 done();
             }).catch(function(error) {
@@ -96,9 +108,9 @@ describe("Remote Module Security", function() {
         // code paths for HTTP loading are exercised correctly
         
         it("should handle allowlisted URL prefixes", function(done) {
-            // esm.sh is in our test allowlist
-            // In debug mode this is allowed anyway, but tests the path
-            import("https://esm.sh/test-module").then(function(module) {
+            // In debug mode the allowlist is not enforced; this just exercises the
+            // remote-load path and confirms we get a network (not security) error.
+            import(DEAD_HTTPS + "/test-module").then(function(module) {
                 expect(module).toBeDefined();
                 done();
             }).catch(function(error) {
@@ -111,7 +123,7 @@ describe("Remote Module Security", function() {
         
         it("should handle non-allowlisted URLs in debug mode", function(done) {
             // This URL is NOT in the allowlist, but debug mode allows it anyway
-            import("https://not-in-allowlist.example.com/module.js").then(function(module) {
+            import(DEAD_HTTPS + "/not-allowlisted/module.js").then(function(module) {
                 expect(module).toBeDefined();
                 done();
             }).catch(function(error) {
@@ -132,7 +144,7 @@ describe("Remote Module Security", function() {
         it("should allow importing from allowlisted static HTTP URLs", function(done) {
             // This test verifies the ResolveModuleCallback security check path
             // is exercised for static imports
-            const testUrl = "https://esm.sh/@test/module";
+            const testUrl = DEAD_HTTPS + "/@test/module";
             
             import(testUrl).then(function(module) {
                 expect(module).toBeDefined();
@@ -152,7 +164,7 @@ describe("Remote Module Security", function() {
         // handling code doesn't crash
         
         it("should provide clear errors for failed HTTP imports", function(done) {
-            import("http://invalid-url-test:9999/module.js").then(function(module) {
+            import(DEAD_HTTP + "/module.js").then(function(module) {
                 done();
             }).catch(function(error) {
                 expect(error).toBeDefined();
@@ -188,7 +200,7 @@ describe("Remote Module Security", function() {
         
         it("should handle URLs with special characters", function(done) {
             // URLs with encoded characters should be handled properly
-            import("https://example.com/module%20with%20spaces.js").then(function(module) {
+            import(DEAD_HTTPS + "/module%20with%20spaces.js").then(function(module) {
                 done();
             }).catch(function(error) {
                 // Error handling should not crash
@@ -198,7 +210,7 @@ describe("Remote Module Security", function() {
         });
         
         it("should handle URLs with query parameters", function(done) {
-            import("https://esm.sh/lodash?target=es2020").then(function(module) {
+            import(DEAD_HTTPS + "/lodash?target=es2020").then(function(module) {
                 done();
             }).catch(function(error) {
                 // Query params should be preserved in URL handling
@@ -208,7 +220,7 @@ describe("Remote Module Security", function() {
         });
         
         it("should handle URLs with fragments", function(done) {
-            import("https://esm.sh/module#section").then(function(module) {
+            import(DEAD_HTTPS + "/module#section").then(function(module) {
                 done();
             }).catch(function(error) {
                 expect(error).toBeDefined();
