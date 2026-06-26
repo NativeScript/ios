@@ -6,6 +6,12 @@ class TestRunnerTests: XCTestCase {
     private var server: HTTPServer!
     private var runtimeUnitTestsExpectation: XCTestExpectation!
 
+    // Most recent spec reported by the in-app Jasmine progress beacon (see the
+    // /progress handler below). When the suite hangs and never POSTs results,
+    // this names the spec that was running when the JS thread stalled.
+    private let progressLock = NSLock()
+    private var lastSpecSeen = "(no spec reported yet)"
+
     override func setUp() {
         continueAfterFailure = false
 
@@ -24,6 +30,24 @@ class TestRunnerTests: XCTestCase {
             let method = (environ["REQUEST_METHOD"] as? String) ?? ""
             let path = (environ["PATH_INFO"] as? String) ?? "/"
             let query = (environ["QUERY_STRING"] as? String) ?? ""
+
+            // Progress beacon from the in-app Jasmine reporter (fire-and-forget):
+            // records the spec currently running so a hang/timeout can report
+            // where the JS suite stalled, even though no JUnit report is POSTed.
+            if method == "GET" && path == "/progress" {
+                if let specParam = query
+                    .split(separator: "&")
+                    .first(where: { $0.hasPrefix("spec=") }) {
+                    let raw = String(specParam.dropFirst("spec=".count))
+                    let decoded = raw.removingPercentEncoding ?? raw
+                    self.progressLock.lock()
+                    self.lastSpecSeen = decoded
+                    self.progressLock.unlock()
+                }
+                startResponse("204 No Content", [])
+                sendBody(Data())
+                return
+            }
 
             // Serve tiny ESM modules for runtime HTTP loader tests.
             if method == "GET" {
@@ -202,7 +226,10 @@ class TestRunnerTests: XCTestCase {
             }
             return
         case .timedOut:
-            XCTFail("Ran past \(Int(jasmineTestsTimeout))s with the \"Jasmine tests\" expectation unfulfilled while the app was STILL RUNNING -> the JS suite HUNG (deadlock or never-settled async); it did not crash. Check the 'test-diagnostics' artifact (simulator.logarchive) for the last spec that logged before the stall.")
+            progressLock.lock()
+            let lastSpec = lastSpecSeen
+            progressLock.unlock()
+            XCTFail("Ran past \(Int(jasmineTestsTimeout))s with the \"Jasmine tests\" expectation unfulfilled while the app was STILL RUNNING -> the JS suite HUNG (deadlock or never-settled async); it did not crash. Last spec reported by the in-app beacon: \"\(lastSpec)\". Also see the 'test-diagnostics' artifact (simulator.logarchive).")
         default:
             XCTFail("Unexpected XCTWaiter result: \(result.rawValue)")
         }

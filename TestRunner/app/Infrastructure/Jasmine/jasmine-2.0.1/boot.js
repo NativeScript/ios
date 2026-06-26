@@ -133,6 +133,32 @@ var TerminalReporter = require('../jasmine-reporters/terminal_reporter').Termina
   }));
   jasmine.getEnv().addReporter(new JUnitXmlReporter());
 
+  // Progress beacon: fire-and-forget GET of each suite/spec name to the XCTest
+  // host's /progress endpoint. When the suite hangs (no JUnit report is ever
+  // POSTed), this lets the Swift harness name the spec that was running when the
+  // JS thread stalled. Async via NSURLSession so it never blocks the JS thread;
+  // best-effort — any error is swallowed.
+  (function installProgressBeacon() {
+    try {
+      var reportUrl = NSProcessInfo.processInfo.environment.objectForKey("REPORT_BASEURL");
+      if (!reportUrl) { return; }
+      var origin = new URL(String(reportUrl)).origin;
+      var beacon = function (name) {
+        try {
+          var url = origin + "/progress?spec=" + encodeURIComponent(name || "");
+          var req = NSMutableURLRequest.requestWithURL(NSURL.URLWithString(url));
+          req.HTTPMethod = "GET";
+          req.timeoutInterval = 2.0;
+          NSURLSession.sharedSession.dataTaskWithRequestCompletionHandler(req, function () {}).resume();
+        } catch (e) { /* best-effort */ }
+      };
+      jasmine.getEnv().addReporter({
+        suiteStarted: function (r) { beacon("[suite] " + (r && r.fullName ? r.fullName : "")); },
+        specStarted: function (r) { beacon(r && r.fullName ? r.fullName : ""); }
+      });
+    } catch (e) { /* best-effort */ }
+  }());
+
   env.specFilter = function(spec) {
     return true;
   };

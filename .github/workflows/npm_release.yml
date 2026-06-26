@@ -241,9 +241,24 @@ jobs:
           # Simulator app crashes land in the host's DiagnosticReports.
           cp -R ~/Library/Logs/DiagnosticReports/. "$DIAG/DiagnosticReports/" 2>/dev/null || true
           cp -R ~/Library/Logs/CoreSimulator/. "$DIAG/CoreSimulator/" 2>/dev/null || true
-          # Unified log from the booted simulator: the app's console output, so
-          # the last spec before a hang is visible even when nothing was POSTed.
-          xcrun simctl spawn booted log collect --output "$DIAG/simulator.logarchive" 2>/dev/null || true
+          # Unified log = the app's console output (so the last spec before a hang
+          # is visible even when nothing was POSTed). `log collect` needs a booted
+          # device; don't rely on the `booted` alias (the prior collect failed
+          # because the sim wasn't booted at that moment). Resolve a concrete UDID
+          # — prefer one already booted from the test run, else the test device,
+          # booting it so the persisted log store can be collected.
+          UDID="$(xcrun simctl list devices booted | grep -oE '[0-9A-Fa-f-]{36}' | head -1)"
+          if [ -z "$UDID" ]; then
+            UDID="$(xcrun simctl list devices 'iPhone 15 Pro Max' | grep -oE '[0-9A-Fa-f-]{36}' | head -1)"
+            [ -n "$UDID" ] && xcrun simctl boot "$UDID" 2>/dev/null || true
+            [ -n "$UDID" ] && xcrun simctl bootstatus "$UDID" 2>/dev/null || true
+          fi
+          if [ -n "$UDID" ]; then
+            echo "Collecting unified log from simulator $UDID"
+            xcrun simctl spawn "$UDID" log collect --output "$DIAG/simulator.logarchive" 2>/dev/null || true
+          else
+            echo "No simulator UDID resolved; skipping logarchive collection."
+          fi
           echo "Collected diagnostics:"; ls -laR "$DIAG" 2>/dev/null || true
       - name: Upload test diagnostics (on failure)
         if: ${{ failure() }}
