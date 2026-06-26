@@ -134,9 +134,17 @@ public final class Transport {
                 // (usually means that this function was called by resumeReading)
                 return
             }
-            fatalError("Failed to read, errno=\(errno), message=\(lastErrorDescription())")
+            // NativeScript test harness: do NOT fatalError. This server runs in
+            // the XCUITest runner, where a trap aborts the whole run ("Executed
+            // 0 tests"). A half-closed client socket (e.g. the runtime's
+            // NSURLConnection module loader) makes recv() fail with
+            // ECONNRESET/ENOTCONN/EINVAL — tear the connection down like a peer
+            // close instead of crashing the runner.
+            closedByPeer()
+            return
         } catch {
-            fatalError("Failed to read")
+            closedByPeer()
+            return
         }
         guard data.count > 0 else {
             closedByPeer()
@@ -186,7 +194,7 @@ public final class Transport {
                     socket.close()
                 }
             }
-        } catch let OSError.ioError(number, message) {
+        } catch let OSError.ioError(number, _) {
             switch number {
             case EAGAIN:
                 break
@@ -200,10 +208,14 @@ public final class Transport {
                 closedByPeer()
 
             default:
-                fatalError("Failed to send, errno=\(number), message=\(message)")
+                // NativeScript test harness: do NOT fatalError (it would abort
+                // the XCUITest runner -> "Executed 0 tests"). Any other send()
+                // failure on a half-dead client socket just means the peer is
+                // gone; tear the connection down instead of crashing.
+                closedByPeer()
             }
         } catch {
-            fatalError("Failed to send")
+            closedByPeer()
         }
     }
 }
