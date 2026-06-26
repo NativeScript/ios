@@ -167,7 +167,10 @@ describe("HTTP ESM Loader", function() {
             // Prefer the local XCTest-hosted HTTP server (when available) to avoid ATS restrictions
             // and make this test deterministic.
             var origin = getHostOrigin();
-            var spec = origin ? (origin + "/esm/timeout.mjs?delayMs=6500") : "https://192.0.2.1:5173/timeout-test.js";
+            // Prefer the local XCTest server's delayed endpoint (deterministic, hermetic).
+            // The fallback is a closed local port (fast connection-refused), never a live
+            // external/TEST-NET host whose connect timeout would stall the JS thread on CI.
+            var spec = origin ? (origin + "/esm/timeout.mjs?delayMs=6500") : "http://127.0.0.1:59999/timeout-test.js";
 
             import(spec).then(function(module) {
                 fail("Should not have succeeded for unreachable server");
