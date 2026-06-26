@@ -227,6 +227,31 @@ jobs:
           command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test | xcpretty
           on_retry_command: rm -rf $TEST_FOLDER/test_results* && xcrun simctl shutdown all
           new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test
+      # When the runtime suite fails it is almost always because the in-app
+      # Jasmine run died before POSTing results (crash or hang). The xcresult is
+      # black-box and captures nothing from inside the app, so collect the two
+      # things that actually explain it: the native crash report (.ips) and the
+      # simulator's unified log (the app's console.log / last spec before a stall).
+      # The watchdog in TestRunnerTests.swift prints which artifact to look at.
+      - name: Collect crash reports & simulator log (on failure)
+        if: ${{ failure() }}
+        run: |
+          DIAG="$TEST_FOLDER/diagnostics"
+          mkdir -p "$DIAG"
+          # Simulator app crashes land in the host's DiagnosticReports.
+          cp -R ~/Library/Logs/DiagnosticReports/. "$DIAG/DiagnosticReports/" 2>/dev/null || true
+          cp -R ~/Library/Logs/CoreSimulator/. "$DIAG/CoreSimulator/" 2>/dev/null || true
+          # Unified log from the booted simulator: the app's console output, so
+          # the last spec before a hang is visible even when nothing was POSTed.
+          xcrun simctl spawn booted log collect --output "$DIAG/simulator.logarchive" 2>/dev/null || true
+          echo "Collected diagnostics:"; ls -laR "$DIAG" 2>/dev/null || true
+      - name: Upload test diagnostics (on failure)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: test-diagnostics
+          path: ${{ env.TEST_FOLDER }}/diagnostics
+          if-no-files-found: ignore
       - name: Validate Test Results
         run: |
           xcparse attachments $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test-out
