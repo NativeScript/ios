@@ -83,8 +83,31 @@ public final class DefaultHTTPServer: HTTPServer {
 
     // called to handle new connections
     private func handleNewConnection() {
-        let clientSocket = try! acceptSocket.accept()
-        let (address, port) = try! clientSocket.getPeerName()
+        // Resilience: a single bad inbound connection must NEVER crash the server.
+        // This server runs inside the XCUITest runner; a fatal error here aborts
+        // the entire run ("Executed 0 tests"). A client can reset/close in the
+        // window between accept() and getPeerName() — common with rapid
+        // fire-and-forget requests — which surfaces as OSError (EINVAL/ENOTCONN);
+        // accept() itself can also transiently fail under connection churn. Drop
+        // the offending connection instead of `try!`-trapping the whole process.
+        let clientSocket: TCPSocket
+        do {
+            clientSocket = try acceptSocket.accept()
+        } catch {
+            logger.error("accept() failed; dropping inbound connection: \(error)")
+            return
+        }
+
+        let address: String
+        let port: Int
+        do {
+            (address, port) = try clientSocket.getPeerName()
+        } catch {
+            logger.error("getPeerName() failed; closing inbound connection: \(error)")
+            clientSocket.close()
+            return
+        }
+
         let transport = Transport(socket: clientSocket, eventLoop: eventLoop)
         let connection = HTTPConnection(
             app: appForConnection,
