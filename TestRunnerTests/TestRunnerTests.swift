@@ -7,6 +7,12 @@ class TestRunnerTests: XCTestCase {
     private var runtimeUnitTestsExpectation: XCTestExpectation!
     private var reportDeliveryFailureReason: String?
 
+    // Most recent spec reported by the in-app Jasmine progress beacon (see the
+    // /progress handler below). When the suite hangs and never POSTs results,
+    // this names the spec that was running when the JS thread stalled.
+    private let progressLock = NSLock()
+    private var lastSpecSeen = "(no spec reported yet)"
+
     override func setUp() {
         continueAfterFailure = false
 
@@ -25,6 +31,24 @@ class TestRunnerTests: XCTestCase {
             let method = (environ["REQUEST_METHOD"] as? String) ?? ""
             let path = (environ["PATH_INFO"] as? String) ?? "/"
             let query = (environ["QUERY_STRING"] as? String) ?? ""
+
+            // Progress beacon from the in-app Jasmine reporter (fire-and-forget):
+            // records the spec currently running so a hang/timeout can report
+            // where the JS suite stalled, even though no JUnit report is POSTed.
+            if method == "GET" && path == "/progress" {
+                if let specParam = query
+                    .split(separator: "&")
+                    .first(where: { $0.hasPrefix("spec=") }) {
+                    let raw = String(specParam.dropFirst("spec=".count))
+                    let decoded = raw.removingPercentEncoding ?? raw
+                    self.progressLock.lock()
+                    self.lastSpecSeen = decoded
+                    self.progressLock.unlock()
+                }
+                startResponse("204 No Content", [])
+                sendBody(Data())
+                return
+            }
 
             // Serve tiny ESM modules for runtime HTTP loader tests.
             if method == "GET" {
@@ -49,8 +73,15 @@ class TestRunnerTests: XCTestCase {
                 }
 
                 if path == "/esm/timeout.mjs" {
-                    // Intentionally delay the response so the runtime HTTP loader hits its request timeout.
-                    // This avoids ATS issues from testing against external plain-http URLs.
+                    // Delay the response WITHOUT blocking the event loop. A
+                    // Thread.sleep here runs on the server's single event-loop
+                    // thread and WEDGES it: the loader's ~5s client timeout fires
+                    // first, the client resets the connection, and the blocked
+                    // loop never recovers — so every later module fetch fails with
+                    // "could not connect" and the whole HTTP-ESM suite times out.
+                    // Schedule the response on the loop instead; the loader still
+                    // hits its client-side timeout because delayMs (6500) exceeds
+                    // the request timeout, and the server stays responsive.
                     var delayMs = 6500
                     if let pair = query
                         .split(separator: "&")
@@ -58,17 +89,23 @@ class TestRunnerTests: XCTestCase {
                        let v = Int(pair.split(separator: "=").last ?? "") {
                         delayMs = v
                     }
-                    Thread.sleep(forTimeInterval: Double(delayMs) / 1000.0)
-
-                    let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
-                    let body = "export const evaluatedAt = \(nowMs); export default { evaluatedAt };"
-                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
-                    sendBody(body.data(using: .utf8) ?? Data())
+                    self.loop.call(withDelay: Double(delayMs) / 1000.0) {
+                        let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
+                        let body = "export const evaluatedAt = \(nowMs); export default { evaluatedAt };"
+                        startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                        sendBody(body.data(using: .utf8) ?? Data())
+                    }
                     return
                 }
 
                 // HMR hot.data test modules – serve the same helper code for .mjs and .js variants
-                if path == "/esm/hmr/hot-data-ext.mjs" || path == "/esm/hmr/hot-data-ext.js" {
+                // Serve the hot.data helper for the canonical path AND for the
+                // dev-endpoint aliases the identity specs import: any /ns/m/...
+                // path that resolves to hot-data-ext (incl. __ns_hmr__/__ns_boot__
+                // tagged variants) and the /ns/core bridge endpoints. The loader
+                // canonicalizes these to the same key, so the imports share a
+                // module instance (and thus import.meta.hot.data).
+                if path.contains("hot-data-ext") || path == "/ns/core" || path.hasPrefix("/ns/core/") {
                     let body = """
                     // HMR hot.data test module (served by XCTest)
                     export function getHot() {
@@ -214,13 +251,16 @@ class TestRunnerTests: XCTestCase {
         switch result {
         case .completed:
             if didCrash {
-                XCTFail("TestRunner exited before reporting Jasmine results (likely crashed). Check ~/Library/Logs/DiagnosticReports/TestRunner-*.ips for the stack.")
+                XCTFail("TestRunner exited before reporting Jasmine results (the runtime CRASHED). Check the 'test-diagnostics' artifact (DiagnosticReports/TestRunner-*.ips) for the native stack.")
             } else if let reason = reportDeliveryFailureReason {
                 XCTFail("TestRunner finished the Jasmine suite but could not deliver the junit report: \(reason)")
             }
             return
         case .timedOut:
-            XCTFail("Asynchronous wait failed: exceeded \(Int(jasmineTestsTimeout)) seconds with unfulfilled \"Jasmine tests\" expectation")
+            progressLock.lock()
+            let lastSpec = lastSpecSeen
+            progressLock.unlock()
+            XCTFail("Ran past \(Int(jasmineTestsTimeout))s with the \"Jasmine tests\" expectation unfulfilled while the app was STILL RUNNING -> the JS suite HUNG (deadlock or never-settled async); it did not crash. Last spec reported by the in-app beacon: \"\(lastSpec)\". Also see the 'test-diagnostics' artifact (simulator.logarchive).")
         default:
             XCTFail("Unexpected XCTWaiter result: \(result.rawValue)")
         }
