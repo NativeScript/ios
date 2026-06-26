@@ -133,11 +133,16 @@ var TerminalReporter = require('../jasmine-reporters/terminal_reporter').Termina
   }));
   jasmine.getEnv().addReporter(new JUnitXmlReporter());
 
-  // Progress beacon: fire-and-forget GET of each suite/spec name to the XCTest
-  // host's /progress endpoint. When the suite hangs (no JUnit report is ever
-  // POSTed), this lets the Swift harness name the spec that was running when the
-  // JS thread stalled. Async via NSURLSession so it never blocks the JS thread;
-  // best-effort — any error is swallowed.
+  // Progress beacon: fire-and-forget GET of each SUITE name to the XCTest host's
+  // /progress endpoint. When the run hangs (no JUnit report is ever POSTed), this
+  // lets the Swift harness name the suite that was running when the JS thread
+  // stalled. Async via NSURLSession so it never blocks the JS thread; best-effort.
+  //
+  // SUITE-level only (not specStarted): the minimal Embassy test server crashed
+  // in handleNewConnection() under the hundreds-of-connections-per-run flood that
+  // a per-spec beacon produced on CI's tighter fd limits. Suites number in the
+  // dozens and fire at suite boundaries, which stays well within those limits
+  // while still pinpointing a hang to its suite.
   (function installProgressBeacon() {
     try {
       var reportUrl = NSProcessInfo.processInfo.environment.objectForKey("REPORT_BASEURL");
@@ -153,8 +158,7 @@ var TerminalReporter = require('../jasmine-reporters/terminal_reporter').Termina
         } catch (e) { /* best-effort */ }
       };
       jasmine.getEnv().addReporter({
-        suiteStarted: function (r) { beacon("[suite] " + (r && r.fullName ? r.fullName : "")); },
-        specStarted: function (r) { beacon(r && r.fullName ? r.fullName : ""); }
+        suiteStarted: function (r) { beacon("[suite] " + (r && r.fullName ? r.fullName : "")); }
       });
     } catch (e) { /* best-effort */ }
   }());
