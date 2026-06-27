@@ -302,7 +302,9 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path,
   success = requireFunc->Call(context, globalObject, 1, args).ToLocal(&result);
 
   if (!success || tc.HasCaught()) {
-    if (RuntimeConfig.IsDebug) {
+    // Main isolate stays alive in debug for HMR; worker isolates must surface
+    // the failure so `worker.onerror` fires (handled in the else branch).
+    if (RuntimeConfig.IsDebug && !cache->isWorker) {
       Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
       Log(@"Error in require() call:");
       Log(@"  Requested module: '%s'", path.c_str());
@@ -347,6 +349,12 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path,
             std::string("require() failed for module ") + path;
       }
       SetOutErrorMessage(outErrorMessage, requireFailureMessage);
+      // For worker isolates, keep the V8 exception pending so the worker entry's
+      // TryCatch (Worker.mm) catches it and routes it to worker.onerror. The
+      // main isolate's release path is unchanged (no rethrow).
+      if (cache->isWorker && tc.HasCaught()) {
+        tc.ReThrow();
+      }
       return false;
     }
   }
@@ -934,7 +942,11 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
   TryCatch tc(isolate);
   Local<Script> script;
   if (!ScriptCompiler::Compile(context, &source, opts).ToLocal(&script) || tc.HasCaught()) {
-    if (RuntimeConfig.IsDebug) {
+    // The main isolate swallows compile errors in debug and continues so a bad
+    // HMR edit doesn't abort the app (the dev overlay surfaces it). Worker
+    // isolates must NOT swallow: a worker entry-script error has to propagate so
+    // `worker.onerror` fires. So fall through to the throw path for workers.
+    if (RuntimeConfig.IsDebug && !Caches::Get(isolate)->isWorker) {
       // Mark that a JavaScript error occurred
       jsErrorOccurred = true;
 
