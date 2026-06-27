@@ -69,14 +69,52 @@ for (const file of opts.checksums) {
 
 let manifest = fs.readFileSync(opts.package, "utf8");
 
-manifest = manifest.split("NS_SPM_VERSION").join(opts.version);
+// Stamping is IDEMPOTENT: each slot is rewritten whether it still holds the
+// NS_SPM_VERSION / NS_CHECKSUM_* token or an already-stamped concrete value.
+// This matters because the release flow pushes the stamped manifest back to
+// `main`, so by the second release there are no tokens left. A one-shot token
+// replace would then silently no-op, the "no changes to commit" tag would land
+// on the prior commit, and every new tag would resolve to the FIRST release's
+// artifacts (the 9.0.4-next.* incident). Anchoring on the structural shape
+// instead of the token lets us re-stamp correctly forever.
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// Each checksum env key ↔ the artifact zip its binaryTarget references (the
+// pairing baked into the manifest template). Lets us find the right checksum
+// slot by URL once the NS_CHECKSUM_* tokens are gone.
+const KEY_TO_ARTIFACT = {
+  NS_CHECKSUM_NATIVESCRIPT_IOS: "NativeScript.xcframework.zip",
+  NS_CHECKSUM_TKLIVESYNC_IOS: "TKLiveSync.xcframework.zip",
+  NS_CHECKSUM_NATIVESCRIPT_VISIONOS: "NativeScript.visionos.xcframework.zip",
+  NS_CHECKSUM_TKLIVESYNC_VISIONOS: "TKLiveSync.visionos.xcframework.zip",
+};
+
+// Version: rewrite the value inside `let nsVersion = "..."`.
+const versionRe = /(let\s+nsVersion\s*=\s*")[^"]*(")/;
+if (!versionRe.test(manifest)) {
+  console.error(`ERROR: could not find 'let nsVersion = "..."' in ${opts.package}`);
+  process.exit(1);
+}
+manifest = manifest.replace(versionRe, `$1${opts.version}$2`);
+
+// Checksums: for each provided checksum, rewrite the value in the binaryTarget
+// whose url points at the matching artifact zip.
 const applied = [];
 for (const [key, value] of Object.entries(checksums)) {
-  if (manifest.includes(key)) {
-    manifest = manifest.split(key).join(value);
-    applied.push(key);
+  const artifact = KEY_TO_ARTIFACT[key];
+  if (!artifact) {
+    console.error(`ERROR: no artifact mapping for checksum key ${key}; update KEY_TO_ARTIFACT.`);
+    process.exit(1);
   }
+  const re = new RegExp(
+    `(url:\\s*"[^"]*${escapeRegExp(artifact)}",\\s*checksum:\\s*")[^"]*(")`
+  );
+  if (!re.test(manifest)) {
+    console.error(`ERROR: no binaryTarget checksum slot for ${artifact} in ${opts.package}`);
+    process.exit(1);
+  }
+  manifest = manifest.replace(re, `$1${value}$2`);
+  applied.push(key);
 }
 
 fs.writeFileSync(opts.package, manifest);
@@ -85,10 +123,13 @@ console.log(`Stamped ${opts.package}`);
 console.log(`  version: ${opts.version}`);
 console.log(`  checksums applied: ${applied.length ? applied.join(", ") : "(none)"}`);
 
-const leftover = (manifest.match(/NS_SPM_VERSION|NS_CHECKSUM_[A-Z_]+/g) || []);
+// Safety net: no placeholder tokens may remain (they'd resolve to a broken URL
+// or a checksum mismatch). With idempotent stamping a leftover token signals a
+// real manifest/key drift (e.g. a missing platform's checksums), not a routine
+// 2nd-release no-op.
+const leftover = [...new Set(manifest.match(/NS_SPM_VERSION|NS_CHECKSUM_[A-Z_]+/g) || [])];
 if (leftover.length) {
-  const unique = [...new Set(leftover)];
-  const msg = `Unstamped tokens remain: ${unique.join(", ")}`;
+  const msg = `Unstamped tokens remain: ${leftover.join(", ")}`;
   if (opts.strict) {
     console.error(`ERROR: ${msg}`);
     process.exit(1);

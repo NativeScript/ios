@@ -464,6 +464,21 @@ jobs:
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
+      - name: Assert ios-spm manifest pins this release
+        run: |
+          # Guard against the manifest pointing at a STALE release — e.g. a stamp
+          # that no-ops and leaves a prior version's nsVersion + artifact
+          # URLs/checksums in place. Those still resolve and checksum-pass (they're
+          # internally consistent), so `swift package resolve` below won't catch
+          # it; this explicit version assertion does.
+          url="https://raw.githubusercontent.com/NativeScript/ios-spm/${NPM_VERSION}/Package.swift"
+          manifest="$(curl -fsSL "$url")"
+          if ! printf '%s\n' "$manifest" | grep -q "let nsVersion = \"${NPM_VERSION}\""; then
+            echo "::error::ios-spm@${NPM_VERSION} does not pin nsVersion=\"${NPM_VERSION}\" (stale stamp?). Found:" >&2
+            printf '%s\n' "$manifest" | grep -n "nsVersion" >&2 || true
+            exit 1
+          fi
+          echo "OK: ios-spm@${NPM_VERSION} pins nsVersion=\"${NPM_VERSION}\""
       - name: Generate a probe package that depends on ios-spm
         run: |
           node -e '
