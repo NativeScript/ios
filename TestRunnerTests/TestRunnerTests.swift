@@ -72,8 +72,15 @@ class TestRunnerTests: XCTestCase {
                 }
 
                 if path == "/esm/timeout.mjs" {
-                    // Intentionally delay the response so the runtime HTTP loader hits its request timeout.
-                    // This avoids ATS issues from testing against external plain-http URLs.
+                    // Delay the response WITHOUT blocking the event loop. A
+                    // Thread.sleep here runs on the server's single event-loop
+                    // thread and WEDGES it: the loader's ~5s client timeout fires
+                    // first, the client resets the connection, and the blocked
+                    // loop never recovers — so every later module fetch fails with
+                    // "could not connect" and the whole HTTP-ESM suite times out.
+                    // Schedule the response on the loop instead; the loader still
+                    // hits its client-side timeout because delayMs (6500) exceeds
+                    // the request timeout, and the server stays responsive.
                     var delayMs = 6500
                     if let pair = query
                         .split(separator: "&")
@@ -81,17 +88,23 @@ class TestRunnerTests: XCTestCase {
                        let v = Int(pair.split(separator: "=").last ?? "") {
                         delayMs = v
                     }
-                    Thread.sleep(forTimeInterval: Double(delayMs) / 1000.0)
-
-                    let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
-                    let body = "export const evaluatedAt = \(nowMs); export default { evaluatedAt };"
-                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
-                    sendBody(body.data(using: .utf8) ?? Data())
+                    self.loop.call(withDelay: Double(delayMs) / 1000.0) {
+                        let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
+                        let body = "export const evaluatedAt = \(nowMs); export default { evaluatedAt };"
+                        startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                        sendBody(body.data(using: .utf8) ?? Data())
+                    }
                     return
                 }
 
                 // HMR hot.data test modules – serve the same helper code for .mjs and .js variants
-                if path == "/esm/hmr/hot-data-ext.mjs" || path == "/esm/hmr/hot-data-ext.js" {
+                // Serve the hot.data helper for the canonical path AND for the
+                // dev-endpoint aliases the identity specs import: any /ns/m/...
+                // path that resolves to hot-data-ext (incl. __ns_hmr__/__ns_boot__
+                // tagged variants) and the /ns/core bridge endpoints. The loader
+                // canonicalizes these to the same key, so the imports share a
+                // module instance (and thus import.meta.hot.data).
+                if path.contains("hot-data-ext") || path == "/ns/core" || path.hasPrefix("/ns/core/") {
                     let body = """
                     // HMR hot.data test module (served by XCTest)
                     export function getHot() {

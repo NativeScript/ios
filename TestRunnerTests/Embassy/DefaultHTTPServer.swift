@@ -103,14 +103,17 @@ public final class DefaultHTTPServer: HTTPServer {
             return
         }
 
-        let address: String
-        let port: Int
+        // getPeerName() is used ONLY for the diagnostic log line below, yet it
+        // fails with EINVAL for some legitimate client connections — notably the
+        // runtime's synchronous HTTP module loader (NSURLConnection). Do NOT drop
+        // the connection on failure: that leaves every module GET unanswered and
+        // hangs the HTTP-ESM tests. Fall back to a placeholder peer and serve it.
+        var address = "?"
+        var port = 0
         do {
             (address, port) = try clientSocket.getPeerName()
         } catch {
-            logger.error("getPeerName() failed; closing inbound connection: \(error)")
-            clientSocket.close()
-            return
+            logger.error("getPeerName() failed; serving with placeholder peer: \(error)")
         }
 
         let transport = Transport(socket: clientSocket, eventLoop: eventLoop)
