@@ -25,6 +25,17 @@ public final class TCPSocket {
     }
 
     /// Whether to ignore SIGPIPE signal or not
+    ///
+    /// NOTE (NativeScript test harness): the get/set deliberately do NOT
+    /// `assert()` on getsockopt/setsockopt failure. This server runs inside the
+    /// XCUITest runner, where any trap aborts the entire run ("Executed 0
+    /// tests"). Some accepted client sockets are already half-closed by the time
+    /// we configure them — notably the runtime's synchronous HTTP module loader
+    /// (NSURLConnection), whose sockets fail getpeername()/setsockopt() with
+    /// EINVAL/ENOTCONN. Treat SO_NOSIGPIPE as best-effort: a later send() on a
+    /// dead socket simply throws and is handled by Transport, instead of the
+    /// whole runner crashing here (assertionFailure in this setter was the
+    /// observed CI failure once getPeerName() was made tolerant).
     var ignoreSigPipe: Bool {
         get {
             #if os(Linux)
@@ -32,10 +43,9 @@ public final class TCPSocket {
             #else
                 var value: Int32 = 0
                 var size = socklen_t(MemoryLayout<Int32>.size)
-                assert(
-                    getsockopt(fileDescriptor, SOL_SOCKET, SO_NOSIGPIPE, &value, &size) >= 0,
-                    "Failed to get SO_NOSIGPIPE, errno=\(errno), message=\(lastErrorDescription())"
-                )
+                guard getsockopt(fileDescriptor, SOL_SOCKET, SO_NOSIGPIPE, &value, &size) >= 0 else {
+                    return false
+                }
                 return value == 1
             #endif
         }
@@ -47,15 +57,12 @@ public final class TCPSocket {
                 return
             #else
                 var value: Int32 = newValue ? 1 : 0
-                assert(
-                    setsockopt(
-                        fileDescriptor,
-                        SOL_SOCKET,
-                        SO_NOSIGPIPE,
-                        &value,
-                        socklen_t(MemoryLayout<Int32>.size)
-                        ) >= 0,
-                    "Failed to set SO_NOSIGPIPE, errno=\(errno), message=\(lastErrorDescription())"
+                _ = setsockopt(
+                    fileDescriptor,
+                    SOL_SOCKET,
+                    SO_NOSIGPIPE,
+                    &value,
+                    socklen_t(MemoryLayout<Int32>.size)
                 )
             #endif
         }

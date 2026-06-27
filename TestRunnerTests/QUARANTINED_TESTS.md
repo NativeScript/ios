@@ -67,6 +67,16 @@ server can't serve these requests.
 filter once the server is fixed):
 - `DefaultHTTPServer.handleNewConnection` tolerates `getPeerName()` failure and
   serves the connection with a placeholder peer (instead of crashing/dropping).
+- `TCPSocket.ignoreSigPipe` get/set no longer `assert()` on
+  getsockopt/setsockopt failure — a half-dead loader socket made
+  `setsockopt(SO_NOSIGPIPE)` fail with EINVAL, and the assert trapped (live in
+  the Debug runner build) → `_assertionFailure` aborted the whole run
+  ("Executed 0 tests"). Now best-effort.
+- `Transport.handleRead`/`handleWrite` tear the connection down
+  (`closedByPeer()`) on any unexpected recv/send error instead of `fatalError`,
+  for the same reason: those sockets reach `Transport` once `getPeerName`/
+  `ignoreSigPipe` stopped trapping, and the next event-loop read/write on a
+  dead socket would otherwise crash the runner.
 - `/esm/timeout.mjs` responds via a non-blocking `loop.call(withDelay:)` instead
   of `Thread.sleep` (which wedged the single-threaded server).
 - The server also serves the `/ns/m/…` hot-data aliases and `/ns/core` bridge
