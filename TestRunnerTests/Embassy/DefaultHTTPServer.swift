@@ -78,7 +78,12 @@ public final class DefaultHTTPServer: HTTPServer {
             self.stop()
             semaphore.signal()
         }
-        _ = semaphore.wait(timeout: DispatchTime.distantFuture)
+        // Finite timeout, not .distantFuture: this runs on the (User-interactive)
+        // main thread during tearDown and waits on the event-loop thread. If that
+        // thread is starved (e.g. under CI load), waiting forever would hang the
+        // whole test process in teardown. The stop is best-effort at teardown, so
+        // bail after a few seconds rather than deadlock.
+        _ = semaphore.wait(timeout: .now() + 10)
     }
 
     // called to handle new connections
