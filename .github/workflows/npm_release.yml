@@ -168,7 +168,12 @@ jobs:
 
   test:
     name: Test
-    runs-on: macos-14
+    # Runtime suite runs on Xcode 26 / iOS 26 — the combo verified passing
+    # locally. iOS 17.x is intentionally NOT used: a worker-teardown stress spec
+    # deadlocks the JS thread there (hangs the whole suite), a bug we don't chase
+    # on an OS we don't ship-test. Pinned (not latest-stable) so the runtime suite
+    # is deterministic; bump to "27" when Xcode 27 ships.
+    runs-on: macos-15
     needs: build
     steps:
       - name: Harden the runner (Audit all outbound calls)
@@ -177,7 +182,10 @@ jobs:
           egress-policy: audit
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: ${{env.XCODE_VERSION}}
+          # Pin to Xcode 26 (latest 26.x on the runner). NOT the ^15.0 release-build
+          # pin — Sequoia/Tahoe ship no Xcode 15. OS=latest below then resolves to
+          # the iOS 26 runtime this Xcode bundles.
+          xcode-version: "26"
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: true
@@ -224,9 +232,62 @@ jobs:
           # TestRunnerTests.swift) need more than 20m headroom per attempt.
           timeout_minutes: 40
           max_attempts: 2
-          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test | xcpretty
+          command: |
+            set -o pipefail
+            # Background native-stack sampler: if the runtime suite deadlocks, the
+            # test-diagnostics artifact gets per-thread backtraces of the hung app
+            # (the JS console never reaches os_log, so this is our only window into
+            # the lock cycle). Killed via trap when xcodebuild returns.
+            bash .github/scripts/sample-hung-app.sh "$TEST_FOLDER/diagnostics" &
+            SAMPLER_PID=$!
+            trap 'kill "$SAMPLER_PID" 2>/dev/null || true' EXIT
+            xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test | xcpretty
           on_retry_command: rm -rf $TEST_FOLDER/test_results* && xcrun simctl shutdown all
-          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test
+          new_command_on_retry: |
+            bash .github/scripts/sample-hung-app.sh "$TEST_FOLDER/diagnostics" &
+            SAMPLER_PID=$!
+            trap 'kill "$SAMPLER_PID" 2>/dev/null || true' EXIT
+            xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test
+      # When the runtime suite fails it is almost always because the in-app
+      # Jasmine run died before POSTing results (crash or hang). The xcresult is
+      # black-box and captures nothing from inside the app, so collect the two
+      # things that actually explain it: the native crash report (.ips) and the
+      # simulator's unified log (the app's console.log / last spec before a stall).
+      # The watchdog in TestRunnerTests.swift prints which artifact to look at.
+      - name: Collect crash reports & simulator log (on failure)
+        if: ${{ failure() }}
+        run: |
+          DIAG="$TEST_FOLDER/diagnostics"
+          mkdir -p "$DIAG"
+          # Simulator app crashes land in the host's DiagnosticReports.
+          cp -R ~/Library/Logs/DiagnosticReports/. "$DIAG/DiagnosticReports/" 2>/dev/null || true
+          cp -R ~/Library/Logs/CoreSimulator/. "$DIAG/CoreSimulator/" 2>/dev/null || true
+          # Unified log = the app's console output (so the last spec before a hang
+          # is visible even when nothing was POSTed). `log collect` needs a booted
+          # device; don't rely on the `booted` alias (the prior collect failed
+          # because the sim wasn't booted at that moment). Resolve a concrete UDID
+          # — prefer one already booted from the test run, else the test device,
+          # booting it so the persisted log store can be collected.
+          UDID="$(xcrun simctl list devices booted | grep -oE '[0-9A-Fa-f-]{36}' | head -1)"
+          if [ -z "$UDID" ]; then
+            UDID="$(xcrun simctl list devices 'iPhone 16 Pro' | grep -oE '[0-9A-Fa-f-]{36}' | head -1)"
+            [ -n "$UDID" ] && xcrun simctl boot "$UDID" 2>/dev/null || true
+            [ -n "$UDID" ] && xcrun simctl bootstatus "$UDID" 2>/dev/null || true
+          fi
+          if [ -n "$UDID" ]; then
+            echo "Collecting unified log from simulator $UDID"
+            xcrun simctl spawn "$UDID" log collect --output "$DIAG/simulator.logarchive" 2>/dev/null || true
+          else
+            echo "No simulator UDID resolved; skipping logarchive collection."
+          fi
+          echo "Collected diagnostics:"; ls -laR "$DIAG" 2>/dev/null || true
+      - name: Upload test diagnostics (on failure)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: test-diagnostics
+          path: ${{ env.TEST_FOLDER }}/diagnostics
+          if-no-files-found: ignore
       - name: Validate Test Results
         run: |
           xcparse attachments $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test-out
