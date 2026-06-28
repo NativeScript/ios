@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdio>
+#include <memory>
+#include <mutex>
 #include <queue>
 #include <string>
 #include <unordered_map>
@@ -142,6 +144,7 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(v8::Isolat
                                                                       const std::string& code,
                                                                       const std::string& urlStr) {
   v8::EscapableHandleScope hs(isolate);
+  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
   const std::string registryKey = CanonicalizeRegistryKey(urlStr);
   if (IsScriptLoadingLogEnabled() && ShouldTraceRegistryKey(urlStr, registryKey)) {
     Log(@"[resolver][register-resolve-only] raw=%s key=%s", urlStr.c_str(),
@@ -207,62 +210,112 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(v8::Isolat
   return hs.Escape(mod);
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Per-isolate (thread-local) module registries: map absolute file paths /
-// canonical URLs → compiled v8::Module handles for the *current* isolate.
-//
-// Why thread_local: NS Worker creates a separate v8::Isolate on its own
-// thread (see Worker::ConstructorCallback in Worker.mm). v8::Global<T>
-// handles are bound to the isolate that created them; reading their
-// internal state from a different isolate is undefined behaviour. A
-// previous design held these registries as a single, process-global map,
-// which under HMR (where the worker fetches the SAME `/ns/m/` URLs the
-// main thread already loaded) caused the worker isolate to receive a
-// Module compiled by the main isolate. V8's linker then read the cross-
-// isolate Module's export table and emitted bogus errors like:
-//   SyntaxError: The requested module 'X' does not provide an export named 'Y'
-// even though the served source clearly declared `Y`. Making the
-// registry thread_local keeps each NS runtime/worker walking its own
-// fresh, valid handle graph.
-//
-// Why the leaky-pointer pattern (heap-allocated, never deleted by the
-// thread-exit destructor): a `thread_local std::unordered_map<...,
-// v8::Global<...>>` would, on thread exit, run the map's destructor —
-// which iterates and calls v8::Global::Reset() on each handle. If the
-// owning isolate was already torn down, those Resets blow up with the
-// `__cxa_finalize_ranges` SIGSEGV/SIGBUS that the original comment
-// warned about. By holding a thread_local *pointer* to a heap-allocated
-// map, the variable's per-thread destructor is a no-op (it just drops
-// a pointer); cleanup of the actual handles is handled explicitly by
-// the Runtime destructor (Runtime.mm) and CleanupImportMapGlobals()
-// below, which run *before* the isolate is disposed.
-//
-// The reference aliases below keep all existing access sites unchanged
-// (no `()` or `->` rewrites needed across ~100+ call sites). On each
-// thread's first use of e.g. `g_moduleRegistry`, the initializer below
-// runs once per thread to bind the reference to that thread's map.
 namespace {
 using ModuleHandleMap = std::unordered_map<std::string, v8::Global<v8::Module>>;
 
-ModuleHandleMap& MakePerIsolateModuleRegistry() {
-	thread_local auto* p = new ModuleHandleMap();
-	return *p;
+// The four module-handle maps for a single isolate. v8::Global<Module> handles
+// are bound to the isolate that created them, so each isolate (main + every
+// Worker) keeps its own set; they are looked up by v8::Isolate* below.
+struct PerIsolateModuleState {
+  ModuleHandleMap registry;            // canonical key  -> compiled module
+  ModuleHandleMap fallbackRegistry;    // canonical key  -> last good module
+  ModuleHandleMap fallbackByRelative;  // relative path  -> last good module
+  ModuleHandleMap vendorCache;         // vendor id      -> synthetic module
+};
+
+std::mutex& ModuleStateTableMutex() {
+  // Leaked-on-purpose process singletons (never destructed) so we never run a
+  // static destructor that would touch v8 handles after isolate disposal.
+  static std::mutex* mutex = new std::mutex();
+  return *mutex;
 }
 
-ModuleHandleMap& MakePerIsolateModuleFallbackRegistry() {
-	thread_local auto* p = new ModuleHandleMap();
-	return *p;
+std::unordered_map<v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>&
+ModuleStateTable() {
+  static auto* table =
+      new std::unordered_map<v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>();
+  return *table;
 }
 
-ModuleHandleMap& MakePerIsolateModuleFallbackByRelative() {
-	thread_local auto* p = new ModuleHandleMap();
-	return *p;
+// Fetch (creating on first use) the module maps owned by `isolate`. Keyed by
+// the isolate itself rather than the calling thread, so the maps follow the
+// isolate even if it is ever entered from another thread under v8::Locker.
+PerIsolateModuleState& ModuleStateFor(v8::Isolate* isolate) {
+  std::lock_guard<std::mutex> lock(ModuleStateTableMutex());
+  auto& table = ModuleStateTable();
+  auto it = table.find(isolate);
+  if (it == table.end()) {
+    it = table.emplace(isolate, std::make_unique<PerIsolateModuleState>()).first;
+  }
+  return *it->second;
 }
 }  // namespace
 
-thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry = MakePerIsolateModuleRegistry();
-static thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleFallbackRegistry = MakePerIsolateModuleFallbackRegistry();
-static thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleFallbackByRelative = MakePerIsolateModuleFallbackByRelative();
+// ────────────────────────────────────────────────────────────────────────────
+// Per-isolate module registries: map absolute file paths / canonical URLs →
+// compiled v8::Module handles, keyed by the owning v8::Isolate*.
+//
+// Why per-isolate (not process-global, not thread_local): v8::Global<T> handles
+// are bound to the isolate that created them; reading their internal state from
+// a different isolate is undefined behaviour. NS Workers each run a separate
+// v8::Isolate on their own thread (see Worker::ConstructorCallback in
+// Worker.mm). A previous design held these as a single process-global map,
+// which under HMR (where a worker fetches the SAME `/ns/m/` URLs the main
+// thread already loaded) handed the worker isolate a Module the main isolate
+// compiled; V8's linker then read the cross-isolate export table and emitted
+// bogus errors like:
+//   SyntaxError: The requested module 'X' does not provide an export named 'Y'
+// A later design made the maps thread_local, which fixed the symptom only
+// because each isolate happens to be pinned to one thread today. Keying
+// explicitly by v8::Isolate* drops that thread==isolate assumption.
+//
+// Lifetime: the per-isolate state is created lazily on first access and torn
+// down by DestroyModuleStateForIsolate(), which the Runtime destructor
+// (Runtime.mm) calls while the isolate is still alive (under v8::Locker) and
+// before disposal — so every v8::Global is Reset() at a safe time. That is what
+// retires the old leaky-pointer hack (a thread_local *pointer* whose per-thread
+// destructor was a deliberate no-op to dodge __cxa_finalize_ranges crashes).
+//
+// Each access site binds a local reference (e.g.
+// `auto& g_moduleRegistry = ModuleRegistryFor(isolate);`) so existing bodies
+// stay byte-for-byte the same while becoming isolate-correct.
+std::unordered_map<std::string, v8::Global<v8::Module>>& ModuleRegistryFor(
+    v8::Isolate* isolate) {
+  return ModuleStateFor(isolate).registry;
+}
+
+static ModuleHandleMap& ModuleFallbackRegistryFor(v8::Isolate* isolate) {
+  return ModuleStateFor(isolate).fallbackRegistry;
+}
+
+static ModuleHandleMap& ModuleFallbackByRelativeFor(v8::Isolate* isolate) {
+  return ModuleStateFor(isolate).fallbackByRelative;
+}
+
+static ModuleHandleMap& VendorModuleCacheFor(v8::Isolate* isolate) {
+  return ModuleStateFor(isolate).vendorCache;
+}
+
+// Reset and drop every module handle owned by `isolate`. Must run while the
+// isolate is still alive (the Runtime destructor calls this under v8::Locker,
+// before isolate disposal).
+void DestroyModuleStateForIsolate(v8::Isolate* isolate) {
+  std::unique_ptr<PerIsolateModuleState> state;
+  {
+    std::lock_guard<std::mutex> lock(ModuleStateTableMutex());
+    auto& table = ModuleStateTable();
+    auto it = table.find(isolate);
+    if (it == table.end()) {
+      return;
+    }
+    state = std::move(it->second);
+    table.erase(it);
+  }
+  for (auto& kv : state->registry) kv.second.Reset();
+  for (auto& kv : state->fallbackRegistry) kv.second.Reset();
+  for (auto& kv : state->fallbackByRelative) kv.second.Reset();
+  for (auto& kv : state->vendorCache) kv.second.Reset();
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Import map: bare specifier → resolved URL (populated by __nsConfigureRuntime)
@@ -278,17 +331,10 @@ static std::vector<std::string> g_volatilePatterns;
 
 // Vendor module registry: maps vendor specifier → evaluated v8::Module.
 // Populated when ns-vendor:// modules are first resolved via SyntheticModule.
-// Per-isolate (thread_local) for the same reason as g_moduleRegistry above —
-// vendor SyntheticModules are isolate-bound and reusing one across isolates
-// breaks the linker's export-table check.
-namespace {
-std::unordered_map<std::string, v8::Global<v8::Module>>& MakePerIsolateVendorModuleCache() {
-	thread_local auto* p = new std::unordered_map<std::string, v8::Global<v8::Module>>();
-	return *p;
-}
-}  // namespace
-
-static thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_vendorModuleCache = MakePerIsolateVendorModuleCache();
+// Lives in PerIsolateModuleState (vendorCache) for the same reason as the
+// module registry above — vendor SyntheticModules are isolate-bound and reusing
+// one across isolates breaks the linker's export-table check. Access via
+// VendorModuleCacheFor(isolate).
 
 static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string& registryKey) {
   if (rawKey != registryKey) {
@@ -344,6 +390,7 @@ static std::string CanonicalizeRegistryKey(const std::string& key) {
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
                                                 v8::Local<v8::Context> context,
                                                 const std::string& requestedUrl) {
+  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
   const std::string registryKey = CanonicalizeHttpUrlKey(requestedUrl);
 
   if (IsScriptLoadingLogEnabled()) {
@@ -705,6 +752,7 @@ static bool IsValidJSIdentifier(const std::string& name) {
 static v8::MaybeLocal<v8::Module> ResolveFromVendorRegistry(v8::Isolate* isolate,
                                                              v8::Local<v8::Context> context,
                                                              const std::string& vendorId) {
+  auto& g_vendorModuleCache = VendorModuleCacheFor(isolate);
   // Check cache first
   auto cached = g_vendorModuleCache.find(vendorId);
   if (cached != g_vendorModuleCache.end()) {
@@ -814,16 +862,12 @@ static v8::MaybeLocal<v8::Module> ResolveFromVendorRegistry(v8::Isolate* isolate
 }
 
 void CleanupImportMapGlobals() {
+  // Process-global import-map state (not isolate-bound). The per-isolate module
+  // handle maps (registry / fallback / fallbackByRelative / vendor) are torn
+  // down separately by DestroyModuleStateForIsolate(), which ~Runtime calls for
+  // every isolate before disposal.
   g_importMap.clear();
   g_volatilePatterns.clear();
-  for (auto& kv : g_vendorModuleCache) { kv.second.Reset(); }
-  g_vendorModuleCache.clear();
-  // Also clear fallback registries — they hold v8::Global<Module> handles that
-  // would crash during static destructor cleanup if not cleared before isolate disposal.
-  for (auto& kv : g_moduleFallbackRegistry) { kv.second.Reset(); }
-  g_moduleFallbackRegistry.clear();
-  for (auto& kv : g_moduleFallbackByRelative) { kv.second.Reset(); }
-  g_moduleFallbackByRelative.clear();
 }
 
 // g_modulesInFlight is defined later in this translation unit (thread_local static); no extern needed here.
@@ -856,6 +900,15 @@ static const std::string& GetDocumentsDirectory() {
 }
 
 void RemoveModuleFromRegistry(const std::string& canonicalPath) {
+  // Only ever called on an isolate's own JS thread during module
+  // resolution/loading, so the entered isolate owns the maps to mutate.
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  if (isolate == nullptr) {
+    return;
+  }
+  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate);
+  auto& g_moduleFallbackByRelative = ModuleFallbackByRelativeFor(isolate);
   const std::string registryKey = CanonicalizeRegistryKey(canonicalPath);
   // Defensive: never operate on an anomalous/sentinel key.
   // This covers the bare "@" anomaly and the special invalid-at stub module used by the dev HTTP loader.
@@ -939,6 +992,13 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
 
 std::vector<std::string> GetLoadedModuleUrls() {
   std::vector<std::string> urls;
+  // Read-only registry introspection for the current isolate (HMR runs this on
+  // the isolate's own JS thread).
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  if (isolate == nullptr) {
+    return urls;
+  }
+  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
   urls.reserve(g_moduleRegistry.size());
 
   for (const auto& entry : g_moduleRegistry) {
@@ -956,6 +1016,7 @@ std::vector<std::string> GetLoadedModuleUrls() {
 
 void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
                        const std::vector<std::string>& urls) {
+  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
   if (urls.empty()) return;
 
   std::unordered_set<std::string> seen;
@@ -1013,6 +1074,8 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
 
 void UpdateModuleFallback(v8::Isolate* isolate, const std::string& canonicalPath,
                           v8::Local<v8::Module> module) {
+  auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate);
+  auto& g_moduleFallbackByRelative = ModuleFallbackByRelativeFor(isolate);
   auto fallbackIt = g_moduleFallbackRegistry.find(canonicalPath);
   if (fallbackIt != g_moduleFallbackRegistry.end()) {
     fallbackIt->second.Reset();
@@ -1405,6 +1468,8 @@ struct ResolutionStackGuard {
 
   ~ResolutionStackGuard() {
     if (active_ && !stack_.empty()) {
+      auto& g_moduleRegistry = ModuleRegistryFor(isolate_);
+      auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate_);
       if (IsScriptLoadingLogEnabled()) {
         Log(@"[resolver][stack] pop (%lu) %s",
             static_cast<unsigned long>(stack_.size()), entry_.c_str());
@@ -1532,6 +1597,7 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& absPath, const std::string& registryAbsPath,
     bool isWorker) {
+  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
   // Debug: Log JSON module handling for worker context
   if (isWorker) {
     printf("ResolveModuleCallback: Worker handling JSON module '%s'\n", absPath.c_str());
@@ -1611,6 +1677,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                                                  v8::Local<v8::FixedArray> import_assertions,
                                                  v8::Local<v8::Module> referrer) {
   v8::Isolate* isolate = context->GetIsolate();
+  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate);
+  auto& g_moduleFallbackByRelative = ModuleFallbackByRelativeFor(isolate);
 
   // 1) Turn the specifier literal into a std::string:
   v8::String::Utf8Value specUtf8(isolate, specifier);
@@ -2543,6 +2612,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::Local<v8::Context> context, v8::Local<v8::ScriptOrModule> referrer,
     v8::Local<v8::String> specifier, v8::Local<v8::FixedArray> import_assertions) {
   v8::Isolate* isolate = context->GetIsolate();
+  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
   // Diagnostic: log every dynamic import attempt.
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const char* cSpec = (*specUtf8) ? *specUtf8 : "<invalid>";

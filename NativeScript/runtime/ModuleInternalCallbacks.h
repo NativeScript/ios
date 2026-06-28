@@ -8,14 +8,22 @@
 
 namespace tns {
 
-// Export our registry so both LoadESModule and the callback see the same data.
-// `thread_local`: each NS isolate (main thread + each Worker thread) gets its
-// own per-thread map, because v8::Global<Module> handles are isolate-bound.
-// See the long-form comment above the definition in ModuleInternalCallbacks.mm
-// for the cross-isolate-handle bug this prevents.
-extern thread_local std::unordered_map<std::string, v8::Global<v8::Module>>& g_moduleRegistry;
+// Per-isolate module registry accessor: map canonical keys → compiled
+// v8::Module handles for `isolate`. Keyed by v8::Isolate* (not thread) because
+// v8::Global<Module> handles are isolate-bound; see the long-form comment above
+// the definition in ModuleInternalCallbacks.mm for the cross-isolate-handle bug
+// this prevents. Callers bind a local alias, e.g.
+// `auto& g_moduleRegistry = tns::ModuleRegistryFor(isolate);`.
+std::unordered_map<std::string, v8::Global<v8::Module>>& ModuleRegistryFor(
+    v8::Isolate* isolate);
 
-// Utility to drop modules from the registry when compilation/instantiation fails
+// Reset + drop every module handle owned by `isolate`. Must be called while the
+// isolate is still alive (the Runtime destructor calls this before disposal).
+void DestroyModuleStateForIsolate(v8::Isolate* isolate);
+
+// Utility to drop modules from the registry when compilation/instantiation
+// fails. Operates on the *current* isolate's maps (resolved internally); only
+// ever called on the isolate's own JS thread during module resolution/loading.
 void RemoveModuleFromRegistry(const std::string& canonicalPath);
 
 // Authoritative HTTP URL loader for dev-served ESM. This compiles and registers
