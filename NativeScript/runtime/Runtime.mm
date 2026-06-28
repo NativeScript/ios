@@ -67,7 +67,7 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
   std::string modulePath;
 
   try {
-    for (auto& kv : tns::g_moduleRegistry) {
+    for (auto& kv : tns::ModuleRegistryFor(isolate)) {
       // Check if Global handle is empty before accessing
       if (kv.second.IsEmpty()) {
         continue;
@@ -262,38 +262,31 @@ Runtime::~Runtime() {
   {
     v8::Locker lock(isolate_);
 
-    // Clear module registry before disposing other handles.
-    // This prevents crashes during g_moduleRegistry cleanup. The registry is
-    // `thread_local` (each NS isolate has its own per-thread map; see
-    // ModuleInternalCallbacks.mm for rationale), so this loop walks ONLY the
-    // entries that this destructor's thread/isolate created.
-    for (auto& kv : g_moduleRegistry) {
-      kv.second.Reset();
-    }
-    g_moduleRegistry.clear();
+    // Tear down this isolate's module maps (registry / fallback /
+    // fallbackByRelative / vendor) before disposing other handles. The maps are
+    // keyed by v8::Isolate* (see ModuleInternalCallbacks.mm), so this resets and
+    // drops only the handles this isolate created — while it is still alive,
+    // under the Locker above. This replaces the old thread_local leaky-pointer
+    // cleanup and also frees worker isolates' maps (previously leaked).
+    tns::DestroyModuleStateForIsolate(isolate_);
 
-    // Clear HMR + import-map globals (`g_importMap`, `g_hotData`,
+    // Clear the remaining HMR + import-map globals (`g_importMap`, `g_hotData`,
     // `g_hotAccept`, `g_hotDispose`, `g_hotPrune`, `g_hotEventListeners`,
-    // `g_hotDeclined`, `g_vendorModuleCache`, etc.) before isolate disposal.
-    // These hold v8::Global handles that would crash during static destructor
-    // cleanup if the isolate is already torn down.
+    // `g_hotDeclined`, etc.) before isolate disposal. These hold v8::Global
+    // handles that would crash during static destructor cleanup if the isolate
+    // is already torn down.
     //
-    // CRITICAL: these globals are PROCESS-WIDE, not per-isolate. They live
-    // in the main isolate's address space but every Runtime destructor would
-    // clear them. That's wrong for worker-isolate teardown: when a worker
-    // dies (e.g. via `__nsTerminateAllWorkers` during an HMR cycle), its
-    // Runtime destructor MUST NOT wipe the main isolate's import map and
-    // hot-state — doing so silently breaks the next HMR cycle's bare-
-    // specifier resolution (vendor packages fall back to filesystem and
-    // fail with `Cannot find module @scope/pkg`).
-    //
-    // Worker isolates have their own `g_moduleRegistry` (thread_local,
-    // cleared above), but they SHARE the static globals with the main
-    // isolate. So we gate this cleanup on "this is the main isolate" —
-    // worker teardown leaves the shared globals intact and the main
-    // isolate continues serving HMR cycles uninterrupted. Real
-    // process-teardown still routes through the main isolate's
-    // destructor, so the cleanup eventually fires.
+    // CRITICAL: unlike the per-isolate module maps above, these globals are
+    // PROCESS-WIDE. They live in the main isolate's address space but every
+    // Runtime destructor would clear them. That's wrong for worker-isolate
+    // teardown: when a worker dies (e.g. via `__nsTerminateAllWorkers` during an
+    // HMR cycle), its Runtime destructor MUST NOT wipe the main isolate's import
+    // map and hot-state — doing so silently breaks the next HMR cycle's bare-
+    // specifier resolution (vendor packages fall back to filesystem and fail
+    // with `Cannot find module @scope/pkg`). So we gate this cleanup on "this is
+    // the main isolate"; worker teardown leaves the shared globals intact and
+    // the main isolate keeps serving HMR cycles. Real process-teardown still
+    // routes through the main isolate's destructor, so the cleanup fires.
     if (!IsRuntimeWorker()) {
       tns::CleanupHMRGlobals();
       tns::CleanupImportMapGlobals();
