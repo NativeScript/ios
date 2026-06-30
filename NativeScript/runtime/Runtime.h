@@ -8,7 +8,14 @@
 #include "SpinLock.h"
 #include "libplatform/libplatform.h"
 
+#include <functional>
+#include <string>
+
 namespace tns {
+
+using ReloadApplicationHook = std::function<bool(const std::string& baseDir)>;
+void SetReloadApplicationHook(ReloadApplicationHook hook);
+bool InvokeReloadApplicationHook(const std::string& baseDir);
 
 class Runtime {
  public:
@@ -66,6 +73,8 @@ class Runtime {
   void DefineGlobalObject(v8::Local<v8::Context> context, bool isWorker);
   void DefineCollectFunction(v8::Local<v8::Context> context);
   void DefineNativeScriptVersion(v8::Isolate* isolate,
+                                 v8::Local<v8::ObjectTemplate> globalTemplate);
+  void DefineNativeScriptRuntime(v8::Isolate* isolate,
                                  v8::Local<v8::ObjectTemplate> globalTemplate);
   void DefinePerformanceObject(v8::Isolate* isolate,
                                v8::Local<v8::ObjectTemplate> globalTemplate);
