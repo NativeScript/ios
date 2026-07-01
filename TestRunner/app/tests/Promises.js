@@ -130,4 +130,24 @@ describe("Promise scheduling", function () {
             done();
         });
     });
+
+    it("the 'then' callback runs for a Promise created on a background thread and resolved on the runtime loop", done => {
+        // https://github.com/NativeScript/ios/issues/330
+        // The promise is constructed on a background dispatch queue whose run
+        // loop is dormant, then resolve() is invoked on the runtime loop. The
+        // resolution must run there instead of being marshaled back to the
+        // parked background loop, otherwise the promise never settles.
+        const backgroundQueue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+        dispatch_async(backgroundQueue, () => {
+            new Promise(resolve => {
+                NSOperationQueue.mainQueue.addOperationWithBlock(() => resolve("settled"));
+            }).then(value => {
+                expect(value).toBe("settled");
+                done();
+            }).catch(error => {
+                expect(true).toBe(false, "The promise rejected unexpectedly: " + error);
+                done();
+            });
+        });
+    });
 });
