@@ -82,6 +82,7 @@ class Runtime {
   std::unique_ptr<ModuleInternal> moduleInternal_;
   int workerId_;
   CFRunLoopRef runtimeLoop_;
+  CFRunLoopObserverRef messageLoopObserver_ = nullptr;
   double startTime;
   double realtimeOrigin;
   // TODO: refactor this. This is only needed because, during program

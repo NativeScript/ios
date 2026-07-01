@@ -183,6 +183,12 @@ Runtime::Runtime() {
 }
 
 Runtime::~Runtime() {
+  if (messageLoopObserver_) {
+    CFRunLoopObserverInvalidate(messageLoopObserver_);
+    CFRelease(messageLoopObserver_);
+    messageLoopObserver_ = nullptr;
+  }
+
   auto currentIsolate = this->isolate_;
   {
     // make sure we remove the isolate from the list of active isolates first
@@ -423,6 +429,27 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   cache->SetContext(context);
 
   this->isolate_ = isolate;
+
+  // Pump V8's foreground task queue on each CFRunLoop iteration.
+  // FinalizationRegistry cleanup callbacks are posted as foreground tasks by V8
+  // during GC — without this, they never execute.
+  CFRunLoopObserverContext obsCtx = {0, this, nullptr, nullptr, nullptr};
+  messageLoopObserver_ = CFRunLoopObserverCreate(
+      kCFAllocatorDefault, kCFRunLoopBeforeWaiting, true, 0,
+      [](CFRunLoopObserverRef observer, CFRunLoopActivity activity, void* info) {
+        auto* runtime = static_cast<Runtime*>(info);
+        auto* isolate = runtime->GetIsolate();
+        if (!IsAlive(isolate)) {
+          return;
+        }
+        v8::Locker locker(isolate);
+        while (v8::platform::PumpMessageLoop(platform_.get(), isolate,
+                                             v8::platform::MessageLoopBehavior::kDoNotWait)) {
+          continue;
+        }
+      },
+      &obsCtx);
+  CFRunLoopAddObserver(runtimeLoop_, messageLoopObserver_, kCFRunLoopCommonModes);
 }
 
 void Runtime::RunMainScript() {
