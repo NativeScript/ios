@@ -38,7 +38,7 @@ describe("Node built-in and optional module resolution", function () {
   });
 
   it("resolves import-map vendor modules through the explicit vendor registry", async function () {
-    const configureRuntime = globalThis.__nsConfigureDevRuntime || globalThis.__nsConfigureRuntime;
+    const configureRuntime = globalThis.__NS_DEV__ && globalThis.__NS_DEV__.configureRuntime;
     expect(typeof configureRuntime).toBe("function");
 
     const previousRegistry = globalThis.__nsVendorRegistry;
