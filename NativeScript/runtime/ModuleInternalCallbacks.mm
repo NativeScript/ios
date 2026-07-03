@@ -259,22 +259,21 @@ PerIsolateModuleState& ModuleStateFor(v8::Isolate* isolate) {
 // are bound to the isolate that created them; reading their internal state from
 // a different isolate is undefined behaviour. NS Workers each run a separate
 // v8::Isolate on their own thread (see Worker::ConstructorCallback in
-// Worker.mm). A previous design held these as a single process-global map,
-// which under HMR (where a worker fetches the SAME `/ns/m/` URLs the main
-// thread already loaded) handed the worker isolate a Module the main isolate
-// compiled; V8's linker then read the cross-isolate export table and emitted
-// bogus errors like:
+// Worker.mm) and, under HMR, fetch the SAME `/ns/m/` URLs the main thread
+// already loaded — a shared map would hand the worker isolate a Module the
+// main isolate compiled, and V8's linker would read the cross-isolate export
+// table and emit bogus errors like:
 //   SyntaxError: The requested module 'X' does not provide an export named 'Y'
-// A later design made the maps thread_local, which fixed the symptom only
-// because each isolate happens to be pinned to one thread today. Keying
-// explicitly by v8::Isolate* drops that thread==isolate assumption.
+// thread_local maps would avoid that only while each isolate happens to be
+// pinned to a single thread; keying explicitly by v8::Isolate* stays correct
+// even if an isolate is ever entered from another thread under v8::Locker.
 //
 // Lifetime: the per-isolate state is created lazily on first access and torn
 // down by DestroyModuleStateForIsolate(), which the Runtime destructor
 // (Runtime.mm) calls while the isolate is still alive (under v8::Locker) and
-// before disposal — so every v8::Global is Reset() at a safe time. That is what
-// retires the old leaky-pointer hack (a thread_local *pointer* whose per-thread
-// destructor was a deliberate no-op to dodge __cxa_finalize_ranges crashes).
+// before disposal — so every v8::Global is Reset() at a safe time, and nothing
+// is left to static/thread destructors (where __cxa_finalize_ranges-time
+// v8::Global resets crash).
 //
 // Each access site binds a local reference (e.g.
 // `auto& g_moduleRegistry = ModuleRegistryFor(isolate);`) so existing bodies
@@ -318,7 +317,7 @@ void DestroyModuleStateForIsolate(v8::Isolate* isolate) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Import map: bare specifier → resolved URL (populated by __nsConfigureRuntime)
+// Import map: bare specifier → resolved URL (populated by __NS_DEV__.configureRuntime)
 // Instead of rewriting import statements in source code on the Vite side, the runtime
 // resolves bare specifiers through this map to either vendor URLs (ns-vendor://)
 // or HTTP module URLs. Source code is served as Vite transformed it.
@@ -1050,10 +1049,10 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     RemoveModuleFromRegistry(url);
   }
 
-  // Drop stale HTTP bodies from the speculative-prefetch cache for
+  // Drop stale HTTP bodies from the kickstart prewarm cache for
   // every URL we just invalidated. Without this, the next
   // `HttpFetchText` for an evicted URL would happily return a stale
-  // body the previous wave (or kickstart) left in the cache, and V8
+  // body a previous kickstart wave left in the cache, and V8
   // would compile that stale source — producing the "1 cycle behind"
   // lag for `.ts` edits with many transitive importers (e.g.
   // constants files). The registry eviction above alone is necessary
@@ -1062,6 +1061,16 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
   // `g_prefetchCache`. Both caches must be cleared for the next
   // compile to see fresh source.
   EvictHttpModulePrefetchCacheUrls(uniqueUrls);
+
+  // Third layer: the OS/CFNetwork HTTP cache is outside the runtime's
+  // direct control and has been observed serving a previous save's body
+  // even with `no-store` headers + a reload-ignoring cache policy
+  // (iOS 18+/26+ Simulator). Mark every invalidated key so the NEXT
+  // network fetch of that URL carries a unique `__ns_dev_nonce` query
+  // param — CFNetwork sees a URL it has never cached and must go to
+  // origin. The nonce is transport-only; module identity stays the
+  // canonical URL.
+  MarkUrlsForCacheBust(uniqueUrls);
 
   if (logScriptLoading) {
     Log(@"[ns-hmr][ios-invalidate] summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
@@ -1358,7 +1367,7 @@ static bool IsDocumentsPath(const std::string& path) {
   if (path.empty()) return false;
   const std::string& docs = GetDocumentsDirectory();
   if (docs.empty()) {
-    // Fallback heuristic (legacy) if we cannot resolve the real Documents dir.
+    // Fallback heuristic if we cannot resolve the real Documents dir.
     return path.find("/Documents/") != std::string::npos || path.find("\\Documents\\") != std::string::npos;
   }
   std::string normalizedInput = NormalizePath(path);
@@ -1722,7 +1731,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   const std::string& spec = normalizedSpec; // use normalized spec for the rest of the resolution logic
 
   // Import map resolution
-  // If the import map is populated (set by __nsConfigureRuntime), check it
+  // If the import map is populated (set by __NS_DEV__.configureRuntime), check it
   // before any other resolution. This is the highest-leverage change from
   // the HMR architecture review: bare specifiers resolve through the map
   // to either vendor URLs or HTTP module URLs, eliminating the need for
@@ -3122,12 +3131,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         Log(@"[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());
       }
       std::string key = CanonicalizeHttpUrlKey(normalizedSpec);
-      // Volatile pattern check: if the URL matches any configured volatile pattern,
-      // evict the cached module so we always re-fetch. This replaces the hardcoded
-      // /@ns/sfc/ and /@ns/asm/ checks with a configurable system.
+      // Volatile pattern check: if the URL matches any configured volatile
+      // pattern, evict the cached module so we always re-fetch. The pattern
+      // list is supplied by the dev client via `__NS_DEV__.configureRuntime`.
       bool isVolatile = IsVolatileUrl(normalizedSpec);
-      // Backward compatibility: if no volatile patterns configured, fall back to
-      // hardcoded SFC/ASM detection
+      // Default when no volatile patterns are configured: detect the SFC/ASM
+      // dev endpoints directly.
       if (!isVolatile && g_volatilePatterns.empty()) {
         bool specIsSfc = normalizedSpec.find("/@ns/sfc/") != std::string::npos;
         bool specIsAsm = normalizedSpec.find("/@ns/asm/") != std::string::npos;
@@ -3149,7 +3158,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // `ɵɵreplaceMetadata`. Without this evict, the boot-time call's
       // resolved module would shadow any subsequent fetch on a path-only
       // canonicalization regression and surface as "first save's metadata
-      // permanently stuck on screen" — exactly the symptom this fixes.
+      // permanently stuck on screen".
       if (!isVolatile && normalizedSpec.find("/@ng/component") != std::string::npos) {
         isVolatile = true;
       }

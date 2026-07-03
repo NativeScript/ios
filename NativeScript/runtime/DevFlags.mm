@@ -16,41 +16,6 @@ bool IsScriptLoadingLogEnabled() {
 
 // HTTP module loader flags
 
-// Reads `httpModulePrefetch` from app config (default: DISABLED).
-//
-// Apps that want to opt in for testing can set:
-//
-//   // nativescript.config.ts
-//   export default {
-//     httpModulePrefetch: true,
-//   } as NativeScriptConfig;
-//
-// Returning false here short-circuits both the cache lookup and the prefetch
-// wave in HttpFetchText, restoring the pre-prefetcher behavior bit-for-bit.
-bool IsHttpModulePrefetchEnabled() {
-  static std::once_flag s_initFlag;
-  static bool s_enabled = false;
-  std::call_once(s_initFlag, []() {
-    @autoreleasepool {
-      id value = Runtime::GetAppConfigValue("httpModulePrefetch");
-      if (value && [value respondsToSelector:@selector(boolValue)]) {
-        s_enabled = [value boolValue];
-      }
-    }
-    // Startup banner. Gated on the logScriptLoading flag so it stays silent
-    // by default — flip the flag in nativescript.config.ts when diagnosing
-    // why prefetch is or isn't engaging.
-    //
-    //   [http-loader] prefetch=disabled   ← expected default
-    //   [http-loader] prefetch=enabled    ← only if config opt-in
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-loader] prefetch=%s shared-session=on hmr-kickstart=on",
-          s_enabled ? "enabled" : "disabled");
-    }
-  });
-  return s_enabled;
-}
-
 // Default OFF because the volume is high (one line per fetch, hundreds per
 // cold boot, hundreds per HMR refresh). Opt in via `nativescript.config.ts`:
 //

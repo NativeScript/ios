@@ -19,13 +19,6 @@ using namespace v8;
 
 namespace tns {
 
-// Debug-mode JS-error flag. Was `extern` from Runtime.mm, whose definition
-// (and its only consumer — the debug keepalive loop in runMainApplication)
-// upstream removed in the #375 error-handling refactor. Defined locally so
-// this branch's assignment sites stay intact across the merge; it is now
-// write-only and can be deleted when this file is reconciled with #375.
-bool jsErrorOccurred = false;
-
 // Helper function to check if a module name looks like an optional external module
 bool IsLikelyOptionalModule(const std::string& moduleName) {
   // Check if it's a bare module name (no path separators) that could be an npm package
@@ -853,9 +846,6 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
   if (!script->Run(context).ToLocal(&result)) {
     // Script execution failed, throw a proper exception instead of aborting V8
     if (RuntimeConfig.IsDebug) {
-      // Mark that a JavaScript error occurred
-      jsErrorOccurred = true;
-
       // Log the detailed JavaScript error with full stack trace
       Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
       Log(@"Error executing script: %s", canonicalPath.c_str());
@@ -947,9 +937,6 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
     // isolates must NOT swallow: a worker entry-script error has to propagate so
     // `worker.onerror` fires. So fall through to the throw path for workers.
     if (RuntimeConfig.IsDebug && !Caches::Get(isolate)->isWorker) {
-      // Mark that a JavaScript error occurred
-      jsErrorOccurred = true;
-
       // Log the detailed JavaScript error with full stack trace
       Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
       Log(@"Error compiling classic script: %s", canonicalPath.c_str());
@@ -1224,8 +1211,8 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       Local<Promise> promise = result.As<Promise>();
 
       // Top-level await can depend on native async work such as fetch(), which requires
-      // both V8 microtasks and the Cocoa run loop to advance. Returning early here causes
-      // callers like __nsStartDevSession(clientUrl) to continue before bootstrap finished.
+      // both V8 microtasks and the Cocoa run loop to advance. Returning early here would
+      // let dynamic-import callers continue before the module finished evaluating.
       auto pumpAsyncProgress = [&]() {
         isolate->PerformMicrotaskCheckpoint();
         if (isHttpModule) {
@@ -1257,8 +1244,6 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             logPhase("evaluate", "promise-rejected");
             if (RuntimeConfig.IsDebug) {
               // In debug mode, show modal and continue without throwing
-              jsErrorOccurred = true;
-
               std::string errorTitle = "Uncaught JavaScript Exception";
               std::string errorMessage = "Module evaluation promise rejected";
               std::string stackTrace = "";
@@ -1301,7 +1286,6 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 
                 // Log the extracted error information
                 Log(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
-                // Reverted: do not remap before logging/displaying
                 if (!stackTrace.empty()) {
                   Log(@"JavaScript stack trace:\n%s", stackTrace.c_str());
                 }
@@ -1335,11 +1319,10 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
               // rejection reason can propagate back through
               // `ModuleInternal::RunModule`'s catch handler into the
               // caller's `outErrorMessage`; otherwise the caller sees
-              // only a generic failure with no detail. For non-HTTP
-              // debug we preserve the historical "show modal + return
-              // empty namespace" behavior — `RunModule`'s
-              // empty-namespace branch then returns true so the app
-              // keeps running.
+              // only a generic failure with no detail. Non-HTTP debug
+              // shows the modal and returns an empty namespace —
+              // `RunModule`'s empty-namespace branch then returns true
+              // so the app keeps running.
               if (isHttpModule) {
                 std::string detail = std::string("HTTP module evaluation promise rejected: ") + canonicalPath;
                 if (!errorMessage.empty()) {
@@ -1381,10 +1364,10 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
           RemoveModuleFromRegistry(canonicalPath);
           // Throw even in debug so the TLA timeout reason flows
           // through `ModuleInternal::RunModule`'s catch handler and
-          // into `__nsStartDevSession`'s JS-side rejection. Pre-fix
-          // the debug path returned an empty namespace silently,
-          // which the dev session reported as a generic "failed to
-          // import" with no clue that TLA had timed out.
+          // into the rejected promise the JS dev client observes —
+          // a silent empty namespace here would surface only as a
+          // generic "failed to import" with no clue that TLA had
+          // timed out.
           if (RuntimeConfig.IsDebug) {
             Log(@"***** JavaScript exception occurred *****");
             Log(@"Top-level await timed out for HTTP ES module: %s", canonicalPath.c_str());

@@ -191,212 +191,51 @@ describe("HTTP ESM Loader", function() {
     });
     
     describe("Integration with HMR", function() {
-        
-        it("should expose import.meta.hot with a working invalidate hook", function(done) {
+
+        it("should NOT attach a native import.meta.hot (hot contexts are injected by the dev server)", function(done) {
+            // The runtime owns no HMR policy: `import.meta.hot` is only present
+            // when the @nativescript/vite dev server injects a JS hot context
+            // into the served module source. Modules loaded outside a dev
+            // session (like this fixture) must see no hot object at all.
             import("~/tests/esm/hmr/test-esm-module.mjs").then(function(module) {
-                const hot = module.getHotContext();
-                if (!hot) {
-                    // In release builds import.meta.hot is stripped; ensure helper reports false.
-                    expect(module.callInvalidateSafe()).toBe(false);
-                    done();
-                    return;
-                }
-                expect(module.callInvalidateSafe()).toBe(true);
-                expect(typeof hot.invalidate).toBe("function");
+                expect(module.getHotContext()).toBeUndefined();
+                expect(module.callInvalidateSafe()).toBe(false);
                 done();
             }).catch(function(error) {
-                fail("Expected to access HMR helpers: " + error.message);
+                fail("Expected to inspect import.meta.hot absence: " + error.message);
                 done();
             });
         });
-        
-        it("should provide stable accept and dispose hooks", function(done) {
-            import("~/tests/esm/hmr/test-esm-module.mjs").then(function(module) {
-                const hot = module.getHotContext();
-                if (!hot) {
-                    // Nothing to assert in release builds; ensure helper reported correctly.
-                    expect(module.callInvalidateSafe()).toBe(false);
-                    done();
-                    return;
-                }
-                expect(typeof hot.accept).toBe("function");
-                expect(typeof hot.dispose).toBe("function");
-                expect(typeof hot.invalidate).toBe("function");
-                done();
-            }).catch(function(error) {
-                fail("Expected import.meta.hot hook inspection to succeed: " + error.message);
-                done();
-            });
-        });
-    });
 
-    describe("HMR hot.data", function () {
-        it("should expose import.meta.hot.data and stable API", function (done) {
-            var origin = getHostOrigin();
-            var specs = origin
-                ? [origin + "/esm/hmr/hot-data-ext.mjs", origin + "/esm/hmr/hot-data-ext.js"]
-                : ["~/tests/esm/hmr/hot-data-ext.mjs"];
-
-            withTimeout(Promise.all(specs.map(function (s) { return import(s); })), 5000, "import hot-data test modules")
-                .then(function (mods) {
-                    var mjs = mods[0];
-                    var apiMjs = mjs && typeof mjs.testHotApi === "function" ? mjs.testHotApi() : null;
-
-                    // In release builds import.meta.hot is stripped; skip these assertions.
-                    if (!(apiMjs && apiMjs.hasHot)) {
-                        pending("import.meta.hot not available (likely release build)");
-                        done();
-                        return;
-                    }
-
-                    expect(apiMjs.ok).toBe(true);
-                    if (mods.length > 1) {
-                        var js = mods[1];
-                        var apiJs = js && typeof js.testHotApi === "function" ? js.testHotApi() : null;
-                        expect(apiJs && apiJs.ok).toBe(true);
-                    }
-                    done();
-                })
-                .catch(function (error) {
-                    fail("Expected hot-data test modules to import: " + formatError(error));
-                    done();
-                });
-        });
-
-        it("should share hot.data across .mjs and .js variants", function (done) {
-            var origin = getHostOrigin();
-            if (!origin) {
-                pending("REPORT_BASEURL not set; cannot import .js as ESM in this harness");
-                done();
-                return;
-            }
-
-            withTimeout(Promise.all([
-                import(origin + "/esm/hmr/hot-data-ext.mjs"),
-                import(origin + "/esm/hmr/hot-data-ext.js"),
-            ]), 5000, "import .mjs/.js hot-data modules")
-                .then(function (mods) {
-                    var mjs = mods[0];
-                    var js = mods[1];
-
-                    var hotMjs = mjs && typeof mjs.getHot === "function" ? mjs.getHot() : null;
-                    var hotJs = js && typeof js.getHot === "function" ? js.getHot() : null;
-                    if (!hotMjs || !hotJs) {
-                        pending("import.meta.hot not available (likely release build)");
-                        done();
-                        return;
-                    }
-
-                    var dataMjs = mjs.getHotData();
-                    var dataJs = js.getHotData();
-                    expect(dataMjs).toBeDefined();
-                    expect(dataJs).toBeDefined();
-
-                    var token = "tok_" + Date.now() + "_" + Math.random();
-                    mjs.setHotValue(token);
-                    expect(js.getHotValue()).toBe(token);
-
-                    // Canonical hot key strips common script extensions, so these should share identity.
-                    expect(dataMjs).toBe(dataJs);
-                    done();
-                })
-                .catch(function (error) {
-                    fail("Expected hot.data sharing assertions to succeed: " + formatError(error));
-                    done();
-                });
-        });
-
-        it("should share hot.data across canonical, live-tagged, and boot-tagged /ns/m URLs", function (done) {
-            var origin = getHostOrigin();
-            if (!origin) {
-                pending("REPORT_BASEURL not set; cannot import host HTTP HMR aliases in this harness");
-                done();
-                return;
-            }
-
-            var canonicalUrl = origin + "/ns/m/esm/hmr/hot-data-ext.mjs";
-            var liveTaggedUrl = origin + "/ns/m/__ns_hmr__/live/esm/hmr/hot-data-ext.js";
-            var bootTaggedUrl = origin + "/ns/m/__ns_boot__/b1/__ns_hmr__/live/esm/hmr/hot-data-ext.mjs";
-
-            withTimeout(Promise.all([
-                import(canonicalUrl),
-                import(liveTaggedUrl),
-                import(bootTaggedUrl),
-            ]), 5000, "import /ns/m hot-data aliases")
-                .then(function (mods) {
-                    var canonical = mods[0];
-                    var liveTagged = mods[1];
-                    var bootTagged = mods[2];
-
-                    var hotCanonical = canonical && typeof canonical.getHot === "function" ? canonical.getHot() : null;
-                    var hotLive = liveTagged && typeof liveTagged.getHot === "function" ? liveTagged.getHot() : null;
-                    var hotBoot = bootTagged && typeof bootTagged.getHot === "function" ? bootTagged.getHot() : null;
-                    if (!hotCanonical || !hotLive || !hotBoot) {
-                        pending("import.meta.hot not available (likely release build)");
-                        done();
-                        return;
-                    }
-
-                    var dataCanonical = canonical.getHotData();
-                    var dataLive = liveTagged.getHotData();
-                    var dataBoot = bootTagged.getHotData();
-                    expect(dataCanonical).toBeDefined();
-                    expect(dataLive).toBeDefined();
-                    expect(dataBoot).toBeDefined();
-
-                    var token = "hmr_alias_" + Date.now() + "_" + Math.random();
-                    canonical.setHotValue(token);
-                    expect(liveTagged.getHotValue()).toBe(token);
-                    expect(bootTagged.getHotValue()).toBe(token);
-                    expect(dataCanonical).toBe(dataLive);
-                    expect(dataCanonical).toBe(dataBoot);
-                    done();
-                })
-                .catch(function (error) {
-                    fail("Expected /ns/m hot-data alias imports to share state: " + formatError(error));
-                    done();
-                });
-        });
-
-        it("should share hot.data across versioned and canonical /ns/core bridge URLs", function (done) {
-            var origin = getHostOrigin();
-            if (!origin) {
-                pending("REPORT_BASEURL not set; cannot import host HTTP bridge aliases in this harness");
-                done();
-                return;
-            }
-
-            withTimeout(Promise.all([
-                import(origin + "/ns/core"),
-                import(origin + "/ns/core/42"),
-            ]), 5000, "import /ns/core bridge aliases")
-                .then(function (mods) {
-                    var canonical = mods[0];
-                    var versioned = mods[1];
-
-                    var hotCanonical = canonical && typeof canonical.getHot === "function" ? canonical.getHot() : null;
-                    var hotVersioned = versioned && typeof versioned.getHot === "function" ? versioned.getHot() : null;
-                    if (!hotCanonical || !hotVersioned) {
-                        pending("import.meta.hot not available (likely release build)");
-                        done();
-                        return;
-                    }
-
-                    var dataCanonical = canonical.getHotData();
-                    var dataVersioned = versioned.getHotData();
-                    expect(dataCanonical).toBeDefined();
-                    expect(dataVersioned).toBeDefined();
-
-                    var token = "core_bridge_" + Date.now() + "_" + Math.random();
-                    canonical.setHotValue(token);
-                    expect(versioned.getHotValue()).toBe(token);
-                    expect(dataCanonical).toBe(dataVersioned);
-                    done();
-                })
-                .catch(function (error) {
-                    fail("Expected /ns/core bridge aliases to share hot.data: " + formatError(error));
-                    done();
-                });
+        it("should expose the dev-loader primitives on the __NS_DEV__ namespace", function() {
+            // The dev surface is ONE global namespace object — `__NS_DEV__` —
+            // carrying the six mechanism primitives; everything else (boot,
+            // hot contexts, full reload, CSS) is @nativescript/vite JS.
+            expect(typeof global.__NS_DEV__).toBe("object");
+            expect(typeof global.__NS_DEV__.configureRuntime).toBe("function");
+            expect(typeof global.__NS_DEV__.invalidateModules).toBe("function");
+            expect(typeof global.__NS_DEV__.kickstartPrefetch).toBe("function");
+            expect(typeof global.__NS_DEV__.getLoadedModuleUrls).toBe("function");
+            expect(typeof global.__NS_DEV__.setDevBootComplete).toBe("function");
+            expect(typeof global.__NS_DEV__.terminateAllWorkers).toBe("function");
+            // No flat `__ns*` dev globals hang off the realm — the namespace
+            // is the whole surface.
+            expect(global.__nsInvalidateModules).toBeUndefined();
+            expect(global.__nsGetLoadedModuleUrls).toBeUndefined();
+            expect(global.__nsKickstartHmrPrefetch).toBeUndefined();
+            expect(global.__nsConfigureDevRuntime).toBeUndefined();
+            expect(global.__nsConfigureRuntime).toBeUndefined();
+            expect(global.__nsSetDevBootComplete).toBeUndefined();
+            expect(global.__nsTerminateAllWorkers).toBeUndefined();
+            // The runtime installs NO orchestration globals — boot, reload,
+            // and hot-callback servicing are @nativescript/vite JS.
+            expect(global.__nsStartDevSession).toBeUndefined();
+            expect(global.__nsReloadDevApp).toBeUndefined();
+            expect(global.__nsApplyStyleUpdate).toBeUndefined();
+            expect(global.__NS_DISPATCH_HOT_EVENT__).toBeUndefined();
+            expect(global.__nsRunHmrDispose).toBeUndefined();
+            expect(global.__nsRunHmrPrune).toBeUndefined();
+            expect(global.__nsHasDeclinedModule).toBeUndefined();
         });
     });
 
@@ -507,17 +346,17 @@ describe("HTTP ESM Loader", function() {
 
 // Focused, deterministic coverage for the native HTTP canonical-key function.
 // These run only in debug builds, where HMRSupport.mm installs the
-// `__nsCanonicalizeHttpUrlKey` diagnostic global; in release they self-skip via
+// `__NS_DEV__.canonicalizeHttpUrlKey` diagnostic; in release they self-skip via
 // pending(). They require no HTTP host — they pin pure string identity behavior.
-describe("HTTP canonical key (native __nsCanonicalizeHttpUrlKey)", function () {
+describe("HTTP canonical key (native __NS_DEV__.canonicalizeHttpUrlKey)", function () {
     function getCanon() {
-        return (typeof global !== "undefined") ? global.__nsCanonicalizeHttpUrlKey : undefined;
+        return (typeof global !== "undefined" && global.__NS_DEV__) ? global.__NS_DEV__.canonicalizeHttpUrlKey : undefined;
     }
 
     function checkKey(input, expected) {
         var canon = getCanon();
         if (typeof canon !== "function") {
-            pending("__nsCanonicalizeHttpUrlKey not installed (release build)");
+            pending("__NS_DEV__.canonicalizeHttpUrlKey not installed (release build)");
             return;
         }
         expect(canon(input)).toBe(expected);
@@ -526,7 +365,7 @@ describe("HTTP canonical key (native __nsCanonicalizeHttpUrlKey)", function () {
     it("is installed as a function in debug builds", function () {
         var canon = getCanon();
         if (typeof canon !== "function") {
-            pending("__nsCanonicalizeHttpUrlKey not installed (release build)");
+            pending("__NS_DEV__.canonicalizeHttpUrlKey not installed (release build)");
             return;
         }
         expect(typeof canon).toBe("function");
@@ -540,14 +379,14 @@ describe("HTTP canonical key (native __nsCanonicalizeHttpUrlKey)", function () {
         checkKey("https://cdn.example.com/lib.js?token=abc", "https://cdn.example.com/lib.js?token=abc");
     });
 
-    it("strips boot and hmr tags to the canonical /ns/m path", function () {
-        checkKey("http://h/ns/m/__ns_boot__/b1/foo.js", "http://h/ns/m/foo.js");
-        checkKey("http://h/ns/m/__ns_hmr__/v7/foo.js", "http://h/ns/m/foo.js");
-    });
-
-    it("collapses versioned bridge endpoints to their base path", function () {
-        checkKey("http://h/ns/rt/42", "http://h/ns/rt");
-        checkKey("http://h/ns/core/13", "http://h/ns/core");
+    it("treats module identity as literally the URL — no path-tag collapses", function () {
+        // There is no path-tag vocabulary and no versioned /ns/rt|core
+        // collapsing: the server emits exactly one canonical URL per module
+        // and freshness is handled by eviction + the eviction-driven fetch
+        // nonce, never by URL variation.
+        checkKey("http://h/ns/m/foo.js", "http://h/ns/m/foo.js");
+        checkKey("http://h/ns/rt", "http://h/ns/rt");
+        checkKey("http://h/ns/core", "http://h/ns/core");
     });
 
     it("ignores URL fragments for dev endpoints", function () {

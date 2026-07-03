@@ -54,10 +54,9 @@ using namespace std;
 //      itself; `import.meta.url` keeps that string unchanged.
 //
 //   3. Absolute filesystem path — `/Users/.../app/src/foo.js`. The
-//      historical production / non-HMR dev shape. Strip the runtime
-//      base dir to recover the legacy "/app/<rel>" shape JS consumers
-//      have always seen, then prepend `file://` so the result is a
-//      well-formed URL.
+//      production / non-HMR dev shape. Strip the runtime base dir to
+//      recover the canonical "/app/<rel>" shape JS consumers see, then
+//      prepend `file://` so the result is a well-formed URL.
 //
 static void InitializeImportMetaObject(Local<Context> context, Local<Module> module,
                                        Local<Object> meta) {
@@ -166,14 +165,6 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
           dirnameStr)
       .Check();
 
-  if (RuntimeConfig.IsDebug) {
-    // Attach minimal import.meta.hot only in dev
-    try {
-      tns::InitializeImportMetaHot(isolate, context, meta, modulePath);
-    } catch (...) {
-      // If anything fails, keep meta without hot to avoid crashing
-    }
-  }
 }
 
 namespace tns {
@@ -266,31 +257,27 @@ Runtime::~Runtime() {
     // fallbackByRelative / vendor) before disposing other handles. The maps are
     // keyed by v8::Isolate* (see ModuleInternalCallbacks.mm), so this resets and
     // drops only the handles this isolate created — while it is still alive,
-    // under the Locker above. This replaces the old thread_local leaky-pointer
-    // cleanup and also frees worker isolates' maps (previously leaked).
+    // under the Locker above. Worker isolates' maps are freed the same way.
     tns::DestroyModuleStateForIsolate(isolate_);
 
-    // Clear the remaining HMR + import-map globals (`g_importMap`, `g_hotData`,
-    // `g_hotAccept`, `g_hotDispose`, `g_hotPrune`, `g_hotEventListeners`,
-    // `g_hotDeclined`, etc.) before isolate disposal. These hold v8::Global
-    // handles that would crash during static destructor cleanup if the isolate
-    // is already torn down.
+    // Clear the remaining dev-loader + import-map globals (`g_importMap`,
+    // the kickstart prewarm cache, cache-bust marks, boot-complete flag)
+    // before isolate disposal.
     //
     // CRITICAL: unlike the per-isolate module maps above, these globals are
     // PROCESS-WIDE. They live in the main isolate's address space but every
     // Runtime destructor would clear them. That's wrong for worker-isolate
-    // teardown: when a worker dies (e.g. via `__nsTerminateAllWorkers` during an
+    // teardown: when a worker dies (e.g. via `__NS_DEV__.terminateAllWorkers` during an
     // HMR cycle), its Runtime destructor MUST NOT wipe the main isolate's import
-    // map and hot-state — doing so silently breaks the next HMR cycle's bare-
-    // specifier resolution (vendor packages fall back to filesystem and fail
-    // with `Cannot find module @scope/pkg`). So we gate this cleanup on "this is
+    // map — doing so silently breaks the next HMR cycle's bare-specifier
+    // resolution (vendor packages fall back to filesystem and fail with
+    // `Cannot find module @scope/pkg`). So we gate this cleanup on "this is
     // the main isolate"; worker teardown leaves the shared globals intact and
     // the main isolate keeps serving HMR cycles. Real process-teardown still
     // routes through the main isolate's destructor, so the cleanup fires.
     if (!IsRuntimeWorker()) {
       tns::CleanupHMRGlobals();
       tns::CleanupImportMapGlobals();
-      tns::ResetActiveDevSession();
     }
 
     DisposerPHV phv(isolate_);
@@ -414,12 +401,10 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   Console::Init(context);
   WeakRef::Init(context);
 
-  // Install every JS-callable HMR + dev-session global the
-  // @nativescript/vite HMR client and deterministic dev-session bootstrap
-  // depend on. Previously inline lambdas here (~650 lines); see
-  // `InitializeHmrDevGlobals` in HMRSupport.mm for the full list and the
-  // try/catch-gated dev-only entry points.
-  tns::InitializeHmrDevGlobals(isolate, context);
+  // Install the `__NS_DEV__` namespace object carrying every JS-callable
+  // dev primitive tooling can depend on; see
+  // `InitializeHmrDevGlobals` in HMRSupport.mm for the member list.
+  tns::InitializeHmrDevGlobals(isolate, context, isWorker);
 
   URLImpl::InstallBlobMethods(context);
 
