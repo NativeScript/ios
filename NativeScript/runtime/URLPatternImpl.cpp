@@ -73,9 +73,19 @@ v8_regex_provider::regex_search(
     auto array = matches.As<v8::Array>();
     auto len = array->Length();
     ret.reserve(len);
-    for (int i = 0; i < len; i++) {
+    // Skip element 0 (the whole-match string). ada's
+    // url_pattern_component::create_component_match_result pairs exec_result[i]
+    // with group_name_list[i], i.e. it expects only the capture groups.
+    // Including element 0 makes exec_result one longer than group_name_list and
+    // indexes it out of bounds (crash). ada documents this: the provider must
+    // drop the full match ("start from 1").
+    for (int i = 1; i < len; i++) {
       v8::Local<v8::Value> item;
-      if (array->Get(isolate->GetCurrentContext(), i).ToLocal(&item)) {
+      // ToLocal returns true on success; bail only when reading the element
+      // fails. (This condition was inverted, which made every regex match
+      // report no match, so URLPattern test()/exec() always failed for patterns
+      // with capture groups.)
+      if (!array->Get(isolate->GetCurrentContext(), i).ToLocal(&item)) {
         return std::nullopt;
       }
 
