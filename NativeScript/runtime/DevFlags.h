@@ -14,12 +14,6 @@ bool IsScriptLoadingLogEnabled();
 
 // HTTP module loader flags
 //
-// Returns true when speculative HTTP module prefetching (the dep-graph BFS
-// kicked off after each successful HttpFetchText) should be enabled. Default
-// OFF so cold-boot behaviour is unchanged for users who have not opted in.
-// Controlled by package.json / nativescript.config: "httpModulePrefetch": true|false
-bool IsHttpModulePrefetchEnabled();
-
 // Returns true when one log line should be emitted per HTTP fetch URL.
 // Default OFF because the volume is high (one line per fetch, hundreds per
 // cold boot, hundreds per HMR refresh). Opt in via package.json /
