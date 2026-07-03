@@ -29,27 +29,6 @@ void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool i
     Local<FunctionTemplate> closeTemplate =
         FunctionTemplate::New(isolate, Worker::CloseWorkerCallback);
     globalTemplate->Set(tns::ToV8String(isolate, "close"), closeTemplate);
-  } else {
-    // Main-thread-only: HMR helper that terminates every live worker.
-    //
-    // Exposes `globalThis.__nsTerminateAllWorkers()` so HMR runtimes
-    // (e.g. @nativescript/vite) can drop every worker in a single call
-    // before re-bootstrapping the JS app. Without this, every HMR cycle
-    // that re-runs a constructor (or any JS scope that creates a
-    // worker) leaks a live worker into the iOS dispatch table — workers
-    // pile up across cycles, all delivering postMessages in parallel.
-    //
-    // The runtime is the single source of truth here: `Caches::Workers`
-    // already tracks every worker for lifecycle reasons, so the JS side
-    // doesn't need to mirror that state. Worker threads do NOT receive
-    // this global — a stuck worker shouldn't be able to take down its
-    // peers. See `Worker::TerminateAllWorkersCallback` for the snapshot
-    // semantics that keep iteration safe across concurrent worker
-    // teardown.
-    Local<FunctionTemplate> terminateAllTemplate =
-        FunctionTemplate::New(isolate, Worker::TerminateAllWorkersCallback);
-    globalTemplate->Set(tns::ToV8String(isolate, "__nsTerminateAllWorkers"),
-                        terminateAllTemplate);
   }
   // Register functions in the main thread
   Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, ConstructorCallback);
