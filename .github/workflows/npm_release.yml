@@ -232,22 +232,9 @@ jobs:
           # TestRunnerTests.swift) need more than 20m headroom per attempt.
           timeout_minutes: 40
           max_attempts: 2
-          command: |
-            set -o pipefail
-            # Background native-stack sampler: if the runtime suite deadlocks, the
-            # test-diagnostics artifact gets per-thread backtraces of the hung app
-            # (the JS console never reaches os_log, so this is our only window into
-            # the lock cycle). Killed via trap when xcodebuild returns.
-            bash .github/scripts/sample-hung-app.sh "$TEST_FOLDER/diagnostics" &
-            SAMPLER_PID=$!
-            trap 'kill "$SAMPLER_PID" 2>/dev/null || true' EXIT
-            xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test | xcpretty
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test | xcpretty
           on_retry_command: rm -rf $TEST_FOLDER/test_results* && xcrun simctl shutdown all
-          new_command_on_retry: |
-            bash .github/scripts/sample-hung-app.sh "$TEST_FOLDER/diagnostics" &
-            SAMPLER_PID=$!
-            trap 'kill "$SAMPLER_PID" 2>/dev/null || true' EXIT
-            xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test
       # When the runtime suite fails it is almost always because the in-app
       # Jasmine run died before POSTing results (crash or hang). The xcresult is
       # black-box and captures nothing from inside the app, so collect the two

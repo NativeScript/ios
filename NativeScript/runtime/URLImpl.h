@@ -24,8 +24,6 @@ namespace tns {
         // `URL.prototype.searchParams` accessor. Must be called once per
         // realm AFTER `Init()` has installed the `URL` constructor and AFTER
         // `URLSearchParamsImpl::Init()` has installed `URLSearchParams`.
-        // Equivalent to running the same script literal that used to live
-        // inline in `Runtime::Init`; behavior is bit-for-bit identical.
         static void InstallBlobMethods(v8::Local<v8::Context> context);
 
         static URLImpl *GetPointer(v8::Local<v8::Object> object);
