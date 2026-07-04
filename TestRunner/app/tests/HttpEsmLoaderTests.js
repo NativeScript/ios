@@ -209,12 +209,13 @@ describe("HTTP ESM Loader", function() {
 
         it("should expose the dev-loader primitives on the __NS_DEV__ namespace", function() {
             // The dev surface is ONE global namespace object — `__NS_DEV__` —
-            // carrying the six mechanism primitives; everything else (boot,
+            // carrying the mechanism primitives; everything else (boot,
             // hot contexts, full reload, CSS) is @nativescript/vite JS.
             expect(typeof global.__NS_DEV__).toBe("object");
             expect(typeof global.__NS_DEV__.configureRuntime).toBe("function");
             expect(typeof global.__NS_DEV__.invalidateModules).toBe("function");
             expect(typeof global.__NS_DEV__.kickstartPrefetch).toBe("function");
+            expect(typeof global.__NS_DEV__.seedModuleBodies).toBe("function");
             expect(typeof global.__NS_DEV__.getLoadedModuleUrls).toBe("function");
             expect(typeof global.__NS_DEV__.setDevBootComplete).toBe("function");
             expect(typeof global.__NS_DEV__.terminateAllWorkers).toBe("function");
@@ -236,6 +237,23 @@ describe("HTTP ESM Loader", function() {
             expect(global.__nsRunHmrDispose).toBeUndefined();
             expect(global.__nsRunHmrPrune).toBeUndefined();
             expect(global.__nsHasDeclinedModule).toBeUndefined();
+        });
+
+        it("seedModuleBodies rejects invalid input without seeding", function() {
+            var dev = global.__NS_DEV__;
+            var noArg = dev.seedModuleBodies();
+            expect(noArg.ok).toBe(false);
+            expect(noArg.seeded).toBe(0);
+            var badEntries = dev.seedModuleBodies([
+                null,
+                { body: "export {};" }, // no url
+                { url: "not-a-url", body: "export {};" }, // non-http scheme
+                { url: "http://127.0.0.1:5173/ns/m/src/app.css", body: "body{}" }, // non-JS shape
+                { url: "http://127.0.0.1:5173/ns/m/src/main", body: "" }, // empty body
+            ]);
+            expect(badEntries.ok).toBe(false);
+            expect(badEntries.seeded).toBe(0);
+            expect(badEntries.bytes).toBe(0);
         });
     });
 
