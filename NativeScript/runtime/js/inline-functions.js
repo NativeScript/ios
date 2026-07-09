@@ -1,5 +1,6 @@
 const {
     ArrayPrototypeConcat,
+    ArrayPrototypeSlice,
     FunctionPrototypeApply,
     ObjectAssign,
     ObjectDefineProperty,
@@ -46,6 +47,23 @@ ObjectAssign(global, {
             if (protocols.length > 0) {
                 target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, protocols) : protocols);
             }
+        }
+    },
+    NativeClass(arg) {
+        // Bare `@NativeClass` on a plain ES class: the class needs no
+        // transformation — the runtime registers its Objective-C subclass
+        // lazily on first native use (ClassBuilder::EnsureExtendedClass).
+        if (typeof arg === 'function') {
+            return arg;
+        }
+        // `@NativeClass({ protocols: [...] })`: record protocols for the
+        // lazy registration, then hand the class back unchanged.
+        var options = arg || {};
+        return function (target) {
+            if (options.protocols && options.protocols.length > 0) {
+                target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, options.protocols) : ArrayPrototypeSlice(options.protocols, 0));
+            }
+            return target;
         }
     },
     ObjCMethod() {
