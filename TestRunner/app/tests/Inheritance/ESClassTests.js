@@ -56,6 +56,45 @@ describe(module.id, function () {
         expect(NSStringFromClass(object.class())).toBe('ESConstructorObject');
     });
 
+    it('ESClassSuperArgsSelectInitializer', function () {
+        class ESCtorArgsObject extends TNSCInterface {
+            constructor(name, x) {
+                // Arguments passed to super(...) drive native initializer resolution;
+                // arguments passed to `new` are only seen by the JS constructor.
+                super(x);
+                this.name = name;
+            }
+        }
+
+        var object = new ESCtorArgsObject('first', 7);
+        expect(object instanceof ESCtorArgsObject).toBe(true);
+        expect(object.name).toBe('first');
+        expect(TNSGetOutput()).toBe('initWithPrimitive:7 called');
+        TNSClearOutput();
+
+        class ESCtorTwoArgsObject extends TNSCInterface {
+            constructor(a, b) {
+                super(a, b);
+            }
+        }
+
+        var object2 = new ESCtorTwoArgsObject(5, 10);
+        expect(object2 instanceof ESCtorTwoArgsObject).toBe(true);
+        expect(TNSGetOutput()).toBe('initWithInt:andInt: 5 10 called');
+        TNSClearOutput();
+
+        // super() with no arguments falls back to plain [[Class alloc] init]
+        class ESCtorNoArgsObject extends TNSCInterface {
+            constructor() {
+                super();
+            }
+        }
+
+        var object3 = new ESCtorNoArgsObject();
+        expect(object3 instanceof ESCtorNoArgsObject).toBe(true);
+        expect(TNSGetOutput()).toBe('init called');
+    });
+
     it('ESClassInstanceMethodsAndSuper', function () {
         class ESMethodsObject extends TNSDerivedInterface {
             baseMethod() {
@@ -110,6 +149,34 @@ describe(module.id, function () {
         expect(object instanceof ESAllocObject).toBe(true);
         expect(object.getAnswer()).toBe(42);
         expect(NSStringFromClass(object.class())).toBe('ESAllocObject');
+    });
+
+    it('ESClassAllocInitDoesNotRunJsConstructor', function () {
+        var constructorRuns = 0;
+
+        class ESAllocNoCtorObject extends NSObject {
+            field = 42;
+
+            constructor() {
+                super();
+                constructorRuns++;
+                this.initializedFromJs = true;
+            }
+        }
+
+        // alloc().init() is purely native initialization: the JS constructor body and
+        // class field initializers only run through `new`, never through alloc/init.
+        var allocated = ESAllocNoCtorObject.alloc().init();
+        expect(constructorRuns).toBe(0);
+        expect(allocated.field).toBe(undefined);
+        expect(allocated.initializedFromJs).toBe(undefined);
+        expect(allocated instanceof ESAllocNoCtorObject).toBe(true);
+        expect(NSStringFromClass(allocated.class())).toBe('ESAllocNoCtorObject');
+
+        var constructed = new ESAllocNoCtorObject();
+        expect(constructorRuns).toBe(1);
+        expect(constructed.field).toBe(42);
+        expect(constructed.initializedFromJs).toBe(true);
     });
 
     it('ESClassNewBeforeConstruction', function () {
