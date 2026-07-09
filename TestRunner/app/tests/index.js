@@ -62,6 +62,7 @@ require("./Marshalling/ProtocolTests");
 require("./Inheritance/InheritanceTests");
 require("./Inheritance/ProtocolImplementationTests");
 require("./Inheritance/TypeScriptTests");
+require("./Inheritance/ESClassTests");
 //
 require("./MethodCallsTests");
 //import "./FunctionsTests";
