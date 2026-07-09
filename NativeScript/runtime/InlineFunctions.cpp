@@ -21,8 +21,8 @@ bool InlineFunctions::IsGlobalFunction(const std::string& name) {
   return name == "CGPointMake" || name == "CGRectMake" ||
          name == "CGSizeMake" || name == "UIEdgeInsetsMake" ||
          name == "NSMakeRange" || name == "__decorate" || name == "__param" ||
-         name == "ObjCClass" || name == "ObjCMethod" || name == "ObjC" ||
-         name == "ObjCParam" || name == "__tsEnum";
+         name == "NativeClass" || name == "ObjCClass" || name == "ObjCMethod" ||
+         name == "ObjC" || name == "ObjCParam" || name == "__tsEnum";
 }
 
 }  // namespace tns

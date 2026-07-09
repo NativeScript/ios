@@ -1,5 +1,6 @@
 const {
     ArrayPrototypeConcat,
+    ArrayPrototypeSlice,
     FunctionPrototypeApply,
     ObjectAssign,
     ObjectDefineProperty,
@@ -46,6 +47,18 @@ ObjectAssign(global, {
             if (protocols.length > 0) {
                 target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, protocols) : protocols);
             }
+        }
+    },
+    NativeClass(arg) {
+        if (typeof arg === 'function') {
+            return arg;
+        }
+        var options = arg || {};
+        return function (target) {
+            if (options.protocols && options.protocols.length > 0) {
+                target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, options.protocols) : ArrayPrototypeSlice(options.protocols));
+            }
+            return target;
         }
     },
     ObjCMethod() {
