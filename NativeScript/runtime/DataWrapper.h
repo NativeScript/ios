@@ -368,8 +368,8 @@ class ObjCDataWrapper : public BaseDataWrapper {
 
 class ObjCClassWrapper : public BaseDataWrapper {
  public:
-  ObjCClassWrapper(Class klazz, bool extendedClass = false)
-      : klass_(klazz), extendedClass_(extendedClass) {}
+  ObjCClassWrapper(Class klazz, bool extendedClass = false, bool esDerivedClass = false)
+      : klass_(klazz), extendedClass_(extendedClass), esDerivedClass_(esDerivedClass) {}
 
   const WrapperType Type() { return WrapperType::ObjCClass; }
 
@@ -377,9 +377,14 @@ class ObjCClassWrapper : public BaseDataWrapper {
 
   bool ExtendedClass() { return this->extendedClass_; }
 
+  // true when the class was registered lazily from a plain ES `class X extends NativeBase {}`
+  // constructor (see ClassBuilder::EnsureExtendedClass)
+  bool ESDerivedClass() { return this->esDerivedClass_; }
+
  private:
   Class klass_;
   bool extendedClass_;
+  bool esDerivedClass_;
 };
 
 class ObjCProtocolWrapper : public BaseDataWrapper {
