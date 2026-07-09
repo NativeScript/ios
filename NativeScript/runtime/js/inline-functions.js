@@ -34,6 +34,18 @@ ObjectAssign(global, {
         return function (target, key) { decorator(target, key, paramIndex); }
     },
 
+    NativeClass(arg) {
+        if (typeof arg === 'function') {
+            return arg;
+        }
+        var options = arg || {};
+        return function (target) {
+            if (options.protocols && options.protocols.length > 0) {
+                target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, options.protocols) : ArrayPrototypeConcat([], options.protocols));
+            }
+            return target;
+        }
+    },
     ObjCClass() {
         // Index loop, not ArrayFrom/spread: this runs at class-definition
         // time, when user code could already have tampered the array

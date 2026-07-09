@@ -920,6 +920,11 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
     Class klass = objc_getClass(item->meta_->name());
 
+    // Plain ES `class X extends NativeType {}` subclasses reach this callback
+    // through super(); use new.target to lazily register (and construct) the
+    // derived class.
+    klass = ClassBuilder::ResolveConstructedClass(context, info.NewTarget(), klass);
+
     const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
     ArgConverter::ConstructObject(context, info, klass, interfaceMeta);
   } catch (NativeScriptException& ex) {
@@ -933,20 +938,27 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
 
   try {
     Local<Object> thiz = info.This();
-    Class klass;
+    Local<Context> context = isolate->GetCurrentContext();
+    Class klass = nil;
 
     BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
     if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass) {
       ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
       klass = classWrapper->Klass();
-    } else {
+    } else if (wrapper == nullptr && thiz->IsFunction()) {
+      // `JSClass.alloc()` where JSClass is a plain ES subclass of a native type
+      // that has not been constructed yet - lazily register its derived class
+      // first.
+      klass = ClassBuilder::EnsureExtendedClass(context, thiz.As<v8::Function>());
+    }
+
+    if (klass == nil) {
       CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(
           info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
       const InterfaceMeta* meta = item->meta_;
       klass = objc_getClass(meta->name());
     }
 
-    Local<Context> context = isolate->GetCurrentContext();
     ObjCAllocDataWrapper* allocWrapper = new ObjCAllocDataWrapper(klass);
     Local<Value> result = ArgConverter::CreateJsWrapper(context, allocWrapper, Local<Object>());
     info.GetReturnValue().Set(result);
@@ -972,15 +984,23 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   // not the class the metadata item was registered for.
   Class klass = item->ResolveClass();
 
+  Local<Context> context = isolate->GetCurrentContext();
   if (thiz->IsFunction()) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
     if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass) {
       ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
       klass = classWrapper->Klass();
+    } else if (wrapper == nullptr) {
+      // Static call through a plain ES subclass of a native type (inherited
+      // static), e.g. `JSClass.new()` - lazily register the derived class so
+      // the invocation dispatches to it.
+      Class ensured = ClassBuilder::EnsureExtendedClass(context, thiz.As<v8::Function>());
+      if (ensured != nil) {
+        klass = ensured;
+      }
     }
   }
 
-  Local<Context> context = isolate->GetCurrentContext();
   Local<Value> result =
       instanceMethod
           ? MetadataBuilder::InvokeMethod(context, item->meta_, thiz, args, klass, true)
@@ -1043,6 +1063,32 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value>& 
                                 item->ResolveClass(), true);
 }
 
+// Resolves the class a static member access should dispatch to, honoring
+// plain ES subclasses of native types used as receivers (e.g.
+// `JSClass.someStaticProperty`).
+static Class ResolveStaticReceiverClass(Local<Context> context, Local<Object> receiver,
+                                        Class fallback) {
+  if (receiver.IsEmpty() || !receiver->IsFunction()) {
+    return fallback;
+  }
+
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
+  if (wrapper != nullptr) {
+    if (wrapper->Type() == WrapperType::ObjCClass) {
+      return static_cast<ObjCClassWrapper*>(wrapper)->Klass();
+    }
+    return fallback;
+  }
+
+  Class ensured = ClassBuilder::EnsureExtendedClass(context, receiver.As<v8::Function>());
+  if (ensured != nil) {
+    return ensured;
+  }
+
+  return fallback;
+}
+
 void MetadataBuilder::PropertyNameGetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
@@ -1055,8 +1101,9 @@ void MetadataBuilder::PropertyNameGetterCallback(const FunctionCallbackInfo<Valu
 
   V8EmptyValueArgs args;
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Value> result = MetadataBuilder::InvokeMethod(
-      context, item->meta_->getter(), Local<Object>(), args, item->ResolveClass(), false);
+  Class klass = ResolveStaticReceiverClass(context, info.This(), item->ResolveClass());
+  Local<Value> result = MetadataBuilder::InvokeMethod(context, item->meta_->getter(),
+                                                      Local<Object>(), args, klass, false);
   if (!result.IsEmpty()) {
     info.GetReturnValue().Set(result);
   }
@@ -1076,8 +1123,9 @@ void MetadataBuilder::PropertyNameSetterCallback(const FunctionCallbackInfo<Valu
 
   V8SimpleValueArgs args(value);
   Local<Context> context = isolate->GetCurrentContext();
-  MetadataBuilder::InvokeMethod(context, item->meta_->setter(), Local<Object>(), args,
-                                item->ResolveClass(), false);
+  Class klass = ResolveStaticReceiverClass(context, info.This(), item->ResolveClass());
+  MetadataBuilder::InvokeMethod(context, item->meta_->setter(), Local<Object>(), args, klass,
+                                false);
 }
 
 void MetadataBuilder::StructFieldGetterCallback(Local<v8::Name> property,
