@@ -141,7 +141,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 
   try {
     CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
-    Class klass = item->data_;
+    Class klass = ClassBuilder::ResolveConstructedClass(context, info.NewTarget(), item->data_);
 
     ArgConverter::ConstructObject(context, info, klass);
   } catch (NativeScriptException& ex) {
@@ -295,104 +295,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         class_addMethod(object_getClass(extendedClass), @selector(initialize), newInitialize,
                         "v@:");
 
-        /// We swizzle the retain and release methods for the following reason:
-        /// When we instantiate a native class via a JavaScript call we add it to the object
-        /// instances map thus incrementing the retainCount by 1. Then, when the native object is
-        /// referenced somewhere else its count will become more than 1. Since we want to keep the
-        /// corresponding JavaScript object alive even if it is not used anywhere, we call GcProtect
-        /// on it. Whenever the native object is released so that its retainCount is 1 (the object
-        /// instances map), we unprotect the corresponding JavaScript object in order to make both
-        /// of them destroyable/GC-able. When the JavaScript object is GC-ed we release the native
-        /// counterpart as well.
-        void (*retain)(id, SEL) =
-            (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
-        IMP newRetain = imp_implementationWithBlock(^(id self) {
-          if (!isolateWrapper.IsValid()) {
-            return retain(self, @selector(retain));
-          }
-          if ([self retainCount] == 1) {
-            auto runtime = Runtime::GetRuntime(isolate);
-            auto runtimeLoop = runtime->RuntimeLoop();
-            void* weakSelf = (__bridge void*)self;
-            auto gcProtect = ^() {
-              auto innerCache = isolateWrapper.GetCache();
-              auto it = innerCache->Instances.find((id)weakSelf);
-              if (it != innerCache->Instances.end()) {
-                v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                Local<Value> value = it->second->Get(isolate);
-                BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                  ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                  objcWrapper->GcProtect();
-                }
-              }
-            };
-            if (CFRunLoopGetCurrent() != runtimeLoop) {
-              tns::ExecuteOnRunLoop(runtimeLoop, gcProtect);
-            } else {
-              gcProtect();
-            }
-          }
-
-          return retain(self, @selector(retain));
-        });
-        class_addMethod(extendedClass, @selector(retain), newRetain, "@@:");
-
-        void (*release)(id, SEL) =
-            (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
-        IMP newRelease = imp_implementationWithBlock(^(id self) {
-          if (!isolateWrapper.IsValid()) {
-            release(self, @selector(release));
-            return;
-          }
-
-          if ([self retainCount] == 2) {
-            void* weakSelf = (__bridge void*)self;
-            auto gcUnprotect = ^() {
-              auto innerCache = isolateWrapper.GetCache();
-              auto it = innerCache->Instances.find((id)weakSelf);
-              if (it != innerCache->Instances.end()) {
-                v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                if (it->second != nullptr) {
-                  Local<Value> value = it->second->Get(isolate);
-                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    objcWrapper->GcUnprotect();
-                  }
-                }
-              }
-            };
-            auto runtime = Runtime::GetRuntime(isolate);
-            auto runtimeLoop = runtime->RuntimeLoop();
-            if (CFRunLoopGetCurrent() != runtimeLoop) {
-              tns::ExecuteOnRunLoop(runtimeLoop, gcUnprotect);
-            } else {
-              auto innerCache = isolateWrapper.GetCache();
-              auto it = innerCache->Instances.find(self);
-              if (it != innerCache->Instances.end()) {
-                v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                if (it->second != nullptr) {
-                  Local<Value> value = it->second->Get(isolate);
-                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    objcWrapper->GcUnprotect();
-                  }
-                }
-              }
-            }
-          }
-
-          release(self, @selector(release));
-        });
-        class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
+        ClassBuilder::SwizzleRetainRelease(isolate, extendedClass);
 
         info.GetReturnValue().SetUndefined();
       }).ToLocalChecked();
@@ -402,6 +305,247 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
       global->DefineOwnProperty(context, tns::ToV8String(isolate, "__extends"), extendsFunc, flags)
           .FromMaybe(false);
   tns::Assert(success, isolate);
+}
+
+void ClassBuilder::SwizzleRetainRelease(Isolate* isolate, Class extendedClass) {
+  IsolateWrapper isolateWrapper(isolate);
+
+  /// We swizzle the retain and release methods for the following reason:
+  /// When we instantiate a native class via a JavaScript call we add it to the object
+  /// instances map thus incrementing the retainCount by 1. Then, when the native object is
+  /// referenced somewhere else its count will become more than 1. Since we want to keep the
+  /// corresponding JavaScript object alive even if it is not used anywhere, we call GcProtect
+  /// on it. Whenever the native object is released so that its retainCount is 1 (the object
+  /// instances map), we unprotect the corresponding JavaScript object in order to make both
+  /// of them destroyable/GC-able. When the JavaScript object is GC-ed we release the native
+  /// counterpart as well.
+  void (*retain)(id, SEL) =
+      (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
+  IMP newRetain = imp_implementationWithBlock(^(id self) {
+    if (!isolateWrapper.IsValid()) {
+      return retain(self, @selector(retain));
+    }
+    if ([self retainCount] == 1) {
+      auto runtime = Runtime::GetRuntime(isolate);
+      auto runtimeLoop = runtime->RuntimeLoop();
+      void* weakSelf = (__bridge void*)self;
+      auto gcProtect = ^() {
+        auto innerCache = isolateWrapper.GetCache();
+        auto it = innerCache->Instances.find((id)weakSelf);
+        if (it != innerCache->Instances.end()) {
+          v8::Locker locker(isolate);
+          Isolate::Scope isolate_scope(isolate);
+          HandleScope handle_scope(isolate);
+          Local<Value> value = it->second->Get(isolate);
+          BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+          if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+            ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+            objcWrapper->GcProtect();
+          }
+        }
+      };
+      if (CFRunLoopGetCurrent() != runtimeLoop) {
+        tns::ExecuteOnRunLoop(runtimeLoop, gcProtect);
+      } else {
+        gcProtect();
+      }
+    }
+
+    return retain(self, @selector(retain));
+  });
+  class_addMethod(extendedClass, @selector(retain), newRetain, "@@:");
+
+  void (*release)(id, SEL) =
+      (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
+  IMP newRelease = imp_implementationWithBlock(^(id self) {
+    if (!isolateWrapper.IsValid()) {
+      release(self, @selector(release));
+      return;
+    }
+
+    if ([self retainCount] == 2) {
+      void* weakSelf = (__bridge void*)self;
+      auto gcUnprotect = ^() {
+        auto innerCache = isolateWrapper.GetCache();
+        auto it = innerCache->Instances.find((id)weakSelf);
+        if (it != innerCache->Instances.end()) {
+          v8::Locker locker(isolate);
+          Isolate::Scope isolate_scope(isolate);
+          HandleScope handle_scope(isolate);
+          if (it->second != nullptr) {
+            Local<Value> value = it->second->Get(isolate);
+            BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+            if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+              ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+              objcWrapper->GcUnprotect();
+            }
+          }
+        }
+      };
+      auto runtime = Runtime::GetRuntime(isolate);
+      auto runtimeLoop = runtime->RuntimeLoop();
+      if (CFRunLoopGetCurrent() != runtimeLoop) {
+        tns::ExecuteOnRunLoop(runtimeLoop, gcUnprotect);
+      } else {
+        auto innerCache = isolateWrapper.GetCache();
+        auto it = innerCache->Instances.find(self);
+        if (it != innerCache->Instances.end()) {
+          v8::Locker locker(isolate);
+          Isolate::Scope isolate_scope(isolate);
+          HandleScope handle_scope(isolate);
+          if (it->second != nullptr) {
+            Local<Value> value = it->second->Get(isolate);
+            BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+            if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+              ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+              objcWrapper->GcUnprotect();
+            }
+          }
+        }
+      }
+    }
+
+    release(self, @selector(release));
+  });
+  class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
+}
+
+Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Function> ctorFunc) {
+  Isolate* isolate = context->GetIsolate();
+
+  // Already registered (or a native/extended constructor that carries a class wrapper)
+  BaseDataWrapper* existingWrapper = tns::GetValue(isolate, ctorFunc);
+  if (existingWrapper != nullptr) {
+    if (existingWrapper->Type() == WrapperType::ObjCClass) {
+      return static_cast<ObjCClassWrapper*>(existingWrapper)->Klass();
+    }
+    return nil;
+  }
+
+  // Walk the constructor prototype chain (mirrors the `class X extends Y` chain) and collect
+  // every plain (unregistered) ES constructor level until we reach a constructor holding an
+  // ObjCClassWrapper. ES-registered ancestors are flattened into this registration; legacy
+  // `.extend()`-created ancestors are not supported (mirrors the historic restriction) and
+  // make this function bail out so callers preserve their old behavior.
+  std::vector<Local<v8::Function>> chainCtors;
+  Local<v8::Function> current = ctorFunc;
+  Class baseClass = nil;
+  while (true) {
+    chainCtors.push_back(current);
+
+    Local<Value> parentValue = current->GetPrototype();
+    if (parentValue.IsEmpty() || !parentValue->IsObject() || !parentValue->IsFunction()) {
+      return nil;
+    }
+
+    Local<v8::Function> parent = parentValue.As<v8::Function>();
+    BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parent);
+    if (parentWrapper == nullptr) {
+      current = parent;
+      continue;
+    }
+
+    if (parentWrapper->Type() != WrapperType::ObjCClass) {
+      return nil;
+    }
+
+    ObjCClassWrapper* parentClassWrapper = static_cast<ObjCClassWrapper*>(parentWrapper);
+    if (!parentClassWrapper->ExtendedClass()) {
+      baseClass = parentClassWrapper->Klass();
+      break;
+    }
+
+    if (parentClassWrapper->ESDerivedClass()) {
+      // Flatten: the parent's registered class sits directly under the pure native base, so
+      // keep walking (collecting the parent's prototype for scanning) until we reach it.
+      current = parent;
+      continue;
+    }
+
+    // Legacy `.extend()`-created base - not supported for ES class chaining.
+    return nil;
+  }
+
+  if (baseClass == nil) {
+    return nil;
+  }
+
+  auto cache = Caches::Get(isolate);
+  auto isolateId = cache->getIsolateId();
+
+  std::string baseClassName = class_getName(baseClass);
+  std::string className = tns::ToString(isolate, ctorFunc->GetName());
+
+  Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, className,
+                                                       std::to_string(isolateId) + "_");
+  class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
+  class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
+
+  // Expose members level by level, most-derived first, so JS shadowing semantics carry over to
+  // the installed Objective-C implementations. Statics like ObjCProtocols/ObjCExposedMethods are
+  // read through the constructor (inheriting through the static chain like class statics do).
+  std::unordered_set<std::string> visitedNames;
+  for (Local<v8::Function> levelCtor : chainCtors) {
+    Local<Value> prototypeValue;
+    bool success = levelCtor->Get(context, tns::ToV8String(isolate, "prototype"))
+                       .ToLocal(&prototypeValue);
+    tns::Assert(success && !prototypeValue.IsEmpty() && prototypeValue->IsObject(), isolate);
+    Local<Object> implementationObject = prototypeValue.As<Object>();
+
+    Local<Value> exposedMethods;
+    success = levelCtor->Get(context, tns::ToV8String(isolate, "ObjCExposedMethods"))
+                  .ToLocal(&exposedMethods);
+    tns::Assert(success, isolate);
+
+    Local<Value> exposedProtocols;
+    success = levelCtor->Get(context, tns::ToV8String(isolate, "ObjCProtocols"))
+                  .ToLocal(&exposedProtocols);
+    tns::Assert(success, isolate);
+
+    ClassBuilder::ExposeDynamicMethods(context, extendedClass, exposedMethods, exposedProtocols,
+                                       implementationObject, &visitedNames);
+  }
+
+  tns::SetValue(isolate, ctorFunc, new ObjCClassWrapper(extendedClass, true, true));
+
+  std::string extendedClassName = class_getName(extendedClass);
+
+  auto extendedPersistent = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
+  extendedPersistent->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
+  cache->CtorFuncs.emplace(extendedClassName, std::move(extendedPersistent));
+
+  Local<Value> ctorPrototypeValue;
+  bool success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype"))
+                     .ToLocal(&ctorPrototypeValue);
+  tns::Assert(success && !ctorPrototypeValue.IsEmpty() && ctorPrototypeValue->IsObject(), isolate);
+  cache->ClassPrototypes.emplace(extendedClassName,
+                                 std::make_unique<Persistent<Object>>(
+                                     isolate, ctorPrototypeValue.As<Object>()));
+
+  ClassBuilder::SwizzleRetainRelease(isolate, extendedClass);
+
+  return extendedClass;
+}
+
+Class ClassBuilder::ResolveConstructedClass(Local<Context> context, Local<Value> newTarget,
+                                            Class fallback) {
+  if (newTarget.IsEmpty() || !newTarget->IsFunction()) {
+    return fallback;
+  }
+
+  Isolate* isolate = context->GetIsolate();
+  Local<v8::Function> newTargetFunc = newTarget.As<v8::Function>();
+
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, newTargetFunc);
+  if (wrapper != nullptr) {
+    if (wrapper->Type() == WrapperType::ObjCClass) {
+      return static_cast<ObjCClassWrapper*>(wrapper)->Klass();
+    }
+    return fallback;
+  }
+
+  Class ensured = ClassBuilder::EnsureExtendedClass(context, newTargetFunc);
+  return ensured != nil ? ensured : fallback;
 }
 
 void ClassBuilder::ExposeDynamicMembers(v8::Local<v8::Context> context, Class extendedClass,
@@ -578,7 +722,8 @@ BinaryTypeEncodingType ClassBuilder::GetTypeEncodingType(Isolate* isolate, Local
 
 void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedClass,
                                         Local<Value> exposedMethods, Local<Value> exposedProtocols,
-                                        Local<Object> implementationObject) {
+                                        Local<Object> implementationObject,
+                                        std::unordered_set<std::string>* visitedNames) {
   Isolate* isolate = context->GetIsolate();
   std::vector<const ProtocolMeta*> protocols;
   if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
@@ -612,6 +757,13 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
       Local<Value> methodName;
       bool success = methodNames->Get(context, i).ToLocal(&methodName);
       tns::Assert(success, isolate);
+
+      // When flattening a multi-level ES class chain, skip names already exposed by a more
+      // derived level (JS shadowing semantics)
+      if (visitedNames != nullptr &&
+          !visitedNames->insert("exposed:" + tns::ToString(isolate, methodName)).second) {
+        continue;
+      }
 
       Local<Value> methodSignature;
       success = exposedMethods.As<Object>()->Get(context, methodName).ToLocal(&methodSignature);
@@ -700,7 +852,8 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
       implementationObject->Get(context, Symbol::GetIterator(isolate)).ToLocal(&symbolIterator);
   tns::Assert(success, isolate);
 
-  if (!symbolIterator.IsEmpty() && symbolIterator->IsFunction()) {
+  if (!symbolIterator.IsEmpty() && symbolIterator->IsFunction() &&
+      !class_conformsToProtocol(extendedClass, @protocol(NSFastEnumeration))) {
     Local<v8::Function> symbolIteratorFunc = symbolIterator.As<v8::Function>();
 
     class_addProtocol(extendedClass, @protocol(NSFastEnumeration));
@@ -723,7 +876,14 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
         isolate);
   }
 
-  tns::Assert(implementationObject->GetOwnPropertyNames(context).ToLocal(&propertyNames), isolate);
+  // Use ALL_PROPERTIES so that non-enumerable members are picked up too - methods and accessors
+  // declared with ES class syntax are non-enumerable, unlike the plain object literals passed to
+  // the legacy `.extend()` API.
+  PropertyFilter propertyFilter =
+      static_cast<PropertyFilter>(PropertyFilter::ALL_PROPERTIES | PropertyFilter::SKIP_SYMBOLS);
+  tns::Assert(
+      implementationObject->GetOwnPropertyNames(context, propertyFilter).ToLocal(&propertyNames),
+      isolate);
   for (uint32_t i = 0; i < propertyNames->Length(); i++) {
     Local<Value> key;
     bool success = propertyNames->Get(context, i).ToLocal(&key);
@@ -733,6 +893,16 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
     }
 
     std::string methodName = tns::ToString(isolate, key);
+
+    if (methodName == "constructor") {
+      continue;
+    }
+
+    // When flattening a multi-level ES class chain, skip names already handled by a more derived
+    // level (JS shadowing semantics)
+    if (visitedNames != nullptr && !visitedNames->insert(methodName).second) {
+      continue;
+    }
 
     Local<Value> propertyDescriptor;
     tns::Assert(implementationObject->GetOwnPropertyDescriptor(context, key.As<v8::Name>())

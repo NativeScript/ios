@@ -1,6 +1,9 @@
 #ifndef ClassBuilder_h
 #define ClassBuilder_h
 
+#include <string>
+#include <unordered_set>
+
 #include "Common.h"
 #include "Metadata.h"
 
@@ -28,6 +31,16 @@ public:
     static void RegisterBaseTypeScriptExtendsFunction(v8::Local<v8::Context> context);
     static void RegisterNativeTypeScriptExtendsFunction(v8::Local<v8::Context> context);
     static std::string GetTypeEncoding(const TypeEncoding* typeEncoding, int argsCount);
+
+    // Lazily registers an Objective-C subclass for a plain ES `class X extends NativeBase {}`
+    // constructor function. Returns the registered class, or nil when ctorFunc is not part of a
+    // native inheritance chain (or the chain goes through a legacy `.extend()`-created class).
+    // Idempotent: subsequent calls return the cached class from the ctor's ObjCClassWrapper.
+    static Class EnsureExtendedClass(v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc);
+
+    // Resolves the Objective-C class that should be instantiated for a construct call, honoring
+    // `new.target` so that plain ES subclasses of native classes get their own registered class.
+    static Class ResolveConstructedClass(v8::Local<v8::Context> context, v8::Local<v8::Value> newTarget, Class fallback);
 private:
     static std::atomic<unsigned long long> classNameCounter_;
 
@@ -35,7 +48,8 @@ private:
     static void SuperAccessorGetterCallback(v8::Local<v8::Name> name, const v8::PropertyCallbackInfo<v8::Value>& info);
     static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-    static void ExposeDynamicMethods(v8::Local<v8::Context> context, Class extendedClass, v8::Local<v8::Value> exposedMethods, v8::Local<v8::Value> exposedProtocols, v8::Local<v8::Object> implementationObject);
+    static void SwizzleRetainRelease(v8::Isolate* isolate, Class extendedClass);
+    static void ExposeDynamicMethods(v8::Local<v8::Context> context, Class extendedClass, v8::Local<v8::Value> exposedMethods, v8::Local<v8::Value> exposedProtocols, v8::Local<v8::Object> implementationObject, std::unordered_set<std::string>* visitedNames = nullptr);
     static void ExposeDynamicMembers(v8::Local<v8::Context> context, Class extendedClass, v8::Local<v8::Object> implementationObject, v8::Local<v8::Object> nativeSignature);
     static void VisitMethods(Class extendedClass, std::string methodName, const BaseClassMeta* meta, std::vector<const MethodMeta*>& methodMetas, std::vector<const ProtocolMeta*> exposedProtocols);
     static void VisitProperties(std::string propertyName, const BaseClassMeta* meta, std::vector<const PropertyMeta*>& propertyMetas, std::vector<const ProtocolMeta*> exposedProtocols);
