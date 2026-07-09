@@ -67,6 +67,18 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
 }
 
 void WorkerWrapper::DrainPendingTasks() {
+  // The drain source is armed (and can be signaled by a main-thread
+  // PostMessage) BEFORE `workerIsolate_` is assigned in BackgroundLooper —
+  // and worker creation can spin its runloop inside that window: under an
+  // HMR dev session the worker's own script loads over HTTP, and
+  // HttpFetchText's boot pump (MaybePumpJSThreadDuringBoot) runs the current
+  // runloop, firing this source with a null isolate (crash in
+  // v8::Locker::Initialize). Bail until the isolate exists — the messages
+  // stay queued and the explicit DrainPendingTasks() call right after
+  // isolate creation delivers them.
+  if (this->workerIsolate_ == nullptr) {
+    return;
+  }
   std::vector<std::shared_ptr<worker::Message>> messages = this->queue_.PopAll();
   v8::Locker locker(this->workerIsolate_);
   Isolate::Scope isolate_scope(this->workerIsolate_);
