@@ -1244,6 +1244,41 @@ static bool QueueHttpDynamicWaiterIfInFlight(
   return true;
 }
 
+// Build a rejection reason that PRESERVES the underlying V8 exception text.
+// InstantiateModule/Evaluate failures carry precise, actionable messages
+// (e.g. "The requested module '<url>' does not provide an export named
+// '<name>'"); rejecting with only a generic stage label ("Instantiation
+// failed (http-loader)") swallows them and turns a one-line fix into a
+// device-side debugging session. `tc` must be the TryCatch that was active
+// around the failing call.
+static v8::Local<v8::Value> BuildModuleFailureReason(v8::Isolate* isolate,
+                                                     v8::TryCatch& tc,
+                                                     const char* stage,
+                                                     const std::string& urlOrKey) {
+  std::string message = std::string(stage) + ": " + urlOrKey;
+  if (tc.HasCaught()) {
+    v8::Local<v8::Message> excMessage = tc.Message();
+    if (!excMessage.IsEmpty()) {
+      v8::String::Utf8Value text(isolate, excMessage->Get());
+      if (*text != nullptr && strlen(*text) > 0) {
+        message += std::string(" — ") + *text;
+      }
+    } else {
+      v8::Local<v8::Value> exception = tc.Exception();
+      if (!exception.IsEmpty()) {
+        v8::String::Utf8Value text(isolate, exception);
+        if (*text != nullptr && strlen(*text) > 0) {
+          message += std::string(" — ") + *text;
+        }
+      }
+    }
+  }
+  if (IsScriptLoadingLogEnabled()) {
+    Log(@"[dyn-import][failure] %s", message.c_str());
+  }
+  return v8::Exception::Error(tns::ToV8String(isolate, message.c_str()));
+}
+
 static void ResolveModuleWaiters(v8::Isolate* isolate,
                                  v8::Local<v8::Context> context,
                                  const std::string& registryKey,
@@ -3225,14 +3260,16 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 Log(@"[dyn-import][http-cache] awaiting evaluation %s", key.c_str());
               }
               g_httpDynamicWaiters[key].emplace_back(isolate, resolver);
-              if (st == v8::Module::kUninstantiated &&
-                  !existing->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
-                RemoveModuleFromRegistry(key);
-                RejectHttpDynamicWaiters(
-                    isolate, context, key,
-                    v8::Exception::Error(
-                        tns::ToV8String(isolate, "Instantiation failed (http-cache hit)")));
-                return scope.Escape(resolver->GetPromise());
+              if (st == v8::Module::kUninstantiated) {
+                v8::TryCatch tcInstantiate(isolate);
+                if (!existing->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+                  RemoveModuleFromRegistry(key);
+                  RejectHttpDynamicWaiters(isolate, context, key,
+                                           BuildModuleFailureReason(isolate, tcInstantiate,
+                                                                    "Instantiation failed (http-cache hit)",
+                                                                    key));
+                  return scope.Escape(resolver->GetPromise());
+                }
               }
 
               if (IsModuleEvaluationInProgress(existing->GetStatus())) {
@@ -3241,14 +3278,17 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
               // Trigger evaluation. If TLA returns a Promise, attach then-handlers to resolve waiters upon settle.
               v8::Local<v8::Value> evalResult;
-              if (!existing->Evaluate(context).ToLocal(&evalResult)) {
-                // Failed evaluation: reject all waiters and drop entry
-                RemoveModuleFromRegistry(key);
-                RejectHttpDynamicWaiters(
-                    isolate, context, key,
-                    v8::Exception::Error(
-                        tns::ToV8String(isolate, "Evaluation failed (http-cache hit)")));
-                return scope.Escape(resolver->GetPromise());
+              {
+                v8::TryCatch tcEvaluate(isolate);
+                if (!existing->Evaluate(context).ToLocal(&evalResult)) {
+                  // Failed evaluation: reject all waiters and drop entry
+                  RemoveModuleFromRegistry(key);
+                  RejectHttpDynamicWaiters(isolate, context, key,
+                                           BuildModuleFailureReason(isolate, tcEvaluate,
+                                                                    "Evaluation failed (http-cache hit)",
+                                                                    key));
+                  return scope.Escape(resolver->GetPromise());
+                }
               }
               // If Evaluate returned a Promise (top-level await), wait until it settles before resolving waiters.
               if (!evalResult.IsEmpty() && evalResult->IsPromise()) {
@@ -3313,14 +3353,16 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       if (!modMaybe.IsEmpty()) {
         v8::Local<v8::Module> mod;
         if (modMaybe.ToLocal(&mod)) {
-          if (mod->GetStatus() == v8::Module::kUninstantiated &&
-              !mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
-            RemoveModuleFromRegistry(key);
-            RejectHttpDynamicWaiters(
-                isolate, context, key,
-                v8::Exception::Error(
-                    tns::ToV8String(isolate, "Instantiation failed (http-loader)")));
-            return scope.Escape(resolver->GetPromise());
+          if (mod->GetStatus() == v8::Module::kUninstantiated) {
+            v8::TryCatch tcInstantiate(isolate);
+            if (!mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+              RemoveModuleFromRegistry(key);
+              RejectHttpDynamicWaiters(isolate, context, key,
+                                       BuildModuleFailureReason(isolate, tcInstantiate,
+                                                                "Instantiation failed (http-loader)",
+                                                                normalizedSpec));
+              return scope.Escape(resolver->GetPromise());
+            }
           }
 
           if (IsModuleEvaluationInProgress(mod->GetStatus())) {
@@ -3334,14 +3376,17 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           // Evaluate once compiled so that namespace is valid for dynamic import resolution
           if (mod->GetStatus() != v8::Module::kEvaluated) {
             v8::Local<v8::Value> evalResult;
-            if (!mod->Evaluate(context).ToLocal(&evalResult)) {
-              // Remove broken registration and reject
-              RemoveModuleFromRegistry(key);
-              RejectHttpDynamicWaiters(
-                  isolate, context, key,
-                  v8::Exception::Error(
-                      tns::ToV8String(isolate, "Evaluation failed (http-loader)")));
-              return scope.Escape(resolver->GetPromise());
+            {
+              v8::TryCatch tcEvaluate(isolate);
+              if (!mod->Evaluate(context).ToLocal(&evalResult)) {
+                // Remove broken registration and reject
+                RemoveModuleFromRegistry(key);
+                RejectHttpDynamicWaiters(isolate, context, key,
+                                         BuildModuleFailureReason(isolate, tcEvaluate,
+                                                                  "Evaluation failed (http-loader)",
+                                                                  normalizedSpec));
+                return scope.Escape(resolver->GetPromise());
+              }
             }
             // If Evaluate returned a Promise (top-level await), wait until it settles before resolving
             if (!evalResult.IsEmpty() && evalResult->IsPromise()) {
