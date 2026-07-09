@@ -328,6 +328,12 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   // Cache reads are one-shot; consuming the entry guarantees that a
   // re-fetch (e.g. after HMR) goes back to the network for fresh source.
   if (TryGetPrefetchedSource(url, out)) {
+    // Seeded bodies can legitimately be empty (type-only TS modules) — same
+    // normalization as the network path below, or the caller's empty-body
+    // guard misreads the hit as "HTTP import failed (status=200)".
+    if (out.empty()) {
+      out = "export {};\n";
+    }
     contentType = "application/javascript"; // best effort — same as the dev server returns
     status = 200;
     g_prefetchHits.fetch_add(1, std::memory_order_relaxed);
@@ -367,10 +373,24 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     usleep(120 * 1000);
     ok = PerformHttpFetchOnceSync(url, out, contentType, status);
   }
+  // NOTE: no long dev-server-startup retry loop here on purpose. The CLI's
+  // `compileWithWatch` gates app deploy/restart on its `vite serve`
+  // readiness probe (bundler-compiler-service), so a connection-refused at
+  // boot is a real failure, not a startup race — surface it immediately.
   if (!ok || status < 200 || status >= 300) {
     return false;
   }
-  if (out.empty()) return false;
+  // An empty 2xx body is a VALID module response: type-only TypeScript
+  // modules legitimately transform to zero runtime code (Vite's /@fs
+  // endpoint serves them as empty 200s). Substitute the canonical empty ESM
+  // module — treating this as a fetch failure kills the entire dev-session
+  // graph with a misleading "HTTP import failed (status=200)".
+  if (out.empty()) {
+    out = "export {};\n";
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-loader] empty 2xx body for %s — serving canonical empty module", url.c_str());
+    }
+  }
   if (IsScriptLoadingLogEnabled()) {
     unsigned long long blen = (unsigned long long)out.size();
     const char* ctstr = contentType.empty() ? "<none>" : contentType.c_str();
@@ -557,7 +577,13 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
 
     status = (int)httpStatusLocal;
     contentType = contentTypeLocal;
-    if (err != nil || bodyLocal.empty()) {
+    // An empty body on a 2xx with no transport error is a legitimate
+    // response (type-only TS modules transform to zero runtime code —
+    // Vite serves them as empty 200s). Only transport errors and empty
+    // non-2xx responses are fetch failures; HttpFetchText normalizes the
+    // empty-success body to the canonical empty module.
+    const bool emptyNon2xx = bodyLocal.empty() && (httpStatusLocal < 200 || httpStatusLocal >= 300);
+    if (err != nil || emptyNon2xx) {
       if (IsScriptLoadingLogEnabled()) {
         NSString* desc = err.localizedDescription ?: @"<no description>";
         NSString* domain = err.domain ?: @"<no domain>";
