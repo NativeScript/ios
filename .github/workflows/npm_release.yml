@@ -54,6 +54,11 @@ jobs:
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
+          # setup-node v6 enables dependency caching by default when it
+          # detects a package manager — a cache-poisoning vector, worst in the
+          # jobs that mint App tokens or publish. Disabled on every setup-node
+          # step in this workflow (also keeps pre-v6 behavior).
+          package-manager-cache: false
       - name: Install deps for version scripts
         run: npm install --no-audit --no-fund
       - name: Compute version and tag
@@ -128,6 +133,7 @@ jobs:
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
+          package-manager-cache: false
           registry-url: "https://registry.npmjs.org"
       - name: Install Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -190,6 +196,7 @@ jobs:
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
+          package-manager-cache: false
       - name: Install Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
@@ -270,6 +277,7 @@ jobs:
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
+          package-manager-cache: false
       - name: Setup
         run: npm install --no-audit --no-fund
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -345,6 +353,7 @@ jobs:
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
+          package-manager-cache: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: spm-artifacts-*
@@ -419,6 +428,7 @@ jobs:
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
+          package-manager-cache: false
           registry-url: "https://registry.npmjs.org"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -482,6 +492,7 @@ jobs:
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
+          package-manager-cache: false
       - name: Assert ios-spm manifest pins this release
         run: |
           # Guard against the tag pointing at a STALE manifest — e.g. a
