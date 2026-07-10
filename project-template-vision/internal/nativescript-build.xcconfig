@@ -1,9 +1,6 @@
 // * NativeScript build related flags
 // * Add [sdk=*] after each one to avoid conflict with CocoaPods flags
-// * NativeScript + TKLiveSync are provided by the SwiftPM "NativeScriptVisionOS" product
-// * (github.com/NativeScript/ios-spm); SwiftPM links/embeds them automatically. The
-// * explicit -framework NativeScript / -framework TKLiveSync / -F internal are omitted.
-OTHER_LDFLAGS[sdk=*] = $(inherited) -ObjC -sectcreate __DATA __TNSMetadata "$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin" -licucore -lz -lc++ -framework Foundation -framework UIKit -framework CoreGraphics -framework CoreServices -framework Security
+OTHER_LDFLAGS[sdk=*] = $(inherited) -ObjC -sectcreate __DATA __TNSMetadata "$(CONFIGURATION_BUILD_DIR)/metadata-$(CURRENT_ARCH).bin" -framework NativeScript -framework TKLiveSync -F"$(SRCROOT)/internal" -licucore -lz -lc++ -framework Foundation -framework UIKit -framework CoreGraphics -framework CoreServices -framework Security
 
 // We need to add CONFIGURATION_BUILD_DIR here so that we can explicitly quote-escape any paths in it, because the implicitly added path by Xcode is not always escaped
 FRAMEWORK_SEARCH_PATHS[sdk=*] = $(inherited) "$(SRCROOT)/internal/" "$(CONFIGURATION_BUILD_DIR)"

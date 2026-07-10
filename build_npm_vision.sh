@@ -11,22 +11,22 @@ cp ./package.json "$OUTPUT_DIR"
 
 cp -r "./project-template-vision/" "$OUTPUT_DIR/framework"
 
-# The NativeScript / TKLiveSync xcframeworks are NO LONGER bundled in npm. They
-# are published as GitHub Release artifacts and consumed via SwiftPM
-# (github.com/NativeScript/ios-spm). Stamp the runtime version into the packaged
-# template's SwiftPM reference so it resolves the matching release.
-NPM_VERSION=$(node -e "console.log(require('./package.json').version)")
-node ./scripts/stamp-template-version.mjs \
-  "$OUTPUT_DIR/framework/__PROJECT_NAME__.xcodeproj/project.pbxproj" \
-  "$NPM_VERSION"
+cp -r "dist/NativeScript.xcframework" "$OUTPUT_DIR/framework/internal"
+cp -r "dist/TKLiveSync.xcframework" "$OUTPUT_DIR/framework/internal"
 
-# Build-time metadata generator is still shipped in npm (Phase 1). See the
-# distribution plan for moving this to an on-demand artifact (Phase 2).
 mkdir -p "$OUTPUT_DIR/framework/internal/metadata-generator-x86_64"
 cp -r "metadata-generator/dist/x86_64/." "$OUTPUT_DIR/framework/internal/metadata-generator-x86_64"
 
 mkdir -p "$OUTPUT_DIR/framework/internal/metadata-generator-arm64"
 cp -r "metadata-generator/dist/arm64/." "$OUTPUT_DIR/framework/internal/metadata-generator-arm64"
+
+# Add xcframeworks to .zip (NPM modules do not support symlinks, unzipping is done by {N} CLI)
+(
+    set -e
+    cd $OUTPUT_DIR/framework/internal
+    zip -qr --symlinks XCFrameworks.zip *.xcframework
+    rm -rf *.xcframework
+)
 
 pushd "$OUTPUT_DIR"
 npm pack
