@@ -7,8 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		39940D9122C4EF600050DDE1 /* NativeScript.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 39940D8C22C4EAAA0050DDE1 /* NativeScript.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		39940E1C22C5DFFF0050DDE1 /* TKLiveSync.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 39940E1B22C5DFFF0050DDE1 /* TKLiveSync.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AA10000000000000000000C1 /* NativeScript in Frameworks */ = {isa = PBXBuildFile; productRef = AA10000000000000000000B1 /* NativeScript */; };
 		858B842D18CA22B800AB12DE /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 858B833A18CA111C00AB12DE /* InfoPlist.strings */; };
 		AAA0AADB2A54B96B00EE55A4 /* NativeScriptStart.m in Sources */ = {isa = PBXBuildFile; fileRef = AAA0AADA2A54B96B00EE55A4 /* NativeScriptStart.m */; };
 		CD45EE7C18DC2D5800FB50C0 /* app in Resources */ = {isa = PBXBuildFile; fileRef = CD45EE7A18DC2D5800FB50C0 /* app */; };
@@ -22,8 +21,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				39940D9122C4EF600050DDE1 /* NativeScript.xcframework in Embed Frameworks */,
-				39940E1C22C5DFFF0050DDE1 /* TKLiveSync.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -35,8 +32,6 @@
 		391174B721F1D99900BA2583 /* plugins-release.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "plugins-release.xcconfig"; sourceTree = SOURCE_ROOT; };
 		391174B821F1D99900BA2583 /* plugins-debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "plugins-debug.xcconfig"; sourceTree = SOURCE_ROOT; };
 		39940D8122C4E84C0050DDE1 /* __PROJECT_NAME__.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = __PROJECT_NAME__.entitlements; sourceTree = "<group>"; };
-		39940D8C22C4EAAA0050DDE1 /* NativeScript.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = NativeScript.xcframework; path = internal/NativeScript.xcframework; sourceTree = "<group>"; };
-		39940E1B22C5DFFF0050DDE1 /* TKLiveSync.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = TKLiveSync.xcframework; path = internal/TKLiveSync.xcframework; sourceTree = "<group>"; };
 		42C751E2232B769100186695 /* nativescript-pre-link */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = "nativescript-pre-link"; path = "internal/nativescript-pre-link"; sourceTree = SOURCE_ROOT; };
 		42C751E3232B769100186695 /* strip-dynamic-framework-architectures.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; name = "strip-dynamic-framework-architectures.sh"; path = "internal/strip-dynamic-framework-architectures.sh"; sourceTree = SOURCE_ROOT; };
 		42C751E4232B769100186695 /* nsld.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; name = nsld.sh; path = internal/nsld.sh; sourceTree = SOURCE_ROOT; };
@@ -63,6 +58,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA10000000000000000000C1 /* NativeScript in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -115,8 +111,6 @@
 		858B833018CA111C00AB12DE /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				39940E1B22C5DFFF0050DDE1 /* TKLiveSync.xcframework */,
-				39940D8C22C4EAAA0050DDE1 /* NativeScript.xcframework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -176,6 +170,9 @@
 			dependencies = (
 			);
 			name = __PROJECT_NAME__;
+			packageProductDependencies = (
+				AA10000000000000000000B1 /* NativeScript */,
+			);
 			productName = JDBridgeApp;
 			productReference = 858B843318CA22B800AB12DE /* __PROJECT_NAME__.app */;
 			productType = "com.apple.product-type.application";
@@ -206,6 +203,9 @@
 				Base,
 			);
 			mainGroup = 858B832518CA111C00AB12DE;
+			packageReferences = (
+				AA10000000000000000000A1 /* XCRemoteSwiftPackageReference "ios-spm" */,
+			);
 			productRefGroup = 858B832F18CA111C00AB12DE /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -498,6 +498,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AA10000000000000000000A1 /* XCRemoteSwiftPackageReference "ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/NativeScript/ios-spm.git";
+			requirement = {
+				kind = exactVersion;
+				version = "__NS_RUNTIME_VERSION__";
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA10000000000000000000B1 /* NativeScript */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA10000000000000000000A1 /* XCRemoteSwiftPackageReference "ios-spm" */;
+			productName = NativeScript;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 858B832618CA111C00AB12DE /* Project object */;
 }

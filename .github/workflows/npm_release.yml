@@ -1,21 +1,112 @@
 on:
   push:
     branches:
-      - main
+      - main # -> prerelease published under the "next" dist-tag
     tags:
-      - "v*"
+      - "v*" # -> release published under the "latest" dist-tag
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to cut, e.g. 9.1.0 (creates tag v<version> and publishes 'latest'). Leave empty for a manual 'next' build."
+        required: false
+        default: ""
 
 env:
   NPM_TAG: "next"
   XCODE_VERSION: "^15.0"
 
+# Minimal default token permissions for every job. Jobs that need more declare it
+# locally (github-release: contents:write; publish: id-token:write). Cross-repo
+# writes to ios-spm use a GitHub App token, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
+# The runtime xcframeworks are no longer shipped inside the npm packages. Each
+# build publishes them as GitHub Release assets and points the SwiftPM manifest
+# (github.com/NativeScript/ios-spm) at them via binaryTarget(url:checksum:). The
+# slim npm package only carries the Xcode project template + metadata generator.
+#
+# Flow: setup → build (ios, visionos) → test → github-release (assets) →
+#       spm-update (stamp + tag ios-spm) → publish (npm) → verify-spm
+#
+# The release half (github-release, spm-update, publish, verify-spm) is gated on
+# repo variable ENABLE_SPM_RELEASE. Until it is 'true' (and the ios-spm App
+# credentials are set), the workflow runs setup/build/test only and publishes NOTHING — so the
+# slim package can never ship before its matching ios-spm tag exists. Turn the
+# variable on as part of the cutover.
 jobs:
-  build:
-    name: Build
-    runs-on: macos-14
+  setup:
+    name: Resolve version
+    runs-on: ubuntu-latest
     outputs:
-      npm_version: ${{ steps.npm_version_output.outputs.NPM_VERSION }}
-      npm_tag: ${{ steps.npm_version_output.outputs.NPM_TAG }}
+      npm_version: ${{ steps.out.outputs.NPM_VERSION }}
+      npm_tag: ${{ steps.out.outputs.NPM_TAG }}
+      build_matrix: ${{ steps.out.outputs.BUILD_MATRIX }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 22
+      - name: Install deps for version scripts
+        run: npm install --no-audit --no-fund
+      - name: Compute version and tag
+        id: out
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            # manual release: cut tag v<input> and publish (latest unless prerelease)
+            NPM_VERSION="${INPUT_VERSION#v}"
+          elif [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            # tag push (v*): the tag is authoritative. Strip the leading 'v' and
+            # assert it matches package.json so the release can't drift from its tag.
+            NPM_VERSION="${GITHUB_REF#refs/tags/}"
+            NPM_VERSION="${NPM_VERSION#v}"
+            PKG_VERSION=$(node -e "console.log(require('./package.json').version);")
+            if [ "$NPM_VERSION" != "$PKG_VERSION" ]; then
+              echo "::error::Tag v$NPM_VERSION does not match package.json version $PKG_VERSION. Bump package.json before tagging." >&2
+              exit 1
+            fi
+          else
+            # branch push (main) or manual run without a version -> "next" prerelease
+            NPM_VERSION=$(node ./scripts/get-next-version.js)
+          fi
+          NPM_TAG=$(NPM_VERSION=$NPM_VERSION node ./scripts/get-npm-tag.js)
+          echo "NPM_VERSION=$NPM_VERSION" >> $GITHUB_OUTPUT
+          echo "NPM_TAG=$NPM_TAG" >> $GITHUB_OUTPUT
+          # Target matrix: ios always builds/publishes. visionos is built and
+          # published ONLY for real releases (a v* tag push, or a manual dispatch
+          # with a version), never for the rolling "next" channel that every push
+          # to main produces. The discriminator is the resolved dist-tag: pushes
+          # to main (and dispatch without a version) -> "next" -> ios only.
+          if [ "$NPM_TAG" = "next" ]; then
+            BUILD_MATRIX='{"include":[{"target":"ios","script":"build-ios"}]}'
+          else
+            BUILD_MATRIX='{"include":[{"target":"ios","script":"build-ios"},{"target":"visionos","script":"build-vision"}]}'
+          fi
+          echo "BUILD_MATRIX=$BUILD_MATRIX" >> $GITHUB_OUTPUT
+          echo "Resolved $NPM_VERSION (tag: $NPM_TAG); build targets: $BUILD_MATRIX"
+
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: macos-14
+    needs: setup
+    strategy:
+      fail-fast: false
+      # Computed in `setup`: ios always; visionos only for real releases
+      # (npm_tag != "next"), never for the rolling "next" channel. Each entry
+      # carries `target` (package identity, @nativescript/<target>) and `script`
+      # (the npm build script; note the vision script is build-vision).
+      matrix: ${{ fromJSON(needs.setup.outputs.build_matrix) }}
+    env:
+      NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -55,34 +146,26 @@ jobs:
             sudo mkdir -p /usr/local/bin
             sudo ln -sf "$(command -v cmake)" /usr/local/bin/cmake
           fi
-      - name: Get Current Version
-        run: |
-          NPM_VERSION=$(node -e "console.log(require('./package.json').version);")
-          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
-      - name: Bump version for dev release
-        if: ${{ !contains(github.ref, 'refs/tags/') }}
-        run: |
-          NPM_VERSION=$(node ./scripts/get-next-version.js)
-          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
-          npm version $NPM_VERSION --no-git-tag-version
-      - name: Output NPM Version and tag
-        id: npm_version_output
-        run: |
-          NPM_TAG=$(node ./scripts/get-npm-tag.js)
-          echo NPM_VERSION=$NPM_VERSION >> $GITHUB_OUTPUT
-          echo NPM_TAG=$NPM_TAG >> $GITHUB_OUTPUT
-      - name: Build
-        run: npm run build-ios
+      - name: Set package version
+        run: npm version $NPM_VERSION --no-git-tag-version --allow-same-version
+      - name: Build (${{ matrix.target }})
+        run: npm run ${{ matrix.script }}
       - name: Upload npm package artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: npm-package
-          path: dist/nativescript-ios-${{steps.npm_version_output.outputs.NPM_VERSION}}.tgz
+          name: npm-package-${{ matrix.target }}
+          path: dist/nativescript-*-${{ env.NPM_VERSION }}.tgz
+      - name: Upload SwiftPM artifacts (xcframework zips + checksums)
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: spm-artifacts-${{ matrix.target }}
+          path: dist/artifacts/*
       - name: Upload dSYMs artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: NativeScript-dSYMs
+          name: dSYMs-${{ matrix.target }}
           path: dist/dSYMs
+
   test:
     name: Test
     runs-on: macos-14
@@ -155,18 +238,172 @@ jobs:
         with:
           name: test-results
           path: ${{env.TEST_FOLDER}}/test_results.xcresult
-  publish:
+
+  # Publish the xcframework zips + dSYMs as a GitHub Release asset for EVERY
+  # version (prerelease unless 'latest'), because the SwiftPM binaryTarget url
+  # must resolve for `next`/`pr` consumers too — not only tagged releases.
+  github-release:
+    name: GitHub Release (SPM assets)
     runs-on: ubuntu-latest
-    environment: npm-publish
+    # Master switch for the SPM release flow. When unset, the workflow runs
+    # setup/build/test only — nothing is released or published, so landing this
+    # on main before the token is configured is a no-op for consumers.
+    if: ${{ vars.ENABLE_SPM_RELEASE == 'true' }}
+    permissions:
+      contents: write
     needs:
+      - setup
       - build
       - test
+    env:
+      NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
+      NPM_TAG: ${{ needs.setup.outputs.npm_tag }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 22
+      - name: Setup
+        run: npm install --no-audit --no-fund
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: spm-artifacts-*
+          path: spm-artifacts
+          merge-multiple: true
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: dSYMs-*
+          path: dist/dSYMs
+          merge-multiple: true
+      - name: Zip dSYMs
+        working-directory: dist/dSYMs
+        run: find . -maxdepth 1 -name '*.dSYM' -print | xargs -I@ zip -r @.zip @ || true
+      - name: Partial Changelog
+        run: npx conventional-changelog -p angular -r2 > body.md
+      - name: Create / update release with SPM artifacts
+        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
+        with:
+          tag: "v${{ env.NPM_VERSION }}"
+          name: "v${{ env.NPM_VERSION }}"
+          commit: ${{ github.sha }}
+          artifacts: "spm-artifacts/*.xcframework.zip,dist/dSYMs/*.zip"
+          bodyFile: "body.md"
+          prerelease: ${{ needs.setup.outputs.npm_tag != 'latest' }}
+          allowUpdates: true
+
+  # Stamp + tag github.com/NativeScript/ios-spm to point at this release's assets.
+  # Cross-repo write uses a short-lived GitHub App installation token, minted per
+  # run and scoped to ios-spm only (no long-lived PAT to rotate). Enable by setting
+  # repo variable ENABLE_SPM_RELEASE=true plus the App credentials
+  # (variable APP_CLIENT_ID + secret APP_PRIVATE_KEY); the App must be installed on
+  # NativeScript/ios-spm with Contents: Read and write.
+  spm-update:
+    name: Update ios-spm manifest
+    runs-on: ubuntu-latest
+    if: ${{ vars.ENABLE_SPM_RELEASE == 'true' }}
+    needs:
+      - setup
+      - build
+      - test
+      - github-release
+    env:
+      NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
+      NPM_TAG: ${{ needs.setup.outputs.npm_tag }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Mint ios-spm App token (short-lived, scoped to ios-spm)
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: NativeScript
+          repositories: ios-spm
+          permission-contents: write
+      - name: Checkout ios (for stamping script)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          path: ios
+          persist-credentials: false
+      - name: Checkout ios-spm
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: NativeScript/ios-spm
+          token: ${{ steps.app-token.outputs.token }}
+          path: ios-spm
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: spm-artifacts-*
+          path: spm-artifacts
+          merge-multiple: true
+      - name: Stamp Package.swift
+        run: |
+          STRICT=""
+          if [ "$NPM_TAG" = "latest" ]; then STRICT="--strict"; fi
+          CHECKSUM_ARGS=""
+          for f in spm-artifacts/checksums-*.env; do
+            [ -f "$f" ] && CHECKSUM_ARGS="$CHECKSUM_ARGS --checksums $f"
+          done
+          echo "Using checksum files:$CHECKSUM_ARGS"
+          if [ -z "$CHECKSUM_ARGS" ]; then echo "No checksum files found" >&2; exit 1; fi
+          node ios/scripts/stamp-spm-release.mjs \
+            --package ios-spm/Package.swift \
+            --version "$NPM_VERSION" \
+            $CHECKSUM_ARGS $STRICT
+      - name: Commit and tag ios-spm
+        working-directory: ios-spm
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config user.name "NativeScript Bot"
+          git config user.email "oss@nativescript.org"
+          # persist-credentials:false keeps the token out of .git/config; push to a
+          # token-authenticated URL instead (the App token is masked in logs).
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/NativeScript/ios-spm.git"
+          git add Package.swift
+          git commit -m "release: $NPM_VERSION" || echo "no changes to commit"
+          git tag -f "$NPM_VERSION"
+          git push "$REMOTE" HEAD:main
+          git push -f "$REMOTE" "refs/tags/$NPM_VERSION"
+
+  publish:
+    name: Publish ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    # Gated + ordered after spm-update so a slim package is never published before
+    # its matching ios-spm tag exists (which would make it unresolvable).
+    if: ${{ vars.ENABLE_SPM_RELEASE == 'true' }}
+    needs:
+      - setup
+      - build
+      - test
+      - spm-update
     permissions:
       contents: read
       id-token: write
+    strategy:
+      fail-fast: false
+      # Same targets as the build matrix (computed in `setup`): visionos is
+      # published only for real releases, never for the "next" channel. The
+      # unused `script` key on each entry is harmless here.
+      matrix: ${{ fromJSON(needs.setup.outputs.build_matrix) }}
     env:
-      NPM_VERSION: ${{needs.build.outputs.npm_version}}
-      NPM_TAG: ${{needs.build.outputs.npm_tag}}
+      NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
+      NPM_TAG: ${{ needs.setup.outputs.npm_tag }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -178,7 +415,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: npm-package
+          name: npm-package-${{ matrix.target }}
           path: dist
       - name: Update npm (required for OIDC trusted publishing)
         run: |
@@ -186,65 +423,142 @@ jobs:
           corepack install -g npm@11.5.1
           test "$(npm --version)" = "11.5.1"
           test "$(npx --version)" = "11.5.1"
+      - name: Resolve package name
+        run: |
+          if [ "${{ matrix.target }}" = "ios" ]; then echo "PKG=ios" >> $GITHUB_ENV; else echo "PKG=visionos" >> $GITHUB_ENV; fi
       - name: Publish package (OIDC trusted publishing)
         if: ${{ vars.USE_NPM_TOKEN != 'true' }}
         run: |
-          echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG via OIDC trusted publishing..."
+          echo "Publishing @nativescript/$PKG@$NPM_VERSION to NPM with tag $NPM_TAG via OIDC trusted publishing..."
           unset NODE_AUTH_TOKEN
           if [ -n "${NPM_CONFIG_USERCONFIG:-}" ]; then
             rm -f "$NPM_CONFIG_USERCONFIG"
           fi
-          npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --access public --provenance
+          npm publish ./dist/nativescript-${PKG}-${NPM_VERSION}.tgz --tag $NPM_TAG --access public --provenance
         env:
           NODE_AUTH_TOKEN: ""
-
       - name: Publish package (granular token)
         if: ${{ vars.USE_NPM_TOKEN == 'true' }}
         run: |
-          echo "Publishing @nativescript/ios@$NPM_VERSION to NPM with tag $NPM_TAG via granular token..."
-          npm publish ./dist/nativescript-ios-${{env.NPM_VERSION}}.tgz --tag $NPM_TAG --access public --provenance
+          echo "Publishing @nativescript/$PKG@$NPM_VERSION to NPM with tag $NPM_TAG via granular token..."
+          npm publish ./dist/nativescript-${PKG}-${NPM_VERSION}.tgz --tag $NPM_TAG --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
-  github-release:
-    runs-on: ubuntu-latest
-    # only runs on tagged commits
-    if: ${{ contains(github.ref, 'refs/tags/') }}
-    permissions:
-      contents: write
+
+  # Post-publish smoke test: resolve ios-spm at the released tag and verify the
+  # binary artifact downloads + checksum-validate against the real Release.
+  #
+  # Channel-aware, mirroring the build/publish matrix: `next` builds iOS only, so
+  # its Release has no visionos assets. `swift package resolve` eagerly downloads
+  # EVERY binaryTarget in a resolved package (not just the ones a referenced
+  # product needs), so resolving the full ios-spm manifest on a `next` version
+  # would try to fetch the visionos zips and 404. For `next` we therefore probe
+  # an iOS-only package; only real releases (v* tag / manual version) resolve the
+  # full manifest and thus also verify the visionos artifacts.
+  verify-spm:
+    name: Verify SPM resolution
+    runs-on: macos-14
+    if: ${{ vars.ENABLE_SPM_RELEASE == 'true' }}
     needs:
-      - build
-      - test
+      - setup
+      - spm-update
     env:
-      NPM_VERSION: ${{needs.build.outputs.npm_version}}
+      NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
+      NPM_TAG: ${{ needs.setup.outputs.npm_tag }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
-      - name: Setup
-        run: npm install
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: npm-package
-          path: dist
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: NativeScript-dSYMs
-          path: dist/dSYMs
-      - name: Zip dSYMs
-        working-directory: dist/dSYMs
-        run: find . -maxdepth 1 -name '*.dSYM' -print | xargs -I@ zip -r @.zip @
-      - name: Partial Changelog
-        run: npx conventional-changelog -p angular -r2 > body.md
-      - uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
-        with:
-          artifacts: "dist/nativescript-ios-*.tgz,dist/dSYMs/*.zip"
-          bodyFile: "body.md"
-          prerelease: ${{needs.build.outputs.npm_tag != 'latest'}}
-          allowUpdates: true
+      - name: Assert ios-spm manifest pins this release
+        run: |
+          # Guard against the manifest pointing at a STALE release — e.g. a stamp
+          # that no-ops and leaves a prior version's nsVersion + artifact
+          # URLs/checksums in place. Those still resolve and checksum-pass (they're
+          # internally consistent), so `swift package resolve` below won't catch
+          # it; this explicit version assertion does.
+          url="https://raw.githubusercontent.com/NativeScript/ios-spm/${NPM_VERSION}/Package.swift"
+          manifest="$(curl -fsSL "$url")"
+          if ! printf '%s\n' "$manifest" | grep -q "let nsVersion = \"${NPM_VERSION}\""; then
+            echo "::error::ios-spm@${NPM_VERSION} does not pin nsVersion=\"${NPM_VERSION}\" (stale stamp?). Found:" >&2
+            printf '%s\n' "$manifest" | grep -n "nsVersion" >&2 || true
+            exit 1
+          fi
+          echo "OK: ios-spm@${NPM_VERSION} pins nsVersion=\"${NPM_VERSION}\""
+      - name: Generate a probe package that depends on ios-spm (real releases)
+        # Real release (v* tag / manual version): the Release carries every asset,
+        # so probe the full ios-spm manifest. `swift package resolve` eagerly
+        # downloads all binaryTargets, exercising the iOS AND visionos artifacts.
+        if: ${{ needs.setup.outputs.npm_tag != 'next' }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const v = process.env.NPM_VERSION;
+            fs.mkdirSync("spmverify/Sources/Probe", { recursive: true });
+            fs.writeFileSync("spmverify/Package.swift",
+              "// swift-tools-version: 5.10\n" +
+              "import PackageDescription\n" +
+              "let package = Package(\n" +
+              "  name: \"Probe\",\n" +
+              "  platforms: [.iOS(.v13)],\n" +
+              "  dependencies: [.package(url: \"https://github.com/NativeScript/ios-spm.git\", exact: \"" + v + "\")],\n" +
+              "  targets: [.target(name: \"Probe\", dependencies: [.product(name: \"NativeScript\", package: \"ios-spm\")])]\n" +
+              ")\n");
+            fs.writeFileSync("spmverify/Sources/Probe/Probe.swift", "// probe\n");
+          '
+      - name: Generate an iOS-only probe package (next channel)
+        # The "next" Release has no visionos assets (build matrix is iOS-only for
+        # next), and `swift package resolve` would eagerly try to fetch every
+        # binaryTarget in the full ios-spm manifest -> 404 on the visionos zips.
+        # So probe an iOS-only package whose binaryTargets are the iOS artifacts
+        # from the stamped manifest (real Release URLs + real checksums): resolve
+        # still downloads and checksum-verifies exactly what a next consumer gets,
+        # and never touches visionos.
+        if: ${{ needs.setup.outputs.npm_tag == 'next' }}
+        run: |
+          url="https://raw.githubusercontent.com/NativeScript/ios-spm/${NPM_VERSION}/Package.swift"
+          curl -fsSL "$url" -o manifest.swift
+          node -e '
+            const fs = require("fs");
+            const v = process.env.NPM_VERSION;
+            const body = fs.readFileSync("manifest.swift", "utf8");
+            // Pull the checksum out of the binaryTarget whose url ends in the given
+            // artifact zip. The url is a Swift interpolation ("\(base)/<zip>"), so
+            // match up to the closing quote; anchoring on <zip>" keeps the iOS
+            // NativeScript slot from matching the visionos one (…visionos.xcframework.zip).
+            const ck = (artifact) => {
+              const re = new RegExp("url:\\s*\"[^\"]*" + artifact.replace(/\./g, "\\.") + "\"\\s*,\\s*checksum:\\s*\"([0-9a-f]{64})\"");
+              const m = body.match(re);
+              if (!m) { console.error("No iOS checksum for " + artifact + " in ios-spm@" + v); process.exit(1); }
+              return m[1];
+            };
+            const nsCk = ck("NativeScript.xcframework.zip");
+            const tkCk = ck("TKLiveSync.xcframework.zip");
+            fs.mkdirSync("spmverify/Sources/Probe", { recursive: true });
+            fs.writeFileSync("spmverify/Package.swift",
+              "// swift-tools-version: 5.10\n" +
+              "import PackageDescription\n" +
+              "let base = \"https://github.com/NativeScript/ios/releases/download/v" + v + "\"\n" +
+              "let package = Package(\n" +
+              "  name: \"Probe\",\n" +
+              "  platforms: [.iOS(.v13)],\n" +
+              "  targets: [\n" +
+              "    .binaryTarget(name: \"NativeScript\", url: \"\\(base)/NativeScript.xcframework.zip\", checksum: \"" + nsCk + "\"),\n" +
+              "    .binaryTarget(name: \"TKLiveSync\", url: \"\\(base)/TKLiveSync.xcframework.zip\", checksum: \"" + tkCk + "\"),\n" +
+              "    .target(name: \"Probe\", dependencies: [\"NativeScript\", \"TKLiveSync\"])\n" +
+              "  ]\n" +
+              ")\n");
+            fs.writeFileSync("spmverify/Sources/Probe/Probe.swift", "// probe\n");
+          '
+      - name: Resolve (downloads the xcframework zips and verifies their checksums)
+        working-directory: spmverify
+        run: |
+          # Resolution fetches each binaryTarget's zip and verifies its SHA-256
+          # against the stamped checksum; a mismatch or a missing release asset
+          # fails the release here. For next this covers the iOS artifacts only;
+          # real releases resolve the full manifest and also cover visionos.
+          swift package resolve
+          echo "ios-spm@$NPM_VERSION resolved and checksum-verified."
