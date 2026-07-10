@@ -9,7 +9,7 @@
 # Usage: ./build_spm_artifacts.sh [ios|visionos]   (default: ios)
 #
 # These artifacts are uploaded to the GitHub Release and referenced by
-# github.com/NativeScript/ios-spm (see scripts/stamp-spm-release.mjs).
+# github.com/NativeScript/ios-spm (see scripts/generate-spm-manifest.mjs).
 set -e
 source "$(dirname "$0")/build_utils.sh"
 

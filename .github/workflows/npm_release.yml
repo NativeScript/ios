@@ -27,7 +27,7 @@ permissions:
 # slim npm package only carries the Xcode project template + metadata generator.
 #
 # Flow: setup → build (ios, visionos) → test → github-release (assets) →
-#       spm-update (stamp + tag ios-spm) → publish (npm) → verify-spm
+#       spm-update (generate manifest + tag ios-spm) → publish (npm) → verify-spm
 #
 # The release half (github-release, spm-update, publish, verify-spm) is gated on
 # repo variable ENABLE_SPM_RELEASE. Until it is 'true' (and the ios-spm App
@@ -350,17 +350,24 @@ jobs:
           pattern: spm-artifacts-*
           path: spm-artifacts
           merge-multiple: true
-      - name: Stamp Package.swift
+      - name: Generate Package.swift
         run: |
+          # The generator emits the WHOLE manifest, shaped by the checksums it
+          # is given: "next" builds produce only checksums-ios.env, so the next
+          # manifest omits the visionOS product/targets whose Release assets
+          # don't exist (SwiftPM eagerly downloads every binaryTarget in a
+          # resolved manifest — an unshipped asset 404s for every consumer).
+          # Real releases pass --strict so a full release can never silently
+          # ship an iOS-only manifest.
           STRICT=""
-          if [ "$NPM_TAG" = "latest" ]; then STRICT="--strict"; fi
+          if [ "$NPM_TAG" != "next" ]; then STRICT="--strict"; fi
           CHECKSUM_ARGS=""
           for f in spm-artifacts/checksums-*.env; do
             [ -f "$f" ] && CHECKSUM_ARGS="$CHECKSUM_ARGS --checksums $f"
           done
           echo "Using checksum files:$CHECKSUM_ARGS"
           if [ -z "$CHECKSUM_ARGS" ]; then echo "No checksum files found" >&2; exit 1; fi
-          node ios/scripts/stamp-spm-release.mjs \
+          node ios/scripts/generate-spm-manifest.mjs \
             --package ios-spm/Package.swift \
             --version "$NPM_VERSION" \
             $CHECKSUM_ARGS $STRICT
@@ -448,13 +455,12 @@ jobs:
   # Post-publish smoke test: resolve ios-spm at the released tag and verify the
   # binary artifact downloads + checksum-validate against the real Release.
   #
-  # Channel-aware, mirroring the build/publish matrix: `next` builds iOS only, so
-  # its Release has no visionos assets. `swift package resolve` eagerly downloads
-  # EVERY binaryTarget in a resolved package (not just the ones a referenced
-  # product needs), so resolving the full ios-spm manifest on a `next` version
-  # would try to fetch the visionos zips and 404. For `next` we therefore probe
-  # an iOS-only package; only real releases (v* tag / manual version) resolve the
-  # full manifest and thus also verify the visionos artifacts.
+  # One probe for every channel, against the REAL released manifest. The
+  # manifest's target set is channel-shaped by generate-spm-manifest.mjs
+  # ("next" manifests only declare the iOS targets, because next Releases have
+  # no visionos assets), so resolving ios-spm at the released tag exercises
+  # exactly the artifact set a consumer's xcodebuild will download: iOS-only on
+  # next, iOS + visionos on real releases (v* tag / manual version).
   verify-spm:
     name: Verify SPM resolution
     runs-on: macos-14
@@ -470,95 +476,41 @@ jobs:
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
       - name: Assert ios-spm manifest pins this release
         run: |
-          # Guard against the manifest pointing at a STALE release — e.g. a stamp
-          # that no-ops and leaves a prior version's nsVersion + artifact
-          # URLs/checksums in place. Those still resolve and checksum-pass (they're
-          # internally consistent), so `swift package resolve` below won't catch
-          # it; this explicit version assertion does.
+          # Guard against the tag pointing at a STALE manifest — e.g. a
+          # commit/tag step that silently failed and left a prior version's
+          # nsVersion + artifact URLs/checksums in place. Those still resolve
+          # and checksum-pass (they're internally consistent), so `swift
+          # package resolve` below won't catch it; this explicit version
+          # assertion does.
           url="https://raw.githubusercontent.com/NativeScript/ios-spm/${NPM_VERSION}/Package.swift"
           manifest="$(curl -fsSL "$url")"
           if ! printf '%s\n' "$manifest" | grep -q "let nsVersion = \"${NPM_VERSION}\""; then
-            echo "::error::ios-spm@${NPM_VERSION} does not pin nsVersion=\"${NPM_VERSION}\" (stale stamp?). Found:" >&2
+            echo "::error::ios-spm@${NPM_VERSION} does not pin nsVersion=\"${NPM_VERSION}\" (stale manifest?). Found:" >&2
             printf '%s\n' "$manifest" | grep -n "nsVersion" >&2 || true
             exit 1
           fi
           echo "OK: ios-spm@${NPM_VERSION} pins nsVersion=\"${NPM_VERSION}\""
-      - name: Generate a probe package that depends on ios-spm (real releases)
-        # Real release (v* tag / manual version): the Release carries every asset,
-        # so probe the full ios-spm manifest. `swift package resolve` eagerly
-        # downloads all binaryTargets, exercising the iOS AND visionos artifacts.
-        if: ${{ needs.setup.outputs.npm_tag != 'next' }}
-        run: |
-          node -e '
-            const fs = require("fs");
-            const v = process.env.NPM_VERSION;
-            fs.mkdirSync("spmverify/Sources/Probe", { recursive: true });
-            fs.writeFileSync("spmverify/Package.swift",
-              "// swift-tools-version: 5.10\n" +
-              "import PackageDescription\n" +
-              "let package = Package(\n" +
-              "  name: \"Probe\",\n" +
-              "  platforms: [.iOS(.v13)],\n" +
-              "  dependencies: [.package(url: \"https://github.com/NativeScript/ios-spm.git\", exact: \"" + v + "\")],\n" +
-              "  targets: [.target(name: \"Probe\", dependencies: [.product(name: \"NativeScript\", package: \"ios-spm\")])]\n" +
-              ")\n");
-            fs.writeFileSync("spmverify/Sources/Probe/Probe.swift", "// probe\n");
-          '
-      - name: Generate an iOS-only probe package (next channel)
-        # The "next" Release has no visionos assets (build matrix is iOS-only for
-        # next), and `swift package resolve` would eagerly try to fetch every
-        # binaryTarget in the full ios-spm manifest -> 404 on the visionos zips.
-        # So probe an iOS-only package whose binaryTargets are the iOS artifacts
-        # from the stamped manifest (real Release URLs + real checksums): resolve
-        # still downloads and checksum-verifies exactly what a next consumer gets,
-        # and never touches visionos.
-        if: ${{ needs.setup.outputs.npm_tag == 'next' }}
-        run: |
-          url="https://raw.githubusercontent.com/NativeScript/ios-spm/${NPM_VERSION}/Package.swift"
-          curl -fsSL "$url" -o manifest.swift
-          node -e '
-            const fs = require("fs");
-            const v = process.env.NPM_VERSION;
-            const body = fs.readFileSync("manifest.swift", "utf8");
-            // Pull the checksum out of the binaryTarget whose url ends in the given
-            // artifact zip. The url is a Swift interpolation ("\(base)/<zip>"), so
-            // match up to the closing quote; anchoring on <zip>" keeps the iOS
-            // NativeScript slot from matching the visionos one (…visionos.xcframework.zip).
-            const ck = (artifact) => {
-              const re = new RegExp("url:\\s*\"[^\"]*" + artifact.replace(/\./g, "\\.") + "\"\\s*,\\s*checksum:\\s*\"([0-9a-f]{64})\"");
-              const m = body.match(re);
-              if (!m) { console.error("No iOS checksum for " + artifact + " in ios-spm@" + v); process.exit(1); }
-              return m[1];
-            };
-            const nsCk = ck("NativeScript.xcframework.zip");
-            const tkCk = ck("TKLiveSync.xcframework.zip");
-            fs.mkdirSync("spmverify/Sources/Probe", { recursive: true });
-            fs.writeFileSync("spmverify/Package.swift",
-              "// swift-tools-version: 5.10\n" +
-              "import PackageDescription\n" +
-              "let base = \"https://github.com/NativeScript/ios/releases/download/v" + v + "\"\n" +
-              "let package = Package(\n" +
-              "  name: \"Probe\",\n" +
-              "  platforms: [.iOS(.v13)],\n" +
-              "  targets: [\n" +
-              "    .binaryTarget(name: \"NativeScript\", url: \"\\(base)/NativeScript.xcframework.zip\", checksum: \"" + nsCk + "\"),\n" +
-              "    .binaryTarget(name: \"TKLiveSync\", url: \"\\(base)/TKLiveSync.xcframework.zip\", checksum: \"" + tkCk + "\"),\n" +
-              "    .target(name: \"Probe\", dependencies: [\"NativeScript\", \"TKLiveSync\"])\n" +
-              "  ]\n" +
-              ")\n");
-            fs.writeFileSync("spmverify/Sources/Probe/Probe.swift", "// probe\n");
-          '
+      - name: Generate a probe package that depends on ios-spm
+        # The probe pins ios-spm at the exact released version. Resolving it
+        # takes the same path a consumer's xcodebuild does, and the released
+        # manifest only declares targets whose assets exist (channel-shaped by
+        # generate-spm-manifest.mjs) — so this single probe is valid for every
+        # channel.
+        run: node scripts/generate-spm-probe.mjs --version "$NPM_VERSION" --dir spmverify
       - name: Resolve (downloads the xcframework zips and verifies their checksums)
         working-directory: spmverify
         run: |
           # Resolution fetches each binaryTarget's zip and verifies its SHA-256
-          # against the stamped checksum; a mismatch or a missing release asset
-          # fails the release here. For next this covers the iOS artifacts only;
-          # real releases resolve the full manifest and also cover visionos.
+          # against the manifest checksum; a mismatch or a missing release asset
+          # fails the release here. For next the manifest declares the iOS
+          # artifacts only; real releases also declare (and verify) visionos.
           swift package resolve
           echo "ios-spm@$NPM_VERSION resolved and checksum-verified."
