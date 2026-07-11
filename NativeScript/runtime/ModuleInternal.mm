@@ -1648,43 +1648,61 @@ Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,
   // Create a module object with exports that throws when accessed
   Local<Object> moduleObj = Object::New(isolate);
 
-  // Create a Proxy that throws an error when any property is accessed
+  // Create a Proxy that throws an error when any property is accessed.
+  //
+  // The message is passed to a constant factory script as a real V8 string
+  // (never interpolated into the script source). Interpolation is a JS
+  // injection hazard: the message itself contains single quotes
+  // ("Module 'zip' is not available...") which terminated the string literal
+  // early and made the generated script a guaranteed SyntaxError
+  // ("missing ) after argument list") that propagated out of require() with
+  // no hint of its origin.
   std::string errorMessage =
       "Module '" + moduleName + "' is not available. This is an optional module.";
-  std::string proxyCode = "(function() {"
-                          "  const error = new Error('" +
-                          errorMessage +
-                          "');"
-                          "  return new Proxy({}, {"
-                          "    get: function(target, prop) {"
-                          "      throw error;"
-                          "    },"
-                          "    set: function(target, prop, value) {"
-                          "      throw error;"
-                          "    },"
-                          "    has: function(target, prop) {"
-                          "      return false;"
-                          "    },"
-                          "    ownKeys: function(target) {"
-                          "      return [];"
-                          "    },"
-                          "    getPrototypeOf: function(target) {"
-                          "      return null;"
-                          "    }"
-                          "  });"
-                          "})()";
+  static const char* kProxyFactorySource = "(function(msg) {"
+                                           "  const error = new Error(msg);"
+                                           "  return new Proxy({}, {"
+                                           "    get: function(target, prop) {"
+                                           "      throw error;"
+                                           "    },"
+                                           "    set: function(target, prop, value) {"
+                                           "      throw error;"
+                                           "    },"
+                                           "    has: function(target, prop) {"
+                                           "      return false;"
+                                           "    },"
+                                           "    ownKeys: function(target) {"
+                                           "      return [];"
+                                           "    },"
+                                           "    getPrototypeOf: function(target) {"
+                                           "      return null;"
+                                           "    }"
+                                           "  });"
+                                           "})";
 
+  TryCatch tc(isolate);
   Local<Script> proxyScript;
-  if (Script::Compile(context, tns::ToV8String(isolate, proxyCode.c_str())).ToLocal(&proxyScript)) {
-    Local<Value> proxyObject;
-    if (proxyScript->Run(context).ToLocal(&proxyObject)) {
-      // Set the exports to the proxy object
-      bool success = moduleObj->Set(context, tns::ToV8String(isolate, "exports"), proxyObject)
-                         .FromMaybe(false);
-      if (!success) {
-        Log(@"Warning: Failed to set exports property on proxy module object");
+  if (Script::Compile(context, tns::ToV8String(isolate, kProxyFactorySource)).ToLocal(&proxyScript)) {
+    Local<Value> factoryValue;
+    if (proxyScript->Run(context).ToLocal(&factoryValue) && factoryValue->IsFunction()) {
+      Local<Value> args[]{tns::ToV8String(isolate, errorMessage.c_str())};
+      Local<Value> proxyObject;
+      if (factoryValue.As<v8::Function>()
+              ->Call(context, v8::Undefined(isolate), 1, args)
+              .ToLocal(&proxyObject)) {
+        // Set the exports to the proxy object
+        bool success = moduleObj->Set(context, tns::ToV8String(isolate, "exports"), proxyObject)
+                           .FromMaybe(false);
+        if (!success) {
+          Log(@"Warning: Failed to set exports property on proxy module object");
+        }
       }
     }
+  }
+  if (tc.HasCaught()) {
+    // The placeholder is best-effort. Never let its construction machinery
+    // leak an exception that masks the real "module not found" condition.
+    Log(@"Warning: placeholder module construction failed for %s", moduleName.c_str());
   }
 
   // Set up the module object
