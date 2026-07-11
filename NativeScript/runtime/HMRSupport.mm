@@ -1229,7 +1229,12 @@ void SeedModuleBodiesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     if (!elem->Get(ctx, bodyKey).ToLocal(&bodyVal) || !bodyVal->IsString()) continue;
     v8::String::Utf8Value bodyU8(isolate, bodyVal);
     if (!*bodyU8) continue;
-    std::string body(*bodyU8);
+    // Length-aware constructor: module source may legitimately contain
+    // embedded NUL bytes (e.g. '\0' string literals compiled into the
+    // served JS). The strlen-based char* ctor would truncate the body at
+    // the first NUL and the module would later fail to compile with
+    // "Unexpected end of input".
+    std::string body(*bodyU8, bodyU8.length());
     if (body.empty()) continue;
 
     const size_t bodySize = body.size();

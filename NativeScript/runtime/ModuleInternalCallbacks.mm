@@ -112,7 +112,9 @@ static const char* ModuleStatusToString(v8::Module::Status status);
 static v8::MaybeLocal<v8::Module> CompileModuleFromSource(v8::Isolate* isolate, v8::Local<v8::Context> context,
                                                           const std::string& code, const std::string& urlStr) {
   v8::EscapableHandleScope hs(isolate);
-  v8::Local<v8::String> sourceText = tns::ToV8String(isolate, code.c_str());
+  // Pass the std::string (length-aware overload), NOT code.c_str(): module
+  // source may contain embedded NUL bytes and the char* path would truncate.
+  v8::Local<v8::String> sourceText = tns::ToV8String(isolate, code);
   v8::Local<v8::String> urlV8;
   if (!v8::String::NewFromUtf8(isolate, urlStr.c_str(), v8::NewStringType::kNormal).ToLocal(&urlV8)) {
     return v8::MaybeLocal<v8::Module>();
@@ -150,7 +152,9 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(v8::Isolat
     Log(@"[resolver][register-resolve-only] raw=%s key=%s", urlStr.c_str(),
         registryKey.c_str());
   }
-  v8::Local<v8::String> sourceText = tns::ToV8String(isolate, code.c_str());
+  // Length-aware conversion (see CompileModuleFromSource) — embedded NULs
+  // in module source must not truncate the compile input.
+  v8::Local<v8::String> sourceText = tns::ToV8String(isolate, code);
   v8::Local<v8::String> urlV8;
   if (!v8::String::NewFromUtf8(isolate, urlStr.c_str(), v8::NewStringType::kNormal).ToLocal(&urlV8)) {
     return v8::MaybeLocal<v8::Module>();
