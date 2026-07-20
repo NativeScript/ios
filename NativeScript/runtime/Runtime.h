@@ -22,6 +22,10 @@ using ReloadApplicationHook = std::function<bool(const std::string& baseDir)>;
 void SetReloadApplicationHook(ReloadApplicationHook hook);
 bool InvokeReloadApplicationHook(const std::string& baseDir);
 
+// Soft-reboot count for this process. 0 on first boot.
+void IncrementRuntimeReloadCount();
+int GetRuntimeReloadCount();
+
 class Runtime {
  public:
   Runtime();

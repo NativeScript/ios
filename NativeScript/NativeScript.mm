@@ -159,6 +159,8 @@ std::unique_ptr<Runtime> runtime_;
 }
 
 - (void)restartWithConfig:(Config*)config {
+  // Count this reboot before the new isolate boots.
+  tns::IncrementRuntimeReloadCount();
   [self shutdownRuntime];
   [self initializeWithConfig:config];
 }

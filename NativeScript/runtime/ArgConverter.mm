@@ -288,6 +288,14 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
   Isolate* isolate = data->isolateWrapper_.Isolate();
 
   if (!data->isolateWrapper_.IsValid()) {
+    // Only methods pass self and _cmd as ffi args.
+    if (data->initialParamIndex_ == 2) {
+      id self_ = *static_cast<const id*>(argValues[0]);
+      SEL cmd = *static_cast<const SEL*>(argValues[1]);
+      LogDroppedDeadIsolateCallback((__bridge void*)self_, (void*)cmd);
+    } else {
+      LogDroppedDeadIsolateCallback(nullptr, nullptr);
+    }
     memset(retValue, 0, cif->rtype->size);
     return;
   }

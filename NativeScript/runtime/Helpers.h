@@ -282,6 +282,9 @@ void SetScriptLoadingLogEnabled(bool enabled);
 bool IsHttpFetchUrlLogEnabled();
 void SetHttpFetchUrlLogEnabled(bool enabled);
 
+// Dropped native->JS call after isolate dispose. target/selector may be null.
+void LogDroppedDeadIsolateCallback(void* target, void* selector);
+
 // Like GetValue, but applies ReleasedObjectPolicy when the object carries no
 // wrapper: throws (kThrow) or schedules a `releasednativeaccess` event
 // (kReport, deduplicated per object), returning nullptr either way.
