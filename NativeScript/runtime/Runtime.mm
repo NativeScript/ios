@@ -587,6 +587,12 @@ bool InvokeReloadApplicationHook(const std::string& baseDir) {
   return reloadApplicationHook_(baseDir);
 }
 
+static std::atomic<int> runtimeReloadCount_{0};
+
+void IncrementRuntimeReloadCount() { runtimeReloadCount_++; }
+
+int GetRuntimeReloadCount() { return runtimeReloadCount_.load(); }
+
 // API to trigger application reload from JS without restarting the application process.
 // Exposes `global.NativeScriptRuntime.reloadApplication(baseDir?)` to JS.
 // `NativeScriptRuntime` class is part of the runtime framework and
@@ -605,6 +611,13 @@ void Runtime::DefineNativeScriptRuntime(Isolate* isolate, Local<ObjectTemplate> 
         info.GetReturnValue().Set(tns::InvokeReloadApplicationHook(baseDir));
       });
   runtimeTemplate->Set(ToV8String(isolate, "reloadApplication"), reloadTemplate);
+
+  // 0 on first boot, incremented on every in-process runtime restart. Lets JS
+  // (e.g. @nativescript/core) detect it is running inside a reloaded instance
+  // and reattach native delegates that UIKit still dispatches to old-bundle
+  // instances of (UIApplication delegate, UIScene delegates).
+  runtimeTemplate->Set(ToV8String(isolate, "reloadCount"),
+                       v8::Number::New(isolate, tns::GetRuntimeReloadCount()));
 
   globalTemplate->Set(ToV8String(isolate, "NativeScriptRuntime"), runtimeTemplate);
 }

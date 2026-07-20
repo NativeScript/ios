@@ -1,6 +1,7 @@
 #include "ArgConverter.h"
 #include <Foundation/Foundation.h>
 #include <sstream>
+#include "DevFlags.h"
 #include "DictionaryAdapter.h"
 #include "Helpers.h"
 #include "Interop.h"
@@ -134,6 +135,15 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
   Isolate* isolate = data->isolateWrapper_.Isolate();
 
   if (!data->isolateWrapper_.IsValid()) {
+    // Instance methods carry (self, _cmd) as the first two ffi args; blocks and
+    // function pointers do not, so only dereference them when present.
+    if (data->initialParamIndex_ == 2) {
+      id self_ = *static_cast<const id*>(argValues[0]);
+      SEL cmd = *static_cast<const SEL*>(argValues[1]);
+      LogDroppedDeadIsolateCallback((__bridge void*)self_, (void*)cmd);
+    } else {
+      LogDroppedDeadIsolateCallback(nullptr, nullptr);
+    }
     memset(retValue, 0, cif->rtype->size);
     return;
   }

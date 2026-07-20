@@ -157,6 +157,9 @@ std::unique_ptr<Runtime> runtime_;
 }
 
 - (void)restartWithConfig:(Config*)config {
+  // Incremented before the new isolate boots so its global template bakes in
+  // the correct `NativeScriptRuntime.reloadCount` value.
+  tns::IncrementRuntimeReloadCount();
   [self shutdownRuntime];
   [self initializeWithConfig:config];
 }

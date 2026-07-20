@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import <objc/runtime.h>
 
 #include "DevFlags.h"
 #include "Runtime.h"
@@ -11,6 +12,24 @@ namespace tns {
 bool IsScriptLoadingLogEnabled() {
   id value = Runtime::GetAppConfigValue("logScriptLoading");
   return value ? [value boolValue] : false;
+}
+
+void LogDroppedDeadIsolateCallback(void* target, void* selector) {
+  if (!IsScriptLoadingLogEnabled()) {
+    return;
+  }
+
+  if (target != nullptr && selector != nullptr) {
+    id self_ = (__bridge id)target;
+    SEL cmd = (SEL)selector;
+    NSLog(@"NativeScript: dropping call to -[%s %s] because the JS isolate that implemented it "
+          @"was disposed (e.g. after reloadApplication); reassign the delegate/callback from the "
+          @"new bundle to restore dispatch",
+          object_getClassName(self_), sel_getName(cmd));
+  } else {
+    NSLog(@"NativeScript: dropping a native callback (block or function pointer) because the JS "
+          @"isolate that implemented it was disposed (e.g. after reloadApplication)");
+  }
 }
 
 // Security config
