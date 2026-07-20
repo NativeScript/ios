@@ -17,6 +17,15 @@ using ReloadApplicationHook = std::function<bool(const std::string& baseDir)>;
 void SetReloadApplicationHook(ReloadApplicationHook hook);
 bool InvokeReloadApplicationHook(const std::string& baseDir);
 
+// Number of times the runtime has been soft-rebooted in this process
+// (restartWithConfig / reloadApplication). 0 for the first boot. Exposed to JS
+// as `NativeScriptRuntime.reloadCount` so application code (e.g.
+// @nativescript/core) can detect a reloaded instance and reattach native
+// delegates (UIApplication delegate, UIScene delegates) that are still pinned
+// to classes created by the previous isolate.
+void IncrementRuntimeReloadCount();
+int GetRuntimeReloadCount();
+
 class Runtime {
  public:
   Runtime();
