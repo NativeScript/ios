@@ -449,6 +449,24 @@ void tns::EmitDebugLog(LogCategory category, const char* format, ...) {
   va_end(ap);
 }
 
+void tns::LogDroppedDeadIsolateCallback(void* target, void* selector) {
+  if (!LogCategoryEnabled(LogCategory::Esm)) {
+    return;
+  }
+
+  if (target != nullptr && selector != nullptr) {
+    id self_ = (__bridge id)target;
+    SEL cmd = (SEL)selector;
+    NSLog(@"NativeScript: dropping call to -[%s %s] because the JS isolate that implemented it "
+          @"was disposed (e.g. after reloadApplication); reassign the delegate/callback from the "
+          @"new bundle to restore dispatch",
+          object_getClassName(self_), sel_getName(cmd));
+  } else {
+    NSLog(@"NativeScript: dropping a native callback (block or function pointer) because the JS "
+          @"isolate that implemented it was disposed (e.g. after reloadApplication)");
+  }
+}
+
 tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,
                                             const char* operation) {
   BaseDataWrapper* wrapper = tns::GetValue(isolate, val);

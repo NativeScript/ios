@@ -271,6 +271,9 @@ enum class ReleasedObjectPolicy {
 ReleasedObjectPolicy GetReleasedObjectPolicy();
 void SetReleasedObjectPolicy(ReleasedObjectPolicy policy);
 
+// Dropped native->JS call after isolate dispose. target/selector may be null.
+void LogDroppedDeadIsolateCallback(void* target, void* selector);
+
 // Like GetValue, but applies ReleasedObjectPolicy when the object carries no
 // wrapper: throws (kThrow) or schedules a `releasednativeaccess` event
 // (kReport, deduplicated per object), returning nullptr either way.
