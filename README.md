@@ -240,10 +240,42 @@ The compiled fat static libraries will be placed inside the `v8/dist` folder.
 
 # Building a Distribution Package
 
-1. Bump the version in package.json
+1. (Optional) Bump the version in package.json
 
 2. Run: `npm run update-version` (*This will update the runtime headers with version info*)
 
-3. Build & pack: `npm run build`
+3. Build & pack: `npm run build-ios`
 
-This will create: `dist/npm/nativescript-ios-{version}.tgz` NPM package ready for publishing.
+This will create `dist/nativescript-ios-{version}.tgz`.
+
+The runtime's NativeScript / TKLiveSync xcframeworks are consumed via SwiftPM, and the
+package can be built in two modes (`--spm-mode`, see `./build_npm_ios.sh --help`):
+
+- **`embedded` (default)** — a self-contained package: the freshly built xcframeworks are
+  embedded (as zips, since npm strips symlinks) at `framework/internal/local-spm` together
+  with a local SwiftPM manifest, and the app template consumes them by relative path.
+  The tgz works on any machine. This is what local builds and PR artifacts produce.
+- **`remote`** — the deploy shape published to npm by the release workflow
+  (`npm run build-ios -- --spm-mode=remote`): no binaries are embedded; the app template
+  pins https://github.com/NativeScript/ios-spm at exactly the package version. The release
+  workflow uploads the xcframework zips as GitHub Release assets and tags ios-spm to match,
+  so a remote-mode package only resolves for versions that shipped through
+  `.github/workflows/npm_release.yml` — don't use this mode for local builds.
+
+# Local Development & Linking
+
+To use a locally built runtime in an app, build the default (embedded) package and point
+the {N} CLI at it:
+
+```bash
+npm run build-ios
+ns platform add ios --framework-path=/path/to/ns-v8ios-runtime/dist/nativescript-ios-{version}.tgz
+```
+
+Because the embedded package is self-contained, the tgz can be copied to other machines,
+shared with teammates, or consumed by an app's CI. The same applies to the `npm-package`
+artifact produced by this repo's pull-request workflow — download it and use it with
+`--framework-path` directly.
+
+To rebuild just the package after runtime changes (without the full `build-ios` pipeline),
+re-run `./build_spm_artifacts.sh ios` followed by `./build_npm_ios.sh`.

@@ -1,0 +1,29 @@
+name: Setup build environment
+description: Node + Python + native build dependencies shared by the workflow build/test jobs.
+inputs:
+  node-version:
+    description: Node.js version to install
+    default: "22"
+  registry-url:
+    description: npm registry URL to configure for publishing (optional)
+    default: ""
+  install-test-tools:
+    description: Also install xcparse and the JUnit report tools ("true"/"false")
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        registry-url: ${{ inputs.registry-url }}
+        # setup-node v6 enables dependency caching by default when it detects a
+        # package manager — a cache-poisoning vector for the release jobs (see
+        # npm_release.yml). Disabled everywhere; also keeps pre-v6 behavior.
+        package-manager-cache: false
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      with:
+        python-version: "3"
+    - name: Install dependencies
+      shell: bash
+      run: ./scripts/install-ci-deps.sh ${{ inputs.install-test-tools == 'true' && '--test-tools' || '' }}

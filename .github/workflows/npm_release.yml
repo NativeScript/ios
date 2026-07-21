@@ -64,40 +64,9 @@ jobs:
       - name: Compute version and tag
         id: out
         env:
+          # env indirection keeps the dispatch input out of shell interpolation
           INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            # manual release: cut tag v<input> and publish (latest unless prerelease)
-            NPM_VERSION="${INPUT_VERSION#v}"
-          elif [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
-            # tag push (v*): the tag is authoritative. Strip the leading 'v' and
-            # assert it matches package.json so the release can't drift from its tag.
-            NPM_VERSION="${GITHUB_REF#refs/tags/}"
-            NPM_VERSION="${NPM_VERSION#v}"
-            PKG_VERSION=$(node -e "console.log(require('./package.json').version);")
-            if [ "$NPM_VERSION" != "$PKG_VERSION" ]; then
-              echo "::error::Tag v$NPM_VERSION does not match package.json version $PKG_VERSION. Bump package.json before tagging." >&2
-              exit 1
-            fi
-          else
-            # branch push (main) or manual run without a version -> "next" prerelease
-            NPM_VERSION=$(node ./scripts/get-next-version.js)
-          fi
-          NPM_TAG=$(NPM_VERSION=$NPM_VERSION node ./scripts/get-npm-tag.js)
-          echo "NPM_VERSION=$NPM_VERSION" >> $GITHUB_OUTPUT
-          echo "NPM_TAG=$NPM_TAG" >> $GITHUB_OUTPUT
-          # Target matrix: ios always builds/publishes. visionos is built and
-          # published ONLY for real releases (a v* tag push, or a manual dispatch
-          # with a version), never for the rolling "next" channel that every push
-          # to main produces. The discriminator is the resolved dist-tag: pushes
-          # to main (and dispatch without a version) -> "next" -> ios only.
-          if [ "$NPM_TAG" = "next" ]; then
-            BUILD_MATRIX='{"include":[{"target":"ios","script":"build-ios"}]}'
-          else
-            BUILD_MATRIX='{"include":[{"target":"ios","script":"build-ios"},{"target":"visionos","script":"build-vision"}]}'
-          fi
-          echo "BUILD_MATRIX=$BUILD_MATRIX" >> $GITHUB_OUTPUT
-          echo "Resolved $NPM_VERSION (tag: $NPM_TAG); build targets: $BUILD_MATRIX"
+        run: node ./scripts/resolve-release.mjs --version "$INPUT_VERSION"
 
   build:
     name: Build ${{ matrix.target }}
@@ -130,32 +99,19 @@ jobs:
         with:
           path: ./llvm
           key: ${{ hashFiles('download_llvm.sh') }}
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      - uses: ./.github/actions/setup-build-env
         with:
-          node-version: 22
-          package-manager-cache: false
           registry-url: "https://registry.npmjs.org"
-      - name: Install Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3"
-      - name: Install Dependencies
-        run: |
-          npm install
-          python3 -m pip install --upgrade pip six
-          # Ensure CMake is available without conflicting with pinned Homebrew formula
-          if ! command -v cmake >/dev/null; then
-            brew list cmake || brew install cmake
-          fi
-          # Some scripts expect cmake at /usr/local/bin; create a shim if needed
-          if [ ! -x /usr/local/bin/cmake ]; then
-            sudo mkdir -p /usr/local/bin
-            sudo ln -sf "$(command -v cmake)" /usr/local/bin/cmake
-          fi
       - name: Set package version
         run: npm version $NPM_VERSION --no-git-tag-version --allow-same-version
       - name: Build (${{ matrix.target }})
-        run: npm run ${{ matrix.script }}
+        # remote mode: the published package embeds no binaries and pins
+        # github.com/NativeScript/ios-spm at this version instead (the
+        # github-release + spm-update jobs make that pin resolvable).
+        env:
+          # env indirection keeps matrix values out of shell interpolation
+          BUILD_SCRIPT: ${{ matrix.script }}
+        run: npm run "$BUILD_SCRIPT" -- --spm-mode=remote
       - name: Upload npm package artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
@@ -193,29 +149,9 @@ jobs:
         with:
           path: ./llvm
           key: ${{ hashFiles('download_llvm.sh') }}
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      - uses: ./.github/actions/setup-build-env
         with:
-          node-version: 22
-          package-manager-cache: false
-      - name: Install Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3"
-      - name: Install Dependencies
-        run: |
-          npm install
-          python3 -m pip install --upgrade pip six
-          # Ensure CMake is available without conflicting with pinned Homebrew formula
-          if ! command -v cmake >/dev/null; then
-            brew list cmake || brew install cmake
-          fi
-          # Some scripts expect cmake at /usr/local/bin; create a shim if needed
-          if [ ! -x /usr/local/bin/cmake ]; then
-            sudo mkdir -p /usr/local/bin
-            sudo ln -sf "$(command -v cmake)" /usr/local/bin/cmake
-          fi
-          brew install chargepoint/xcparse/xcparse
-          npm install -g @edusperoni/junit-cli-report-viewer verify-junit-xml
+          install-test-tools: "true"
       - name: Prepare
         run: npm run setup-ci
       - name: Prepare test folder
@@ -360,26 +296,19 @@ jobs:
           path: spm-artifacts
           merge-multiple: true
       - name: Generate Package.swift
+        # The generator emits the WHOLE manifest, shaped by the checksums it
+        # finds: "next" builds produce only checksums-ios.env, so the next
+        # manifest omits the visionOS product/targets whose Release assets
+        # don't exist (SwiftPM eagerly downloads every binaryTarget in a
+        # resolved manifest — an unshipped asset 404s for every consumer).
+        # Any non-"next" --channel requires the full checksum set, so a real
+        # release can never silently ship an iOS-only manifest.
         run: |
-          # The generator emits the WHOLE manifest, shaped by the checksums it
-          # is given: "next" builds produce only checksums-ios.env, so the next
-          # manifest omits the visionOS product/targets whose Release assets
-          # don't exist (SwiftPM eagerly downloads every binaryTarget in a
-          # resolved manifest — an unshipped asset 404s for every consumer).
-          # Real releases pass --strict so a full release can never silently
-          # ship an iOS-only manifest.
-          STRICT=""
-          if [ "$NPM_TAG" != "next" ]; then STRICT="--strict"; fi
-          CHECKSUM_ARGS=""
-          for f in spm-artifacts/checksums-*.env; do
-            [ -f "$f" ] && CHECKSUM_ARGS="$CHECKSUM_ARGS --checksums $f"
-          done
-          echo "Using checksum files:$CHECKSUM_ARGS"
-          if [ -z "$CHECKSUM_ARGS" ]; then echo "No checksum files found" >&2; exit 1; fi
           node ios/scripts/generate-spm-manifest.mjs \
             --package ios-spm/Package.swift \
             --version "$NPM_VERSION" \
-            $CHECKSUM_ARGS $STRICT
+            --checksums-dir spm-artifacts \
+            --channel "$NPM_TAG"
       - name: Commit and tag ios-spm
         working-directory: ios-spm
         env:
@@ -493,29 +422,19 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
-      - name: Assert ios-spm manifest pins this release
-        run: |
-          # Guard against the tag pointing at a STALE manifest — e.g. a
-          # commit/tag step that silently failed and left a prior version's
-          # nsVersion + artifact URLs/checksums in place. Those still resolve
-          # and checksum-pass (they're internally consistent), so `swift
-          # package resolve` below won't catch it; this explicit version
-          # assertion does.
-          url="https://raw.githubusercontent.com/NativeScript/ios-spm/${NPM_VERSION}/Package.swift"
-          manifest="$(curl -fsSL "$url")"
-          if ! printf '%s\n' "$manifest" | grep -q "let nsVersion = \"${NPM_VERSION}\""; then
-            echo "::error::ios-spm@${NPM_VERSION} does not pin nsVersion=\"${NPM_VERSION}\" (stale manifest?). Found:" >&2
-            printf '%s\n' "$manifest" | grep -n "nsVersion" >&2 || true
-            exit 1
-          fi
-          echo "OK: ios-spm@${NPM_VERSION} pins nsVersion=\"${NPM_VERSION}\""
       - name: Generate a probe package that depends on ios-spm
         # The probe pins ios-spm at the exact released version. Resolving it
         # takes the same path a consumer's xcodebuild does, and the released
         # manifest only declares targets whose assets exist (channel-shaped by
         # generate-spm-manifest.mjs) — so this single probe is valid for every
-        # channel.
-        run: node scripts/generate-spm-probe.mjs --version "$NPM_VERSION" --dir spmverify
+        # channel. --assert-release-manifest additionally guards against the
+        # tag pointing at a stale (prior version's) manifest, which would
+        # still resolve and checksum-pass below.
+        run: |
+          node scripts/generate-spm-probe.mjs \
+            --version "$NPM_VERSION" \
+            --dir spmverify \
+            --assert-release-manifest
       - name: Resolve (downloads the xcframework zips and verifies their checksums)
         working-directory: spmverify
         run: |

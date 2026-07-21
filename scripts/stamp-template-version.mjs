@@ -6,14 +6,34 @@
 // with the concrete version being published, so `@nativescript/ios@X` always
 // resolves the matching `ios-spm` tag `X` (and therefore the xcframework built
 // for X). The {N} CLI copies the stamped template verbatim — no CLI change.
-//
-// Usage: node scripts/stamp-template-version.mjs <project.pbxproj> <version>
 import fs from "node:fs";
+import { parseArgs } from "node:util";
 
-const [, , pbxPath, version] = process.argv;
+const USAGE = `Usage: node scripts/stamp-template-version.mjs <project.pbxproj> <version>
 
-if (!pbxPath || !version) {
-  console.error("Usage: stamp-template-version.mjs <project.pbxproj> <version>");
+  <project.pbxproj>  packaged template project to stamp
+  <version>          version to pin the ios-spm reference to (exactVersion)
+  -h, --help         show this help`;
+
+let values, positionals;
+try {
+  ({ values, positionals } = parseArgs({
+    options: { help: { type: "boolean", short: "h", default: false } },
+    allowPositionals: true,
+  }));
+} catch (e) {
+  console.error(e.message);
+  console.error(USAGE);
+  process.exit(1);
+}
+if (values.help) {
+  console.log(USAGE);
+  process.exit(0);
+}
+
+const [pbxPath, version] = positionals;
+if (!pbxPath || !version || positionals.length > 2) {
+  console.error(USAGE);
   process.exit(1);
 }
 

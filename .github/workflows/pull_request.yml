@@ -23,26 +23,7 @@ jobs:
         with:
           path: ./llvm
           key: ${{ hashFiles('download_llvm.sh') }}
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
-        with:
-          node-version: 20
-      - name: Install Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3"
-      - name: Install Dependencies
-        run: |
-          npm install
-          python3 -m pip install --upgrade pip six
-          # Ensure CMake is available without conflicting with pinned Homebrew formula
-          if ! command -v cmake >/dev/null; then
-            brew list cmake || brew install cmake
-          fi
-          # Some scripts expect cmake at /usr/local/bin; create a shim if needed
-          if [ ! -x /usr/local/bin/cmake ]; then
-            sudo mkdir -p /usr/local/bin
-            sudo ln -sf "$(command -v cmake)" /usr/local/bin/cmake
-          fi
+      - uses: ./.github/actions/setup-build-env
       - name: Get Current Version
         run: |
           echo NPM_VERSION=$(node -e "console.log(require('./package.json').version);") >> $GITHUB_ENV
@@ -52,12 +33,20 @@ jobs:
           echo NPM_VERSION=$NPM_VERSION >> $GITHUB_ENV
           npm version $NPM_VERSION --no-git-tag-version
       - name: Build
+        # Default (embedded) SwiftPM mode: the xcframework zips ship inside the
+        # package, so the artifact below is self-contained — download it and
+        # use it directly with `ns platform add ios --framework-path=<tgz>`.
         run: npm run build-ios
       - name: Upload npm package artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: npm-package
           path: dist/nativescript-ios-${{env.NPM_VERSION}}.tgz
+      - name: Upload SwiftPM artifacts (xcframework zips + checksums)
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: spm-artifacts
+          path: dist/artifacts/*
       - name: Upload dSYMs artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
@@ -80,28 +69,9 @@ jobs:
         with:
           path: ./llvm
           key: ${{ hashFiles('download_llvm.sh') }}
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      - uses: ./.github/actions/setup-build-env
         with:
-          node-version: 20
-      - name: Install Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3"
-      - name: Install Dependencies
-        run: |
-          npm install
-          python3 -m pip install --upgrade pip six
-          # Ensure CMake is available without conflicting with pinned Homebrew formula
-          if ! command -v cmake >/dev/null; then
-            brew list cmake || brew install cmake
-          fi
-          # Some scripts expect cmake at /usr/local/bin; create a shim if needed
-          if [ ! -x /usr/local/bin/cmake ]; then
-            sudo mkdir -p /usr/local/bin
-            sudo ln -sf "$(command -v cmake)" /usr/local/bin/cmake
-          fi
-          brew install chargepoint/xcparse/xcparse
-          npm install -g @edusperoni/junit-cli-report-viewer verify-junit-xml
+          install-test-tools: "true"
       - name: Prepare test folder
         id: prepare-test-folder
         run: |

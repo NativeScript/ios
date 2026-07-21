@@ -2,7 +2,26 @@
 set -e
 source "$(dirname "$0")/build_utils.sh"
 
-checkpoint "Preparing npm package for iOS..."
+usage() {
+  echo "Usage: ./build_npm_ios.sh [--spm-mode <embedded|remote>]"
+  echo ""
+  echo "  --spm-mode embedded  (default) self-contained package: the xcframework zips"
+  echo "                       from dist/artifacts are embedded at"
+  echo "                       framework/internal/local-spm and the app template"
+  echo "                       references them by relative path. Portable — for local"
+  echo "                       testing (ns platform add ios --framework-path=...) and"
+  echo "                       PR artifacts."
+  echo "  --spm-mode remote    deploy shape used by the release workflow: no binaries"
+  echo "                       embedded; the app template pins"
+  echo "                       github.com/NativeScript/ios-spm at exactly this package"
+  echo "                       version. Only resolves for versions shipped by the"
+  echo "                       release pipeline."
+  echo "  -h, --help           show this help"
+}
+
+parse_spm_mode_args "$@"
+
+checkpoint "Preparing npm package for iOS ($SPM_MODE SwiftPM mode)..."
 OUTPUT_DIR="dist/npm"
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
@@ -11,56 +30,36 @@ cp ./package.json "$OUTPUT_DIR"
 
 cp -r "./project-template-ios/" "$OUTPUT_DIR/framework"
 
-# The NativeScript / TKLiveSync xcframeworks are NO LONGER bundled in npm. They
-# are published as GitHub Release artifacts and consumed via SwiftPM
-# (github.com/NativeScript/ios-spm). Stamp the runtime version into the packaged
-# template's SwiftPM reference so it resolves the matching release.
-NPM_VERSION=$(node -e "console.log(require('./package.json').version)")
-node ./scripts/stamp-template-version.mjs \
-  "$OUTPUT_DIR/framework/__PROJECT_NAME__.xcodeproj/project.pbxproj" \
-  "$NPM_VERSION"
-
-# Local builds have no ios-spm release tag to resolve, so by default (outside
-# CI) rewrite the template to a LOCAL SwiftPM package over the xcframeworks
-# just built into dist/. Force with NS_SPM_LOCAL=1, disable with NS_SPM_LOCAL=0.
-# The resulting .tgz embeds an absolute path into this checkout — local
-# `ns platform add ios --framework-path=dist/nativescript-ios-*.tgz` use only.
-if [[ "${NS_SPM_LOCAL:-}" == "1" || ( -z "${CI:-}" && "${NS_SPM_LOCAL:-}" != "0" ) ]]; then
-  LOCAL_SPM_DIR="$(pwd)/dist/local-spm"
-  rm -rf "$LOCAL_SPM_DIR"
+# The runtime xcframeworks are consumed via SwiftPM in both modes; what differs
+# is where the SwiftPM package lives (see usage above). The zips come from
+# build_spm_artifacts.sh — zipped because npm strips symlinks (the Catalyst
+# slices contain them) and SwiftPM extracts local zip binary targets itself.
+if [ "$SPM_MODE" = "embedded" ]; then
+  ARTIFACTS_DIR="dist/artifacts"
+  LOCAL_SPM_DIR="$OUTPUT_DIR/framework/internal/local-spm"
+  for zip in NativeScript.xcframework.zip TKLiveSync.xcframework.zip; do
+    if [ ! -f "$ARTIFACTS_DIR/$zip" ]; then
+      echo "Missing $ARTIFACTS_DIR/$zip — run ./build_spm_artifacts.sh ios first." >&2
+      exit 1
+    fi
+  done
   mkdir -p "$LOCAL_SPM_DIR"
-  cp -R "dist/NativeScript.xcframework" "$LOCAL_SPM_DIR/"
-  cp -R "dist/TKLiveSync.xcframework" "$LOCAL_SPM_DIR/"
-  cat > "$LOCAL_SPM_DIR/Package.swift" <<'EOF'
-// swift-tools-version: 5.10
-// Local dev override of github.com/NativeScript/ios-spm: same product shape,
-// but binaryTargets point at the freshly built xcframeworks in this folder.
-import PackageDescription
-
-let package = Package(
-    name: "NativeScriptSDK",
-    platforms: [
-        .iOS(.v13),
-        .macCatalyst(.v13),
-    ],
-    products: [
-        .library(name: "NativeScript", targets: ["NativeScript", "TKLiveSync"]),
-        .library(name: "NativeScriptSDK", targets: ["NativeScript", "TKLiveSync"]),
-    ],
-    dependencies: [],
-    targets: [
-        .binaryTarget(name: "NativeScript", path: "NativeScript.xcframework"),
-        .binaryTarget(name: "TKLiveSync", path: "TKLiveSync.xcframework"),
-    ]
-)
-EOF
+  cp "./spm-templates/local-spm-ios/Package.swift" "$LOCAL_SPM_DIR/"
+  cp "$ARTIFACTS_DIR/NativeScript.xcframework.zip" \
+     "$ARTIFACTS_DIR/TKLiveSync.xcframework.zip" \
+     "$LOCAL_SPM_DIR/"
   node ./scripts/stamp-template-local-spm.mjs \
     "$OUTPUT_DIR/framework/__PROJECT_NAME__.xcodeproj/project.pbxproj" \
-    "$LOCAL_SPM_DIR"
+    "internal/local-spm" \
+    --package-dir "$LOCAL_SPM_DIR"
+else
+  NPM_VERSION=$(node -e "console.log(require('./package.json').version)")
+  node ./scripts/stamp-template-version.mjs \
+    "$OUTPUT_DIR/framework/__PROJECT_NAME__.xcodeproj/project.pbxproj" \
+    "$NPM_VERSION"
 fi
 
-# Build-time metadata generator is still shipped in npm (Phase 1). See the
-# distribution plan for moving this to an on-demand artifact (Phase 2).
+# Build-time metadata generator is still shipped in npm (Phase 1).
 mkdir -p "$OUTPUT_DIR/framework/internal/metadata-generator-x86_64"
 cp -r "metadata-generator/dist/x86_64/." "$OUTPUT_DIR/framework/internal/metadata-generator-x86_64"
 
