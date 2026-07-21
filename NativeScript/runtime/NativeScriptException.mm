@@ -11,6 +11,7 @@
 #include <limits>
 #include <mutex>
 #include <sstream>
+#include "ArgConverter.h"
 #include "Caches.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
@@ -88,6 +89,13 @@ NativeScriptException::NativeScriptException(Isolate* isolate, const std::string
   this->fullMessage_ =
       GetFullMessage(isolate, Exception::CreateMessage(isolate, error), this->message_);
 }
+NativeScriptException::NativeScriptException(Isolate* isolate, Local<Value> jsError,
+                                             const std::string& message) {
+  this->javascriptException_ = new Persistent<Value>(isolate, jsError);
+  this->message_ = message;
+  this->name_ = "NativeScriptException";
+}
+
 NativeScriptException::~NativeScriptException() { delete this->javascriptException_; }
 
 void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Value> error) {
@@ -203,12 +211,46 @@ void NativeScriptException::ReportUnhandledRejection(Isolate* isolate, Local<Pro
                   "Unhandled promise rejection:");
 }
 
+// Schedules an uncaught @throw on the runtime loop with a clean, V8-scope-free
+// stack. Throwing synchronously from here is unsafe: ReportFatalTail runs inside
+// V8 callbacks (message listener) or under the drain observer's V8 scopes. The
+// deferred block runs on a frame with no V8 scopes, so the uncaught NSException
+// terminates the app with a real crash report. Best-effort: silently returns if
+// the runtime/loop is gone (e.g. during teardown).
+static void ScheduleDeferredThrow(Isolate* isolate, NSException* e) {
+  Runtime* rt = Runtime::GetRuntime(isolate);
+  if (rt == nullptr) {
+    return;
+  }
+  CFRunLoopRef loop = rt->RuntimeLoop();
+  if (loop == nullptr) {
+    return;
+  }
+  CFRunLoopPerformBlock(loop, kCFRunLoopCommonModes, ^{
+    @throw e;
+  });
+  CFRunLoopWakeUp(loop);
+}
+
 void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error,
                                             Local<v8::Message> message,
                                             const std::string& stackOverride,
                                             const std::string& logPrefix) {
   Local<Context> context = isolate->GetCurrentContext();
   Local<Object> global = context->Global();
+
+  // A branded escapeException reaching the fatal tail (e.g. a listener did
+  // `throw interop.escapeException(x)`; the bootstrap routes listener throws to
+  // nativeReportFatal) is an explicit crash/forward request: skip shim + log and
+  // schedule the deferred @throw of the extracted NSException, regardless of the
+  // crash flag.
+  {
+    NSException* branded = ArgConverter::ExtractEscapedException(context, error);
+    if (branded != nil) {
+      ScheduleDeferredThrow(isolate, branded);
+      return;
+    }
+  }
   Local<Value> handler;
   id value = Runtime::GetAppConfigValue("discardUncaughtJsExceptions");
   bool isDiscarded = value ? [value boolValue] : false;
@@ -302,6 +344,23 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
       Log(@"%s", logPrefix.c_str());
     }
     Log(@"NativeScript discarding uncaught JS exception!");
+  }
+
+  // Opt-in (default off): after reporting, crash the app with a real native
+  // crash report by scheduling an uncaught @throw on a scope-free frame. Skipped
+  // when discarding (discardUncaughtJsExceptions is an explicit "do not crash").
+  if (!isDiscarded) {
+    id crashValue = Runtime::GetAppConfigValue("crashOnUncaughtJsExceptions");
+    bool shouldCrash = crashValue ? [crashValue boolValue] : false;
+    if (shouldCrash) {
+      NSString* reasonText = tns::ToNSString(fullMessage);
+      NSDictionary* userInfo =
+          stackTrace.empty() ? nil : @{@"JavaScriptStack" : tns::ToNSString(stackTrace)};
+      NSException* fatal = [NSException exceptionWithName:@"NativeScriptFatalJSException"
+                                                   reason:reasonText
+                                                 userInfo:userInfo];
+      ScheduleDeferredThrow(isolate, fatal);
+    }
   }
 }
 

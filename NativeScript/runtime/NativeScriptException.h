@@ -16,6 +16,11 @@ class NativeScriptException {
                         const std::string& message);
   NativeScriptException(v8::Isolate* isolate, const std::string& message,
                         const std::string& name = "NativeScriptException");
+  // Carries a pre-built JS error object (e.g. one wrapping a native NSException
+  // via `nativeException`) so ReThrowToV8 surfaces exactly that object to the
+  // JS catch handler. `message` is used only for logging.
+  NativeScriptException(v8::Isolate* isolate, v8::Local<v8::Value> jsError,
+                        const std::string& message);
   ~NativeScriptException();
   void ReThrowToV8(v8::Isolate* isolate);
   const std::string& getMessage() const { return message_; }

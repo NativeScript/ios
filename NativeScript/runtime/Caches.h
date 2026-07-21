@@ -167,6 +167,13 @@ class Caches {
   std::unique_ptr<v8::Persistent<v8::Function>> DispatchRejectionHandledFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 
+  // Phase 3 per-isolate brand for interop.escapeException. An isolate-private
+  // symbol (v8::Private, not a plain Symbol) so user code cannot discover or
+  // forge it. Created lazily via ArgConverter::GetEscapeExceptionBrand and used
+  // to mark/extract escaped native exceptions across JS<->native boundaries.
+  std::unique_ptr<v8::Persistent<v8::Private>> EscapeExceptionBrand =
+      std::unique_ptr<v8::Persistent<v8::Private>>(nullptr);
+
   using unique_void_ptr = std::unique_ptr<void, void (*)(void const*)>;
   template <typename T>
   auto unique_void(T* ptr) -> unique_void_ptr {
