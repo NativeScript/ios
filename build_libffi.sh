@@ -5,10 +5,11 @@ set -euo pipefail
 # the runtime ships, using the currently selected Xcode (xcode-select /
 # DEVELOPER_DIR) instead of hardcoded /Applications/Xcode.app paths.
 #
-# Artifacts land in libffi/dist/<slice>/{lib/libffi.a,include}. With
-# --install they are also copied into NativeScript/lib/<slice>/ and
-# NativeScript/include/libffi/<arch>/ (the vendored locations the Xcode
-# project links against).
+# Builds run out-of-tree under build/libffi/ (gitignored) so the libffi
+# submodule stays clean. Artifacts land in build/libffi/dist/<slice>/
+# {lib/libffi.a,include}. With --install they are also copied into
+# NativeScript/lib/<slice>/ and NativeScript/include/libffi/<arch>/ (the
+# vendored locations the Xcode project links against).
 #
 # Note: all slices build from the same libffi source. On x86_64 the vector
 # (SIMD) support caps at 16-byte vectors — wider vectors are rejected with
@@ -16,7 +17,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIBFFI_DIR="$SCRIPT_DIR/libffi"
-DIST_DIR="$LIBFFI_DIR/dist"
+BUILD_ROOT="$SCRIPT_DIR/build/libffi"
+DIST_DIR="$BUILD_ROOT/dist"
 
 ALL_SLICES=(
   arm64-iphoneos
@@ -133,7 +135,7 @@ rm -rf "$DIST_DIR"
 for slice in "${SLICES[@]}"; do
   IFS='|' read -r sdk host target_cflags <<< "$(slice_config "$slice")"
   sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
-  build_dir="$LIBFFI_DIR/build-$slice"
+  build_dir="$BUILD_ROOT/build-$slice"
   out_dir="$DIST_DIR/$slice"
 
   echo "==> $slice (sdk: $(basename "$sdk_path"))"
