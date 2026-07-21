@@ -57,6 +57,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     --jobs)
       shift
+      if [ $# -eq 0 ] || ! [[ "$1" =~ ^[0-9]+$ ]]; then
+        echo "--jobs requires a numeric argument" >&2
+        usage
+        exit 1
+      fi
       JOBS="$1"
       ;;
     -h|--help)
@@ -159,6 +164,12 @@ if [ "$INSTALL" -eq 1 ]; then
     # The generated headers are identical for every slice of the same arch.
     cp "$DIST_DIR/$slice/include/ffi.h" "$DIST_DIR/$slice/include/ffitarget.h" \
        "$SCRIPT_DIR/NativeScript/include/libffi/$arch/"
+    # Upstream ffi.h includes its sibling with angle brackets, which only
+    # resolves in Xcode via basename headermaps — ambiguous with two arch
+    # copies of ffitarget.h in the project. Use a quoted include so each
+    # ffi.h deterministically picks up the ffitarget.h next to it.
+    sed -i '' 's|#include <ffitarget.h>|#include "ffitarget.h"|' \
+      "$SCRIPT_DIR/NativeScript/include/libffi/$arch/ffi.h"
   done
 fi
 

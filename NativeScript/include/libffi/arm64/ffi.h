@@ -84,7 +84,7 @@ extern "C" {
 /* This should always refer to the last type code (for sanity checks).  */
 #define FFI_TYPE_LAST       FFI_TYPE_VECTOR
 
-#include <ffitarget.h>
+#include "ffitarget.h"
 
 #ifndef LIBFFI_ASM
 
