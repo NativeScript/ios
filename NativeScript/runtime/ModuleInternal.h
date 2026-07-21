@@ -6,6 +6,14 @@
 
 namespace tns {
 
+// Heuristic: does this bare specifier look like an npm-style package name
+// (as opposed to an explicit, extension-qualified file reference)? Shared by
+// both the CommonJS require() path (ModuleInternal.mm) and the ESM
+// import()/resolver path (ModuleInternalCallbacks.mm) so the two can't drift
+// out of sync with each other. See the definition in ModuleInternal.mm for
+// the full rationale.
+bool IsLikelyOptionalModule(const std::string& moduleName);
+
 class ModuleInternal {
  public:
   ModuleInternal(v8::Local<v8::Context> context);
