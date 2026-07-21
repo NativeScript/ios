@@ -37,6 +37,50 @@ describe("Node built-in and optional module resolution", function () {
     expect(threw).toBe(true);
   });
 
+  // IsLikelyOptionalModule is shared between require() (CommonJS) and this ESM resolver
+  // (see ModuleInternal.h) so the boundary can't drift apart between the two paths. The
+  // require()-side cases live in shared/Require/index.js; these mirror them for import()
+  // to confirm the two stay in parity.
+  it("still creates a placeholder for a dotted-but-not-extension bare specifier", async function () {
+    // A dot that isn't a recognized file extension (e.g. an npm name like "lodash.debounce")
+    // must still be treated as optional, not as an explicit missing file.
+    const mod = await import("__ns_optional_test_module.dotted__");
+
+    expect(mod).toBeDefined();
+    expect(typeof mod.default).toBe("object");
+
+    let threw = false;
+    try {
+      // eslint-disable-next-line no-unused-expressions
+      mod.default.someProperty;
+    } catch (e) {
+      threw = true;
+    }
+    expect(threw).toBe(true);
+  });
+
+  it("rejects immediately for a missing bare specifier that carries an explicit file extension", async function () {
+    // Mirrors the require()-side "video.js" case: a bare specifier with a recognized file
+    // extension is an explicit (here, missing) file reference, not an optional dependency,
+    // so import() must reject instead of resolving to a lazily-throwing placeholder.
+    const names = [
+      "__ns_missing_import_test__.js",
+      "__ns_missing_import_test__.json",
+      "__ns_missing_import_test__.mjs",
+      "video.js",
+    ];
+
+    for (const name of names) {
+      let threw = false;
+      try {
+        await import(name);
+      } catch (e) {
+        threw = true;
+      }
+      expect(threw).toBe(true);
+    }
+  });
+
   it("resolves import-map vendor modules through the explicit vendor registry", async function () {
     const configureRuntime = globalThis.__NS_DEV__ && globalThis.__NS_DEV__.configureRuntime;
     expect(typeof configureRuntime).toBe("function");

@@ -28,20 +28,8 @@
 
 namespace tns {
 
-// Helper function to check if a module name looks like an optional external module
-static bool IsLikelyOptionalModule(const std::string& moduleName) {
-  // Skip Node.js built-in modules (they should be handled separately)
-  if (moduleName.rfind("node:", 0) == 0) {
-    return false;
-  }
-
-  // Check if it's a bare module name (no path separators) that could be an npm package
-  if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
-      moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
-    return true;
-  }
-  return false;
-}
+// IsLikelyOptionalModule is declared in ModuleInternal.h and defined once in
+// ModuleInternal.mm, shared with the require() path so the two can't drift apart.
 
 // Helper function to check if a module name is a Node.js built-in module
 static bool IsNodeBuiltinModule(const std::string& moduleName) {
