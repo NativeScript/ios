@@ -11,33 +11,77 @@
 // manifests only declare the iOS artifacts, real releases also declare (and
 // therefore also verify) the visionOS ones.
 //
-// Usage: node scripts/generate-spm-probe.mjs --version <v> [--dir spmverify]
+// --assert-release-manifest additionally fetches the released manifest and
+// asserts it pins nsVersion to this exact version. This guards against the tag
+// pointing at a STALE manifest — e.g. a commit/tag step that silently failed
+// and left a prior version's nsVersion + artifact URLs/checksums in place.
+// Those still resolve and checksum-pass (they're internally consistent), so
+// `swift package resolve` won't catch it; the explicit assertion does.
 import fs from "node:fs";
 import path from "node:path";
+import { parseArgs } from "node:util";
 
-const args = process.argv.slice(2);
-const opts = { dir: "spmverify" };
-for (let i = 0; i < args.length; i++) {
-  const a = args[i];
-  if (a === "--version") opts.version = args[++i];
-  else if (a === "--dir") opts.dir = args[++i];
-  else {
-    console.error(`Unknown argument: ${a}`);
-    process.exit(1);
-  }
+const USAGE = `Usage: node scripts/generate-spm-probe.mjs --version <version> [--dir <outdir>] [--assert-release-manifest]
+
+  --version                  released ios-spm version to pin (exact)
+  --dir                      output directory for the probe package (default: spmverify)
+  --assert-release-manifest  fetch the released ios-spm manifest and assert it
+                             pins nsVersion to this exact version
+  -h, --help                 show this help`;
+
+let values;
+try {
+  ({ values } = parseArgs({
+    options: {
+      version: { type: "string" },
+      dir: { type: "string", default: "spmverify" },
+      "assert-release-manifest": { type: "boolean", default: false },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  }));
+} catch (e) {
+  console.error(e.message);
+  console.error(USAGE);
+  process.exit(1);
+}
+if (values.help) {
+  console.log(USAGE);
+  process.exit(0);
 }
 
-if (!opts.version) {
-  console.error("Usage: generate-spm-probe.mjs --version <v> [--dir <outdir>]");
+if (!values.version) {
+  console.error(USAGE);
   process.exit(1);
 }
 
 // The version is interpolated into Swift source; accept semver (with optional
 // prerelease) and nothing else.
 const VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
-if (!VERSION_RE.test(opts.version)) {
-  console.error(`ERROR: "${opts.version}" is not a valid release version`);
+if (!VERSION_RE.test(values.version)) {
+  console.error(`ERROR: "${values.version}" is not a valid release version`);
   process.exit(1);
+}
+
+if (values["assert-release-manifest"]) {
+  const url = `https://raw.githubusercontent.com/NativeScript/ios-spm/${values.version}/Package.swift`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    console.error(
+      `ERROR: could not fetch ${url} (HTTP ${res.status}) — was ios-spm tagged for this release?`
+    );
+    process.exit(1);
+  }
+  const releasedManifest = await res.text();
+  if (!releasedManifest.includes(`let nsVersion = "${values.version}"`)) {
+    console.error(
+      `ERROR: ios-spm@${values.version} does not pin nsVersion="${values.version}" (stale manifest?). Found:`
+    );
+    for (const line of releasedManifest.split("\n")) {
+      if (line.includes("nsVersion")) console.error(`  ${line.trim()}`);
+    }
+    process.exit(1);
+  }
+  console.log(`OK: ios-spm@${values.version} pins nsVersion="${values.version}"`);
 }
 
 const manifest = `// swift-tools-version: 5.10
@@ -47,7 +91,7 @@ let package = Package(
     name: "Probe",
     platforms: [.iOS(.v13)],
     dependencies: [
-        .package(url: "https://github.com/NativeScript/ios-spm.git", exact: "${opts.version}")
+        .package(url: "https://github.com/NativeScript/ios-spm.git", exact: "${values.version}")
     ],
     targets: [
         .target(name: "Probe", dependencies: [.product(name: "NativeScript", package: "ios-spm")])
@@ -55,11 +99,11 @@ let package = Package(
 )
 `;
 
-fs.mkdirSync(path.join(opts.dir, "Sources", "Probe"), { recursive: true });
-fs.writeFileSync(path.join(opts.dir, "Package.swift"), manifest);
+fs.mkdirSync(path.join(values.dir, "Sources", "Probe"), { recursive: true });
+fs.writeFileSync(path.join(values.dir, "Package.swift"), manifest);
 fs.writeFileSync(
-  path.join(opts.dir, "Sources", "Probe", "Probe.swift"),
+  path.join(values.dir, "Sources", "Probe", "Probe.swift"),
   "// probe\n"
 );
 
-console.log(`Generated probe package in ${opts.dir} (ios-spm exact: ${opts.version})`);
+console.log(`Generated probe package in ${values.dir} (ios-spm exact: ${values.version})`);

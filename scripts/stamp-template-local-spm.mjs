@@ -1,37 +1,56 @@
 #!/usr/bin/env node
-// Stamp a packaged project template to consume the runtime via a LOCAL SwiftPM
-// package instead of the released ios-spm tag (the D6 "dev/offline override"
-// from SPM_DISTRIBUTION_PLAN.md).
+// Stamp a packaged project template to consume the runtime from the local
+// SwiftPM package embedded in the npm package (framework/internal/local-spm)
+// instead of the released ios-spm tag.
 //
-// Local `npm run build-ios` produces xcframeworks in dist/ but no ios-spm
-// release tag, so the template's XCRemoteSwiftPackageReference (exactVersion
-// pinned by stamp-template-version.mjs) can never resolve. This script rewrites
-// that reference into an XCLocalSwiftPackageReference pointing at the local-spm
-// package the build just created (dist/local-spm — Package.swift + binary
-// targets over the built xcframeworks).
-//
-// The resulting npm package is machine-specific (it embeds an absolute path
-// into this checkout) and is only meant for `ns platform add ios
-// --framework-path=dist/nativescript-ios-<version>.tgz` style local testing.
-//
-// Usage: node scripts/stamp-template-local-spm.mjs <project.pbxproj> <abs-path-to-local-spm>
+// Replaces the template's XCRemoteSwiftPackageReference (which pins
+// github.com/NativeScript/ios-spm at __NS_RUNTIME_VERSION__, see
+// stamp-template-version.mjs) with an XCLocalSwiftPackageReference at the
+// given relative path. Xcode resolves that path relative to the project
+// directory, so "internal/local-spm" keeps resolving after the {N} CLI copies
+// the template into an app's platforms folder.
 import fs from "node:fs";
 import path from "node:path";
+import { parseArgs } from "node:util";
 
-const [, , pbxPath, localSpmPath] = process.argv;
+const USAGE = `Usage: node scripts/stamp-template-local-spm.mjs <project.pbxproj> <relative-path> [--package-dir <dir>]
 
-if (!pbxPath || !localSpmPath) {
-  console.error("Usage: stamp-template-local-spm.mjs <project.pbxproj> <abs-path-to-local-spm>");
+  <project.pbxproj>  packaged template project to stamp
+  <relative-path>    path Xcode resolves relative to the project directory,
+                     e.g. "internal/local-spm"
+  --package-dir      on-disk location of the package being referenced; when
+                     given, it must contain a Package.swift (sanity check that
+                     the packaging step actually embedded the package)
+  -h, --help         show this help`;
+
+let values, positionals;
+try {
+  ({ values, positionals } = parseArgs({
+    options: {
+      "package-dir": { type: "string" },
+      help: { type: "boolean", short: "h", default: false },
+    },
+    allowPositionals: true,
+  }));
+} catch (e) {
+  console.error(e.message);
+  console.error(USAGE);
+  process.exit(1);
+}
+if (values.help) {
+  console.log(USAGE);
+  process.exit(0);
+}
+
+const [pbxPath, stampPath] = positionals;
+if (!pbxPath || !stampPath || positionals.length > 2) {
+  console.error(USAGE);
   process.exit(1);
 }
 
-if (!path.isAbsolute(localSpmPath)) {
-  console.error(`local-spm path must be absolute, got: ${localSpmPath}`);
-  process.exit(1);
-}
-
-if (!fs.existsSync(path.join(localSpmPath, "Package.swift"))) {
-  console.error(`No Package.swift found in ${localSpmPath} — run the runtime build first.`);
+const packageDir = values["package-dir"];
+if (packageDir && !fs.existsSync(path.join(packageDir, "Package.swift"))) {
+  console.error(`No Package.swift found in ${packageDir} — was the local SwiftPM package embedded?`);
   process.exit(1);
 }
 
@@ -59,7 +78,7 @@ contents = contents.replace(
   `/* Begin XCLocalSwiftPackageReference section */
 \t\t${refUuid} /* XCLocalSwiftPackageReference "local-spm" */ = {
 \t\t\tisa = XCLocalSwiftPackageReference;
-\t\t\trelativePath = ${JSON.stringify(localSpmPath)};
+\t\t\trelativePath = ${JSON.stringify(stampPath)};
 \t\t};
 /* End XCLocalSwiftPackageReference section */`
 );
@@ -69,4 +88,4 @@ contents = contents.replace(
 contents = contents.split(`${refUuid} /* XCRemoteSwiftPackageReference "ios-spm" */`).join(`${refUuid} /* XCLocalSwiftPackageReference "local-spm" */`);
 
 fs.writeFileSync(pbxPath, contents);
-console.log(`Stamped ${pbxPath} → local SwiftPM package at ${localSpmPath}`);
+console.log(`Stamped ${pbxPath} → local SwiftPM package at ${stampPath}`);

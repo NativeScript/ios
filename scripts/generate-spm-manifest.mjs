@@ -1,44 +1,85 @@
 #!/usr/bin/env node
 // Generate ios-spm/Package.swift for a release.
 //
-// ensure binaryTarget whose Release asset was never uploaded breaks
-// resolution for every consumer of that version. Here, the visionOS
-// product/targets are emitted only when the visionOS checksums are provided.
+// A binaryTarget whose Release asset was never uploaded breaks resolution for
+// every consumer of that version (SwiftPM eagerly downloads every binaryTarget
+// in a resolved manifest). Here, the visionOS product/targets are emitted only
+// when the visionOS checksums are provided.
 //
 // Checksums come from the KEY=sha256 env files produced by
-// build_spm_artifacts.sh (one file per platform). The iOS checksums are always
-// required. --strict additionally requires the visionOS checksums; pass it for
-// every non-"next" release so a real release can never silently ship an
+// build_spm_artifacts.sh (one file per platform), passed individually via
+// --checksums and/or collected from a directory via --checksums-dir. The iOS
+// checksums are always required. The visionOS checksums are additionally
+// required when the release channel is anything but "next" (--channel), or
+// when --strict is passed — so a real release can never silently ship an
 // iOS-only manifest.
-//
-// Usage:
-//   node scripts/generate-spm-manifest.mjs \
-//     --package /path/to/ios-spm/Package.swift \
-//     --version 9.1.0 \
-//     --checksums checksums-ios.env [--checksums checksums-visionos.env] \
-//     [--strict]
 import fs from "node:fs";
+import path from "node:path";
+import { parseArgs } from "node:util";
 
-const args = process.argv.slice(2);
-const opts = { checksums: [] };
-for (let i = 0; i < args.length; i++) {
-  const a = args[i];
-  if (a === "--package") opts.package = args[++i];
-  else if (a === "--version") opts.version = args[++i];
-  else if (a === "--checksums") opts.checksums.push(args[++i]);
-  else if (a === "--strict") opts.strict = true;
-  else {
-    console.error(`Unknown argument: ${a}`);
+const USAGE = `Usage: node scripts/generate-spm-manifest.mjs --package <Package.swift> --version <version>
+         (--checksums <file> ... | --checksums-dir <dir>) [--channel <tag>] [--strict]
+
+  --package        path to the ios-spm Package.swift to (over)write
+  --version        release version the manifest pins (nsVersion + asset URLs)
+  --checksums      a checksums-<target>.env file from build_spm_artifacts.sh
+                   (repeatable)
+  --checksums-dir  directory to scan for checksums-*.env files (e.g. the merged
+                   spm-artifacts download)
+  --channel        npm dist-tag of this release; any channel other than "next"
+                   requires the full checksum set (implies --strict)
+  --strict         require the visionOS checksums regardless of channel
+  -h, --help       show this help`;
+
+let values;
+try {
+  ({ values } = parseArgs({
+    options: {
+      package: { type: "string" },
+      version: { type: "string" },
+      checksums: { type: "string", multiple: true, default: [] },
+      "checksums-dir": { type: "string" },
+      channel: { type: "string" },
+      strict: { type: "boolean", default: false },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  }));
+} catch (e) {
+  console.error(e.message);
+  console.error(USAGE);
+  process.exit(1);
+}
+if (values.help) {
+  console.log(USAGE);
+  process.exit(0);
+}
+
+const opts = {
+  package: values.package,
+  version: values.version,
+  checksums: [...values.checksums],
+  strict: values.strict || (values.channel !== undefined && values.channel !== "next"),
+};
+
+const checksumsDir = values["checksums-dir"];
+if (checksumsDir) {
+  if (!fs.existsSync(checksumsDir)) {
+    console.error(`ERROR: --checksums-dir ${checksumsDir} does not exist`);
     process.exit(1);
   }
+  const found = fs
+    .readdirSync(checksumsDir)
+    .filter((f) => /^checksums-.*\.env$/.test(f))
+    .sort()
+    .map((f) => path.join(checksumsDir, f));
+  opts.checksums.push(...found);
 }
 
 if (!opts.package || !opts.version || opts.checksums.length === 0) {
-  console.error(
-    "Usage: generate-spm-manifest.mjs --package <Package.swift> --version <v> --checksums <file> [--checksums <file>] [--strict]"
-  );
+  console.error(USAGE);
   process.exit(1);
 }
+console.log(`Using checksum files: ${opts.checksums.join(", ")}`);
 
 // The version is interpolated into Swift source and into a release URL; accept
 // semver (with optional prerelease) and nothing else.
@@ -101,7 +142,7 @@ if (presentVision.length !== 0 && presentVision.length !== VISION_KEYS.length) {
 const includeVision = presentVision.length === VISION_KEYS.length;
 if (opts.strict && !includeVision) {
   console.error(
-    "ERROR: --strict requires the visionOS checksums (a non-next release must ship the full manifest)"
+    "ERROR: this channel requires the visionOS checksums (a non-next release must ship the full manifest)"
   );
   process.exit(1);
 }
