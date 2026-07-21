@@ -28,6 +28,8 @@
 
 namespace tns {
 
+// IsLikelyOptionalModule is shared with the require() path — declared in
+// ModuleInternal.h, defined in ModuleInternal.mm.
 // Helper function to check if a module name is a Node.js built-in module
 static bool IsNodeBuiltinModule(const std::string& moduleName) {
   return moduleName.rfind("node:", 0) == 0;

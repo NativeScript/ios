@@ -19,11 +19,41 @@ using namespace v8;
 
 namespace tns {
 
-// Helper function to check if a module name looks like an optional external module
+// Shared by both the require() path (this file) and the import()/ESM resolver path
+// (ModuleInternalCallbacks.mm) — see the declaration in ModuleInternal.h. Keeping a single
+// definition means a boundary fix like the extension carve-out below automatically applies
+// to both call sites instead of only the one that happened to get touched.
 bool IsLikelyOptionalModule(const std::string& moduleName) {
-  // Check if it's a bare module name (no path separators) that could be an npm package
+  // Node built-ins are handled by their own dedicated resolution path; never treat them as
+  // an optional external module.
+  if (moduleName.rfind("node:", 0) == 0) {
+    return false;
+  }
+
+  // Check if it's a bare module name (no path separators) that could be an npm package.
+  //
+  // Bare specifiers that end in a recognizable script/data extension (e.g. "foo.js",
+  // "config.json") are explicit file references, not npm-style package names — real npm
+  // package names don't carry a file extension. Treating them as "likely optional" would
+  // swallow a genuine "module not found" failure behind a lazily-throwing placeholder
+  // instead of letting require()/import() fail immediately, which is what callers (and the
+  // existing "should throw error if cant find node module" test) expect for those names.
+  //
+  // This carve-out is deliberately narrow: a dotted bare name that doesn't end in one of
+  // these exact extensions (e.g. "lodash.debounce") is still treated as optional, same as
+  // before. See ModuleInternal.mm/ModuleInternalCallbacks.mm optional-module tests for the
+  // cases this boundary is expected to hold for.
+  static const char* kExplicitFileExtensions[] = {".js", ".mjs", ".cjs", ".json", ".node", ".ts"};
+
   if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
       moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
+    for (const char* ext : kExplicitFileExtensions) {
+      size_t extLen = strlen(ext);
+      if (moduleName.size() > extLen &&
+          moduleName.compare(moduleName.size() - extLen, extLen, ext) == 0) {
+        return false;
+      }
+    }
     return true;
   }
   return false;
