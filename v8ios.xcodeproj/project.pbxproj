@@ -2339,7 +2339,10 @@
 		};
 		C293752B229FC4740075CB16 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			platformFilter = ios;
+			platformFilters = (
+				ios,
+				xros,
+			);
 			target = C29374E1229FC0F60075CB16 /* TestFixtures */;
 			targetProxy = C293752A229FC4740075CB16 /* PBXContainerItemProxy */;
 		};
@@ -2433,6 +2436,7 @@
 		C23992CE236C2D6E00D2F720 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_STYLE = Automatic;
@@ -2459,6 +2463,7 @@
 		C23992CF236C2D6E00D2F720 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
 				CLANG_ENABLE_MODULES = NO;
 				CODE_SIGN_STYLE = Automatic;
@@ -2682,6 +2687,7 @@
 		C29374E9229FC0F60075CB16 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				CLANG_ENABLE_MODULES = NO;
 				CLANG_WARN_STRICT_PROTOTYPES = NO;
 				DEFINES_MODULE = YES;
@@ -2699,6 +2705,7 @@
 		C29374EA229FC0F60075CB16 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				CLANG_ENABLE_MODULES = NO;
 				CLANG_WARN_STRICT_PROTOTYPES = NO;
 				DEFINES_MODULE = YES;
