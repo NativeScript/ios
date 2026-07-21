@@ -25,16 +25,53 @@ class NativeScriptException {
   // Isolate-level promise rejection callback (SetPromiseRejectCallback). Feeds
   // the per-isolate PromiseRejectionTracker owned by Caches.
   static void OnPromiseRejected(v8::PromiseRejectMessage message);
-  // Shared reporting tail used by both the uncaught-error message listener and
-  // the promise-rejection drain. `message` may be empty (rejections carry no
-  // v8::Message); `stackOverride` short-circuits stack derivation when
-  // non-empty; `logPrefix` distinguishes the log line (e.g. rejections) while
-  // preserving the fatal-exception framing.
+  // Installs the WHATWG error-events layer (Event/EventTarget/ErrorEvent/
+  // PromiseRejectionEvent constructors, EventTarget methods on globalThis and
+  // global reportError). Evaluated once per isolate during Runtime::Init, right
+  // after PromiseProxy::Init, for both main and worker isolates. Stashes the
+  // three native dispatch closures in Caches.
+  static void InitErrorEvents(v8::Local<v8::Context> context);
+  // Entry point for reporting an uncaught sync exception (message listener) and
+  // reportError. First dispatches an `error` ErrorEvent through the JS listener
+  // store; if a listener calls preventDefault() the report is fully handled and
+  // nothing else runs. Otherwise falls through to ReportFatalTail. `message`
+  // may be empty (rejections/reportError carry no v8::Message); `stackOverride`
+  // short-circuits stack derivation when non-empty; `logPrefix` distinguishes
+  // the log line while preserving the fatal-exception framing.
   static void ReportToJsHandlersAndLog(v8::Isolate* isolate,
                                        v8::Local<v8::Value> error,
                                        v8::Local<v8::Message> message,
                                        const std::string& stackOverride = "",
                                        const std::string& logPrefix = "");
+  // Reports an unhandled promise rejection: dispatches a PromiseRejectionEvent
+  // (not an ErrorEvent) and, when unprevented, falls through to ReportFatalTail
+  // with the "Unhandled promise rejection:" prefix. Used by
+  // PromiseRejectionTracker::Drain on the main isolate.
+  static void ReportUnhandledRejection(v8::Isolate* isolate,
+                                       v8::Local<v8::Promise> promise,
+                                       v8::Local<v8::Value> reason,
+                                       const std::string& stackOverride = "");
+  // Dispatches the cancelable `unhandledrejection` PromiseRejectionEvent
+  // through the JS listener store. Returns true when a listener called
+  // preventDefault(). Never re-dispatches on failure: a dispatch that itself
+  // throws is logged and treated as unprevented so the error is never lost.
+  static bool DispatchUnhandledRejectionEvent(v8::Isolate* isolate,
+                                              v8::Local<v8::Promise> promise,
+                                              v8::Local<v8::Value> reason);
+  // Fires the non-cancelable `rejectionhandled` PromiseRejectionEvent for a
+  // late-attached handler. `reason` may be undefined (Phase 2 does not retain
+  // the reason past reporting).
+  static void DispatchRejectionHandledEvent(v8::Isolate* isolate,
+                                            v8::Local<v8::Promise> promise,
+                                            v8::Local<v8::Value> reason);
+  // The terminal tail shared by the uncaught-error path, the rejection path and
+  // the JS `nativeReportFatal` handshake: calls the __on* shim and emits the
+  // fatal-exception log. Does NOT dispatch any event (the caller has already
+  // done so, or is reportError dispatching from JS), preventing recursion.
+  static void ReportFatalTail(v8::Isolate* isolate, v8::Local<v8::Value> error,
+                              v8::Local<v8::Message> message,
+                              const std::string& stackOverride = "",
+                              const std::string& logPrefix = "");
   static std::string GetErrorStackTrace(
       v8::Isolate* isolate, const v8::Local<v8::StackTrace>& stackTrace);
   static void ShowErrorModal(v8::Isolate* isolate, const std::string& title,
@@ -89,12 +126,26 @@ class PromiseRejectionTracker {
   }
 
  private:
+  // The observer polls this atomic to decide whether a drain is needed. Both
+  // the still-to-report rejections and the queued rejectionhandled events count
+  // as work; reportedOutstanding_ does not (it only waits for a late handler).
   void SyncPendingCount() {
-    pendingCount_.store(pending_.size(), std::memory_order_release);
+    pendingCount_.store(pending_.size() + pendingRejectionHandled_.size(),
+                        std::memory_order_release);
   }
+  // Drop weak handles the GC has already cleared.
+  void PruneReportedOutstanding();
 
   v8::Isolate* isolate_;
   std::vector<PendingRejection> pending_;
+  // Promises whose rejection was already reported (unhandledrejection fired,
+  // prevented or not) and are still outstanding. Held as phantom-weak globals
+  // (SetWeak) so a GC'd promise drops out automatically; a handler added later
+  // moves the promise into pendingRejectionHandled_.
+  std::vector<v8::Global<v8::Promise>> reportedOutstanding_;
+  // rejectionhandled events queued by OnHandlerAdded (which runs during a
+  // microtask checkpoint) to fire as a task on the next drain, per spec.
+  std::vector<v8::Global<v8::Promise>> pendingRejectionHandled_;
   std::atomic<size_t> pendingCount_{0};
   // Rejections that arrive while a drain is in progress are deferred to the
   // next turn: Drain snapshots and clears `pending_` before iterating, so any

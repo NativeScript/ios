@@ -351,6 +351,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   DefineGlobalObject(context, isWorker);
   DefineCollectFunction(context);
   PromiseProxy::Init(context);
+  NativeScriptException::InitErrorEvents(context);
   Console::Init(context);
   WeakRef::Init(context);
 

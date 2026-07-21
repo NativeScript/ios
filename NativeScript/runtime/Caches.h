@@ -155,6 +155,18 @@ class Caches {
   std::unique_ptr<v8::Persistent<v8::Function>> UnmanagedTypeCtorFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 
+  // Phase 2 WHATWG error-events dispatch closures returned by the bootstrap
+  // IIFE (NativeScriptException::InitErrorEvents). They close over the internal
+  // listener store, so native dispatch keeps working even if app code
+  // overwrites globalThis.dispatchEvent. Cleaned up with the other Persistent
+  // members when Caches is destroyed, before isolate disposal.
+  std::unique_ptr<v8::Persistent<v8::Function>> DispatchErrorEventFunc =
+      std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+  std::unique_ptr<v8::Persistent<v8::Function>> DispatchUnhandledRejectionFunc =
+      std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+  std::unique_ptr<v8::Persistent<v8::Function>> DispatchRejectionHandledFunc =
+      std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+
   using unique_void_ptr = std::unique_ptr<void, void (*)(void const*)>;
   template <typename T>
   auto unique_void(T* ptr) -> unique_void_ptr {
