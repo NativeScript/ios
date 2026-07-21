@@ -12,6 +12,7 @@
 #include <mutex>
 #include <sstream>
 #include "Caches.h"
+#include "DataWrapper.h"
 #include "Helpers.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
@@ -92,21 +93,51 @@ NativeScriptException::~NativeScriptException() { delete this->javascriptExcepti
 void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Value> error) {
   @try {
     Isolate* isolate = message->GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> global = context->Global();
-    Local<Value> handler;
-    id value = Runtime::GetAppConfigValue("discardUncaughtJsExceptions");
-    bool isDiscarded = value ? [value boolValue] : false;
+    ReportToJsHandlersAndLog(isolate, error, message);
+  } @catch (NSException* exception) {
+    Log(@"OnUncaughtError: Caught exception during error handling: %@", exception);
+    @throw exception;
+  }
+}
 
-    std::string cbName = isDiscarded ? "__onDiscardedError" : "__onUncaughtError";
-    bool success = global->Get(context, tns::ToV8String(isolate, cbName)).ToLocal(&handler);
+void NativeScriptException::ReportToJsHandlersAndLog(Isolate* isolate, Local<Value> error,
+                                                     Local<v8::Message> message,
+                                                     const std::string& stackOverride,
+                                                     const std::string& logPrefix) {
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> global = context->Global();
+  Local<Value> handler;
+  id value = Runtime::GetAppConfigValue("discardUncaughtJsExceptions");
+  bool isDiscarded = value ? [value boolValue] : false;
 
-    std::string stackTrace = tns::GetSmartStackTrace(isolate, nullptr, error);
-    if (stackTrace.empty()) {
+  std::string cbName = isDiscarded ? "__onDiscardedError" : "__onUncaughtError";
+  bool success = global->Get(context, tns::ToV8String(isolate, cbName)).ToLocal(&handler);
+
+  std::string stackTrace = stackOverride;
+  if (stackTrace.empty()) {
+    stackTrace = tns::GetSmartStackTrace(isolate, nullptr, error);
+  }
+  if (stackTrace.empty()) {
+    if (!message.IsEmpty()) {
       stackTrace = GetErrorStackTrace(isolate, message->GetStackTrace());
+    } else {
+      // Rejections carry no v8::Message; fall back to the reason's own stack.
+      stackTrace = GetErrorStackTrace(isolate, Exception::GetStackTrace(error));
     }
-    std::string fullMessage;
+  }
 
+  // Derive the human-readable message string, either from the v8::Message (sync
+  // exceptions) or from the reason value itself (rejections, no v8::Message).
+  auto messageOrReasonString = [&]() -> std::string {
+    if (!message.IsEmpty()) {
+      Local<v8::String> messageV8String = message->Get();
+      return tns::ToString(isolate, messageV8String);
+    }
+    return tns::ToString(isolate, error);
+  };
+
+  std::string fullMessage;
+  if (error->IsObject()) {
     auto errObject = error.As<Object>();
     auto fullMessageString = tns::ToV8String(isolate, "fullMessage");
     if (errObject->HasOwnProperty(context, fullMessageString).ToChecked()) {
@@ -117,56 +148,194 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
         fullMessage = tns::ToString(isolate, fullMessage_);
       } else {
         // Fallback to regular message if fullMessage access fails
-        Local<v8::String> messageV8String = message->Get();
-        fullMessage = tns::ToString(isolate, messageV8String);
+        fullMessage = messageOrReasonString();
       }
     } else {
-      Local<v8::String> messageV8String = message->Get();
-      std::string messageString = tns::ToString(isolate, messageV8String);
-      fullMessage = messageString + "\n at \n" + stackTrace;
+      fullMessage = messageOrReasonString() + "\n at \n" + stackTrace;
     }
-
-    if (success && handler->IsFunction()) {
-      if (error->IsObject()) {
-        // Try to set stackTrace property, but don't crash if it fails
-        bool stackTraceSet = error.As<Object>()
-                                 ->Set(context, tns::ToV8String(isolate, "stackTrace"),
-                                       tns::ToV8String(isolate, stackTrace))
-                                 .FromMaybe(false);
-        if (!stackTraceSet) {
-          Log(@"Warning: Failed to set stackTrace property on error object");
-        }
-      }
-
-      Local<v8::Function> errorHandlerFunc = handler.As<v8::Function>();
-      Local<Object> thiz = Object::New(isolate);
-      Local<Value> args[] = {error};
-      Local<Value> result;
-      TryCatch tc(isolate);
-      success = errorHandlerFunc->Call(context, thiz, 1, args).ToLocal(&result);
-      if (tc.HasCaught()) {
-        tns::LogError(isolate, tc);
-      }
-
-      // Don't crash if error handler call failed - just log it
-      if (!success) {
-        Log(@"Warning: Error handler function call failed");
-      }
-    }
-
-    if (!isDiscarded) {
-      Log(@"***** Fatal JavaScript exception *****\n");
-      Log(@"%s", fullMessage.c_str());
-      if (!stackTrace.empty()) {
-        Log(@"%s", stackTrace.c_str());
-      }
-    } else {
-      Log(@"NativeScript discarding uncaught JS exception!");
-    }
-  } @catch (NSException* exception) {
-    Log(@"OnUncaughtError: Caught exception during error handling: %@", exception);
-    @throw exception;
+  } else {
+    fullMessage = messageOrReasonString() + "\n at \n" + stackTrace;
   }
+
+  if (success && handler->IsFunction()) {
+    if (error->IsObject()) {
+      // Try to set stackTrace property, but don't crash if it fails
+      bool stackTraceSet = error.As<Object>()
+                               ->Set(context, tns::ToV8String(isolate, "stackTrace"),
+                                     tns::ToV8String(isolate, stackTrace))
+                               .FromMaybe(false);
+      if (!stackTraceSet) {
+        Log(@"Warning: Failed to set stackTrace property on error object");
+      }
+    }
+
+    Local<v8::Function> errorHandlerFunc = handler.As<v8::Function>();
+    Local<Object> thiz = Object::New(isolate);
+    Local<Value> args[] = {error};
+    Local<Value> result;
+    TryCatch tc(isolate);
+    success = errorHandlerFunc->Call(context, thiz, 1, args).ToLocal(&result);
+    if (tc.HasCaught()) {
+      tns::LogError(isolate, tc);
+    }
+
+    // Don't crash if error handler call failed - just log it
+    if (!success) {
+      Log(@"Warning: Error handler function call failed");
+    }
+  }
+
+  if (!isDiscarded) {
+    Log(@"***** Fatal JavaScript exception *****\n");
+    if (!logPrefix.empty()) {
+      Log(@"%s", logPrefix.c_str());
+    }
+    Log(@"%s", fullMessage.c_str());
+    if (!stackTrace.empty()) {
+      Log(@"%s", stackTrace.c_str());
+    }
+  } else {
+    if (!logPrefix.empty()) {
+      Log(@"%s", logPrefix.c_str());
+    }
+    Log(@"NativeScript discarding uncaught JS exception!");
+  }
+}
+
+void NativeScriptException::OnPromiseRejected(v8::PromiseRejectMessage message) {
+  Local<Promise> promise = message.GetPromise();
+  Isolate* isolate = promise->GetIsolate();
+  auto cache = Caches::Get(isolate);
+  if (cache == nullptr || cache->PromiseRejections == nullptr) {
+    return;
+  }
+
+  switch (message.GetEvent()) {
+    case v8::kPromiseRejectWithNoHandler:
+      cache->PromiseRejections->OnReject(promise, message.GetValue());
+      break;
+    case v8::kPromiseHandlerAddedAfterReject:
+      cache->PromiseRejections->OnHandlerAdded(promise);
+      break;
+    case v8::kPromiseResolveAfterResolved:
+    case v8::kPromiseRejectAfterResolved:
+      // Not relevant to unhandled-rejection tracking.
+      break;
+  }
+}
+
+void PromiseRejectionTracker::OnReject(Local<Promise> promise, Local<Value> reason) {
+  for (auto& entry : pending_) {
+    if (entry.promise.Get(isolate_)->SameValue(promise)) {
+      // Already tracked; refresh the reason for the latest rejection value.
+      entry.reason.Reset(isolate_, reason);
+      return;
+    }
+  }
+  PendingRejection entry;
+  entry.promise.Reset(isolate_, promise);
+  entry.reason.Reset(isolate_, reason);
+  entry.reported = false;
+  pending_.push_back(std::move(entry));
+  SyncPendingCount();
+}
+
+void PromiseRejectionTracker::OnHandlerAdded(Local<Promise> promise) {
+  for (auto it = pending_.begin(); it != pending_.end(); ++it) {
+    if (it->promise.Get(isolate_)->SameValue(promise)) {
+      // Phase 1: a handler attached before the rejection was drained cancels
+      // the report. (Phase 2 will fire `rejectionhandled` when it->reported.)
+      pending_.erase(it);
+      SyncPendingCount();
+      return;
+    }
+  }
+}
+
+// Gives a worker's global `onerror` a chance to handle a rejected reason,
+// mirroring WorkerWrapper::CallOnErrorHandlers. Returns true when the handler
+// signalled it consumed the error (truthy return).
+static bool GiveWorkerOnErrorAChance(Isolate* isolate, Local<Context> context,
+                                     Local<Value> reason) {
+  Local<Object> global = context->Global();
+  Local<Value> onErrorVal;
+  if (!global->Get(context, tns::ToV8String(isolate, "onerror")).ToLocal(&onErrorVal)) {
+    return false;
+  }
+  if (onErrorVal.IsEmpty() || !onErrorVal->IsFunction()) {
+    return false;
+  }
+
+  Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
+  Local<Value> args[1] = {reason};
+  Local<Value> result;
+  TryCatch tc(isolate);
+  bool success = onErrorFunc->Call(context, v8::Undefined(isolate), 1, args).ToLocal(&result);
+  return success && !result.IsEmpty() && result->BooleanValue(isolate);
+}
+
+void PromiseRejectionTracker::Drain(Local<Context> context) {
+  if (draining_) {
+    return;
+  }
+  draining_ = true;
+
+  std::vector<PendingRejection> snapshot;
+  snapshot.swap(pending_);
+  SyncPendingCount();
+
+  auto cache = Caches::Get(isolate_);
+  bool isWorker = cache->isWorker;
+
+  for (auto& entry : snapshot) {
+    if (entry.reported) {
+      continue;
+    }
+    entry.reported = true;
+
+    // The observer calling us holds live V8 scopes, so an NSException from the
+    // reporting path must not unwind past this frame — catch and log instead.
+    @try {
+      Local<Value> reason = entry.reason.Get(isolate_);
+
+      std::string stack = tns::GetSmartStackTrace(isolate_, nullptr, reason);
+      if (stack.empty()) {
+        stack =
+            NativeScriptException::GetErrorStackTrace(isolate_, Exception::GetStackTrace(reason));
+      }
+
+      if (isWorker) {
+        // Mirror the uncaught worker error channel: worker-global onerror first,
+        // then forward to the main isolate's worker.onerror.
+        if (GiveWorkerOnErrorAChance(isolate_, context, reason)) {
+          continue;
+        }
+        Runtime* runtime = Runtime::GetRuntime(isolate_);
+        if (runtime == nullptr) {
+          continue;
+        }
+        int workerId = runtime->WorkerId();
+        bool found = false;
+        auto state = Caches::Workers->Get(workerId, found);
+        if (!found || state == nullptr) {
+          continue;
+        }
+        auto* worker = static_cast<WorkerWrapper*>(state->UserData());
+        if (worker == nullptr) {
+          continue;
+        }
+        std::string reasonMessage = tns::ToString(isolate_, reason);
+        worker->PassUncaughtRejectionToMain(reasonMessage, "Worker script", stack, 1);
+      } else {
+        NativeScriptException::ReportToJsHandlersAndLog(isolate_, reason, Local<v8::Message>(),
+                                                        stack, "Unhandled promise rejection:");
+      }
+    } @catch (NSException* exception) {
+      Log(@"PromiseRejectionTracker: exception while reporting rejection: %@", exception);
+    }
+  }
+
+  draining_ = false;
 }
 
 void NativeScriptException::ReThrowToV8(Isolate* isolate) {

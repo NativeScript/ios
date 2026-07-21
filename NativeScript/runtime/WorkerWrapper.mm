@@ -321,6 +321,22 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(const std::string& mes
                                                           const std::string& source,
                                                           const std::string& stackTrace,
                                                           int lineNumber, bool async) {
+  this->ForwardErrorPayloadToMain(message, source, stackTrace, lineNumber, async);
+}
+
+void WorkerWrapper::PassUncaughtRejectionToMain(const std::string& message,
+                                                const std::string& source,
+                                                const std::string& stackTrace, int lineNumber,
+                                                bool async) {
+  if (this->isTerminating_ || this->isDisposed_) {
+    return;
+  }
+  this->ForwardErrorPayloadToMain(message, source, stackTrace, lineNumber, async);
+}
+
+void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const std::string& source,
+                                              const std::string& stackTrace, int lineNumber,
+                                              bool async) {
   auto runtime = static_cast<Runtime*>(mainIsolate_->GetData(Constants::RUNTIME_SLOT));
   if (runtime == nullptr) {
     return;
