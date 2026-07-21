@@ -108,7 +108,10 @@ jobs:
         # remote mode: the published package embeds no binaries and pins
         # github.com/NativeScript/ios-spm at this version instead (the
         # github-release + spm-update jobs make that pin resolvable).
-        run: npm run ${{ matrix.script }} -- --spm-mode=remote
+        env:
+          # env indirection keeps matrix values out of shell interpolation
+          BUILD_SCRIPT: ${{ matrix.script }}
+        run: npm run "$BUILD_SCRIPT" -- --spm-mode=remote
       - name: Upload npm package artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:

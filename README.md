@@ -267,7 +267,7 @@ package can be built in two modes (`--spm-mode`, see `./build_npm_ios.sh --help`
 To use a locally built runtime in an app, build the default (embedded) package and point
 the {N} CLI at it:
 
-```
+```bash
 npm run build-ios
 ns platform add ios --framework-path=/path/to/ns-v8ios-runtime/dist/nativescript-ios-{version}.tgz
 ```

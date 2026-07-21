@@ -18,42 +18,7 @@ usage() {
   echo "  -h, --help           show this help"
 }
 
-SPM_MODE="embedded"
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --spm-mode)
-      if [ $# -lt 2 ]; then
-        echo "--spm-mode requires a value" >&2
-        usage >&2
-        exit 1
-      fi
-      SPM_MODE="$2"
-      shift 2
-      ;;
-    --spm-mode=*)
-      SPM_MODE="${1#*=}"
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown argument: $1" >&2
-      usage >&2
-      exit 1
-      ;;
-  esac
-done
-
-case "$SPM_MODE" in
-  embedded|remote) ;;
-  *)
-    echo "Invalid --spm-mode '$SPM_MODE' (expected embedded or remote)" >&2
-    usage >&2
-    exit 1
-    ;;
-esac
+parse_spm_mode_args "$@"
 
 checkpoint "Preparing npm package for visionOS ($SPM_MODE SwiftPM mode)..."
 OUTPUT_DIR="dist/npm"
