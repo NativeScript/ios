@@ -639,7 +639,7 @@ void PromiseRejectionTracker::OnReject(Local<Promise> promise, Local<Value> reas
 void PromiseRejectionTracker::PruneReportedOutstanding() {
   reportedOutstanding_.erase(
       std::remove_if(reportedOutstanding_.begin(), reportedOutstanding_.end(),
-                     [](const v8::Global<v8::Promise>& g) { return g.IsEmpty(); }),
+                     [](const ReportedRejection& r) { return r.promise.IsEmpty(); }),
       reportedOutstanding_.end());
 }
 
@@ -657,13 +657,16 @@ void PromiseRejectionTracker::OnHandlerAdded(Local<Promise> promise) {
   // microtask checkpoint, but spec fires rejectionhandled as a task, so we defer
   // to the next drain turn instead of dispatching synchronously.
   for (auto it = reportedOutstanding_.begin(); it != reportedOutstanding_.end(); ++it) {
-    if (it->IsEmpty()) {
+    if (it->promise.IsEmpty()) {
       continue;
     }
-    if (it->Get(isolate_)->SameValue(promise)) {
+    if (it->promise.Get(isolate_)->SameValue(promise)) {
+      ReportedRejection queued;
+      // Re-anchor the promise strongly (the outstanding handle is weak) and
+      // carry the original reason so the event reports it per spec.
+      queued.promise.Reset(isolate_, promise);
+      queued.reason = std::move(it->reason);
       reportedOutstanding_.erase(it);
-      v8::Global<v8::Promise> queued;
-      queued.Reset(isolate_, promise);
       pendingRejectionHandled_.push_back(std::move(queued));
       SyncPendingCount();
       PruneReportedOutstanding();
@@ -702,9 +705,9 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
   draining_ = true;
 
   // Fire queued rejectionhandled events first (they were deferred from a
-  // microtask checkpoint to run as a task on this drain turn). Reason is passed
-  // as undefined: Phase 2 does not retain the reason past reporting.
-  std::vector<v8::Global<v8::Promise>> handledSnapshot;
+  // microtask checkpoint to run as a task on this drain turn), carrying the
+  // retained original rejection reason.
+  std::vector<ReportedRejection> handledSnapshot;
   handledSnapshot.swap(pendingRejectionHandled_);
 
   std::vector<PendingRejection> snapshot;
@@ -715,13 +718,14 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
   bool isWorker = cache->isWorker;
 
   for (auto& queued : handledSnapshot) {
-    if (queued.IsEmpty()) {
+    if (queued.promise.IsEmpty()) {
       continue;
     }
     @try {
-      Local<Promise> promise = queued.Get(isolate_);
-      NativeScriptException::DispatchRejectionHandledEvent(isolate_, promise,
-                                                           v8::Undefined(isolate_));
+      Local<Promise> promise = queued.promise.Get(isolate_);
+      Local<Value> reason = queued.reason.IsEmpty() ? v8::Undefined(isolate_).As<Value>()
+                                                    : queued.reason.Get(isolate_);
+      NativeScriptException::DispatchRejectionHandledEvent(isolate_, promise, reason);
     } @catch (NSException* exception) {
       Log(@"PromiseRejectionTracker: exception while firing rejectionhandled: %@", exception);
     }
@@ -775,8 +779,11 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
       // or not). Keep the promise as a phantom-weak outstanding entry so a
       // handler attached later fires rejectionhandled; a GC'd promise drops out
       // on its own.
-      reportedOutstanding_.push_back(std::move(entry.promise));
-      reportedOutstanding_.back().SetWeak();
+      ReportedRejection outstanding;
+      outstanding.promise = std::move(entry.promise);
+      outstanding.reason = std::move(entry.reason);
+      reportedOutstanding_.push_back(std::move(outstanding));
+      reportedOutstanding_.back().promise.SetWeak();
     } @catch (NSException* exception) {
       Log(@"PromiseRejectionTracker: exception while reporting rejection: %@", exception);
     }

@@ -159,6 +159,9 @@ describe("WHATWG error events", function () {
                     expect(rejectionHandled.type).toBe("rejectionhandled");
                     expect(typeof rejectionHandled.promise.then).toBe("function");
                     expect(rejectionHandled.promise).toBe(reportedPromise);
+                    // The original rejection reason is retained past reporting
+                    // and carried on the rejectionhandled event, per spec.
+                    expect(rejectionHandled.reason).toBe(reason);
                     done();
                 });
             }, 20);

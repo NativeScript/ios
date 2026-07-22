@@ -130,7 +130,9 @@ Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapp
 
 Local<Private> ArgConverter::GetEscapeExceptionBrand(Isolate* isolate) {
   auto cache = Caches::Get(isolate);
-  if (cache == nullptr) {
+  // Caches::Get never returns null — after isolate removal it returns a dummy
+  // cache — so validity is the real liveness check before touching V8 state.
+  if (cache == nullptr || !cache->IsValid()) {
     return Local<Private>();
   }
   if (cache->EscapeExceptionBrand == nullptr) {

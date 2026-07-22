@@ -1163,11 +1163,16 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property,
         id thiz = *static_cast<const id*>(argValues[0]);
         auto cache = Caches::Get(isolate);
         auto it = cache->Instances.find(thiz);
-        Local<Object> self_ = it != cache->Instances.end()
-                                  ? it->second->Get(isolate).As<Object>()
-                                  : ArgConverter::CreateJsWrapper(
-                                        v8Context, new ObjCDataWrapper(thiz), Local<Object>())
-                                        .As<Object>();
+        ObjCDataWrapper* wrapper = nullptr;
+        Local<Object> self_ =
+            it != cache->Instances.end()
+                ? it->second->Get(isolate).As<Object>()
+                : ArgConverter::CreateJsWrapper(v8Context, wrapper = new ObjCDataWrapper(thiz),
+                                                Local<Object>())
+                      .As<Object>();
+        if (wrapper != nullptr) {
+          tns::DeleteWrapperIfUnused(isolate, self_, wrapper);
+        }
 
         uint8_t* argBuffer = (uint8_t*)argValues[2];
         const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();

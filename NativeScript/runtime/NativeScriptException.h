@@ -64,8 +64,7 @@ class NativeScriptException {
                                               v8::Local<v8::Promise> promise,
                                               v8::Local<v8::Value> reason);
   // Fires the non-cancelable `rejectionhandled` PromiseRejectionEvent for a
-  // late-attached handler. `reason` may be undefined (Phase 2 does not retain
-  // the reason past reporting).
+  // late-attached handler, carrying the original rejection reason.
   static void DispatchRejectionHandledEvent(v8::Isolate* isolate,
                                             v8::Local<v8::Promise> promise,
                                             v8::Local<v8::Value> reason);
@@ -141,16 +140,24 @@ class PromiseRejectionTracker {
   // Drop weak handles the GC has already cleared.
   void PruneReportedOutstanding();
 
+  // A rejection that was already reported (unhandledrejection fired, prevented
+  // or not). The original reason is retained so a late rejectionhandled event
+  // carries it per spec; it is released when the entry is pruned or fired.
+  struct ReportedRejection {
+    v8::Global<v8::Promise> promise;
+    v8::Global<v8::Value> reason;
+  };
+
   v8::Isolate* isolate_;
   std::vector<PendingRejection> pending_;
-  // Promises whose rejection was already reported (unhandledrejection fired,
-  // prevented or not) and are still outstanding. Held as phantom-weak globals
-  // (SetWeak) so a GC'd promise drops out automatically; a handler added later
-  // moves the promise into pendingRejectionHandled_.
-  std::vector<v8::Global<v8::Promise>> reportedOutstanding_;
+  // Reported rejections still outstanding. The promise handle is phantom-weak
+  // (SetWeak) so a GC'd promise drops the whole entry (reason included); a
+  // handler added later moves the entry into pendingRejectionHandled_.
+  std::vector<ReportedRejection> reportedOutstanding_;
   // rejectionhandled events queued by OnHandlerAdded (which runs during a
-  // microtask checkpoint) to fire as a task on the next drain, per spec.
-  std::vector<v8::Global<v8::Promise>> pendingRejectionHandled_;
+  // microtask checkpoint) to fire as a task on the next drain, per spec. Held
+  // strong so the promise survives until the event fires.
+  std::vector<ReportedRejection> pendingRejectionHandled_;
   std::atomic<size_t> pendingCount_{0};
   // Rejections that arrive while a drain is in progress are deferred to the
   // next turn: Drain snapshots and clears `pending_` before iterating, so any
