@@ -10,6 +10,7 @@
 #include <fstream>
 #include <locale>
 #include <sstream>
+#include "BuiltinLoader.h"
 #include "Caches.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
@@ -484,43 +485,13 @@ Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
     return caches->SmartJSONStringifyFunc->Get(isolate);
   }
 
-  std::string smartStringifyFunctionScript =
-      "(function () {\n"
-      "    function smartStringify(object) {\n"
-      "        const seen = [];\n"
-      "        var replacer = function (key, value) {\n"
-      "            if (value != null && typeof value == \"object\") {\n"
-      "                if (seen.indexOf(value) >= 0) {\n"
-      "                    if (key) {\n"
-      "                        return \"[Circular]\";\n"
-      "                    }\n"
-      "                    return;\n"
-      "                }\n"
-      "                seen.push(value);\n"
-      "            }\n"
-      "            return value;\n"
-      "        };\n"
-      "        return JSON.stringify(object, replacer, 2);\n"
-      "    }\n"
-      "    return smartStringify;\n"
-      "})();";
-
-  Local<v8::String> source = tns::ToV8String(isolate, smartStringifyFunctionScript);
   Local<Context> context = isolate->GetCurrentContext();
 
-  Local<Script> script;
-  bool success = Script::Compile(context, source).ToLocal(&script);
-  tns::Assert(success, isolate);
-
-  if (script.IsEmpty()) {
-    return Local<v8::Function>();
-  }
-
   Local<Value> result;
-  success = script->Run(context).ToLocal(&result);
+  bool success = BuiltinLoader::RunBuiltin(context, BuiltinId::kSmartStringify).ToLocal(&result);
   tns::Assert(success, isolate);
 
-  if (result.IsEmpty() && !result->IsFunction()) {
+  if (result.IsEmpty() || !result->IsFunction()) {
     return Local<v8::Function>();
   }
 
