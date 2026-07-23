@@ -66,9 +66,12 @@ describe("WHATWG error events", function () {
         expect(received.type).toBe("error");
         expect(received.error).toBe(err);
         expect(received.message).toBe("x");
-        // preventDefault() in the listener must suppress the __onUncaughtError shim.
+        // preventDefault() in the listener must suppress the __onUncaughtError shim for
+        // THIS error. Assert on the specific error rather than uncaught.length: the shim is
+        // process-global and other specs' async errors/rejections can drain into it during
+        // these quiet turns, so a bare length===0 is flaky in the full suite.
         afterQuietTurns(function () {
-            expect(uncaught.length).toBe(0);
+            expect(uncaught).not.toContain(err);
             done();
         });
     });
@@ -111,8 +114,10 @@ describe("WHATWG error events", function () {
             expect(received.type).toBe("unhandledrejection");
             expect(received.reason).toBe(reason);
             expect(typeof received.promise.then).toBe("function");
+            // Assert THIS rejection was suppressed, not uncaught.length===0 — the shim is
+            // process-global and unrelated async errors drain into it during quiet turns.
             afterQuietTurns(function () {
-                expect(uncaught.length).toBe(0);
+                expect(uncaught).not.toContain(reason);
                 done();
             });
         });
@@ -283,8 +288,10 @@ describe("WHATWG error events", function () {
 
         expect(received).not.toBeNull();
         expect(received.error).toBe(err);
+        // Assert THIS error was suppressed, not uncaught.length===0 (process-global shim;
+        // other specs' async errors can drain into it during quiet turns).
         afterQuietTurns(function () {
-            expect(uncaught.length).toBe(0);
+            expect(uncaught).not.toContain(err);
             done();
         });
     });

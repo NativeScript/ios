@@ -15,6 +15,17 @@ class TestRunnerTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
 
+        // Ignore SIGPIPE process-wide for the XCUITest host. Embassy send()s HTTP
+        // responses to client sockets over raw BSD sockets; SO_NOSIGPIPE is set only
+        // best-effort per socket (TCPSocket.ignoreSigPipe) and deliberately does NOT
+        // apply to sockets the runtime's synchronous NSURLConnection module loader has
+        // already half-closed. A send() on such a socket raises SIGPIPE — which killed
+        // the whole runner ("Test crashed with signal pipe", 0 tests) on CI, where the
+        // half-closed-at-send race is far likelier than on a fast local loopback.
+        // Ignoring it turns that into the EPIPE the server already handles. Test-host
+        // only; the shipped runtime is unaffected.
+        signal(SIGPIPE, SIG_IGN)
+
         // Standalone (not via self.expectation(...)) so we can drive it through
         // XCTWaiter alongside the crash watchdog without tripping the
         // XCTestCase "must waitForExpectations" rule.
@@ -130,7 +141,12 @@ class TestRunnerTests: XCTestCase {
 
         try! server.start()
 
-        DispatchQueue.global(qos: .background).async {
+        // .userInitiated, not .background: the XCUITest main thread (user-interactive)
+        // blocks on this event loop — synchronously in the app's HTTP module-loader
+        // specs and in tearDown's server.stopAndWait(). A .background loop is a
+        // priority inversion (flagged by the Thread Performance Checker) that the
+        // scheduler can starve on a loaded CI runner, stalling those waits.
+        DispatchQueue.global(qos: .userInitiated).async {
             self.loop.runForever()
         }
     }
