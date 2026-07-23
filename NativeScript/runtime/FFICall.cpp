@@ -71,25 +71,24 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
         }
         case BinaryTypeEncodingType::ExtVectorEncoding: {
             size_t size = typeEncoding->details.extVector.size;
-#if defined(__x86_64__)
-            // We need isStructMember because double3 vectors are handled
-            // differently in x86_64. When a vector is a struct field
-            // it is passed in memory but when not - the ST0 register is
-            // used for the third element. In armv8 double3 vector will always
-            // be passed in memory (as it's size > 16).
-            if (size == 3 && isStructMember) {
-#else
-            // For armv8 we always need to pass the array size
-            // as the vector would fill a whole register in order
-            // to calculate the proper flags value.
-            if (size == 3) {
-#endif
-                size = 4;
-            }
-
+            // Vector API (FFI_TYPE_VECTOR): describe the true lane count;
+            // ffi_prep_cif computes the layout for size == 0 types. The
+            // runtime also reads ffi_type.size standalone (result marshaling
+            // mallocs/memcpys by it before any cif exists), so prefill
+            // size/alignment with the exact values libffi's initialize_vector
+            // derives — prep_cif honors prefilled aggregates (same convention
+            // as structs): size = lanes * lane_size rounded up to a power of
+            // two, alignment = min(size, 16).
             const TypeEncoding* innerType = typeEncoding->details.extVector.getInnerType();
             ffi_type* innerFFIType = FFICall::GetArgumentType(innerType, isStructMember);
-            ffi_type* type = new ffi_type({ .size = size * innerFFIType->size, .alignment = innerFFIType->alignment, .type = FFI_TYPE_EXT_VECTOR });
+            size_t vecSize = size * innerFFIType->size;
+            size_t p2 = 1;
+            while (p2 < vecSize) {
+                p2 <<= 1;
+            }
+            ffi_type* type = new ffi_type({ .size = p2,
+                                            .alignment = static_cast<unsigned short>(p2 < 16 ? p2 : 16),
+                                            .type = FFI_TYPE_VECTOR });
             type->elements = new ffi_type*[size + 1];
 
             if (size > 0) {

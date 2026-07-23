@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------*-C-*-
-   ffitarget.h - Copyright (c) 2012, 2014, 2018  Anthony Green
+   ffitarget.h - Copyright (c) 2012, 2014, 2018, 2026  Anthony Green
                  Copyright (c) 1996-2003, 2010  Red Hat, Inc.
                  Copyright (C) 2008  Free Software Foundation, Inc.
 
@@ -54,6 +54,17 @@
 #define FFI_TARGET_HAS_COMPLEX_TYPE
 #endif
 
+#ifdef X86_64
+#define FFI_TARGET_HAS_INT128
+#endif
+
+/* The System V x86-64 psABI passes 8- and 16-byte vectors in SSE registers;
+   this is implemented by the ffi64.c (FFI_UNIX64) backend only.  32-bit x86
+   and the Windows x86-64 backend (ffiw64.c) do not marshal vectors.  */
+#if defined(X86_64) && !defined(X86_WIN64)
+#define FFI_TARGET_HAS_VECTOR_TYPE
+#endif
+
 /* ---- Generic type definitions ----------------------------------------- */
 
 #ifndef LIBFFI_ASM
@@ -85,9 +96,9 @@ typedef enum ffi_abi {
   FFI_LAST_ABI,
 #ifdef __GNUC__
   FFI_DEFAULT_ABI = FFI_GNUW64
-#else  
+#else
   FFI_DEFAULT_ABI = FFI_WIN64
-#endif  
+#endif
 
 #elif defined(X86_64) || (defined (__x86_64__) && defined (X86_DARWIN))
   FFI_FIRST_ABI = 1,
@@ -136,12 +147,26 @@ typedef enum ffi_abi {
 
 #if defined (X86_64) || defined(X86_WIN64) \
     || (defined (__x86_64__) && defined (X86_DARWIN))
-# define FFI_TRAMPOLINE_SIZE 24
+/* 4 bytes of ENDBR64 + 7 bytes of LEA + 6 bytes of JMP + 7 bytes of NOP
+   + 8 bytes of pointer.  */
+# define FFI_TRAMPOLINE_SIZE 32
 # define FFI_NATIVE_RAW_API 0
 #else
-# define FFI_TRAMPOLINE_SIZE 12
+/* 4 bytes of ENDBR32 + 5 bytes of MOV + 5 bytes of JMP + 2 unused
+   bytes.  */
+# define FFI_TRAMPOLINE_SIZE 16
 # define FFI_NATIVE_RAW_API 1  /* x86 has native raw api support */
 #endif
 
+#if !defined(GENERATE_LIBFFI_MAP) && defined(__CET__)
+# include <cet.h>
+# if (__CET__ & 1) != 0
+#   define ENDBR_PRESENT
+# endif
+# define _CET_NOTRACK notrack
+#else
+# define _CET_ENDBR
+# define _CET_NOTRACK
 #endif
 
+#endif
