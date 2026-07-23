@@ -885,11 +885,21 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
           if (state == Promise::kRejected) {
             RemoveModuleFromRegistry(canonicalPath);
             logPhase("evaluate", "promise-rejected");
+            if (!promiseTc.HasCaught()) {
+              // With top-level-await semantics, evaluation errors don't throw into
+              // the TryCatch — they surface only as the rejection reason of the
+              // evaluation promise. Re-throw the reason on the isolate so the
+              // TryCatch captures it and the exception below carries the original
+              // error message and stack trace instead of a synthetic placeholder.
+              isolate->ThrowException(promise->Result());
+            }
             if (promiseTc.HasCaught()) {
+              if (RuntimeConfig.IsDebug) {
+                Log(@"Error evaluating ES module (rejected promise): %s", canonicalPath.c_str());
+                tns::LogError(isolate, promiseTc);
+              }
               throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
             } else {
-              Local<Value> reason = promise->Result();
-              isolate->ThrowException(reason);
               throw NativeScriptException(isolate, "Module evaluation promise rejected");
             }
           }
