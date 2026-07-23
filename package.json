@@ -35,6 +35,7 @@
   "devDependencies": {
     "conventional-changelog-cli": "^2.1.1",
     "dayjs": "^1.11.7",
+    "esbuild": "0.28.1",
     "husky": "^9.0.11",
     "lint-staged": "^15.2.7",
     "semver": "^7.5.0"

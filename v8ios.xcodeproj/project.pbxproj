@@ -291,6 +291,8 @@
 		C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */; };
 		C2DDEB91229EAC8300345BFE /* FFICall.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB68229EAC8100345BFE /* FFICall.cpp */; };
 		C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB69229EAC8100345BFE /* WeakRef.cpp */; };
+		4A5C201A2E2B000100000006 /* BuiltinLoader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000100000001 /* BuiltinLoader.cpp */; };
+		4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */; };
 		C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */; };
 		C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6B229EAC8200345BFE /* Console.cpp */; };
 		C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */; };
@@ -805,6 +807,11 @@
 		C2DDEB67229EAC8100345BFE /* MetadataBuilder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MetadataBuilder.h; sourceTree = "<group>"; };
 		C2DDEB68229EAC8100345BFE /* FFICall.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FFICall.cpp; sourceTree = "<group>"; };
 		C2DDEB69229EAC8100345BFE /* WeakRef.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WeakRef.cpp; sourceTree = "<group>"; };
+		4A5C201A2E2B000100000001 /* BuiltinLoader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BuiltinLoader.cpp; sourceTree = "<group>"; };
+		4A5C201A2E2B000100000002 /* BuiltinLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BuiltinLoader.h; sourceTree = "<group>"; };
+		4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = RuntimeBuiltins.cpp; path = generated/RuntimeBuiltins.cpp; sourceTree = "<group>"; };
+		4A5C201A2E2B000100000004 /* RuntimeBuiltins.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RuntimeBuiltins.h; path = generated/RuntimeBuiltins.h; sourceTree = "<group>"; };
+		4A5C201A2E2B000100000005 /* js */ = {isa = PBXFileReference; lastKnownFileType = folder; path = js; sourceTree = "<group>"; };
 		C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ArgConverter.mm; sourceTree = "<group>"; };
 		C2DDEB6B229EAC8200345BFE /* Console.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
 		C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SetTimeout.cpp; sourceTree = "<group>"; };
@@ -1517,6 +1524,11 @@
 				C298C025233C9AEA000DDF54 /* TSHelpers.cpp */,
 				C2DDEB82229EAC8200345BFE /* WeakRef.h */,
 				C2DDEB69229EAC8100345BFE /* WeakRef.cpp */,
+				4A5C201A2E2B000100000002 /* BuiltinLoader.h */,
+				4A5C201A2E2B000100000001 /* BuiltinLoader.cpp */,
+				4A5C201A2E2B000100000004 /* RuntimeBuiltins.h */,
+				4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */,
+				4A5C201A2E2B000100000005 /* js */,
 				3CD1D9BF29AA2C14004C1C21 /* DisposerPHV.mm */,
 				3CD1D9C029AA2C14004C1C21 /* DisposerPHV.h */,
 				C22C092122CA3F370080D176 /* Worker.h */,
@@ -1803,6 +1815,7 @@
 			buildConfigurationList = C2DDEB37229EAB3B00345BFE /* Build configuration list for PBXNativeTarget "NativeScript" */;
 			buildPhases = (
 				C2DDEB2D229EAB3B00345BFE /* Headers */,
+				4A5C201A2E2B000100000008 /* Generate RuntimeBuiltins */,
 				C2DDEB2E229EAB3B00345BFE /* Sources */,
 				C2DDEB2F229EAB3B00345BFE /* Frameworks */,
 				C2DDEB30229EAB3B00345BFE /* Resources */,
@@ -1939,6 +1952,26 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		4A5C201A2E2B000100000008 /* Generate RuntimeBuiltins */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"$(SRCROOT)/tools/js2c-inputs.xcfilelist",
+			);
+			inputPaths = (
+			);
+			name = "Generate RuntimeBuiltins";
+			outputFileListPaths = (
+				"$(SRCROOT)/tools/js2c-outputs.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nexport PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"\nif ! command -v node >/dev/null 2>&1; then\n  echo \"error: node is required to generate the runtime builtins (tools/js2c.mjs); install Node.js or add it to PATH\" >&2\n  exit 1\nfi\ncd \"${SRCROOT}\"\nnode tools/js2c.mjs --out-dir NativeScript/runtime/generated NativeScript/runtime/js/*.js\n";
+		};
 		2BFE21F02AC1B28000307752 /* Add default metadata */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -2248,6 +2281,8 @@
 				C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */,
 				6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */,
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
+				4A5C201A2E2B000100000006 /* BuiltinLoader.cpp in Sources */,
+				4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */,
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
@@ -2943,6 +2978,7 @@
 					"$(SRCROOT)/NativeScript/inspector",
 					"$(SRCROOT)/NativeScript/v8runtime",
 					"$(SRCROOT)/NativeScript/jsi",
+					"$(SRCROOT)/NativeScript/runtime/generated",
 				);
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
@@ -3035,6 +3071,7 @@
 					"$(SRCROOT)/NativeScript/inspector",
 					"$(SRCROOT)/NativeScript/v8runtime",
 					"$(SRCROOT)/NativeScript/jsi",
+					"$(SRCROOT)/NativeScript/runtime/generated",
 				);
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";

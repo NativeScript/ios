@@ -3,6 +3,7 @@
 #include <numeric>
 #include <sstream>
 #include "ArgConverter.h"
+#include "BuiltinLoader.h"
 #include "Caches.h"
 #include "FastEnumerationAdapter.h"
 #include "Helpers.h"
@@ -157,27 +158,10 @@ void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Local<Context> context)
     return;
   }
 
-  std::string extendsFuncScript = "(function() { "
-                                  "    function __extends(d, b) { "
-                                  "         for (var p in b) {"
-                                  "             if (b.hasOwnProperty(p)) {"
-                                  "                 d[p] = b[p];"
-                                  "             }"
-                                  "         }"
-                                  "         function __() { this.constructor = d; }"
-                                  "         d.prototype = b === null ? Object.create(b) : "
-                                  "(__.prototype = b.prototype, new __());"
-                                  "    } "
-                                  "    return __extends;"
-                                  "})()";
-
-  Local<Script> script;
-  tns::Assert(Script::Compile(context, tns::ToV8String(isolate, extendsFuncScript.c_str()))
-                  .ToLocal(&script),
-              isolate);
-
   Local<Value> extendsFunc;
-  tns::Assert(script->Run(context).ToLocal(&extendsFunc) && extendsFunc->IsFunction(), isolate);
+  tns::Assert(BuiltinLoader::RunBuiltin(context, BuiltinId::kClassExtends).ToLocal(&extendsFunc) &&
+                  extendsFunc->IsFunction(),
+              isolate);
 
   cache->OriginalExtendsFunc =
       std::make_unique<Persistent<v8::Function>>(isolate, extendsFunc.As<v8::Function>());

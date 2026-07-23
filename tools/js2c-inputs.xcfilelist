@@ -1,0 +1,12 @@
+$(SRCROOT)/tools/js2c.mjs
+$(SRCROOT)/NativeScript/runtime/js/blob-url.js
+$(SRCROOT)/NativeScript/runtime/js/class-extends.js
+$(SRCROOT)/NativeScript/runtime/js/error-events.js
+$(SRCROOT)/NativeScript/runtime/js/events.js
+$(SRCROOT)/NativeScript/runtime/js/inline-functions.js
+$(SRCROOT)/NativeScript/runtime/js/placeholder-module.js
+$(SRCROOT)/NativeScript/runtime/js/promise-proxy.js
+$(SRCROOT)/NativeScript/runtime/js/require-factory.js
+$(SRCROOT)/NativeScript/runtime/js/smart-stringify.js
+$(SRCROOT)/NativeScript/runtime/js/ts-helpers.js
+$(SRCROOT)/NativeScript/runtime/js/weak-ref.js

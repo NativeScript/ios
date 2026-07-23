@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <utime.h>
 #include <string>
+#include "BuiltinLoader.h"
 #include "Caches.h"
 #include "DevFlags.h"
 #include "Helpers.h"
@@ -90,32 +91,14 @@ std::string ResolveMainEntryFromPackageJson(const std::string& baseDir) {
 }
 
 ModuleInternal::ModuleInternal(Local<Context> context) {
-  std::string requireFactoryScript = "(function() { "
-                                     "    function require_factory(requireInternal, dirName) { "
-                                     "        return function require(modulePath) { "
-                                     "            if(global.__pauseOnNextRequire) {  debugger; "
-                                     "global.__pauseOnNextRequire = false; }"
-                                     "            return requireInternal(modulePath, dirName); "
-                                     "        } "
-                                     "    } "
-                                     "    return require_factory; "
-                                     "})()";
-
   Isolate* isolate = context->GetIsolate();
   Local<Object> global = context->Global();
-  Local<Script> script;
   TryCatch tc(isolate);
-  if (!Script::Compile(context, tns::ToV8String(isolate, requireFactoryScript.c_str()))
-           .ToLocal(&script) &&
-      tc.HasCaught()) {
-    tns::LogError(isolate, tc);
-    Log(@"FATAL: Failed to compile require factory script");
-    return;
-  }
-
   Local<Value> result;
-  if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
-    tns::LogError(isolate, tc);
+  if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kRequireFactory).ToLocal(&result)) {
+    if (tc.HasCaught()) {
+      tns::LogError(isolate, tc);
+    }
     Log(@"FATAL: Failed to run require factory script");
     return;
   }
@@ -1186,36 +1169,30 @@ Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,
   // Create a module object with exports that throws when accessed
   Local<Object> moduleObj = Object::New(isolate);
 
-  // Create a Proxy that throws an error when any property is accessed
+  // Build a Proxy that throws when any property is accessed. The factory
+  // (internal/placeholder-module.js) is compiled once per isolate and invoked
+  // with the per-module error message.
   std::string errorMessage =
       "Module '" + moduleName + "' is not available. This is an optional module.";
-  std::string proxyCode = "(function() {"
-                          "  const error = new Error('" +
-                          errorMessage +
-                          "');"
-                          "  return new Proxy({}, {"
-                          "    get: function(target, prop) {"
-                          "      throw error;"
-                          "    },"
-                          "    set: function(target, prop, value) {"
-                          "      throw error;"
-                          "    },"
-                          "    has: function(target, prop) {"
-                          "      return false;"
-                          "    },"
-                          "    ownKeys: function(target) {"
-                          "      return [];"
-                          "    },"
-                          "    getPrototypeOf: function(target) {"
-                          "      return null;"
-                          "    }"
-                          "  });"
-                          "})()";
 
-  Local<Script> proxyScript;
-  if (Script::Compile(context, tns::ToV8String(isolate, proxyCode.c_str())).ToLocal(&proxyScript)) {
+  auto cache = Caches::Get(isolate);
+  Local<v8::Function> factory;
+  if (cache->PlaceholderModuleFactoryFunc != nullptr) {
+    factory = cache->PlaceholderModuleFactoryFunc->Get(isolate);
+  } else {
+    Local<Value> factoryValue;
+    if (BuiltinLoader::RunBuiltin(context, BuiltinId::kPlaceholderModule).ToLocal(&factoryValue) &&
+        factoryValue->IsFunction()) {
+      factory = factoryValue.As<v8::Function>();
+      cache->PlaceholderModuleFactoryFunc =
+          std::make_unique<Persistent<v8::Function>>(isolate, factory);
+    }
+  }
+
+  if (!factory.IsEmpty()) {
+    Local<Value> args[] = {tns::ToV8String(isolate, errorMessage)};
     Local<Value> proxyObject;
-    if (proxyScript->Run(context).ToLocal(&proxyObject)) {
+    if (factory->Call(context, v8::Undefined(isolate), 1, args).ToLocal(&proxyObject)) {
       // Set the exports to the proxy object
       bool success = moduleObj->Set(context, tns::ToV8String(isolate, "exports"), proxyObject)
                          .FromMaybe(false);
@@ -1243,6 +1220,13 @@ Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,
 
   // Cache the placeholder module
   this->loadedModules_[cacheKey] = std::make_shared<Persistent<Object>>(isolate, moduleObj);
+
+  // The first require() of a missing optional module throws (node semantics,
+  // relied on by the shared require tests); the placeholder above only serves
+  // repeat requires through the module cache. This matches the historical
+  // behavior, where the placeholder-proxy compile left a pending exception.
+  isolate->ThrowException(
+      Exception::Error(tns::ToV8String(isolate, "Cannot find module '" + moduleName + "'")));
 
   return moduleObj;
 }

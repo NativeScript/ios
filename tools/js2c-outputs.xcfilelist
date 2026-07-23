@@ -1,0 +1,2 @@
+$(SRCROOT)/NativeScript/runtime/generated/RuntimeBuiltins.h
+$(SRCROOT)/NativeScript/runtime/generated/RuntimeBuiltins.cpp

@@ -146,6 +146,8 @@ class Caches {
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> SmartJSONStringifyFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+  std::unique_ptr<v8::Persistent<v8::Function>> PlaceholderModuleFactoryFunc =
+      std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> InteropReferenceCtorFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> PointerCtorFunc =
