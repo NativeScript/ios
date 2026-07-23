@@ -13,7 +13,13 @@ on:
 
 env:
   NPM_TAG: "next"
-  XCODE_VERSION: "^15.0"
+  # Xcode pin shared by the build (shipped xcframework) and test jobs — both run on
+  # macos-15 with Xcode 26 (the test job drives the iOS 26 simulator). Pin the MAJOR
+  # only, never a "^" range: GitHub keeps only a few Xcode/simulator versions per
+  # runner image and prunes old ones, so a range to a removed version fails hard —
+  # exactly what ^15.0 did once Xcode 15 left the images. Bump to "27" when Xcode 27
+  # ships (and verify the runtime still builds/links on the new toolchain).
+  XCODE_VERSION: "26"
 
 # Minimal default token permissions for every job. Jobs that need more declare it
 # locally (github-release: contents:write; publish: id-token:write). Cross-repo
@@ -70,7 +76,10 @@ jobs:
 
   build:
     name: Build ${{ matrix.target }}
-    runs-on: macos-14
+    # macos-15 (arm64): macos-14 is deprecated (brownouts began 2026-07-06, fully
+    # unsupported 2026-11-02). Builds the shipped xcframework on Xcode 26 — the same
+    # toolchain the test job validates. iOS + visionOS SDKs both ship with Xcode 26.
+    runs-on: macos-15
     needs: setup
     strategy:
       fail-fast: false
@@ -144,7 +153,9 @@ jobs:
           egress-policy: audit
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: ${{env.XCODE_VERSION}}
+          # Xcode 26 → iOS 26 simulator (see the job note above). Shared with the build
+          # job via XCODE_VERSION so the tested toolchain matches the shipped one.
+          xcode-version: ${{ env.XCODE_VERSION }}
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: true
@@ -447,7 +458,10 @@ jobs:
   # next, iOS + visionos on real releases (v* tag / manual version).
   verify-spm:
     name: Verify SPM resolution
-    runs-on: macos-14
+    # macos-14 is deprecated; macos-15 provides the Swift toolchain for `swift package
+    # resolve`. No setup-xcode here — this job only resolves + checksum-verifies the
+    # ios-spm binaryTargets, so the image's default Xcode is fine.
+    runs-on: macos-15
     if: ${{ vars.ENABLE_SPM_RELEASE == 'true' }}
     needs:
       - setup

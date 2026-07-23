@@ -3,12 +3,18 @@ on:
 
 env:
   NPM_TAG: "pr"
-  XCODE_VERSION: "^15.0"
+  # Xcode pin shared by build and test, both on macos-15. Pin the MAJOR only, never a
+  # "^" range: GitHub prunes old Xcode/simulator versions from the runner images, so a
+  # range to a removed version fails hard (as ^15.0 did once Xcode 15 left the images).
+  # Bump to "27" when Xcode 27 ships.
+  XCODE_VERSION: "26"
 
 jobs:
   build:
     name: Build
-    runs-on: macos-14
+    # macos-14 is deprecated (brownouts began 2026-07-06, unsupported 2026-11-02);
+    # macos-15 (arm64) carries Xcode 26.
+    runs-on: macos-15
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
@@ -54,7 +60,10 @@ jobs:
           path: dist/dSYMs
   test:
     name: Test
-    runs-on: macos-14
+    # macos-15 (arm64) on Xcode 26. The suite runs on the iOS 26 simulator (iPhone 16
+    # Pro, OS=latest) — matching npm_release.yml and deliberately off iOS 17.x, where a
+    # worker-teardown stress spec deadlocks the JS thread (see TestRunnerTests.swift).
+    runs-on: macos-15
     needs: build
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
@@ -86,9 +95,9 @@ jobs:
           # TestRunnerTests.swift) need more than 20m headroom per attempt.
           timeout_minutes: 40
           max_attempts: 2
-          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test | xcpretty
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test | xcpretty
           on_retry_command: rm -rf $TEST_FOLDER/test_results* && xcrun simctl shutdown all
-          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=17.2,name\=iPhone\ 15\ Pro\ Max build test
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test
       - name: Validate Test Results
         run: |
           xcparse attachments $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test-out
