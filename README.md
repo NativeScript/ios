@@ -43,6 +43,10 @@ Runtime initialization took 55ms
 
 If all tests pass, everything is good! At this point you can make changes to the runtime, add breakpoints and step through with the debugger. In the next section we'll see how to attach the runtime to an existing NativeScript application allowing us to debug runtime issues in actual apps.
 
+# Documentation
+
+Runtime feature documentation lives in the [docs](docs/README.md) folder — see [Error handling](docs/error-handling.md) for the global error events, native exception round-tripping and `interop.escapeException`.
+
 # Attaching the runtime to a NativeScript app
 
 In the existing app, we need to prepare the Xcode project using `ns prepare ios`. This will create a folder named `platforms/ios` and in there a `<appname>.xcworkspace` (or .xcodeproject but note the following...).
