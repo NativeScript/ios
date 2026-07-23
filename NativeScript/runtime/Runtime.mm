@@ -5,6 +5,8 @@
 #include "Caches.h"
 #include "Console.h"
 #include "Constants.h"
+#include "ErrorEvents.h"
+#include "Events.h"
 #include "Helpers.h"
 #include "InlineFunctions.h"
 #include "Interop.h"
@@ -227,6 +229,14 @@ Runtime::Runtime() {
 }
 
 Runtime::~Runtime() {
+  // Tear the rejection observer down before any isolate teardown: it references
+  // the isolate and reads Caches, both of which are invalidated below.
+  if (rejectionObserver_ != nullptr) {
+    CFRunLoopObserverInvalidate(rejectionObserver_);
+    CFRelease(rejectionObserver_);
+    rejectionObserver_ = nullptr;
+  }
+
   auto currentIsolate = this->isolate_;
   {
     // make sure we remove the isolate from the list of active isolates first
@@ -392,13 +402,25 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   isolate->SetHostInitializeImportMetaObjectCallback(InitializeImportMetaObject);
 
   isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
+  isolate->SetPromiseRejectCallback(NativeScriptException::OnPromiseRejected);
 
   Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
   context->Enter();
 
+  // Drain tracked unhandled promise rejections once per runloop turn, just
+  // before the loop sleeps. The info pointer is the isolate; the callback
+  // re-validates liveness because the isolate may be torn down between turns.
+  CFRunLoopObserverContext observerContext = {0, isolate, nullptr, nullptr, nullptr};
+  rejectionObserver_ =
+      CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopBeforeWaiting, /*repeats*/ true,
+                              /*order*/ 0, Runtime::DrainRejectionsObserver, &observerContext);
+  CFRunLoopAddObserver(runtimeLoop_, rejectionObserver_, kCFRunLoopCommonModes);
+
   DefineGlobalObject(context, isWorker);
   DefineCollectFunction(context);
   PromiseProxy::Init(context);
+  Events::Init(context);
+  ErrorEvents::Init(context);
   Console::Init(context);
   WeakRef::Init(context);
 
@@ -640,6 +662,28 @@ void Runtime::DefineDateTimeConfigurationChangeNotificationMethod(
       });
   globalTemplate->Set(ToV8String(isolate, "__dateTimeConfigurationChangeNotification"),
                       drainMicrotaskTemplate);
+}
+
+void Runtime::DrainRejectionsObserver(CFRunLoopObserverRef observer, CFRunLoopActivity activity,
+                                      void* info) {
+  Isolate* isolate = static_cast<Isolate*>(info);
+  if (!Runtime::IsAlive(isolate)) {
+    return;
+  }
+  auto cache = Caches::Get(isolate);
+  // HasPending is an atomic read: OnReject can run on any thread holding the
+  // v8::Locker, so pending_ itself must only be touched under the lock below.
+  if (!cache->IsValid() || cache->PromiseRejections == nullptr ||
+      !cache->PromiseRejections->HasPending()) {
+    return;
+  }
+
+  v8::Locker locker(isolate);
+  Isolate::Scope isolate_scope(isolate);
+  HandleScope handle_scope(isolate);
+  Local<Context> context = cache->GetContext();
+  Context::Scope context_scope(context);
+  cache->PromiseRejections->Drain(context);
 }
 
 bool Runtime::IsAlive(const Isolate* isolate) {

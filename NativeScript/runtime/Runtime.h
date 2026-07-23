@@ -90,10 +90,15 @@ class Runtime {
 
   static void PerformanceNowCallback(
       const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void DrainRejectionsObserver(CFRunLoopObserverRef observer,
+                                      CFRunLoopActivity activity, void* info);
   v8::Isolate* isolate_;
   std::unique_ptr<ModuleInternal> moduleInternal_;
   int workerId_;
   CFRunLoopRef runtimeLoop_;
+  // Drains unhandled promise rejections once per runloop turn
+  // (kCFRunLoopBeforeWaiting). Torn down before isolate disposal in ~Runtime.
+  CFRunLoopObserverRef rejectionObserver_ = nullptr;
   double startTime;
   double realtimeOrigin;
   // TODO: refactor this. This is only needed because, during program

@@ -529,6 +529,13 @@ class WorkerWrapper : public BaseDataWrapper {
                                              const std::string& source,
                                              const std::string& stackTrace,
                                              int lineNumber, bool async = true);
+  // Forwards a drained unhandled promise rejection to the main isolate's
+  // worker.onerror, guarded against teardown. Shares marshaling with the
+  // exception overload above.
+  void PassUncaughtRejectionToMain(const std::string& message,
+                                   const std::string& source,
+                                   const std::string& stackTrace,
+                                   int lineNumber, bool async = true);
   void PostMessage(std::shared_ptr<worker::Message> message);
   // Re-arm the message drain without enqueueing — used by the deferred-drain
   // retry when the worker's entry script hasn't installed `onmessage` yet.
@@ -572,6 +579,10 @@ class WorkerWrapper : public BaseDataWrapper {
 
   void BackgroundLooper(std::function<v8::Isolate*()> func);
   void DrainPendingTasks();
+  void ForwardErrorPayloadToMain(const std::string& message,
+                                 const std::string& source,
+                                 const std::string& stackTrace, int lineNumber,
+                                 bool async);
   v8::Local<v8::Object> ConstructErrorObject(v8::Local<v8::Context> context,
                                              std::string message,
                                              std::string source,

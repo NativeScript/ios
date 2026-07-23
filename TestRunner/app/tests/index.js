@@ -96,6 +96,12 @@ require("./NodeBuiltinsAndOptionalModulesTests.mjs");
 // Exception handling tests
 require("./ExceptionHandlingTests");
 
+// WHATWG error events (error/unhandledrejection/rejectionhandled, reportError)
+require("./ErrorEventsTests");
+
+// interop.escapeException + JS<->native boundary hardening (Phase 3)
+require("./EscapeExceptionTests");
+
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();
 

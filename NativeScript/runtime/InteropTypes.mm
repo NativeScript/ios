@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "ArgConverter.h"
 #include "Caches.h"
 #include "Constants.h"
 #include "FunctionReference.h"
@@ -31,6 +32,7 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
   RegisterFreeFunction(context, interop);
   RegisterAdoptFunction(context, interop);
   RegisterSizeOfFunction(context, interop);
+  RegisterEscapeExceptionFunction(context, interop);
 
   RegisterInteropType(
       context, types, "noop",
@@ -327,6 +329,156 @@ void Interop::RegisterAllocFunction(Local<Context> context, Local<Object> intero
   tns::Assert(success, isolate);
 
   success = interop->Set(context, tns::ToV8String(isolate, "alloc"), func).FromMaybe(false);
+  tns::Assert(success, isolate);
+}
+
+// Returns the wrapped NSException value carried by `value` — either `value`
+// itself when it wraps an NSException, or its `.nativeException` when `value` is
+// an Error carrying a wrapped NSException. Empty handle otherwise.
+static Local<Value> GetWrappedNSException(Local<Context> context, Local<Value> value) {
+  Isolate* isolate = context->GetIsolate();
+  auto isWrappedNSException = [&](Local<Value> v) -> bool {
+    if (v.IsEmpty() || !v->IsObject()) {
+      return false;
+    }
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, v);
+    if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
+      return false;
+    }
+    id data = static_cast<ObjCDataWrapper*>(wrapper)->Data();
+    return [data isKindOfClass:[NSException class]];
+  };
+
+  if (isWrappedNSException(value)) {
+    return value;
+  }
+  if (value->IsObject()) {
+    Local<Value> nativeExc;
+    if (value.As<Object>()
+            ->Get(context, tns::ToV8String(isolate, "nativeException"))
+            .ToLocal(&nativeExc) &&
+        isWrappedNSException(nativeExc)) {
+      return nativeExc;
+    }
+  }
+  return Local<Value>();
+}
+
+void Interop::RegisterEscapeExceptionFunction(Local<Context> context, Local<Object> interop) {
+  Local<v8::Function> func;
+  bool success =
+      v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Local<Context> context = isolate->GetCurrentContext();
+
+        if (info.Length() < 1) {
+          isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+              isolate, "interop.escapeException requires 1 argument, but only 0 present.")));
+          return;
+        }
+
+        Local<Value> x = info[0];
+        Local<Private> brand = ArgConverter::GetEscapeExceptionBrand(isolate);
+
+        // Idempotent: an already-branded value is returned unchanged.
+        if (!brand.IsEmpty() && x->IsObject()) {
+          Maybe<bool> hasBrand = x.As<Object>()->HasPrivate(context, brand);
+          if (hasBrand.IsJust() && hasBrand.FromJust()) {
+            info.GetReturnValue().Set(x);
+            return;
+          }
+        }
+
+        // Derive the message string, preferring x.message when x is an Error.
+        std::string message;
+        bool xIsObject = x->IsObject();
+        if (xIsObject) {
+          Local<Value> msgVal;
+          if (x.As<Object>()->Get(context, tns::ToV8String(isolate, "message")).ToLocal(&msgVal) &&
+              !msgVal->IsNullOrUndefined()) {
+            message = tns::ToString(isolate, msgVal);
+          } else {
+            message = tns::ToString(isolate, x);
+          }
+        } else {
+          message = tns::ToString(isolate, x);
+        }
+
+        // The returned value is a real JS Error so `throw interop.escapeException(x)`
+        // behaves like a normal throw in pure-JS paths.
+        Local<Value> errVal = Exception::Error(tns::ToV8String(isolate, message));
+        Local<Object> errObj = errVal.As<Object>();
+
+        // Copy stack from x when it is an Error carrying one.
+        std::string stack;
+        if (xIsObject) {
+          Local<Value> stackVal;
+          if (x.As<Object>()->Get(context, tns::ToV8String(isolate, "stack")).ToLocal(&stackVal) &&
+              stackVal->IsString()) {
+            stack = tns::ToString(isolate, stackVal);
+            errObj->Set(context, tns::ToV8String(isolate, "stack"), stackVal).FromMaybe(false);
+          }
+        }
+
+        // Capture the escape-site JS stack: where interop.escapeException was
+        // called, distinct from the origin stack of the error being wrapped.
+        std::string escapeStack = NativeScriptException::GetErrorStackTrace(
+            isolate, v8::StackTrace::CurrentStackTrace(isolate, 100, v8::StackTrace::kOverview));
+
+        // Build the branded payload: the original NSException when x carries one,
+        // otherwise synthesis info (name/message/stack). The escape-site stack
+        // always travels along, in both shapes.
+        Local<Object> payload = Object::New(isolate);
+        payload
+            ->Set(context, tns::ToV8String(isolate, "escapeStack"),
+                  tns::ToV8String(isolate, escapeStack))
+            .FromMaybe(false);
+        Local<Value> nativeExc = GetWrappedNSException(context, x);
+        if (!nativeExc.IsEmpty()) {
+          payload->Set(context, tns::ToV8String(isolate, "nativeException"), nativeExc)
+              .FromMaybe(false);
+          // Also carry the JS origin/propagation stack of the error that wrapped
+          // the native exception, when present.
+          if (!stack.empty()) {
+            payload
+                ->Set(context, tns::ToV8String(isolate, "stack"), tns::ToV8String(isolate, stack))
+                .FromMaybe(false);
+          }
+        } else {
+          std::string name = "Error";
+          if (xIsObject) {
+            Local<Value> nameVal;
+            if (x.As<Object>()->Get(context, tns::ToV8String(isolate, "name")).ToLocal(&nameVal) &&
+                nameVal->IsString()) {
+              name = tns::ToString(isolate, nameVal);
+            }
+          }
+          payload->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, name))
+              .FromMaybe(false);
+          payload
+              ->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, message))
+              .FromMaybe(false);
+          // When x is a non-Error (no .stack, e.g. a plain string) fall back to
+          // the escape-site stack so a stack always travels with the escape.
+          const std::string& synthStack = stack.empty() ? escapeStack : stack;
+          payload
+              ->Set(context, tns::ToV8String(isolate, "stack"),
+                    tns::ToV8String(isolate, synthStack))
+              .FromMaybe(false);
+        }
+
+        if (!brand.IsEmpty()) {
+          errObj->SetPrivate(context, brand, payload).FromMaybe(false);
+        }
+
+        info.GetReturnValue().Set(errObj);
+      }).ToLocal(&func);
+
+  Isolate* isolate = context->GetIsolate();
+  tns::Assert(success, isolate);
+
+  success =
+      interop->Set(context, tns::ToV8String(isolate, "escapeException"), func).FromMaybe(false);
   tns::Assert(success, isolate);
 }
 
