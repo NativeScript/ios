@@ -21,6 +21,21 @@ namespace tns {}
 
 @end
 
+static Config* CopyConfig(Config* config) {
+  Config* copy = [[Config alloc] init];
+  copy.BaseDir = config.BaseDir;
+  copy.ApplicationPath = config.ApplicationPath;
+  copy.MetadataPtr = config.MetadataPtr;
+  copy.IsDebug = config.IsDebug;
+  copy.LogToSystemConsole = config.LogToSystemConsole;
+  copy.ArgumentsCount = config.ArgumentsCount;
+  copy.Arguments = config.Arguments;
+  return copy;
+}
+
+static NativeScript* currentNativeScript;
+static Config* currentConfig;
+
 @implementation NativeScript
 
 extern char defaultStartOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
@@ -66,6 +81,9 @@ std::unique_ptr<Runtime> runtime_;
 
 - (instancetype)initializeWithConfig:(Config*)config {
   if (self = [super init]) {
+    currentNativeScript = self;
+    currentConfig = CopyConfig(config);
+
     RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
     if (config.ApplicationPath != nil) {
       RuntimeConfig.ApplicationPath =
@@ -81,6 +99,15 @@ std::unique_ptr<Runtime> runtime_;
     }
     RuntimeConfig.IsDebug = [config IsDebug];
     RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
+
+    // Connect the JS-exposed `NativeScriptRuntime.reloadApplication(baseDir?)`
+    // global (registered by the runtime) to the Objective-C implementation below.
+    tns::SetReloadApplicationHook([](const std::string& baseDir) -> bool {
+      NSString* dir = baseDir.empty()
+                          ? nil
+                          : [NSString stringWithUTF8String:baseDir.c_str()];
+      return [NativeScriptRuntime reloadApplication:dir] == YES;
+    });
 
     Runtime::Initialize();
     runtime_ = nullptr;
@@ -114,8 +141,37 @@ std::unique_ptr<Runtime> runtime_;
 }
 
 - (void)restartWithConfig:(Config*)config {
+  // Incremented before the new isolate boots so its global template bakes in
+  // the correct `NativeScriptRuntime.reloadCount` value.
+  tns::IncrementRuntimeReloadCount();
   [self shutdownRuntime];
   [self initializeWithConfig:config];
+}
+
+@end
+
+@implementation NativeScriptRuntime
+
++ (BOOL)reloadApplication {
+  return [self reloadApplication:nil];
+}
+
++ (BOOL)reloadApplication:(NSString*)baseDir {
+  if (currentNativeScript == nil || currentConfig == nil) {
+    return NO;
+  }
+
+  Config* config = CopyConfig(currentConfig);
+  if (baseDir != nil && [baseDir length] > 0) {
+    config.BaseDir = baseDir;
+  }
+
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [currentNativeScript restartWithConfig:config];
+    [currentNativeScript runMainApplication];
+  });
+
+  return YES;
 }
 
 @end

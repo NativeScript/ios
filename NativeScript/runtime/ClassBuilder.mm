@@ -4,6 +4,7 @@
 #include <sstream>
 #include "ArgConverter.h"
 #include "Caches.h"
+#include "DevFlags.h"
 #include "FastEnumerationAdapter.h"
 #include "Helpers.h"
 #include "Interop.h"
@@ -892,6 +893,17 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+        if (!context->isolateWrapper_.IsValid()) {
+          // The isolate that implemented this property is gone (e.g. after
+          // reloadApplication). UIKit may still query stale delegate instances
+          // (like `window` on a JS-extended UIApplicationDelegate); bail with a
+          // zeroed return instead of locking a disposed isolate.
+          id self_ = *static_cast<const id*>(argValues[0]);
+          SEL cmd = *static_cast<const SEL*>(argValues[1]);
+          LogDroppedDeadIsolateCallback((__bridge void*)self_, (void*)cmd);
+          memset(retValue, 0, cif->rtype->size);
+          return;
+        }
         v8::Locker locker(context->isolate_);
         Isolate::Scope isolate_scope(context->isolate_);
         HandleScope handle_scope(context->isolate_);
@@ -926,6 +938,12 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+        if (!context->isolateWrapper_.IsValid()) {
+          id self_ = *static_cast<const id*>(argValues[0]);
+          SEL cmd = *static_cast<const SEL*>(argValues[1]);
+          LogDroppedDeadIsolateCallback((__bridge void*)self_, (void*)cmd);
+          return;
+        }
         v8::Locker locker(context->isolate_);
         Isolate::Scope isolate_scope(context->isolate_);
         HandleScope handle_scope(context->isolate_);
