@@ -78,6 +78,12 @@
 // raised.
 + (NSString*)invokeAndDescribeException:(void (^)(void))block;
 
+// Returns the JavaScript stack trace associated with `exception` via the
+// NSException(NativeScript) category, or nil when unavailable. The category
+// lives in the NativeScript framework (loaded in-process at runtime) but is not
+// linked by TestFixtures at compile time, so it is invoked via performSelector.
++ (NSString* _Nullable)jsStackTraceForException:(NSException* _Nullable)exception;
+
 // Reads a key from a dictionary natively (exercises the JS-backed
 // DictionaryAdapter's objectForKey boundary).
 + (id)dictionaryValueForKey:(NSDictionary*)dictionary key:(NSString*)key;

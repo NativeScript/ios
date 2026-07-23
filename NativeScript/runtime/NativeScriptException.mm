@@ -16,6 +16,7 @@
 #include "DataWrapper.h"
 #include "ErrorEvents.h"
 #include "Helpers.h"
+#include "NSExceptionSupport.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
 
@@ -286,10 +287,15 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
     if (shouldCrash) {
       NSString* reasonText = tns::ToNSString(fullMessage);
       NSDictionary* userInfo =
-          stackTrace.empty() ? nil : @{@"JavaScriptStack" : tns::ToNSString(stackTrace)};
+          stackTrace.empty() ? nil : @{TNSJavaScriptStackTraceKey : tns::ToNSString(stackTrace)};
       NSException* fatal = [NSException exceptionWithName:@"NativeScriptFatalJSException"
                                                    reason:reasonText
                                                  userInfo:userInfo];
+      // Mirror the stack onto the associated object so the category accessor is
+      // uniform for crash-SDK hooks.
+      if (!stackTrace.empty()) {
+        tns::SetJSStackOnException(fatal, tns::ToNSString(stackTrace));
+      }
       ScheduleDeferredThrow(isolate, fatal);
     }
   }

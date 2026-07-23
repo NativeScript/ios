@@ -420,13 +420,30 @@ void Interop::RegisterEscapeExceptionFunction(Local<Context> context, Local<Obje
           }
         }
 
+        // Capture the escape-site JS stack: where interop.escapeException was
+        // called, distinct from the origin stack of the error being wrapped.
+        std::string escapeStack = NativeScriptException::GetErrorStackTrace(
+            isolate, v8::StackTrace::CurrentStackTrace(isolate, 100, v8::StackTrace::kOverview));
+
         // Build the branded payload: the original NSException when x carries one,
-        // otherwise synthesis info (name/message/stack).
+        // otherwise synthesis info (name/message/stack). The escape-site stack
+        // always travels along, in both shapes.
         Local<Object> payload = Object::New(isolate);
+        payload
+            ->Set(context, tns::ToV8String(isolate, "escapeStack"),
+                  tns::ToV8String(isolate, escapeStack))
+            .FromMaybe(false);
         Local<Value> nativeExc = GetWrappedNSException(context, x);
         if (!nativeExc.IsEmpty()) {
           payload->Set(context, tns::ToV8String(isolate, "nativeException"), nativeExc)
               .FromMaybe(false);
+          // Also carry the JS origin/propagation stack of the error that wrapped
+          // the native exception, when present.
+          if (!stack.empty()) {
+            payload
+                ->Set(context, tns::ToV8String(isolate, "stack"), tns::ToV8String(isolate, stack))
+                .FromMaybe(false);
+          }
         } else {
           std::string name = "Error";
           if (xIsObject) {
@@ -441,7 +458,12 @@ void Interop::RegisterEscapeExceptionFunction(Local<Context> context, Local<Obje
           payload
               ->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, message))
               .FromMaybe(false);
-          payload->Set(context, tns::ToV8String(isolate, "stack"), tns::ToV8String(isolate, stack))
+          // When x is a non-Error (no .stack, e.g. a plain string) fall back to
+          // the escape-site stack so a stack always travels with the escape.
+          const std::string& synthStack = stack.empty() ? escapeStack : stack;
+          payload
+              ->Set(context, tns::ToV8String(isolate, "stack"),
+                    tns::ToV8String(isolate, synthStack))
               .FromMaybe(false);
         }
 

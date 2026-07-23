@@ -393,6 +393,20 @@
   return e ? e.reason : nil;
 }
 
++ (NSString*)jsStackTraceForException:(NSException*)exception {
+  if (exception == nil) {
+    return nil;
+  }
+  SEL sel = NSSelectorFromString(@"tns_javascriptStackTrace");
+  if (![exception respondsToSelector:sel]) {
+    return nil;
+  }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+  return [exception performSelector:sel];
+#pragma clang diagnostic pop
+}
+
 + (id)dictionaryValueForKey:(NSDictionary*)dictionary key:(NSString*)key {
   return [dictionary objectForKey:key];
 }

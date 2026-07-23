@@ -4,6 +4,7 @@
 #include "DictionaryAdapter.h"
 #include "Helpers.h"
 #include "Interop.h"
+#include "NSExceptionSupport.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -143,6 +144,24 @@ Local<Private> ArgConverter::GetEscapeExceptionBrand(Isolate* isolate) {
   return cache->EscapeExceptionBrand->Get(isolate);
 }
 
+// Builds the combined JS stack string attached to an escaped exception via the
+// associated object: the origin (propagation) stack of the wrapping error and
+// the escape-site stack, each under a labeled section. Empty or duplicate
+// sections are omitted; returns nil when nothing is available.
+static NSString* BuildCombinedJSStack(const std::string& origin, const std::string& escape) {
+  NSMutableArray<NSString*>* parts = [NSMutableArray array];
+  if (!origin.empty()) {
+    [parts addObject:[NSString stringWithFormat:@"JS stack:\n%@", tns::ToNSString(origin)]];
+  }
+  if (!escape.empty() && escape != origin) {
+    [parts addObject:[NSString stringWithFormat:@"Escaped at:\n%@", tns::ToNSString(escape)]];
+  }
+  if (parts.count == 0) {
+    return nil;
+  }
+  return [parts componentsJoinedByString:@"\n\n"];
+}
+
 id ArgConverter::ExtractEscapedException(Local<Context> context, Local<Value> value) {
   Isolate* isolate = context->GetIsolate();
   if (value.IsEmpty() || !value->IsObject()) {
@@ -163,20 +182,6 @@ id ArgConverter::ExtractEscapedException(Local<Context> context, Local<Value> va
   }
   Local<Object> payload = payloadVal.As<Object>();
 
-  // Original NSException carried through unchanged when present.
-  Local<Value> nativeExc;
-  if (payload->Get(context, tns::ToV8String(isolate, "nativeException")).ToLocal(&nativeExc) &&
-      nativeExc->IsObject()) {
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, nativeExc);
-    if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-      id data = static_cast<ObjCDataWrapper*>(wrapper)->Data();
-      if ([data isKindOfClass:[NSException class]]) {
-        return (NSException*)data;
-      }
-    }
-  }
-
-  // Otherwise synthesize an NSException from the branded name/message/stack.
   auto readString = [&](const char* key, const std::string& fallback) -> std::string {
     Local<Value> v;
     if (payload->Get(context, tns::ToV8String(isolate, key)).ToLocal(&v) && !v.IsEmpty() &&
@@ -185,6 +190,33 @@ id ArgConverter::ExtractEscapedException(Local<Context> context, Local<Value> va
     }
     return fallback;
   };
+
+  // The escape-site stack always travels with the payload; the origin stack is
+  // the wrapping error's own `.stack`, carried when present.
+  std::string escapeStack = readString("escapeStack", "");
+
+  // Original NSException carried through unchanged when present.
+  Local<Value> nativeExc;
+  if (payload->Get(context, tns::ToV8String(isolate, "nativeException")).ToLocal(&nativeExc) &&
+      nativeExc->IsObject()) {
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, nativeExc);
+    if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+      id data = static_cast<ObjCDataWrapper*>(wrapper)->Data();
+      if ([data isKindOfClass:[NSException class]]) {
+        // Attach the JS stack WITHOUT mutating the original exception's identity
+        // or userInfo — the round-trip contract requires the very same object to
+        // reach the native @catch. The category accessor surfaces it uniformly.
+        std::string originStack = readString("stack", "");
+        NSString* combined = BuildCombinedJSStack(originStack, escapeStack);
+        if (combined != nil) {
+          tns::SetJSStackOnException((NSException*)data, combined);
+        }
+        return (NSException*)data;
+      }
+    }
+  }
+
+  // Otherwise synthesize an NSException from the branded name/message/stack.
   std::string name = readString("name", "NativeScriptException");
   std::string message = readString("message", "");
   std::string stack = readString("stack", "");
@@ -194,8 +226,25 @@ id ArgConverter::ExtractEscapedException(Local<Context> context, Local<Value> va
     // Put the JS stack in the reason too so it shows up in native crash logs.
     reasonText = [reasonText stringByAppendingFormat:@"\n%@", tns::ToNSString(stack)];
   }
-  NSDictionary* userInfo = stack.empty() ? nil : @{@"JavaScriptStack" : tns::ToNSString(stack)};
-  return [NSException exceptionWithName:tns::ToNSString(name) reason:reasonText userInfo:userInfo];
+  NSMutableDictionary* userInfo = [NSMutableDictionary dictionary];
+  if (!stack.empty()) {
+    userInfo[TNSJavaScriptStackTraceKey] = tns::ToNSString(stack);
+  }
+  // Carry the escape-site stack separately only when it adds information beyond
+  // the origin stack.
+  if (!escapeStack.empty() && escapeStack != stack) {
+    userInfo[TNSJavaScriptEscapeStackTraceKey] = tns::ToNSString(escapeStack);
+  }
+  NSException* synthesized = [NSException exceptionWithName:tns::ToNSString(name)
+                                                     reason:reasonText
+                                                   userInfo:userInfo.count ? userInfo : nil];
+  // Attach the combined stack via associated object so the category accessor is
+  // uniform across synthesized and rethrown-original exceptions.
+  NSString* combined = BuildCombinedJSStack(stack, escapeStack);
+  if (combined != nil) {
+    tns::SetJSStackOnException(synthesized, combined);
+  }
+  return synthesized;
 }
 
 id ArgConverter::HandleBoundaryException(Local<Context> context, TryCatch& tc) {

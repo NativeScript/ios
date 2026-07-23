@@ -125,6 +125,85 @@ describe("interop.escapeException and boundary hardening", function () {
         });
     });
 
+    describe("JS stack travels with escaped exceptions", function () {
+        // Named functions so the captured JS stack contains recognizable tokens
+        // regardless of how the module's script name is rendered in a frame.
+        function escapeSiteMarker(makeThrow) {
+            makeThrow();
+        }
+
+        it("a synthesized escape carries the JS stack in userInfo and via the category", function () {
+            const ex = TNSTestNativeCallbacks.invokeBlockCatchingException(function () {
+                escapeSiteMarker(function throwSynthesizedEscape() {
+                    throw interop.escapeException(new Error("synth-with-stack"));
+                });
+            });
+
+            expect(ex).not.toBeNull();
+            expect(ex instanceof NSException).toBe(true);
+
+            // userInfo carries the origin JS stack under the documented key.
+            const userInfoStack = ex.userInfo ? ex.userInfo.objectForKey("JavaScriptStack") : null;
+            expect(userInfoStack).not.toBeNull();
+            expect(String(userInfoStack)).toContain("throwSynthesizedEscape");
+
+            // The category (associated-object) accessor returns the same/similar text.
+            const viaCategory = TNSTestNativeCallbacks.jsStackTraceForException(ex);
+            expect(viaCategory).not.toBeNull();
+            expect(String(viaCategory)).toContain("throwSynthesizedEscape");
+        });
+
+        it("a non-Error escape still produces an escape-site stack via the category", function () {
+            const ex = TNSTestNativeCallbacks.invokeBlockCatchingException(function () {
+                escapeSiteMarker(function throwPlainStringEscape() {
+                    throw interop.escapeException("plain-string");
+                });
+            });
+
+            expect(ex).not.toBeNull();
+            expect(ex instanceof NSException).toBe(true);
+
+            const viaCategory = TNSTestNativeCallbacks.jsStackTraceForException(ex);
+            expect(viaCategory).not.toBeNull();
+            expect(String(viaCategory).length).toBeGreaterThan(0);
+            expect(String(viaCategory)).toContain("throwPlainStringEscape");
+        });
+
+        it("an original native NSException round-trips unchanged but carries a JS stack via the category", function () {
+            let caughtInJs = null;
+            try {
+                NSArray.alloc().init().objectAtIndex(3);
+            } catch (e) {
+                caughtInJs = e;
+            }
+            expect(caughtInJs).not.toBeNull();
+            expect(caughtInJs.nativeException instanceof NSException).toBe(true);
+
+            const ex = TNSTestNativeCallbacks.invokeBlockCatchingException(function () {
+                escapeSiteMarker(function rethrowOriginalNativeException() {
+                    throw interop.escapeException(caughtInJs);
+                });
+            });
+
+            // The original native exception reaches native unchanged.
+            expect(ex).not.toBeNull();
+            expect(ex instanceof NSException).toBe(true);
+            expect(ex.name).toBe("NSRangeException");
+            expect(ex.reason).toContain("beyond bounds");
+
+            // Identity preserved: no JavaScriptStack key was injected into userInfo.
+            const userInfoStack = ex.userInfo ? ex.userInfo.objectForKey("JavaScriptStack") : null;
+            expect(userInfoStack).toBeNull();
+
+            // ...but the associated-object stack is now available via the category,
+            // proving attachment without mutating the exception.
+            const viaCategory = TNSTestNativeCallbacks.jsStackTraceForException(ex);
+            expect(viaCategory).not.toBeNull();
+            expect(String(viaCategory).length).toBeGreaterThan(0);
+            expect(String(viaCategory)).toContain("rethrowOriginalNativeException");
+        });
+    });
+
     describe("adapter boundary hardening (no process abort on JS throw)", function () {
         it("a throwing getter read through the DictionaryAdapter yields a default, reports, and does not crash", function (done) {
             const jsObject = {
