@@ -43,6 +43,18 @@ void InlineFunctions::Init(Local<Context> context) {
         "            }"
         "        }"
         "    },"
+        "    NativeClass(arg) {"
+        "        if (typeof arg === 'function') {"
+        "            return arg;"
+        "        }"
+        "        var options = arg || {};"
+        "        return function (target) {"
+        "            if (options.protocols && options.protocols.length > 0) {"
+        "                target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? target.ObjCProtocols.concat(options.protocols) : options.protocols.slice());"
+        "            }"
+        "            return target;"
+        "        }"
+        "    },"
         "    ObjCMethod() {"
         "        var name = arguments[0];"
         "        var hasName = (name !== undefined && typeof name === \"string\");"
@@ -134,6 +146,7 @@ bool InlineFunctions::IsGlobalFunction(std::string name) {
         name == "NSMakeRange" ||
         name == "__decorate" ||
         name == "__param" ||
+        name == "NativeClass" ||
         name == "ObjCClass" ||
         name == "ObjCMethod" ||
         name == "ObjC" ||

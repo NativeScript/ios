@@ -4,6 +4,7 @@
 #include "ArgConverter.h"
 #include "ArrayAdapter.h"
 #include "Caches.h"
+#include "ClassBuilder.h"
 #include "Constants.h"
 #include "DictionaryAdapter.h"
 #include "ExtVector.h"
@@ -576,6 +577,15 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
   } else if (argHelper.isObject() && typeEncoding->type == BinaryTypeEncodingType::ClassEncoding) {
     Local<Object> obj = arg.As<Object>();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
+    if (wrapper == nullptr && obj->IsFunction()) {
+      // A plain ES subclass of a native type passed where a Class is expected
+      // (e.g. `tableView.registerClassForCellReuseIdentifier(JSClass, ...)`) - lazily
+      // register its derived class first.
+      Class ensured = ClassBuilder::EnsureExtendedClass(context, obj.As<v8::Function>());
+      if (ensured != nil) {
+        wrapper = tns::GetValue(isolate, obj);
+      }
+    }
     tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass, isolate);
     ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
     Class clazz = classWrapper->Klass();
@@ -728,6 +738,14 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
       }
     } else {
       Local<Object> obj = arg.As<Object>();
+      if (obj->IsFunction()) {
+        // A plain ES subclass of a native type passed where an `id` is expected - lazily
+        // register its derived class and marshal the Objective-C Class object.
+        Class ensured = ClassBuilder::EnsureExtendedClass(context, obj.As<v8::Function>());
+        if (ensured != nil) {
+          return ensured;
+        }
+      }
       DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
       // CFAutorelease(adapter);
       return adapter;
