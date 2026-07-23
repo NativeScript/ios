@@ -183,9 +183,12 @@ describe("HTTP ESM Loader", function() {
         });
         
         it("should handle malformed URLs gracefully", function() {
-            // The loader should ignore malformed http specifiers
+            // The loader must not throw *synchronously* for a malformed http specifier.
+            // import("http://") returns a promise that rejects ("HTTP fetch/compile
+            // failed"); swallow it so the discarded rejection isn't surfaced by the
+            // unhandled-rejection tracker (that report is unrelated to what this asserts).
             expect(function() {
-                import("http://");
+                import("http://").catch(function () {});
             }).not.toThrow();
         });
     });
