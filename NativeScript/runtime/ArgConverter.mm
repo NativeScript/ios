@@ -263,7 +263,7 @@ id ArgConverter::HandleBoundaryException(Local<Context> context, TryCatch& tc) {
   }
 
   // Unbranded: report exactly once through the uncaught path (error-event
-  // dispatch + shims + log; honors crashOnUncaughtJsExceptions). This is the
+  // dispatch + shims + log; honors uncaughtErrorPolicy). This is the
   // path for the Assert-hardened sites that today never reach the message
   // listener at all.
   Local<v8::Message> message = tc.Message();

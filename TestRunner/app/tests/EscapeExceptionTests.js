@@ -250,9 +250,9 @@ describe("interop.escapeException and boundary hardening", function () {
         });
     });
 
-    // manual: crashOnUncaughtJsExceptions is not exercised automatically because a
+    // manual: uncaughtErrorPolicy "throw" is not exercised automatically because a
     // real crash would kill the test runner. To smoke it manually, set
-    // { "crashOnUncaughtJsExceptions": true } in the app config and throw an
+    // { "uncaughtErrorPolicy": "throw" } in the app config and throw an
     // unprevented error (or `throw interop.escapeException(err)` from an `error`
     // listener) — the app must terminate with a NativeScriptFatalJSException
     // crash report scheduled on the runtime loop. Default-off behavior (report +

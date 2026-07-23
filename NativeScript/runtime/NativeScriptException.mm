@@ -184,8 +184,20 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
     }
   }
   Local<Value> handler;
+  // Deprecated: still honored in full (selects the __onDiscardedError callback
+  // and skips the fatal log), but new code should handle errors with an
+  // error/unhandledrejection listener calling preventDefault(), or set
+  // uncaughtErrorPolicy.
   id value = Runtime::GetAppConfigValue("discardUncaughtJsExceptions");
   bool isDiscarded = value ? [value boolValue] : false;
+  if (isDiscarded) {
+    static std::once_flag warnedDeprecated;
+    std::call_once(warnedDeprecated, []() {
+      Log(@"NativeScript: \"discardUncaughtJsExceptions\" is deprecated. Handle errors with a "
+          @"globalThis \"error\"/\"unhandledrejection\" listener calling preventDefault(), or "
+          @"configure \"uncaughtErrorPolicy\".");
+    });
+  }
 
   std::string cbName = isDiscarded ? "__onDiscardedError" : "__onUncaughtError";
   bool success = global->Get(context, tns::ToV8String(isolate, cbName)).ToLocal(&handler);
@@ -278,13 +290,20 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
     Log(@"NativeScript discarding uncaught JS exception!");
   }
 
-  // Opt-in (default off): after reporting, crash the app with a real native
-  // crash report by scheduling an uncaught @throw on a scope-free frame. Skipped
-  // when discarding (discardUncaughtJsExceptions is an explicit "do not crash").
+  // uncaughtErrorPolicy — the cross-platform uncaught-error contract:
+  //   "report" (default): report and keep the app running;
+  //   "throw":            after reporting, rethrow the unprevented error
+  //                       natively (deferred to a clean scope-free frame). This
+  //                       is a throw, not a crash guarantee — the app terminates
+  //                       only if no native handler catches it.
+  // The deprecated discardUncaughtJsExceptions flag suppresses the throw (an
+  // explicit "keep the app alive").
   if (!isDiscarded) {
-    id crashValue = Runtime::GetAppConfigValue("crashOnUncaughtJsExceptions");
-    bool shouldCrash = crashValue ? [crashValue boolValue] : false;
-    if (shouldCrash) {
+    id policyValue = Runtime::GetAppConfigValue("uncaughtErrorPolicy");
+    std::string policy = [policyValue isKindOfClass:[NSString class]]
+                             ? std::string([(NSString*)policyValue UTF8String])
+                             : "report";
+    if (policy == "throw") {
       NSString* reasonText = tns::ToNSString(fullMessage);
       NSDictionary* userInfo =
           stackTrace.empty() ? nil : @{TNSJavaScriptStackTraceKey : tns::ToNSString(stackTrace)};
@@ -297,6 +316,12 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
         tns::SetJSStackOnException(fatal, tns::ToNSString(stackTrace));
       }
       ScheduleDeferredThrow(isolate, fatal);
+    } else if (policy != "report") {
+      static std::once_flag warnedPolicy;
+      std::call_once(warnedPolicy, [&policy]() {
+        Log(@"NativeScript: unknown uncaughtErrorPolicy \"%s\" — falling back to \"report\".",
+            policy.c_str());
+      });
     }
   }
 }

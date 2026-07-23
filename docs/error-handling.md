@@ -1,6 +1,6 @@
 # Error handling
 
-The runtime implements the WHATWG error model at the global level: uncaught JavaScript exceptions and unhandled promise rejections are dispatched as cancelable events on `globalThis`, native `NSException`s round-trip into JavaScript with the original object attached, and `interop.escapeException` forwards a JavaScript throw to a native caller as a real `@throw`. By default nothing crashes the app — reporting is opt-out per error (`preventDefault()`), and crashing is opt-in (`crashOnUncaughtJsExceptions`).
+The runtime implements the WHATWG error model at the global level: uncaught JavaScript exceptions and unhandled promise rejections are dispatched as cancelable events on `globalThis`, native `NSException`s round-trip into JavaScript with the original object attached, and `interop.escapeException` forwards a JavaScript throw to a native caller as a real `@throw`. By default nothing crashes the app — reporting is opt-out per error (`preventDefault()`), and rethrowing unprevented errors natively is opt-in (`uncaughtErrorPolicy: "throw"`).
 
 ## Quick reference
 
@@ -40,7 +40,7 @@ globalThis.addEventListener("rejectionhandled", (e) => {
 
 Notes:
 
-- `error` and `unhandledrejection` are `cancelable`; `preventDefault()` suppresses every downstream consequence (legacy hooks, fatal log, error modal, `crashOnUncaughtJsExceptions`).
+- `error` and `unhandledrejection` are `cancelable`; `preventDefault()` suppresses every downstream consequence (legacy hooks, fatal log, error modal, the `uncaughtErrorPolicy: "throw"` rethrow).
 - Events fire even if app code overwrites `globalThis.dispatchEvent` — native dispatch goes through closures captured at startup.
 - A listener that throws does not stop the remaining listeners; the thrown value is routed to the fatal reporting tail directly (never recursively dispatched as another `error` event).
 - The events also fire on worker globals. A worker's unhandled rejection dispatches `unhandledrejection` on the worker's own global first; only when unprevented does it continue to the worker-global `onerror` and then to the main isolate's `worker.onerror`, mirroring uncaught worker errors.
@@ -149,27 +149,33 @@ The accessor is uniform across all cases; underneath:
 |---|---|
 | Synthesized escape | `userInfo[TNSJavaScriptStackTraceKey]` (`@"JavaScriptStack"`), plus `userInfo[TNSJavaScriptEscapeStackTraceKey]` (`@"JavaScriptEscapeStack"`) when the `escapeException` call site differs from the error's origin; also appended to `reason` |
 | Rethrown original `NSException` | attached as an associated object (identity and `userInfo` are untouched); the string combines the origin stack and the escape site |
-| `crashOnUncaughtJsExceptions` fatal (`NativeScriptFatalJSException`) | `userInfo[TNSJavaScriptStackTraceKey]`, also in `reason` |
+| `uncaughtErrorPolicy: "throw"` fatal (`NativeScriptFatalJSException`) | `userInfo[TNSJavaScriptStackTraceKey]`, also in `reason` |
 
 `tns_javascriptStackTrace` and the two `userInfo` keys are the stable contract for crash-SDK integrations.
 
 ## Configuration
 
-Both flags live in the app's `package.json`, both default to off:
+`uncaughtErrorPolicy` in the app's `package.json` is the uncaught-error contract, unified across NativeScript runtimes (9.1+):
 
-| Flag | Effect |
-|---|---|
-| `discardUncaughtJsExceptions` | Unprevented errors call `__onDiscardedError` instead of `__onUncaughtError` and skip the fatal log. Also disables `crashOnUncaughtJsExceptions`. |
-| `crashOnUncaughtJsExceptions` | After an unprevented error is reported, the app crashes with a real `NSException` (JS stack in `reason` and `userInfo`), thrown from a clean frame on the runtime loop so crash reporters capture it properly. |
+```jsonc
+{ "uncaughtErrorPolicy": "report" } // default: report and keep running
+{ "uncaughtErrorPolicy": "throw" }  // unprevented errors are rethrown natively
+```
+
+- `"report"` — after the event dispatch and legacy hooks, log the fatal message and keep the app alive.
+- `"throw"` — additionally rethrow the error as a real `NSException` (`NativeScriptFatalJSException`, JS stack in `reason` and `userInfo`), from a clean frame on the runtime loop. This is a **throw, not a crash guarantee**: the app terminates only if no native handler catches it — which also means crash reporters capture it properly when it does.
+- Unknown values log a warning once and fall back to `"report"`.
+
+Deprecated: `discardUncaughtJsExceptions` is still honored in full for now — unprevented errors route to `__onDiscardedError` instead of `__onUncaughtError`, the fatal log is skipped, and any `"throw"` policy is suppressed — but it logs a deprecation warning. Migrate to an `error`/`unhandledrejection` listener calling `preventDefault()` (per-error, more precise) and `uncaughtErrorPolicy`.
 
 Terminal-path decision table for an uncaught error / unhandled rejection:
 
-| Condition | legacy hook called | fatal log / modal | native crash |
+| Condition | legacy hook called | fatal log / modal | native throw |
 |---|---|---|---|
-| default | `__onUncaughtError` | yes | no |
-| `discardUncaughtJsExceptions` | `__onDiscardedError` | no | no |
+| `"report"` (default) | `__onUncaughtError` | yes | no |
+| `"throw"`, unprevented | `__onUncaughtError` | yes | yes |
 | listener called `preventDefault()` | no | no | no |
-| `crashOnUncaughtJsExceptions`, unprevented | `__onUncaughtError` | yes | yes |
+| `discardUncaughtJsExceptions` (deprecated) | `__onDiscardedError` | no | no |
 
 ## Crash reporter integration
 
@@ -193,7 +199,7 @@ globalThis.addEventListener("error", (e) => {
 });
 ```
 
-Native side — for the `NSUncaughtExceptionHandler`/signal layer, read `exception.tns_javascriptStackTrace` (or the `userInfo` keys) to attach the JS stack to crashes that never pass through the JS event layer (escaped exceptions, `crashOnUncaughtJsExceptions`).
+Native side — for the `NSUncaughtExceptionHandler`/signal layer, read `exception.tns_javascriptStackTrace` (or the `userInfo` keys) to attach the JS stack to crashes that never pass through the JS event layer (escaped exceptions, `uncaughtErrorPolicy: "throw"`).
 
 ## Legacy hooks (deprecated)
 
