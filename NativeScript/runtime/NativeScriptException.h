@@ -30,12 +30,6 @@ class NativeScriptException {
   // Isolate-level promise rejection callback (SetPromiseRejectCallback). Feeds
   // the per-isolate PromiseRejectionTracker owned by Caches.
   static void OnPromiseRejected(v8::PromiseRejectMessage message);
-  // Installs the WHATWG error-events layer (Event/EventTarget/ErrorEvent/
-  // PromiseRejectionEvent constructors, EventTarget methods on globalThis and
-  // global reportError). Evaluated once per isolate during Runtime::Init, right
-  // after PromiseProxy::Init, for both main and worker isolates. Stashes the
-  // three native dispatch closures in Caches.
-  static void InitErrorEvents(v8::Local<v8::Context> context);
   // Entry point for reporting an uncaught sync exception (message listener) and
   // reportError. First dispatches an `error` ErrorEvent through the JS listener
   // store; if a listener calls preventDefault() the report is fully handled and
@@ -56,18 +50,6 @@ class NativeScriptException {
                                        v8::Local<v8::Promise> promise,
                                        v8::Local<v8::Value> reason,
                                        const std::string& stackOverride = "");
-  // Dispatches the cancelable `unhandledrejection` PromiseRejectionEvent
-  // through the JS listener store. Returns true when a listener called
-  // preventDefault(). Never re-dispatches on failure: a dispatch that itself
-  // throws is logged and treated as unprevented so the error is never lost.
-  static bool DispatchUnhandledRejectionEvent(v8::Isolate* isolate,
-                                              v8::Local<v8::Promise> promise,
-                                              v8::Local<v8::Value> reason);
-  // Fires the non-cancelable `rejectionhandled` PromiseRejectionEvent for a
-  // late-attached handler, carrying the original rejection reason.
-  static void DispatchRejectionHandledEvent(v8::Isolate* isolate,
-                                            v8::Local<v8::Promise> promise,
-                                            v8::Local<v8::Value> reason);
   // The terminal tail shared by the uncaught-error path, the rejection path and
   // the JS `nativeReportFatal` handshake: calls the __on* shim and emits the
   // fatal-exception log. Does NOT dispatch any event (the caller has already

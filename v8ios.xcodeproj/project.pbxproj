@@ -279,6 +279,10 @@
 		C2D71D7623E18C41000CD5F0 /* robin_hood.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D71D7523E18C41000CD5F0 /* robin_hood.h */; };
 		C2D7E9D523F42C1100DB289C /* PromiseProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D7E9D323F42C1100DB289C /* PromiseProxy.h */; };
 		C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D7E9D423F42C1100DB289C /* PromiseProxy.cpp */; };
+		33118456DD6996CFA0F4BE94 /* ErrorEvents.h in Headers */ = {isa = PBXBuildFile; fileRef = AA8F22C26B03F50C6F191B8F /* ErrorEvents.h */; };
+		C79DADCF4D076CD80EE4ED13 /* ErrorEvents.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F5D0708037B4A4ACBC03CBF9 /* ErrorEvents.cpp */; };
+		5E6BCFCA78A8AE651EB78180 /* Events.h in Headers */ = {isa = PBXBuildFile; fileRef = 76C6D020ADB0F5972F3110F1 /* Events.h */; };
+		462FA976C64356112F69C395 /* Events.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 57F19E556878D1CF14C0EA04 /* Events.cpp */; };
 		C2DDEB8D229EAC8300345BFE /* Common.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB64229EAC8100345BFE /* Common.h */; };
 		C2DDEB8E229EAC8300345BFE /* Interop.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB65229EAC8100345BFE /* Interop.h */; };
 		C2DDEB8F229EAC8300345BFE /* ArgConverter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB66229EAC8100345BFE /* ArgConverter.h */; };
@@ -782,6 +786,10 @@
 		C2D71D7523E18C41000CD5F0 /* robin_hood.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = robin_hood.h; sourceTree = "<group>"; };
 		C2D7E9D323F42C1100DB289C /* PromiseProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PromiseProxy.h; sourceTree = "<group>"; };
 		C2D7E9D423F42C1100DB289C /* PromiseProxy.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PromiseProxy.cpp; sourceTree = "<group>"; };
+		AA8F22C26B03F50C6F191B8F /* ErrorEvents.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ErrorEvents.h; sourceTree = "<group>"; };
+		F5D0708037B4A4ACBC03CBF9 /* ErrorEvents.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ErrorEvents.cpp; sourceTree = "<group>"; };
+		76C6D020ADB0F5972F3110F1 /* Events.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Events.h; sourceTree = "<group>"; };
+		57F19E556878D1CF14C0EA04 /* Events.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Events.cpp; sourceTree = "<group>"; };
 		C2DDEB16229EA89000345BFE /* TestRunner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestRunner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2DDEB26229EA89200345BFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C2DDEB32229EAB3B00345BFE /* NativeScript.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScript.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1436,6 +1444,10 @@
 				AA5DBFD62EC19216008D12F9 /* DevFlags.mm */,
 				C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */,
 				C2DDEB8B229EAC8300345BFE /* DictionaryAdapter.mm */,
+				AA8F22C26B03F50C6F191B8F /* ErrorEvents.h */,
+				F5D0708037B4A4ACBC03CBF9 /* ErrorEvents.cpp */,
+				76C6D020ADB0F5972F3110F1 /* Events.h */,
+				57F19E556878D1CF14C0EA04 /* Events.cpp */,
 				C2A5F8692359AEB600074AFA /* ExtVector.h */,
 				C2A5F8682359AEB500074AFA /* ExtVector.cpp */,
 				C2CC8EE922BBA01E00B78928 /* FastEnumerationAdapter.h */,
@@ -1623,6 +1635,8 @@
 				C2DDEBA1229EAC8300345BFE /* FFICall.h in Headers */,
 				C266567C22AA630F00EE15CC /* NSDataAdapter.h in Headers */,
 				C2D7E9D523F42C1100DB289C /* PromiseProxy.h in Headers */,
+				33118456DD6996CFA0F4BE94 /* ErrorEvents.h in Headers */,
+				5E6BCFCA78A8AE651EB78180 /* Events.h in Headers */,
 				C2A5F86B2359AEB600074AFA /* ExtVector.h in Headers */,
 				3C5333352B0E683100BE0C47 /* Message.hpp in Headers */,
 				C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */,
@@ -2279,6 +2293,8 @@
 				C2C8EE7422CE3266001F8CEC /* ConcurrentQueue.cpp in Sources */,
 				C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */,
 				C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */,
+				C79DADCF4D076CD80EE4ED13 /* ErrorEvents.cpp in Sources */,
+				462FA976C64356112F69C395 /* Events.cpp in Sources */,
 				3CEA20DC2A7DA8320009BE8F /* IsolateWrapper.cpp in Sources */,
 				C275F477253B37AB00A997D5 /* UnmanagedType.mm in Sources */,
 				C266569E22B282BA00EE15CC /* FunctionReference.cpp in Sources */,

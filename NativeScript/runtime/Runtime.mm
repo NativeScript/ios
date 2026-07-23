@@ -5,6 +5,8 @@
 #include "Caches.h"
 #include "Console.h"
 #include "Constants.h"
+#include "ErrorEvents.h"
+#include "Events.h"
 #include "Helpers.h"
 #include "InlineFunctions.h"
 #include "Interop.h"
@@ -351,7 +353,8 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   DefineGlobalObject(context, isWorker);
   DefineCollectFunction(context);
   PromiseProxy::Init(context);
-  NativeScriptException::InitErrorEvents(context);
+  Events::Init(context);
+  ErrorEvents::Init(context);
   Console::Init(context);
   WeakRef::Init(context);
 

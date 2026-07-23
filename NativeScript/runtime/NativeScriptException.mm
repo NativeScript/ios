@@ -14,6 +14,7 @@
 #include "ArgConverter.h"
 #include "Caches.h"
 #include "DataWrapper.h"
+#include "ErrorEvents.h"
 #include "Helpers.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
@@ -108,40 +109,6 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
   }
 }
 
-// Native function handed to the bootstrap IIFE as `nativeReportFatal(error,
-// stackString)`. It runs the terminal tail (shim + fatal log) WITHOUT
-// re-dispatching an event: reportError and listener-thrown errors have already
-// gone through JS dispatch, so dispatching again here would recurse.
-static void NativeReportFatalCallback(const FunctionCallbackInfo<Value>& info) {
-  Isolate* isolate = info.GetIsolate();
-  Local<Value> error = info.Length() > 0 ? info[0] : v8::Undefined(isolate).As<Value>();
-  std::string stack = info.Length() > 1 ? tns::ToString(isolate, info[1]) : "";
-  NativeScriptException::ReportFatalTail(isolate, error, Local<v8::Message>(), stack, "");
-}
-
-// Dispatches the cancelable `error` ErrorEvent through the JS listener store.
-// Returns true when a listener called preventDefault(). A dispatch that itself
-// throws is logged and treated as unprevented so an error is never lost.
-static bool DispatchErrorEvent(Isolate* isolate, Local<Value> error,
-                               const std::string& messageString, const std::string& stack) {
-  auto cache = Caches::Get(isolate);
-  if (cache == nullptr || cache->DispatchErrorEventFunc == nullptr) {
-    return false;
-  }
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<v8::Function> dispatch = cache->DispatchErrorEventFunc->Get(isolate);
-  Local<Value> args[] = {error, tns::ToV8String(isolate, messageString),
-                         tns::ToV8String(isolate, stack)};
-  Local<Value> result;
-  TryCatch tc(isolate);
-  bool success = dispatch->Call(context, context->Global(), 3, args).ToLocal(&result);
-  if (tc.HasCaught()) {
-    tns::LogError(isolate, tc);
-    return false;
-  }
-  return success && !result.IsEmpty() && result->BooleanValue(isolate);
-}
-
 void NativeScriptException::ReportToJsHandlersAndLog(Isolate* isolate, Local<Value> error,
                                                      Local<v8::Message> message,
                                                      const std::string& stackOverride,
@@ -158,53 +125,17 @@ void NativeScriptException::ReportToJsHandlersAndLog(Isolate* isolate, Local<Val
   if (stackForEvent.empty()) {
     stackForEvent = tns::GetSmartStackTrace(isolate, nullptr, error);
   }
-  if (DispatchErrorEvent(isolate, error, messageString, stackForEvent)) {
+  if (ErrorEvents::DispatchError(isolate, error, messageString, stackForEvent)) {
     return;
   }
 
   ReportFatalTail(isolate, error, message, stackOverride, logPrefix);
 }
 
-bool NativeScriptException::DispatchUnhandledRejectionEvent(Isolate* isolate,
-                                                            Local<Promise> promise,
-                                                            Local<Value> reason) {
-  auto cache = Caches::Get(isolate);
-  if (cache == nullptr || cache->DispatchUnhandledRejectionFunc == nullptr) {
-    return false;
-  }
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<v8::Function> dispatch = cache->DispatchUnhandledRejectionFunc->Get(isolate);
-  Local<Value> args[] = {promise, reason};
-  Local<Value> result;
-  TryCatch tc(isolate);
-  bool success = dispatch->Call(context, context->Global(), 2, args).ToLocal(&result);
-  if (tc.HasCaught()) {
-    tns::LogError(isolate, tc);
-    return false;
-  }
-  return success && !result.IsEmpty() && result->BooleanValue(isolate);
-}
-
-void NativeScriptException::DispatchRejectionHandledEvent(Isolate* isolate, Local<Promise> promise,
-                                                          Local<Value> reason) {
-  auto cache = Caches::Get(isolate);
-  if (cache == nullptr || cache->DispatchRejectionHandledFunc == nullptr) {
-    return;
-  }
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<v8::Function> dispatch = cache->DispatchRejectionHandledFunc->Get(isolate);
-  Local<Value> args[] = {promise, reason};
-  Local<Value> result;
-  TryCatch tc(isolate);
-  if (!dispatch->Call(context, context->Global(), 2, args).ToLocal(&result) && tc.HasCaught()) {
-    tns::LogError(isolate, tc);
-  }
-}
-
 void NativeScriptException::ReportUnhandledRejection(Isolate* isolate, Local<Promise> promise,
                                                      Local<Value> reason,
                                                      const std::string& stackOverride) {
-  if (DispatchUnhandledRejectionEvent(isolate, promise, reason)) {
+  if (ErrorEvents::DispatchUnhandledRejection(isolate, promise, reason)) {
     return;
   }
   ReportFatalTail(isolate, reason, Local<v8::Message>(), stackOverride,
@@ -364,240 +295,6 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
   }
 }
 
-void NativeScriptException::InitErrorEvents(Local<Context> context) {
-  // WHATWG error-events layer. Plain (module-free) script, strict inside the
-  // IIFE, ES5-ish so it never depends on other runtime extensions. The IIFE is
-  // invoked with one argument — the native nativeReportFatal(error, stack)
-  // function that runs the terminal tail — and returns three closures bound to
-  // the internal listener store so native dispatch survives app code
-  // overwriting globalThis.dispatchEvent.
-  std::string source = R"(
-    (function (nativeReportFatal) {
-      "use strict";
-      var g = globalThis;
-
-      function Event(type, opts) {
-        opts = opts || {};
-        this.type = String(type);
-        this.bubbles = !!opts.bubbles;
-        this.cancelable = !!opts.cancelable;
-        this.composed = !!opts.composed;
-        this.defaultPrevented = false;
-        this.target = null;
-        this.currentTarget = null;
-        this._stopPropagation = false;
-        this._stopImmediate = false;
-      }
-      Event.prototype.preventDefault = function () {
-        if (this.cancelable) { this.defaultPrevented = true; }
-      };
-      Event.prototype.stopPropagation = function () { this._stopPropagation = true; };
-      Event.prototype.stopImmediatePropagation = function () {
-        this._stopPropagation = true;
-        this._stopImmediate = true;
-      };
-
-      function ErrorEvent(type, opts) {
-        opts = opts || {};
-        Event.call(this, type, opts);
-        this.message = opts.message !== undefined ? String(opts.message) : "";
-        this.filename = opts.filename !== undefined ? String(opts.filename) : "";
-        this.lineno = opts.lineno !== undefined ? (opts.lineno | 0) : 0;
-        this.colno = opts.colno !== undefined ? (opts.colno | 0) : 0;
-        this.error = opts.error !== undefined ? opts.error : null;
-      }
-      ErrorEvent.prototype = Object.create(Event.prototype);
-      ErrorEvent.prototype.constructor = ErrorEvent;
-
-      function PromiseRejectionEvent(type, opts) {
-        opts = opts || {};
-        Event.call(this, type, opts);
-        this.promise = opts.promise;
-        this.reason = opts.reason;
-      }
-      PromiseRejectionEvent.prototype = Object.create(Event.prototype);
-      PromiseRejectionEvent.prototype.constructor = PromiseRejectionEvent;
-
-      // A listener that throws must not stop other listeners: route the thrown
-      // value to the native fatal tail instead of ever recursively dispatching
-      // another `error` event from inside dispatch.
-      function reportListenerError(e) {
-        try { nativeReportFatal(e, (e && e.stack) || ""); } catch (ignored) {}
-      }
-
-      function EventTargetImpl() { this._listeners = Object.create(null); }
-      EventTargetImpl.prototype.addEventListener = function (type, callback, options) {
-        if (callback === null || callback === undefined) { return; }
-        type = String(type);
-        var capture = false, once = false;
-        if (typeof options === "boolean") {
-          capture = options;
-        } else if (options && typeof options === "object") {
-          capture = !!options.capture;
-          once = !!options.once;
-        }
-        var list = this._listeners[type];
-        if (!list) { list = this._listeners[type] = []; }
-        for (var i = 0; i < list.length; i++) {
-          if (list[i].callback === callback && list[i].capture === capture) { return; }
-        }
-        list.push({ callback: callback, once: once, capture: capture });
-      };
-      EventTargetImpl.prototype.removeEventListener = function (type, callback, options) {
-        type = String(type);
-        var capture = false;
-        if (typeof options === "boolean") {
-          capture = options;
-        } else if (options && typeof options === "object") {
-          capture = !!options.capture;
-        }
-        var list = this._listeners[type];
-        if (!list) { return; }
-        for (var i = 0; i < list.length; i++) {
-          if (list[i].callback === callback && list[i].capture === capture) {
-            list.splice(i, 1);
-            return;
-          }
-        }
-      };
-      EventTargetImpl.prototype.dispatchEvent = function (event) {
-        event.target = this;
-        event.currentTarget = this;
-        var list = this._listeners[event.type];
-        if (list) {
-          // Snapshot so listeners added during dispatch are not invoked and
-          // registration order is preserved.
-          var snapshot = list.slice();
-          for (var i = 0; i < snapshot.length; i++) {
-            var entry = snapshot[i];
-            var idx = list.indexOf(entry);
-            if (idx === -1) { continue; }  // removed since snapshot
-            if (entry.once) { list.splice(idx, 1); }
-            var cb = entry.callback;
-            try {
-              if (typeof cb === "function") {
-                cb.call(this, event);
-              } else if (cb && typeof cb.handleEvent === "function") {
-                cb.handleEvent(event);
-              }
-            } catch (e) {
-              reportListenerError(e);
-            }
-            if (event._stopImmediate) { break; }
-          }
-        }
-        event.currentTarget = null;
-        return !event.defaultPrevented;
-      };
-
-      // Internal EventTarget instance backing the global. globalThis's prototype
-      // is intentionally NOT made an EventTarget; only the three methods are
-      // bound onto it.
-      var globalTarget = new EventTargetImpl();
-      g.addEventListener = function (type, callback, options) {
-        return globalTarget.addEventListener(type, callback, options);
-      };
-      g.removeEventListener = function (type, callback, options) {
-        return globalTarget.removeEventListener(type, callback, options);
-      };
-      g.dispatchEvent = function (event) {
-        return globalTarget.dispatchEvent(event);
-      };
-
-      function EventTarget() { EventTargetImpl.call(this); }
-      EventTarget.prototype.addEventListener = EventTargetImpl.prototype.addEventListener;
-      EventTarget.prototype.removeEventListener = EventTargetImpl.prototype.removeEventListener;
-      EventTarget.prototype.dispatchEvent = EventTargetImpl.prototype.dispatchEvent;
-
-      g.reportError = function (e) {
-        if (arguments.length === 0) {
-          throw new TypeError("Failed to execute 'reportError': 1 argument required, but only 0 present.");
-        }
-        var ev = new ErrorEvent("error", {
-          message: (e && e.message !== undefined && e.message !== null) ? String(e.message) : String(e),
-          error: e,
-          cancelable: true
-        });
-        if (globalTarget.dispatchEvent(ev)) {
-          nativeReportFatal(e, (e && e.stack) || "");
-        }
-      };
-
-      g.Event = Event;
-      g.EventTarget = EventTarget;
-      g.ErrorEvent = ErrorEvent;
-      g.PromiseRejectionEvent = PromiseRejectionEvent;
-
-      // Closures called by C++. They never look up globalThis.dispatchEvent, so
-      // they keep working even if app code overwrites it.
-      function dispatchErrorEvent(error, message, stack) {
-        var ev = new ErrorEvent("error", {
-          message: message !== undefined && message !== null ? String(message) : "",
-          error: error,
-          cancelable: true
-        });
-        globalTarget.dispatchEvent(ev);
-        return ev.defaultPrevented;
-      }
-      function dispatchUnhandledRejection(promise, reason) {
-        var ev = new PromiseRejectionEvent("unhandledrejection", {
-          promise: promise,
-          reason: reason,
-          cancelable: true
-        });
-        globalTarget.dispatchEvent(ev);
-        return ev.defaultPrevented;
-      }
-      function dispatchRejectionHandled(promise, reason) {
-        var ev = new PromiseRejectionEvent("rejectionhandled", {
-          promise: promise,
-          reason: reason,
-          cancelable: false
-        });
-        globalTarget.dispatchEvent(ev);
-      }
-
-      return [dispatchErrorEvent, dispatchUnhandledRejection, dispatchRejectionHandled];
-    })
-  )";
-
-  Isolate* isolate = context->GetIsolate();
-
-  Local<Script> script;
-  bool success = Script::Compile(context, tns::ToV8String(isolate, source)).ToLocal(&script);
-  tns::Assert(success && !script.IsEmpty(), isolate);
-
-  Local<Value> result;
-  success = script->Run(context).ToLocal(&result);
-  tns::Assert(success && result->IsFunction(), isolate);
-
-  Local<v8::Function> iife = result.As<v8::Function>();
-
-  Local<v8::Function> nativeReportFatal;
-  success = v8::Function::New(context, NativeReportFatalCallback).ToLocal(&nativeReportFatal);
-  tns::Assert(success, isolate);
-
-  Local<Value> installArgs[] = {nativeReportFatal};
-  Local<Value> iifeResult;
-  success = iife->Call(context, context->Global(), 1, installArgs).ToLocal(&iifeResult);
-  tns::Assert(success && iifeResult->IsArray(), isolate);
-
-  Local<v8::Array> closures = iifeResult.As<v8::Array>();
-  Local<Value> errorFn, rejectionFn, handledFn;
-  tns::Assert(closures->Get(context, 0).ToLocal(&errorFn) && errorFn->IsFunction(), isolate);
-  tns::Assert(closures->Get(context, 1).ToLocal(&rejectionFn) && rejectionFn->IsFunction(),
-              isolate);
-  tns::Assert(closures->Get(context, 2).ToLocal(&handledFn) && handledFn->IsFunction(), isolate);
-
-  auto cache = Caches::Get(isolate);
-  cache->DispatchErrorEventFunc =
-      std::make_unique<Persistent<v8::Function>>(isolate, errorFn.As<v8::Function>());
-  cache->DispatchUnhandledRejectionFunc =
-      std::make_unique<Persistent<v8::Function>>(isolate, rejectionFn.As<v8::Function>());
-  cache->DispatchRejectionHandledFunc =
-      std::make_unique<Persistent<v8::Function>>(isolate, handledFn.As<v8::Function>());
-}
-
 void NativeScriptException::OnPromiseRejected(v8::PromiseRejectMessage message) {
   Local<Promise> promise = message.GetPromise();
   Isolate* isolate = promise->GetIsolate();
@@ -725,7 +422,7 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
       Local<Promise> promise = queued.promise.Get(isolate_);
       Local<Value> reason = queued.reason.IsEmpty() ? v8::Undefined(isolate_).As<Value>()
                                                     : queued.reason.Get(isolate_);
-      NativeScriptException::DispatchRejectionHandledEvent(isolate_, promise, reason);
+      ErrorEvents::DispatchRejectionHandled(isolate_, promise, reason);
     } @catch (NSException* exception) {
       Log(@"PromiseRejectionTracker: exception while firing rejectionhandled: %@", exception);
     }
@@ -754,7 +451,7 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
         // preventDefault() there fully handles it. Only when unprevented fall
         // through to the existing worker channel (worker-global onerror →
         // forward to the main isolate's worker.onerror).
-        if (!NativeScriptException::DispatchUnhandledRejectionEvent(isolate_, promise, reason)) {
+        if (!ErrorEvents::DispatchUnhandledRejection(isolate_, promise, reason)) {
           if (!GiveWorkerOnErrorAChance(isolate_, context, reason)) {
             Runtime* runtime = Runtime::GetRuntime(isolate_);
             if (runtime != nullptr) {

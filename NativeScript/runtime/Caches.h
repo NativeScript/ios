@@ -155,11 +155,19 @@ class Caches {
   std::unique_ptr<v8::Persistent<v8::Function>> UnmanagedTypeCtorFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 
+  // Internal EventTarget instance backing the global, returned by the generic
+  // event-primitives bootstrap IIFE (Events::Init). Holds the real listener
+  // store, so native layers dispatch through it without going through
+  // overwritable globals. Cleaned up with the other Persistent members when
+  // Caches is destroyed, before isolate disposal.
+  std::unique_ptr<v8::Persistent<v8::Object>> GlobalEventTarget =
+      std::unique_ptr<v8::Persistent<v8::Object>>(nullptr);
+
   // Phase 2 WHATWG error-events dispatch closures returned by the bootstrap
-  // IIFE (NativeScriptException::InitErrorEvents). They close over the internal
-  // listener store, so native dispatch keeps working even if app code
-  // overwrites globalThis.dispatchEvent. Cleaned up with the other Persistent
-  // members when Caches is destroyed, before isolate disposal.
+  // IIFE (ErrorEvents::Init). They close over the internal listener store, so
+  // native dispatch keeps working even if app code overwrites
+  // globalThis.dispatchEvent. Cleaned up with the other Persistent members when
+  // Caches is destroyed, before isolate disposal.
   std::unique_ptr<v8::Persistent<v8::Function>> DispatchErrorEventFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> DispatchUnhandledRejectionFunc =
