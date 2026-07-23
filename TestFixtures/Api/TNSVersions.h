@@ -1,5 +1,6 @@
 #define generateVersionDeclarations(V1, V2)                                                   \
-  __attribute__((availability(ios, introduced = V1))) @interface TNSInterface                 \
+  __attribute__((availability(ios, introduced = V1)))                                         \
+  @interface TNSInterface                                                                     \
   ##V2##Plus : NSObject @end                                                                  \
                                                                                               \
   @interface TNSInterfaceMembers                                                              \
@@ -58,6 +59,7 @@ generateMinors(15);
 #define MAX_AVAILABILITY 31.7
 
 __attribute__((availability(ios, introduced = MAX_AVAILABILITY)))
+__attribute__((availability(visionos, introduced = MAX_AVAILABILITY)))
 @protocol TNSProtocolNeverAvailable<NSObject>
 
 @property(class, readonly) int staticPropertyFromProtocolNeverAvailable;
@@ -74,7 +76,8 @@ __attribute__((availability(ios, introduced = MAX_AVAILABILITY)))
 
 @end
 
-__attribute__((availability(ios, introduced = 1.0))) @protocol TNSProtocolAlwaysAvailable<NSObject>
+__attribute__((availability(ios, introduced = 1.0)))
+@protocol TNSProtocolAlwaysAvailable<NSObject>
 
 @property(class, readonly) int staticPropertyFromProtocolAlwaysAvailable;
 
@@ -91,6 +94,7 @@ __attribute__((availability(ios, introduced = 1.0))) @protocol TNSProtocolAlways
 @end
 
 __attribute__((availability(ios, introduced = MAX_AVAILABILITY)))
+__attribute__((availability(visionos, introduced = MAX_AVAILABILITY)))
 @interface TNSInterfaceNeverAvailable : TNSInterfaceAlwaysAvailable
 @end
 

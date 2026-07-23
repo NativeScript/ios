@@ -2,14 +2,40 @@ const semver = require("semver");
 const child_process = require("child_process");
 const dayjs = require("dayjs");
 const fs = require("fs");
+const { parseArgs } = require("node:util");
+
+const USAGE = `Usage: node scripts/get-next-version.js [--version <version>] [--tag <tag>]
+
+  --version   base version (default: $NPM_VERSION, then package.json)
+  --tag       prerelease channel, e.g. next or pr (default: $NPM_TAG, then next)
+  -h, --help  show this help`;
+
+let values;
+try {
+  ({ values } = parseArgs({
+    options: {
+      version: { type: "string" },
+      tag: { type: "string" },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  }));
+} catch (e) {
+  console.error(e.message);
+  console.error(USAGE);
+  process.exit(1);
+}
+if (values.help) {
+  console.log(USAGE);
+  process.exit(0);
+}
 
 const currentVersion =
-  process.env.NPM_VERSION || require("../package.json").version;
+  values.version || process.env.NPM_VERSION || require("../package.json").version;
 
 if (!currentVersion) {
   throw new Error("Invalid current version");
 }
-const currentTag = process.env.NPM_TAG || "next";
+const currentTag = values.tag || process.env.NPM_TAG || "next";
 const runID = process.env.GITHUB_RUN_ID || 0;
 
 let prPrerelease = "";

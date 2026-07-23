@@ -48,8 +48,7 @@ require("./Marshalling/ObjCTypesTests");
 require("./Marshalling/ConstantsTests");
 require("./Marshalling/RecordTests");
 require("./Marshalling/VectorTests");
-// todo: figure out why this test is failing with a EXC_BAD_ACCESS on TNSRecords.m matrix initialization
-// require("./Marshalling/MatrixTests");
+require("./Marshalling/MatrixTests");
 require("./Marshalling/NSStringTests");
 //import "./Marshalling/TypesTests";
 require("./Marshalling/PointerTests");
