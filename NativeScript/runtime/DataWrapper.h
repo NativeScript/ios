@@ -525,6 +525,9 @@ class WorkerWrapper : public BaseDataWrapper {
                                              const std::string& stackTrace,
                                              int lineNumber, bool async = true);
   void PostMessage(std::shared_ptr<worker::Message> message);
+  // Re-arm the message drain without enqueueing — used by the deferred-drain
+  // retry when the worker's entry script hasn't installed `onmessage` yet.
+  void SignalMessageDrain();
   void Close();
   void Terminate();
 
@@ -547,6 +550,9 @@ class WorkerWrapper : public BaseDataWrapper {
   std::atomic<bool> isTerminating_;
   std::atomic<bool> isDisposed_;
   std::atomic<bool> isWeak_;
+  // True while a deferred drain retry is in flight (see DrainPendingTasks) —
+  // prevents stacking one retry per drain attempt.
+  std::atomic<bool> drainRetryPending_;
   std::function<void(v8::Isolate*, v8::Local<v8::Object> thiz,
                      std::shared_ptr<worker::Message>)>
       onMessage_;

@@ -6,10 +6,25 @@
 
 namespace tns {
 
+// Heuristic: does this bare specifier look like an npm-style package name
+// (as opposed to an explicit, extension-qualified file reference)? Shared by
+// both the CommonJS require() path (ModuleInternal.mm) and the ESM
+// import()/resolver path (ModuleInternalCallbacks.mm) so the two can't drift
+// out of sync with each other. See the definition in ModuleInternal.mm for
+// the full rationale.
+bool IsLikelyOptionalModule(const std::string& moduleName);
+
 class ModuleInternal {
  public:
   ModuleInternal(v8::Local<v8::Context> context);
-  bool RunModule(v8::Isolate* isolate, std::string path);
+  // When `outErrorMessage` is non-null, the failure cause is written into
+  // it on a false return: `NativeScriptException::getMessage()` for
+  // thrown exceptions, the V8 exception text for require() failures, the
+  // top-level-await rejection/timeout reason for ES modules, or a
+  // directional hint when the module returned an empty namespace without
+  // throwing.
+  bool RunModule(v8::Isolate* isolate, std::string path,
+                 std::string* outErrorMessage = nullptr);
   void RunScript(v8::Isolate* isolate, std::string script);
   static v8::Local<v8::Value> LoadScript(v8::Isolate* isolate,
                                          const std::string& path);

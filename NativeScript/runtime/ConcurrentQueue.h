@@ -15,6 +15,12 @@ public:
     void Initialize(CFRunLoopRef runLoop, void (*performWork)(void*), void* info);
     void Push(std::shared_ptr<worker::Message> message);
     std::vector<std::shared_ptr<worker::Message>> PopAll();
+    bool IsEmpty();
+    // Re-arm the drain source without enqueueing a new message — used to
+    // retry delivery of already-queued messages (e.g. a worker whose entry
+    // script hasn't installed `onmessage` yet). Safe from any thread; a
+    // no-op once terminated.
+    void Signal();
     void Terminate();
 private:
     std::queue<std::shared_ptr<worker::Message>> messagesQueue_;
