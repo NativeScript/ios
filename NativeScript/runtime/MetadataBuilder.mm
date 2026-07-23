@@ -39,6 +39,13 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
   GlobalHandlerContext* ctx =
       static_cast<GlobalHandlerContext*>(info.Data().As<External>()->Value());
 
+  // Decline while this exact name is being defined as an own property below —
+  // CreateDataProperty's lookup re-enters this interceptor before the property
+  // exists on the global.
+  if (ctx->definingProperty_ == propName && !propName.empty()) {
+    return;
+  }
+
   if (ctx->isWorkerThread_ &&
       std::find(Worker::GlobalFunctions.begin(), Worker::GlobalFunctions.end(), propName) !=
           Worker::GlobalFunctions.end()) {
@@ -138,6 +145,14 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
     if (!script->Run(context).ToLocal(&result)) {
       tns::Assert(false, isolate);
     }
+    // Memoize the evaluated value as a real own property: the interceptor is
+    // registered kNonMasking, so later reads of this global bypass it (and the
+    // per-access recompilation of the meta's JS snippet) entirely.
+    ctx->definingProperty_ = propName;
+    bool memoized =
+        context->Global()->CreateDataProperty(context, property, result).FromMaybe(false);
+    (void)memoized;
+    ctx->definingProperty_.clear();
     info.GetReturnValue().Set(result);
   } else if (meta->type() == MetaType::Struct) {
     const StructMeta* structMeta = static_cast<const StructMeta*>(meta);

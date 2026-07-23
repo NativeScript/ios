@@ -157,14 +157,26 @@ class BaseDataWrapper {
 
 class EnumDataWrapper : public BaseDataWrapper {
  public:
-  EnumDataWrapper(std::string jsCode) : jsCode_(jsCode) {}
+  EnumDataWrapper(std::string jsCode)
+      : jsCode_(jsCode), hasCachedValue_(false), cachedValue_(0) {}
 
   const WrapperType Type() { return WrapperType::Enum; }
 
   std::string JSCode() { return jsCode_; }
 
+  // Numeric value memoized by Interop::WriteValue so the enum's JS snippet is
+  // compiled and evaluated at most once per wrapper.
+  bool HasCachedValue() const { return hasCachedValue_; }
+  double CachedValue() const { return cachedValue_; }
+  void SetCachedValue(double value) {
+    cachedValue_ = value;
+    hasCachedValue_ = true;
+  }
+
  private:
   std::string jsCode_;
+  bool hasCachedValue_;
+  double cachedValue_;
 };
 
 class PointerTypeWrapper : public BaseDataWrapper {
