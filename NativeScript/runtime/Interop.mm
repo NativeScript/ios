@@ -1651,8 +1651,45 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     ffi_call(parametrizedCall->Cif, FFI_FN(methodCall.functionPointer_), call.ResultBuffer(),
              call.ArgsArray());
   } @catch (NSException* e) {
-    std::string message = [[e description] UTF8String];
-    throw NativeScriptException(message);
+    // Preserve the original NSException: build a JS Error carrying its name and
+    // reason, and attach the wrapped native object as `nativeException` (mirrors
+    // the NSError-out path below). Throw it via NativeScriptException so the JS
+    // catch handler receives exactly this object.
+    Isolate* isolate = methodCall.context_->GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    NSString* nsName = [e name];
+    NSString* nsReason = [e reason];
+    std::string message =
+        nsReason ? [nsReason UTF8String] : (nsName ? [nsName UTF8String] : "NSException");
+
+    Local<Value> jsErrVal = Exception::Error(tns::ToV8String(isolate, message));
+    if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
+      // Fallback: keep the description-only behavior if Error creation fails.
+      throw NativeScriptException([[e description] UTF8String]);
+    }
+
+    Local<Object> jsErrObj = jsErrVal.As<Object>();
+    if (nsName != nil) {
+      jsErrObj
+          ->Set(context, tns::ToV8String(isolate, "name"),
+                tns::ToV8String(isolate, [nsName UTF8String]))
+          .FromMaybe(false);
+    }
+    if (nsReason != nil) {
+      jsErrObj
+          ->Set(context, tns::ToV8String(isolate, "message"),
+                tns::ToV8String(isolate, [nsReason UTF8String]))
+          .FromMaybe(false);
+    }
+
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper((id)e);
+    Local<Value> nativeWrapper =
+        ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
+    jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper)
+        .FromMaybe(false);
+
+    throw NativeScriptException(isolate, jsErrObj.As<Value>(), message);
   }
 
   if (errorRef != nullptr) {

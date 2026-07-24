@@ -60,7 +60,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     auto cache = Caches::Get(isolate);
     auto isolateId = cache->getIsolateId();
 
-    Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName, std::to_string(isolateId) + "_");
+    Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName,
+                                                         std::to_string(isolateId) + "_");
     class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
     class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 
@@ -214,8 +215,8 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
 
         auto isolateId = cache->getIsolateId();
-        __block Class extendedClass =
-            ClassBuilder::GetExtendedClass(baseClassName, extendedClassName, std::to_string(isolateId) + "_");
+        __block Class extendedClass = ClassBuilder::GetExtendedClass(
+            baseClassName, extendedClassName, std::to_string(isolateId) + "_");
         class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
         class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 
@@ -892,24 +893,40 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
-        v8::Locker locker(context->isolate_);
-        Isolate::Scope isolate_scope(context->isolate_);
-        HandleScope handle_scope(context->isolate_);
-        Local<v8::Function> getterFunc = context->callback_->Get(context->isolate_);
-        Local<Value> res;
+        Isolate* isolate = context->isolate_;
+        // Scopes-before-@throw: a branded escape is captured and @thrown only
+        // after every V8 scope in the inner block has destructed.
+        NSException* __strong pendingThrow = nil;
+        {
+          v8::Locker locker(isolate);
+          Isolate::Scope isolate_scope(isolate);
+          HandleScope handle_scope(isolate);
+          Local<v8::Function> getterFunc = context->callback_->Get(isolate);
+          Local<Value> res;
 
-        id thiz = *static_cast<const id*>(argValues[0]);
-        auto cache = Caches::Get(context->isolate_);
-        auto it = cache->Instances.find(thiz);
-        Local<Object> self_ = it != cache->Instances.end()
-                                  ? it->second->Get(context->isolate_).As<Object>()
-                                  : context->implementationObject_->Get(context->isolate_);
-        Local<Context> v8Context = Caches::Get(context->isolate_)->GetContext();
-        tns::Assert(getterFunc->Call(v8Context, self_, 0, nullptr).ToLocal(&res),
-                    context->isolate_);
-
-        const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
-        ArgConverter::SetValue(v8Context, retValue, res, typeEncoding);
+          id thiz = *static_cast<const id*>(argValues[0]);
+          auto cache = Caches::Get(isolate);
+          auto it = cache->Instances.find(thiz);
+          Local<Object> self_ = it != cache->Instances.end()
+                                    ? it->second->Get(isolate).As<Object>()
+                                    : context->implementationObject_->Get(isolate);
+          Local<Context> v8Context = Caches::Get(isolate)->GetContext();
+          TryCatch tc(isolate);
+          if (!getterFunc->Call(v8Context, self_, 0, nullptr).ToLocal(&res)) {
+            NSException* ex = ArgConverter::HandleBoundaryException(v8Context, tc);
+            if (ex != nil) {
+              pendingThrow = ex;
+            }
+            // Default getter result on a JS throw: zeroed return buffer.
+            memset(retValue, 0, cif->rtype->size);
+          } else {
+            const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
+            ArgConverter::SetValue(v8Context, retValue, res, typeEncoding);
+          }
+        }
+        if (pendingThrow != nil) {
+          @throw pendingThrow;
+        }
       };
       const TypeEncoding* typeEncoding = propertyMeta->getter()->encodings()->first();
       IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback, userData);
@@ -926,29 +943,41 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
-        v8::Locker locker(context->isolate_);
-        Isolate::Scope isolate_scope(context->isolate_);
-        HandleScope handle_scope(context->isolate_);
-        Local<v8::Function> setterFunc = context->callback_->Get(context->isolate_);
-        Local<Value> res;
+        Isolate* isolate = context->isolate_;
+        NSException* __strong pendingThrow = nil;
+        {
+          v8::Locker locker(isolate);
+          Isolate::Scope isolate_scope(isolate);
+          HandleScope handle_scope(isolate);
+          Local<v8::Function> setterFunc = context->callback_->Get(isolate);
+          Local<Value> res;
 
-        id thiz = *static_cast<const id*>(argValues[0]);
-        auto cache = Caches::Get(context->isolate_);
-        auto it = cache->Instances.find(thiz);
-        Local<Object> self_ = it != cache->Instances.end()
-                                  ? it->second->Get(context->isolate_).As<Object>()
-                                  : context->implementationObject_->Get(context->isolate_);
+          id thiz = *static_cast<const id*>(argValues[0]);
+          auto cache = Caches::Get(isolate);
+          auto it = cache->Instances.find(thiz);
+          Local<Object> self_ = it != cache->Instances.end()
+                                    ? it->second->Get(isolate).As<Object>()
+                                    : context->implementationObject_->Get(isolate);
 
-        uint8_t* argBuffer = (uint8_t*)argValues[2];
-        const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();
-        BaseCall call(argBuffer);
-        Local<Context> v8Context = Caches::Get(context->isolate_)->GetContext();
-        Local<Value> jsWrapper = Interop::GetResult(v8Context, typeEncoding, &call, true);
-        Local<Value> params[1] = {jsWrapper};
+          uint8_t* argBuffer = (uint8_t*)argValues[2];
+          const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();
+          BaseCall call(argBuffer);
+          Local<Context> v8Context = Caches::Get(isolate)->GetContext();
+          Local<Value> jsWrapper = Interop::GetResult(v8Context, typeEncoding, &call, true);
+          Local<Value> params[1] = {jsWrapper};
 
-        tns::Assert(setterFunc->Call(context->isolate_->GetCurrentContext(), self_, 1, params)
-                        .ToLocal(&res),
-                    context->isolate_);
+          TryCatch tc(isolate);
+          if (!setterFunc->Call(v8Context, self_, 1, params).ToLocal(&res)) {
+            NSException* ex = ArgConverter::HandleBoundaryException(v8Context, tc);
+            if (ex != nil) {
+              pendingThrow = ex;
+            }
+            // Setter returns void; nothing to write on a JS throw.
+          }
+        }
+        if (pendingThrow != nil) {
+          @throw pendingThrow;
+        }
       };
 
       const TypeEncoding* typeEncoding = propertyMeta->setter()->encodings()->first();
