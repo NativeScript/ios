@@ -127,10 +127,31 @@ void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Va
   }
 }
 
+// Defined below; needed by the escape-brand short-circuits in the reporters.
+static void ScheduleDeferredThrow(v8::Isolate* isolate, NSException* e);
+
+// An explicit interop.escapeException is a crash/forward request, never an
+// error report: it must not dispatch events (preventDefault cannot veto it —
+// matching Android, where the brand is checked before any dispatch), must not
+// call the legacy hooks and must not log. Returns true when `value` carried the
+// brand and the native throw was scheduled.
+static bool ScheduleEscapedExceptionIfBranded(Isolate* isolate, Local<Value> value) {
+  Local<Context> context = isolate->GetCurrentContext();
+  NSException* branded = ArgConverter::ExtractEscapedException(context, value);
+  if (branded == nil) {
+    return false;
+  }
+  ScheduleDeferredThrow(isolate, branded);
+  return true;
+}
+
 void NativeScriptException::ReportToJsHandlersAndLog(Isolate* isolate, Local<Value> error,
                                                      Local<v8::Message> message,
                                                      const std::string& stackOverride,
                                                      const std::string& logPrefix) {
+  if (ScheduleEscapedExceptionIfBranded(isolate, error)) {
+    return;
+  }
   // First: give `error` event listeners a chance. If one prevents the default,
   // the report is fully handled — no shim, no fatal log.
   std::string messageString;
@@ -185,6 +206,9 @@ void NativeScriptException::ReportToJsHandlersAndLog(Isolate* isolate, Local<Val
 void NativeScriptException::ReportUnhandledRejection(Isolate* isolate, Local<Promise> promise,
                                                      Local<Value> reason,
                                                      const std::string& stackOverride) {
+  if (ScheduleEscapedExceptionIfBranded(isolate, reason)) {
+    return;
+  }
   if (ErrorEvents::DispatchUnhandledRejection(isolate, promise, reason)) {
     return;
   }
@@ -603,6 +627,12 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
       }
 
       if (isWorker) {
+        // An escapeException-branded reason converts straight to the native
+        // throw (never dispatched, never vetoable) — same rule as the main
+        // isolate's ReportUnhandledRejection.
+        if (ScheduleEscapedExceptionIfBranded(isolate_, reason)) {
+          continue;
+        }
         // Dispatch the rejection event on the worker's own global first;
         // preventDefault() there fully handles it. Only when unprevented fall
         // through to the existing worker channel (worker-global onerror →

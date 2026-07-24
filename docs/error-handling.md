@@ -65,7 +65,7 @@ target.dispatchEvent(new Event("tick")); // returns !defaultPrevented
 
 ### What lands on the events
 
-The stacks live on the error/reason **value**, not on the event — and the thrown value can be anything, so shape-check before use:
+The stacks live on the error/reason **value**, not on the event — and the thrown value can be anything, so shape-check before use. Object-valued errors/reasons additionally carry a combined `stackTrace` string property, populated **before** the event dispatches (`e.error.stackTrace` / `e.reason.stackTrace` — same contract on Android):
 
 | You wrote | `e.error` / `e.reason` is | JS stack | Native exception |
 |---|---|---|---|
@@ -115,7 +115,7 @@ try {
 
 - Otherwise an `NSException` is synthesized: `name` from the error's name, `reason` from its message plus the JS stack, and the stacks in `userInfo` (see the native section).
 - An escaped exception that nothing catches natively terminates the app with a real native crash report.
-- Escapes thrown from *inside* an `error`/`unhandledrejection` listener are honored too: the reporting tail detects the brand and schedules the native throw.
+- **An explicit escape always wins.** A branded error that reaches the uncaught machinery *anywhere* — thrown uncaught in a timer/microtask, used as an unhandled rejection reason, or thrown from inside an `error`/`unhandledrejection` listener — converts straight to the native throw: no events are dispatched, no hooks run, and `preventDefault()` cannot veto it (matching Android, where the brand is checked before any dispatch).
 - `escapeException` is the per-call tool and works **regardless of `uncaughtErrorPolicy`** and **at every boundary** (including native→JS blocks and overridden methods): it bypasses JS-side reporting entirely and converts *that one throw* into a native `@throw`. `uncaughtErrorPolicy: "throw"` is the global policy — it applies only to *unprevented, unbranded* errors, only *after* they are reported, and only rethrows synchronously at boundaries that report within their own frame (property accessors / adapters); block and overridden-method boundaries fall back to the deferred clean-frame throw. When you need a native handler around a specific block/method call to catch a JS failure, use `escapeException`, not the policy.
 
 Limitations: two boundaries execute under the *caller's* live V8 scopes and therefore cannot convert a branded escape into a native throw — fast enumeration (`for...in` over a JS object from native) and `DictionaryAdapter.getProperties`. There, a branded escape surfaces as an ordinary JS exception.
