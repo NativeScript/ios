@@ -58,6 +58,29 @@ class NativeScriptException {
                               v8::Local<v8::Message> message,
                               const std::string& stackOverride = "",
                               const std::string& logPrefix = "");
+  // uncaughtErrorPolicy "throw" handoff slot (per isolate). When the policy is
+  // "throw", ReportFatalTail deposits the NSException to throw here (typed `id`
+  // so this header stays usable from the pure-C++ TUs that include it — mirrors
+  // ArgConverter.h) and schedules a deferred fallback throw. A JS→native
+  // boundary that originated the error claims the slot while still under its V8
+  // scopes and @throws the exception synchronously after scope teardown, so a
+  // native @try/@catch around the boundary can catch it (Android parity).
+  // Loop-originated errors (timers, microtasks, rejections) are never claimed
+  // and are thrown by the deferred fallback from a clean, scope-free frame.
+  //
+  // Deposits happen under the isolate lock (reporting is serialized); claims
+  // happen either at the boundary (under the Locker) or in the deferred
+  // fallback (mutex only). The identity-checked claim prevents a stale fallback
+  // block from throwing a newer deposit.
+  static void DepositPendingPolicyThrow(v8::Isolate* isolate, id exception);
+  // Returns and clears the isolate's pending policy throw, or nil.
+  static id ClaimPendingPolicyThrow(v8::Isolate* isolate);
+  // Claims only when the stored exception IS `expected` (pointer identity);
+  // used by the deferred fallback so an older block cannot steal/throw a newer
+  // deposit. Returns the claimed exception or nil.
+  static id ClaimPendingPolicyThrowIfEqual(v8::Isolate* isolate, id expected);
+  // Clears any pending policy throw for the isolate (called during teardown).
+  static void OnIsolateTeardown(v8::Isolate* isolate);
   static std::string GetErrorStackTrace(
       v8::Isolate* isolate, const v8::Local<v8::StackTrace>& stackTrace);
   static void ShowErrorModal(v8::Isolate* isolate, const std::string& title,

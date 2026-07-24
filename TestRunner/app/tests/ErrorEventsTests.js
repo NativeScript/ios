@@ -86,6 +86,10 @@ describe("WHATWG error events", function () {
         expect(received.error).toBe(err);
         expect(uncaught.length).toBe(1);
         expect(uncaught[0]).toBe(err);
+        // Fix A: an Error reported (unprevented) through the pipeline ends up
+        // with a combined `stackTrace` string on the error object.
+        expect(typeof err.stackTrace).toBe("string");
+        expect(err.stackTrace.length).toBeGreaterThan(0);
         done();
     });
 
@@ -93,6 +97,39 @@ describe("WHATWG error events", function () {
         expect(function () {
             global.reportError();
         }).toThrowError(TypeError);
+    });
+
+    it("an error reported through a native boundary has a combined stackTrace set BEFORE the error event fires", function (done) {
+        // Reading an overridden getter from native routes the JS throw through
+        // the C++ boundary reporter (ReportToJsHandlersAndLog), which now sets
+        // `error.stackTrace` before dispatching the cancelable `error` event —
+        // matching Android — so the listener observes it during dispatch (not
+        // only `error.stack`).
+        const marker = "boundary-stacktrace-marker";
+        let sawEvent = false;
+        let stackTraceInListener = null;
+        onGlobal("error", function (e) {
+            if (e.error && e.error.message === marker) {
+                sawEvent = true;
+                stackTraceInListener = e.error.stackTrace;
+                e.preventDefault();
+            }
+        });
+
+        const Derived = TNSDerivedInterface.extend({
+            get baseProperty() {
+                throw new Error(marker);
+            }
+        });
+        const instance = Derived.alloc().init();
+        TNSTestNativeCallbacks.objectValueForKeyKey(instance, "baseProperty");
+
+        pollUntil(function () { return sawEvent; }, function () {
+            expect(sawEvent).toBe(true);
+            expect(typeof stackTraceInListener).toBe("string");
+            expect(stackTraceInListener.length).toBeGreaterThan(0);
+            done();
+        });
     });
 
     it("unhandledrejection listener receives reason and promise; preventDefault suppresses the shim", function (done) {
@@ -111,6 +148,11 @@ describe("WHATWG error events", function () {
             expect(received.type).toBe("unhandledrejection");
             expect(received.reason).toBe(reason);
             expect(typeof received.promise.then).toBe("function");
+            // Fix A / Android parity: the rejection drain sets a combined
+            // `stackTrace` on the (object) reason BEFORE dispatching the event,
+            // so a listener sees it (not only `reason.stack`).
+            expect(typeof received.reason.stackTrace).toBe("string");
+            expect(received.reason.stackTrace.length).toBeGreaterThan(0);
             afterQuietTurns(function () {
                 expect(uncaught.length).toBe(0);
                 done();

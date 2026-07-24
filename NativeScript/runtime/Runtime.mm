@@ -193,6 +193,10 @@ Runtime::~Runtime() {
     rejectionObserver_ = nullptr;
   }
 
+  // Drop any pending uncaughtErrorPolicy "throw" deposit for this isolate so a
+  // stale entry can't outlive the isolate it keys on.
+  NativeScriptException::OnIsolateTeardown(isolate_);
+
   auto currentIsolate = this->isolate_;
   {
     // make sure we remove the isolate from the list of active isolates first

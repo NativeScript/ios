@@ -250,11 +250,43 @@ describe("interop.escapeException and boundary hardening", function () {
         });
     });
 
-    // manual: uncaughtErrorPolicy "throw" is not exercised automatically because a
-    // real crash would kill the test runner. To smoke it manually, set
-    // { "uncaughtErrorPolicy": "throw" } in the app config and throw an
-    // unprevented error (or `throw interop.escapeException(err)` from an `error`
-    // listener) — the app must terminate with a NativeScriptFatalJSException
-    // crash report scheduled on the runtime loop. Default-off behavior (report +
-    // continue) is covered by every other suite here.
+    // manual: uncaughtErrorPolicy "throw" is not exercised automatically because
+    // its terminal case (a real crash) would kill the test runner, and the policy
+    // cannot be toggled at runtime (GetAppConfigValue caches, and flipping it
+    // would break every other spec). The whole suite staying green under the
+    // default "report" policy is itself the pin that the claim-slot machinery is
+    // inert when the policy is off.
+    //
+    // To smoke it manually, set { "uncaughtErrorPolicy": "throw" } in the app
+    // config, then:
+    //
+    // 1. BOUNDARY-ORIGINATED, reported SYNCHRONOUSLY (catchable — Android parity):
+    //    boundaries that report inside their own frame via HandleBoundaryException
+    //    — overridden property getters/setters and DictionaryAdapter reads invoked
+    //    from native — rethrow the NSException at that boundary after scope
+    //    teardown. A native @try/@catch wrapping that native access catches it.
+    //    (The existing "throwing overridden getter"/"throwing DictionaryAdapter"
+    //    specs above drive exactly these boundaries; under "throw" the read would
+    //    surface a NativeScriptFatalJSException instead of a nil default.)
+    //
+    //    IMPORTANT LIMITATION (verified empirically): the native→JS block /
+    //    overridden-method boundary (ArgConverter::MethodCallback, e.g.
+    //    invokeBlockCatchingException) does NOT get a synchronous rethrow. It uses
+    //    tc.ReThrow(), so an unbranded plain Error is surfaced to V8 as a pending
+    //    exception and is caught in JS up-stack (or reported later at an uncaught
+    //    Invoke), never during the block's own frame. A native @try/@catch around
+    //    invokeBlockCatchingException therefore does NOT catch a plain Error under
+    //    "throw" — it still surfaces to JS. Use interop.escapeException(err) to
+    //    force a synchronous native @throw at that boundary regardless of policy.
+    //
+    // 2. LOOP-ORIGINATED (deferred clean-frame throw): an uncaught error in a
+    //    setTimeout callback has no originating boundary to claim it, so it is
+    //    thrown from a clean, scope-free frame on the runtime loop and terminates
+    //    the app (nothing catches it) with a NativeScriptFatalJSException crash
+    //    report:
+    //
+    //      setTimeout(() => { throw new Error("policy-throw-timer"); }, 0);
+    //
+    // Default-off behavior (report + continue) is covered by every other suite
+    // here.
 });

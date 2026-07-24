@@ -269,6 +269,18 @@ id ArgConverter::HandleBoundaryException(Local<Context> context, TryCatch& tc) {
   Local<v8::Message> message = tc.Message();
   NativeScriptException::ReportToJsHandlersAndLog(isolate, exception, message);
   tc.Reset();
+
+  // uncaughtErrorPolicy "throw": the report above runs synchronously here (still
+  // under the boundary's live V8 scopes). Under the "throw" policy it deposited
+  // the NSException into the per-isolate slot; claim it and hand it back so the
+  // caller @throws it AFTER closing every V8 scope (same scopes-before-@throw
+  // discipline as a branded escape) — a native @try/@catch around the boundary
+  // then catches it, matching Android. Under the default "report" policy nothing
+  // is deposited and this is nil.
+  id policyThrow = NativeScriptException::ClaimPendingPolicyThrow(isolate);
+  if (policyThrow != nil) {
+    return policyThrow;
+  }
   return nil;
 }
 
@@ -383,6 +395,26 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
           tc.ReThrow();
         }
       }
+    }
+
+    // uncaughtErrorPolicy "throw" boundary claim (best-effort). Unlike the
+    // HandleBoundaryException sites (property accessors, DictionaryAdapter),
+    // which report the throw SYNCHRONOUSLY within their own frame and can
+    // therefore claim the deposit here, this path uses tc.ReThrow(): the
+    // unbranded exception is surfaced to V8 as pending and only reported when it
+    // reaches an uncaught V8 Invoke boundary UP THE STACK (or is caught in JS
+    // first). Empirically (verified with instrumentation over the suite,
+    // including a native-origin NSOperationQueue-invoked block) the message
+    // listener does NOT run during `tc`'s teardown, so under the "throw" policy
+    // nothing has been deposited by the time we reach this point and this claim
+    // is a no-op — those errors are instead handled by the deferred clean-frame
+    // fallback. The claim is kept as a defensive hook (harmless when the slot is
+    // empty; identity-checked so it can never steal an unrelated deposit) and to
+    // mirror the boundary discipline. Under the default "report" policy nothing
+    // is ever deposited. The NSError-out branch neither reports nor deposits.
+    // Skip when a branded escape already set pendingThrow.
+    if (pendingThrow == nil) {
+      pendingThrow = NativeScriptException::ClaimPendingPolicyThrow(isolate);
     }
 
     if (pendingThrow == nil) {

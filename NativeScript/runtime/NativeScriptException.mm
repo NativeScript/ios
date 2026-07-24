@@ -11,6 +11,7 @@
 #include <limits>
 #include <mutex>
 #include <sstream>
+#include <unordered_map>
 #include "ArgConverter.h"
 #include "Caches.h"
 #include "DataWrapper.h"
@@ -42,6 +43,22 @@ struct PendingErrorDisplay {
 static std::mutex gErrorDisplayMutex;
 static PendingErrorDisplay gPendingErrorDisplay;
 static uint64_t gNextErrorTicket = 1;
+
+// Per-isolate uncaughtErrorPolicy "throw" handoff slot. The NSException lifetime
+// is managed by ARC (__strong) — fine in this .mm. Heap-allocated and never
+// destroyed: ~Runtime reaches this registry via OnIsolateTeardown, and a global
+// Runtime can be destructed during __cxa_finalize at process exit — after this
+// TU's file-scope statics would have been destroyed. Locking a destroyed
+// std::mutex throws std::system_error out of the noexcept destructor chain and
+// terminates the process, so the registry must outlive all static destructors.
+static std::mutex& PolicyThrowMutex() {
+  static std::mutex* mutex = new std::mutex();
+  return *mutex;
+}
+static std::unordered_map<v8::Isolate*, NSException * __strong>& PendingPolicyThrows() {
+  static auto* map = new std::unordered_map<v8::Isolate*, NSException * __strong>();
+  return *map;
+}
 
 }  // namespace
 
@@ -122,15 +139,47 @@ void NativeScriptException::ReportToJsHandlersAndLog(Isolate* isolate, Local<Val
   } else {
     messageString = tns::ToString(isolate, error);
   }
+  // Derive the combined stack ONCE, with the full fallback chain ReportFatalTail
+  // uses (stackOverride → GetSmartStackTrace → v8::Message stack → the error's
+  // own stack), so the `error` event listeners and the fatal tail observe the
+  // same string.
   std::string stackForEvent = stackOverride;
   if (stackForEvent.empty()) {
     stackForEvent = tns::GetSmartStackTrace(isolate, nullptr, error);
   }
+  if (stackForEvent.empty()) {
+    if (!message.IsEmpty()) {
+      stackForEvent = GetErrorStackTrace(isolate, message->GetStackTrace());
+    } else {
+      // Rejections/reportError carry no v8::Message; fall back to the error's
+      // own stack.
+      stackForEvent = GetErrorStackTrace(isolate, Exception::GetStackTrace(error));
+    }
+  }
+
+  // Android sets a combined `stackTrace` property on the error object BEFORE
+  // dispatching the `error` event, so listeners can read `e.error.stackTrace`
+  // (not only `e.error.stack`). Mirror that here (object errors only; guarded /
+  // non-fatal on failure — same pattern ReportFatalTail uses). ReportFatalTail
+  // sets it again with the same value (idempotent) for callers that reach it
+  // directly (the nativeReportFatal handshake).
+  if (error->IsObject()) {
+    Local<Context> context = isolate->GetCurrentContext();
+    bool stackTraceSet = error.As<Object>()
+                             ->Set(context, tns::ToV8String(isolate, "stackTrace"),
+                                   tns::ToV8String(isolate, stackForEvent))
+                             .FromMaybe(false);
+    if (!stackTraceSet) {
+      Log(@"Warning: Failed to set stackTrace property on error object");
+    }
+  }
+
   if (ErrorEvents::DispatchError(isolate, error, messageString, stackForEvent)) {
     return;
   }
 
-  ReportFatalTail(isolate, error, message, stackOverride, logPrefix);
+  // Pass the already-derived stack down so ReportFatalTail does not re-derive it.
+  ReportFatalTail(isolate, error, message, stackForEvent, logPrefix);
 }
 
 void NativeScriptException::ReportUnhandledRejection(Isolate* isolate, Local<Promise> promise,
@@ -162,6 +211,38 @@ static void ScheduleDeferredThrow(Isolate* isolate, NSException* e) {
     @throw e;
   });
   CFRunLoopWakeUp(loop);
+}
+
+void NativeScriptException::DepositPendingPolicyThrow(Isolate* isolate, id exception) {
+  std::lock_guard<std::mutex> lock(PolicyThrowMutex());
+  PendingPolicyThrows()[isolate] = (NSException*)exception;  // overwrites any prior entry
+}
+
+id NativeScriptException::ClaimPendingPolicyThrow(Isolate* isolate) {
+  std::lock_guard<std::mutex> lock(PolicyThrowMutex());
+  auto it = PendingPolicyThrows().find(isolate);
+  if (it == PendingPolicyThrows().end()) {
+    return nil;
+  }
+  NSException* e = it->second;
+  PendingPolicyThrows().erase(it);
+  return e;
+}
+
+id NativeScriptException::ClaimPendingPolicyThrowIfEqual(Isolate* isolate, id expected) {
+  std::lock_guard<std::mutex> lock(PolicyThrowMutex());
+  auto it = PendingPolicyThrows().find(isolate);
+  if (it == PendingPolicyThrows().end() || it->second != expected) {
+    return nil;
+  }
+  NSException* e = it->second;
+  PendingPolicyThrows().erase(it);
+  return e;
+}
+
+void NativeScriptException::OnIsolateTeardown(Isolate* isolate) {
+  std::lock_guard<std::mutex> lock(PolicyThrowMutex());
+  PendingPolicyThrows().erase(isolate);
 }
 
 void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error,
@@ -293,9 +374,14 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
   // uncaughtErrorPolicy — the cross-platform uncaught-error contract:
   //   "report" (default): report and keep the app running;
   //   "throw":            after reporting, rethrow the unprevented error
-  //                       natively (deferred to a clean scope-free frame). This
-  //                       is a throw, not a crash guarantee — the app terminates
-  //                       only if no native handler catches it.
+  //                       natively. If a JS→native boundary originated the error
+  //                       it is rethrown synchronously there (catchable by a
+  //                       native @try/@catch around that call, matching Android);
+  //                       otherwise (loop-originated: timers, microtasks,
+  //                       rejections) it is thrown from a clean, scope-free frame
+  //                       on the runtime loop. Either way it is a throw, not a
+  //                       crash guarantee — the app terminates only if nothing
+  //                       catches it.
   // The deprecated discardUncaughtJsExceptions flag suppresses the throw (an
   // explicit "keep the app alive").
   if (!isDiscarded) {
@@ -315,7 +401,32 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
       if (!stackTrace.empty()) {
         tns::SetJSStackOnException(fatal, tns::ToNSString(stackTrace));
       }
-      ScheduleDeferredThrow(isolate, fatal);
+      // Claim-slot handoff: deposit the exception and schedule a FALLBACK
+      // clean-frame throw. A JS→native boundary that originated this error
+      // claims the slot while still under its V8 scopes and @throws `fatal`
+      // synchronously after scope teardown, so a native @try/@catch around the
+      // boundary can catch it (Android parity). Loop-originated errors (timers,
+      // microtasks, rejections) are never claimed at a boundary, so the fallback
+      // throws them from a clean, scope-free frame exactly as before.
+      //
+      // The fallback claims by pointer IDENTITY (ClaimPendingPolicyThrowIfEqual):
+      // reporting is serialized under the isolate lock, but if a newer error is
+      // deposited and then claimed (by its boundary or its own fallback) before
+      // this block runs, the identity check fails and this now-stale block is a
+      // no-op — it can never throw a different (newer) error than the one it was
+      // scheduled for.
+      DepositPendingPolicyThrow(isolate, fatal);
+      Runtime* rt = Runtime::GetRuntime(isolate);
+      CFRunLoopRef loop = rt != nullptr ? rt->RuntimeLoop() : nullptr;
+      if (loop != nullptr) {
+        CFRunLoopPerformBlock(loop, kCFRunLoopCommonModes, ^{
+          id e = ClaimPendingPolicyThrowIfEqual(isolate, fatal);
+          if (e != nil) {
+            @throw e;
+          }
+        });
+        CFRunLoopWakeUp(loop);
+      }
     } else if (policy != "report") {
       static std::once_flag warnedPolicy;
       std::call_once(warnedPolicy, [&policy]() {
@@ -475,6 +586,20 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
       if (stack.empty()) {
         stack =
             NativeScriptException::GetErrorStackTrace(isolate_, Exception::GetStackTrace(reason));
+      }
+
+      // Android parity (Fix A): populate `reason.stackTrace` BEFORE dispatching
+      // the unhandledrejection event so listeners can read `e.reason.stackTrace`
+      // (object reasons only; guarded / non-fatal). Covers both the worker and
+      // main dispatch branches below.
+      if (reason->IsObject() && !stack.empty()) {
+        bool ok = reason.As<Object>()
+                      ->Set(context, tns::ToV8String(isolate_, "stackTrace"),
+                            tns::ToV8String(isolate_, stack))
+                      .FromMaybe(false);
+        if (!ok) {
+          Log(@"Warning: Failed to set stackTrace property on rejection reason");
+        }
       }
 
       if (isWorker) {
