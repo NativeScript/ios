@@ -151,3 +151,103 @@ describe("Promise scheduling", function () {
         });
     });
 });
+
+describe("unhandled rejections", function () {
+    // Unhandled rejections are tracked per-isolate and reported once per runloop
+    // turn (kCFRunLoopBeforeWaiting) through the same uncaught-error machinery
+    // exposed via global.__onUncaughtError. Each test installs a temporary hook
+    // and restores the previous one in afterEach no matter what.
+    let previousHook;
+    let reported;
+
+    beforeEach(function () {
+        previousHook = global.__onUncaughtError;
+        reported = [];
+        global.__onUncaughtError = function (error) {
+            reported.push(error);
+        };
+    });
+
+    afterEach(function () {
+        global.__onUncaughtError = previousHook;
+    });
+
+    // The drain happens on a runloop turn, so poll across a few turns until the
+    // hook fires (or give up after a bounded number of turns).
+    function afterDrain(cb) {
+        let turns = 0;
+        (function poll() {
+            if (reported.length > 0 || turns >= 20) {
+                cb();
+                return;
+            }
+            turns++;
+            setTimeout(poll, 10);
+        })();
+    }
+
+    // Wait a couple of runloop turns to confirm the hook did NOT fire.
+    function afterQuietTurns(cb) {
+        setTimeout(function () {
+            setTimeout(cb, 20);
+        }, 20);
+    }
+
+    it("reports an unhandled Promise.reject", function (done) {
+        const reason = new Error("unhandled-promise-reject");
+        Promise.reject(reason);
+        afterDrain(function () {
+            expect(reported.length).toBeGreaterThan(0);
+            expect(reported[0]).toBe(reason);
+            done();
+        });
+    });
+
+    it("does not report when .catch is attached synchronously in the same turn", function (done) {
+        const p = Promise.reject(new Error("handled-same-turn"));
+        p.catch(function () {});
+        afterQuietTurns(function () {
+            expect(reported.length).toBe(0);
+            done();
+        });
+    });
+
+    it("reports an uncaught throw from an async function", function (done) {
+        const reason = new Error("async-function-throw");
+        (async () => {
+            throw reason;
+        })();
+        afterDrain(function () {
+            expect(reported.length).toBeGreaterThan(0);
+            expect(reported[0]).toBe(reason);
+            done();
+        });
+    });
+
+    it("reports an unhandled rejection thrown from a .then callback", function (done) {
+        const reason = new Error("then-callback-throw");
+        Promise.resolve().then(() => {
+            throw reason;
+        });
+        afterDrain(function () {
+            expect(reported.length).toBeGreaterThan(0);
+            expect(reported[0]).toBe(reason);
+            done();
+        });
+    });
+
+    it("ignores a late .catch attached after the rejection was already reported", function (done) {
+        const reason = new Error("late-catch");
+        const p = Promise.reject(reason);
+        afterDrain(function () {
+            expect(reported.length).toBeGreaterThan(0);
+            // Attaching a handler after the report was already delivered must not
+            // crash (Phase 1 silently drops the already-drained entry).
+            p.catch(function () {});
+            afterQuietTurns(function () {
+                expect(reported.length).toBe(1);
+                done();
+            });
+        });
+    });
+});

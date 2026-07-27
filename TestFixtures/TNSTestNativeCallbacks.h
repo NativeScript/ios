@@ -69,4 +69,27 @@
 - (void (^)())getBlock;
 - (void (^)())getBlockFromNative;
 
+// Invokes `block` inside @try/@catch and returns the caught NSException, or nil
+// when the block completes without raising. Used to observe native exceptions
+// escaping from JS through interop.escapeException.
++ (NSException*)invokeBlockCatchingException:(void (^)(void))block;
+
+// Convenience: returns the caught exception's reason, or nil when none was
+// raised.
++ (NSString*)invokeAndDescribeException:(void (^)(void))block;
+
+// Returns the JavaScript stack trace associated with `exception` via the
+// NSException(NativeScript) category, or nil when unavailable. The category
+// lives in the NativeScript framework (loaded in-process at runtime) but is not
+// linked by TestFixtures at compile time, so it is invoked via performSelector.
++ (NSString* _Nullable)jsStackTraceForException:(NSException* _Nullable)exception;
+
+// Reads a key from a dictionary natively (exercises the JS-backed
+// DictionaryAdapter's objectForKey boundary).
++ (id)dictionaryValueForKey:(NSDictionary*)dictionary key:(NSString*)key;
+
+// Reads a key path from an object natively via KVC (exercises a JS property
+// accessor boundary).
++ (id)objectValueForKey:(id)object key:(NSString*)key;
+
 @end

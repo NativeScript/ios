@@ -4,6 +4,7 @@
 #include "DictionaryAdapter.h"
 #include "Helpers.h"
 #include "Interop.h"
+#include "NSExceptionSupport.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -128,6 +129,161 @@ Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapp
   return result;
 }
 
+Local<Private> ArgConverter::GetEscapeExceptionBrand(Isolate* isolate) {
+  auto cache = Caches::Get(isolate);
+  // Caches::Get never returns null — after isolate removal it returns a dummy
+  // cache — so validity is the real liveness check before touching V8 state.
+  if (cache == nullptr || !cache->IsValid()) {
+    return Local<Private>();
+  }
+  if (cache->EscapeExceptionBrand == nullptr) {
+    Local<Private> brand =
+        Private::New(isolate, tns::ToV8String(isolate, "interop.escapeException"));
+    cache->EscapeExceptionBrand = std::make_unique<Persistent<Private>>(isolate, brand);
+  }
+  return cache->EscapeExceptionBrand->Get(isolate);
+}
+
+// Builds the combined JS stack string attached to an escaped exception via the
+// associated object: the origin (propagation) stack of the wrapping error and
+// the escape-site stack, each under a labeled section. Empty or duplicate
+// sections are omitted; returns nil when nothing is available.
+static NSString* BuildCombinedJSStack(const std::string& origin, const std::string& escape) {
+  NSMutableArray<NSString*>* parts = [NSMutableArray array];
+  if (!origin.empty()) {
+    [parts addObject:[NSString stringWithFormat:@"JS stack:\n%@", tns::ToNSString(origin)]];
+  }
+  if (!escape.empty() && escape != origin) {
+    [parts addObject:[NSString stringWithFormat:@"Escaped at:\n%@", tns::ToNSString(escape)]];
+  }
+  if (parts.count == 0) {
+    return nil;
+  }
+  return [parts componentsJoinedByString:@"\n\n"];
+}
+
+id ArgConverter::ExtractEscapedException(Local<Context> context, Local<Value> value) {
+  Isolate* isolate = context->GetIsolate();
+  if (value.IsEmpty() || !value->IsObject()) {
+    return nil;
+  }
+  Local<Private> brand = GetEscapeExceptionBrand(isolate);
+  if (brand.IsEmpty()) {
+    return nil;
+  }
+  Local<Object> obj = value.As<Object>();
+  Maybe<bool> hasBrand = obj->HasPrivate(context, brand);
+  if (hasBrand.IsNothing() || !hasBrand.FromJust()) {
+    return nil;
+  }
+  Local<Value> payloadVal;
+  if (!obj->GetPrivate(context, brand).ToLocal(&payloadVal) || !payloadVal->IsObject()) {
+    return nil;
+  }
+  Local<Object> payload = payloadVal.As<Object>();
+
+  auto readString = [&](const char* key, const std::string& fallback) -> std::string {
+    Local<Value> v;
+    if (payload->Get(context, tns::ToV8String(isolate, key)).ToLocal(&v) && !v.IsEmpty() &&
+        v->IsString()) {
+      return tns::ToString(isolate, v);
+    }
+    return fallback;
+  };
+
+  // The escape-site stack always travels with the payload; the origin stack is
+  // the wrapping error's own `.stack`, carried when present.
+  std::string escapeStack = readString("escapeStack", "");
+
+  // Original NSException carried through unchanged when present.
+  Local<Value> nativeExc;
+  if (payload->Get(context, tns::ToV8String(isolate, "nativeException")).ToLocal(&nativeExc) &&
+      nativeExc->IsObject()) {
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, nativeExc);
+    if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+      id data = static_cast<ObjCDataWrapper*>(wrapper)->Data();
+      if ([data isKindOfClass:[NSException class]]) {
+        // Attach the JS stack WITHOUT mutating the original exception's identity
+        // or userInfo — the round-trip contract requires the very same object to
+        // reach the native @catch. The category accessor surfaces it uniformly.
+        std::string originStack = readString("stack", "");
+        NSString* combined = BuildCombinedJSStack(originStack, escapeStack);
+        if (combined != nil) {
+          tns::SetJSStackOnException((NSException*)data, combined);
+        }
+        return (NSException*)data;
+      }
+    }
+  }
+
+  // Otherwise synthesize an NSException from the branded name/message/stack.
+  std::string name = readString("name", "NativeScriptException");
+  std::string message = readString("message", "");
+  std::string stack = readString("stack", "");
+
+  NSString* reasonText = tns::ToNSString(message);
+  if (!stack.empty()) {
+    // Put the JS stack in the reason too so it shows up in native crash logs.
+    reasonText = [reasonText stringByAppendingFormat:@"\n%@", tns::ToNSString(stack)];
+  }
+  NSMutableDictionary* userInfo = [NSMutableDictionary dictionary];
+  if (!stack.empty()) {
+    userInfo[TNSJavaScriptStackTraceKey] = tns::ToNSString(stack);
+  }
+  // Carry the escape-site stack separately only when it adds information beyond
+  // the origin stack.
+  if (!escapeStack.empty() && escapeStack != stack) {
+    userInfo[TNSJavaScriptEscapeStackTraceKey] = tns::ToNSString(escapeStack);
+  }
+  NSException* synthesized = [NSException exceptionWithName:tns::ToNSString(name)
+                                                     reason:reasonText
+                                                   userInfo:userInfo.count ? userInfo : nil];
+  // Attach the combined stack via associated object so the category accessor is
+  // uniform across synthesized and rethrown-original exceptions.
+  NSString* combined = BuildCombinedJSStack(stack, escapeStack);
+  if (combined != nil) {
+    tns::SetJSStackOnException(synthesized, combined);
+  }
+  return synthesized;
+}
+
+id ArgConverter::HandleBoundaryException(Local<Context> context, TryCatch& tc) {
+  if (!tc.HasCaught()) {
+    return nil;
+  }
+  Isolate* isolate = context->GetIsolate();
+  Local<Value> exception = tc.Exception();
+
+  id escaped = ExtractEscapedException(context, exception);
+  if (escaped != nil) {
+    // Branded escape: convert to an ObjC throw. Clear the V8 exception; the
+    // caller @throws this AFTER closing all V8 scopes.
+    tc.Reset();
+    return escaped;
+  }
+
+  // Unbranded: report exactly once through the uncaught path (error-event
+  // dispatch + shims + log; honors uncaughtErrorPolicy). This is the
+  // path for the Assert-hardened sites that today never reach the message
+  // listener at all.
+  Local<v8::Message> message = tc.Message();
+  NativeScriptException::ReportToJsHandlersAndLog(isolate, exception, message);
+  tc.Reset();
+
+  // uncaughtErrorPolicy "throw": the report above runs synchronously here (still
+  // under the boundary's live V8 scopes). Under the "throw" policy it deposited
+  // the NSException into the per-isolate slot; claim it and hand it back so the
+  // caller @throws it AFTER closing every V8 scope (same scopes-before-@throw
+  // discipline as a branded escape) — a native @try/@catch around the boundary
+  // then catches it, matching Android. Under the default "report" policy nothing
+  // is deposited and this is nil.
+  id policyThrow = NativeScriptException::ClaimPendingPolicyThrow(isolate);
+  if (policyThrow != nil) {
+    return policyThrow;
+  }
+  return nil;
+}
+
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
   MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
 
@@ -138,90 +294,143 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     return;
   }
 
-  v8::Locker locker(isolate);
-  Isolate::Scope isolate_scope(isolate);
-  HandleScope handle_scope(isolate);
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  // Declared before all V8 scopes: an ObjC exception must never unwind through a
+  // live V8 scope (Locker/HandleScope/Context::Scope). A branded escape caught
+  // below is captured here and @thrown only after the inner block closes every
+  // V8 scope.
+  NSException* __strong pendingThrow = nil;
 
-  Local<Context> context = cache->GetContext();
-  Context::Scope context_scope(context);
-  std::shared_ptr<Persistent<Value>> poCallback = data->callback_;
+  {
+    v8::Locker locker(isolate);
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
-  bool hasErrorOutParameter = false;
+    Local<Context> context = cache->GetContext();
+    Context::Scope context_scope(context);
+    std::shared_ptr<Persistent<Value>> poCallback = data->callback_;
 
-  std::vector<Local<Value>> v8Args;
-  v8Args.reserve(data->paramsCount_);
-  const TypeEncoding* typeEncoding = data->typeEncoding_;
-  for (int i = 0; i < data->paramsCount_; i++) {
-    typeEncoding = typeEncoding->next();
-    if (i == data->paramsCount_ - 1 && ArgConverter::IsErrorOutParameter(typeEncoding)) {
-      hasErrorOutParameter = true;
-      // No need to provide the NSError** parameter to the javascript callback
-      continue;
-    }
+    bool hasErrorOutParameter = false;
 
-    int argIndex = i + data->initialParamIndex_;
+    std::vector<Local<Value>> v8Args;
+    v8Args.reserve(data->paramsCount_);
+    const TypeEncoding* typeEncoding = data->typeEncoding_;
+    for (int i = 0; i < data->paramsCount_; i++) {
+      typeEncoding = typeEncoding->next();
+      if (i == data->paramsCount_ - 1 && ArgConverter::IsErrorOutParameter(typeEncoding)) {
+        hasErrorOutParameter = true;
+        // No need to provide the NSError** parameter to the javascript callback
+        continue;
+      }
 
-    uint8_t* argBuffer = (uint8_t*)argValues[argIndex];
-    BaseCall call(argBuffer);
-    Local<Value> jsWrapper = Interop::GetResult(context, typeEncoding, &call, true);
+      int argIndex = i + data->initialParamIndex_;
 
-    if (!jsWrapper.IsEmpty()) {
-      v8Args.push_back(jsWrapper);
-    } else {
-      v8Args.push_back(v8::Undefined(isolate));
-    }
-  }
+      uint8_t* argBuffer = (uint8_t*)argValues[argIndex];
+      BaseCall call(argBuffer);
+      Local<Value> jsWrapper = Interop::GetResult(context, typeEncoding, &call, true);
 
-  Local<Object> thiz = context->Global();
-  if (data->initialParamIndex_ > 1) {
-    id self_ = *static_cast<const id*>(argValues[0]);
-    auto it = cache->Instances.find(self_);
-    if (it != cache->Instances.end()) {
-      thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
-    } else {
-      ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
-      thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();
-      tns::DeleteWrapperIfUnused(isolate, thiz, wrapper);
-    }
-  }
-
-  Local<Value> result;
-  Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
-
-  bool success = false;
-  if (hasErrorOutParameter) {
-    // We don't want the global error handler (NativeScriptException::OnUncaughtError) to be called
-    // for javascript exceptions occuring inside methods that have NSError* parameters. Those js
-    // errors will be marshalled to NSError* and sent directly to the calling native code. The
-    // v8::TryCatch statement prevents the global handler to be called.
-    TryCatch tc(isolate);
-    success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
-    if (!success && tc.HasCaught()) {
-      Local<Value> exception = tc.Exception();
-      std::string message = tns::ToString(isolate, exception);
-
-      int errorParamIndex = data->initialParamIndex_ + data->paramsCount_ - 1;
-      void* errorParam = argValues[errorParamIndex];
-      NSError* __strong** outPtr = static_cast<NSError * __strong**>(errorParam);
-      if (outPtr && *outPtr) {
-        NSError* error =
-            [NSError errorWithDomain:@"TNSErrorDomain"
-                                code:164
-                            userInfo:@{@"TNSJavaScriptError" : tns::ToNSString(message)}];
-        **static_cast<NSError * __strong**>(outPtr) = error;
+      if (!jsWrapper.IsEmpty()) {
+        v8Args.push_back(jsWrapper);
+      } else {
+        v8Args.push_back(v8::Undefined(isolate));
       }
     }
-  } else {
-    success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
-  }
 
-  if (!success) {
-    memset(retValue, 0, cif->rtype->size);
-    return;
-  }
+    Local<Object> thiz = context->Global();
+    if (data->initialParamIndex_ > 1) {
+      id self_ = *static_cast<const id*>(argValues[0]);
+      auto it = cache->Instances.find(self_);
+      if (it != cache->Instances.end()) {
+        thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
+      } else {
+        ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
+        thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();
+        tns::DeleteWrapperIfUnused(isolate, thiz, wrapper);
+      }
+    }
 
-  ArgConverter::SetValue(context, retValue, result, data->typeEncoding_);
+    Local<Value> result;
+    Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
+
+    bool success = false;
+    if (hasErrorOutParameter) {
+      // We don't want the global error handler (NativeScriptException::OnUncaughtError) to be
+      // called for javascript exceptions occuring inside methods that have NSError* parameters.
+      // Those js errors will be marshalled to NSError* and sent directly to the calling native
+      // code. The v8::TryCatch statement prevents the global handler to be called.
+      TryCatch tc(isolate);
+      success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
+      if (!success && tc.HasCaught()) {
+        // A branded escapeException follows the @throw path even here, taking
+        // precedence over NSError-out marshaling.
+        NSException* escaped = ExtractEscapedException(context, tc.Exception());
+        if (escaped != nil) {
+          pendingThrow = escaped;
+        } else {
+          Local<Value> exception = tc.Exception();
+          std::string message = tns::ToString(isolate, exception);
+
+          int errorParamIndex = data->initialParamIndex_ + data->paramsCount_ - 1;
+          void* errorParam = argValues[errorParamIndex];
+          NSError* __strong** outPtr = static_cast<NSError * __strong**>(errorParam);
+          if (outPtr && *outPtr) {
+            NSError* error =
+                [NSError errorWithDomain:@"TNSErrorDomain"
+                                    code:164
+                                userInfo:@{@"TNSJavaScriptError" : tns::ToNSString(message)}];
+            **static_cast<NSError * __strong**>(outPtr) = error;
+          }
+        }
+      }
+    } else {
+      TryCatch tc(isolate);
+      success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
+      if (!success && tc.HasCaught()) {
+        NSException* escaped = ExtractEscapedException(context, tc.Exception());
+        if (escaped != nil) {
+          pendingThrow = escaped;
+        } else {
+          // Unbranded: re-throw so the pending exception surfaces to V8's message
+          // listener exactly once (OnUncaughtError), preserving existing behavior.
+          tc.ReThrow();
+        }
+      }
+    }
+
+    // uncaughtErrorPolicy "throw" boundary claim (best-effort). Unlike the
+    // HandleBoundaryException sites (property accessors, DictionaryAdapter),
+    // which report the throw SYNCHRONOUSLY within their own frame and can
+    // therefore claim the deposit here, this path uses tc.ReThrow(): the
+    // unbranded exception is surfaced to V8 as pending and only reported when it
+    // reaches an uncaught V8 Invoke boundary UP THE STACK (or is caught in JS
+    // first). Empirically (verified with instrumentation over the suite,
+    // including a native-origin NSOperationQueue-invoked block) the message
+    // listener does NOT run during `tc`'s teardown, so under the "throw" policy
+    // nothing has been deposited by the time we reach this point and this claim
+    // is a no-op — those errors are instead handled by the deferred clean-frame
+    // fallback. The claim is kept as a defensive hook (harmless when the slot is
+    // empty; identity-checked so it can never steal an unrelated deposit) and to
+    // mirror the boundary discipline. Under the default "report" policy nothing
+    // is ever deposited. The NSError-out branch neither reports nor deposits.
+    // Skip when a branded escape already set pendingThrow.
+    if (pendingThrow == nil) {
+      pendingThrow = NativeScriptException::ClaimPendingPolicyThrow(isolate);
+    }
+
+    if (pendingThrow == nil) {
+      if (!success) {
+        memset(retValue, 0, cif->rtype->size);
+      } else {
+        ArgConverter::SetValue(context, retValue, result, data->typeEncoding_);
+      }
+    } else {
+      memset(retValue, 0, cif->rtype->size);
+    }
+  }  // all V8 scopes destruct here
+
+  if (pendingThrow != nil) {
+    @throw pendingThrow;
+  }
 }
 
 void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value> value,
