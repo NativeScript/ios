@@ -15,10 +15,9 @@ using namespace std;
 
 namespace tns {
 
-void ArgConverter::Init(Local<Context> context,
-                        GenericNamedPropertyGetterCallback structPropertyGetter,
-                        GenericNamedPropertySetterCallback structPropertySetter) {
-  Isolate* isolate = context->GetIsolate();
+void ArgConverter::Init(Local<Context> context, NamedPropertyGetterCallback structPropertyGetter,
+                        NamedPropertySetterCallbackV2 structPropertySetter) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   cache->EmptyObjCtorFunc = std::make_unique<Persistent<v8::Function>>(
       isolate, ArgConverter::CreateEmptyInstanceFunction(context));
@@ -29,7 +28,7 @@ void ArgConverter::Init(Local<Context> context,
 
 Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Object> receiver,
                                   V8Args& args, const MethodMeta* meta, bool isMethodCallback) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   id target = nil;
   bool instanceMethod = !receiver.IsEmpty();
   bool callSuper = false;
@@ -119,7 +118,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
 Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapper* wrapper,
                                            bool skipGCRegistration,
                                            const std::vector<std::string>& additionalProtocols) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   if (wrapper == nullptr) {
     return Null(isolate);
   }
@@ -163,7 +162,7 @@ static NSString* BuildCombinedJSStack(const std::string& origin, const std::stri
 }
 
 id ArgConverter::ExtractEscapedException(Local<Context> context, Local<Value> value) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   if (value.IsEmpty() || !value->IsObject()) {
     return nil;
   }
@@ -251,7 +250,7 @@ id ArgConverter::HandleBoundaryException(Local<Context> context, TryCatch& tc) {
   if (!tc.HasCaught()) {
     return nil;
   }
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Value> exception = tc.Exception();
 
   id escaped = ExtractEscapedException(context, exception);
@@ -445,7 +444,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
     return;
   }
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   // TODO: Refactor this to reuse some existing logic in Interop::SetFFIParams
   BinaryTypeEncodingType type = typeEncoding->type;
@@ -556,7 +555,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
 
 void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbackInfo<Value>& info,
                                    Class klass, const InterfaceMeta* interfaceMeta) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(klass != nullptr, isolate);
 
   id result = nil;
@@ -610,7 +609,7 @@ const MethodMeta* ArgConverter::FindInitializer(Local<Context> context, Class kl
                                                 const InterfaceMeta* interfaceMeta,
                                                 const FunctionCallbackInfo<Value>& info,
                                                 std::vector<Local<Value>>& args) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   std::vector<const MethodMeta*> candidates;
   args = tns::ArgsToVector(info);
   std::vector<Local<Value>> initializerArgs;
@@ -702,7 +701,7 @@ bool ArgConverter::CanInvoke(Local<Context> context, const TypeEncoding* typeEnc
     return true;
   }
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
     const char* name = typeEncoding->details.declarationReference.name.valuePtr();
     if (strcmp(name, "NSNumber") == 0 && tns::IsNumber(arg)) {
@@ -777,9 +776,9 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj,
   std::vector<Local<Value>> args;
   constructorTokens = "";
   Local<Context> context;
-  bool success = obj->GetCreationContext().ToLocal(&context);
+  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
   tns::Assert(success);
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Array> properties;
   if (obj->GetOwnPropertyNames(context).ToLocal(&properties)) {
     std::stringstream ss;
@@ -803,7 +802,7 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj,
 Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapper* wrapper,
                                            Local<Object> receiver, bool skipGCRegistration,
                                            const std::vector<std::string>& additionalProtocols) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   if (wrapper == nullptr) {
     return Null(isolate);
@@ -1024,14 +1023,14 @@ const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
 
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context,
                                                                    bool skipGCRegistration) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyObjCtorFunc.get();
   tns::Assert(ctorFunc != nullptr, isolate);
   return ArgConverter::CreateEmptyInstance(context, ctorFunc, skipGCRegistration);
 }
 
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyStruct(Local<Context> context) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyStructCtorFunc.get();
   tns::Assert(ctorFunc != nullptr, isolate);
   return ArgConverter::CreateEmptyInstance(context, ctorFunc);
@@ -1039,7 +1038,7 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyStruct(Local<Context
 
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(
     Local<Context> context, Persistent<v8::Function>* ctorFunc, bool skipGCRegistration) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Function> emptyCtorFunc = ctorFunc->Get(isolate);
   Local<Value> value;
   if (!emptyCtorFunc->CallAsConstructor(context, 0, nullptr).ToLocal(&value) || value.IsEmpty() ||
@@ -1059,9 +1058,9 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(
 }
 
 Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(
-    Local<Context> context, GenericNamedPropertyGetterCallback propertyGetter,
-    GenericNamedPropertySetterCallback propertySetter) {
-  Isolate* isolate = context->GetIsolate();
+    Local<Context> context, NamedPropertyGetterCallback propertyGetter,
+    NamedPropertySetterCallbackV2 propertySetter) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<FunctionTemplate> emptyInstanceCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
   Local<ObjectTemplate> instanceTemplate = emptyInstanceCtorFuncTemplate->InstanceTemplate();
   instanceTemplate->SetInternalFieldCount(2);
@@ -1071,8 +1070,8 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(
     instanceTemplate->SetHandler(config);
   }
 
-  instanceTemplate->SetIndexedPropertyHandler(IndexedPropertyGetterCallback,
-                                              IndexedPropertySetterCallback);
+  instanceTemplate->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetterCallback,
+                                                                   IndexedPropertySetterCallback));
 
   Local<v8::Function> emptyInstanceCtorFunc;
   if (!emptyInstanceCtorFuncTemplate->GetFunction(context).ToLocal(&emptyInstanceCtorFunc)) {
@@ -1081,24 +1080,24 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(
   return emptyInstanceCtorFunc;
 }
 
-void ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
-                                                 const PropertyCallbackInfo<Value>& args) {
-  Local<Object> thiz = args.This();
+Intercepted ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
+                                                        const PropertyCallbackInfo<Value>& args) {
+  Local<Object> thiz = args.Holder();
   Isolate* isolate = args.GetIsolate();
   BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
   if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   ObjCDataWrapper* objcDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
   id target = objcDataWrapper->Data();
   if (![target isKindOfClass:[NSArray class]]) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   NSArray* array = (NSArray*)target;
   if (index >= [array count]) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   id obj = [array objectAtIndex:index];
@@ -1107,17 +1106,17 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
   auto it = cache->Instances.find(obj);
   if (it != cache->Instances.end()) {
     args.GetReturnValue().Set(it->second->Get(isolate));
-    return;
+    return v8::Intercepted::kYes;
   }
 
   if (obj == nil || obj == [NSNull null]) {
     args.GetReturnValue().SetNull();
-    return;
+    return v8::Intercepted::kYes;
   }
 
   if ([obj isKindOfClass:[@YES class]]) {
     args.GetReturnValue().Set([obj boolValue]);
-    return;
+    return v8::Intercepted::kYes;
   }
 
   if ([obj isKindOfClass:[NSDate class]]) {
@@ -1126,7 +1125,7 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
     Local<Value> date;
     if (Date::New(context, time).ToLocal(&date)) {
       args.GetReturnValue().Set(date);
-      return;
+      return v8::Intercepted::kYes;
     }
 
     std::ostringstream errorStream;
@@ -1134,19 +1133,19 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
     std::string errorMessage = errorStream.str();
     Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
     isolate->ThrowException(error);
-    return;
+    return v8::Intercepted::kYes;
   }
 
   if ([obj isKindOfClass:[NSString class]]) {
     NSString* nativeStr = (NSString*)obj;
     args.GetReturnValue().Set(tns::ToV8String(isolate, nativeStr));
-    return;
+    return v8::Intercepted::kYes;
   }
 
   if ([obj isKindOfClass:[NSNumber class]] && ![obj isKindOfClass:[NSDecimalNumber class]]) {
     double value = [obj doubleValue];
     args.GetReturnValue().Set(value);
-    return;
+    return v8::Intercepted::kYes;
   }
 
   Local<Context> context = isolate->GetCurrentContext();
@@ -1154,36 +1153,41 @@ void ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
   Local<Value> result = ArgConverter::ConvertArgument(context, newWrapper);
   tns::DeleteWrapperIfUnused(isolate, result, newWrapper);
   args.GetReturnValue().Set(result);
+  return v8::Intercepted::kYes;
 }
 
-void ArgConverter::IndexedPropertySetterCallback(uint32_t index, Local<Value> value,
-                                                 const PropertyCallbackInfo<Value>& args) {
-  Local<Object> thiz = args.This();
+Intercepted ArgConverter::IndexedPropertySetterCallback(
+    uint32_t index, Local<Value> value, const PropertyCallbackInfo<v8::Boolean>& args) {
+  Local<Object> thiz = args.Holder();
   Isolate* isolate = args.GetIsolate();
   BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
   if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   ObjCDataWrapper* objcDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
   id target = objcDataWrapper->Data();
   if (![target isKindOfClass:[NSMutableArray class]]) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   NSMutableArray* array = (NSMutableArray*)target;
   if (index >= [array count]) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   BaseDataWrapper* itemWrapper = tns::GetValue(isolate, value);
   if (itemWrapper == nullptr || itemWrapper->Type() != WrapperType::ObjCObject) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   ObjCDataWrapper* objcItemDataWrapper = static_cast<ObjCDataWrapper*>(itemWrapper);
   id item = objcItemDataWrapper->Data();
   [target replaceObjectAtIndex:index withObject:item];
+  // Not intercepted: the native write is done, but V8 must still perform
+  // the ordinary store, which is what the old void-returning callback did
+  // by falling through without setting a return value.
+  return v8::Intercepted::kNo;
 }
 
 void ArgConverter::FindMethodOverloads(Class klass, std::string methodName, MemberType type,

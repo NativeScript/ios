@@ -7,8 +7,8 @@
 
 #include "V8Runtime.h"
 
-#include "runtime/Runtime.h"
 #include "runtime/Helpers.h"
+#include "runtime/Runtime.h"
 #include "v8.h"
 
 // #include <glog/logging.h>
@@ -212,7 +212,7 @@ void V8Runtime::OnMainLoopIdle() {
 //   v8::MaybeLocal<v8::String> sourceURLValue = v8::String::NewFromUtf8(
 //       isolate, sourceURL.c_str(), v8::NewStringType::kNormal,
 //       static_cast<int>(sourceURL.length()));
-//   v8::ScriptOrigin origin(isolate, sourceURLValue.ToLocalChecked());
+//   v8::ScriptOrigin origin(sourceURLValue.ToLocalChecked());
 
 //   v8::Local<v8::Context> context(isolate->GetCurrentContext());
 
@@ -294,10 +294,10 @@ void V8Runtime::ReportException(v8::Isolate* isolate,
     if (tryCatch->StackTrace(context).ToLocal(&stackTraceString) &&
         stackTraceString->IsString() &&
         v8::Local<v8::String>::Cast(stackTraceString)->Length() > 0) {
-  v8::String::Utf8Value stackTrace(isolate, stackTraceString);
-  std::string stlStack = JSIV8ValueConverter::ToSTLString(stackTrace);
-  // Reverted: do not remap stack here
-  ss << stlStack << std::endl;
+      v8::String::Utf8Value stackTrace(isolate, stackTraceString);
+      std::string stlStack = JSIV8ValueConverter::ToSTLString(stackTrace);
+      // Reverted: do not remap stack here
+      ss << stlStack << std::endl;
     }
 
     throw jsi::JSError(const_cast<V8Runtime&>(*this), ss.str());
@@ -406,7 +406,7 @@ V8Runtime::InternalFieldType V8Runtime::GetInternalFieldType(
   if (object->InternalFieldCount() != 2) {
     return V8Runtime::InternalFieldType::kInvalid;
   }
-  v8::Local<v8::Value> typeValue = object->GetInternalField(0);
+  v8::Local<v8::Value> typeValue = object->GetInternalField(0).As<v8::Value>();
   assert(typeValue->IsUint32());
   return static_cast<V8Runtime::InternalFieldType>(
       v8::Local<v8::Uint32>::Cast(typeValue)->Value());
@@ -821,8 +821,8 @@ jsi::Object V8Runtime::createObject(
     throw jsi::JSError(*this, "Unable to create HostObject");
   }
 
-  v8::Local<v8::External> wrappedHostObjectProxy =
-      v8::External::New(isolate_, hostObjectProxy);
+  v8::Local<v8::External> wrappedHostObjectProxy = v8::External::New(
+      isolate_, hostObjectProxy, v8::kExternalPointerTypeTagDefault);
   v8Object->SetInternalField(0, v8::Integer::NewFromUnsigned(
                                     isolate_, InternalFieldType::kHostObject));
   v8Object->SetInternalField(1, wrappedHostObjectProxy);
@@ -846,8 +846,8 @@ std::shared_ptr<jsi::HostObject> V8Runtime::getHostObject(
       JSIV8ValueConverter::ToV8Object(*this, object);
   v8::Local<v8::External> internalField =
       v8::Local<v8::External>::Cast(v8Object->GetInternalField(1));
-  HostObjectProxy* hostObjectProxy =
-      reinterpret_cast<HostObjectProxy*>(internalField->Value());
+  HostObjectProxy* hostObjectProxy = reinterpret_cast<HostObjectProxy*>(
+      internalField->Value(v8::kExternalPointerTypeTagDefault));
   assert(hostObjectProxy);
   return hostObjectProxy->GetHostObject();
 }
@@ -876,8 +876,8 @@ jsi::HostFunctionType& V8Runtime::getHostFunction(
       v8::Local<v8::External>::Cast(
           v8Function->Get(isolate_->GetCurrentContext(), prop)
               .ToLocalChecked());
-  HostFunctionProxy* hostFunctionProxy =
-      reinterpret_cast<HostFunctionProxy*>(wrappedHostFunctionProxy->Value());
+  HostFunctionProxy* hostFunctionProxy = reinterpret_cast<HostFunctionProxy*>(
+      wrappedHostFunctionProxy->Value(v8::kExternalPointerTypeTagDefault));
   assert(hostFunctionProxy);
   return hostFunctionProxy->GetHostFunction();
 }
@@ -910,7 +910,8 @@ std::shared_ptr<jsi::NativeState> V8Runtime::getNativeState(
   v8::Local<v8::Object> v8Object =
       JSIV8ValueConverter::ToV8Object(*this, object);
   auto* nativeStatePtr = reinterpret_cast<std::shared_ptr<jsi::NativeState>*>(
-      v8Object->GetAlignedPointerFromInternalField(1));
+      v8Object->GetAlignedPointerFromInternalField(
+          1, v8::kEmbedderDataTypeTagDefault));
   return std::shared_ptr(*nativeStatePtr);
 }
 
@@ -946,7 +947,8 @@ void V8Runtime::setNativeState(const jsi::Object& object,
   auto* nativeStatePtr =
       new std::shared_ptr<jsi::NativeState>(std::move(state));
   v8Object->SetAlignedPointerInInternalField(
-      1, reinterpret_cast<void*>(nativeStatePtr));
+      1, reinterpret_cast<void*>(nativeStatePtr),
+      v8::kEmbedderDataTypeTagDefault);
 
   // Clone properties to the new object created from object template with
   // two internal fields.
@@ -1322,8 +1324,8 @@ jsi::Function V8Runtime::createFunctionFromHostFunction(
 
   HostFunctionProxy* hostFunctionProxy =
       new HostFunctionProxy(*this, isolate_, std::move(func));
-  v8::Local<v8::External> wrappedHostFunctionProxy =
-      v8::External::New(isolate_, hostFunctionProxy);
+  v8::Local<v8::External> wrappedHostFunctionProxy = v8::External::New(
+      isolate_, hostFunctionProxy, v8::kExternalPointerTypeTagDefault);
   v8::Local<v8::Function> v8HostFunction =
       v8::Function::New(isolate_->GetCurrentContext(),
                         HostFunctionProxy::FunctionCallback,

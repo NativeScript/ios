@@ -31,23 +31,18 @@ extern "C" void NSLog(CFStringRef format, ...);
 
 namespace tns {
 
-inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,
-                                        const std::string& value) {
-  return v8::String::NewFromUtf8(isolate, value.c_str(),
-                                 v8::NewStringType::kNormal,
+inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const std::string& value) {
+  return v8::String::NewFromUtf8(isolate, value.c_str(), v8::NewStringType::kNormal,
                                  (int)value.length())
       .ToLocalChecked();
 }
 
-inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const char* value,
-                                        int length) {
-  return v8::String::NewFromUtf8(isolate, value, v8::NewStringType::kNormal,
-                                 length)
+inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const char* value, int length) {
+  return v8::String::NewFromUtf8(isolate, value, v8::NewStringType::kNormal, length)
       .ToLocalChecked();
 }
 #ifdef __OBJC__
-inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,
-                                        const NSString* value) {
+inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const NSString* value) {
   /*
    // TODO: profile if this is faster
    // maybe have multiple conversion
@@ -73,14 +68,12 @@ inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate,
       return result;
   }
    */
-  return v8::String::NewFromUtf8(
-             isolate, [value UTF8String], v8::NewStringType::kNormal,
-             (int)[value lengthOfBytesUsingEncoding:NSUTF8StringEncoding])
+  return v8::String::NewFromUtf8(isolate, [value UTF8String], v8::NewStringType::kNormal,
+                                 (int)[value lengthOfBytesUsingEncoding:NSUTF8StringEncoding])
       .ToLocalChecked();
 }
 #endif
-inline std::string ToString(v8::Isolate* isolate,
-                            const v8::Local<v8::Value>& value) {
+inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
   if (value.IsEmpty()) {
     return std::string();
   }
@@ -102,14 +95,12 @@ inline std::string ToString(v8::Isolate* isolate,
 
 #ifdef __OBJC__
 inline NSString* ToNSString(const std::string& v) {
-  return [[[NSString alloc] initWithBytes:v.c_str()
-                                   length:v.length()
+  return [[[NSString alloc] initWithBytes:v.c_str() length:v.length()
                                  encoding:NSUTF8StringEncoding] S_AUTORELEASE];
 }
 // Reads the V8 string's native UTF-16 buffer directly so lone surrogates and
 // embedded NUL survive the bridge; a UTF-8 round-trip loses both.
-inline NSString* ToNSString(v8::Isolate* isolate,
-                            const v8::Local<v8::Value>& value) {
+inline NSString* ToNSString(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
   if (value.IsEmpty()) {
     return @"";
   }
@@ -119,21 +110,24 @@ inline NSString* ToNSString(v8::Isolate* isolate,
     return ToNSString(isolate, obj);
   }
 
-  v8::String::Value result(isolate, value);
-
-  const uint16_t* val = *result;
-  if (val == nullptr) {
+  v8::Local<v8::String> str;
+  if (!value->ToString(isolate->GetCurrentContext()).ToLocal(&str)) {
     return @"";
   }
 
-  return [NSString stringWithCharacters:(const unichar*)val
-                                 length:result.length()];
+  v8::String::ValueView result(isolate, str);
+  if (result.is_one_byte()) {
+    // A one-byte V8 string is Latin-1, not UTF-8.
+    return [[[NSString alloc] initWithBytes:result.data8()
+                                     length:result.length()
+                                   encoding:NSISOLatin1StringEncoding] S_AUTORELEASE];
+  }
+
+  return [NSString stringWithCharacters:(const unichar*)result.data16() length:result.length()];
 }
 #endif
-std::u16string ToUtf16String(v8::Isolate* isolate,
-                             const v8::Local<v8::Value>& value);
-inline double ToNumber(v8::Isolate* isolate,
-                       const v8::Local<v8::Value>& value) {
+std::u16string ToUtf16String(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
+inline double ToNumber(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
   double result = NAN;
 
   if (value.IsEmpty()) {
@@ -173,29 +167,23 @@ inline bool ToBool(const v8::Local<v8::Value>& value) {
 std::vector<uint16_t> ToVector(const std::string& value);
 
 bool Exists(const char* fullPath);
-v8::Local<v8::String> ReadModule(v8::Isolate* isolate,
-                                 const std::string& filePath);
+v8::Local<v8::String> ReadModule(v8::Isolate* isolate, const std::string& filePath);
 const char* ReadText(const std::string& filePath, long& length, bool& isNew);
 std::string ReadText(const std::string& file);
 uint8_t* ReadBinary(const std::string path, long& length, bool& isNew);
 bool WriteBinary(const std::string& path, const void* data, long length);
 
-void SetPrivateValue(const v8::Local<v8::Object>& obj,
-                     const v8::Local<v8::String>& propName,
+void SetPrivateValue(const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName,
                      const v8::Local<v8::Value>& value);
 v8::Local<v8::Value> GetPrivateValue(const v8::Local<v8::Object>& obj,
                                      const v8::Local<v8::String>& propName);
 
-void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj,
-              BaseDataWrapper* value);
-BaseDataWrapper* GetValue(v8::Isolate* isolate,
-                          const v8::Local<v8::Value>& val);
+void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
+BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 void DeleteValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
-bool DeleteWrapperIfUnused(v8::Isolate* isolate,
-                           const v8::Local<v8::Value>& obj,
+bool DeleteWrapperIfUnused(v8::Isolate* isolate, const v8::Local<v8::Value>& obj,
                            BaseDataWrapper* value);
-std::vector<v8::Local<v8::Value>> ArgsToVector(
-    const v8::FunctionCallbackInfo<v8::Value>& info);
+std::vector<v8::Local<v8::Value>> ArgsToVector(const v8::FunctionCallbackInfo<v8::Value>& info);
 
 inline bool IsString(const v8::Local<v8::Value>& value) {
   return !value.IsEmpty() && (value->IsString() || value->IsStringObject());
@@ -213,14 +201,11 @@ inline bool IsBool(const v8::Local<v8::Value>& value) {
   return !value.IsEmpty() && (value->IsBoolean() || value->IsBooleanObject());
 }
 
-bool IsArrayOrArrayLike(v8::Isolate* isolate,
-                        const v8::Local<v8::Value>& value);
-void* TryGetBufferFromArrayBuffer(const v8::Local<v8::Value>& value,
-                                  bool& isArrayBuffer);
+bool IsArrayOrArrayLike(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
+void* TryGetBufferFromArrayBuffer(const v8::Local<v8::Value>& value, bool& isArrayBuffer);
 
 void ExecuteOnRunLoop(CFRunLoopRef queue, void (^func)(void), bool async = true);
-void ExecuteOnDispatchQueue(dispatch_queue_t queue, std::function<void()> func,
-                            bool async = true);
+void ExecuteOnDispatchQueue(dispatch_queue_t queue, std::function<void()> func, bool async = true);
 void ExecuteOnMainThread(std::function<void()> func, bool async = true);
 
 void LogError(v8::Isolate* isolate, v8::TryCatch& tc);
@@ -240,8 +225,7 @@ static inline void TNS_FormatAndLog(NSString* fmt, ...) {
 
   // Use NSString's formatting to handle both C and Objective-C format
   // specifiers
-  NSString* formattedString =
-      [[NSString alloc] initWithFormat:fmt arguments:ap];
+  NSString* formattedString = [[NSString alloc] initWithFormat:fmt arguments:ap];
   va_end(ap);
 
   if (!formattedString) {
@@ -322,11 +306,10 @@ v8::Local<v8::String> JsonStringifyObject(v8::Local<v8::Context> context,
                                           bool handleCircularReferences = true);
 v8::Local<v8::Function> GetSmartJSONStringifyFunction(v8::Isolate* isolate);
 
-std::string ReplaceAll(const std::string source, std::string find,
-                       std::string replacement);
+std::string ReplaceAll(const std::string source, std::string find, std::string replacement);
 
-const std::string BuildStacktraceFrameLocationPart(
-    v8::Isolate* isolate, v8::Local<v8::StackFrame> frame);
+const std::string BuildStacktraceFrameLocationPart(v8::Isolate* isolate,
+                                                   v8::Local<v8::StackFrame> frame);
 const std::string BuildStacktraceFrameMessage(v8::Isolate* isolate,
                                               v8::Local<v8::StackFrame> frame);
 const std::string GetStackTrace(v8::Isolate* isolate);
@@ -339,8 +322,7 @@ std::string RemapStackTraceIfAvailable(v8::Isolate* isolate, const std::string& 
 // 1) exception.stack if provided
 // 2) TryCatch.StackTrace / Message()->GetStackTrace when TryCatch provided
 // 3) Current stack via GetStackTrace
-std::string GetSmartStackTrace(v8::Isolate* isolate,
-                               v8::TryCatch* tryCatch = nullptr,
+std::string GetSmartStackTrace(v8::Isolate* isolate, v8::TryCatch* tryCatch = nullptr,
                                v8::Local<v8::Value> exception = v8::Local<v8::Value>());
 
 bool LiveSync(v8::Isolate* isolate);
@@ -351,38 +333,29 @@ void Assert(bool condition, v8::Isolate* isolate = nullptr,
 void StopExecutionAndLogStackTrace(v8::Isolate* isolate);
 
 // Helpers from Node
-inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate,
-                                           const char* data, int length) {
-  return v8::String::NewFromOneByte(isolate,
-                                    reinterpret_cast<const uint8_t*>(data),
+inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate, const char* data, int length) {
+  return v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(data),
                                     v8::NewStringType::kNormal, length)
       .ToLocalChecked();
 }
-inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate,
-                                           const signed char* data,
+inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate, const signed char* data,
                                            int length) {
-  return v8::String::NewFromOneByte(isolate,
-                                    reinterpret_cast<const uint8_t*>(data),
+  return v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(data),
                                     v8::NewStringType::kNormal, length)
       .ToLocalChecked();
 }
-inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate,
-                                           const unsigned char* data,
+inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate, const unsigned char* data,
                                            int length) {
-  return v8::String::NewFromOneByte(isolate, data, v8::NewStringType::kNormal,
-                                    length)
+  return v8::String::NewFromOneByte(isolate, data, v8::NewStringType::kNormal, length)
       .ToLocalChecked();
 }
 
 // Convenience wrapper around v8::String::NewFromOneByte().
-inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate,
-                                           const char* data, int length = -1);
+inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate, const char* data, int length = -1);
 // For the people that compile with -funsigned-char.
-inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate,
-                                           const signed char* data,
+inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate, const signed char* data,
                                            int length = -1);
-inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate,
-                                           const unsigned char* data,
+inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate, const unsigned char* data,
                                            int length = -1);
 
 v8::Local<v8::FunctionTemplate> NewFunctionTemplate(
@@ -393,84 +366,69 @@ v8::Local<v8::FunctionTemplate> NewFunctionTemplate(
     v8::SideEffectType side_effect = v8::SideEffectType::kHasSideEffect,
     const v8::CFunction* c_function = nullptr);
 // Convenience methods for NewFunctionTemplate().
-void SetMethod(v8::Local<v8::Context> context, v8::Local<v8::Object> that,
-               const char* name, v8::FunctionCallback callback,
-               v8::Local<v8::Value> data = v8::Local<v8::Value>());
+void SetMethod(v8::Local<v8::Context> context, v8::Local<v8::Object> that, const char* name,
+               v8::FunctionCallback callback, v8::Local<v8::Value> data = v8::Local<v8::Value>());
 // Similar to SetProtoMethod but without receiver signature checks.
-void SetMethod(v8::Isolate* isolate, v8::Local<v8::Template> that,
-               const char* name, v8::FunctionCallback callback,
-               v8::Local<v8::Value> data = v8::Local<v8::Value>());
-void SetFastMethod(v8::Isolate* isolate, v8::Local<v8::Template> that,
-                   const char* name, v8::FunctionCallback slow_callback,
-                   const v8::CFunction* c_function,
+void SetMethod(v8::Isolate* isolate, v8::Local<v8::Template> that, const char* name,
+               v8::FunctionCallback callback, v8::Local<v8::Value> data = v8::Local<v8::Value>());
+void SetFastMethod(v8::Isolate* isolate, v8::Local<v8::Template> that, const char* name,
+                   v8::FunctionCallback slow_callback, const v8::CFunction* c_function,
                    v8::Local<v8::Value> data = v8::Local<v8::Value>());
-void SetFastMethod(v8::Local<v8::Context> context, v8::Local<v8::Object> that,
-                   const char* name, v8::FunctionCallback slow_callback,
-                   const v8::CFunction* c_function,
+void SetFastMethod(v8::Local<v8::Context> context, v8::Local<v8::Object> that, const char* name,
+                   v8::FunctionCallback slow_callback, const v8::CFunction* c_function,
                    v8::Local<v8::Value> data = v8::Local<v8::Value>());
-void SetFastMethodNoSideEffect(
-    v8::Isolate* isolate, v8::Local<v8::Template> that, const char* name,
-    v8::FunctionCallback slow_callback, const v8::CFunction* c_function,
-    v8::Local<v8::Value> data = v8::Local<v8::Value>());
-void SetFastMethodNoSideEffect(
-    v8::Local<v8::Context> context, v8::Local<v8::Object> that,
-    const char* name, v8::FunctionCallback slow_callback,
-    const v8::CFunction* c_function,
-    v8::Local<v8::Value> data = v8::Local<v8::Value>());
-void SetProtoMethod(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> that,
-                    const char* name, v8::FunctionCallback callback,
+void SetFastMethodNoSideEffect(v8::Isolate* isolate, v8::Local<v8::Template> that, const char* name,
+                               v8::FunctionCallback slow_callback, const v8::CFunction* c_function,
+                               v8::Local<v8::Value> data = v8::Local<v8::Value>());
+void SetFastMethodNoSideEffect(v8::Local<v8::Context> context, v8::Local<v8::Object> that,
+                               const char* name, v8::FunctionCallback slow_callback,
+                               const v8::CFunction* c_function,
+                               v8::Local<v8::Value> data = v8::Local<v8::Value>());
+void SetProtoMethod(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> that, const char* name,
+                    v8::FunctionCallback callback,
                     v8::Local<v8::Value> data = v8::Local<v8::Value>());
-void SetInstanceMethod(v8::Isolate* isolate,
-                       v8::Local<v8::FunctionTemplate> that, const char* name,
+void SetInstanceMethod(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> that, const char* name,
                        v8::FunctionCallback callback,
                        v8::Local<v8::Value> data = v8::Local<v8::Value>());
 // Safe variants denote the function has no side effects.
-void SetMethodNoSideEffect(v8::Local<v8::Context> context,
-                           v8::Local<v8::Object> that, const char* name,
-                           v8::FunctionCallback callback,
-                           v8::Local<v8::Value> data = v8::Local<v8::Value>());
-void SetProtoMethodNoSideEffect(
-    v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> that,
-    const char* name, v8::FunctionCallback callback,
-    v8::Local<v8::Value> data = v8::Local<v8::Value>());
-void SetMethodNoSideEffect(v8::Isolate* isolate, v8::Local<v8::Template> that,
+void SetMethodNoSideEffect(v8::Local<v8::Context> context, v8::Local<v8::Object> that,
                            const char* name, v8::FunctionCallback callback,
+                           v8::Local<v8::Value> data = v8::Local<v8::Value>());
+void SetProtoMethodNoSideEffect(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> that,
+                                const char* name, v8::FunctionCallback callback,
+                                v8::Local<v8::Value> data = v8::Local<v8::Value>());
+void SetMethodNoSideEffect(v8::Isolate* isolate, v8::Local<v8::Template> that, const char* name,
+                           v8::FunctionCallback callback,
                            v8::Local<v8::Value> data = v8::Local<v8::Value>());
 enum class SetConstructorFunctionFlag {
   NONE,
   SET_CLASS_NAME,
 };
-void SetConstructorFunction(v8::Local<v8::Context> context,
-                            v8::Local<v8::Object> that, const char* name,
-                            v8::Local<v8::FunctionTemplate> tmpl,
-                            SetConstructorFunctionFlag flag =
-                                SetConstructorFunctionFlag::SET_CLASS_NAME);
-void SetConstructorFunction(v8::Local<v8::Context> context,
-                            v8::Local<v8::Object> that,
-                            v8::Local<v8::String> name,
-                            v8::Local<v8::FunctionTemplate> tmpl,
-                            SetConstructorFunctionFlag flag =
-                                SetConstructorFunctionFlag::SET_CLASS_NAME);
-void SetConstructorFunction(v8::Isolate* isolate, v8::Local<v8::Template> that,
-                            const char* name,
-                            v8::Local<v8::FunctionTemplate> tmpl,
-                            SetConstructorFunctionFlag flag =
-                                SetConstructorFunctionFlag::SET_CLASS_NAME);
-void SetConstructorFunction(v8::Isolate* isolate, v8::Local<v8::Template> that,
-                            v8::Local<v8::String> name,
-                            v8::Local<v8::FunctionTemplate> tmpl,
-                            SetConstructorFunctionFlag flag =
-                                SetConstructorFunctionFlag::SET_CLASS_NAME);
+void SetConstructorFunction(
+    v8::Local<v8::Context> context, v8::Local<v8::Object> that, const char* name,
+    v8::Local<v8::FunctionTemplate> tmpl,
+    SetConstructorFunctionFlag flag = SetConstructorFunctionFlag::SET_CLASS_NAME);
+void SetConstructorFunction(
+    v8::Local<v8::Context> context, v8::Local<v8::Object> that, v8::Local<v8::String> name,
+    v8::Local<v8::FunctionTemplate> tmpl,
+    SetConstructorFunctionFlag flag = SetConstructorFunctionFlag::SET_CLASS_NAME);
+void SetConstructorFunction(
+    v8::Isolate* isolate, v8::Local<v8::Template> that, const char* name,
+    v8::Local<v8::FunctionTemplate> tmpl,
+    SetConstructorFunctionFlag flag = SetConstructorFunctionFlag::SET_CLASS_NAME);
+void SetConstructorFunction(
+    v8::Isolate* isolate, v8::Local<v8::Template> that, v8::Local<v8::String> name,
+    v8::Local<v8::FunctionTemplate> tmpl,
+    SetConstructorFunctionFlag flag = SetConstructorFunctionFlag::SET_CLASS_NAME);
 
 template <int N>
-inline v8::Local<v8::String> FIXED_ONE_BYTE_STRING(v8::Isolate* isolate,
-                                                   const char (&data)[N]) {
+inline v8::Local<v8::String> FIXED_ONE_BYTE_STRING(v8::Isolate* isolate, const char (&data)[N]) {
   return OneByteString(isolate, data, N - 1);
 }
 
 template <std::size_t N>
-inline v8::Local<v8::String> FIXED_ONE_BYTE_STRING(
-    v8::Isolate* isolate, const std::array<char, N>& arr) {
+inline v8::Local<v8::String> FIXED_ONE_BYTE_STRING(v8::Isolate* isolate,
+                                                   const std::array<char, N>& arr) {
   return OneByteString(isolate, arr.data(), N - 1);
 }
 
@@ -480,8 +438,8 @@ class PersistentToLocal {
   // while the returned Local<T> is still in scope, it will destroy the
   // reference to the object.
   template <class TypeName>
-  static inline v8::Local<TypeName> Default(
-      v8::Isolate* isolate, const v8::PersistentBase<TypeName>& persistent) {
+  static inline v8::Local<TypeName> Default(v8::Isolate* isolate,
+                                            const v8::PersistentBase<TypeName>& persistent) {
     if (persistent.IsWeak()) {
       return PersistentToLocal::Weak(isolate, persistent);
     } else {
@@ -495,16 +453,15 @@ class PersistentToLocal {
   // Do not call persistent.Reset() while the returned Local<T> is still in
   // scope, it will destroy the reference to the object.
   template <class TypeName>
-  static inline v8::Local<TypeName> Strong(
-      const v8::PersistentBase<TypeName>& persistent) {
+  static inline v8::Local<TypeName> Strong(const v8::PersistentBase<TypeName>& persistent) {
     //    DCHECK(!persistent.IsWeak());
     return *reinterpret_cast<v8::Local<TypeName>*>(
         const_cast<v8::PersistentBase<TypeName>*>(&persistent));
   }
 
   template <class TypeName>
-  static inline v8::Local<TypeName> Weak(
-      v8::Isolate* isolate, const v8::PersistentBase<TypeName>& persistent) {
+  static inline v8::Local<TypeName> Weak(v8::Isolate* isolate,
+                                         const v8::PersistentBase<TypeName>& persistent) {
     return v8::Local<TypeName>::New(isolate, persistent);
   }
 };

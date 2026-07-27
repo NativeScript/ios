@@ -374,7 +374,8 @@ void JsV8InspectorClient::connect(int argc, char** argv) {
 }
 
 void JsV8InspectorClient::createInspectorSession() {
-  this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, {});
+  this->session_ = this->inspector_->connect(JsV8InspectorClient::contextGroupId, this, {},
+                                             v8_inspector::V8Inspector::kFullyTrusted);
 }
 
 void JsV8InspectorClient::disconnect() {
@@ -491,6 +492,10 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
   Isolate::Scope isolate_scope(isolate);
   v8::HandleScope handle_scope(isolate);
   Local<Context> context = tns::Caches::Get(isolate)->GetContext();
+  // Conversions below (tns::ToString on a non-string, JSON::Parse/Stringify)
+  // reach V8 APIs that read the entered context; without one they dereference
+  // an empty Local<Context>.
+  Context::Scope context_scope(context);
   bool success;
 
   auto json_message = json::parse(message);
@@ -887,7 +892,7 @@ void JsV8InspectorClient::registerModules() {
          global->Set(context, tns::ToV8String(isolate, "__registerDomainDispatcher"), func)
              .FromMaybe(false));
 
-  Local<External> data = External::New(isolate, this);
+  Local<External> data = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
   success = v8::Function::New(context, inspectorSendEventCallback, data).ToLocal(&func);
   assert(success && global->Set(context, tns::ToV8String(isolate, "__inspectorSendEvent"), func)
                         .FromMaybe(false));
@@ -945,8 +950,8 @@ void JsV8InspectorClient::registerDomainDispatcherCallback(
 
 void JsV8InspectorClient::inspectorSendEventCallback(const FunctionCallbackInfo<Value>& args) {
   Local<External> data = args.Data().As<External>();
-  v8_inspector::JsV8InspectorClient* client =
-      static_cast<v8_inspector::JsV8InspectorClient*>(data->Value());
+  v8_inspector::JsV8InspectorClient* client = static_cast<v8_inspector::JsV8InspectorClient*>(
+      data->Value(v8::kExternalPointerTypeTagDefault));
   Isolate* isolate = args.GetIsolate();
   Local<v8::String> arg = args[0].As<v8::String>();
   std::string message = tns::ToString(isolate, arg);
@@ -1001,9 +1006,9 @@ void JsV8InspectorClient::consoleLog(v8::Isolate* isolate, ConsoleAPIType method
   const int contextId = V8ContextInfo::executionContextId(context);
 
   std::unique_ptr<v8_inspector::V8ConsoleMessage> msg =
-      v8_inspector::V8ConsoleMessage::createForConsoleAPI(context, contextId, contextGroupId, impl,
-                                                          currentTimeMS(), method, args, String16{},
-                                                          std::move(stackImpl));
+      v8_inspector::V8ConsoleMessage::createForConsoleAPI(
+          context, contextId, contextGroupId, impl, currentTimeMS(), method,
+          {args.data(), args.size()}, String16{}, std::move(stackImpl));
 
   // Going through the message storage both reports to enabled sessions and
   // keeps the message for replay on Runtime.enable, so anything logged

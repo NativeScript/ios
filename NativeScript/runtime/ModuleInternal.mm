@@ -101,7 +101,7 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
                                      "    return require_factory; "
                                      "})()";
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> global = context->Global();
   Local<Script> script;
   TryCatch tc(isolate);
@@ -127,8 +127,8 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   this->requireFactoryFunction_ =
       std::make_unique<Persistent<v8::Function>>(isolate, result.As<v8::Function>());
 
-  Local<FunctionTemplate> requireFuncTemplate =
-      FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
+  Local<FunctionTemplate> requireFuncTemplate = FunctionTemplate::New(
+      isolate, RequireCallback, External::New(isolate, this, v8::kExternalPointerTypeTagDefault));
   this->requireFunction_ = std::make_unique<Persistent<v8::Function>>(
       isolate, requireFuncTemplate->GetFunction(context).ToLocalChecked());
 
@@ -260,8 +260,8 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
         }
       }
     }
-    ModuleInternal* moduleInternal =
-        static_cast<ModuleInternal*>(info.Data().As<External>()->Value());
+    ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(
+        info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
     moduleName = tns::ToString(isolate, info[0].As<v8::String>());
     callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
@@ -396,7 +396,6 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
   }
 
   Local<Object> moduleObj;
-  Local<Value> exportsObj;
   std::string path;
 
   try {
@@ -662,7 +661,7 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
     throw NativeScriptException(isolate, "Failed to create URL string for script " + canonicalPath);
   }
 
-  ScriptOrigin origin(isolate, urlString,
+  ScriptOrigin origin(urlString,
                       0,      // line offset
                       0,      // column offset
                       false,  // shared_cross_origin
@@ -709,7 +708,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                                 "Failed to create URL string for ES module " + canonicalPath);
   }
 
-  ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, Local<Value>(), false, false,
+  ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
                       true  // ← is_module
   );
   ScriptCompiler::Source source(sourceText, origin, cacheData);
@@ -952,7 +951,6 @@ void ModuleInternal::RunScript(Isolate* isolate, std::string script) {
     Log(@"Warning: Failed to get require function from global object in RunScript");
     return;
   }
-  Local<Value> result;
   this->RunScriptString(isolate, context, script);
 }
 

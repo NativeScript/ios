@@ -30,7 +30,8 @@ URLSearchParamsImpl* URLSearchParamsImpl::GetPointer(
   if (object->InternalFieldCount() < 1) {
     return nullptr;
   }
-  auto ptr = object->GetAlignedPointerFromInternalField(0);
+  auto ptr = object->GetAlignedPointerFromInternalField(
+      0, v8::kEmbedderDataTypeTagDefault);
   if (ptr == nullptr) {
     return nullptr;
   }
@@ -74,7 +75,7 @@ v8::Local<v8::FunctionTemplate> URLSearchParamsImpl::GetCtor(
   tmpl->Set(ToV8String(isolate, "set"),
             v8::FunctionTemplate::New(isolate, Set));
 
-  tmpl->SetAccessor(ToV8String(isolate, "size"), GetSize);
+  tmpl->SetNativeDataProperty(ToV8String(isolate, "size"), GetSize);
 
   tmpl->Set(ToV8String(isolate, "sort"),
             v8::FunctionTemplate::New(isolate, Sort));
@@ -256,7 +257,7 @@ void ReturnLiveIterator(const v8::FunctionCallbackInfo<v8::Value>& args,
 // No further V8 API may be called once that happens.
 bool ValueToString(v8::Local<v8::Context> context, v8::Local<v8::Value> value,
                    std::string& out) {
-  auto isolate = context->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
   v8::Local<v8::String> str;
   if (!value->ToString(context).ToLocal(&str)) {
     return false;
@@ -274,7 +275,7 @@ bool OpenIterator(v8::Local<v8::Context> context, v8::Local<v8::Value> receiver,
                   v8::Local<v8::Function> iterMethod,
                   v8::Local<v8::Object>& outIterator,
                   v8::Local<v8::Function>& outNext) {
-  auto isolate = context->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
   v8::Local<v8::Value> iteratorValue;
   if (!iterMethod->Call(context, receiver, 0, nullptr)
            .ToLocal(&iteratorValue)) {
@@ -306,7 +307,7 @@ bool OpenIterator(v8::Local<v8::Context> context, v8::Local<v8::Value> receiver,
 bool StepIterator(v8::Local<v8::Context> context,
                   v8::Local<v8::Object> iterator, v8::Local<v8::Function> next,
                   v8::Local<v8::Value>& outValue, bool& outDone) {
-  auto isolate = context->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
   v8::Local<v8::Value> resultValue;
   if (!next->Call(context, iterator, 0, nullptr).ToLocal(&resultValue)) {
     return false;
@@ -336,7 +337,7 @@ bool StepIterator(v8::Local<v8::Context> context,
 // re-throws the triggering exception around this call.
 void CloseIterator(v8::Local<v8::Context> context,
                    v8::Local<v8::Object> iterator) {
-  auto isolate = context->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
   v8::TryCatch tryCatch(isolate);
   v8::Local<v8::Value> returnMethod;
   if (iterator->Get(context, ToV8String(isolate, "return"))
@@ -361,7 +362,7 @@ void CloseIterator(v8::Local<v8::Context> context,
 bool MaterializeInnerSequence(v8::Local<v8::Context> context,
                               v8::Local<v8::Value> value,
                               std::vector<std::string>& out) {
-  auto isolate = context->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
   // Per WebIDL "convert to sequence<T>": if Type(V) is not Object, throw a
   // TypeError. Primitives (including strings) are NOT boxed here — boxing
   // would wrongly accept e.g. ["ab"] as the pair ("a","b") instead of
@@ -434,7 +435,7 @@ bool BuildFromSequence(v8::Local<v8::Context> context,
                        v8::Local<v8::Object> object,
                        v8::Local<v8::Function> iterMethod,
                        ada::url_search_params& params) {
-  auto isolate = context->GetIsolate();
+  auto isolate = v8::Isolate::GetCurrent();
   v8::Local<v8::Object> iterator;
   v8::Local<v8::Function> next;
   if (!OpenIterator(context, object, iterMethod, iterator, next)) {
@@ -575,7 +576,8 @@ void URLSearchParamsImpl::Ctor(
 
   auto searchParams = new URLSearchParamsImpl(params);
 
-  ret->SetAlignedPointerInInternalField(0, searchParams);
+  ret->SetAlignedPointerInInternalField(0, searchParams,
+                                        v8::kEmbedderDataTypeTagDefault);
 
   searchParams->BindFinalizer(isolate, ret);
 
@@ -789,9 +791,9 @@ void URLSearchParamsImpl::Set(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void URLSearchParamsImpl::GetSize(
-    v8::Local<v8::String> property,
+    v8::Local<v8::Name> property,
     const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLSearchParamsImpl* ptr = GetPointer(info.This());
+  URLSearchParamsImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     ThrowTypeError(info.GetIsolate(), "Illegal invocation");
     return;

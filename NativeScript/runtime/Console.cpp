@@ -18,7 +18,7 @@ using namespace v8;
 namespace tns {
 
 void Console::Init(Local<Context> context) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Context::Scope context_scope(context);
   Local<Object> console = Object::New(isolate);
   bool success =
@@ -85,7 +85,8 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
   bool hasStackTrace = isStackFrame(stringResult);
   std::string processedStringResult = stringResult;
   if (hasStackTrace) {
-    processedStringResult = tns::RemapStackTraceIfAvailable(isolate, processedStringResult);
+    processedStringResult =
+        tns::RemapStackTraceIfAvailable(isolate, processedStringResult);
   }
 
   std::string verbosityLevelUpper = verbosityLevel;
@@ -108,9 +109,11 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
       "CONSOLE " + verbosityLevelUpper + ": " + msgToLog;
   Log("%s", msgWithVerbosity.c_str());
 
-  if (RuntimeConfig.IsDebug && Runtime::showErrorDisplay() && verbosityLevel == "error" && hasStackTrace) {
+  if (RuntimeConfig.IsDebug && Runtime::showErrorDisplay() &&
+      verbosityLevel == "error" && hasStackTrace) {
     try {
-      // Log("Console.cpp: Forwarding console payload to error display: %s", msgToLog.c_str());
+      // Log("Console.cpp: Forwarding console payload to error display: %s",
+      // msgToLog.c_str());
       NativeScriptException::SubmitConsoleErrorPayload(isolate, msgToLog);
     } catch (const std::exception& e) {
       Log("Console.cpp: Exception updating modal: %s", e.what());
@@ -297,7 +300,7 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
 void Console::AttachLogFunction(Local<Context> context, Local<Object> console,
                                 const std::string name,
                                 v8::FunctionCallback callback) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   Local<v8::Function> func;
   if (!Function::New(context, callback, tns::ToV8String(isolate, name), 0,
@@ -344,7 +347,7 @@ std::string Console::BuildStringFromArgs(
 
 const Local<v8::String> Console::BuildStringFromArg(Local<Context> context,
                                                     const Local<Value>& val) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::String> argString;
   if (val->IsFunction()) {
     bool success = val->ToDetailString(context).ToLocal(&argString);
@@ -401,9 +404,10 @@ const Local<v8::String> Console::BuildStringFromArg(Local<Context> context,
 
 const Local<v8::String> Console::TransformJSObject(Local<Object> object) {
   Local<Context> context;
-  bool success = object->GetCreationContext().ToLocal(&context);
+  bool success =
+      object->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
   tns::Assert(success);
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Value> value;
   {
     TryCatch tc(isolate);

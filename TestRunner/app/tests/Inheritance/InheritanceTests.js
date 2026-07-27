@@ -8,9 +8,10 @@ describe(module.id, function () {
         expect('baseMethod' in TNSBaseInterface).toBe(true);
         expect(TNSBaseInterface.hasOwnProperty('baseCategoryMethod')).toBe(true);
 
+        // No 'arguments'/'caller': they are restricted accessors on
+        // Function.prototype, not own properties of the constructor.
         expect(Object.getOwnPropertyNames(TNSBaseInterface).sort()).toEqual([
             'alloc',
-            'arguments',
             'baseCategoryMethod',
             'baseCategoryProperty',
             'baseCategoryProtocolMethod1',
@@ -31,7 +32,6 @@ describe(module.id, function () {
             'baseProtocolProperty1Optional',
             'baseProtocolProperty2',
             'baseProtocolProperty2Optional',
-            'caller',
             'extend',
             'length',
             'name',

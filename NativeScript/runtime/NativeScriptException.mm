@@ -119,7 +119,7 @@ NativeScriptException::~NativeScriptException() { delete this->javascriptExcepti
 
 void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Value> error) {
   @try {
-    Isolate* isolate = message->GetIsolate();
+    Isolate* isolate = v8::Isolate::GetCurrent();
     ReportToJsHandlersAndLog(isolate, error, message);
   } @catch (NSException* exception) {
     Log(@"OnUncaughtError: Caught exception during error handling: %@", exception);
@@ -463,7 +463,7 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
 
 void NativeScriptException::OnPromiseRejected(v8::PromiseRejectMessage message) {
   Local<Promise> promise = message.GetPromise();
-  Isolate* isolate = promise->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   if (cache == nullptr || cache->PromiseRejections == nullptr) {
     return;

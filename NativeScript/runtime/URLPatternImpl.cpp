@@ -140,7 +140,8 @@ void URLPatternImpl::Init(v8::Isolate* isolate,
 }
 
 URLPatternImpl* URLPatternImpl::GetPointer(v8::Local<v8::Object> object) {
-  auto ptr = object->GetAlignedPointerFromInternalField(0);
+  auto ptr = object->GetAlignedPointerFromInternalField(
+      0, v8::kEmbedderDataTypeTagDefault);
   if (ptr == nullptr) {
     return nullptr;
   }
@@ -347,7 +348,8 @@ void URLPatternImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     auto patternImpl = new URLPatternImpl(std::move(*url_pattern));
 
-    thiz->SetAlignedPointerInInternalField(0, patternImpl);
+    thiz->SetAlignedPointerInInternalField(0, patternImpl,
+                                           v8::kEmbedderDataTypeTagDefault);
 
     patternImpl->BindFinalizer(isolate, thiz);
 
@@ -437,7 +439,8 @@ void URLPatternImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value>& args) {
   } else {
     auto patternImpl = new URLPatternImpl(std::move(*url_pattern));
 
-    thiz->SetAlignedPointerInInternalField(0, patternImpl);
+    thiz->SetAlignedPointerInInternalField(0, patternImpl,
+                                           v8::kEmbedderDataTypeTagDefault);
 
     patternImpl->BindFinalizer(isolate, thiz);
 
@@ -447,7 +450,7 @@ void URLPatternImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void URLPatternImpl::GetHash(v8::Local<v8::Name> property,
                              const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLPatternImpl* ptr = GetPointer(info.This());
+  URLPatternImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     info.GetReturnValue().SetEmptyString();
     return;
@@ -462,7 +465,7 @@ void URLPatternImpl::GetHash(v8::Local<v8::Name> property,
 void URLPatternImpl::GetHostName(
     v8::Local<v8::Name> property,
     const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLPatternImpl* ptr = GetPointer(info.This());
+  URLPatternImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     info.GetReturnValue().SetEmptyString();
     return;
@@ -477,7 +480,7 @@ void URLPatternImpl::GetHostName(
 void URLPatternImpl::GetPassword(
     v8::Local<v8::Name> property,
     const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLPatternImpl* ptr = GetPointer(info.This());
+  URLPatternImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     info.GetReturnValue().SetEmptyString();
     return;
@@ -493,7 +496,7 @@ void URLPatternImpl::GetPassword(
 void URLPatternImpl::GetPathName(
     v8::Local<v8::Name> property,
     const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLPatternImpl* ptr = GetPointer(info.This());
+  URLPatternImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     info.GetReturnValue().SetEmptyString();
     return;
@@ -508,7 +511,7 @@ void URLPatternImpl::GetPathName(
 
 void URLPatternImpl::GetPort(v8::Local<v8::Name> property,
                              const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLPatternImpl* ptr = GetPointer(info.This());
+  URLPatternImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     info.GetReturnValue().SetEmptyString();
     return;
@@ -524,7 +527,7 @@ void URLPatternImpl::GetPort(v8::Local<v8::Name> property,
 void URLPatternImpl::GetProtocol(
     v8::Local<v8::Name> property,
     const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLPatternImpl* ptr = GetPointer(info.This());
+  URLPatternImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     info.GetReturnValue().SetEmptyString();
     return;
@@ -540,7 +543,7 @@ void URLPatternImpl::GetProtocol(
 void URLPatternImpl::GetSearch(
     v8::Local<v8::Name> property,
     const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLPatternImpl* ptr = GetPointer(info.This());
+  URLPatternImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     info.GetReturnValue().SetEmptyString();
     return;
@@ -556,7 +559,7 @@ void URLPatternImpl::GetSearch(
 void URLPatternImpl::GetUserName(
     v8::Local<v8::Name> property,
     const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLPatternImpl* ptr = GetPointer(info.This());
+  URLPatternImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     info.GetReturnValue().SetEmptyString();
     return;
@@ -572,7 +575,7 @@ void URLPatternImpl::GetUserName(
 void URLPatternImpl::GetHasRegExpGroups(
     v8::Local<v8::Name> property,
     const v8::PropertyCallbackInfo<v8::Value>& info) {
-  URLPatternImpl* ptr = GetPointer(info.This());
+  URLPatternImpl* ptr = GetPointer(info.Holder());
   if (ptr == nullptr) {
     info.GetReturnValue().Set(false);
     return;

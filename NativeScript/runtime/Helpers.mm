@@ -36,14 +36,19 @@ std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
     return tns::ToUtf16String(isolate, obj);
   }
 
-  v8::String::Value result(isolate, value);
-
-  uint16_t* val = *result;
-  if (val == nullptr) {
+  Local<v8::String> str;
+  if (!value->ToString(isolate->GetCurrentContext()).ToLocal(&str)) {
     return std::u16string();
   }
 
-  return std::u16string((char16_t*)val, result.length());
+  v8::String::ValueView result(isolate, str);
+  if (result.is_one_byte()) {
+    // A one-byte V8 string is Latin-1, so widening each byte is the conversion.
+    const uint8_t* data = result.data8();
+    return std::u16string(data, data + result.length());
+  }
+
+  return std::u16string((const char16_t*)result.data16(), result.length());
 }
 
 std::vector<uint16_t> tns::ToVector(const std::string& value) {
@@ -190,9 +195,9 @@ bool tns::WriteBinary(const std::string& path, const void* data, long length) {
 void tns::SetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName,
                           const Local<Value>& value) {
   Local<Context> context;
-  bool success = obj->GetCreationContext().ToLocal(&context);
+  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
   tns::Assert(success);
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Private> privateKey = Private::ForApi(isolate, propName);
 
   if (!obj->SetPrivate(context, privateKey, value).To(&success) || !success) {
@@ -202,9 +207,9 @@ void tns::SetPrivateValue(const Local<Object>& obj, const Local<v8::String>& pro
 
 Local<Value> tns::GetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName) {
   Local<Context> context;
-  bool success = obj->GetCreationContext().ToLocal(&context);
+  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
   tns::Assert(success);
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Private> privateKey = Private::ForApi(isolate, propName);
 
   Maybe<bool> hasPrivate = obj->HasPrivate(context, privateKey);
@@ -237,7 +242,7 @@ void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* 
     return;
   }
 
-  Local<External> ext = External::New(isolate, value);
+  Local<External> ext = External::New(isolate, value, v8::kExternalPointerTypeTagDefault);
 
   if (obj->InternalFieldCount() > 0) {
     obj->SetInternalField(0, ext);
@@ -253,12 +258,13 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
 
   Local<Object> obj = val.As<Object>();
   if (obj->InternalFieldCount() > 0) {
-    Local<Value> field = obj->GetInternalField(0);
+    Local<Value> field = obj->GetInternalField(0).As<v8::Value>();
     if (field.IsEmpty() || field->IsNullOrUndefined() || !field->IsExternal()) {
       return nullptr;
     }
 
-    return static_cast<BaseDataWrapper*>(field.As<External>()->Value());
+    return static_cast<BaseDataWrapper*>(
+        field.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   }
 
   Local<Value> metadataProp = tns::GetPrivateValue(obj, tns::ToV8String(isolate, "metadata"));
@@ -266,7 +272,8 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
     return nullptr;
   }
 
-  return static_cast<BaseDataWrapper*>(metadataProp.As<External>()->Value());
+  return static_cast<BaseDataWrapper*>(
+      metadataProp.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 }
 
 void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
@@ -287,7 +294,7 @@ void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
   }
 
   Local<Context> context;
-  bool success = obj->GetCreationContext().ToLocal(&context);
+  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
   tns::Assert(success, isolate);
   Local<Private> privateKey = Private::ForApi(isolate, metadataKey);
 
@@ -315,7 +322,7 @@ bool tns::IsArrayOrArrayLike(Isolate* isolate, const Local<Value>& value) {
 
   Local<Object> obj = value.As<Object>();
   Local<Context> context;
-  bool success = obj->GetCreationContext().ToLocal(&context);
+  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
   tns::Assert(success, isolate);
   return obj->Has(context, ToV8String(isolate, "length")).FromMaybe(false);
 }
@@ -441,7 +448,7 @@ void tns::LogError(Isolate* isolate, TryCatch& tc) {
 
 Local<v8::String> tns::JsonStringifyObject(Local<Context> context, Local<Value> value,
                                            bool handleCircularReferences) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   if (value.IsEmpty()) {
     return v8::String::Empty(isolate);
   }
@@ -815,7 +822,7 @@ Local<v8::FunctionTemplate> NewFunctionTemplate(v8::Isolate* isolate, v8::Functi
 }
 void SetMethod(Local<v8::Context> context, Local<v8::Object> that, const char* name,
                v8::FunctionCallback callback, Local<v8::Value> data) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Function> function =
       NewFunctionTemplate(isolate, callback, data, Local<v8::Signature>(),
                           v8::ConstructorBehavior::kThrow, v8::SideEffectType::kHasSideEffect)
@@ -851,7 +858,7 @@ void SetFastMethod(Isolate* isolate, Local<Template> that, const char* name,
 void SetFastMethod(Local<v8::Context> context, Local<v8::Object> that, const char* name,
                    v8::FunctionCallback slow_callback, const v8::CFunction* c_function,
                    Local<v8::Value> data) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Function> function =
       NewFunctionTemplate(isolate, slow_callback, data, Local<v8::Signature>(),
                           v8::ConstructorBehavior::kThrow, v8::SideEffectType::kHasSideEffect,
@@ -865,7 +872,7 @@ void SetFastMethod(Local<v8::Context> context, Local<v8::Object> that, const cha
 void SetFastMethodNoSideEffect(Local<v8::Context> context, Local<v8::Object> that, const char* name,
                                v8::FunctionCallback slow_callback, const v8::CFunction* c_function,
                                Local<v8::Value> data) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Function> function =
       NewFunctionTemplate(isolate, slow_callback, data, Local<v8::Signature>(),
                           v8::ConstructorBehavior::kThrow, v8::SideEffectType::kHasNoSideEffect,
@@ -889,7 +896,7 @@ void SetFastMethodNoSideEffect(Isolate* isolate, Local<Template> that, const cha
 }
 void SetMethodNoSideEffect(Local<v8::Context> context, Local<v8::Object> that, const char* name,
                            v8::FunctionCallback callback, Local<v8::Value> data) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Function> function =
       NewFunctionTemplate(isolate, callback, data, Local<v8::Signature>(),
                           v8::ConstructorBehavior::kThrow, v8::SideEffectType::kHasNoSideEffect)
@@ -950,7 +957,7 @@ void SetInstanceMethod(v8::Isolate* isolate, Local<v8::FunctionTemplate> that, c
 }
 void SetConstructorFunction(Local<v8::Context> context, Local<v8::Object> that, const char* name,
                             Local<v8::FunctionTemplate> tmpl, SetConstructorFunctionFlag flag) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   SetConstructorFunction(context, that, tns::OneByteString(isolate, name), tmpl, flag);
 }
 void SetConstructorFunction(Local<Context> context, Local<Object> that, Local<v8::String> name,

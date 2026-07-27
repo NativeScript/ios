@@ -198,7 +198,7 @@ class ValueCache {
 
 void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrapper, void* dest,
                              Local<Value> arg) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   ValueCache argHelper(arg);
   bool isEmptyOrUndefined = arg.IsEmpty() || arg->IsNullOrUndefined();
   bool success = false;
@@ -237,7 +237,7 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
 
 void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncoding, void* dest,
                          Local<Value> arg) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   ExecuteWriteValueDebugValidationsIfInDebug(context, typeEncoding, dest, arg);
   ValueCache argHelper(arg);
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
@@ -682,7 +682,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
 }
 
 id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
     return nil;
   } else if (tns::IsString(arg)) {
@@ -741,7 +741,7 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
 
 Local<Value> Interop::StructToValue(Local<Context> context, void* result, StructInfo structInfo,
                                     std::shared_ptr<Persistent<Value>> parentStruct) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   StructWrapper* wrapper = nullptr;
   if (parentStruct == nullptr) {
     ffi_type* ffiType = structInfo.FFIType();
@@ -783,7 +783,7 @@ void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
 void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
                                std::vector<StructField> fields, Local<Value> inititalizer,
                                ptrdiff_t& position) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   for (auto it = fields.begin(); it != fields.end(); it++) {
     StructField field = *it;
 
@@ -891,7 +891,7 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
 Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* typeWrapper,
                                       BaseCall* call,
                                       std::shared_ptr<Persistent<Value>> parentStruct) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   if (typeWrapper->Type() == WrapperType::StructType) {
     StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(typeWrapper);
@@ -910,7 +910,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
                                 std::shared_ptr<Persistent<Value>> parentStruct,
                                 bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged,
                                 bool isInitializer) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   if (returnsUnmanaged) {
     uint8_t* data = call->GetResult<uint8_t*>();
@@ -1064,7 +1064,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     // matching Block_release runs in ObjectManager::DisposeValue.
     JSBlock* ownedBlock = reinterpret_cast<JSBlock*>(Block_copy(block));
     BlockWrapper* blockWrapper = new BlockWrapper(ownedBlock, typeEncoding, true);
-    Local<External> ext = External::New(isolate, blockWrapper);
+    Local<External> ext = External::New(isolate, blockWrapper, v8::kExternalPointerTypeTagDefault);
     Local<v8::Function> callback;
 
     bool success =
@@ -1072,7 +1072,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             context,
             [](const FunctionCallbackInfo<Value>& info) {
               Local<External> ext = info.Data().As<External>();
-              BlockWrapper* wrapper = static_cast<BlockWrapper*>(ext->Value());
+              BlockWrapper* wrapper =
+                  static_cast<BlockWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
 
               JSBlock* block = static_cast<JSBlock*>(wrapper->Block());
 
@@ -1117,7 +1118,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     size_t parametersCount = typeEncoding->details.functionPointer.signature.count;
     AnonymousFunctionWrapper* wrapper =
         new AnonymousFunctionWrapper(functionPointer, parametersEncoding, parametersCount);
-    Local<External> ext = External::New(isolate, wrapper);
+    Local<External> ext = External::New(isolate, wrapper, v8::kExternalPointerTypeTagDefault);
 
     Local<v8::Function> func;
     bool success =
@@ -1125,8 +1126,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
             context,
             [](const FunctionCallbackInfo<Value>& info) {
               Isolate* isolate = info.GetIsolate();
-              AnonymousFunctionWrapper* wrapper =
-                  static_cast<AnonymousFunctionWrapper*>(info.Data().As<External>()->Value());
+              AnonymousFunctionWrapper* wrapper = static_cast<AnonymousFunctionWrapper*>(
+                  info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
               tns::Assert(wrapper != nullptr, isolate);
 
               V8FunctionCallbackArgs args(info);
@@ -1275,7 +1276,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
 Local<Value> Interop::GetPrimitiveReturnType(Local<Context> context, BinaryTypeEncodingType type,
                                              BaseCall* call) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   if (type == BinaryTypeEncodingType::CStringEncoding) {
     unsigned char* result = call->GetResult<unsigned char*>();
     if (result == nullptr) {
@@ -1428,7 +1429,7 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
     return;
   }
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   uint8_t* data = (uint8_t*)wrapper->Data();
   uint8_t* destBuffer = data + field.Offset();
 
@@ -1437,7 +1438,8 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
     case BinaryTypeEncodingType::StructDeclarationReference: {
       Local<Object> obj = value.As<Object>();
       Local<External> ext = obj->GetInternalField(0).As<External>();
-      StructWrapper* targetStruct = static_cast<StructWrapper*>(ext->Value());
+      StructWrapper* targetStruct =
+          static_cast<StructWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
 
       void* sourceBuffer = targetStruct->Data();
       size_t fieldSize = field.FFIType()->size;
@@ -1519,9 +1521,9 @@ Local<v8::Array> Interop::ToArray(Local<Object> object) {
   }
 
   Local<Context> context;
-  bool success = object->GetCreationContext().ToLocal(&context);
+  bool success = object->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
   tns::Assert(success);
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   Local<v8::Function> sliceFunc;
   auto cache = Caches::Get(isolate);
@@ -1655,7 +1657,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     // reason, and attach the wrapped native object as `nativeException` (mirrors
     // the NSError-out path below). Throw it via NativeScriptException so the JS
     // catch handler receives exactly this object.
-    Isolate* isolate = methodCall.context_->GetIsolate();
+    Isolate* isolate = v8::Isolate::GetCurrent();
     Local<Context> context = isolate->GetCurrentContext();
 
     NSString* nsName = [e name];
@@ -1699,7 +1701,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     if (error) {
       // Create JS Error with localizedDescription, attach code, domain and nativeException,
       // and throw it into V8 so JS catch handlers receive it (with proper stack).
-      Isolate* isolate = methodCall.context_->GetIsolate();
+      Isolate* isolate = v8::Isolate::GetCurrent();
       Local<Context> context = isolate->GetCurrentContext();
 
       Local<Value> jsErrVal =
@@ -1756,7 +1758,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 void ExecuteWriteValueValidationsAndStopExecutionAndLogStackTrace(Local<Context> context,
                                                                   const TypeEncoding* typeEncoding,
                                                                   void* dest, Local<Value> arg) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
   Local<Value> originArg = arg;
   if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
@@ -1792,7 +1794,7 @@ bool IsTypeEncondingHandldedByDebugMessages(const TypeEncoding* typeEncoding) {
 
 void LogWriteValueTraceMessage(Local<Context> context, const TypeEncoding* typeEncoding, void* dest,
                                Local<Value> arg) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
   std::string originName = tns::ToString(isolate, arg);
   if (originName == "") {

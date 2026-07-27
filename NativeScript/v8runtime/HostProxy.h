@@ -23,11 +23,13 @@ class HostObjectProxy {
   std::shared_ptr<facebook::jsi::HostObject> GetHostObject();
 
  public:
-  static void Getter(v8::Local<v8::Name> property,
-                     const v8::PropertyCallbackInfo<v8::Value>& info);
+  static v8::Intercepted Getter(
+      v8::Local<v8::Name> property,
+      const v8::PropertyCallbackInfo<v8::Value>& info);
 
-  static void Setter(v8::Local<v8::Name> property, v8::Local<v8::Value> value,
-                     const v8::PropertyCallbackInfo<v8::Value>& info);
+  static v8::Intercepted Setter(
+      v8::Local<v8::Name> property, v8::Local<v8::Value> value,
+      const v8::PropertyCallbackInfo<v8::Boolean>& info);
 
   static void Enumerator(const v8::PropertyCallbackInfo<v8::Array>& info);
 

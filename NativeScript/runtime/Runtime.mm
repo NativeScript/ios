@@ -21,7 +21,6 @@
 #include "Worker.h"
 // #include "SetTimeout.h"
 
-#include "DisposerPHV.h"
 #include "IsolateWrapper.h"
 
 #include <mutex>
@@ -43,7 +42,7 @@ using namespace std;
 // Import meta callback to support import.meta.url
 static void InitializeImportMetaObject(Local<Context> context, Local<Module> module,
                                        Local<Object> meta) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   // Look up the module path in the global module registry (with safety checks)
   std::string modulePath;
@@ -229,8 +228,7 @@ Runtime::~Runtime() {
     }
     g_moduleRegistry.clear();
 
-    DisposerPHV phv(isolate_);
-    isolate_->VisitHandlesWithClassIds(&phv);
+    ObjectManager::DisposeAllRegistered(isolate_);
 
     if (IsRuntimeWorker()) {
       auto currentWorker =
@@ -261,13 +259,17 @@ Isolate* Runtime::CreateIsolate() {
     //     ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
     //     : platform::NewDefaultPlatform();
 
+    // Flags must be set before V8::Initialize(), which freezes them; changing a
+    // flag afterwards aborts the process. Don't pass --jitless either:
+    // v8_enable_lite_mode already implies it and makes the flag read-only,
+    // which is likewise fatal to set.
+    std::string flags = RuntimeConfig.IsDebug ? "--expose_gc" : "--expose_gc --no-lazy";
+    V8::SetFlagsFromString(flags.c_str(), flags.size());
+
     Runtime::platform_ = platform::NewDefaultPlatform();
 
     V8::InitializePlatform(Runtime::platform_.get());
     V8::Initialize();
-    std::string flags =
-        RuntimeConfig.IsDebug ? "--expose_gc --jitless" : "--expose_gc --jitless --no-lazy";
-    V8::SetFlagsFromString(flags.c_str(), flags.size());
     v8Initialized_ = true;
   }
 
@@ -526,19 +528,19 @@ bool Runtime::showErrorDisplay() {
 }
 
 void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> global = context->Global();
   const PropertyAttribute readOnlyFlags =
       static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
   if (!global
-           ->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "global"), global,
+           ->DefineOwnProperty(context, ToV8String(v8::Isolate::GetCurrent(), "global"), global,
                                readOnlyFlags)
            .FromMaybe(false)) {
     tns::Assert(false, isolate);
   }
 
   if (isWorker && !global
-                       ->DefineOwnProperty(context, ToV8String(context->GetIsolate(), "self"),
+                       ->DefineOwnProperty(context, ToV8String(v8::Isolate::GetCurrent(), "self"),
                                            global, readOnlyFlags)
                        .FromMaybe(false)) {
     tns::Assert(false, isolate);
@@ -552,7 +554,7 @@ void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
 }
 
 void Runtime::DefineCollectFunction(Local<Context> context) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> global = context->Global();
   Local<Value> value;
   bool success = global->Get(context, tns::ToV8String(isolate, "gc")).ToLocal(&value);
