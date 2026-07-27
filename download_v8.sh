@@ -53,7 +53,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "${V8_SKIP_DOWNLOAD:-0}" != "0" ]; then
-    echo "V8_SKIP_DOWNLOAD is set; leaving NativeScript/lib and the headers alone."
+    echo "V8_SKIP_DOWNLOAD is set; leaving NativeScript/{lib,include,inspector} alone."
     exit 0
 fi
 
@@ -62,7 +62,15 @@ if [ -z "$RELEASE" ]; then
     RELEASE="$(tr -d '[:space:]' < "$RELEASE_FILE")"
 fi
 
-if [ "$FORCE" = "0" ] && [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$RELEASE" ]; then
+# The stamp alone is not enough: it says which release was installed, not that
+# the three trees are still on disk. Re-install rather than leave a half-removed
+# checkout looking up to date.
+installed() {
+    [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$RELEASE" ] \
+        && [ -f "$NS_DIR/include/v8.h" ] && [ -d "$NS_DIR/inspector" ]
+}
+
+if [ "$FORCE" = "0" ] && installed; then
     echo "V8 $RELEASE already installed. Use --force to reinstall."
     exit 0
 fi
