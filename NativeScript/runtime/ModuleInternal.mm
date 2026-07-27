@@ -17,16 +17,6 @@ using namespace v8;
 
 namespace tns {
 
-// Helper function to check if a module name looks like an optional external module
-bool IsLikelyOptionalModule(const std::string& moduleName) {
-  // Check if it's a bare module name (no path separators) that could be an npm package
-  if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
-      moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
-    return true;
-  }
-  return false;
-}
-
 // Helper function to check if a file path is an ES module (.mjs) but not a source map (.mjs.map)
 bool IsESModule(const std::string& path) {
   return path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0 &&
@@ -411,21 +401,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
   }
 
   if (path.empty()) {
-    // For absolute paths (where baseDir is "/"), always throw an error instead of creating
-    // placeholder
-    bool isAbsolutePath = (baseDir == "/");
-
-    // Create placeholder module only for likely optional modules that aren't absolute paths
-    if (!isAbsolutePath && IsLikelyOptionalModule(moduleName)) {
-      return this->CreatePlaceholderModule(isolate, moduleName, cacheKey);
-    }
-
-    // For absolute paths or non-optional modules, throw an error
-    std::string errorMsg = "Module not found: '" + moduleName + "'";
-    if (isAbsolutePath) {
-      errorMsg = "Cannot find module '" + baseDir + moduleName + "'";
-    }
-    throw NativeScriptException(isolate, errorMsg, "Error");
+    throw NativeScriptException(isolate, "Cannot find module '" + moduleName + "'", "Error");
   }
 
   NSString* pathStr = [NSString stringWithUTF8String:path.c_str()];
@@ -1067,14 +1043,8 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
   }
 
   if (exists == NO) {
-    // Check if this looks like an optional module
-    if (IsLikelyOptionalModule(moduleName)) {
-      // Return empty string to indicate optional module not found
-      return std::string();
-    }
-
     // Create a detailed error message with context
-    std::string errorMsg = "Module not found: '" + moduleName + "'";
+    std::string errorMsg = "Cannot find module '" + moduleName + "'";
     errorMsg += "\n  Base directory: " + baseDir;
     errorMsg += "\n  Attempted paths:";
 
@@ -1174,75 +1144,6 @@ std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packag
 
   // If none found, default to .js (let the loading system handle the error)
   return std::string([[basePath stringByAppendingPathExtension:@"js"] UTF8String]);
-}
-
-Local<Object> ModuleInternal::CreatePlaceholderModule(Isolate* isolate,
-                                                      const std::string& moduleName,
-                                                      const std::string& cacheKey) {
-  Local<Context> context = isolate->GetCurrentContext();
-
-  // Create a module object with exports that throws when accessed
-  Local<Object> moduleObj = Object::New(isolate);
-
-  // Create a Proxy that throws an error when any property is accessed
-  std::string errorMessage =
-      "Module '" + moduleName + "' is not available. This is an optional module.";
-  std::string proxyCode = "(function() {"
-                          "  const error = new Error('" +
-                          errorMessage +
-                          "');"
-                          "  return new Proxy({}, {"
-                          "    get: function(target, prop) {"
-                          "      throw error;"
-                          "    },"
-                          "    set: function(target, prop, value) {"
-                          "      throw error;"
-                          "    },"
-                          "    has: function(target, prop) {"
-                          "      return false;"
-                          "    },"
-                          "    ownKeys: function(target) {"
-                          "      return [];"
-                          "    },"
-                          "    getPrototypeOf: function(target) {"
-                          "      return null;"
-                          "    }"
-                          "  });"
-                          "})()";
-
-  Local<Script> proxyScript;
-  if (Script::Compile(context, tns::ToV8String(isolate, proxyCode.c_str())).ToLocal(&proxyScript)) {
-    Local<Value> proxyObject;
-    if (proxyScript->Run(context).ToLocal(&proxyObject)) {
-      // Set the exports to the proxy object
-      bool success = moduleObj->Set(context, tns::ToV8String(isolate, "exports"), proxyObject)
-                         .FromMaybe(false);
-      if (!success) {
-        Log(@"Warning: Failed to set exports property on proxy module object");
-      }
-    }
-  }
-
-  // Set up the module object
-  bool success = moduleObj
-                     ->Set(context, tns::ToV8String(isolate, "id"),
-                           tns::ToV8String(isolate, moduleName.c_str()))
-                     .FromMaybe(false);
-  if (!success) {
-    Log(@"Warning: Failed to set id property on module object");
-  }
-
-  success =
-      moduleObj->Set(context, tns::ToV8String(isolate, "loaded"), v8::Boolean::New(isolate, true))
-          .FromMaybe(false);
-  if (!success) {
-    Log(@"Warning: Failed to set loaded property on module object");
-  }
-
-  // Cache the placeholder module
-  this->loadedModules_[cacheKey] = std::make_shared<Persistent<Object>>(isolate, moduleObj);
-
-  return moduleObj;
 }
 
 ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& path) {

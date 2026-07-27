@@ -25,21 +25,6 @@
 
 namespace tns {
 
-// Helper function to check if a module name looks like an optional external module
-static bool IsLikelyOptionalModule(const std::string& moduleName) {
-  // Skip Node.js built-in modules (they should be handled separately)
-  if (moduleName.rfind("node:", 0) == 0) {
-    return false;
-  }
-
-  // Check if it's a bare module name (no path separators) that could be an npm package
-  if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
-      moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
-    return true;
-  }
-  return false;
-}
-
 // Helper function to check if a module name is a Node.js built-in module
 static bool IsNodeBuiltinModule(const std::string& moduleName) {
   return moduleName.rfind("node:", 0) == 0;
@@ -1375,68 +1360,13 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         }
       }
 
-      std::string msg = "Cannot find module " + spec + " (failed to create in-memory polyfill)";
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Node.js polyfill creation failed: %s", msg.c_str());
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-        return v8::MaybeLocal<v8::Module>();
-      }
-    } else if (IsLikelyOptionalModule(spec)) {
-      // Treat bare specifiers as optional modules with an in-memory placeholder ES module
-      // that throws on property access. This avoids bundle writes in iOS release builds.
-
-      std::string key = std::string("optional:") + spec;
-      auto itExisting = g_moduleRegistry.find(key);
-      if (itExisting != g_moduleRegistry.end()) {
-        v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
-        if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
-          return v8::MaybeLocal<v8::Module>(existing);
-        }
-        RemoveModuleFromRegistry(key);
-      }
-
-      std::string placeholderContent = "const error = new Error(\"Module '" + spec +
-                                       "' is not available. This is an optional module.\");\n"
-                                       "const proxy = new Proxy({}, {\n"
-                                       "  get: function(target, prop) { throw error; },\n"
-                                       "  set: function(target, prop, value) { throw error; },\n"
-                                       "  has: function(target, prop) { return false; },\n"
-                                       "  ownKeys: function(target) { return []; },\n"
-                                       "  getPrototypeOf: function(target) { return null; }\n"
-                                       "});\n"
-                                       "export default proxy;\n";
-
-      v8::MaybeLocal<v8::Module> m =
-          CompileModuleForResolveRegisterOnly(isolate, context, placeholderContent, key);
-      if (!m.IsEmpty()) {
-        v8::Local<v8::Module> mod;
-        if (m.ToLocal(&mod)) {
-          return m;
-        }
-      }
-
-      std::string msg =
-          "Cannot find module " + spec + " (failed to create in-memory optional placeholder)";
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-        return v8::MaybeLocal<v8::Module>();
-      }
+      std::string msg = "Cannot find module '" + spec + "' (failed to create in-memory polyfill)";
+      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+      return v8::MaybeLocal<v8::Module>();
     } else {
-      // Not an optional module, throw the original error
-      std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Module not found: %s", msg.c_str());
-        // Return empty instead of crashing in debug mode
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-        return v8::MaybeLocal<v8::Module>();
-      }
+      std::string msg = "Cannot find module '" + spec + "' (tried " + absPath + ")";
+      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+      return v8::MaybeLocal<v8::Module>();
     }
   }
 
@@ -1467,14 +1397,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     v8::Local<v8::String> urlString;
     if (!v8::String::NewFromUtf8(isolate, url.c_str(), v8::NewStringType::kNormal)
              .ToLocal(&urlString)) {
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Failed to create URL string for JSON module");
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(v8::Exception::Error(
-            tns::ToV8String(isolate, "Failed to create URL string for JSON module")));
-        return v8::MaybeLocal<v8::Module>();
-      }
+      isolate->ThrowException(v8::Exception::Error(
+          tns::ToV8String(isolate, "Failed to create URL string for JSON module")));
+      return v8::MaybeLocal<v8::Module>();
     }
 
     v8::ScriptOrigin origin(urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false,
@@ -1484,14 +1409,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     v8::Local<v8::Module> jsonModule;
     if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&jsonModule)) {
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Failed to compile JSON module");
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(
-            v8::Exception::SyntaxError(tns::ToV8String(isolate, "Failed to compile JSON module")));
-        return v8::MaybeLocal<v8::Module>();
-      }
+      isolate->ThrowException(
+          v8::Exception::SyntaxError(tns::ToV8String(isolate, "Failed to compile JSON module")));
+      return v8::MaybeLocal<v8::Module>();
     }
 
     // No imports inside this module, so instantiate directly
