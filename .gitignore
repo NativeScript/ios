@@ -56,3 +56,29 @@ v8_build
 /project-template-ios/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/
 /project-template-vision/.build_env_vars.sh
 /project-template-vision/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+
+# V8 prebuilts, fetched by download_v8.sh from the release
+# pinned in V8_RELEASE. Not committed: the full matrix cannot be built
+# on one machine, so hand-assembled binaries are neither reproducible nor
+# verifiable.
+#
+# The headers are ignored along with the libraries on purpose: keeping a
+# vendored copy in git is how it drifts out of step with the binaries it
+# describes -- the crdtp headers here sat on 10.3 against a 14.9 libcrdtp.
+# Sourcing both from one verified artifact makes that impossible.
+# tools/v8 holds our scripts, not a V8 checkout; the bare 'v8' rule above
+# would otherwise swallow it.
+!tools/v8/
+!tools/v8/**
+
+/.v8-prebuilt/
+NativeScript/lib/*/*.a
+!NativeScript/lib/*/libffi.a
+NativeScript/lib/.v8-release-stamp
+NativeScript/include/**
+!NativeScript/include/libffi.h
+!NativeScript/include/libffi/
+!NativeScript/include/libffi/**
+NativeScript/inspector/src/
+NativeScript/inspector/third_party/
+NativeScript/inspector/absl/

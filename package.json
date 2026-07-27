@@ -22,8 +22,6 @@
   "scripts": {
     "prepare": "husky",
     "apply-patches": "./apply_patches.sh",
-    "build-v8-source": "./build_v8_source.sh",
-    "build-v8-source-catalyst": "./build_v8_source_catalyst.sh",
     "build-ios": "node prepare-target ios && ./build_all_ios.sh",
     "build-vision": "node prepare-target visionos && ./build_all_vision.sh",
     "setup-ci": "./build_metadata_generator.sh",
