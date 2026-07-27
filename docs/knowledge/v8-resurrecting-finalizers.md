@@ -1,6 +1,7 @@
 # Restoring resurrecting finalizers on V8 14.9
 
-Status: **compiles**; runtime behaviour not yet exercised
+Status: **exercised by the runtime suite** (904 tests, 0 failures); the flag-driven stress
+scenarios below are still unrun
 Patch: [`v8_resurrecting_finalizers.patch`](v8_resurrecting_finalizers.patch) — 6 files, +175/-3,
 against V8 **14.9.207.39** (`branch-heads/14.9`). The patch and the pinned
 version live in [NativeScript/v8-buildscripts](https://github.com/NativeScript/v8-buildscripts).
@@ -116,6 +117,8 @@ so a pending node's slot is updated exactly once after evacuation.
 
 ## Verified so far
 
+- **Runs.** The TestRunner suite is green against the patched V8 — 904 tests, 0 failures,
+  0 errors, 11 skipped — including the GC tests named at the end of the next section.
 - **Compiles.** Full V8 build for `arm64-iphonesimulator` at 14.9.207.39, exit 0, no warnings
   in the patched files.
 - Applies cleanly to pristine 14.9.207.39.
@@ -125,30 +128,32 @@ so a pending node's slot is updated exactly once after evacuation.
 - No exhaustive switch over `WeakCallbackType` exists outside `Node::MakeWeak`, so adding the
   enum value breaks no other translation unit.
 
-## NOT verified — do this before trusting it
+## Still unverified
 
-**The patch compiles but has never run.** Everything below is about runtime behaviour and
-needs a V8 that actually executes — none of it is exercised by building.
+The runtime suite passes against the patched V8, which drives the resurrection path in anger —
+see *"Worker instance should not be garbage collected if the worker thread is alive"* below.
+Everything in this section is narrower: it needs a V8 run under specific flags, and the suite's
+default configuration reaches none of it.
 
 1. **Re-running the marking closure after `EnterProcessGlobalAtomicPause()`.** The
    closure is asserted empty at that point and this patch pushes new roots and re-drives it. The
    `CHECK(IsCppHeapMarkingFinished(...))` after the second drain is the tripwire. Run under
    `--stress-incremental-marking` and `--stress-concurrent-marking`. **Highest-value test.**
-3. **Resurrect-then-rearm, end to end.** A finalizer that re-arms N times then resets, across
+2. **Resurrect-then-rearm, end to end.** A finalizer that re-arms N times then resets, across
    repeated `--expose-gc` major GCs, under `--verify-heap`. Confirms the callback site, the
    un-zapped slot through `MakeWeak`'s `CHECK_NE(object_, kGlobalHandleZapValue)`, and the
    `CHECK_WITH_MSG` contract.
-4. **Resurrected object reaching a cppgc object.** Give a resurrected wrapper a JS property
+3. **Resurrected object reaching a cppgc object.** Give a resurrected wrapper a JS property
    chain to a cppgc-managed wrapper and confirm it is not swept. This is invariant 1's test; it
    is the failure mode with no loud assertion.
-5. **Young-generation path.** A finalizer handle on a young object: confirm scavenge promotes it
+4. **Young-generation path.** A finalizer handle on a young object: confirm scavenge promotes it
    rather than finalizing, and that `IncrementNodesDiedInNewSpace` accounting stays sane.
-6. **Nested GC inside a finalizer callback.** Allocate heavily in the callback; confirm no
+5. **Nested GC inside a finalizer callback.** Allocate heavily in the callback; confirm no
    double-invocation and no collection of the object under inspection.
 
-The runtime's existing GC tests are the acceptance gate — in particular *"Worker instance should
-not be garbage collected if the worker thread is alive"*, which exercises the `WorkerWrapper`
-resurrection site directly.
+The runtime's existing GC tests are the acceptance gate for the patch as the runtime uses it,
+and they pass — in particular *"Worker instance should not be garbage collected if the worker
+thread is alive"*, which exercises the `WorkerWrapper` resurrection site directly.
 
 ## Upgrade cost
 

@@ -190,10 +190,8 @@ where `Holder() == This()` and nothing inherits it.
 
 ## Outstanding
 
-Nothing blocking. Two follow-ups:
+Nothing blocking. One follow-up:
 
-- Only `arm64-iphonesimulator` has been rebuilt; the other six architectures in
-  `NativeScript/lib` still hold 10.3 libraries.
 - `DisposerPHV.{h,mm}` is now dead code -- `Isolate::VisitHandlesWithClassIds` no longer exists,
   so the visitor can never be driven. Its logic moved to `ObjectManager::DisposeAllRegistered()`.
 
