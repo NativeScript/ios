@@ -85,7 +85,7 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   url_aggregator url;
 
-  auto url_string = tns::ToString(isolate, args[0].As<v8::String>());
+  auto url_string = tns::ToString(isolate, args[0]);
 
   if (count > 1) {
     if (args[1]->IsString()) {
@@ -477,13 +477,12 @@ void URLImpl::CanParse(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
   auto isolate = info.GetIsolate();
   if (count > 1) {
-    auto url_string = tns::ToString(isolate, info[0].As<v8::String>());
-    auto base_string = tns::ToString(isolate, info[1].As<v8::String>());
+    auto url_string = tns::ToString(isolate, info[0]);
+    auto base_string = tns::ToString(isolate, info[1]);
     std::string_view base_string_view(base_string.data(), base_string.length());
     value = can_parse(url_string, &base_string_view);
   } else {
-    value = can_parse(tns::ToString(isolate, info[0].As<v8::String>()).c_str(),
-                      nullptr);
+    value = can_parse(tns::ToString(isolate, info[0]).c_str(), nullptr);
   }
 
   info.GetReturnValue().Set(value);
