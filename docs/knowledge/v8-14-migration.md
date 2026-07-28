@@ -131,10 +131,14 @@ declarations were removed; they were genuinely unused, not merely unread.
 later, and several pin exactly `CLANG_CXX_LANGUAGE_STANDARD = c++17` in their
 `platforms/ios/build.xcconfig` — which sat precisely on the old floor.
 
-The app can't override this from `App_Resources/iOS/build.xcconfig`: the CLI merges every plugin's
-xcconfig *and* the app's into `plugins-{debug,release}.xcconfig`, one value per key, and the app's
-value does not reliably win. That merged file is then the **last** `#include` in
-`build-{debug,release}.xcconfig`, so it also beats the project-level setting in the pbxproj.
+The app can't override this from `App_Resources/iOS/build.xcconfig`. The CLI merges every plugin's
+xcconfig *and* the app's into `plugins-{debug,release}.xcconfig`, and the merge is **first writer
+wins** — `XcconfigService.mergeFiles` deletes a key from the incoming file when the destination
+already has it. `mergeProjectXcconfigFiles` merges the plugins first and the app's file *last*, so
+for any key a plugin already set, the app's value is discarded outright; among plugins the winner
+is whichever comes first in dependency-resolution order. That merged file is then the **last**
+`#include` in `build-{debug,release}.xcconfig`, so it also beats the project-level setting in the
+pbxproj.
 
 Plugins are expected to declare c++20 themselves. Worth knowing that a single stale transitive
 plugin is enough to hold an entire app below the floor, and that the resulting error points at our
