@@ -2,7 +2,7 @@
 
 Status: **exercised by the runtime suite** (904 tests, 0 failures); the flag-driven stress
 scenarios below are still unrun
-Patch: [`v8_resurrecting_finalizers.patch`](v8_resurrecting_finalizers.patch) — 6 files, +175/-3,
+Patch: [`v8_resurrecting_finalizers.patch`](v8_resurrecting_finalizers.patch) — 6 files, +184/-3,
 against V8 **14.9.207.39** (`branch-heads/14.9`). The patch and the pinned
 version live in [NativeScript/v8-buildscripts](https://github.com/NativeScript/v8-buildscripts).
 Built clean for `arm64-iphonesimulator` (lite mode, no sandbox, no pointer compression).
@@ -64,9 +64,39 @@ not the queue — is the source of truth: entries are re-checked before invocati
 epilogue callbacks run before the drain and may reset a queued handle out from under it.
 
 **3. Post-pause invocation** (`GlobalHandles::PostGarbageCollectionProcessing`). Callbacks
-run from the GC epilogue via `InvokeExternalCallbacks` ([heap.cc:1775](https://source.chromium.org/chromium/chromium/src/+/main:v8/src/heap/heap.cc)),
-where JS execution and V8 API calls are allowed — *not* from the first-pass phantom path,
-which runs in-pause and forbids both.
+run from the GC epilogue via `InvokeExternalCallbacks` — *not* from the first-pass phantom
+path, which runs in-pause and forbids allocation. The drain is wrapped in
+`AllowJavascriptExecution`; see below for why that is required rather than incidental.
+
+**4. Lifting `DisallowJavascriptExecution`.** `Heap::CollectGarbage` holds one across the
+*entire* collection, epilogue included — `heap.cc`, "JS execution is not allowed in any of
+the callbacks" — and `InvokeExternalCallbacks()` re-enables allocation
+(`AllowGarbageCollection`) but deliberately not JS, asserting on entry that JS is disallowed.
+Entering JS from a callback therefore hits
+
+```cpp
+// src/execution/execution.cc, Invoke()
+if (!AllowJavascriptExecution::IsAllowed(isolate)) {
+  GRACEFUL_FATAL("Invoke in DisallowJavascriptExecutionScope");
+}
+```
+
+and aborts the process. **This is a behavioural change from 10.3**, where
+`InvokeSecondPassPhantomCallbacks()` ran under an explicit `AllowJavascriptExecution`.
+
+The runtime depends on the 10.3 behaviour and cannot avoid it:
+`ObjectManager::FinalizerCallback` → `DisposeValue` → `[target release]` runs `-dealloc`, and
+any JS-backed override that teardown reaches — a JS `UIView` subclass being removed from its
+superview, a delegate, a block — re-enters JS through `ArgConverter::MethodCallback`. So the
+patch lifts the scope around the finalizer drain **only**: `InvokeSecondPassPhantomCallbacks()`
+below it still asserts JS is disallowed, so the scope is closed before it runs.
+
+Both scopes are live in release builds. Only the `…DebugOnly` aliases generated in
+`assert-scope.h` compile away, and neither `Heap::CollectGarbage` nor this patch uses those.
+
+The Android runtime shares this patch but does not depend on the lift: its finalizer makes a
+single runtime-internal JNI call (`makeInstanceWeakAndCheckIfAlive`) and Java has no
+synchronous destructor that could re-enter JS.
 
 The public enum gains a third value; `api.cc` needs no change (it passes the type through,
 and the only switch is in `Node::MakeWeak`).
@@ -114,6 +144,48 @@ so a pending node's slot is updated exactly once after evacuation.
 - **`Node::PostGarbageCollectionProcessing` keeps upstream's name deliberately.**
   `tools/cfi/ignores.txt` blocklists `*GlobalHandles*PostGarbageCollectionProcessing*` because
   `weak_callback_` is invoked on the wrong type. Renaming it breaks CFI builds.
+
+## Known hazard: a finalized object can outlive its native half
+
+`IdentifyDeadFinalizerHandles()` snapshots the dead set *before* `IterateFinalizerHandlesAsRoots()`
+and the re-drain, so the queue is built against pre-resurrection marking. If two wrappers are
+both JS-unreachable and one references the other, **both** are queued:
+
+- `n1` holds `n2`; neither is reachable from a JS root, so both are queued.
+- The keep-alive marks `n1`'s whole closure — `n2` included — live, so nothing is swept.
+- `n2`'s callback runs first and disposes: `[N2 release]`, wrapper deleted.
+- `n1`'s callback finds `IsGcProtected()` and re-arms.
+
+`n1` comes back holding a JS object whose native half is gone. `DisposeValue` does neuter the
+husk (`delete wrapper` then `tns::DeleteValue`, which sets internal field 0 to `Undefined`), so
+it is not a dangling `BaseDataWrapper*` — but consumers that read the field without checking,
+`Pointer.cpp` among them, will read `Undefined` as an `External` and dereference it.
+
+**This is not fixable by deferring the release or by re-checking liveness after the drain.**
+Every queued node is rooted by `IterateFinalizerHandlesAsRoots()` and treated as a strong
+retainer for the rest of the cycle, so immediately after the GC *every* disposed object still
+looks alive; the check cannot separate "alive because a referrer revived" from "alive because
+it was rooted for its own finalization". Waiting a cycle does not converge either: `n1` re-arms
+weak, so the next `IdentifyDeadFinalizerHandles()` finds both unmarked again and re-queues the
+same pair.
+
+Nor is it fixable by making `GcProtect()` a strong root instead of a disposal veto. Disposal
+here is driven by whether *native* still needs the object, not by JS reachability, and that is
+precisely what lets a JS↔ObjC cycle collect at all: an unprotected object is released even
+though surviving JS still references it. Turning protection into an opaque strong root would
+convert every such cycle into a permanent leak.
+
+The real fix is to stop expressing liveness with roots and express it by *tracing* — `CppHeap`,
+`v8::Object::Wrap`/`Unwrap`, `TracedReference` and cppgc `Trace()`, which mark *through* the
+embedder graph and so collect cross-heap cycles without resurrection. That is
+[RESURRECTION_TO_REACHABILITY.md](RESURRECTION_TO_REACHABILITY.md). Note that the intermediate
+option is gone: `EmbedderRootsHandler::IsRoot()`, which used to let an embedder declare a
+`TracedReference` a root per-GC, no longer exists in 14.9 — only `ResetRoot`/`TryResetRoot`
+remain.
+
+Until then, the cheap mitigation is to give the husk defined behaviour: throw "native object
+has already been released" from a single checked accessor rather than letting each call site
+read `Undefined` as a pointer.
 
 ## Verified so far
 
