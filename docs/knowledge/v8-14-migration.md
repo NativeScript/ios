@@ -142,6 +142,23 @@ headers rather than at the plugin that pinned the standard. An app that needs to
 regardless can assign `CLANG_CXX_LANGUAGE_STANDARD` *after* the `plugins-*.xcconfig` include in
 `build-{debug,release}.xcconfig`, which is the only layer that beats the merge.
 
+Both project templates now default to `gnu++20`; they were on `gnu++0x`, which is C++11 in the
+pre-ratification spelling and two floors below what `v8config.h` accepts. That fixes the baseline
+for an app carrying its own C++ or ObjC++ sources, but by the ordering above it is a project-level
+setting, so a plugin pinning a lower standard still wins over it.
+
+## The templates' C standard
+
+`GCC_C_LANGUAGE_STANDARD` is the only language setting the metadata generator reads:
+`build-step-metadata-generator.py` passes it straight through as clang's `-std=` when parsing the
+SDK, and never looks at `CLANG_CXX_LANGUAGE_STANDARD`. The templates were on `gnu99`, which
+predates C11; they are now on `gnu17`, Xcode's current default.
+
+This changes no metadata. Regenerating against the iOS 26.2 SDK under both standards produces
+byte-identical output — the binary, the umbrella header, and all 193 YAML modules. The only
+observable difference is one fewer spurious diagnostic, *"redefinition of typedef 'MPSImageBatch'
+is a C11 feature"*, which C11 and later allow.
+
 ## Vendored inspector sources
 
 `NativeScript/inspector/src` is a copy of V8's inspector/base/debug headers, previously pinned to
