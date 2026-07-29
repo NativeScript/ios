@@ -11,8 +11,6 @@
 #include <mutex>
 #include <queue>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include "DevFlags.h"
 #include "HMRSupport.h"
@@ -270,8 +268,6 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
 }
 
 namespace {
-using ModuleHandleMap = std::unordered_map<std::string, v8::Global<v8::Module>>;
-
 // The four module-handle maps for a single isolate. v8::Global<Module> handles
 // are bound to the isolate that created them, so each isolate (main + every
 // Worker) keeps its own set; they are looked up by v8::Isolate* below.
@@ -289,9 +285,10 @@ std::mutex& ModuleStateTableMutex() {
   return *mutex;
 }
 
-std::unordered_map<v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>& ModuleStateTable() {
+robin_hood::unordered_map<v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>&
+ModuleStateTable() {
   static auto* table =
-      new std::unordered_map<v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>();
+      new robin_hood::unordered_map<v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>();
   return *table;
 }
 
@@ -336,7 +333,7 @@ PerIsolateModuleState& ModuleStateFor(v8::Isolate* isolate) {
 // Each access site binds a local reference (e.g.
 // `auto& g_moduleRegistry = ModuleRegistryFor(isolate);`) so existing bodies
 // stay byte-for-byte the same while becoming isolate-correct.
-std::unordered_map<std::string, v8::Global<v8::Module>>& ModuleRegistryFor(v8::Isolate* isolate) {
+ModuleHandleMap& ModuleRegistryFor(v8::Isolate* isolate) {
   return ModuleStateFor(isolate).registry;
 }
 
@@ -378,7 +375,7 @@ void DestroyModuleStateForIsolate(v8::Isolate* isolate) {
 // Instead of rewriting import statements in source code on the Vite side, the runtime
 // resolves bare specifiers through this map to either vendor URLs (ns-vendor://)
 // or HTTP module URLs. Source code is served as Vite transformed it.
-static std::unordered_map<std::string, std::string> g_importMap;
+static robin_hood::unordered_map<std::string, std::string> g_importMap;
 
 // Volatile URL patterns: URLs matching these substrings are always re-fetched
 // (cache is evicted before loading). Configured by Vite at boot instead of
@@ -1100,7 +1097,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
   auto& g_moduleRegistry = ModuleRegistryFor(isolate);
   if (urls.empty()) return;
 
-  std::unordered_set<std::string> seen;
+  robin_hood::unordered_set<std::string> seen;
   std::vector<std::string> uniqueUrls;
   uniqueUrls.reserve(urls.size());
 
@@ -1216,12 +1213,12 @@ void UpdateModuleFallback(v8::Isolate* isolate, const std::string& canonicalPath
 
 // Track active resolution stack to detect and short-circuit self-recursive module loads
 static thread_local std::vector<std::string> g_moduleResolutionStack;
-static thread_local std::unordered_map<std::string, size_t> g_moduleReentryCounts;
-static thread_local std::unordered_map<std::string, std::unordered_set<std::string>>
+static thread_local robin_hood::unordered_map<std::string, size_t> g_moduleReentryCounts;
+static thread_local robin_hood::unordered_map<std::string, robin_hood::unordered_set<std::string>>
     g_moduleReentryParents;
-static thread_local std::unordered_map<std::string, std::string> g_modulePrimaryImporters;
-static thread_local std::unordered_set<std::string> g_modulesInFlight;
-static thread_local std::unordered_set<std::string> g_modulesPendingReset;
+static thread_local robin_hood::unordered_map<std::string, std::string> g_modulePrimaryImporters;
+static thread_local robin_hood::unordered_set<std::string> g_modulesInFlight;
+static thread_local robin_hood::unordered_set<std::string> g_modulesPendingReset;
 // The threshold for detecting circular dependencies during module resolution.
 // 256 was chosen as a high enough value to allow deep but legitimate module graphs,
 // but low enough to catch runaway recursion or infinite circular imports.
@@ -1230,10 +1227,11 @@ static thread_local std::unordered_set<std::string> g_modulesPendingReset;
 static constexpr size_t kMaxModuleReentryCount = 256;
 // Waiters: module path -> list of Promise resolvers waiting for completion (instantiated/evaluated
 // or errored)
-static std::unordered_map<std::string, std::vector<v8::Global<v8::Promise::Resolver>>>
+static robin_hood::unordered_map<std::string, std::vector<v8::Global<v8::Promise::Resolver>>>
     g_moduleWaiters;
 // Dynamic HTTP import waiters: resolve to module namespace when available.
-static thread_local std::unordered_map<std::string, std::vector<v8::Global<v8::Promise::Resolver>>>
+static thread_local robin_hood::unordered_map<std::string,
+                                              std::vector<v8::Global<v8::Promise::Resolver>>>
     g_httpDynamicWaiters;
 
 static bool IsModuleEvaluationInProgress(v8::Module::Status status) {

@@ -3,10 +3,16 @@
 #include <v8.h>
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
+#include "robin_hood.h"
+
 namespace tns {
+
+// Canonical module key → compiled-module handle map used by the per-isolate
+// registries below.
+using ModuleHandleMap =
+    robin_hood::unordered_map<std::string, v8::Global<v8::Module>>;
 
 // Per-isolate module registry accessor: map canonical keys → compiled
 // v8::Module handles for `isolate`. Keyed by v8::Isolate* (not thread) because
@@ -14,8 +20,7 @@ namespace tns {
 // the definition in ModuleInternalCallbacks.mm for the cross-isolate-handle bug
 // this prevents. Callers bind a local alias, e.g.
 // `auto& g_moduleRegistry = tns::ModuleRegistryFor(isolate);`.
-std::unordered_map<std::string, v8::Global<v8::Module>>& ModuleRegistryFor(
-    v8::Isolate* isolate);
+ModuleHandleMap& ModuleRegistryFor(v8::Isolate* isolate);
 
 // Reset + drop every module handle owned by `isolate`. Must be called while the
 // isolate is still alive (the Runtime destructor calls this before disposal).
