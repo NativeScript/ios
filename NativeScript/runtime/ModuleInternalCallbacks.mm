@@ -1821,16 +1821,6 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     Log(@"[resolver][spec] %s", normalizedSpec.c_str());
   }
 
-  // Normalize '@/' alias to '/src/' for static imports (mirrors client dynamic import
-  // normalization)
-  if (normalizedSpec.rfind("@/", 0) == 0) {
-    std::string orig = normalizedSpec;
-    normalizedSpec = std::string("/src/") + normalizedSpec.substr(2);
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[resolver][normalize] %@ -> %@", [NSString stringWithUTF8String:orig.c_str()],
-          [NSString stringWithUTF8String:normalizedSpec.c_str()]);
-    }
-  }
   // Guard against a bare '@' spec showing up (invalid); return empty to avoid poisoning registry
   // with '@'
   if (normalizedSpec == "@") {
@@ -2762,7 +2752,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
     }
   }
-  // Normalize spec: expand '@/'; only strip ?query/hash for non-HTTP specs so SFC HTTP keys keep
+  // Normalize spec: only strip ?query/hash for non-HTTP specs so SFC HTTP keys keep
   // version tags
   std::string rawSpec = cSpec ? std::string(cSpec) : std::string();
   std::string normalizedSpec = rawSpec;
@@ -2774,10 +2764,6 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     if (qpos != std::string::npos) {
       normalizedSpec = normalizedSpec.substr(0, qpos);
     }
-  }
-  // expand '@/'
-  if (normalizedSpec.rfind("@/", 0) == 0) {
-    normalizedSpec = std::string("/src/") + normalizedSpec.substr(2);
   }
   if (normalizedSpec != rawSpec) {
     // Rebuild V8 string only if changed
