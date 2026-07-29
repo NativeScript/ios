@@ -5,6 +5,17 @@ deliberately reinstates code that #412 removed. If the removal was intentional,
 this document is the argument to overturn — delete the machinery *and* the test
 and doc that still describe it, in one change.
 
+**Update (2026-07-29): the import()-side branch was removed again, this time
+deliberately.** The simplification pass
+([hmr-simplification-pass.md](hmr-simplification-pass.md) §2) split the
+question in two: on the ESM side a missing bare specifier now rejects
+outright — optionality is `try { await import(x) } catch {}` at the call
+site, and in dev sessions an import-map miss must fail loudly — while the
+require() side below, where the placeholder's lazy-throw contract is
+app-visible shipped behavior, stands exactly as this document describes and
+still needs Ed's call. The decision rule applied: remove first, and let a
+real-world reproduction argue it back in with evidence.
+
 ## What was restored
 
 `feat!: upgrade V8 to 14.9.207.39` (0e89474) deleted the whole optional-module

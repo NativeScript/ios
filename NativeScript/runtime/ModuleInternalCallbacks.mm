@@ -29,8 +29,6 @@
 
 namespace tns {
 
-// IsLikelyOptionalModule is shared with the require() path — declared in
-// ModuleInternal.h, defined in ModuleInternal.mm.
 // Helper function to check if a module name is a Node.js built-in module
 static bool IsNodeBuiltinModule(const std::string& moduleName) {
   return moduleName.rfind("node:", 0) == 0;
@@ -2344,44 +2342,6 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       }
 
       std::string msg = "Cannot find module '" + spec + "' (failed to create in-memory polyfill)";
-      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-      return v8::MaybeLocal<v8::Module>();
-    } else if (IsLikelyOptionalModule(spec)) {
-      // Treat bare specifiers as optional modules with an in-memory placeholder ES module
-      // that throws on property access. This avoids bundle writes in iOS release builds.
-
-      std::string key = std::string("optional:") + spec;
-      auto itExisting = g_moduleRegistry.find(key);
-      if (itExisting != g_moduleRegistry.end()) {
-        v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
-        if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
-          return v8::MaybeLocal<v8::Module>(existing);
-        }
-        RemoveModuleFromRegistry(key);
-      }
-
-      std::string placeholderContent = "const error = new Error(\"Module '" + spec +
-                                       "' is not available. This is an optional module.\");\n"
-                                       "const proxy = new Proxy({}, {\n"
-                                       "  get: function(target, prop) { throw error; },\n"
-                                       "  set: function(target, prop, value) { throw error; },\n"
-                                       "  has: function(target, prop) { return false; },\n"
-                                       "  ownKeys: function(target) { return []; },\n"
-                                       "  getPrototypeOf: function(target) { return null; }\n"
-                                       "});\n"
-                                       "export default proxy;\n";
-
-      v8::MaybeLocal<v8::Module> m =
-          CompileModuleForResolveRegisterOnly(isolate, context, placeholderContent, key);
-      if (!m.IsEmpty()) {
-        v8::Local<v8::Module> mod;
-        if (m.ToLocal(&mod)) {
-          return m;
-        }
-      }
-
-      std::string msg =
-          "Cannot find module '" + spec + "' (failed to create in-memory optional placeholder)";
       isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
       return v8::MaybeLocal<v8::Module>();
     } else {
