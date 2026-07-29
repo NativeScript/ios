@@ -2762,69 +2762,6 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
     }
   }
-  // ── Early guard: intercept bare "@" immediately to avoid any downstream handling ──
-  // We perform this check again here (in addition to normalization guards below) to ensure
-  // no intermediate path attempts to treat "@" as a real module. This also provides a
-  // distinct marker in logs to verify the new code path is active in the built binary.
-  {
-    v8::EscapableHandleScope scope_immediate(isolate);
-    v8::Local<v8::Promise::Resolver> resolver_immediate;
-    if (!v8::Promise::Resolver::New(context).ToLocal(&resolver_immediate)) {
-      return v8::MaybeLocal<v8::Promise>();
-    }
-    if (cSpec && std::strcmp(cSpec, "@") == 0) {
-      if (IsScriptLoadingLogEnabled()) {
-        // Try to capture referrer and JS stack to identify the source
-        NSString* refName = nil;
-        v8::Local<v8::Value> resName = resource_name;
-        if (!resName.IsEmpty() && resName->IsString()) {
-          v8::String::Utf8Value rn(isolate, resName);
-          if (*rn) {
-            refName = [NSString stringWithUTF8String:*rn];
-          }
-        }
-        Log(@"[dyn-import][guard] immediate '@' stub (ref=%@)", refName ?: @"<unknown>");
-        // JS stack (best-effort)
-        v8::HandleScope hs2(isolate);
-        v8::TryCatch tc2(isolate);
-        v8::Local<v8::String> evalSrc2 =
-            tns::ToV8String(isolate, "(function(){ try { return (new Error('__dyn_at_v2__')).stack "
-                                     "|| 'no-stack'; } catch(e){ return 'stack-failed'; } })()");
-        v8::Local<v8::Script> script2;
-        if (v8::Script::Compile(context, evalSrc2).ToLocal(&script2)) {
-          v8::Local<v8::Value> val2;
-          if (script2->Run(context).ToLocal(&val2)) {
-            v8::String::Utf8Value s2(isolate, val2);
-            if (*s2) {
-              Log(@"[dyn-import][guard] '@' stack: %@", [NSString stringWithUTF8String:*s2]);
-            }
-          }
-        }
-      }
-      const char* kEmptySrc = "export {}\n";
-      std::string url = "file:///app/__invalid_at__.mjs";
-      v8::MaybeLocal<v8::Module> modMaybe =
-          CompileModuleFromSource(isolate, context, kEmptySrc, url);
-      v8::Local<v8::Module> mod;
-      if (modMaybe.ToLocal(&mod)) {
-        g_moduleRegistry[CanonicalizeRegistryKey(url)].Reset(isolate, mod);
-        if (mod->GetStatus() != v8::Module::kEvaluated) {
-          if (mod->Evaluate(context).IsEmpty()) {
-            resolver_immediate
-                ->Reject(context, v8::Exception::Error(tns::ToV8String(
-                                      isolate, "Evaluation failed for empty module")))
-                .FromMaybe(false);
-            return scope_immediate.Escape(resolver_immediate->GetPromise());
-          }
-        }
-        resolver_immediate->Resolve(context, mod->GetModuleNamespace()).FromMaybe(false);
-        return scope_immediate.Escape(resolver_immediate->GetPromise());
-      }
-      // If compilation somehow failed, still resolve with an empty object namespace
-      resolver_immediate->Resolve(context, v8::Object::New(isolate)).FromMaybe(false);
-      return scope_immediate.Escape(resolver_immediate->GetPromise());
-    }
-  }
   // Normalize spec: expand '@/'; only strip ?query/hash for non-HTTP specs so SFC HTTP keys keep
   // version tags
   std::string rawSpec = cSpec ? std::string(cSpec) : std::string();
@@ -2841,32 +2778,6 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   // expand '@/'
   if (normalizedSpec.rfind("@/", 0) == 0) {
     normalizedSpec = std::string("/src/") + normalizedSpec.substr(2);
-  }
-  // guard against collapse to '@'
-  if (normalizedSpec == "@") {
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[dyn-import][normalize] invalid '@' spec, capturing JS stack");
-    }
-    // Attempt to capture JS stack by evaluating new Error().stack in JS context
-    v8::HandleScope hs(isolate);
-    v8::TryCatch tc(isolate);
-    v8::Local<v8::String> evalSrc =
-        tns::ToV8String(isolate, "(function(){ try { return (new Error('__dyn_at__')).stack || "
-                                 "'no-stack'; } catch(e){ return 'stack-failed'; } })()");
-    v8::Local<v8::Script> script;
-    if (v8::Script::Compile(context, evalSrc).ToLocal(&script)) {
-      v8::Local<v8::Value> val;
-      if (script->Run(context).ToLocal(&val)) {
-        v8::String::Utf8Value s(isolate, val);
-        if (*s) {
-          NSString* stack = [NSString stringWithUTF8String:*s];
-          if (IsScriptLoadingLogEnabled()) {
-            Log(@"[dyn-import][normalize] '@' stack: %@", stack);
-          }
-        }
-      }
-    }
-    normalizedSpec = rawSpec;  // revert to raw
   }
   if (normalizedSpec != rawSpec) {
     // Rebuild V8 string only if changed
