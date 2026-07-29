@@ -20,8 +20,8 @@ namespace tns {
 //
 // The runtime deliberately exposes *mechanism* only:
 //   - the synchronous HTTP text fetch backing the HTTP ESM loader
-//     (V8 10.3.22's ResolveModuleCallback is synchronous, so the fetch
-//     must be native),
+//     (V8's ResolveModuleCallback is synchronous — still true as of
+//     14.9.207.39 — so the fetch must be native),
 //   - a body prewarm cache + list-mode kickstart so a server-computed
 //     module closure can be fetched in one parallel wave before V8's
 //     serial synchronous walk,
