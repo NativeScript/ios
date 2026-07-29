@@ -43,7 +43,8 @@ void UpdateModuleFallback(v8::Isolate* isolate,
 void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
                        const std::vector<std::string>& urls);
 
-// Diagnostics helper: returns URL-like keys currently loaded in the module registry.
+// Diagnostics helper: returns URL-like keys currently loaded in the module
+// registry.
 std::vector<std::string> GetLoadedModuleUrls();
 
 // Resolve callback signature (with import‑assertions slot)
@@ -59,13 +60,15 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::Local<v8::FixedArray> import_assertions);
 
 // Import map support
-// Parse and store an import map from JSON. Expected shape: {"imports": {"key": "value", ...}}
+// Parse and store an import map from JSON. Expected shape: {"imports": {"key":
+// "value", ...}}
 void SetImportMap(const std::string& json);
 
 // Set URL patterns that should bypass module cache (e.g. "/@ns/sfc/", "?v=")
 void SetVolatilePatterns(const std::vector<std::string>& patterns);
 
-// Clear import map state and vendor module cache. Must be called before isolate disposal.
+// Clear import map state and vendor module cache. Must be called before isolate
+// disposal.
 void CleanupImportMapGlobals();
 
 }  // namespace tns

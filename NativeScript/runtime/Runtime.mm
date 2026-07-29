@@ -28,6 +28,7 @@
 
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 #include "DevFlags.h"
 #include "HMRSupport.h"
 #include "ModuleBinding.hpp"
@@ -35,7 +36,6 @@
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
-#include <vector>
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -95,8 +95,8 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
     if (slashPos != std::string::npos && slashPos < colonPos) return false;
     for (size_t i = 0; i < colonPos; i++) {
       char c = s[i];
-      const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                      (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.';
+      const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                      c == '+' || c == '-' || c == '.';
       if (!ok) return false;
     }
     return true;
@@ -140,11 +140,10 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
     dirname = "/app";
   } else if (hasUrlScheme(modulePath)) {
     size_t schemeEnd = modulePath.find("://");
-    size_t pathStart = (schemeEnd == std::string::npos) ? std::string::npos
-                                                        : modulePath.find('/', schemeEnd + 3);
+    size_t pathStart =
+        (schemeEnd == std::string::npos) ? std::string::npos : modulePath.find('/', schemeEnd + 3);
     size_t lastSlash = modulePath.find_last_of('/');
-    if (pathStart != std::string::npos && lastSlash != std::string::npos &&
-        lastSlash > pathStart) {
+    if (pathStart != std::string::npos && lastSlash != std::string::npos && lastSlash > pathStart) {
       dirname = modulePath.substr(0, lastSlash);
     } else {
       // No path beyond the host (`http://host`) or scheme without `//`
@@ -168,7 +167,6 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
           context, String::NewFromUtf8(isolate, "dirname", NewStringType::kNormal).ToLocalChecked(),
           dirnameStr)
       .Check();
-
 }
 
 namespace tns {
@@ -472,8 +470,7 @@ void Runtime::RunMainScript() {
   this->moduleInternal_->RunModule(isolate, "./");
 }
 
-bool Runtime::RunModule(const std::string moduleName,
-                        std::string* outErrorMessage) {
+bool Runtime::RunModule(const std::string moduleName, std::string* outErrorMessage) {
   Isolate* isolate = this->GetIsolate();
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);

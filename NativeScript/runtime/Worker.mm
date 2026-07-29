@@ -458,13 +458,13 @@ void Worker::TerminateAllWorkersCallback(const FunctionCallbackInfo<Value>& info
   // a single misbehaving worker should never abort the HMR cycle that
   // triggered this callback.
   std::vector<std::shared_ptr<Caches::WorkerState>> snapshot;
-  Caches::Workers->ForEach([&snapshot](int& /* id */,
-                                       std::shared_ptr<Caches::WorkerState>& state) -> bool {
-    if (state) {
-      snapshot.push_back(state);
-    }
-    return false;  // continue iteration over every entry
-  });
+  Caches::Workers->ForEach(
+      [&snapshot](int& /* id */, std::shared_ptr<Caches::WorkerState>& state) -> bool {
+        if (state) {
+          snapshot.push_back(state);
+        }
+        return false;  // continue iteration over every entry
+      });
 
   int32_t terminatedCount = 0;
   for (auto& state : snapshot) {

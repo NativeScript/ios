@@ -17,8 +17,10 @@ public:
     // of workers terminated, as a number). Worker threads do NOT receive this
     // function — terminating workers from inside a worker would let a stuck
     // worker take down its peers.
-    static void TerminateAllWorkersCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
-private:
+    static void TerminateAllWorkersCallback(
+        const v8::FunctionCallbackInfo<v8::Value>& info);
+
+   private:
     static void ConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void PostMessageCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
     static void TerminateCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
