@@ -13,3 +13,6 @@ reconstruct rather than because anything needs doing.
 - [Resurrecting finalizers](knowledge/v8-resurrecting-finalizers.md) — the patch
   that restores `WeakCallbackType::kFinalizer`, removed upstream right after
   10.3.22, with its invariants and test plan.
+- [The optional-module placeholder](knowledge/optional-module-placeholder.md) —
+  why the V8 14.9 rebase reinstated the machinery #412 removed, and the
+  consistent way to remove it if that was the intent. Needs review.

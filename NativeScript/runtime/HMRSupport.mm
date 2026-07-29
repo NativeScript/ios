@@ -239,10 +239,11 @@ static void ClearAllCacheBustMarks() {
 // HTTP body cache + parallel kickstart prewarm
 // ============================================================================
 //
-// V8 10.3.22 only exposes a synchronous ResolveModuleCallback for static
-// imports. Each call into HttpFetchText() blocks the JS thread on a
-// synchronous network turn, which forces serial fetching from the JS
-// thread's perspective.
+// V8 only exposes a synchronous ResolveModuleCallback for static imports —
+// there is no HostLoadImportedModule/FinishLoadingImportedModule equivalent in
+// the public API as of 14.9.207.39. Each call into HttpFetchText() blocks the
+// JS thread on a synchronous network turn, which forces serial fetching from
+// the JS thread's perspective.
 //
 // `__NS_DEV__.kickstartPrefetch(urls)` lets the JS dev client hand the runtime
 // a server-computed module closure (cold-boot graph or HMR eviction set)
