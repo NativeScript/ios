@@ -21,11 +21,11 @@ using namespace v8;
 
 namespace tns {
 
-// Shared by both the require() path (this file) and the import()/ESM resolver path
-// (ModuleInternalCallbacks.mm) — see the declaration in ModuleInternal.h. Keeping a single
-// definition means a boundary fix like the extension carve-out below automatically applies
-// to both call sites instead of only the one that happened to get touched.
-bool IsLikelyOptionalModule(const std::string& moduleName) {
+// require()-path policy only: import() rejects a missing bare specifier outright
+// (ESM optionality is `try { await import(x) } catch {}` at the call site, and in
+// dev sessions a bare specifier the import map doesn't cover is a config bug that
+// must fail loudly — see docs/knowledge/hmr-simplification-pass.md §2).
+static bool IsLikelyOptionalModule(const std::string& moduleName) {
   // Node built-ins are handled by their own dedicated resolution path; never treat them as
   // an optional external module.
   if (moduleName.rfind("node:", 0) == 0) {
