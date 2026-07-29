@@ -8,14 +8,13 @@
 #include <atomic>
 #include <mutex>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
 #include "Worker.h"
+#include "robin_hood.h"
 
 // Use centralized dev flags helper for logging
 
@@ -165,7 +164,8 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   size_t start = 0;
   while (start <= query.size()) {
     size_t amp = query.find('&', start);
-    std::string pair = (amp == std::string::npos) ? query.substr(start) : query.substr(start, amp - start);
+    std::string pair =
+        (amp == std::string::npos) ? query.substr(start) : query.substr(start, amp - start);
     if (!pair.empty()) {
       size_t eq = pair.find('=');
       std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
@@ -200,7 +200,7 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
 // enters the module registry key (identity stays the canonical URL),
 // and the server and the registry never see a varied URL.
 static std::mutex g_bustNextFetchMutex;
-static std::unordered_set<std::string> g_bustNextFetchKeys;
+static robin_hood::unordered_set<std::string> g_bustNextFetchKeys;
 
 void MarkUrlsForCacheBust(const std::vector<std::string>& urls) {
   if (urls.empty()) return;
@@ -277,7 +277,7 @@ static void MaybePumpJSThreadDuringBoot();
 static inline void InvokeHttpFetchYield();
 
 static std::mutex g_prefetchMutex;
-static std::unordered_map<std::string, std::string> g_prefetchCache;
+static robin_hood::unordered_map<std::string, std::string> g_prefetchCache;
 
 // Always-on diagnostic counters. These intentionally do NOT gate behind
 // IsScriptLoadingLogEnabled() — without this signal we cannot tell a
@@ -302,11 +302,12 @@ static std::atomic<size_t> g_fetchSyncMedium{0};  // 10–99ms
 static std::atomic<size_t> g_fetchSyncSlow{0};    // >=100ms
 static constexpr size_t kFetchSyncSummaryEvery = 100;
 
-bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status) {
+bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType,
+                   int& status) {
   // Security gate: check if remote module loading is allowed before any HTTP fetch.
   // This is the single point of enforcement for all HTTP module loading.
   if (!IsRemoteUrlAllowed(url)) {
-    status = 403; // Forbidden
+    status = 403;  // Forbidden
     if (IsScriptLoadingLogEnabled()) {
       Log(@"[http-esm][security][blocked] %s", url.c_str());
     }
@@ -478,7 +479,10 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
     }
 
     NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:fetchUrl.c_str()]];
-    if (!u) { status = 0; return false; }
+    if (!u) {
+      status = 0;
+      return false;
+    }
 
     NSError* err = nil;
     NSInteger httpStatusLocal = 0;
@@ -771,7 +775,7 @@ namespace {
 
 struct KickstartContext {
   std::mutex mutex;
-  std::unordered_set<std::string> visited;
+  robin_hood::unordered_set<std::string> visited;
   std::atomic<size_t> fetchedCount{0};
   std::atomic<size_t> bytes{0};
   dispatch_group_t group = nullptr;
@@ -1342,4 +1346,4 @@ void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> contex
   MirrorGlobalOnGlobalThis(isolate, context, "__NS_DEV__");
 }
 
-} // namespace tns
+}  // namespace tns
