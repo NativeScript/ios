@@ -606,6 +606,14 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
   }
 
   if (path.empty()) {
+    // A bare specifier shaped like an npm package name resolves to a
+    // lazily-throwing placeholder, so an app can ship without an optional
+    // dependency installed and only fail if it actually touches it. A
+    // specifier resolved against "/" is an explicit absolute path, never an
+    // optional package, so it always hard-fails.
+    if (baseDir != "/" && IsLikelyOptionalModule(moduleName)) {
+      return this->CreatePlaceholderModule(isolate, moduleName, cacheKey);
+    }
     throw NativeScriptException(isolate, "Cannot find module '" + moduleName + "'", "Error");
   }
 
@@ -1550,6 +1558,12 @@ std::string ModuleInternal::ResolvePath(Isolate* isolate, const std::string& bas
   }
 
   if (exists == NO) {
+    // No path for an optional-looking package: LoadImpl turns the empty result
+    // into the placeholder module rather than a hard failure.
+    if (IsLikelyOptionalModule(moduleName)) {
+      return std::string();
+    }
+
     // Create a detailed error message with context
     std::string errorMsg = "Cannot find module '" + moduleName + "'";
     errorMsg += "\n  Base directory: " + baseDir;
