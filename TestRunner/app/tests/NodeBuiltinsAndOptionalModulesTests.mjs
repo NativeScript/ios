@@ -124,6 +124,22 @@ describe("Node built-in and optional module resolution", function () {
   });
 
   it("reuses blob URL modules across concurrent and repeated imports", async function () {
+    // `Blob` is a @nativescript/core global — the bare TestRunner realm has
+    // none. Stand in a minimal one: `URL.createObjectURL` only needs the
+    // argument to be `instanceof Blob` and to carry `type`, and the loader only
+    // ever calls `.text()` on it.
+    const previousBlob = globalThis.Blob;
+    globalThis.Blob = class Blob {
+      constructor(parts, options) {
+        this._text = (parts || []).join("");
+        this.type = (options && options.type) || "";
+      }
+
+      text() {
+        return Promise.resolve(this._text);
+      }
+    };
+
     delete globalThis.__nsBlobEvalCount;
 
     const blobSource = [
@@ -133,14 +149,16 @@ describe("Node built-in and optional module resolution", function () {
       "export default { evalCount, kind };",
     ].join("\n");
 
-    const url = URL.createObjectURL(new Blob([blobSource], { type: "text/javascript" }), {
-      ext: ".mjs",
-    });
-
-    expect(typeof url).toBe("string");
-    expect(url.indexOf("blob:nativescript/")).toBe(0);
+    let url;
 
     try {
+      url = URL.createObjectURL(new Blob([blobSource], { type: "text/javascript" }), {
+        ext: ".mjs",
+      });
+
+      expect(typeof url).toBe("string");
+      expect(url.indexOf("blob:nativescript/")).toBe(0);
+
       const [first, second] = await Promise.all([import(url), import(url)]);
       const third = await import(url);
 
@@ -153,8 +171,15 @@ describe("Node built-in and optional module resolution", function () {
       expect(first.kind).toBe("blob-module");
       expect(globalThis.__nsBlobEvalCount).toBe(1);
     } finally {
-      URL.revokeObjectURL(url);
+      if (typeof url === "string") {
+        URL.revokeObjectURL(url);
+      }
       delete globalThis.__nsBlobEvalCount;
+      if (typeof previousBlob === "undefined") {
+        delete globalThis.Blob;
+      } else {
+        globalThis.Blob = previousBlob;
+      }
     }
   });
 });
