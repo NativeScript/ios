@@ -30,6 +30,45 @@ var TerminalReporter = require('../jasmine-reporters/terminal_reporter').Termina
    *
    * Build up the functions that will be exposed as the Jasmine public interface. A project can customize, rename or alias any of these functions as desired, provided the implementation remains unchanged.
    */
+  // Jasmine 2.0.1 decides whether a body is asynchronous from its declared
+  // arity alone (QueueRunner: `fn.length > 0`). A zero-arity `async function`
+  // is therefore treated as synchronous: its promise is discarded and the spec
+  // is recorded as passed before the first `await` resumes. Assertions then run
+  // after the fact — attributed to whichever spec is current by then — and
+  // rejections escape as unhandled.
+  //
+  // Give those bodies the `done` callback Jasmine needs so it waits for the
+  // promise to settle. Only `async function` bodies are rewritten: handing a
+  // `done` to every zero-arity body would move the entire suite's synchronous
+  // specs onto the async path, which changes when the runloop turns between
+  // them. A synchronous throw is left to propagate — QueueRunner's attemptAsync
+  // catches it and attributes it to the right spec.
+  var AsyncFunction = (async function() {}).constructor;
+
+  function awaitPromiseResult(func) {
+    if (typeof func !== 'function' || func.length > 0 ||
+        !(func instanceof AsyncFunction)) {
+      return func;
+    }
+
+    return function(done) {
+      var result = func.call(this);
+
+      if (!result || typeof result.then !== 'function') {
+        done();
+        return;
+      }
+
+      result.then(function() {
+        done();
+      }, function(error) {
+        var detail = (error && (error.stack || error.message)) || String(error);
+        env.expect('promise rejected: ' + detail).toBeUndefined();
+        done();
+      });
+    };
+  }
+
   var jasmineInterface = {
     describe: function(description, specDefinitions) {
       return env.describe(description, specDefinitions);
@@ -40,19 +79,19 @@ var TerminalReporter = require('../jasmine-reporters/terminal_reporter').Termina
     },
 
     it: function(desc, func) {
-      return env.it(desc, func);
+      return env.it(desc, awaitPromiseResult(func));
     },
 
     xit: function(desc, func) {
-      return env.xit(desc, func);
+      return env.xit(desc, awaitPromiseResult(func));
     },
 
     beforeEach: function(beforeEachFunction) {
-      return env.beforeEach(beforeEachFunction);
+      return env.beforeEach(awaitPromiseResult(beforeEachFunction));
     },
 
     afterEach: function(afterEachFunction) {
-      return env.afterEach(afterEachFunction);
+      return env.afterEach(awaitPromiseResult(afterEachFunction));
     },
 
     expect: function(actual) {
