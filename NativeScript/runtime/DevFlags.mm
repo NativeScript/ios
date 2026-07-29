@@ -1,11 +1,11 @@
 #import <Foundation/Foundation.h>
 
+#include <mutex>
+#include <vector>
 #include "DevFlags.h"
 #include "Helpers.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
-#include <vector>
-#include <mutex>
 
 namespace tns {
 
@@ -34,8 +34,7 @@ bool IsHttpFetchUrlLogEnabled() {
       }
     }
     if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-loader] fetch-url-log=%s",
-          s_enabled ? "enabled" : "disabled");
+      Log(@"[http-loader] fetch-url-log=%s", s_enabled ? "enabled" : "disabled");
     }
   });
   return s_enabled;
@@ -57,8 +56,7 @@ static std::vector<std::string> s_remoteModuleAllowlist;
 // "https://cdn.example.com.attacker.com/x.js" or
 // "https://cdn.example.com:9999/x.js". To allow a specific port, include it in
 // the allowlist entry (deny-by-default for anything not explicitly listed).
-static bool RemoteUrlMatchesAllowlistEntry(const std::string& url,
-                                           const std::string& entry) {
+static bool RemoteUrlMatchesAllowlistEntry(const std::string& url, const std::string& entry) {
   if (entry.empty()) return false;
   if (url.size() < entry.size()) return false;
   if (url.compare(0, entry.size(), entry) != 0) return false;
@@ -126,14 +124,14 @@ bool IsRemoteUrlAllowed(const std::string& url) {
   if (s_remoteModuleAllowlist.empty()) {
     return true;
   }
-  
+
   // Check if URL matches any allowlist entry on a URL-component boundary.
   for (const std::string& entry : s_remoteModuleAllowlist) {
     if (RemoteUrlMatchesAllowlistEntry(url, entry)) {
       return true;
     }
   }
-  
+
   return false;
 }
 

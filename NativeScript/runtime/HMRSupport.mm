@@ -6,11 +6,11 @@
 #include "DevFlags.h"
 
 #include <atomic>
+#include <mutex>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <string>
-#include <mutex>
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
@@ -33,24 +33,22 @@ static inline bool EndsWith(const std::string& s, const char* suffix) {
 
 void MirrorGlobalOnGlobalThis(v8::Isolate* isolate, v8::Local<v8::Context> context,
                               const char* name) {
-  std::string src =
-      "if (typeof globalThis !== 'undefined' && typeof globalThis." +
-      std::string(name) +
-      " === 'undefined') {"
-      "  Object.defineProperty(globalThis, '" + std::string(name) +
-      "', { value: this." + std::string(name) +
-      ", writable: true, configurable: true, enumerable: false });"
-      "}";
+  std::string src = "if (typeof globalThis !== 'undefined' && typeof globalThis." +
+                    std::string(name) +
+                    " === 'undefined') {"
+                    "  Object.defineProperty(globalThis, '" +
+                    std::string(name) + "', { value: this." + std::string(name) +
+                    ", writable: true, configurable: true, enumerable: false });"
+                    "}";
 
   v8::Local<v8::Script> script;
-  if (v8::Script::Compile(context, tns::ToV8String(isolate, src.c_str()))
-          .ToLocal(&script)) {
+  if (v8::Script::Compile(context, tns::ToV8String(isolate, src.c_str())).ToLocal(&script)) {
     script->Run(context).FromMaybe(v8::Local<v8::Value>());
   }
 }
 
-static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                             const char* key, bool value) {
+static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> context, const char* key,
+                             bool value) {
   context->Global()
       ->Set(context, tns::ToV8String(isolate, key), v8::Boolean::New(isolate, value))
       .FromMaybe(false);
@@ -71,8 +69,7 @@ static inline bool IsDevSessionBootComplete() {
   return g_devSessionBootComplete.load(std::memory_order_relaxed);
 }
 
-void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                        bool value) {
+void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bool value) {
   SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", value);
   g_devSessionBootComplete.store(value, std::memory_order_relaxed);
   if (IsScriptLoadingLogEnabled()) {
@@ -94,7 +91,8 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   }
   // Drop fragment entirely
   size_t hashPos = normalizedUrl.find('#');
-  std::string noHash = (hashPos == std::string::npos) ? normalizedUrl : normalizedUrl.substr(0, hashPos);
+  std::string noHash =
+      (hashPos == std::string::npos) ? normalizedUrl : normalizedUrl.substr(0, hashPos);
 
   // Locate path start and query start
   size_t schemePos = noHash.find("://");
@@ -151,11 +149,9 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
       // Preserve query as-is — `t` is the version discriminator.
       return noHash;
     }
-    const bool isDevEndpoint =
-      StartsWith(pathOnly, "/ns/") ||
-      StartsWith(pathOnly, "/node_modules/.vite/") ||
-      StartsWith(pathOnly, "/@id/") ||
-      StartsWith(pathOnly, "/@fs/");
+    const bool isDevEndpoint = StartsWith(pathOnly, "/ns/") ||
+                               StartsWith(pathOnly, "/node_modules/.vite/") ||
+                               StartsWith(pathOnly, "/@id/") || StartsWith(pathOnly, "/@fs/");
     if (!isDevEndpoint) {
       // Preserve query as-is (fragment already removed).
       return noHash;
@@ -268,7 +264,8 @@ static void ClearAllCacheBustMarks() {
 
 // Forward declarations — these helpers are defined below their first use,
 // matching the existing convention in this file.
-static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, std::string& contentType, int& status);
+static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
+                                     std::string& contentType, int& status);
 static bool LooksLikeJsSourceUrl(const std::string& url);
 static bool TryGetPrefetchedSource(const std::string& url, std::string& out);
 static void MaybeLogPrefetchSummary(const char* trigger);
@@ -285,8 +282,8 @@ static std::unordered_map<std::string, std::string> g_prefetchCache;
 // Always-on diagnostic counters. These intentionally do NOT gate behind
 // IsScriptLoadingLogEnabled() — without this signal we cannot tell a
 // helping prewarm cache from a hurting one.
-static std::atomic<size_t> g_prefetchHits{0};            // V8 asked for a URL we had cached
-static std::atomic<size_t> g_prefetchMisses{0};          // V8 asked for a URL we did not have
+static std::atomic<size_t> g_prefetchHits{0};    // V8 asked for a URL we had cached
+static std::atomic<size_t> g_prefetchMisses{0};  // V8 asked for a URL we did not have
 
 // synchronous-fetch timing histogram.
 //
@@ -300,9 +297,9 @@ static std::atomic<size_t> g_prefetchMisses{0};          // V8 asked for a URL w
 // working. If most are "slow", we still have churn to track down.
 static std::atomic<size_t> g_fetchSyncCount{0};
 static std::atomic<uint64_t> g_fetchSyncTotalMs{0};
-static std::atomic<size_t> g_fetchSyncFast{0};   // <10ms
-static std::atomic<size_t> g_fetchSyncMedium{0}; // 10–99ms
-static std::atomic<size_t> g_fetchSyncSlow{0};   // >=100ms
+static std::atomic<size_t> g_fetchSyncFast{0};    // <10ms
+static std::atomic<size_t> g_fetchSyncMedium{0};  // 10–99ms
+static std::atomic<size_t> g_fetchSyncSlow{0};    // >=100ms
 static constexpr size_t kFetchSyncSummaryEvery = 100;
 
 bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status) {
@@ -335,7 +332,7 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     if (out.empty()) {
       out = "export {};\n";
     }
-    contentType = "application/javascript"; // best effort — same as the dev server returns
+    contentType = "application/javascript";  // best effort — same as the dev server returns
     status = 200;
     g_prefetchHits.fetch_add(1, std::memory_order_relaxed);
     if (IsScriptLoadingLogEnabled()) {
@@ -346,8 +343,7 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
       // network fetches so we can attribute who actually paid for
       // each module body. ms is omitted because the cache lookup is
       // effectively instantaneous compared to network I/O.
-      Log(@"[http-loader][fetch][prefetch] %s bytes=%lu",
-          url.c_str(), (unsigned long)out.size());
+      Log(@"[http-loader][fetch][prefetch] %s bytes=%lu", url.c_str(), (unsigned long)out.size());
     }
     MaybeLogPrefetchSummary("hit");
     // Yield to the placeholder heartbeat between cache hits — without
@@ -363,9 +359,8 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   // inside PerformHttpFetchOnceSync) so the retry interval gets
   // billed to the URL too — which is what the user sees as "this
   // URL was slow".
-  const uint64_t netStartUs = urlLogEnabled
-      ? (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0)
-      : 0ull;
+  const uint64_t netStartUs =
+      urlLogEnabled ? (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0) : 0ull;
   bool ok = PerformHttpFetchOnceSync(url, out, contentType, status);
   if (!ok) {
     if (IsScriptLoadingLogEnabled()) {
@@ -400,8 +395,8 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   if (urlLogEnabled) {
     const uint64_t netEndUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
     const uint64_t netMs = netEndUs > netStartUs ? (netEndUs - netStartUs) / 1000ull : 0ull;
-    Log(@"[http-loader][fetch][network] %s bytes=%lu ms=%llu",
-        url.c_str(), (unsigned long)out.size(), (unsigned long long)netMs);
+    Log(@"[http-loader][fetch][network] %s bytes=%lu ms=%llu", url.c_str(),
+        (unsigned long)out.size(), (unsigned long long)netMs);
   }
 
   MaybeLogPrefetchSummary("miss");
@@ -444,7 +439,8 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 // a working implementation, and there is currently no non-deprecated
 // API that gives us a runloop-independent synchronous fetch with a
 // real HTTP status code.
-static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, std::string& contentType, int& status) {
+static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
+                                     std::string& contentType, int& status) {
   @autoreleasepool {
     // One-time: replace the shared NSURLCache with a zero-capacity one
     // so CFNetwork has no on-disk store to satisfy fetches from. Per-
@@ -494,7 +490,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
     NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:u];
     [request setHTTPMethod:@"GET"];
     [request setValue:@"application/javascript, text/javascript, */*;q=0.1"
-   forHTTPHeaderField:@"Accept"];
+        forHTTPHeaderField:@"Accept"];
     [request setValue:@"identity" forHTTPHeaderField:@"Accept-Encoding"];
     [request setTimeoutInterval:5.0];
     // CRITICAL for HMR: layered defense to bypass CFNetwork's URL cache.
@@ -503,8 +499,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
     // Combined with the zero-capacity sharedURLCache and the eviction-
     // driven URL nonce above, these give us a reliable "always go to
     // origin" path for the dev runtime.
-    [request setValue:@"no-cache, no-store, max-age=0"
-   forHTTPHeaderField:@"Cache-Control"];
+    [request setValue:@"no-cache, no-store, max-age=0" forHTTPHeaderField:@"Cache-Control"];
     [request setValue:@"no-cache" forHTTPHeaderField:@"Pragma"];
     // Force a fresh TCP connection per fetch. CFNetwork has been
     // observed to serve a body buffered on a kept-alive HTTP/1.1
@@ -551,7 +546,8 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
     }
 
     const auto fetchEndUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
-    const uint64_t fetchMs = fetchEndUs > fetchStartUs ? (fetchEndUs - fetchStartUs) / 1000ull : 0ull;
+    const uint64_t fetchMs =
+        fetchEndUs > fetchStartUs ? (fetchEndUs - fetchStartUs) / 1000ull : 0ull;
     g_fetchSyncTotalMs.fetch_add(fetchMs, std::memory_order_relaxed);
     if (fetchMs < 10) {
       g_fetchSyncFast.fetch_add(1, std::memory_order_relaxed);
@@ -561,19 +557,16 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
       g_fetchSyncSlow.fetch_add(1, std::memory_order_relaxed);
     }
     const size_t syncCount = g_fetchSyncCount.fetch_add(1, std::memory_order_relaxed) + 1;
-    if (syncCount > 0 && syncCount % kFetchSyncSummaryEvery == 0 &&
-        IsScriptLoadingLogEnabled()) {
+    if (syncCount > 0 && syncCount % kFetchSyncSummaryEvery == 0 && IsScriptLoadingLogEnabled()) {
       const size_t fast = g_fetchSyncFast.load(std::memory_order_relaxed);
       const size_t medium = g_fetchSyncMedium.load(std::memory_order_relaxed);
       const size_t slow = g_fetchSyncSlow.load(std::memory_order_relaxed);
       const uint64_t totalMs = g_fetchSyncTotalMs.load(std::memory_order_relaxed);
       const uint64_t avgMs = syncCount ? totalMs / (uint64_t)syncCount : 0;
-      Log(@"[http-loader][fetch-sync][summary] count=%lu avg=%llums fast(<10ms)=%lu medium=%lu slow(>=100ms)=%lu",
-          (unsigned long)syncCount,
-          (unsigned long long)avgMs,
-          (unsigned long)fast,
-          (unsigned long)medium,
-          (unsigned long)slow);
+      Log(@"[http-loader][fetch-sync][summary] count=%lu avg=%llums fast(<10ms)=%lu medium=%lu "
+          @"slow(>=100ms)=%lu",
+          (unsigned long)syncCount, (unsigned long long)avgMs, (unsigned long)fast,
+          (unsigned long)medium, (unsigned long)slow);
     }
 
     status = (int)httpStatusLocal;
@@ -588,14 +581,10 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out, s
       if (IsScriptLoadingLogEnabled()) {
         NSString* desc = err.localizedDescription ?: @"<no description>";
         NSString* domain = err.domain ?: @"<no domain>";
-        Log(@"[http-loader][fetch-error] url=%s domain=%@ code=%ld desc=%@ status=%ld bodyEmpty=%d ms=%llu",
-            url.c_str(),
-            domain,
-            (long)err.code,
-            desc,
-            (long)httpStatusLocal,
-            bodyLocal.empty() ? 1 : 0,
-            (unsigned long long)fetchMs);
+        Log(@"[http-loader][fetch-error] url=%s domain=%@ code=%ld desc=%@ status=%ld bodyEmpty=%d "
+            @"ms=%llu",
+            url.c_str(), domain, (long)err.code, desc, (long)httpStatusLocal,
+            bodyLocal.empty() ? 1 : 0, (unsigned long long)fetchMs);
       }
       return false;
     }
@@ -639,8 +628,8 @@ void EvictHttpModulePrefetchCacheUrls(const std::vector<std::string>& urls) {
     }
   }
   if (dropped > 0 && IsScriptLoadingLogEnabled()) {
-    Log(@"[http-loader][prefetch][evict] dropped=%lu of %lu",
-        (unsigned long)dropped, (unsigned long)urls.size());
+    Log(@"[http-loader][prefetch][evict] dropped=%lu of %lu", (unsigned long)dropped,
+        (unsigned long)urls.size());
   }
 }
 
@@ -651,12 +640,21 @@ static bool LooksLikeJsSourceUrl(const std::string& url) {
 
   // Skip non-JS resource types that V8 either won't request through this
   // path or that would break our content-type assumption on cache hit.
-  if (EndsWith(path, ".css") || EndsWith(path, ".scss") || EndsWith(path, ".sass") || EndsWith(path, ".less")) return false;
-  if (EndsWith(path, ".png") || EndsWith(path, ".jpg") || EndsWith(path, ".jpeg") || EndsWith(path, ".gif") || EndsWith(path, ".svg") || EndsWith(path, ".webp") || EndsWith(path, ".ico")) return false;
+  if (EndsWith(path, ".css") || EndsWith(path, ".scss") || EndsWith(path, ".sass") ||
+      EndsWith(path, ".less"))
+    return false;
+  if (EndsWith(path, ".png") || EndsWith(path, ".jpg") || EndsWith(path, ".jpeg") ||
+      EndsWith(path, ".gif") || EndsWith(path, ".svg") || EndsWith(path, ".webp") ||
+      EndsWith(path, ".ico"))
+    return false;
   if (EndsWith(path, ".json")) return false;
   if (EndsWith(path, ".html") || EndsWith(path, ".htm")) return false;
-  if (EndsWith(path, ".woff") || EndsWith(path, ".woff2") || EndsWith(path, ".ttf") || EndsWith(path, ".otf") || EndsWith(path, ".eot")) return false;
-  if (EndsWith(path, ".mp4") || EndsWith(path, ".webm") || EndsWith(path, ".mp3") || EndsWith(path, ".wav")) return false;
+  if (EndsWith(path, ".woff") || EndsWith(path, ".woff2") || EndsWith(path, ".ttf") ||
+      EndsWith(path, ".otf") || EndsWith(path, ".eot"))
+    return false;
+  if (EndsWith(path, ".mp4") || EndsWith(path, ".webm") || EndsWith(path, ".mp3") ||
+      EndsWith(path, ".wav"))
+    return false;
   return true;
 }
 
@@ -680,12 +678,10 @@ static void MaybeLogPrefetchSummary(const char* trigger) {
   }
 
   size_t hitPct = total ? (hits * 100 / total) : 0;
-  Log(@"[http-loader][prefetch][summary] trigger=%s totalAsks=%lu hits=%lu (%lu%%) misses=%lu cache=%lu",
-      trigger,
-      (unsigned long)total,
-      (unsigned long)hits, (unsigned long)hitPct,
-      (unsigned long)misses,
-      (unsigned long)cacheSize);
+  Log(@"[http-loader][prefetch][summary] trigger=%s totalAsks=%lu hits=%lu (%lu%%) misses=%lu "
+      @"cache=%lu",
+      trigger, (unsigned long)total, (unsigned long)hits, (unsigned long)hitPct,
+      (unsigned long)misses, (unsigned long)cacheSize);
 }
 
 // Cold-boot JS-thread runloop pump.
@@ -849,10 +845,8 @@ static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
   }
 }
 
-bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls,
-                                  int maxConcurrent,
-                                  double timeoutSeconds,
-                                  size_t* outFetchedCount,
+bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls, int maxConcurrent,
+                                  double timeoutSeconds, size_t* outFetchedCount,
                                   uint64_t* outElapsedMs) {
   if (urls.empty()) return false;
   // Drop empty / non-allowlisted URLs up front. We still want a
@@ -898,7 +892,8 @@ bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls,
     const uint64_t timeoutUs = (uint64_t)(timeoutSeconds * 1000.0 * 1000.0);
     timedOut = 1;
     while (true) {
-      const long sliceResult = dispatch_group_wait(ctx->group, dispatch_time(DISPATCH_TIME_NOW, sliceNs));
+      const long sliceResult =
+          dispatch_group_wait(ctx->group, dispatch_time(DISPATCH_TIME_NOW, sliceNs));
       if (sliceResult == 0) {
         timedOut = 0;
         break;
@@ -908,8 +903,8 @@ bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls,
       InvokeHttpFetchYield();
     }
   } else {
-    const dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW,
-                                                   (int64_t)(timeoutSeconds * NSEC_PER_SEC));
+    const dispatch_time_t deadline =
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeoutSeconds * NSEC_PER_SEC));
     timedOut = dispatch_group_wait(ctx->group, deadline);
   }
 
@@ -922,13 +917,10 @@ bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls,
   if (outElapsedMs) *outElapsedMs = elapsedMs;
 
   if (IsScriptLoadingLogEnabled()) {
-    Log(@"[hmr-kickstart][list] first=%s urls=%lu fetched=%lu bytes=%lu ms=%llu status=%s concurrency=%d",
-        diagSeed.c_str(),
-        (unsigned long)requestedCount,
-        (unsigned long)fetched,
-        (unsigned long)bytes,
-        (unsigned long long)elapsedMs,
-        timedOut == 0 ? "drained" : "timeout",
+    Log(@"[hmr-kickstart][list] first=%s urls=%lu fetched=%lu bytes=%lu ms=%llu status=%s "
+        @"concurrency=%d",
+        diagSeed.c_str(), (unsigned long)requestedCount, (unsigned long)fetched,
+        (unsigned long)bytes, (unsigned long long)elapsedMs, timedOut == 0 ? "drained" : "timeout",
         maxConcurrent);
   }
 
@@ -964,12 +956,10 @@ namespace {
 void InstallDevFunction(v8::Isolate* isolate, v8::Local<v8::Context> context,
                         v8::Local<v8::Object> target, const char* name,
                         v8::FunctionCallback callback) {
-  v8::Local<v8::FunctionTemplate> fnTpl =
-      v8::FunctionTemplate::New(isolate, callback);
+  v8::Local<v8::FunctionTemplate> fnTpl = v8::FunctionTemplate::New(isolate, callback);
   v8::Local<v8::Function> fn = fnTpl->GetFunction(context).ToLocalChecked();
   fn->SetName(tns::ToV8String(isolate, name));
-  target->CreateDataProperty(context, tns::ToV8String(isolate, name), fn)
-      .Check();
+  target->CreateDataProperty(context, tns::ToV8String(isolate, name), fn).Check();
 }
 
 void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -997,11 +987,14 @@ void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info
       if (*utf8) jsonStr = *utf8;
     } else if (importMapVal->IsObject()) {
       // Serialize object to JSON string
-      v8::Local<v8::Object> jsonObj = ctx->Global()->Get(ctx,
-        tns::ToV8String(isolate, "JSON")).ToLocalChecked().As<v8::Object>();
-      v8::Local<v8::Function> stringify = jsonObj->Get(ctx,
-        tns::ToV8String(isolate, "stringify")).ToLocalChecked().As<v8::Function>();
-      v8::Local<v8::Value> args[] = { importMapVal };
+      v8::Local<v8::Object> jsonObj = ctx->Global()
+                                          ->Get(ctx, tns::ToV8String(isolate, "JSON"))
+                                          .ToLocalChecked()
+                                          .As<v8::Object>();
+      v8::Local<v8::Function> stringify = jsonObj->Get(ctx, tns::ToV8String(isolate, "stringify"))
+                                              .ToLocalChecked()
+                                              .As<v8::Function>();
+      v8::Local<v8::Value> args[] = {importMapVal};
       v8::Local<v8::Value> result;
       if (stringify->Call(ctx, jsonObj, 1, args).ToLocal(&result) && result->IsString()) {
         v8::String::Utf8Value utf8(isolate, result);
@@ -1104,13 +1097,18 @@ void KickstartHmrPrefetchCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
   auto buildResult = [&](bool ok, size_t fetched, uint64_t elapsedMs) {
     v8::Local<v8::Object> result = v8::Object::New(isolate);
     result->Set(ctx, tns::ToV8String(isolate, "ok"), v8::Boolean::New(isolate, ok)).Check();
-    result->Set(ctx, tns::ToV8String(isolate, "fetched"), v8::Integer::NewFromUnsigned(isolate, (uint32_t)fetched)).Check();
-    result->Set(ctx, tns::ToV8String(isolate, "ms"), v8::Number::New(isolate, (double)elapsedMs)).Check();
+    result
+        ->Set(ctx, tns::ToV8String(isolate, "fetched"),
+              v8::Integer::NewFromUnsigned(isolate, (uint32_t)fetched))
+        .Check();
+    result->Set(ctx, tns::ToV8String(isolate, "ms"), v8::Number::New(isolate, (double)elapsedMs))
+        .Check();
     info.GetReturnValue().Set(result);
   };
 
   if (info.Length() < 1 || (!info[0]->IsString() && !info[0]->IsArray())) {
-    Log(@"[__NS_DEV__.kickstartPrefetch] expected (urls: string[], options?) or (url: string, options?)");
+    Log(@"[__NS_DEV__.kickstartPrefetch] expected (urls: string[], options?) or (url: string, "
+        @"options?)");
     buildResult(false, 0, 0);
     return;
   }
@@ -1165,7 +1163,8 @@ void KickstartHmrPrefetchCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 
   size_t fetched = 0;
   uint64_t elapsedMs = 0;
-  bool ok = tns::KickstartHmrPrefetchUrlsSync(urls, maxConcurrent, timeoutSeconds, &fetched, &elapsedMs);
+  bool ok =
+      tns::KickstartHmrPrefetchUrlsSync(urls, maxConcurrent, timeoutSeconds, &fetched, &elapsedMs);
   buildResult(ok, fetched, elapsedMs);
 }
 
@@ -1188,8 +1187,12 @@ void SeedModuleBodiesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   auto buildResult = [&](bool ok, size_t seeded, size_t bytes) {
     v8::Local<v8::Object> result = v8::Object::New(isolate);
     result->Set(ctx, tns::ToV8String(isolate, "ok"), v8::Boolean::New(isolate, ok)).Check();
-    result->Set(ctx, tns::ToV8String(isolate, "seeded"), v8::Integer::NewFromUnsigned(isolate, (uint32_t)seeded)).Check();
-    result->Set(ctx, tns::ToV8String(isolate, "bytes"), v8::Number::New(isolate, (double)bytes)).Check();
+    result
+        ->Set(ctx, tns::ToV8String(isolate, "seeded"),
+              v8::Integer::NewFromUnsigned(isolate, (uint32_t)seeded))
+        .Check();
+    result->Set(ctx, tns::ToV8String(isolate, "bytes"), v8::Number::New(isolate, (double)bytes))
+        .Check();
     info.GetReturnValue().Set(result);
   };
 
@@ -1250,8 +1253,8 @@ void SeedModuleBodiesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   }
 
   if (tns::IsScriptLoadingLogEnabled()) {
-    Log(@"[__NS_DEV__.seedModuleBodies] seeded=%lu bytes=%lu of %u entries",
-        (unsigned long)seeded, (unsigned long)bytes, len);
+    Log(@"[__NS_DEV__.seedModuleBodies] seeded=%lu bytes=%lu of %u entries", (unsigned long)seeded,
+        (unsigned long)bytes, len);
   }
 
   buildResult(seeded > 0, seeded, bytes);
@@ -1263,13 +1266,10 @@ void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
   std::vector<std::string> urls = tns::GetLoadedModuleUrls();
-  v8::Local<v8::Array> result =
-      v8::Array::New(isolate, static_cast<int>(urls.size()));
+  v8::Local<v8::Array> result = v8::Array::New(isolate, static_cast<int>(urls.size()));
 
   for (uint32_t index = 0; index < urls.size(); index++) {
-    result
-        ->Set(ctx, index, tns::ToV8String(isolate, urls[index].c_str()))
-        .FromMaybe(false);
+    result->Set(ctx, index, tns::ToV8String(isolate, urls[index].c_str())).FromMaybe(false);
   }
 
   info.GetReturnValue().Set(result);
@@ -1296,8 +1296,7 @@ void SetDevBootCompleteCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 
 }  // namespace
 
-void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                             bool isWorker) {
+void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> context, bool isWorker) {
   // The dev host API lives here: `__NS_DEV__`.
   v8::Local<v8::Object> dev = v8::Object::New(isolate);
 
@@ -1327,24 +1326,19 @@ void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> contex
           return;
         }
         v8::String::Utf8Value u(iso, info[0]);
-        std::string key =
-            CanonicalizeHttpUrlKey(*u ? std::string(*u) : std::string());
+        std::string key = CanonicalizeHttpUrlKey(*u ? std::string(*u) : std::string());
         info.GetReturnValue().Set(tns::ToV8String(iso, key.c_str()));
       };
-      v8::Local<v8::Function> fn =
-          v8::Function::New(context, canonicalizeCb).ToLocalChecked();
+      v8::Local<v8::Function> fn = v8::Function::New(context, canonicalizeCb).ToLocalChecked();
       fn->SetName(tns::ToV8String(isolate, "canonicalizeHttpUrlKey"));
-      dev->CreateDataProperty(
-             context, tns::ToV8String(isolate, "canonicalizeHttpUrlKey"), fn)
+      dev->CreateDataProperty(context, tns::ToV8String(isolate, "canonicalizeHttpUrlKey"), fn)
           .Check();
     } catch (...) {
       // Don't crash if debug-diagnostic setup fails
     }
   }
 
-  context->Global()
-      ->Set(context, tns::ToV8String(isolate, "__NS_DEV__"), dev)
-      .FromMaybe(false);
+  context->Global()->Set(context, tns::ToV8String(isolate, "__NS_DEV__"), dev).FromMaybe(false);
   MirrorGlobalOnGlobalThis(isolate, context, "__NS_DEV__");
 }
 
