@@ -95,6 +95,45 @@ static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string&
 static std::string CanonicalizeRegistryKey(const std::string& key);
 static const char* ModuleStatusToString(v8::Module::Status status);
 
+// Turn a value JS handed us into a real v8::Promise.
+//
+// A promise that reaches us from JS is usually NOT a v8::Promise: PromiseProxy
+// replaces the global Promise with a Proxy whose construct trap returns
+// `new Proxy(promise, ...)` so callbacks can be marshaled back to the creating
+// runloop. Such a value satisfies `instanceof Promise` in JS but fails
+// v8::Value::IsPromise(), so testing for a v8::Promise silently rejects
+// perfectly good input. Adopt any thenable instead — Resolver::New builds on the
+// intrinsic %Promise%, which the global override does not affect, and resolving
+// it with a thenable adopts that thenable's state.
+//
+// Values produced by V8 itself (Module::Evaluate) are genuine promises and take
+// the fast path.
+static v8::MaybeLocal<v8::Promise> AdoptThenable(v8::Isolate* isolate,
+                                                 v8::Local<v8::Context> context,
+                                                 v8::Local<v8::Value> value) {
+  if (value.IsEmpty()) {
+    return v8::MaybeLocal<v8::Promise>();
+  }
+  if (value->IsPromise()) {
+    return value.As<v8::Promise>();
+  }
+  if (!value->IsObject()) {
+    return v8::MaybeLocal<v8::Promise>();
+  }
+
+  v8::Local<v8::Value> thenVal;
+  if (!value.As<v8::Object>()->Get(context, tns::ToV8String(isolate, "then")).ToLocal(&thenVal) ||
+      !thenVal->IsFunction()) {
+    return v8::MaybeLocal<v8::Promise>();
+  }
+
+  v8::Local<v8::Promise::Resolver> adopter;
+  if (!v8::Promise::Resolver::New(context).ToLocal(&adopter) ||
+      adopter->Resolve(context, value).IsNothing()) {
+    return v8::MaybeLocal<v8::Promise>();
+  }
+  return adopter->GetPromise();
+}
 
 static v8::MaybeLocal<v8::Module> CompileModuleFromSource(v8::Isolate* isolate, v8::Local<v8::Context> context,
                                                           const std::string& code, const std::string& urlStr) {
@@ -2962,17 +3001,38 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
       v8::Local<v8::Function> textFn = textFnVal.As<v8::Function>();
 
-      v8::Local<v8::Value> textPromiseVal;
-      if (!textFn->Call(context, blobObj, 0, nullptr).ToLocal(&textPromiseVal) || !textPromiseVal->IsPromise()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] Blob.text() did not return a Promise");
+      // Keep the two failure modes distinct — a throw out of text() and a
+      // return value that isn't awaitable — and carry the thrown value's text
+      // into the rejection. Collapsing both into one opaque message loses the
+      // only evidence of why a blob module would not load.
+      v8::Local<v8::Value> textResultVal;
+      std::string textFailure;
+      {
+        v8::TryCatch textTc(isolate);
+        if (!textFn->Call(context, blobObj, 0, nullptr).ToLocal(&textResultVal)) {
+          textFailure = "Blob.text() threw";
+          if (textTc.HasCaught()) {
+            v8::String::Utf8Value thrown(isolate, textTc.Exception());
+            if (*thrown) {
+              textFailure += std::string(": ") + *thrown;
+            }
+          }
         }
-        RejectHttpDynamicWaiters(
-            isolate, context, blobRegistryKey,
-            v8::Exception::Error(tns::ToV8String(isolate, "Blob.text() failed")));
+      }
+
+      v8::Local<v8::Promise> textPromise;
+      if (textFailure.empty() &&
+          !AdoptThenable(isolate, context, textResultVal).ToLocal(&textPromise)) {
+        textFailure = "Blob.text() did not return a thenable";
+      }
+      if (!textFailure.empty()) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][blob] %s", textFailure.c_str());
+        }
+        RejectHttpDynamicWaiters(isolate, context, blobRegistryKey,
+                                 v8::Exception::Error(tns::ToV8String(isolate, textFailure)));
         return scope.Escape(resolver->GetPromise());
       }
-      v8::Local<v8::Promise> textPromise = textPromiseVal.As<v8::Promise>();
 
       // Create data structure to pass to the callbacks.
       struct BlobImportData {
@@ -3522,10 +3582,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           v8::Local<v8::Value> argv[1] = { specifier };
           v8::MaybeLocal<v8::Value> maybePromise = fetchFn->Call(context, context->Global(), 1, argv);
           v8::Local<v8::Value> promiseVal;
-          if (maybePromise.ToLocal(&promiseVal) && promiseVal->IsPromise()) {
+          v8::Local<v8::Promise> jsPromise;
+          if (maybePromise.ToLocal(&promiseVal) &&
+              AdoptThenable(isolate, context, promiseVal).ToLocal(&jsPromise)) {
             // Chain: when JS promise resolves, retry resolution.
-            v8::Local<v8::Promise> jsPromise = promiseVal.As<v8::Promise>();
-            // We attach then() via microtask enqueue style: create functions capturing resolver & spec.
+            // We attach then() via microtask enqueue style: create functions capturing resolver &
+            // spec.
             struct FetchRetryData { v8::Global<v8::Promise::Resolver> resolver; v8::Global<v8::String> spec; v8::Global<v8::FixedArray> assertions; };
             auto* data = new FetchRetryData{ v8::Global<v8::Promise::Resolver>(isolate, resolver), v8::Global<v8::String>(isolate, specifier), v8::Global<v8::FixedArray>(isolate, import_assertions) };
 
