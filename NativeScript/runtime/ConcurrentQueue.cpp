@@ -41,17 +41,18 @@ std::vector<std::shared_ptr<worker::Message>> ConcurrentQueue::PopAll() {
 }
 
 bool ConcurrentQueue::IsEmpty() {
-    std::unique_lock<std::mutex> mlock(this->mutex_);
-    return this->messagesQueue_.empty();
+  std::unique_lock<std::mutex> mlock(this->mutex_);
+  return this->messagesQueue_.empty();
 }
 
 void ConcurrentQueue::Signal() {
-    // Mirrors Push()'s validity handling instead of SignalAndWakeUp()'s
-    // assert: a retry racing Terminate() must be a silent no-op.
-    if (this->runLoopTasksSource_ == nullptr || !CFRunLoopSourceIsValid(this->runLoopTasksSource_)) {
-        return;
-    }
-    this->SignalAndWakeUp();
+  // Mirrors Push()'s validity handling instead of SignalAndWakeUp()'s
+  // assert: a retry racing Terminate() must be a silent no-op.
+  if (this->runLoopTasksSource_ == nullptr ||
+      !CFRunLoopSourceIsValid(this->runLoopTasksSource_)) {
+    return;
+  }
+  this->SignalAndWakeUp();
 }
 
 void ConcurrentQueue::SignalAndWakeUp() {

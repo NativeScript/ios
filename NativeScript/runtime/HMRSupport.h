@@ -44,7 +44,8 @@ namespace tns {
 // module under exactly one URL and never varies it for freshness.
 std::string CanonicalizeHttpUrlKey(const std::string& url);
 
-// Minimal text fetch for HTTP ESM loader. Returns true on 2xx with non-empty body.
+// Minimal text fetch for HTTP ESM loader. Returns true on 2xx with non-empty
+// body.
 // - out: response body
 // - contentType: Content-Type header if present
 // - status: HTTP status code
@@ -109,8 +110,7 @@ void MarkUrlsForCacheBust(const std::vector<std::string>& urls);
 // `outFetchedCount` (optional) receives the number of distinct URLs
 // fetched. `outElapsedMs` (optional) receives wall-clock time.
 bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls,
-                                  int maxConcurrent,
-                                  double timeoutSeconds,
+                                  int maxConcurrent, double timeoutSeconds,
                                   size_t* outFetchedCount,
                                   uint64_t* outElapsedMs);
 
@@ -131,8 +131,8 @@ void CleanupHMRGlobals();
 // Mirror a globally-installed value onto `globalThis.<name>` so
 // `globalThis.<name>` lookups resolve when the runtime installs the
 // canonical value on the realm's global object.
-void MirrorGlobalOnGlobalThis(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                              const char* name);
+void MirrorGlobalOnGlobalThis(v8::Isolate* isolate,
+                              v8::Local<v8::Context> context, const char* name);
 
 // ─────────────────────────────────────────────────────────────
 // Dev host namespace installer
@@ -147,12 +147,13 @@ void MirrorGlobalOnGlobalThis(v8::Isolate* isolate, v8::Local<v8::Context> conte
 //   - configureRuntime(config)        (import map + volatile patterns)
 //   - invalidateModules(urls)         (registry + cache eviction)
 //   - kickstartPrefetch(urls, opts?)  (parallel HTTP prewarm, list mode)
-//   - seedModuleBodies(entries)       (batch prewarm seeding from the boot archive)
+//   - seedModuleBodies(entries)       (batch prewarm seeding from the boot
+//   archive)
 //   - getLoadedModuleUrls()           (registry introspection)
 //   - setDevBootComplete(value?)      (boot-complete signal)
 //   - terminateAllWorkers()           (main isolate only; see Worker.h)
 //   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
-void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                             bool isWorker);
+void InitializeHmrDevGlobals(v8::Isolate* isolate,
+                             v8::Local<v8::Context> context, bool isWorker);
 
 } // namespace tns
