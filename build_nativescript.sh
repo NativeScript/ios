@@ -2,6 +2,10 @@
 set -e
 source "$(dirname "$0")/build_utils.sh"
 
+# The V8 libraries and headers are not committed; fetch the pinned release.
+# No-ops once they are in place, and honours V8_SKIP_DOWNLOAD=1.
+"$(dirname "$0")/download_v8.sh"
+
 function to_bool() {
   local arg="$1"
   case "$(echo "$arg" | tr '[:upper:]' '[:lower:]')" in

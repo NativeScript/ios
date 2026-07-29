@@ -28,13 +28,14 @@ std::shared_ptr<jsi::HostObject> HostObjectProxy::GetHostObject() {
 }
 
 // static
-void HostObjectProxy::Getter(v8::Local<v8::Name> property,
-                             const v8::PropertyCallbackInfo<v8::Value>& info) {
+v8::Intercepted HostObjectProxy::Getter(
+    v8::Local<v8::Name> property,
+    const v8::PropertyCallbackInfo<v8::Value>& info) {
   v8::HandleScope scopedHandle(info.GetIsolate());
   v8::Local<v8::External> data =
-      v8::Local<v8::External>::Cast(info.This()->GetInternalField(1));
-  HostObjectProxy* hostObjectProxy =
-      reinterpret_cast<HostObjectProxy*>(data->Value());
+      v8::Local<v8::External>::Cast(info.Holder()->GetInternalField(1));
+  HostObjectProxy* hostObjectProxy = reinterpret_cast<HostObjectProxy*>(
+      data->Value(v8::kExternalPointerTypeTagDefault));
 
   assert(hostObjectProxy);
 
@@ -46,7 +47,7 @@ void HostObjectProxy::Getter(v8::Local<v8::Name> property,
   } catch (const jsi::JSError& error) {
     info.GetIsolate()->ThrowException(
         JSIV8ValueConverter::ToV8Value(runtime, error.value()));
-    return;
+    return v8::Intercepted::kYes;
   } catch (const std::exception& ex) {
     auto excValue =
         runtime.global()
@@ -58,7 +59,7 @@ void HostObjectProxy::Getter(v8::Local<v8::Name> property,
                       std::string("): ") + ex.what());
     info.GetIsolate()->ThrowException(
         JSIV8ValueConverter::ToV8Value(runtime, excValue));
-    return;
+    return v8::Intercepted::kYes;
   } catch (...) {
     auto excValue =
         runtime.global()
@@ -70,20 +71,21 @@ void HostObjectProxy::Getter(v8::Local<v8::Name> property,
                       std::string("): <unknown>"));
     info.GetIsolate()->ThrowException(
         JSIV8ValueConverter::ToV8Value(runtime, excValue));
-    return;
+    return v8::Intercepted::kYes;
   }
   info.GetReturnValue().Set(JSIV8ValueConverter::ToV8Value(runtime, ret));
+  return v8::Intercepted::kYes;
 }
 
 // static
-void HostObjectProxy::Setter(v8::Local<v8::Name> property,
-                             v8::Local<v8::Value> value,
-                             const v8::PropertyCallbackInfo<v8::Value>& info) {
+v8::Intercepted HostObjectProxy::Setter(
+    v8::Local<v8::Name> property, v8::Local<v8::Value> value,
+    const v8::PropertyCallbackInfo<v8::Boolean>& info) {
   v8::HandleScope scopedHandle(info.GetIsolate());
   v8::Local<v8::External> data =
-      v8::Local<v8::External>::Cast(info.This()->GetInternalField(1));
-  HostObjectProxy* hostObjectProxy =
-      reinterpret_cast<HostObjectProxy*>(data->Value());
+      v8::Local<v8::External>::Cast(info.Holder()->GetInternalField(1));
+  HostObjectProxy* hostObjectProxy = reinterpret_cast<HostObjectProxy*>(
+      data->Value(v8::kExternalPointerTypeTagDefault));
 
   assert(hostObjectProxy);
   auto& runtime = hostObjectProxy->runtime_;
@@ -95,7 +97,7 @@ void HostObjectProxy::Setter(v8::Local<v8::Name> property,
   } catch (const jsi::JSError& error) {
     info.GetIsolate()->ThrowException(
         JSIV8ValueConverter::ToV8Value(runtime, error.value()));
-    return;
+    return v8::Intercepted::kYes;
   } catch (const std::exception& ex) {
     auto excValue =
         runtime.global()
@@ -107,7 +109,7 @@ void HostObjectProxy::Setter(v8::Local<v8::Name> property,
                       std::string("): ") + ex.what());
     info.GetIsolate()->ThrowException(
         JSIV8ValueConverter::ToV8Value(runtime, excValue));
-    return;
+    return v8::Intercepted::kYes;
   } catch (...) {
     auto excValue =
         runtime.global()
@@ -119,9 +121,12 @@ void HostObjectProxy::Setter(v8::Local<v8::Name> property,
                       std::string("): <unknown>"));
     info.GetIsolate()->ThrowException(
         JSIV8ValueConverter::ToV8Value(runtime, excValue));
-    return;
+    return v8::Intercepted::kYes;
   }
-  return;
+  // Not intercepted: the native write is done, but V8 must still perform
+  // the ordinary store, which is what the old void-returning callback did
+  // by falling through without setting a return value.
+  return v8::Intercepted::kNo;
 }
 
 // static
@@ -129,9 +134,9 @@ void HostObjectProxy::Enumerator(
     const v8::PropertyCallbackInfo<v8::Array>& info) {
   v8::HandleScope scopedHandle(info.GetIsolate());
   v8::Local<v8::External> data =
-      v8::Local<v8::External>::Cast(info.This()->GetInternalField(1));
-  HostObjectProxy* hostObjectProxy =
-      reinterpret_cast<HostObjectProxy*>(data->Value());
+      v8::Local<v8::External>::Cast(info.Holder()->GetInternalField(1));
+  HostObjectProxy* hostObjectProxy = reinterpret_cast<HostObjectProxy*>(
+      data->Value(v8::kExternalPointerTypeTagDefault));
 
   assert(hostObjectProxy);
 
@@ -194,7 +199,8 @@ void HostFunctionProxy::FunctionCallback(
     const v8::FunctionCallbackInfo<v8::Value>& info) {
   v8::HandleScope scopedHandle(info.GetIsolate());
   v8::Local<v8::External> data = v8::Local<v8::External>::Cast(info.Data());
-  auto* hostFunctionProxy = reinterpret_cast<HostFunctionProxy*>(data->Value());
+  auto* hostFunctionProxy = reinterpret_cast<HostFunctionProxy*>(
+      data->Value(v8::kExternalPointerTypeTagDefault));
 
   auto& runtime = hostFunctionProxy->runtime_;
 

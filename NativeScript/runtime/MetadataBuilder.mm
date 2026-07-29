@@ -23,7 +23,7 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate,
                                                       bool isWorkerThread) {
   GlobalHandlerContext* handlerContext = new GlobalHandlerContext(isWorkerThread);
   Caches::Get(isolate)->registerCacheBoundObject(handlerContext);
-  Local<External> ext = External::New(isolate, handlerContext);
+  Local<External> ext = External::New(isolate, handlerContext, v8::kExternalPointerTypeTagDefault);
 
   NamedPropertyHandlerConfiguration config(MetadataBuilder::GlobalPropertyGetter, nullptr, nullptr,
                                            nullptr, nullptr, ext,
@@ -31,27 +31,27 @@ void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate,
   globalTemplate->SetHandler(config);
 }
 
-void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
-                                           const PropertyCallbackInfo<Value>& info) {
+v8::Intercepted MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
+                                                      const PropertyCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   std::string propName = tns::ToString(isolate, property);
 
-  GlobalHandlerContext* ctx =
-      static_cast<GlobalHandlerContext*>(info.Data().As<External>()->Value());
+  GlobalHandlerContext* ctx = static_cast<GlobalHandlerContext*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
   if (ctx->isWorkerThread_ &&
       std::find(Worker::GlobalFunctions.begin(), Worker::GlobalFunctions.end(), propName) !=
           Worker::GlobalFunctions.end()) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   if (InlineFunctions::IsGlobalFunction(propName)) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   const Meta* meta = ArgConverter::GetMeta(propName);
   if (meta == nullptr || !meta->isAvailable()) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   Local<Context> context = isolate->GetCurrentContext();
@@ -85,7 +85,7 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
     if (it != cache->CFunctions.end()) {
       Local<v8::Function> func = it->second->Get(isolate);
       info.GetReturnValue().Set(func);
-      return;
+      return v8::Intercepted::kYes;
     }
 
     const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
@@ -99,7 +99,7 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
     CacheItem<FunctionMeta>* item =
         new CacheItem<FunctionMeta>(funcMeta, std::string(), functionPointer);
     Caches::Get(isolate)->registerCacheBoundObject(item);
-    Local<External> ext = External::New(isolate, item);
+    Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
     Local<v8::Function> func;
     bool success = v8::Function::New(context, CFunctionCallback, ext).ToLocal(&func);
     tns::Assert(success, isolate);
@@ -116,7 +116,7 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
     void* dataSymbol =
         SymbolLoader::instance().loadDataSymbol(meta->topLevelModule(), meta->name());
     if (!dataSymbol) {
-      return;
+      return v8::Intercepted::kNo;
     }
 
     const VarMeta* varMeta = static_cast<const VarMeta*>(meta);
@@ -146,11 +146,12 @@ void MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
         MetadataBuilder::GetOrCreateStructCtorFunction(context, structInfo);
     info.GetReturnValue().Set(structCtorFunc);
   }
+  return v8::Intercepted::kYes;
 }
 
 Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context> context,
                                                                    StructInfo structInfo) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   auto it = cache->StructConstructorFunctions.find(structInfo.Name());
   if (it != cache->StructConstructorFunctions.end()) {
@@ -158,7 +159,7 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context
   }
 
   StructTypeWrapper* wrapper = new StructTypeWrapper(structInfo);
-  Local<External> ext = External::New(isolate, wrapper);
+  Local<External> ext = External::New(isolate, wrapper, v8::kExternalPointerTypeTagDefault);
   Local<v8::Function> structCtorFunc;
   bool success =
       v8::Function::New(context, StructConstructorCallback, ext).ToLocal(&structCtorFunc);
@@ -184,8 +185,8 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
   try {
-    StructTypeWrapper* typeWrapper =
-        static_cast<StructTypeWrapper*>(info.Data().As<External>()->Value());
+    StructTypeWrapper* typeWrapper = static_cast<StructTypeWrapper*>(
+        info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
     StructInfo structInfo = typeWrapper->StructInfo();
 
@@ -288,7 +289,8 @@ std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Local<Context> contex
     Interop::InitializeStruct(context, data, structInfo.Fields(), initializer);
   } else {
     Local<External> ext = initializer->GetInternalField(0).As<External>();
-    BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+    BaseDataWrapper* wrapper =
+        static_cast<BaseDataWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
     if (wrapper->Type() != WrapperType::Struct) {
       return std::make_pair(ffiType, data);
     }
@@ -315,7 +317,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     robin_hood::unordered_map<std::string, uint8_t>& instanceMembers,
     robin_hood::unordered_map<std::string, uint8_t>& staticMembers,
     const std::vector<std::string>& additionalProtocols) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<FunctionTemplate> ctorFuncTemplate;
   auto cache = Caches::Get(isolate);
 
@@ -330,7 +332,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
   std::string className;
   CacheItem<BaseClassMeta>* item = new CacheItem<BaseClassMeta>(meta, className);
   Caches::Get(isolate)->registerCacheBoundObject(item);
-  Local<External> ext = External::New(isolate, item);
+  Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
 
   ctorFuncTemplate = FunctionTemplate::New(isolate, ClassConstructorCallback, ext);
   ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
@@ -477,7 +479,7 @@ void MetadataBuilder::RegisterAllocMethod(Isolate* isolate,
   std::string className;
   CacheItem<InterfaceMeta>* item = new CacheItem<InterfaceMeta>(interfaceMeta, className);
   Caches::Get(isolate)->registerCacheBoundObject(item);
-  Local<External> ext = External::New(isolate, item);
+  Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
   Local<FunctionTemplate> allocFuncTemplate = FunctionTemplate::New(isolate, AllocCallback, ext);
   ctorFuncTemplate->Set(tns::ToV8String(isolate, "alloc"), allocFuncTemplate);
 }
@@ -485,7 +487,7 @@ void MetadataBuilder::RegisterAllocMethod(Isolate* isolate,
 void MetadataBuilder::RegisterInstanceMethods(
     Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta,
     KnownUnknownClassPair pair, robin_hood::unordered_map<std::string, uint8_t>& names) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
   for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
@@ -499,7 +501,7 @@ void MetadataBuilder::RegisterInstanceMethods(
     if (methodsIt == names.end()) {
       CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name());
       Caches::Get(isolate)->registerCacheBoundObject(item);
-      Local<External> ext = External::New(isolate, item);
+      Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
       Local<FunctionTemplate> instanceMethodTemplate =
           FunctionTemplate::New(isolate, MethodCallback, ext);
       proto->Set(tns::ToV8String(isolate, methodMeta->jsName()), instanceMethodTemplate);
@@ -512,7 +514,7 @@ void MetadataBuilder::RegisterInstanceProperties(
     Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta,
     const std::string className, KnownUnknownClassPair pair,
     robin_hood::unordered_map<std::string, uint8_t>& names) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
   for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
@@ -534,11 +536,11 @@ void MetadataBuilder::RegisterInstanceProperties(
     if (accessors > 0 && (propertiesIt == names.end() || propertiesIt->second < accessors)) {
       CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className);
       Caches::Get(isolate)->registerCacheBoundObject(item);
-      Local<External> ext = External::New(isolate, item);
+      Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
       Local<FunctionTemplate> getter = FunctionTemplate::New(isolate, PropertyGetterCallback, ext);
       Local<FunctionTemplate> setter = FunctionTemplate::New(isolate, PropertySetterCallback, ext);
       proto->SetAccessorProperty(tns::ToV8String(isolate, propMeta->jsName()), getter, setter,
-                                 PropertyAttribute::None, AccessControl::DEFAULT);
+                                 PropertyAttribute::None);
       names.emplace(propertyName, accessors);
     }
   }
@@ -592,7 +594,7 @@ void MetadataBuilder::RegisterAdditionalProtocols(
 void MetadataBuilder::RegisterStaticMethods(
     Local<Context> context, Local<v8::Function> ctorFunc, const BaseClassMeta* meta,
     KnownUnknownClassPair pair, robin_hood::unordered_map<std::string, uint8_t>& names) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   for (auto it = meta->staticMethods->begin(); it != meta->staticMethods->end(); it++) {
     const MethodMeta* methodMeta = (*it).valuePtr();
     if (!methodMeta->isAvailableInClasses(pair, true)) {
@@ -604,7 +606,7 @@ void MetadataBuilder::RegisterStaticMethods(
     if (methodsIt == names.end()) {
       CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name());
       Caches::Get(isolate)->registerCacheBoundObject(item);
-      Local<External> ext = External::New(isolate, item);
+      Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
       Local<FunctionTemplate> staticMethodTemplate =
           FunctionTemplate::New(isolate, MethodCallback, ext);
       Local<v8::Function> staticMethod;
@@ -630,7 +632,7 @@ void MetadataBuilder::RegisterStaticProperties(
     Local<Context> context, Local<v8::Function> ctorFunc, const BaseClassMeta* meta,
     const std::string className, KnownUnknownClassPair pair,
     robin_hood::unordered_map<std::string, uint8_t>& names) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   for (auto it = meta->staticProps->begin(); it != meta->staticProps->end(); it++) {
     const PropertyMeta* propMeta = (*it).valuePtr();
@@ -652,16 +654,25 @@ void MetadataBuilder::RegisterStaticProperties(
     if (accessors > 0 && (propertiesIt == names.end() || propertiesIt->second < accessors)) {
       CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className);
       Caches::Get(isolate)->registerCacheBoundObject(item);
-      Local<External> ext = External::New(isolate, item);
+      Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
 
       Local<v8::String> propName = tns::ToV8String(isolate, propMeta->jsName());
-      bool success;
-      Maybe<bool> maybeSuccess = ctorFunc->SetAccessor(
-          context, propName, PropertyNameGetterCallback, PropertyNameSetterCallback, ext,
-          AccessControl::DEFAULT, PropertyAttribute::DontDelete);
-      if (!maybeSuccess.To(&success) || !success) {
+      // A real accessor pair, not SetNativeDataProperty: a derived class
+      // inherits this from the base constructor, and assigning through the
+      // derived one must reach the setter instead of shadowing it with an own
+      // data property.
+      Local<v8::Function> propGetter;
+      Local<v8::Function> propSetter;
+      if (!FunctionTemplate::New(isolate, PropertyNameGetterCallback, ext)
+               ->GetFunction(context)
+               .ToLocal(&propGetter) ||
+          !FunctionTemplate::New(isolate, PropertyNameSetterCallback, ext)
+               ->GetFunction(context)
+               .ToLocal(&propSetter)) {
         tns::Assert(false, isolate);
       }
+      ctorFunc->SetAccessorProperty(propName, propGetter, propSetter,
+                                    PropertyAttribute::DontDelete);
       names.emplace(propertyName, accessors);
     }
   }
@@ -692,8 +703,8 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
   Local<Context> context = isolate->GetCurrentContext();
   tns::Assert(info.IsConstructCall(), isolate);
   try {
-    CacheItem<BaseClassMeta>* item =
-        static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
+    CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(
+        info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
     Class klass = objc_getClass(item->meta_->name());
 
     const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
@@ -716,8 +727,8 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
       ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
       klass = classWrapper->Klass();
     } else {
-      CacheItem<InterfaceMeta>* item =
-          static_cast<CacheItem<InterfaceMeta>*>(info.Data().As<External>()->Value());
+      CacheItem<InterfaceMeta>* item = static_cast<CacheItem<InterfaceMeta>*>(
+          info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
       const InterfaceMeta* meta = item->meta_;
       klass = objc_getClass(meta->name());
     }
@@ -733,8 +744,8 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
 
 void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  CacheItem<MethodMeta>* item =
-      static_cast<CacheItem<MethodMeta>*>(info.Data().As<External>()->Value());
+  CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
   bool instanceMethod = info.This()->InternalFieldCount() > 0;
   V8FunctionCallbackArgs args(info);
@@ -769,8 +780,8 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& 
   }
 
   Isolate* isolate = info.GetIsolate();
-  CacheItem<PropertyMeta>* item =
-      static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+  CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   if (!item->meta_->hasGetter()) {
     Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Property is not readable."));
     isolate->ThrowException(error);
@@ -788,8 +799,8 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& 
 
 void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  CacheItem<PropertyMeta>* item =
-      static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+  CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   if (!item->meta_->hasSetter()) {
     Local<Value> error =
         Exception::Error(tns::ToV8String(isolate, "Attempted to assign to readonly property."));
@@ -805,11 +816,10 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value>& 
                                 true);
 }
 
-void MetadataBuilder::PropertyNameGetterCallback(Local<v8::Name> name,
-                                                 const PropertyCallbackInfo<Value>& info) {
+void MetadataBuilder::PropertyNameGetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  CacheItem<PropertyMeta>* item =
-      static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+  CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   if (!item->meta_->hasGetter()) {
     Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Property is not readable."));
     isolate->ThrowException(error);
@@ -825,11 +835,11 @@ void MetadataBuilder::PropertyNameGetterCallback(Local<v8::Name> name,
   }
 }
 
-void MetadataBuilder::PropertyNameSetterCallback(Local<v8::Name> name, Local<Value> value,
-                                                 const PropertyCallbackInfo<void>& info) {
+void MetadataBuilder::PropertyNameSetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  CacheItem<PropertyMeta>* item =
-      static_cast<CacheItem<PropertyMeta>*>(info.Data().As<External>()->Value());
+  Local<Value> value = info[0];
+  CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   if (!item->meta_->hasSetter()) {
     Local<Value> error =
         Exception::Error(tns::ToV8String(isolate, "Attempted to assign to readonly property."));
@@ -843,16 +853,16 @@ void MetadataBuilder::PropertyNameSetterCallback(Local<v8::Name> name, Local<Val
                                 item->className_, false);
 }
 
-void MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property,
-                                                   const PropertyCallbackInfo<Value>& info) {
+Intercepted MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property,
+                                                          const PropertyCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  Local<Object> thiz = info.This();
+  Local<Object> thiz = info.Holder();
 
   std::string propertyName = tns::ToString(isolate, property);
 
   if (propertyName == "") {
     info.GetReturnValue().Set(thiz);
-    return;
+    return Intercepted::kYes;
   }
 
   BaseDataWrapper* baseWrapper = tns::GetValue(isolate, thiz);
@@ -874,7 +884,7 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property,
                          [&propertyName](StructField& f) { return f.Name() == propertyName; });
   if (it == fields.end()) {
     info.GetReturnValue().SetUndefined();
-    return;
+    return Intercepted::kYes;
   }
 
   StructField field = *it;
@@ -888,23 +898,24 @@ void MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property,
       Interop::GetResult(context, fieldEncoding, &call, false, parentStruct, true);
 
   info.GetReturnValue().Set(result);
+  return Intercepted::kYes;
 }
 
-void MetadataBuilder::StructPropertySetterCallback(Local<v8::Name> property, Local<Value> value,
-                                                   const PropertyCallbackInfo<Value>& info) {
+Intercepted MetadataBuilder::StructPropertySetterCallback(
+    Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Object> thiz = info.This();
+  Local<Object> thiz = info.Holder();
 
   std::string propertyName = tns::ToString(isolate, property);
 
   if (propertyName == "") {
-    info.GetReturnValue().Set(thiz);
-    return;
+    return Intercepted::kYes;
   }
 
   Local<External> ext = thiz->GetInternalField(0).As<External>();
-  StructWrapper* wrapper = static_cast<StructWrapper*>(ext->Value());
+  StructWrapper* wrapper =
+      static_cast<StructWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
 
   StructInfo structInfo = wrapper->StructInfo();
   std::vector<StructField> fields = structInfo.Fields();
@@ -912,17 +923,18 @@ void MetadataBuilder::StructPropertySetterCallback(Local<v8::Name> property, Loc
   auto it = std::find_if(fields.begin(), fields.end(),
                          [&propertyName](StructField& f) { return f.Name() == propertyName; });
   if (it == fields.end()) {
-    return;
+    return Intercepted::kNo;
   }
 
   StructField field = *it;
   Interop::SetStructPropertyValue(context, wrapper, field, value);
+  return Intercepted::kYes;
 }
 
 void MetadataBuilder::DefineFunctionLengthProperty(Local<Context> context,
                                                    const TypeEncodingsList<ArrayCount>* encodings,
                                                    Local<v8::Function> func) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(
       PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
   int paramsCount = std::max(0, encodings->count - 1);
@@ -957,7 +969,7 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
   try {
     return ArgConverter::Invoke(context, klass, receiver, args, meta, isMethodCallback);
   } catch (NativeScriptException& ex) {
-    Isolate* isolate = context->GetIsolate();
+    Isolate* isolate = v8::Isolate::GetCurrent();
     ex.ReThrowToV8(isolate);
     return Local<Value>();
   }
@@ -966,8 +978,8 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
 void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   try {
-    CacheItem<FunctionMeta>* item =
-        static_cast<CacheItem<FunctionMeta>*>(info.Data().As<External>()->Value());
+    CacheItem<FunctionMeta>* item = static_cast<CacheItem<FunctionMeta>*>(
+        info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
     if (strcmp(item->meta_->jsName(), "UIApplicationMain") == 0) {
       std::vector<std::shared_ptr<Persistent<Value>>> args;
@@ -1013,18 +1025,18 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
   }
 }
 
-void MetadataBuilder::SwizzledInstanceMethodCallback(Local<v8::Name> property, Local<Value> value,
-                                                     const PropertyCallbackInfo<Value>& info) {
+v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
+    Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
   std::string methodName = tns::ToString(isolate, property);
 
-  CacheItem<BaseClassMeta>* item =
-      static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
+  CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   const BaseClassMeta* meta = item->meta_;
 
   Class klass = objc_getClass(meta->name());
   if (klass == nil) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   int index = meta->instanceMethods->binarySearch([methodName](const PtrTo<MethodMeta>& current) {
@@ -1033,7 +1045,7 @@ void MetadataBuilder::SwizzledInstanceMethodCallback(Local<v8::Name> property, L
   });
 
   if (index < 0) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   const MethodMeta* methodMeta = meta->instanceMethods->operator[](index).valuePtr();
@@ -1054,21 +1066,25 @@ void MetadataBuilder::SwizzledInstanceMethodCallback(Local<v8::Name> property, L
     SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
     class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding.c_str());
   }
+  // Not intercepted: the native write is done, but V8 must still perform
+  // the ordinary store, which is what the old void-returning callback did
+  // by falling through without setting a return value.
+  return v8::Intercepted::kNo;
 }
 
-void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property,
-                                               const PropertyDescriptor& desc,
-                                               const PropertyCallbackInfo<Value>& info) {
+v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
+    Local<v8::Name> property, const PropertyDescriptor& desc,
+    const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
   std::string propertyName = tns::ToString(isolate, property);
 
-  CacheItem<BaseClassMeta>* item =
-      static_cast<CacheItem<BaseClassMeta>*>(info.Data().As<External>()->Value());
+  CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   const BaseClassMeta* meta = item->meta_;
 
   Class klass = objc_getClass(meta->name());
   if (klass == nil) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   int index = meta->instanceProps->binarySearch([propertyName](const PtrTo<PropertyMeta>& current) {
@@ -1077,7 +1093,7 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property,
   });
 
   if (index < 0) {
-    return;
+    return v8::Intercepted::kNo;
   }
 
   const PropertyMeta* propertyMeta = meta->instanceProps->operator[](index).valuePtr();
@@ -1209,6 +1225,10 @@ void MetadataBuilder::SwizzledPropertyCallback(Local<v8::Name> property,
     SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
     class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding);
   }
+  // Not intercepted: the native write is done, but V8 must still perform
+  // the ordinary store, which is what the old void-returning callback did
+  // by falling through without setting a return value.
+  return v8::Intercepted::kNo;
 }
 
 }  // namespace tns

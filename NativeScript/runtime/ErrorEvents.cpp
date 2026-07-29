@@ -115,7 +115,7 @@ void ErrorEvents::Init(Local<Context> context) {
     })
   )";
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   auto cache = Caches::Get(isolate);
   tns::Assert(cache != nullptr && cache->GlobalEventTarget != nullptr, isolate);

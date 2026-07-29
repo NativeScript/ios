@@ -124,20 +124,26 @@ void Timers::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
   auto timerState = new TimerState();
   timerState->runloop = Runtime::GetRuntime(isolate)->RuntimeLoop();
   Caches::Get(isolate)->registerCacheBoundObject(timerState);
-  tns::NewFunctionTemplate(isolate, Timers::SetTimeoutCallback,
-                           v8::External::New(isolate, timerState));
+  tns::NewFunctionTemplate(
+      isolate, Timers::SetTimeoutCallback,
+      v8::External::New(isolate, timerState,
+                        v8::kExternalPointerTypeTagDefault));
   tns::SetMethod(isolate, globalTemplate, "__ns__setTimeout",
                  Timers::SetTimeoutCallback,
-                 v8::External::New(isolate, timerState));
+                 v8::External::New(isolate, timerState,
+                                   v8::kExternalPointerTypeTagDefault));
   tns::SetMethod(isolate, globalTemplate, "__ns__setInterval",
                  Timers::SetIntervalCallback,
-                 v8::External::New(isolate, timerState));
+                 v8::External::New(isolate, timerState,
+                                   v8::kExternalPointerTypeTagDefault));
   tns::SetMethod(isolate, globalTemplate, "__ns__clearTimeout",
                  Timers::ClearTimeoutCallback,
-                 v8::External::New(isolate, timerState));
+                 v8::External::New(isolate, timerState,
+                                   v8::kExternalPointerTypeTagDefault));
   tns::SetMethod(isolate, globalTemplate, "__ns__clearInterval",
                  Timers::ClearTimeoutCallback,
-                 v8::External::New(isolate, timerState));
+                 v8::External::New(isolate, timerState,
+                                   v8::kExternalPointerTypeTagDefault));
   Caches::Get(isolate)->registerCacheBoundObject(new TimerState());
 }
 
@@ -162,7 +168,8 @@ void TimerCallback(CFRunLoopTimerRef timer, void* info) {
   }
 
   v8::Local<v8::Function> cb = task->callback_.Get(isolate);
-  v8::Local<v8::Context> context = cb->GetCreationContextChecked();
+  v8::Local<v8::Context> context =
+      cb->GetCreationContextChecked(v8::Isolate::GetCurrent());
   Context::Scope context_scope(context);
   int argc = task->args_ ? static_cast<int>(task->args_->size()) : 0;
   if (argc > 0) {
@@ -188,7 +195,8 @@ void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value>& args,
                       bool repeatable) {
   auto argLength = args.Length();
   auto extData = args.Data().As<External>();
-  TimerState* state = reinterpret_cast<TimerState*>(extData->Value());
+  TimerState* state = reinterpret_cast<TimerState*>(
+      extData->Value(v8::kExternalPointerTypeTagDefault));
   int id = ++state->currentTimerId;
   if (argLength >= 1) {
     if (!args[0]->IsFunction()) {
@@ -273,7 +281,8 @@ void Timers::ClearTimeoutCallback(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   auto argLength = args.Length();
   auto extData = args.Data().As<External>();
-  auto thiz = reinterpret_cast<TimerState*>(extData->Value());
+  auto thiz = reinterpret_cast<TimerState*>(
+      extData->Value(v8::kExternalPointerTypeTagDefault));
   int id = -1;
   if (argLength > 0) {
     auto isolate = args.GetIsolate();

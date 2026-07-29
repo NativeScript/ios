@@ -6,8 +6,9 @@
 //  Copyright © 2023 Progress. All rights reserved.
 //
 
-#include "Helpers.h"
 #include "Message.hpp"
+
+#include "Helpers.h"
 #include "NativeScriptException.h"
 
 using namespace v8;
@@ -17,11 +18,9 @@ namespace worker {
 namespace {
 void ThrowDataCloneException(Local<Context> context,
                              Local<v8::String> message) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   //  Local<Value> argv[] = {message,
   //                         FIXED_ONE_BYTE_STRING(isolate, "DataCloneError")};
-  Local<Value> exception;
-  Local<v8::Function> domexception_ctor;
   NativeScriptException except(isolate, tns::ToString(isolate, message),
                                "DataCloneError");
   except.ReThrowToV8(isolate);
@@ -366,7 +365,10 @@ v8::Maybe<bool> Message::Serialize(v8::Isolate* isolate,
   for (Local<ArrayBuffer> ab : array_buffers) {
     // If serialization succeeded, we render it inaccessible in this Isolate.
     std::shared_ptr<BackingStore> backing_store = ab->GetBackingStore();
-    ab->Detach();
+    // A null key is accepted for buffers without a detach key. The result is
+    // deliberately discarded: the void Detach() this replaced could not report
+    // failure either, and a detach-key mismatch must not abort the process.
+    ab->Detach(v8::Local<v8::Value>()).FromMaybe(false);
 
     array_buffers_.emplace_back(std::move(backing_store));
   }

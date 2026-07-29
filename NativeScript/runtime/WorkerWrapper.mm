@@ -216,7 +216,7 @@ void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
   Local<Value> onErrorVal;
   bool success =
       global->Get(context, tns::ToV8String(this->workerIsolate_, "onerror")).ToLocal(&onErrorVal);
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(success, isolate);
 
   if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
@@ -244,7 +244,7 @@ void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
 
 void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context, TryCatch& tc,
                                                           bool async) {
-  Isolate* workerIsolate = context->GetIsolate();
+  Isolate* workerIsolate = v8::Isolate::GetCurrent();
   int lineNumber = 0;
   std::string message = "";
   std::string src = "";
@@ -377,7 +377,7 @@ void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const 
 Local<Object> WorkerWrapper::ConstructErrorObject(Local<Context> context, std::string message,
                                                   std::string source, std::string stackTrace,
                                                   int lineNumber) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
   Local<Object> obj;
   bool success = objTemplate->NewInstance(context).ToLocal(&obj);

@@ -35,8 +35,8 @@ struct MethodCallbackWrapper {
 class ArgConverter {
  public:
   static void Init(v8::Local<v8::Context> context,
-                   v8::GenericNamedPropertyGetterCallback structPropertyGetter,
-                   v8::GenericNamedPropertySetterCallback structPropertySetter);
+                   v8::NamedPropertyGetterCallback structPropertyGetter,
+                   v8::NamedPropertySetterCallbackV2 structPropertySetter);
   static v8::Local<v8::Value> Invoke(v8::Local<v8::Context> context,
                                      Class klass,
                                      v8::Local<v8::Object> receiver,
@@ -91,8 +91,8 @@ class ArgConverter {
  private:
   static v8::Local<v8::Function> CreateEmptyInstanceFunction(
       v8::Local<v8::Context> context,
-      v8::GenericNamedPropertyGetterCallback propertyGetter = nullptr,
-      v8::GenericNamedPropertySetterCallback propertySetter = nullptr);
+      v8::NamedPropertyGetterCallback propertyGetter = nullptr,
+      v8::NamedPropertySetterCallbackV2 propertySetter = nullptr);
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyInstance(
       v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc,
       bool skipGCRegistration = false);
@@ -112,11 +112,11 @@ class ArgConverter {
                         const v8::FunctionCallbackInfo<v8::Value>& info);
   static std::vector<v8::Local<v8::Value>> GetInitializerArgs(
       v8::Local<v8::Object> obj, std::string& constructorTokens);
-  static void IndexedPropertyGetterCallback(
+  static v8::Intercepted IndexedPropertyGetterCallback(
       uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& args);
-  static void IndexedPropertySetterCallback(
+  static v8::Intercepted IndexedPropertySetterCallback(
       uint32_t index, v8::Local<v8::Value> value,
-      const v8::PropertyCallbackInfo<v8::Value>& args);
+      const v8::PropertyCallbackInfo<v8::Boolean>& args);
   static bool IsErrorOutParameter(const TypeEncoding* typeEncoding);
   static std::vector<const MethodMeta*> GetInitializers(
       Caches* cache, Class klass, const InterfaceMeta* interfaceMeta);

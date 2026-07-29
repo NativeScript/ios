@@ -16,7 +16,7 @@ using namespace v8;
 namespace tns {
 
 void Interop::RegisterInteropTypes(Local<Context> context) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> global = context->Global();
 
   Local<Object> interop = Object::New(isolate);
@@ -124,7 +124,7 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
 }
 
 Local<Object> Interop::GetInteropType(Local<Context> context, BinaryTypeEncodingType type) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   auto it = cache->PrimitiveInteropTypes.find(type);
   if (it != cache->PrimitiveInteropTypes.end()) {
@@ -136,7 +136,7 @@ Local<Object> Interop::GetInteropType(Local<Context> context, BinaryTypeEncoding
 
 void Interop::RegisterInteropType(Local<Context> context, Local<Object> types, std::string name,
                                   PrimitiveDataWrapper* wrapper, bool autoDelete) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
   ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, name));
   ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
@@ -181,11 +181,13 @@ void Interop::RegisterBufferFromDataFunction(Local<Context> context, Local<Objec
         Isolate* isolate = info.GetIsolate();
         tns::Assert(info.Length() == 1 && info[0]->IsObject(), isolate);
         Local<Object> arg = info[0].As<Object>();
-        tns::Assert(arg->InternalFieldCount() > 0 && arg->GetInternalField(0)->IsExternal(),
-                    isolate);
+        tns::Assert(
+            arg->InternalFieldCount() > 0 && arg->GetInternalField(0).As<v8::Value>()->IsExternal(),
+            isolate);
 
         Local<External> ext = arg->GetInternalField(0).As<External>();
-        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(ext->Value());
+        ObjCDataWrapper* wrapper =
+            static_cast<ObjCDataWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
 
         id obj = wrapper->Data();
         tns::Assert([obj isKindOfClass:[NSData class]], isolate);
@@ -211,7 +213,7 @@ void Interop::RegisterBufferFromDataFunction(Local<Context> context, Local<Objec
         info.GetReturnValue().Set(result);
       }).ToLocal(&func);
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(success, isolate);
 
   success =
@@ -233,11 +235,13 @@ void Interop::RegisterStringFromCString(Local<Context> context, Local<Object> in
             stringLength = desiredLength;
           }
         }
-        tns::Assert(arg->InternalFieldCount() > 0 && arg->GetInternalField(0)->IsExternal(),
-                    isolate);
+        tns::Assert(
+            arg->InternalFieldCount() > 0 && arg->GetInternalField(0).As<v8::Value>()->IsExternal(),
+            isolate);
 
         Local<External> ext = arg->GetInternalField(0).As<External>();
-        BaseDataWrapper* wrapper = static_cast<BaseDataWrapper*>(ext->Value());
+        BaseDataWrapper* wrapper =
+            static_cast<BaseDataWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
         tns::Assert(wrapper != nullptr);
         char* data = nullptr;
         switch (wrapper->Type()) {
@@ -267,7 +271,7 @@ void Interop::RegisterStringFromCString(Local<Context> context, Local<Object> in
         info.GetReturnValue().Set(result);
       }).ToLocal(&func);
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(success, isolate);
 
   success =
@@ -295,7 +299,7 @@ void Interop::RegisterHandleOfFunction(Local<Context> context, Local<Object> int
                    }
                  }).ToLocal(&func);
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(success, isolate);
 
   success = interop->Set(context, tns::ToV8String(isolate, "handleof"), func).FromMaybe(false);
@@ -320,12 +324,13 @@ void Interop::RegisterAllocFunction(Local<Context> context, Local<Object> intero
 
                    Local<Value> pointerInstance = Pointer::NewInstance(context, data);
                    PointerWrapper* wrapper = static_cast<PointerWrapper*>(
-                       pointerInstance.As<Object>()->GetInternalField(0).As<External>()->Value());
+                       pointerInstance.As<Object>()->GetInternalField(0).As<External>()->Value(
+                           v8::kExternalPointerTypeTagDefault));
                    wrapper->SetAdopted(true);
                    info.GetReturnValue().Set(pointerInstance);
                  }).ToLocal(&func);
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(success, isolate);
 
   success = interop->Set(context, tns::ToV8String(isolate, "alloc"), func).FromMaybe(false);
@@ -336,7 +341,7 @@ void Interop::RegisterAllocFunction(Local<Context> context, Local<Object> intero
 // itself when it wraps an NSException, or its `.nativeException` when `value` is
 // an Error carrying a wrapped NSException. Empty handle otherwise.
 static Local<Value> GetWrappedNSException(Local<Context> context, Local<Value> value) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   auto isWrappedNSException = [&](Local<Value> v) -> bool {
     if (v.IsEmpty() || !v->IsObject()) {
       return false;
@@ -474,7 +479,7 @@ void Interop::RegisterEscapeExceptionFunction(Local<Context> context, Local<Obje
         info.GetReturnValue().Set(errObj);
       }).ToLocal(&func);
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(success, isolate);
 
   success =
@@ -505,7 +510,7 @@ void Interop::RegisterFreeFunction(Local<Context> context, Local<Object> interop
                    info.GetReturnValue().SetUndefined();
                  }).ToLocal(&func);
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(success, isolate);
 
   success = interop->Set(context, tns::ToV8String(isolate, "free"), func).FromMaybe(false);
@@ -528,7 +533,7 @@ void Interop::RegisterAdoptFunction(Local<Context> context, Local<Object> intero
                    info.GetReturnValue().Set(arg);
                  }).ToLocal(&func);
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(success, isolate);
 
   success = interop->Set(context, tns::ToV8String(isolate, "adopt"), func).FromMaybe(false);
@@ -597,7 +602,7 @@ void Interop::RegisterSizeOfFunction(Local<Context> context, Local<Object> inter
                    }
                  }).ToLocal(&func);
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(success, isolate);
 
   success = interop->Set(context, tns::ToV8String(isolate, "sizeof"), func).FromMaybe(false);
@@ -612,7 +617,7 @@ const TypeEncoding* Interop::CreateEncoding(BinaryTypeEncodingType type) {
 }
 
 Local<Value> Interop::HandleOf(Local<Context> context, Local<Value> value) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   if (!value->IsNullOrUndefined()) {
     if (value->IsArrayBuffer() || value->IsArrayBufferView() || value->IsSharedArrayBuffer()) {
       bool isArrayBuffer = false;

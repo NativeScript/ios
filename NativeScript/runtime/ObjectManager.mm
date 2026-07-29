@@ -20,15 +20,117 @@ void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate)
                       FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
 }
 
+namespace {
+
+void LinkRegistered(v8::Isolate* isolate, ObjectWeakCallbackState* state) {
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  if (cache == nullptr) {
+    return;
+  }
+  state->head_ = &cache->ObjectManagedValues;
+  state->next_ = *state->head_;
+  if (state->next_ != nullptr) {
+    state->next_->prev_ = state;
+  }
+  *state->head_ = state;
+}
+
+void UnlinkRegistered(ObjectWeakCallbackState* state) {
+  if (state->head_ == nullptr) {
+    return;
+  }
+  if (state->prev_ != nullptr) {
+    state->prev_->next_ = state->next_;
+  } else if (*state->head_ == state) {
+    *state->head_ = state->next_;
+  }
+  if (state->next_ != nullptr) {
+    state->next_->prev_ = state->prev_;
+  }
+  state->head_ = nullptr;
+  state->prev_ = nullptr;
+  state->next_ = nullptr;
+}
+
+}  // namespace
+
 std::shared_ptr<Persistent<Value>> ObjectManager::Register(Local<Context> context,
                                                            const Local<Value> obj) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   std::shared_ptr<Persistent<Value>> objectHandle =
       std::make_shared<Persistent<Value>>(isolate, obj);
   objectHandle->SetWrapperClassId(Constants::ClassTypes::ObjectManagedValue);
   ObjectWeakCallbackState* state = new ObjectWeakCallbackState(objectHandle);
   objectHandle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+
+  LinkRegistered(isolate, state);
+
   return objectHandle;
+}
+
+namespace {
+
+// The DataWrapper-tagged handles used to be reached through
+// Isolate::VisitHandlesWithClassIds; they all live in Caches, so walk those
+// directly instead.
+template <typename Map>
+void DisposeHandleMap(v8::Isolate* isolate, Map& map) {
+  for (auto& entry : map) {
+    if (entry.second == nullptr || entry.second->IsEmpty()) {
+      continue;
+    }
+    ObjectManager::DisposeValue(isolate, entry.second->Get(isolate), true);
+  }
+}
+
+void DisposeHandle(v8::Isolate* isolate,
+                   const std::unique_ptr<v8::Persistent<v8::Function>>& handle) {
+  if (handle == nullptr || handle->IsEmpty()) {
+    return;
+  }
+  ObjectManager::DisposeValue(isolate, handle->Get(isolate), true);
+}
+
+}  // namespace
+
+void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  if (cache == nullptr) {
+    return;
+  }
+
+  // Runs from ~Runtime, which holds a Locker but has not entered the isolate;
+  // creating handles below requires it to be entered.
+  Isolate::Scope isolateScope(isolate);
+  HandleScope scope(isolate);
+
+  // Detach the whole list first so disposal can't walk into freed entries.
+  ObjectWeakCallbackState* state = cache->ObjectManagedValues;
+  cache->ObjectManagedValues = nullptr;
+
+  while (state != nullptr) {
+    ObjectWeakCallbackState* next = state->next_;
+
+    std::shared_ptr<Persistent<Value>> handle = state->target_;
+    if (handle != nullptr && !handle->IsEmpty()) {
+      ObjectManager::DisposeValue(isolate, handle->Get(isolate), true);
+      if (handle->IsWeak()) {
+        handle->ClearWeak<ObjectWeakCallbackState>();
+      }
+      handle->Reset();
+    }
+    delete state;
+
+    state = next;
+  }
+
+  DisposeHandleMap(isolate, cache->CtorFuncs);
+  DisposeHandleMap(isolate, cache->ProtocolCtorFuncs);
+  DisposeHandleMap(isolate, cache->CFunctions);
+  DisposeHandleMap(isolate, cache->PrimitiveInteropTypes);
+  DisposeHandle(isolate, cache->InteropReferenceCtorFunc);
+  DisposeHandle(isolate, cache->PointerCtorFunc);
+  DisposeHandle(isolate, cache->FunctionReferenceCtorFunc);
 }
 
 void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackState>& data) {
@@ -38,10 +140,11 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
   bool disposed = ObjectManager::DisposeValue(isolate, value);
 
   if (disposed) {
+    UnlinkRegistered(state);
     state->target_->Reset();
     delete state;
   } else {
-    state->target_->ClearWeak();
+    state->target_->ClearWeak<void>();
     state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
   }
 }
@@ -53,7 +156,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
 
   Local<Object> obj = value.As<Object>();
   if (obj->InternalFieldCount() > 1 && !isFinalDisposal) {
-    Local<Value> superValue = obj->GetInternalField(1);
+    Local<Value> superValue = obj->GetInternalField(1).As<v8::Value>();
     if (!superValue.IsEmpty() && superValue->IsString()) {
       // Do not dispose the ObjCWrapper contained in a "super" instance
       return true;
@@ -222,6 +325,7 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     if (it != cache->Instances.end()) {
       ObjectWeakCallbackState* state = it->second->ClearWeak<ObjectWeakCallbackState>();
       if (state != nullptr) {
+        UnlinkRegistered(state);
         delete state;
       }
       cache->Instances.erase(it);

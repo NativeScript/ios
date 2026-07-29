@@ -14,13 +14,14 @@ namespace tns {
 // marshaled back to its creating thread only when that thread is the runtime
 // loop; a promise created elsewhere settles on whichever thread resolves it.
 static void IsRuntimeRunloopCallback(const FunctionCallbackInfo<Value>& args) {
-    Runtime* runtime = Runtime::GetRuntime(args.GetIsolate());
-    bool isRuntimeLoop = runtime != nullptr && CFRunLoopGetCurrent() == runtime->RuntimeLoop();
-    args.GetReturnValue().Set(isRuntimeLoop);
+  Runtime* runtime = Runtime::GetRuntime(args.GetIsolate());
+  bool isRuntimeLoop =
+      runtime != nullptr && CFRunLoopGetCurrent() == runtime->RuntimeLoop();
+  args.GetReturnValue().Set(isRuntimeLoop);
 }
 
 void PromiseProxy::Init(v8::Local<v8::Context> context) {
-    std::string source = R"(
+  std::string source = R"(
         // Run a Promise's callbacks on the thread that created it, but only when
         // that thread is the runtime loop. A Promise created on a background
         // thread settles on whichever thread resolves it, because the background
@@ -92,26 +93,29 @@ void PromiseProxy::Init(v8::Local<v8::Context> context) {
         })
     )";
 
-    Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
-    Local<Script> script;
-    bool success = Script::Compile(context, tns::ToV8String(isolate, source)).ToLocal(&script);
-    tns::Assert(success && !script.IsEmpty(), isolate);
+  Local<Script> script;
+  bool success = Script::Compile(context, tns::ToV8String(isolate, source))
+                     .ToLocal(&script);
+  tns::Assert(success && !script.IsEmpty(), isolate);
 
-    Local<Value> result;
-    success = script->Run(context).ToLocal(&result);
-    tns::Assert(success && result->IsFunction(), isolate);
+  Local<Value> result;
+  success = script->Run(context).ToLocal(&result);
+  tns::Assert(success && result->IsFunction(), isolate);
 
-    Local<v8::Function> installProxy = result.As<v8::Function>();
+  Local<v8::Function> installProxy = result.As<v8::Function>();
 
-    Local<v8::Function> isRuntimeRunloop;
-    success = v8::Function::New(context, IsRuntimeRunloopCallback).ToLocal(&isRuntimeRunloop);
-    tns::Assert(success, isolate);
+  Local<v8::Function> isRuntimeRunloop;
+  success = v8::Function::New(context, IsRuntimeRunloopCallback)
+                .ToLocal(&isRuntimeRunloop);
+  tns::Assert(success, isolate);
 
-    Local<Value> installArgs[] = { isRuntimeRunloop };
-    Local<Value> installResult;
-    success = installProxy->Call(context, context->Global(), 1, installArgs).ToLocal(&installResult);
-    tns::Assert(success, isolate);
+  Local<Value> installArgs[] = {isRuntimeRunloop};
+  Local<Value> installResult;
+  success = installProxy->Call(context, context->Global(), 1, installArgs)
+                .ToLocal(&installResult);
+  tns::Assert(success, isolate);
 }
 
-}
+}  // namespace tns

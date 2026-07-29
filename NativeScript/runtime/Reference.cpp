@@ -1,403 +1,452 @@
 #include "Reference.h"
-#include "Pointer.h"
+
 #include "Caches.h"
-#include "ObjectManager.h"
+#include "Constants.h"
 #include "Helpers.h"
 #include "Interop.h"
-#include "Constants.h"
+#include "ObjectManager.h"
+#include "Pointer.h"
 
 using namespace v8;
 
 namespace tns {
 
 void Reference::Register(Local<Context> context, Local<Object> interop) {
-    Isolate* isolate = context->GetIsolate();
-    Local<v8::Function> ctorFunc = Reference::GetInteropReferenceCtorFunc(context);
-    bool success = interop->Set(context, tns::ToV8String(isolate, "Reference"), ctorFunc).FromMaybe(false);
-    tns::Assert(success, isolate);
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<v8::Function> ctorFunc =
+      Reference::GetInteropReferenceCtorFunc(context);
+  bool success =
+      interop->Set(context, tns::ToV8String(isolate, "Reference"), ctorFunc)
+          .FromMaybe(false);
+  tns::Assert(success, isolate);
 }
 
-Local<Value> Reference::FromPointer(Local<Context> context, Local<Value> type, void* handle) {
-    Isolate* isolate = context->GetIsolate();
-    Local<Value> pointer = Pointer::NewInstance(context, handle);
-    ObjectManager::Register(context, pointer);
+Local<Value> Reference::FromPointer(Local<Context> context, Local<Value> type,
+                                    void* handle) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Value> pointer = Pointer::NewInstance(context, handle);
+  ObjectManager::Register(context, pointer);
 
-    Local<v8::Function> interopReferenceCtorFunc = Reference::GetInteropReferenceCtorFunc(context);
-    Local<Value> args[2] = { type, pointer };
-    Local<Object> instance;
-    bool success = interopReferenceCtorFunc->NewInstance(context, 2, args).ToLocal(&instance);
-    tns::Assert(success, isolate);
-    ObjectManager::Register(context, instance);
+  Local<v8::Function> interopReferenceCtorFunc =
+      Reference::GetInteropReferenceCtorFunc(context);
+  Local<Value> args[2] = {type, pointer};
+  Local<Object> instance;
+  bool success = interopReferenceCtorFunc->NewInstance(context, 2, args)
+                     .ToLocal(&instance);
+  tns::Assert(success, isolate);
+  ObjectManager::Register(context, instance);
 
-    return instance;
+  return instance;
 }
 
-Local<v8::Function> Reference::GetInteropReferenceCtorFunc(Local<Context> context) {
-    Isolate* isolate = context->GetIsolate();
-    auto cache = Caches::Get(isolate);
-    Persistent<v8::Function>* interopReferenceCtor = cache->InteropReferenceCtorFunc.get();
-    if (interopReferenceCtor != nullptr) {
-        return interopReferenceCtor->Get(isolate);
-    }
+Local<v8::Function> Reference::GetInteropReferenceCtorFunc(
+    Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  auto cache = Caches::Get(isolate);
+  Persistent<v8::Function>* interopReferenceCtor =
+      cache->InteropReferenceCtorFunc.get();
+  if (interopReferenceCtor != nullptr) {
+    return interopReferenceCtor->Get(isolate);
+  }
 
-    Local<FunctionTemplate> ctorFuncTemplate = FunctionTemplate::New(isolate, ReferenceConstructorCallback);
-    ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "Reference"));
-    ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-    ctorFuncTemplate->InstanceTemplate()->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetCallback, IndexedPropertySetCallback));
-    Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
-    proto->SetAccessor(tns::ToV8String(isolate, "value"), GetValueCallback, SetValueCallback);
+  Local<FunctionTemplate> ctorFuncTemplate =
+      FunctionTemplate::New(isolate, ReferenceConstructorCallback);
+  ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, "Reference"));
+  ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+  ctorFuncTemplate->InstanceTemplate()->SetHandler(
+      IndexedPropertyHandlerConfiguration(IndexedPropertyGetCallback,
+                                          IndexedPropertySetCallback));
+  Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
+  proto->SetAccessorProperty(tns::ToV8String(isolate, "value"),
+                             FunctionTemplate::New(isolate, GetValueCallback),
+                             FunctionTemplate::New(isolate, SetValueCallback));
 
-    Local<v8::Function> ctorFunc;
-    if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
-        tns::Assert(false, isolate);
-    }
+  Local<v8::Function> ctorFunc;
+  if (!ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc)) {
+    tns::Assert(false, isolate);
+  }
 
-    tns::SetValue(isolate, ctorFunc, new ReferenceTypeWrapper());
-    Local<Value> prototypeValue;
-    bool success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
-    tns::Assert(success && prototypeValue->IsObject(), isolate);
-    Local<Object> prototype = prototypeValue.As<Object>();
-    Reference::RegisterToStringMethod(context, prototype);
+  tns::SetValue(isolate, ctorFunc, new ReferenceTypeWrapper());
+  Local<Value> prototypeValue;
+  bool success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype"))
+                     .ToLocal(&prototypeValue);
+  tns::Assert(success && prototypeValue->IsObject(), isolate);
+  Local<Object> prototype = prototypeValue.As<Object>();
+  Reference::RegisterToStringMethod(context, prototype);
 
-    cache->InteropReferenceCtorFunc = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
-    cache->InteropReferenceCtorFunc->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
+  cache->InteropReferenceCtorFunc =
+      std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
+  cache->InteropReferenceCtorFunc->SetWrapperClassId(
+      Constants::ClassTypes::DataWrapper);
 
-    return ctorFunc;
+  return ctorFunc;
 }
 
-void Reference::ReferenceConstructorCallback(const FunctionCallbackInfo<Value>& info) {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    Persistent<Value>* val = nullptr;
-    BaseDataWrapper* typeWrapper = nullptr;
-    if (info.Length() == 1) {
-        if (!info[0]->IsNullOrUndefined()) {
-            val = new Persistent<Value>(isolate, info[0]);
-        }
-    } else if (info.Length() > 1) {
-        if (!info[0]->IsNullOrUndefined() && !info[1]->IsNullOrUndefined()) {
-            Local<Value> typeValue = info[0];
-            typeWrapper = tns::GetValue(isolate, typeValue);
-            tns::Assert(typeWrapper != nullptr, isolate);
-            val = new Persistent<Value>(isolate, info[1]);
-        }
+void Reference::ReferenceConstructorCallback(
+    const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  Persistent<Value>* val = nullptr;
+  BaseDataWrapper* typeWrapper = nullptr;
+  if (info.Length() == 1) {
+    if (!info[0]->IsNullOrUndefined()) {
+      val = new Persistent<Value>(isolate, info[0]);
     }
-    
-    if(val != nullptr) {
-        val->SetWeak();
+  } else if (info.Length() > 1) {
+    if (!info[0]->IsNullOrUndefined() && !info[1]->IsNullOrUndefined()) {
+      Local<Value> typeValue = info[0];
+      typeWrapper = tns::GetValue(isolate, typeValue);
+      tns::Assert(typeWrapper != nullptr, isolate);
+      val = new Persistent<Value>(isolate, info[1]);
     }
+  }
 
-    ReferenceWrapper* wrapper = new ReferenceWrapper(typeWrapper, val);
-    Local<Object> thiz = info.This();
-    tns::SetValue(isolate, thiz, wrapper);
+  if (val != nullptr) {
+    val->SetWeak();
+  }
 
-    ObjectManager::Register(context, thiz);
+  ReferenceWrapper* wrapper = new ReferenceWrapper(typeWrapper, val);
+  Local<Object> thiz = info.This();
+  tns::SetValue(isolate, thiz, wrapper);
+
+  ObjectManager::Register(context, thiz);
 }
 
-void Reference::IndexedPropertyGetCallback(uint32_t index, const PropertyCallbackInfo<Value>& info) {
-    Isolate* isolate = info.GetIsolate();
-    Local<Object> thiz = info.This();
-    Local<Context> context = isolate->GetCurrentContext();
+v8::Intercepted Reference::IndexedPropertyGetCallback(
+    uint32_t index, const PropertyCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Object> thiz = info.Holder();
+  Local<Context> context = isolate->GetCurrentContext();
 
-    DataPair pair = Reference::GetDataPair(thiz);
-    const TypeEncoding* typeEncoding = pair.typeEncoding_;
-    size_t size = pair.size_;
-    void* data = pair.data_;
+  DataPair pair = Reference::GetDataPair(thiz);
+  const TypeEncoding* typeEncoding = pair.typeEncoding_;
+  size_t size = pair.size_;
+  void* data = pair.data_;
 
-    void* ptr = (uint8_t*)data + index * size;
-    BaseCall call((uint8_t*)ptr);
-    
-    Local<Value> result;
-    if (typeEncoding != nullptr) {
-        result = Interop::GetResult(context, typeEncoding, &call, false);
-    } else {
-        result = Interop::GetResultByType(context, pair.typeWrapper_, &call);
-    }
+  void* ptr = (uint8_t*)data + index * size;
+  BaseCall call((uint8_t*)ptr);
+
+  Local<Value> result;
+  if (typeEncoding != nullptr) {
+    result = Interop::GetResult(context, typeEncoding, &call, false);
+  } else {
+    result = Interop::GetResultByType(context, pair.typeWrapper_, &call);
+  }
+  info.GetReturnValue().Set(result);
+  return v8::Intercepted::kYes;
+}
+
+v8::Intercepted Reference::IndexedPropertySetCallback(
+    uint32_t index, Local<Value> value,
+    const PropertyCallbackInfo<v8::Boolean>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> thiz = info.Holder();
+
+  DataPair pair = Reference::GetDataPair(thiz);
+  const TypeEncoding* typeEncoding = pair.typeEncoding_;
+  size_t size = pair.size_;
+  void* data = pair.data_;
+  void* ptr = (uint8_t*)data + index * size;
+
+  if (typeEncoding != nullptr) {
+    Interop::WriteValue(context, typeEncoding, ptr, value);
+  } else {
+    Interop::WriteTypeValue(context, pair.typeWrapper_, ptr, value);
+  }
+  // Not intercepted: the native write is done, but V8 must still perform
+  // the ordinary store, which is what the old void-returning callback did
+  // by falling through without setting a return value.
+  return v8::Intercepted::kNo;
+}
+
+void Reference::GetValueCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Value> result = Reference::GetReferredValue(context, info.This());
+  if (result.IsEmpty()) {
+    info.GetReturnValue().SetUndefined();
+  } else {
     info.GetReturnValue().Set(result);
+  }
 }
 
-void Reference::IndexedPropertySetCallback(uint32_t index, Local<Value> value, const PropertyCallbackInfo<Value>& info) {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Object> thiz = info.This();
+void Reference::SetValueCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Value> value = info[0];
+  BaseDataWrapper* baseWrapper = tns::GetValue(isolate, info.This());
+  tns::Assert(baseWrapper->Type() == WrapperType::Reference, isolate);
+  ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
+  Persistent<Value>* poValue = new Persistent<Value>(isolate, value);
 
-    DataPair pair = Reference::GetDataPair(thiz);
-    const TypeEncoding* typeEncoding = pair.typeEncoding_;
-    size_t size = pair.size_;
-    void* data = pair.data_;
-    void* ptr = (uint8_t*)data + index * size;
-    
-    if (typeEncoding != nullptr) {
-        Interop::WriteValue(context, typeEncoding, ptr, value);
+  wrapper->SetData(nullptr);
+  wrapper->SetEncoding(nullptr);
+  wrapper->SetValue(poValue);
+}
+
+Local<Value> Reference::GetReferredValue(Local<Context> context,
+                                         Local<Value> value) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
+  if (baseWrapper == nullptr || baseWrapper->Type() != WrapperType::Reference) {
+    return value;
+  }
+
+  ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
+  if (wrapper->Data() != nullptr && wrapper->Encoding() != nullptr) {
+    const TypeEncoding* encoding = wrapper->Encoding();
+    uint8_t* data = (uint8_t*)wrapper->Data();
+
+    BaseCall call(data);
+    Local<Value> jsResult = Interop::GetResult(context, encoding, &call, true);
+    if (wrapper->Value() != nullptr) {
+      wrapper->Value()->Reset(isolate, jsResult);
     } else {
-        Interop::WriteTypeValue(context, pair.typeWrapper_, ptr, value);
+      wrapper->SetValue(new Persistent<Value>(isolate, jsResult));
     }
-}
-
-void Reference::GetValueCallback(Local<v8::Name> name, const PropertyCallbackInfo<Value>& info) {
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Value> result = Reference::GetReferredValue(context, info.This());
-    if (result.IsEmpty()) {
-        info.GetReturnValue().SetUndefined();
-    } else {
-        info.GetReturnValue().Set(result);
-    }
-}
-
-void Reference::SetValueCallback(Local<v8::Name> name, Local<Value> value, const PropertyCallbackInfo<void>& info) {
-    Isolate* isolate = info.GetIsolate();
-    BaseDataWrapper* baseWrapper = tns::GetValue(isolate, info.This());
-    tns::Assert(baseWrapper->Type() == WrapperType::Reference, isolate);
-    ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
-    Persistent<Value>* poValue = new Persistent<Value>(isolate, value);
 
     wrapper->SetData(nullptr);
     wrapper->SetEncoding(nullptr);
-    wrapper->SetValue(poValue);
+    return jsResult;
+  }
+
+  if (wrapper->Value() == nullptr) {
+    return Local<Value>();
+  }
+
+  Local<Value> innerValue = wrapper->Value()->Get(isolate);
+  baseWrapper = tns::GetValue(isolate, innerValue);
+  if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Reference) {
+    wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
+    if (wrapper->Value() != nullptr) {
+      return Reference::GetReferredValue(context,
+                                         wrapper->Value()->Get(isolate));
+    }
+  }
+
+  BaseDataWrapper* typeWrapper = wrapper->TypeWrapper();
+  if (typeWrapper != nullptr &&
+      Reference::IsSupportedType(typeWrapper->Type()) &&
+      baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Pointer) {
+    Reference::DataPair pair = Reference::GetDataPair(value.As<Object>());
+    if (pair.data_ != nullptr) {
+      BaseCall call((uint8_t*)pair.data_);
+      Local<Value> result;
+
+      if (pair.typeEncoding_ != nullptr) {
+        result = Interop::GetResult(context, pair.typeEncoding_, &call, false);
+      } else {
+        result = Interop::GetResultByType(context, typeWrapper, &call);
+      }
+      return result;
+    }
+  }
+
+  return innerValue;
 }
 
-Local<Value> Reference::GetReferredValue(Local<Context> context, Local<Value> value) {
-    Isolate* isolate = context->GetIsolate();
-    BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
-    if (baseWrapper == nullptr || baseWrapper->Type() != WrapperType::Reference) {
-        return value;
-    }
-
-    ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
-    if (wrapper->Data() != nullptr && wrapper->Encoding() != nullptr) {
-        const TypeEncoding* encoding = wrapper->Encoding();
-        uint8_t* data = (uint8_t*)wrapper->Data();
-
-        BaseCall call(data);
-        Local<Value> jsResult = Interop::GetResult(context, encoding, &call, true);
-        if (wrapper->Value() != nullptr) {
-            wrapper->Value()->Reset(isolate, jsResult);
-        } else {
-            wrapper->SetValue(new Persistent<Value>(isolate, jsResult));
-        }
-
-        wrapper->SetData(nullptr);
-        wrapper->SetEncoding(nullptr);
-        return jsResult;
-    }
-
-    if (wrapper->Value() == nullptr) {
-        return Local<Value>();
-    }
-
-    Local<Value> innerValue = wrapper->Value()->Get(isolate);
-    baseWrapper = tns::GetValue(isolate, innerValue);
-    if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Reference) {
-        wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
-        if (wrapper->Value() != nullptr) {
-            return Reference::GetReferredValue(context, wrapper->Value()->Get(isolate));
-        }
-    }
-
-    BaseDataWrapper* typeWrapper = wrapper->TypeWrapper();
-    if (typeWrapper != nullptr && Reference::IsSupportedType(typeWrapper->Type()) && baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Pointer) {
-        Reference::DataPair pair = Reference::GetDataPair(value.As<Object>());
-        if (pair.data_ != nullptr) {
-            BaseCall call((uint8_t*)pair.data_);
-            Local<Value> result;
-            
-            if (pair.typeEncoding_ != nullptr) {
-                result = Interop::GetResult(context, pair.typeEncoding_, &call, false);
-            } else {
-                result = Interop::GetResultByType(context, typeWrapper, &call);
-            }
-            return result;
-        }
-    }
-
-    return innerValue;
-}
-
-void* Reference::GetWrappedPointer(Local<Context> context, Local<Value> reference, const TypeEncoding* typeEncoding) {
-    if (reference.IsEmpty() || reference->IsNullOrUndefined()) {
-        return nullptr;
-    }
-
-    Isolate* isolate = context->GetIsolate();
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, reference);
-    tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
-    ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
-    if (refWrapper->Data() != nullptr) {
-        return refWrapper->Data();
-    }
-
-    Local<Value> value = refWrapper->Value()->Get(isolate);
-    BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
-
-    if (wrappedValue == nullptr) {
-        BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
-        if (typeWrapper == nullptr) {
-            return nullptr;
-        }
-
-        if (typeWrapper->Type() == WrapperType::Primitive) {
-            PrimitiveDataWrapper* primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
-            const TypeEncoding* enc = primitiveWrapper->TypeEncoding();
-            size_t size = primitiveWrapper->Size();
-            void* data = malloc(size);
-            Interop::WriteValue(context, enc, data, value);
-            refWrapper->SetData(data, true);
-            return data;
-        }
-
-        if (typeWrapper->Type() != WrapperType::StructType) {
-            return nullptr;
-        }
-
-        StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
-
-        StructInfo structInfo = structTypeWrapper->StructInfo();
-        void* data = malloc(structInfo.FFIType()->size);
-        Interop::InitializeStruct(context, data, structInfo.Fields(), value);
-        refWrapper->SetData(data, true);
-        refWrapper->SetEncoding(typeEncoding);
-        return data;
-    }
-
-    if (wrappedValue->Type() == WrapperType::ObjCClass) {
-        ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrappedValue);
-        void* handle = malloc(sizeof(Class*));
-        Class clazz = classWrapper->Klass();
-        *static_cast<Class*>(handle) = clazz;
-        refWrapper->SetData(handle, true);
-        return (Class**)handle;
-    }
-
-    if (wrappedValue->Type() == WrapperType::ObjCProtocol) {
-        ObjCProtocolWrapper* protoWrapper = static_cast<ObjCProtocolWrapper*>(wrappedValue);
-        Protocol* proto = protoWrapper->Proto();
-        void* handle = malloc(sizeof(Protocol**));
-        *static_cast<Protocol**>(handle) = proto;
-        refWrapper->SetData(handle, true);
-        return (Protocol**)handle;
-    }
-
-    if (wrappedValue->Type() == WrapperType::ObjCObject) {
-        ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrappedValue);
-        id target = dataWrapper->Data();
-        void* handle = malloc(sizeof(id));
-        *static_cast<id*>(handle) = target;
-        refWrapper->SetData(handle, true);
-        return (id)handle;
-    }
-
-    if (wrappedValue->Type() == WrapperType::Struct) {
-        StructWrapper* structWrapper = static_cast<StructWrapper*>(wrappedValue);
-        return structWrapper->Data();
-    }
-
-    if (wrappedValue->Type() == WrapperType::Pointer) {
-        PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
-        void* data = pw->Data();
-        return data;
-    }
-
+void* Reference::GetWrappedPointer(Local<Context> context,
+                                   Local<Value> reference,
+                                   const TypeEncoding* typeEncoding) {
+  if (reference.IsEmpty() || reference->IsNullOrUndefined()) {
     return nullptr;
+  }
+
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, reference);
+  tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference,
+              isolate);
+  ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
+  if (refWrapper->Data() != nullptr) {
+    return refWrapper->Data();
+  }
+
+  Local<Value> value = refWrapper->Value()->Get(isolate);
+  BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
+
+  if (wrappedValue == nullptr) {
+    BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
+    if (typeWrapper == nullptr) {
+      return nullptr;
+    }
+
+    if (typeWrapper->Type() == WrapperType::Primitive) {
+      PrimitiveDataWrapper* primitiveWrapper =
+          static_cast<PrimitiveDataWrapper*>(typeWrapper);
+      const TypeEncoding* enc = primitiveWrapper->TypeEncoding();
+      size_t size = primitiveWrapper->Size();
+      void* data = malloc(size);
+      Interop::WriteValue(context, enc, data, value);
+      refWrapper->SetData(data, true);
+      return data;
+    }
+
+    if (typeWrapper->Type() != WrapperType::StructType) {
+      return nullptr;
+    }
+
+    StructTypeWrapper* structTypeWrapper =
+        static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
+
+    StructInfo structInfo = structTypeWrapper->StructInfo();
+    void* data = malloc(structInfo.FFIType()->size);
+    Interop::InitializeStruct(context, data, structInfo.Fields(), value);
+    refWrapper->SetData(data, true);
+    refWrapper->SetEncoding(typeEncoding);
+    return data;
+  }
+
+  if (wrappedValue->Type() == WrapperType::ObjCClass) {
+    ObjCClassWrapper* classWrapper =
+        static_cast<ObjCClassWrapper*>(wrappedValue);
+    void* handle = malloc(sizeof(Class*));
+    Class clazz = classWrapper->Klass();
+    *static_cast<Class*>(handle) = clazz;
+    refWrapper->SetData(handle, true);
+    return (Class**)handle;
+  }
+
+  if (wrappedValue->Type() == WrapperType::ObjCProtocol) {
+    ObjCProtocolWrapper* protoWrapper =
+        static_cast<ObjCProtocolWrapper*>(wrappedValue);
+    Protocol* proto = protoWrapper->Proto();
+    void* handle = malloc(sizeof(Protocol**));
+    *static_cast<Protocol**>(handle) = proto;
+    refWrapper->SetData(handle, true);
+    return (Protocol**)handle;
+  }
+
+  if (wrappedValue->Type() == WrapperType::ObjCObject) {
+    ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrappedValue);
+    id target = dataWrapper->Data();
+    void* handle = malloc(sizeof(id));
+    *static_cast<id*>(handle) = target;
+    refWrapper->SetData(handle, true);
+    return (id)handle;
+  }
+
+  if (wrappedValue->Type() == WrapperType::Struct) {
+    StructWrapper* structWrapper = static_cast<StructWrapper*>(wrappedValue);
+    return structWrapper->Data();
+  }
+
+  if (wrappedValue->Type() == WrapperType::Pointer) {
+    PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
+    void* data = pw->Data();
+    return data;
+  }
+
+  return nullptr;
 }
 
-void Reference::RegisterToStringMethod(Local<Context> context, Local<Object> prototype) {
-    Isolate* isolate = context->GetIsolate();
-    Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+void Reference::RegisterToStringMethod(Local<Context> context,
+                                       Local<Object> prototype) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(
+      isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
         BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-        tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
+        tns::Assert(
+            wrapper != nullptr && wrapper->Type() == WrapperType::Reference,
+            isolate);
         ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
         Persistent<Value>* value = refWrapper->Value();
 
         char buffer[100];
         if (value == nullptr) {
-            snprintf(buffer, 100, "<Reference: %p>", reinterpret_cast<void*>(0));
+          snprintf(buffer, 100, "<Reference: %p>", reinterpret_cast<void*>(0));
         } else {
-            snprintf(buffer, 100, "<Reference: %p>", value);
+          snprintf(buffer, 100, "<Reference: %p>", value);
         }
 
         Local<v8::String> result = tns::ToV8String(isolate, buffer);
         info.GetReturnValue().Set(result);
-    });
+      });
 
-    Local<v8::Function> func;
-    tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
+  Local<v8::Function> func;
+  tns::Assert(funcTemplate->GetFunction(context).ToLocal(&func), isolate);
 
-    bool success = prototype->Set(context, tns::ToV8String(isolate, "toString"), func).FromMaybe(false);
-    tns::Assert(success, isolate);
+  bool success =
+      prototype->Set(context, tns::ToV8String(isolate, "toString"), func)
+          .FromMaybe(false);
+  tns::Assert(success, isolate);
 }
 
 Reference::DataPair Reference::GetDataPair(Local<Object> obj) {
-    Local<Context> context;
-    bool success = obj->GetCreationContext().ToLocal(&context);
-    tns::Assert(success);
-    Isolate* isolate = context->GetIsolate();
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
-    tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference, isolate);
-    ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
-    BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
-    
-    size_t size = 0;
-    
-    if (typeWrapper != nullptr) {
-        const TypeEncoding* typeEncoding = nullptr;
+  Local<Context> context;
+  bool success =
+      obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
+  tns::Assert(success);
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
+  tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference,
+              isolate);
+  ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
+  BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
 
-        if (Reference::IsSupportedType(typeWrapper->Type())) {
-            switch(typeWrapper->Type()) {
-                case WrapperType::Primitive: {
-                    PrimitiveDataWrapper* primitiveWrapper = static_cast<PrimitiveDataWrapper*>(typeWrapper);
-                    
-                    size = primitiveWrapper->Size();
-                    typeEncoding = primitiveWrapper->TypeEncoding();
-                    break;
-                }
-                case WrapperType::StructType: {
-                    StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
-                    StructInfo structInfo = structTypeWrapper->StructInfo();
-                    
-                    size = structInfo.FFIType()->size;
-                    break;
-                }
-                default: {
-                    break;
-                }
-            }
-        } else {
-            // TODO: Currently only PrimitiveDataWrappers and Structs are supported as type parameters
-            // Objective C class classes should also be handled
-            tns::Assert(false, isolate);
+  size_t size = 0;
+
+  if (typeWrapper != nullptr) {
+    const TypeEncoding* typeEncoding = nullptr;
+
+    if (Reference::IsSupportedType(typeWrapper->Type())) {
+      switch (typeWrapper->Type()) {
+        case WrapperType::Primitive: {
+          PrimitiveDataWrapper* primitiveWrapper =
+              static_cast<PrimitiveDataWrapper*>(typeWrapper);
+
+          size = primitiveWrapper->Size();
+          typeEncoding = primitiveWrapper->TypeEncoding();
+          break;
         }
+        case WrapperType::StructType: {
+          StructTypeWrapper* structTypeWrapper =
+              static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
+          StructInfo structInfo = structTypeWrapper->StructInfo();
 
-        Local<Value> value = refWrapper->Value()->Get(isolate);
-        BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
-        if (wrappedValue != nullptr && wrappedValue->Type() == WrapperType::Pointer) {
-            PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
-            void* data = pw->Data();
-
-            DataPair pair(typeWrapper, typeEncoding, data, size);
-            return pair;
+          size = structInfo.FFIType()->size;
+          break;
         }
+        default: {
+          break;
+        }
+      }
+    } else {
+      // TODO: Currently only PrimitiveDataWrappers and Structs are supported as
+      // type parameters Objective C class classes should also be handled
+      tns::Assert(false, isolate);
     }
 
-    if (refWrapper->Encoding() != nullptr && refWrapper->Data() != nullptr) {
-        const TypeEncoding* typeEncoding = refWrapper->Encoding();
-        
-        if (typeWrapper == nullptr) {
-            ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
-            size = ffiType->size;
-            FFICall::DisposeFFIType(ffiType, typeEncoding);
-        }
-        
-        DataPair pair(typeWrapper, typeEncoding, refWrapper->Data(), size);
-        return pair;
+    Local<Value> value = refWrapper->Value()->Get(isolate);
+    BaseDataWrapper* wrappedValue = tns::GetValue(isolate, value);
+    if (wrappedValue != nullptr &&
+        wrappedValue->Type() == WrapperType::Pointer) {
+      PointerWrapper* pw = static_cast<PointerWrapper*>(wrappedValue);
+      void* data = pw->Data();
+
+      DataPair pair(typeWrapper, typeEncoding, data, size);
+      return pair;
+    }
+  }
+
+  if (refWrapper->Encoding() != nullptr && refWrapper->Data() != nullptr) {
+    const TypeEncoding* typeEncoding = refWrapper->Encoding();
+
+    if (typeWrapper == nullptr) {
+      ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
+      size = ffiType->size;
+      FFICall::DisposeFFIType(ffiType, typeEncoding);
     }
 
-    tns::Assert(false, isolate);
-    return DataPair(typeWrapper, nullptr, nullptr, size);
+    DataPair pair(typeWrapper, typeEncoding, refWrapper->Data(), size);
+    return pair;
+  }
+
+  tns::Assert(false, isolate);
+  return DataPair(typeWrapper, nullptr, nullptr, size);
 }
 
 bool Reference::IsSupportedType(WrapperType type) {
-    return type == WrapperType::Primitive || type == WrapperType::StructType;
+  return type == WrapperType::Primitive || type == WrapperType::StructType;
 }
-}
+}  // namespace tns

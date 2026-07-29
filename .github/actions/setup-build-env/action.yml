@@ -27,3 +27,9 @@ runs:
     - name: Install dependencies
       shell: bash
       run: ./scripts/install-ci-deps.sh ${{ inputs.install-test-tools == 'true' && '--test-tools' || '' }}
+    # The V8 libraries and headers are not committed. build_nativescript.sh also
+    # calls this, but the test job drives xcodebuild directly, so it belongs in
+    # the shared setup rather than in one job. It is a no-op once installed.
+    - name: Fetch prebuilt V8
+      shell: bash
+      run: ./download_v8.sh

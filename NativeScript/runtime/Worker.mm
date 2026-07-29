@@ -343,7 +343,6 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
       return;
     }
 
-    Local<Value> error;
     auto context = Caches::Get(isolate)->GetContext();
     auto message = std::make_shared<worker::Message>();
     Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
@@ -460,8 +459,13 @@ Local<v8::String> Worker::Serialize(Isolate* isolate, Local<Value> value, Local<
 }
 
 void Worker::SetWorkerId(Isolate* isolate, int workerId) {
+  // Runs on the worker thread right after Runtime::Init(), whose Isolate::Scope
+  // has already been unwound -- so this has to enter the isolate itself, and
+  // take the context from the caches rather than GetCurrentContext().
+  Isolate::Scope isolateScope(isolate);
   HandleScope scope(isolate);
-  Local<Context> context = isolate->GetCurrentContext();
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Context::Scope contextScope(context);
   Local<Object> global = context->Global();
   global->SetPrivate(context, Private::ForApi(isolate, tns::ToV8String(isolate, "workerId")),
                      Number::New(isolate, workerId));

@@ -147,7 +147,7 @@ void Events::Init(Local<Context> context) {
     })
   )";
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   Local<Script> script;
   bool success = Script::Compile(context, tns::ToV8String(isolate, source))

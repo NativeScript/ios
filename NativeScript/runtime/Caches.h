@@ -12,6 +12,7 @@
 namespace tns {
 
 struct StructInfo;
+struct ObjectWeakCallbackState;
 class PromiseRejectionTracker;
 
 struct pair_hash {
@@ -84,6 +85,13 @@ class Caches {
   // Per-isolate unhandled promise rejection tracking. Fed by
   // NativeScriptException::OnPromiseRejected and drained once per runloop turn.
   std::unique_ptr<PromiseRejectionTracker> PromiseRejections;
+
+  // Head of the intrusive list of wrappers registered by
+  // ObjectManager::Register(). V8 no longer offers a way to enumerate
+  // persistent handles, so teardown disposal walks this instead. Entries unlink
+  // themselves when the wrapper is disposed, so the list only ever holds live
+  // wrappers.
+  ObjectWeakCallbackState* ObjectManagedValues = nullptr;
 
   robin_hood::unordered_map<const Meta*,
                             std::unique_ptr<v8::Persistent<v8::Value>>>

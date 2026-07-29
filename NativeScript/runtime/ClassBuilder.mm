@@ -20,7 +20,7 @@ Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate,
                                                         const InterfaceMeta* interfaceMeta) {
   CacheItem* item = new CacheItem(interfaceMeta, nullptr);
   Caches::Get(isolate)->registerCacheBoundObject(item);
-  Local<External> ext = External::New(isolate, item);
+  Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
   return FunctionTemplate::New(isolate, ClassBuilder::ExtendCallback, ext);
 }
 
@@ -31,7 +31,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
 
   try {
     Local<Context> context = isolate->GetCurrentContext();
-    CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
+    CacheItem* item = static_cast<CacheItem*>(
+        info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
     Local<Object> implementationObject = info[0].As<Object>();
     Local<v8::Function> baseFunc = info.This().As<v8::Function>();
@@ -78,7 +79,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
 
     CacheItem* cacheItem = new CacheItem(nullptr, extendedClass);
     Caches::Get(isolate)->registerCacheBoundObject(cacheItem);
-    Local<External> ext = External::New(isolate, cacheItem);
+    Local<External> ext = External::New(isolate, cacheItem, v8::kExternalPointerTypeTagDefault);
     Local<FunctionTemplate> extendedClassCtorFuncTemplate =
         FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
     extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
@@ -96,13 +97,16 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     if (!implementationObject->SetPrototype(context, baseProto).To(&success) || !success) {
       tns::Assert(false, isolate);
     }
-    if (!implementationObject
-             ->SetAccessor(context, tns::ToV8String(isolate, "super"), SuperAccessorGetterCallback,
-                           nullptr, ext)
-             .To(&success) ||
-        !success) {
+    Local<v8::Function> superGetter;
+    if (!FunctionTemplate::New(isolate, SuperAccessorGetterCallback, ext)
+             ->GetFunction(context)
+             .ToLocal(&superGetter)) {
       tns::Assert(false, isolate);
     }
+    // Must be a function-backed accessor: it needs the receiver, and
+    // PropertyCallbackInfo no longer exposes it (Holder() is this object, not
+    // the instance that inherits from it).
+    implementationObject->SetAccessorProperty(tns::ToV8String(isolate, "super"), superGetter);
 
     extendClassCtorFunc->SetName(tns::ToV8String(isolate, class_getName(extendedClass)));
     Local<Value> extendFuncPrototypeValue;
@@ -141,7 +145,8 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
   Local<Context> context = isolate->GetCurrentContext();
 
   try {
-    CacheItem* item = static_cast<CacheItem*>(info.Data().As<External>()->Value());
+    CacheItem* item = static_cast<CacheItem*>(
+        info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
     Class klass = item->data_;
 
     ArgConverter::ConstructObject(context, info, klass);
@@ -151,7 +156,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
 }
 
 void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Local<Context> context) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   if (cache->OriginalExtendsFunc.get() != nullptr) {
     return;
@@ -184,7 +189,7 @@ void ClassBuilder::RegisterBaseTypeScriptExtendsFunction(Local<Context> context)
 }
 
 void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> context) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> global = context->Global();
 
   Local<v8::Function> extendsFunc =
@@ -408,7 +413,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
 void ClassBuilder::ExposeDynamicMembers(v8::Local<v8::Context> context, Class extendedClass,
                                         Local<Object> implementationObject,
                                         Local<Object> nativeSignature) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   Local<Value> exposedMethods;
   bool success = nativeSignature->Get(context, tns::ToV8String(isolate, "exposedMethods"))
@@ -580,7 +585,7 @@ BinaryTypeEncodingType ClassBuilder::GetTypeEncodingType(Isolate* isolate, Local
 void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedClass,
                                         Local<Value> exposedMethods, Local<Value> exposedProtocols,
                                         Local<Object> implementationObject) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   std::vector<const ProtocolMeta*> protocols;
   if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
     Local<v8::Array> protocolsArray = exposedProtocols.As<v8::Array>();
@@ -988,8 +993,7 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
   }
 }
 
-void ClassBuilder::SuperAccessorGetterCallback(Local<v8::Name> property,
-                                               const PropertyCallbackInfo<Value>& info) {
+void ClassBuilder::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
   Local<Object> thiz = info.This();

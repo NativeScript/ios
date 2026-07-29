@@ -25,21 +25,6 @@
 
 namespace tns {
 
-// Helper function to check if a module name looks like an optional external module
-static bool IsLikelyOptionalModule(const std::string& moduleName) {
-  // Skip Node.js built-in modules (they should be handled separately)
-  if (moduleName.rfind("node:", 0) == 0) {
-    return false;
-  }
-
-  // Check if it's a bare module name (no path separators) that could be an npm package
-  if (moduleName.find('/') == std::string::npos && moduleName.find('\\') == std::string::npos &&
-      moduleName[0] != '.' && moduleName[0] != '~' && moduleName[0] != '/') {
-    return true;
-  }
-  return false;
-}
-
 // Helper function to check if a module name is a Node.js built-in module
 static bool IsNodeBuiltinModule(const std::string& moduleName) {
   return moduleName.rfind("node:", 0) == 0;
@@ -111,8 +96,7 @@ static v8::MaybeLocal<v8::Module> CompileModuleFromSource(v8::Isolate* isolate,
            .ToLocal(&urlV8)) {
     return v8::MaybeLocal<v8::Module>();
   }
-  v8::ScriptOrigin origin(isolate, urlV8, 0, 0, false, -1, v8::Local<v8::Value>(), false, false,
-                          true);
+  v8::ScriptOrigin origin(urlV8, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
   v8::ScriptCompiler::Source src(sourceText, origin);
   v8::Local<v8::Module> mod;
   if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
@@ -145,8 +129,7 @@ static v8::MaybeLocal<v8::Module> CompileModuleFromSourceRegisterFirst(
            .ToLocal(&urlV8)) {
     return v8::MaybeLocal<v8::Module>();
   }
-  v8::ScriptOrigin origin(isolate, urlV8, 0, 0, false, -1, v8::Local<v8::Value>(), false, false,
-                          true);
+  v8::ScriptOrigin origin(urlV8, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
   v8::ScriptCompiler::Source src(sourceText, origin);
   v8::Local<v8::Module> mod;
   if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
@@ -198,8 +181,7 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
            .ToLocal(&urlV8)) {
     return v8::MaybeLocal<v8::Module>();
   }
-  v8::ScriptOrigin origin(isolate, urlV8, 0, 0, false, -1, v8::Local<v8::Value>(), false, false,
-                          true);
+  v8::ScriptOrigin origin(urlV8, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
   v8::ScriptCompiler::Source src(sourceText, origin);
   v8::Local<v8::Module> mod;
   {
@@ -724,7 +706,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                                                  v8::Local<v8::String> specifier,
                                                  v8::Local<v8::FixedArray> import_assertions,
                                                  v8::Local<v8::Module> referrer) {
-  v8::Isolate* isolate = context->GetIsolate();
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
 
   // 1) Turn the specifier literal into a std::string:
   v8::String::Utf8Value specUtf8(isolate, specifier);
@@ -1378,68 +1360,13 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         }
       }
 
-      std::string msg = "Cannot find module " + spec + " (failed to create in-memory polyfill)";
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Node.js polyfill creation failed: %s", msg.c_str());
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-        return v8::MaybeLocal<v8::Module>();
-      }
-    } else if (IsLikelyOptionalModule(spec)) {
-      // Treat bare specifiers as optional modules with an in-memory placeholder ES module
-      // that throws on property access. This avoids bundle writes in iOS release builds.
-
-      std::string key = std::string("optional:") + spec;
-      auto itExisting = g_moduleRegistry.find(key);
-      if (itExisting != g_moduleRegistry.end()) {
-        v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
-        if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
-          return v8::MaybeLocal<v8::Module>(existing);
-        }
-        RemoveModuleFromRegistry(key);
-      }
-
-      std::string placeholderContent = "const error = new Error(\"Module '" + spec +
-                                       "' is not available. This is an optional module.\");\n"
-                                       "const proxy = new Proxy({}, {\n"
-                                       "  get: function(target, prop) { throw error; },\n"
-                                       "  set: function(target, prop, value) { throw error; },\n"
-                                       "  has: function(target, prop) { return false; },\n"
-                                       "  ownKeys: function(target) { return []; },\n"
-                                       "  getPrototypeOf: function(target) { return null; }\n"
-                                       "});\n"
-                                       "export default proxy;\n";
-
-      v8::MaybeLocal<v8::Module> m =
-          CompileModuleForResolveRegisterOnly(isolate, context, placeholderContent, key);
-      if (!m.IsEmpty()) {
-        v8::Local<v8::Module> mod;
-        if (m.ToLocal(&mod)) {
-          return m;
-        }
-      }
-
-      std::string msg =
-          "Cannot find module " + spec + " (failed to create in-memory optional placeholder)";
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Optional module placeholder creation failed: %s", msg.c_str());
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-        return v8::MaybeLocal<v8::Module>();
-      }
+      std::string msg = "Cannot find module '" + spec + "' (failed to create in-memory polyfill)";
+      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+      return v8::MaybeLocal<v8::Module>();
     } else {
-      // Not an optional module, throw the original error
-      std::string msg = "Cannot find module " + spec + " (tried " + absPath + ")";
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Module not found: %s", msg.c_str());
-        // Return empty instead of crashing in debug mode
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-        return v8::MaybeLocal<v8::Module>();
-      }
+      std::string msg = "Cannot find module '" + spec + "' (tried " + absPath + ")";
+      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+      return v8::MaybeLocal<v8::Module>();
     }
   }
 
@@ -1470,31 +1397,21 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     v8::Local<v8::String> urlString;
     if (!v8::String::NewFromUtf8(isolate, url.c_str(), v8::NewStringType::kNormal)
              .ToLocal(&urlString)) {
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Failed to create URL string for JSON module");
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(v8::Exception::Error(
-            tns::ToV8String(isolate, "Failed to create URL string for JSON module")));
-        return v8::MaybeLocal<v8::Module>();
-      }
+      isolate->ThrowException(v8::Exception::Error(
+          tns::ToV8String(isolate, "Failed to create URL string for JSON module")));
+      return v8::MaybeLocal<v8::Module>();
     }
 
-    v8::ScriptOrigin origin(isolate, urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false,
-                            false, true /* is_module */);
+    v8::ScriptOrigin origin(urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false,
+                            true /* is_module */);
 
     v8::ScriptCompiler::Source src(sourceText, origin);
 
     v8::Local<v8::Module> jsonModule;
     if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&jsonModule)) {
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - Failed to compile JSON module");
-        return v8::MaybeLocal<v8::Module>();
-      } else {
-        isolate->ThrowException(
-            v8::Exception::SyntaxError(tns::ToV8String(isolate, "Failed to compile JSON module")));
-        return v8::MaybeLocal<v8::Module>();
-      }
+      isolate->ThrowException(
+          v8::Exception::SyntaxError(tns::ToV8String(isolate, "Failed to compile JSON module")));
+      return v8::MaybeLocal<v8::Module>();
     }
 
     // No imports inside this module, so instantiate directly
@@ -1860,9 +1777,10 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 // ────────────────────────────────────────────────────────────────────────────
 // Dynamic import() host callback
 v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
-    v8::Local<v8::Context> context, v8::Local<v8::ScriptOrModule> referrer,
-    v8::Local<v8::String> specifier, v8::Local<v8::FixedArray> import_assertions) {
-  v8::Isolate* isolate = context->GetIsolate();
+    v8::Local<v8::Context> context, v8::Local<v8::Data> host_defined_options,
+    v8::Local<v8::Value> resource_name, v8::Local<v8::String> specifier,
+    v8::Local<v8::FixedArray> import_assertions) {
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
   // Diagnostic: log every dynamic import attempt.
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const char* cSpec = (*specUtf8) ? *specUtf8 : "<invalid>";
@@ -1870,7 +1788,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   if (IsScriptLoadingLogEnabled()) {
     Log(@"[dyn-import] → %@", specStr);
     // Also log the referrer resource when available to correlate origin of dynamic imports
-    v8::Local<v8::Value> resName = referrer->GetResourceName();
+    v8::Local<v8::Value> resName = resource_name;
     if (!resName.IsEmpty() && resName->IsString()) {
       v8::String::Utf8Value rn(isolate, resName);
       if (*rn) {
@@ -1892,7 +1810,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       if (IsScriptLoadingLogEnabled()) {
         // Try to capture referrer and JS stack to identify the source
         NSString* refName = nil;
-        v8::Local<v8::Value> resName = referrer->GetResourceName();
+        v8::Local<v8::Value> resName = resource_name;
         if (!resName.IsEmpty() && resName->IsString()) {
           v8::String::Utf8Value rn(isolate, resName);
           if (*rn) {
@@ -2137,7 +2055,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                   v8::Isolate* iso = info.GetIsolate();
                   v8::HandleScope hs(iso);
                   if (!info.Data()->IsExternal()) return;
-                  auto* d = static_cast<EvalWaitData*>(info.Data().As<v8::External>()->Value());
+                  auto* d = static_cast<EvalWaitData*>(
+                      info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
                   v8::Local<v8::Context> ctx = d->ctx.Get(iso);
                   std::string keyLocal = d->key;
                   v8::Local<v8::Module> modLocal = d->mod.Get(iso);
@@ -2157,7 +2076,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                   v8::Isolate* iso = info.GetIsolate();
                   v8::HandleScope hs(iso);
                   if (!info.Data()->IsExternal()) return;
-                  auto* d = static_cast<EvalWaitData*>(info.Data().As<v8::External>()->Value());
+                  auto* d = static_cast<EvalWaitData*>(
+                      info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
                   v8::Local<v8::Context> ctx = d->ctx.Get(iso);
                   std::string keyLocal = d->key;
                   v8::Local<v8::Value> reason =
@@ -2182,11 +2102,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                   delete d;
                 };
                 v8::Local<v8::FunctionTemplate> thenFulfillTpl = v8::FunctionTemplate::New(
-                    isolate, onFulfilled, v8::External::New(isolate, data));
+                    isolate, onFulfilled,
+                    v8::External::New(isolate, data, v8::kExternalPointerTypeTagDefault));
                 v8::Local<v8::Function> thenFulfill =
                     thenFulfillTpl->GetFunction(context).ToLocalChecked();
                 v8::Local<v8::FunctionTemplate> thenRejectTpl = v8::FunctionTemplate::New(
-                    isolate, onRejected, v8::External::New(isolate, data));
+                    isolate, onRejected,
+                    v8::External::New(isolate, data, v8::kExternalPointerTypeTagDefault));
                 v8::Local<v8::Function> thenReject =
                     thenRejectTpl->GetFunction(context).ToLocalChecked();
                 p->Then(context, thenFulfill, thenReject).ToLocalChecked();
@@ -2265,7 +2187,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 v8::Isolate* iso = info.GetIsolate();
                 v8::HandleScope hs(iso);
                 if (!info.Data()->IsExternal()) return;
-                auto* d = static_cast<EvalWaitData2*>(info.Data().As<v8::External>()->Value());
+                auto* d = static_cast<EvalWaitData2*>(
+                    info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
                 v8::Local<v8::Context> ctx = d->ctx.Get(iso);
                 std::string keyLocal = d->key;
                 v8::Local<v8::Module> modLocal = d->mod.Get(iso);
@@ -2288,7 +2211,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 v8::Isolate* iso = info.GetIsolate();
                 v8::HandleScope hs(iso);
                 if (!info.Data()->IsExternal()) return;
-                auto* d = static_cast<EvalWaitData2*>(info.Data().As<v8::External>()->Value());
+                auto* d = static_cast<EvalWaitData2*>(
+                    info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
                 v8::Local<v8::Context> ctx = d->ctx.Get(iso);
                 std::string keyLocal = d->key;
                 v8::Local<v8::Value> reason =
@@ -2315,11 +2239,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 delete d;
               };
               v8::Local<v8::FunctionTemplate> thenFulfillTpl2 = v8::FunctionTemplate::New(
-                  isolate, onFulfilled2, v8::External::New(isolate, data2));
+                  isolate, onFulfilled2,
+                  v8::External::New(isolate, data2, v8::kExternalPointerTypeTagDefault));
               v8::Local<v8::Function> thenFulfill2 =
                   thenFulfillTpl2->GetFunction(context).ToLocalChecked();
               v8::Local<v8::FunctionTemplate> thenRejectTpl2 = v8::FunctionTemplate::New(
-                  isolate, onRejected2, v8::External::New(isolate, data2));
+                  isolate, onRejected2,
+                  v8::External::New(isolate, data2, v8::kExternalPointerTypeTagDefault));
               v8::Local<v8::Function> thenReject2 =
                   thenRejectTpl2->GetFunction(context).ToLocalChecked();
               p->Then(context, thenFulfill2, thenReject2).ToLocalChecked();
@@ -2367,7 +2293,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     if (!normalizedSpec.empty() &&
         (normalizedSpec.rfind("./", 0) == 0 || normalizedSpec.rfind("../", 0) == 0)) {
       // Try to extract a base directory from referrer->GetResourceName() which is a file:// URL
-      v8::Local<v8::Value> resName = referrer->GetResourceName();
+      v8::Local<v8::Value> resName = resource_name;
       if (!resName.IsEmpty() && resName->IsString()) {
         v8::String::Utf8Value rn(isolate, resName);
         std::string refUrl = *rn ? *rn : std::string();
@@ -2480,7 +2406,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
               v8::Isolate* isolateInner = info.GetIsolate();
               v8::HandleScope hs(isolateInner);
               if (!info.Data()->IsExternal()) return;
-              auto* d = static_cast<FetchRetryData*>(info.Data().As<v8::External>()->Value());
+              auto* d = static_cast<FetchRetryData*>(
+                  info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
               v8::Local<v8::Context> ctx = isolateInner->GetCurrentContext();
               v8::Local<v8::Promise::Resolver> res = d->resolver.Get(isolateInner);
               v8::Local<v8::String> specLocal = d->spec.Get(isolateInner);
@@ -2522,7 +2449,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
               v8::Isolate* isolateInner = info.GetIsolate();
               v8::HandleScope hs(isolateInner);
               if (!info.Data()->IsExternal()) return;
-              auto* d = static_cast<FetchRetryData*>(info.Data().As<v8::External>()->Value());
+              auto* d = static_cast<FetchRetryData*>(
+                  info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
               v8::Local<v8::Context> ctx = isolateInner->GetCurrentContext();
               v8::Local<v8::Promise::Resolver> res = d->resolver.Get(isolateInner);
               v8::Local<v8::Value> reason =
@@ -2533,12 +2461,14 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
               delete d;
             };
 
-            v8::Local<v8::FunctionTemplate> thenFulfillTpl =
-                v8::FunctionTemplate::New(isolate, onFulfilled, v8::External::New(isolate, data));
+            v8::Local<v8::FunctionTemplate> thenFulfillTpl = v8::FunctionTemplate::New(
+                isolate, onFulfilled,
+                v8::External::New(isolate, data, v8::kExternalPointerTypeTagDefault));
             v8::Local<v8::Function> thenFulfill =
                 thenFulfillTpl->GetFunction(context).ToLocalChecked();
-            v8::Local<v8::FunctionTemplate> thenRejectTpl =
-                v8::FunctionTemplate::New(isolate, onRejected, v8::External::New(isolate, data));
+            v8::Local<v8::FunctionTemplate> thenRejectTpl = v8::FunctionTemplate::New(
+                isolate, onRejected,
+                v8::External::New(isolate, data, v8::kExternalPointerTypeTagDefault));
             v8::Local<v8::Function> thenReject =
                 thenRejectTpl->GetFunction(context).ToLocalChecked();
             v8::Local<v8::Value> thenArgs[2] = {thenFulfill, thenReject};
@@ -2606,7 +2536,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           v8::Isolate* iso = info.GetIsolate();
           v8::HandleScope hs(iso);
           if (!info.Data()->IsExternal()) return;
-          auto* d = static_cast<DynEvalData*>(info.Data().As<v8::External>()->Value());
+          auto* d = static_cast<DynEvalData*>(
+              info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
           v8::Local<v8::Context> ctx = d->ctx.Get(iso);
           v8::Local<v8::Module> modLocal = d->mod.Get(iso);
           v8::Local<v8::Promise::Resolver> res = d->res.Get(iso);
@@ -2620,7 +2551,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           v8::Isolate* iso = info.GetIsolate();
           v8::HandleScope hs(iso);
           if (!info.Data()->IsExternal()) return;
-          auto* d = static_cast<DynEvalData*>(info.Data().As<v8::External>()->Value());
+          auto* d = static_cast<DynEvalData*>(
+              info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
           v8::Local<v8::Context> ctx = d->ctx.Get(iso);
           v8::Local<v8::Promise::Resolver> res = d->res.Get(iso);
           v8::Local<v8::Value> reason =
@@ -2636,11 +2568,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           if (!res.IsEmpty()) res->Reject(ctx, reason).FromMaybe(false);
           delete d;
         };
-        v8::Local<v8::FunctionTemplate> fulfillTpl =
-            v8::FunctionTemplate::New(isolate, onFulfilled, v8::External::New(isolate, d));
+        v8::Local<v8::FunctionTemplate> fulfillTpl = v8::FunctionTemplate::New(
+            isolate, onFulfilled,
+            v8::External::New(isolate, d, v8::kExternalPointerTypeTagDefault));
         v8::Local<v8::Function> fulfill = fulfillTpl->GetFunction(context).ToLocalChecked();
-        v8::Local<v8::FunctionTemplate> rejectTpl =
-            v8::FunctionTemplate::New(isolate, onRejected, v8::External::New(isolate, d));
+        v8::Local<v8::FunctionTemplate> rejectTpl = v8::FunctionTemplate::New(
+            isolate, onRejected, v8::External::New(isolate, d, v8::kExternalPointerTypeTagDefault));
         v8::Local<v8::Function> reject = rejectTpl->GetFunction(context).ToLocalChecked();
         p->Then(context, fulfill, reject).ToLocalChecked();
         return scope.Escape(resolver->GetPromise());
