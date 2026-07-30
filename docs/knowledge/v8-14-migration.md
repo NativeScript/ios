@@ -14,6 +14,41 @@ and installed by `download_v8.sh`; the resurrecting-finalizer patch is described
   which we do not link. V8 10.3 had no Temporal, so disabling keeps parity.
 - arm64 **simulator** objects come out as `minos 14.0` regardless of the requested 13.0 —
   that is an Apple floor for arm64 simulator slices, not a project setting.
+- `cppgc_enable_caged_heap=false` is required on iOS. See below.
+
+### The cppgc caged heap does not fit in an iOS address space
+
+Shipped in `v8-14.9.207.39-1` and `-2`, fixed in `-3`. **The symptom was a launch crash on
+some devices and not others** — an iPad Air died, an iPad Pro was fine — so it is worth
+recording how it happens.
+
+`cppgc_enable_caged_heap` defaults to **true on arm64** ("Enable heap reservation of size
+4GB") and, contrary to how the flags read, does *not* track
+`v8_enable_pointer_compression` — which we had already disabled. Enabling it forces cppgc's
+own pointer compression on, and that reservation path asks for **twice** the cage to satisfy
+alignment. `V8::Initialize()` calls `cppgc::InitializeProcess` unconditionally
+(`src/api/api.cc`), so every app reserved **8 GiB of 4 GiB-aligned address space** at startup
+whether or not it used cppgc — and nothing in the runtime used cppgc at all.
+
+iOS budgets *virtual address space* per process by device RAM. This is not about free memory:
+the reservation is `PROT_NONE`, costs no physical pages, and the iPad had plenty of RAM. It
+needs a contiguous, 4 GiB-aligned hole, and on a smaller device the process map has none once
+the binary, frameworks, dyld shared cache and malloc zones are placed. `CagedHeap` tries four
+hint addresses, then calls Oilpan's fatal OOM handler — an `EXC_BREAKPOINT` before a line of
+JS runs.
+
+Turning the cage off costs cppgc pointer compression (`Member<T>` becomes 8 bytes instead of
+4), the cppgc young generation, and a write-barrier fast path. It costs nothing in API:
+`CppHeap` and unified heap tracing are untouched, so the planned cppgc migration is
+unaffected. The alternative — the
+`com.apple.developer.kernel.extended-virtual-addressing` entitlement — was rejected because it
+makes every existing app edit its entitlements to survive a runtime upgrade, and any app that
+misses it crashes on launch on smaller hardware. It remains an option for apps that
+deliberately want large heaps.
+
+**Neither CI nor the simulator can catch this class of bug.** The simulator inherits macOS's
+address space and passes regardless; `-2` passed the full suite. Anything touching large
+virtual reservations has to be tried on constrained hardware.
 
 ### New link-time dependencies
 
