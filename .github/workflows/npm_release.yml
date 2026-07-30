@@ -168,19 +168,30 @@ jobs:
           timeout_minutes: 40
           max_attempts: 2
           command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test | xcpretty
-          on_retry_command: rm -rf $TEST_FOLDER/test_results* && xcrun simctl shutdown all
+          # Keep the failed attempt's bundle — it holds the diagnostics of the
+          # failure being retried. Everything else at the result path must go
+          # (including extensionless staging leftovers), or the retry dies with
+          # "Existing file at -resultBundlePath".
+          on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult; mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $TEST_FOLDER/test_results*; do [ "$f" = "$TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
           new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test
       - name: Validate Test Results
         run: |
           xcparse attachments $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test-out
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+      - name: Collect test diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-test-diagnostics
+        with:
+          test-folder: ${{env.TEST_FOLDER}}
       - name: Archive Test Result Data
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: test-results
-          path: ${{env.TEST_FOLDER}}/test_results.xcresult
+          path: |
+            ${{env.TEST_FOLDER}}/test_results.xcresult
+            ${{env.TEST_FOLDER}}/test_results_attempt1.xcresult
 
   # Publish the xcframework zips + dSYMs as a GitHub Release asset for EVERY
   # version (prerelease unless 'latest'), because the SwiftPM binaryTarget url

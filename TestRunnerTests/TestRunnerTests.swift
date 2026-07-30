@@ -5,6 +5,7 @@ class TestRunnerTests: XCTestCase {
     private var loop: EventLoop!
     private var server: HTTPServer!
     private var runtimeUnitTestsExpectation: XCTestExpectation!
+    private var reportDeliveryFailureReason: String?
 
     override func setUp() {
         continueAfterFailure = false
@@ -29,6 +30,9 @@ class TestRunnerTests: XCTestCase {
                 sendBody(Data())
                 self.runtimeUnitTestsExpectation.fulfill()
             } else {
+                // The app POSTs here when it exhausted its report retries; the
+                // payload is a human-readable reason instead of junit XML.
+                let isDeliveryFailure = (environ["PATH_INFO"] as? String)?.hasSuffix("/delivery_failed") ?? false
                 var buffer = Data()
                 let input = environ["swsgi.input"] as! SWSGIInput
                 var finished = false
@@ -37,9 +41,13 @@ class TestRunnerTests: XCTestCase {
                     if data.isEmpty && !finished {
                         finished = true
 
-                        let report = XCTAttachment(uniformTypeIdentifier: "junit.xml", name: "junit.xml", payload: buffer, userInfo: nil)
-                        report.lifetime = .keepAlways
-                        self.add(report)
+                        if isDeliveryFailure {
+                            self.reportDeliveryFailureReason = String(data: buffer, encoding: .utf8) ?? "unknown"
+                        } else {
+                            let report = XCTAttachment(uniformTypeIdentifier: "junit.xml", name: "junit.xml", payload: buffer, userInfo: nil)
+                            report.lifetime = .keepAlways
+                            self.add(report)
+                        }
 
                         startResponse("204 No Content", [])
                         sendBody(Data())
@@ -51,7 +59,10 @@ class TestRunnerTests: XCTestCase {
 
         try! server.start()
 
-        DispatchQueue.global(qos: .background).async {
+        // Not .background: CI VMs throttle background-QoS threads hard enough
+        // to starve this accept loop, and it is the only channel through which
+        // results ever arrive.
+        DispatchQueue.global(qos: .userInitiated).async {
             self.loop.runForever()
         }
     }
@@ -72,6 +83,10 @@ class TestRunnerTests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchEnvironment["REPORT_BASEURL"] = "http://[::1]:\(port)/junit_report"
+        // The app's report retries and delivery_failed sentinel count from its
+        // launch, which precedes the wait below — keep a margin so delivery
+        // gives up (and the sentinel lands) before our timeout fires.
+        app.launchEnvironment["REPORT_DEADLINE_SECONDS"] = String(Int(jasmineTestsTimeout) - 60)
         app.launch()
 
         // Watchdog: if the runtime crashes (e.g. EXC_BAD_ACCESS) it never
@@ -100,6 +115,8 @@ class TestRunnerTests: XCTestCase {
         case .completed:
             if didCrash {
                 XCTFail("TestRunner exited before reporting Jasmine results (likely crashed). Check ~/Library/Logs/DiagnosticReports/TestRunner-*.ips for the stack.")
+            } else if let reason = reportDeliveryFailureReason {
+                XCTFail("TestRunner finished the Jasmine suite but could not deliver the junit report: \(reason)")
             }
             return
         case .timedOut:

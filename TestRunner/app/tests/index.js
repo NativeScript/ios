@@ -1,6 +1,9 @@
 // Inform the test results runner that the runtime is up.
 console.log('Application Start!');
 
+// The report delivery deadline (REPORT_DEADLINE_SECONDS) counts from launch.
+var appStartMs = Date.now();
+
 require("../Infrastructure/timers");
 require("../Infrastructure/simulator");
 global.utf8 = require("../Infrastructure/utf8")
@@ -22,17 +25,72 @@ global.__JUnitSaveResults = function (text) {
     }
 
     var reportUrl = NSProcessInfo.processInfo.environment.objectForKey("REPORT_BASEURL");
-    if (reportUrl) {
-        var urlRequest = NSMutableURLRequest.requestWithURL(NSURL.URLWithString(reportUrl));
+    if (!reportUrl) {
+        return;
+    }
+
+    // The results host (TestRunnerTests.swift) waits on this single POST; if it
+    // is lost the whole run times out. Retry hard, but stop early enough that a
+    // final delivery_failed sentinel can still reach the host before its wait
+    // budget (which also covers the suite itself) expires.
+    var maxAttempts = 10;
+    var retryDelayMs = 5000;
+    var requestTimeoutS = 30;
+    var deadlineSeconds = parseInt(NSProcessInfo.processInfo.environment.objectForKey("REPORT_DEADLINE_SECONDS"), 10) || 540;
+    var deadlineMs = appStartMs + deadlineSeconds * 1000;
+
+    var sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration;
+    sessionConfig.timeoutIntervalForRequest = requestTimeoutS;
+    var session = NSURLSession.sessionWithConfigurationDelegateDelegateQueue(sessionConfig, null, NSOperationQueue.mainQueue);
+
+    function post(url, body, onFailure) {
+        var urlRequest = NSMutableURLRequest.requestWithURL(NSURL.URLWithString(url));
         urlRequest.HTTPMethod = "POST";
         urlRequest.setValueForHTTPHeaderField("Content-Type", "application/xml");
-        urlRequest.HTTPBody = NSString.stringWithString(text).dataUsingEncoding(4);
-        var sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration;
-        var queue = NSOperationQueue.mainQueue;
-        var session = NSURLSession.sessionWithConfigurationDelegateDelegateQueue(sessionConfig, null, queue);
-        var dataTask = session.dataTaskWithRequestCompletionHandler(urlRequest, (data, response, error) => { });
+        urlRequest.HTTPBody = NSString.stringWithString(body).dataUsingEncoding(4);
+        var dataTask = session.dataTaskWithRequestCompletionHandler(urlRequest, (data, response, error) => {
+            if (error) {
+                onFailure("error: " + error.localizedDescription);
+            } else if (!response || response.statusCode < 200 || response.statusCode >= 300) {
+                onFailure("status: " + (response ? response.statusCode : "none"));
+            }
+        });
         dataTask.resume();
     }
+
+    // Best-effort sentinel so the host can fail immediately with a delivery
+    // diagnostic instead of waiting out its full timeout.
+    function sendDeliveryFailed(attempts, reason) {
+        post(reportUrl + "/delivery_failed",
+            "junit report delivery failed after " + attempts + " attempts; last failure " + reason,
+            function () { });
+    }
+
+    function attemptReport(attempt) {
+        post(reportUrl, text, function (reason) {
+            console.log("junit report POST failed (attempt " + attempt + "/" + maxAttempts + ", " + reason + ")");
+            if (attempt >= maxAttempts) {
+                sendDeliveryFailed(attempt, reason);
+                return;
+            }
+            setTimeout(function () {
+                // Deadline is checked when the timer fires, not when it is
+                // scheduled: under load timers run late, and a retry started
+                // past this window would eat the sentinel's slot.
+                var worstCaseRetryMs = 2 * requestTimeoutS * 1000;
+                if (Date.now() + worstCaseRetryMs <= deadlineMs) {
+                    attemptReport(attempt + 1);
+                } else {
+                    sendDeliveryFailed(attempt, reason);
+                }
+            }, retryDelayMs);
+        });
+    }
+
+    // The first attempt intentionally has no deadline guard: even past the
+    // deadline a one-shot report is still the most valuable outcome, and a
+    // late fulfill is harmless to the host.
+    attemptReport(1);
 };
 
 global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
