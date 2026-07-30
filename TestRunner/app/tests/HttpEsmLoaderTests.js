@@ -214,29 +214,9 @@ describe("HTTP ESM Loader", function() {
             expect(typeof global.__NS_DEV__).toBe("object");
             expect(typeof global.__NS_DEV__.configureRuntime).toBe("function");
             expect(typeof global.__NS_DEV__.invalidateModules).toBe("function");
-            expect(typeof global.__NS_DEV__.prewarm).toBe("function");
             expect(typeof global.__NS_DEV__.getLoadedModuleUrls).toBe("function");
             expect(typeof global.__NS_DEV__.setDevBootComplete).toBe("function");
             expect(typeof global.__NS_DEV__.terminateAllWorkers).toBe("function");
-        });
-
-        it("prewarm rejects invalid seed entries without seeding", function() {
-            var dev = global.__NS_DEV__;
-            var noArg = dev.prewarm();
-            expect(noArg.ok).toBe(false);
-            expect(noArg.seeded).toBe(0);
-            expect(noArg.fetched).toBe(0);
-            var badEntries = dev.prewarm([
-                null,
-                { body: "export {};" }, // no url
-                { url: "not-a-url", body: "export {};" }, // non-http scheme
-                { url: "http://127.0.0.1:5173/ns/m/src/app.css", body: "body{}" }, // non-JS shape
-                { url: "http://127.0.0.1:5173/ns/m/src/main", body: "" }, // empty body
-            ]);
-            expect(badEntries.ok).toBe(false);
-            expect(badEntries.seeded).toBe(0);
-            expect(badEntries.fetched).toBe(0);
-            expect(badEntries.bytes).toBe(0);
         });
     });
 

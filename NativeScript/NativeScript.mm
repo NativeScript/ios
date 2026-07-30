@@ -3,6 +3,7 @@
 #include "inspector/JsV8InspectorClient.h"
 #include "runtime/Console.h"
 #include "runtime/Helpers.h"
+#include "runtime/ModuleInternalCallbacks.h"
 #include "runtime/Runtime.h"
 #include "runtime/RuntimeConfig.h"
 #include "runtime/Tasks.h"
@@ -43,6 +44,23 @@ std::unique_ptr<Runtime> runtime_;
 
   CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
   tns::Tasks::Drain();
+
+  // Async-pipeline boot handoff. For UI apps Tasks::Drain() invokes
+  // UIApplicationMain and never returns — the app's main runloop services
+  // any in-flight async module loads. When Drain returns (the entry never
+  // called UIApplicationMain — e.g. a top-level-await entry still loading
+  // its graph), pump a manual runloop until the pending module work
+  // settles, Node-like. A load completion may itself register the
+  // UIApplicationMain task, so drain after each slice; if that drain calls
+  // UIApplicationMain, it takes over from here and never returns.
+  if (tns::HasPendingAsyncModuleGraphWork()) {
+    const CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + 120.0;
+    while (tns::HasPendingAsyncModuleGraphWork() && CFAbsoluteTimeGetCurrent() < deadline) {
+      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
+      tns::Tasks::Drain();
+    }
+    tns::Tasks::Drain();
+  }
 }
 
 - (bool)liveSync {
