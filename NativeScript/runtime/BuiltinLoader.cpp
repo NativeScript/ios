@@ -15,10 +15,12 @@ namespace {
 std::mutex builtinCacheMutex;
 std::vector<uint8_t> builtinCache[static_cast<unsigned>(BuiltinId::kCount)];
 
-}  // namespace
+// Every builtin is compiled as a function body receiving this single, fixed
+// parameter (Node's internalBinding idiom): natives arrive as properties of
+// one bag object and each file destructures what it needs.
+constexpr const char* kBindingParamName = "binding";
 
-MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context,
-                                            BuiltinId id) {
+MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   const BuiltinSource& builtin = GetBuiltinSource(id);
   const unsigned index = static_cast<unsigned>(id);
@@ -43,8 +45,9 @@ MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context,
   );
   Local<v8::String> sourceText = tns::ToV8String(
       isolate, builtin.source, static_cast<int>(builtin.length));
+  Local<v8::String> params[] = {tns::ToV8String(isolate, kBindingParamName)};
 
-  Local<Script> script;
+  Local<v8::Function> fn;
   if (!blob.empty()) {
     // The Source owns and deletes the CachedData object; BufferNotOwned keeps
     // the underlying bytes (our copy) out of its hands.
@@ -52,24 +55,25 @@ MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context,
         blob.data(), static_cast<int>(blob.size()),
         ScriptCompiler::CachedData::BufferNotOwned);
     ScriptCompiler::Source source(sourceText, origin, cachedData);
-    if (ScriptCompiler::Compile(context, &source,
-                                ScriptCompiler::kConsumeCodeCache)
-            .ToLocal(&script) &&
+    if (ScriptCompiler::CompileFunction(context, &source, 1, params, 0, nullptr,
+                                        ScriptCompiler::kConsumeCodeCache)
+            .ToLocal(&fn) &&
         !cachedData->rejected) {
-      return script->Run(context);
+      return fn;
     }
     // Rejected cache (e.g. produced under different flags): fall through and
     // recompile eagerly so the refreshed blob covers inner functions again.
   }
 
   ScriptCompiler::Source source(sourceText, origin);
-  if (!ScriptCompiler::Compile(context, &source, ScriptCompiler::kEagerCompile)
-           .ToLocal(&script)) {
-    return MaybeLocal<Value>();
+  if (!ScriptCompiler::CompileFunction(context, &source, 1, params, 0, nullptr,
+                                       ScriptCompiler::kEagerCompile)
+           .ToLocal(&fn)) {
+    return MaybeLocal<v8::Function>();
   }
 
   std::unique_ptr<ScriptCompiler::CachedData> produced(
-      ScriptCompiler::CreateCodeCache(script->GetUnboundScript()));
+      ScriptCompiler::CreateCodeCacheForFunction(fn));
   if (produced != nullptr && produced->data != nullptr &&
       produced->length > 0) {
     std::lock_guard<std::mutex> lock(builtinCacheMutex);
@@ -77,7 +81,24 @@ MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context,
                                produced->data + produced->length);
   }
 
-  return script->Run(context);
+  return fn;
+}
+
+}  // namespace
+
+MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context,
+                                            BuiltinId id,
+                                            Local<Value> binding) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+
+  Local<v8::Function> fn;
+  if (!CompileBuiltin(context, id).ToLocal(&fn)) {
+    return MaybeLocal<Value>();
+  }
+
+  Local<Value> args[] = {binding.IsEmpty() ? v8::Undefined(isolate).As<Value>()
+                                           : binding};
+  return fn->Call(context, v8::Undefined(isolate), 1, args);
 }
 
 }  // namespace tns

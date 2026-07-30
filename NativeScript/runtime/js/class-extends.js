@@ -1,4 +1,3 @@
-(function() { 
     function __extends(d, b) { 
          for (var p in b) {
              if (b.hasOwnProperty(p)) {
@@ -10,4 +9,3 @@
 (__.prototype = b.prototype, new __());
     } 
     return __extends;
-})()

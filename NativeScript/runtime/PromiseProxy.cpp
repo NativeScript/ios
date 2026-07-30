@@ -24,22 +24,22 @@ static void IsRuntimeRunloopCallback(const FunctionCallbackInfo<Value>& args) {
 void PromiseProxy::Init(v8::Local<v8::Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
-  Local<Value> result;
-  bool success = BuiltinLoader::RunBuiltin(context, BuiltinId::kPromiseProxy)
-                     .ToLocal(&result);
-  tns::Assert(success && result->IsFunction(), isolate);
-
-  Local<v8::Function> installProxy = result.As<v8::Function>();
-
   Local<v8::Function> isRuntimeRunloop;
-  success = v8::Function::New(context, IsRuntimeRunloopCallback)
-                .ToLocal(&isRuntimeRunloop);
+  bool success = v8::Function::New(context, IsRuntimeRunloopCallback)
+                     .ToLocal(&isRuntimeRunloop);
   tns::Assert(success, isolate);
 
-  Local<Value> installArgs[] = {isRuntimeRunloop};
-  Local<Value> installResult;
-  success = installProxy->Call(context, context->Global(), 1, installArgs)
-                .ToLocal(&installResult);
+  Local<Object> binding = Object::New(isolate);
+  success = binding
+                ->Set(context, tns::ToV8String(isolate, "isRuntimeRunloop"),
+                      isRuntimeRunloop)
+                .FromMaybe(false);
+  tns::Assert(success, isolate);
+
+  Local<Value> result;
+  success =
+      BuiltinLoader::RunBuiltin(context, BuiltinId::kPromiseProxy, binding)
+          .ToLocal(&result);
   tns::Assert(success, isolate);
 }
 

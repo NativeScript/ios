@@ -9,8 +9,9 @@ using namespace v8;
 
 namespace tns {
 
-// Native function handed to the bootstrap IIFE as `nativeReportFatal(error,
-// stackString)`. It runs the terminal tail (shim + fatal log) WITHOUT
+// Native function handed to the error-events builtin as
+// `binding.nativeReportFatal(error, stackString)`. It runs the terminal tail
+// (shim + fatal log) WITHOUT
 // re-dispatching an event: reportError and listener-thrown errors have already
 // gone through JS dispatch, so dispatching again here would recurse.
 static void NativeReportFatalCallback(const FunctionCallbackInfo<Value>& info) {
@@ -23,40 +24,42 @@ static void NativeReportFatalCallback(const FunctionCallbackInfo<Value>& info) {
 }
 
 void ErrorEvents::Init(Local<Context> context) {
-  // WHATWG error-events layer, layered on top of the generic event primitives
-  // installed by Events::Init. Plain (module-free) script, strict inside the
-  // IIFE, ES5-ish so it never depends on other runtime extensions. The IIFE is
-  // invoked with two arguments — the internal EventTarget backing the global
-  // (so native dispatch survives app code overwriting globalThis.dispatchEvent)
-  // and the native nativeReportFatal(error, stack) function that runs the
-  // terminal tail — and returns three closures bound to that backing store.
-  // ErrorEvent/PromiseRejectionEvent subclass the Event captured off globalThis
-  // at init time, which runs before any user code.
+  // WHATWG error-events layer (internal/error-events.js), layered on top of
+  // the generic event primitives installed by Events::Init. The builtin
+  // receives — via its binding bag — the internal EventTarget backing the
+  // global (so native dispatch survives app code overwriting
+  // globalThis.dispatchEvent) and the native nativeReportFatal(error, stack)
+  // function that runs the terminal tail, and returns three closures bound to
+  // that backing store. ErrorEvent/PromiseRejectionEvent subclass the Event
+  // captured off globalThis at init time, which runs before any user code.
   Isolate* isolate = v8::Isolate::GetCurrent();
 
   auto cache = Caches::Get(isolate);
   tns::Assert(cache != nullptr && cache->GlobalEventTarget != nullptr, isolate);
   Local<Object> globalTarget = cache->GlobalEventTarget->Get(isolate);
 
-  Local<Value> result;
-  bool success = BuiltinLoader::RunBuiltin(context, BuiltinId::kErrorEvents)
-                     .ToLocal(&result);
-  tns::Assert(success && result->IsFunction(), isolate);
-
-  Local<v8::Function> iife = result.As<v8::Function>();
-
   Local<v8::Function> nativeReportFatal;
-  success = v8::Function::New(context, NativeReportFatalCallback)
-                .ToLocal(&nativeReportFatal);
+  bool success = v8::Function::New(context, NativeReportFatalCallback)
+                     .ToLocal(&nativeReportFatal);
   tns::Assert(success, isolate);
 
-  Local<Value> installArgs[] = {globalTarget, nativeReportFatal};
-  Local<Value> iifeResult;
-  success = iife->Call(context, context->Global(), 2, installArgs)
-                .ToLocal(&iifeResult);
-  tns::Assert(success && iifeResult->IsArray(), isolate);
+  Local<Object> binding = Object::New(isolate);
+  success =
+      binding
+          ->Set(context, tns::ToV8String(isolate, "globalTarget"), globalTarget)
+          .FromMaybe(false) &&
+      binding
+          ->Set(context, tns::ToV8String(isolate, "nativeReportFatal"),
+                nativeReportFatal)
+          .FromMaybe(false);
+  tns::Assert(success, isolate);
 
-  Local<v8::Array> closures = iifeResult.As<v8::Array>();
+  Local<Value> result;
+  success = BuiltinLoader::RunBuiltin(context, BuiltinId::kErrorEvents, binding)
+                .ToLocal(&result);
+  tns::Assert(success && result->IsArray(), isolate);
+
+  Local<v8::Array> closures = result.As<v8::Array>();
   Local<Value> errorFn, rejectionFn, handledFn;
   tns::Assert(
       closures->Get(context, 0).ToLocal(&errorFn) && errorFn->IsFunction(),
