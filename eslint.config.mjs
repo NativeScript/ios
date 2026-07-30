@@ -1,9 +1,9 @@
 // Lint setup for the runtime's builtin JavaScript (NativeScript/runtime/js).
-// Each file is compiled by BuiltinLoader as a FUNCTION BODY with the single
-// fixed parameter `binding` (see NativeScript/runtime/js/README.md), so
-// sourceType is "commonjs" (allows top-level return) and `binding` is a
-// declared global. no-undef is the typo net for binding-bag destructures and
-// native-global usage alike.
+// Each file is compiled by BuiltinLoader as a FUNCTION BODY with the fixed
+// parameters `exports`, `module` and `binding` (see
+// NativeScript/runtime/js/README.md), which are declared as globals here.
+// no-undef is the typo net for binding-bag destructures and native-global
+// usage alike.
 import globals from 'globals';
 
 export default [
@@ -11,9 +11,11 @@ export default [
     files: ['NativeScript/runtime/js/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: 'commonjs',
+      sourceType: 'script',
       globals: {
         ...globals.es2021,
+        exports: 'readonly',
+        module: 'readonly',
         binding: 'readonly',
         global: 'readonly',
         console: 'readonly',

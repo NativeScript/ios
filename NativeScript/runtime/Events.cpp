@@ -10,7 +10,7 @@ namespace tns {
 
 void Events::Init(Local<Context> context) {
   // Generic WHATWG event primitives (internal/events.js). The builtin installs
-  // Event/EventTarget and the global EventTarget methods, then returns the
+  // Event/EventTarget and the global EventTarget methods, then exports the
   // internal EventTarget instance backing the global so native dispatch
   // survives app code overwriting globalThis.dispatchEvent. The error-events
   // layer (ErrorEvents::Init) runs immediately after and installs the native

@@ -14,4 +14,4 @@ function smartStringify(object) {
     };
     return JSON.stringify(object, replacer, 2);
 }
-return smartStringify;
+module.exports = smartStringify;

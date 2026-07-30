@@ -8,4 +8,4 @@
          d.prototype = b === null ? Object.create(b) : 
 (__.prototype = b.prototype, new __());
     } 
-    return __extends;
+    module.exports = __extends;
