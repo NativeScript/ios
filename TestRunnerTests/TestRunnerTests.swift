@@ -83,6 +83,10 @@ class TestRunnerTests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchEnvironment["REPORT_BASEURL"] = "http://[::1]:\(port)/junit_report"
+        // The app's report retries and delivery_failed sentinel count from its
+        // launch, which precedes the wait below — keep a margin so delivery
+        // gives up (and the sentinel lands) before our timeout fires.
+        app.launchEnvironment["REPORT_DEADLINE_SECONDS"] = String(Int(jasmineTestsTimeout) - 60)
         app.launch()
 
         // Watchdog: if the runtime crashes (e.g. EXC_BAD_ACCESS) it never

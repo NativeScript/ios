@@ -1,6 +1,9 @@
 // Inform the test results runner that the runtime is up.
 console.log('Application Start!');
 
+// The report delivery deadline (REPORT_DEADLINE_SECONDS) counts from launch.
+var appStartMs = Date.now();
+
 require("../Infrastructure/timers");
 require("../Infrastructure/simulator");
 global.utf8 = require("../Infrastructure/utf8")
@@ -27,13 +30,17 @@ global.__JUnitSaveResults = function (text) {
     }
 
     // The results host (TestRunnerTests.swift) waits on this single POST; if it
-    // is lost the whole run times out. Retry hard, and cap the per-request
-    // timeout so all attempts fit well inside the host's wait budget.
+    // is lost the whole run times out. Retry hard, but stop early enough that a
+    // final delivery_failed sentinel can still reach the host before its wait
+    // budget (which also covers the suite itself) expires.
     var maxAttempts = 10;
     var retryDelayMs = 5000;
+    var requestTimeoutS = 30;
+    var deadlineSeconds = parseInt(NSProcessInfo.processInfo.environment.objectForKey("REPORT_DEADLINE_SECONDS"), 10) || 540;
+    var deadlineMs = appStartMs + deadlineSeconds * 1000;
 
     var sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration;
-    sessionConfig.timeoutIntervalForRequest = 30;
+    sessionConfig.timeoutIntervalForRequest = requestTimeoutS;
     var session = NSURLSession.sessionWithConfigurationDelegateDelegateQueue(sessionConfig, null, NSOperationQueue.mainQueue);
 
     function post(url, body, onFailure) {
@@ -54,7 +61,10 @@ global.__JUnitSaveResults = function (text) {
     function attemptReport(attempt) {
         post(reportUrl, text, function (reason) {
             console.log("junit report POST failed (attempt " + attempt + "/" + maxAttempts + ", " + reason + ")");
-            if (attempt < maxAttempts) {
+            // Worst case a retry costs delay + full request timeout, and the
+            // sentinel afterwards needs another request timeout.
+            var worstCaseRetryMs = retryDelayMs + 2 * requestTimeoutS * 1000;
+            if (attempt < maxAttempts && Date.now() + worstCaseRetryMs <= deadlineMs) {
                 setTimeout(function () {
                     attemptReport(attempt + 1);
                 }, retryDelayMs);
@@ -62,7 +72,7 @@ global.__JUnitSaveResults = function (text) {
                 // Best-effort sentinel so the host can fail immediately with a
                 // delivery diagnostic instead of waiting out its full timeout.
                 post(reportUrl + "/delivery_failed",
-                    "junit report delivery failed after " + maxAttempts + " attempts; last failure " + reason,
+                    "junit report delivery failed after " + attempt + " attempts; last failure " + reason,
                     function () { });
             }
         });
