@@ -5,6 +5,7 @@
 
 #include "Caches.h"
 #include "Helpers.h"
+#include "NsBuiltinModules.h"
 
 using namespace v8;
 
@@ -18,14 +19,55 @@ std::vector<uint8_t> builtinCache[static_cast<unsigned>(BuiltinId::kCount)];
 
 // Every builtin is compiled as a function body receiving these fixed
 // parameters, mirroring Node's module wrapper: a file exports through
-// `module.exports`/`exports`, natives arrive as properties of the `binding`
-// bag (Node's internalBinding idiom) and intrinsics as properties of
-// `primordials`; each file destructures what it needs.
+// `module.exports`/`exports`, reaches sibling builtin modules through
+// `require`, natives arrive as properties of the `binding` bag (Node's
+// internalBinding idiom) and intrinsics as properties of `primordials`; each
+// file destructures what it needs.
 constexpr const char* kExportsParamName = "exports";
+constexpr const char* kRequireParamName = "require";
 constexpr const char* kModuleParamName = "module";
 constexpr const char* kBindingParamName = "binding";
 constexpr const char* kPrimordialsParamName = "primordials";
-constexpr int kParamCount = 4;
+constexpr int kParamCount = 5;
+
+// The `require` every builtin receives: builtin specifiers only, so a builtin
+// can never reach application code or the filesystem.
+void BuiltinRequireCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() < 1 || !info[0]->IsString()) {
+    isolate->ThrowException(Exception::TypeError(
+        tns::ToV8String(isolate, "require() expects a specifier string")));
+    return;
+  }
+
+  Local<Context> context = isolate->GetCurrentContext();
+  std::string specifier = tns::ToString(isolate, info[0].As<v8::String>());
+  Local<Object> exports;
+  if (NsBuiltinModules::GetExports(context, specifier).ToLocal(&exports)) {
+    info.GetReturnValue().Set(exports);
+  } else if (!NsBuiltinModules::IsRegistered(specifier)) {
+    isolate->ThrowException(Exception::Error(tns::ToV8String(
+        isolate, NsBuiltinModules::NotFoundMessage(specifier))));
+  }
+}
+
+MaybeLocal<v8::Function> GetBuiltinRequire(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  if (cache->BuiltinRequire != nullptr) {
+    return cache->BuiltinRequire->Get(isolate);
+  }
+
+  Local<v8::Function> require;
+  if (!v8::Function::New(context, BuiltinRequireCallback, Local<Value>(), 1,
+                         ConstructorBehavior::kThrow)
+           .ToLocal(&require)) {
+    return MaybeLocal<v8::Function>();
+  }
+  cache->BuiltinRequire =
+      std::make_unique<Persistent<v8::Function>>(isolate, require);
+  return require;
+}
 
 MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -54,6 +96,7 @@ MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
       isolate, builtin.source, static_cast<int>(builtin.length));
   Local<v8::String> params[] = {
       tns::ToV8String(isolate, kExportsParamName),
+      tns::ToV8String(isolate, kRequireParamName),
       tns::ToV8String(isolate, kModuleParamName),
       tns::ToV8String(isolate, kBindingParamName),
       tns::ToV8String(isolate, kPrimordialsParamName)};
@@ -105,6 +148,11 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id,
     return MaybeLocal<Value>();
   }
 
+  Local<v8::Function> require;
+  if (!GetBuiltinRequire(context).ToLocal(&require)) {
+    return MaybeLocal<Value>();
+  }
+
   Local<Object> exportsObj = Object::New(isolate);
   Local<Object> moduleObj = Object::New(isolate);
   Local<v8::String> exportsKey = tns::ToV8String(isolate, kExportsParamName);
@@ -113,7 +161,7 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id,
   }
 
   Local<Value> args[] = {
-      exportsObj, moduleObj,
+      exportsObj, require, moduleObj,
       binding.IsEmpty() ? v8::Undefined(isolate).As<Value>() : binding,
       primordials};
   if (fn->Call(context, v8::Undefined(isolate), kParamCount, args).IsEmpty()) {
