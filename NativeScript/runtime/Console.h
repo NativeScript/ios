@@ -14,6 +14,9 @@ class Console {
   static void AttachInspectorClient(
       v8_inspector::JsV8InspectorClient* inspector);
   static void DetachInspectorClient();
+  // Builds this realm's inspect function (Caches::InspectFunc) if it isn't
+  // there yet. Public so ns:util can re-export the same instance.
+  static void InitInspect(v8::Local<v8::Context> context);
 
  private:
   using ConsoleAPIType = v8_inspector::ConsoleAPIType;
@@ -34,7 +37,6 @@ class Console {
   static v8::Local<v8::String> InspectValue(v8::Local<v8::Context> context,
                                             const v8::Local<v8::Value>& val,
                                             int depth = -1);
-  static void InitInspect(v8::Local<v8::Context> context);
   static ConsoleAPIType VerbosityToInspectorMethod(const std::string level);
 
   static void SendToDevToolsFrontEnd(

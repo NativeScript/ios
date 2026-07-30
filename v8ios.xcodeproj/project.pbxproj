@@ -293,6 +293,7 @@
 		C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB69229EAC8100345BFE /* WeakRef.cpp */; };
 		4A5C201A2E2B000100000006 /* BuiltinLoader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000100000001 /* BuiltinLoader.cpp */; };
 		4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */; };
+		4A5C201A2E2B000200000006 /* NsBuiltinModules.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000200000001 /* NsBuiltinModules.cpp */; };
 		C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */; };
 		C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6B229EAC8200345BFE /* Console.cpp */; };
 		C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */; };
@@ -809,6 +810,8 @@
 		C2DDEB69229EAC8100345BFE /* WeakRef.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WeakRef.cpp; sourceTree = "<group>"; };
 		4A5C201A2E2B000100000001 /* BuiltinLoader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BuiltinLoader.cpp; sourceTree = "<group>"; };
 		4A5C201A2E2B000100000002 /* BuiltinLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BuiltinLoader.h; sourceTree = "<group>"; };
+		4A5C201A2E2B000200000001 /* NsBuiltinModules.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = NsBuiltinModules.cpp; sourceTree = "<group>"; };
+		4A5C201A2E2B000200000002 /* NsBuiltinModules.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NsBuiltinModules.h; sourceTree = "<group>"; };
 		4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = RuntimeBuiltins.cpp; path = generated/RuntimeBuiltins.cpp; sourceTree = "<group>"; };
 		4A5C201A2E2B000100000004 /* RuntimeBuiltins.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RuntimeBuiltins.h; path = generated/RuntimeBuiltins.h; sourceTree = "<group>"; };
 		4A5C201A2E2B000100000005 /* js */ = {isa = PBXFileReference; lastKnownFileType = folder; path = js; sourceTree = "<group>"; };
@@ -1526,6 +1529,8 @@
 				C2DDEB69229EAC8100345BFE /* WeakRef.cpp */,
 				4A5C201A2E2B000100000002 /* BuiltinLoader.h */,
 				4A5C201A2E2B000100000001 /* BuiltinLoader.cpp */,
+				4A5C201A2E2B000200000002 /* NsBuiltinModules.h */,
+				4A5C201A2E2B000200000001 /* NsBuiltinModules.cpp */,
 				4A5C201A2E2B000100000004 /* RuntimeBuiltins.h */,
 				4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */,
 				4A5C201A2E2B000100000005 /* js */,
@@ -2282,6 +2287,7 @@
 				6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */,
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
 				4A5C201A2E2B000100000006 /* BuiltinLoader.cpp in Sources */,
+				4A5C201A2E2B000200000006 /* NsBuiltinModules.cpp in Sources */,
 				4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */,
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */,
