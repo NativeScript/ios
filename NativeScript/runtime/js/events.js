@@ -124,4 +124,4 @@ EventTarget.prototype.dispatchEvent = EventTargetImpl.prototype.dispatchEvent;
 g.Event = Event;
 g.EventTarget = EventTarget;
 
-return globalTarget;
+module.exports = globalTarget;

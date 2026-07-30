@@ -7,4 +7,4 @@ function require_factory(requireInternal, dirName) {
         return requireInternal(modulePath, dirName);
     };
 }
-return require_factory;
+module.exports = require_factory;

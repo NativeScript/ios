@@ -78,4 +78,4 @@ function dispatchRejectionHandled(promise, reason) {
   globalTarget.dispatchEvent(ev);
 }
 
-return [dispatchErrorEvent, dispatchUnhandledRejection, dispatchRejectionHandled];
+module.exports = [dispatchErrorEvent, dispatchUnhandledRejection, dispatchRejectionHandled];
