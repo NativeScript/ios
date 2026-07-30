@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <utime.h>
 #include <string>
+#include "BuiltinLoader.h"
 #include "Caches.h"
 #include "DevFlags.h"
 #include "Helpers.h"
@@ -80,32 +81,14 @@ std::string ResolveMainEntryFromPackageJson(const std::string& baseDir) {
 }
 
 ModuleInternal::ModuleInternal(Local<Context> context) {
-  std::string requireFactoryScript = "(function() { "
-                                     "    function require_factory(requireInternal, dirName) { "
-                                     "        return function require(modulePath) { "
-                                     "            if(global.__pauseOnNextRequire) {  debugger; "
-                                     "global.__pauseOnNextRequire = false; }"
-                                     "            return requireInternal(modulePath, dirName); "
-                                     "        } "
-                                     "    } "
-                                     "    return require_factory; "
-                                     "})()";
-
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> global = context->Global();
-  Local<Script> script;
   TryCatch tc(isolate);
-  if (!Script::Compile(context, tns::ToV8String(isolate, requireFactoryScript.c_str()))
-           .ToLocal(&script) &&
-      tc.HasCaught()) {
-    tns::LogError(isolate, tc);
-    Log(@"FATAL: Failed to compile require factory script");
-    return;
-  }
-
   Local<Value> result;
-  if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
-    tns::LogError(isolate, tc);
+  if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kRequireFactory).ToLocal(&result)) {
+    if (tc.HasCaught()) {
+      tns::LogError(isolate, tc);
+    }
     Log(@"FATAL: Failed to run require factory script");
     return;
   }
