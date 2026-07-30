@@ -123,6 +123,15 @@ provide it.
   the registry distinguishes public modules from internal builtins, and only
   public ones resolve (Node's `canBeRequiredByUsers` split).
 
+## Source-text modules: deliberately not supported
+
+Builtins are classic function bodies, not ES modules, on both runtimes. If
+cross-builtin code sharing is ever needed, the first answer is bundling at
+generation time (author as ESM, emit function bodies); runtime source-text
+builtin modules (Node's `kSourceTextModule`) are justified only by a concrete
+need for live module semantics (TLA, live bindings, cyclic imports), which no
+current or planned builtin has. Revisit here before building either.
+
 ## iOS implementation notes (non-normative)
 
 Builtin modules are function-body builtins (`NativeScript/runtime/js/`,
