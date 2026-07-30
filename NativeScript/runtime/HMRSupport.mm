@@ -25,11 +25,6 @@ static inline bool StartsWith(const std::string& s, const char* prefix) {
   return s.size() >= n && s.compare(0, n, prefix) == 0;
 }
 
-static inline bool EndsWith(const std::string& s, const char* suffix) {
-  size_t n = strlen(suffix);
-  return s.size() >= n && s.compare(s.size() - n, n, suffix) == 0;
-}
-
 void MirrorGlobalOnGlobalThis(v8::Isolate* isolate, v8::Local<v8::Context> context,
                               const char* name) {
   std::string src = "if (typeof globalThis !== 'undefined' && typeof globalThis." +
@@ -57,9 +52,9 @@ static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> contex
 // Dev-boot completion flag
 //
 // Native-side mirror of `__NS_HMR_BOOT_COMPLETE__`. Read by the
-// runloop pump in `MaybePumpJSThreadDuringBoot` (and the cold-boot
-// kickstart wait) so their gate is a single relaxed atomic load on
-// the HMR-time hot path. The JS dev client flips this via the
+// runloop pump in `MaybePumpJSThreadDuringBoot` so its gate is a
+// single relaxed atomic load on the HMR-time hot path. The JS dev
+// client flips this via the
 // `__NS_DEV__.setDevBootComplete(bool)` global once the real app root view
 // commits; boot orchestration itself is entirely userland.
 static std::atomic<bool> g_devSessionBootComplete{false};
@@ -91,7 +86,7 @@ void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bo
 // `__NS_DEV__.configureRuntime({ canonicalization: {...} })`.
 //
 // Write-before-read contract: the client configures this once, before the
-// first prewarm/import wave (session-bootstrap order), so plain statics are
+// first import wave (session-bootstrap order), so plain statics are
 // safe here — the same convention as `g_volatilePatterns` / `g_importMap`.
 // URLs touched before configuration (the local trampoline's clean
 // `/ns/core/*` imports) carry no query, so they canonicalize identically
@@ -166,7 +161,7 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   //
   // The dev server serves every module under ONE canonical URL — module
   // identity IS the URL string. Freshness after an HMR edit is handled by
-  // `__NS_DEV__.invalidateModules` (registry + prefetch-cache evict) plus the
+  // `__NS_DEV__.invalidateModules` (registry evict) plus the
   // eviction-driven fetch nonce in `PerformHttpFetchOnceSync`, never by URL
   // variation. There is deliberately no path-tag vocabulary to collapse here.
   //
@@ -292,60 +287,36 @@ static void ClearAllCacheBustMarks() {
 }
 
 // ============================================================================
-// HTTP body cache + parallel kickstart prewarm
+// HTTP module fetching
 // ============================================================================
 //
-// V8 only exposes a synchronous ResolveModuleCallback for static imports —
-// there is no HostLoadImportedModule/FinishLoadingImportedModule equivalent in
-// the public API as of 14.9.207.39. Each call into HttpFetchText() blocks the
-// JS thread on a synchronous network turn, which forces serial fetching from
-// the JS thread's perspective.
+// Two fetch primitives back the HTTP ESM loader:
+//   - `HttpFetchText` — the synchronous fetch V8's ResolveModuleCallback
+//     falls back to for anything the async module-graph walk missed
+//     (the callback is synchronous — still true as of 14.9.207.39 — so
+//     this fallback must be native and blocking).
+//   - `FetchModuleBodyAsync` — the NSURLSession-backed primitive behind
+//     the phase-1 async graph walk (StartAsyncHttpModuleGraphLoad),
+//     which fetches the transitive closure concurrently off the JS
+//     thread before instantiation begins.
 //
-// `__NS_DEV__.prewarm(entries)` lets the JS dev client hand the runtime
-// a server-computed module closure (cold-boot graph, boot archive, or HMR
-// eviction set): string entries are fetched in one parallel wave BEFORE V8
-// walks the import graph; `{url, body}` entries are seeded with zero
-// network. Bodies land in `g_prefetchCache` keyed by full URL; the
-// always-on cache read in `HttpFetchText` then serves V8's synchronous
-// walk at memory speed.
-//
-// The runtime performs NO import scanning and NO speculative graph
-// discovery of its own — the server owns the module graph and supplies
-// explicit URL lists.
-//
-// Correctness invariants:
-//   1. Cache reads consume (one-shot). A second HttpFetchText for the
-//      same URL after a cache hit triggers a fresh network fetch — this
-//      is the right behavior for HMR where re-fetching means we got a
-//      newer version of the module.
-//   2. Every kickstart fetch goes through IsRemoteUrlAllowed() exactly
-//      the same way HttpFetchText does. The security gate is preserved.
-//   3. Kickstart overwrites cache entries unconditionally — a body the
-//      client explicitly asked to re-fetch is authoritative by
-//      construction (the previous entry is stale).
+// There is deliberately NO body prewarm cache and NO JS-driven prefetch
+// API here. Measurement (see docs/knowledge/hmr-simplification-pass.md)
+// showed the async discovery walk beats server-computed
+// closure/archive seeding on real apps — concurrent fetches overlap
+// with on-device compile, while seeding serializes a full server-side
+// transform pass before the entry can start.
 
 // Forward declarations — these helpers are defined below their first use,
 // matching the existing convention in this file.
 static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
                                      std::string& contentType, int& status);
-static bool LooksLikeJsSourceUrl(const std::string& url);
-static bool TryGetPrefetchedSource(const std::string& url, std::string& out);
-static void MaybeLogPrefetchSummary(const char* trigger);
 static void MaybePumpJSThreadDuringBoot();
 // Forward decl: the pluggable HTTP-fetch yield hook is defined below
 // MaybePumpJSThreadDuringBoot (which is its default callback), but HttpFetchText
 // calls it from earlier in the file. See the definition for the rationale on
 // the atomic indirection.
 static inline void InvokeHttpFetchYield();
-
-static std::mutex g_prefetchMutex;
-static robin_hood::unordered_map<std::string, std::string> g_prefetchCache;
-
-// Always-on diagnostic counters. These intentionally do NOT gate behind
-// IsScriptLoadingLogEnabled() — without this signal we cannot tell a
-// helping prewarm cache from a hurting one.
-static std::atomic<size_t> g_prefetchHits{0};    // V8 asked for a URL we had cached
-static std::atomic<size_t> g_prefetchMisses{0};  // V8 asked for a URL we did not have
 
 // synchronous-fetch timing histogram.
 //
@@ -376,47 +347,11 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
     return false;
   }
 
-  // Hoist the URL-log flag once per call so the two success branches
-  // below pay one TLS read instead of two.
+  // Hoist the URL-log flag once per call so the success branches below pay
+  // one TLS read instead of two.
   const bool urlLogEnabled = IsHttpFetchUrlLogEnabled();
 
-  // Cache-read fast path. The JS dev client populates `g_prefetchCache`
-  // via `__NS_DEV__.prewarm(entries)` right before importing (cold
-  // boot) or re-importing (HMR); by the time V8's synchronous walk asks
-  // for a module, the body is already here and the walk runs at memory
-  // speed instead of network speed.
-  //
-  // Cache reads are one-shot; consuming the entry guarantees that a
-  // re-fetch (e.g. after HMR) goes back to the network for fresh source.
-  if (TryGetPrefetchedSource(url, out)) {
-    // Seeded bodies can legitimately be empty (type-only TS modules) — same
-    // normalization as the network path below, or the caller's empty-body
-    // guard misreads the hit as "HTTP import failed (status=200)".
-    if (out.empty()) {
-      out = "export {};\n";
-    }
-    contentType = "application/javascript";  // best effort — same as the dev server returns
-    status = 200;
-    g_prefetchHits.fetch_add(1, std::memory_order_relaxed);
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-loader][prefetch][hit] %s (%lu bytes)", url.c_str(), (unsigned long)out.size());
-    }
-    if (urlLogEnabled) {
-      // Per-URL diagnostic. Distinguish prewarm-cache hits from
-      // network fetches so we can attribute who actually paid for
-      // each module body. ms is omitted because the cache lookup is
-      // effectively instantaneous compared to network I/O.
-      Log(@"[http-loader][fetch][prefetch] %s bytes=%lu", url.c_str(), (unsigned long)out.size());
-    }
-    MaybeLogPrefetchSummary("hit");
-    // Yield to the placeholder heartbeat between cache hits — without
-    // this the runloop is starved by back-to-back HttpFetchText calls.
-    InvokeHttpFetchYield();
-    return true;
-  }
-
-  // Slow path: cache miss → synchronous fetch with one retry on failure.
-  g_prefetchMisses.fetch_add(1, std::memory_order_relaxed);
+  // Synchronous fetch with one retry on failure.
   // Time the network branch end-to-end so the per-URL log can
   // attribute milliseconds to each fetch. We measure here (not
   // inside PerformHttpFetchOnceSync) so the retry interval gets
@@ -462,7 +397,6 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
         (unsigned long)out.size(), (unsigned long long)netMs);
   }
 
-  MaybeLogPrefetchSummary("miss");
   // Yield to the placeholder heartbeat after the 10–60ms sync fetch
   // block so the bar can repaint before V8 calls us again.
   InvokeHttpFetchYield();
@@ -502,46 +436,94 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
 // a working implementation, and there is currently no non-deprecated
 // API that gives us a runloop-independent synchronous fetch with a
 // real HTTP status code.
+// Shared request builder for the sync (NSURLConnection) and async
+// (NSURLSession) module fetch paths so both carry identical cache-defeat
+// semantics. Returns an autoreleased NSMutableURLRequest (nil for
+// unparseable URLs) and reports via `outBustRequested` whether the URL was
+// marked for an eviction-driven cache-bust nonce (the caller clears the
+// mark once a fresh body actually arrives).
+static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
+                                                    bool* outBustRequested) {
+  // One-time: replace the shared NSURLCache with a zero-capacity one
+  // so CFNetwork has no on-disk store to satisfy fetches from. Per-
+  // request cache policy + `removeCachedResponseForRequest:` were
+  // empirically insufficient on iOS 18+/26+ Simulator — fsCachedData
+  // would still serve a previous save's body for a just-updated URL.
+  static dispatch_once_t s_cacheDisableOnce;
+  dispatch_once(&s_cacheDisableOnce, ^{
+    NSURLCache* nullCache = [[NSURLCache alloc] initWithMemoryCapacity:0
+                                                          diskCapacity:0
+                                                          directoryURL:nil];
+    [NSURLCache setSharedURLCache:nullCache];
+  });
+
+  // Eviction-driven cache-bust: if this URL's canonical key was marked
+  // by `InvalidateModules` (via `MarkUrlsForCacheBust`), append a
+  // unique nonce query parameter so CFNetwork sees a different URL
+  // and cannot satisfy the request from any cache layer. The dev
+  // server ignores unknown query params on module routes, so the
+  // response body is unchanged. First-touch fetches don't need
+  // busting — nothing has cached them yet — so unmarked URLs go out
+  // verbatim (some Vite virtual routes require exact-match URLs and
+  // 404 on unknown query params).
+  std::string fetchUrl = url;
+  const bool bustRequested = IsUrlMarkedForCacheBust(url);
+  if (outBustRequested) *outBustRequested = bustRequested;
+  if (bustRequested) {
+    static std::atomic<uint64_t> s_fetchSeq{0};
+    const uint64_t seq = s_fetchSeq.fetch_add(1, std::memory_order_relaxed);
+    const uint64_t nowMs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0);
+    fetchUrl += (url.find('?') == std::string::npos) ? '?' : '&';
+    fetchUrl += "__ns_dev_nonce=";
+    fetchUrl += std::to_string(nowMs);
+    fetchUrl += "-";
+    fetchUrl += std::to_string(seq);
+  }
+
+  NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:fetchUrl.c_str()]];
+  if (!u) {
+    return nil;
+  }
+
+  NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:u];
+  [request setHTTPMethod:@"GET"];
+  [request setValue:@"application/javascript, text/javascript, */*;q=0.1"
+      forHTTPHeaderField:@"Accept"];
+  [request setValue:@"identity" forHTTPHeaderField:@"Accept-Encoding"];
+  [request setTimeoutInterval:5.0];
+  // CRITICAL for HMR: layered defense to bypass CFNetwork's URL cache.
+  // `setCachePolicy:` alone is insufficient on iOS 18+/26+ Simulator —
+  // CFNetwork still serves a previous save's body from fsCachedData.
+  // Combined with the zero-capacity sharedURLCache and the eviction-
+  // driven URL nonce above, these give us a reliable "always go to
+  // origin" path for the dev runtime.
+  [request setValue:@"no-cache, no-store, max-age=0" forHTTPHeaderField:@"Cache-Control"];
+  [request setValue:@"no-cache" forHTTPHeaderField:@"Pragma"];
+  // Force a fresh TCP connection per fetch. CFNetwork has been
+  // observed to serve a body buffered on a kept-alive HTTP/1.1
+  // connection for a prior fetch when a new fetch reuses it.
+  [request setValue:@"close" forHTTPHeaderField:@"Connection"];
+  [request setCachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData];
+  [request setHTTPShouldHandleCookies:NO];
+  // `setHTTPShouldUsePipelining:` is deprecated on visionOS 2.4+ (classic
+  // loader only). Passing NO matches the default — pipelining is already
+  // off — so this is intent-preserving on every platform; suppress the
+  // deprecation so the -Werror visionOS build keeps compiling.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  [request setHTTPShouldUsePipelining:NO];
+#pragma clang diagnostic pop
+  [[NSURLCache sharedURLCache] removeCachedResponseForRequest:request];
+
+  return request;
+}
+
 static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
                                      std::string& contentType, int& status) {
   @autoreleasepool {
-    // One-time: replace the shared NSURLCache with a zero-capacity one
-    // so CFNetwork has no on-disk store to satisfy fetches from. Per-
-    // request cache policy + `removeCachedResponseForRequest:` were
-    // empirically insufficient on iOS 18+/26+ Simulator — fsCachedData
-    // would still serve a previous save's body for a just-updated URL.
-    static dispatch_once_t s_cacheDisableOnce;
-    dispatch_once(&s_cacheDisableOnce, ^{
-      NSURLCache* nullCache = [[NSURLCache alloc] initWithMemoryCapacity:0
-                                                            diskCapacity:0
-                                                            directoryURL:nil];
-      [NSURLCache setSharedURLCache:nullCache];
-    });
-
-    // Eviction-driven cache-bust: if this URL's canonical key was marked
-    // by `InvalidateModules` (via `MarkUrlsForCacheBust`), append a
-    // unique nonce query parameter so CFNetwork sees a different URL
-    // and cannot satisfy the request from any cache layer. The dev
-    // server ignores unknown query params on module routes, so the
-    // response body is unchanged. First-touch fetches don't need
-    // busting — nothing has cached them yet — so unmarked URLs go out
-    // verbatim (some Vite virtual routes require exact-match URLs and
-    // 404 on unknown query params).
-    std::string fetchUrl = url;
-    const bool bustRequested = IsUrlMarkedForCacheBust(url);
-    if (bustRequested) {
-      static std::atomic<uint64_t> s_fetchSeq{0};
-      const uint64_t seq = s_fetchSeq.fetch_add(1, std::memory_order_relaxed);
-      const uint64_t nowMs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0);
-      fetchUrl += (url.find('?') == std::string::npos) ? '?' : '&';
-      fetchUrl += "__ns_dev_nonce=";
-      fetchUrl += std::to_string(nowMs);
-      fetchUrl += "-";
-      fetchUrl += std::to_string(seq);
-    }
-
-    NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:fetchUrl.c_str()]];
-    if (!u) {
+    bool bustRequested = false;
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url, &bustRequested);
+    if (!request) {
       status = 0;
       return false;
     }
@@ -552,36 +534,6 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
     std::string bodyLocal;
 
     const auto fetchStartUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
-
-    NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:u];
-    [request setHTTPMethod:@"GET"];
-    [request setValue:@"application/javascript, text/javascript, */*;q=0.1"
-        forHTTPHeaderField:@"Accept"];
-    [request setValue:@"identity" forHTTPHeaderField:@"Accept-Encoding"];
-    [request setTimeoutInterval:5.0];
-    // CRITICAL for HMR: layered defense to bypass CFNetwork's URL cache.
-    // `setCachePolicy:` alone is insufficient on iOS 18+/26+ Simulator —
-    // CFNetwork still serves a previous save's body from fsCachedData.
-    // Combined with the zero-capacity sharedURLCache and the eviction-
-    // driven URL nonce above, these give us a reliable "always go to
-    // origin" path for the dev runtime.
-    [request setValue:@"no-cache, no-store, max-age=0" forHTTPHeaderField:@"Cache-Control"];
-    [request setValue:@"no-cache" forHTTPHeaderField:@"Pragma"];
-    // Force a fresh TCP connection per fetch. CFNetwork has been
-    // observed to serve a body buffered on a kept-alive HTTP/1.1
-    // connection for a prior fetch when a new fetch reuses it.
-    [request setValue:@"close" forHTTPHeaderField:@"Connection"];
-    [request setCachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData];
-    [request setHTTPShouldHandleCookies:NO];
-    // `setHTTPShouldUsePipelining:` is deprecated on visionOS 2.4+ (classic
-    // loader only). Passing NO matches the default — pipelining is already
-    // off — so this is intent-preserving on every platform; suppress the
-    // deprecation so the -Werror visionOS build keeps compiling.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    [request setHTTPShouldUsePipelining:NO];
-#pragma clang diagnostic pop
-    [[NSURLCache sharedURLCache] removeCachedResponseForRequest:request];
 
     NSURLResponse* response = nil;
 #pragma clang diagnostic push
@@ -666,88 +618,124 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
   }
 }
 
-static bool TryGetPrefetchedSource(const std::string& url, std::string& out) {
-  std::lock_guard<std::mutex> lock(g_prefetchMutex);
-  auto it = g_prefetchCache.find(url);
-  if (it == g_prefetchCache.end()) return false;
-  out = std::move(it->second);
-  g_prefetchCache.erase(it);
-  return true;
+// ─────────────────────────────────────────────────────────────
+// Async module fetch (NSURLSession)
+//
+// The async pipeline's fetches never block the JS thread, so the
+// NSURLConnection workaround documented above PerformHttpFetchOnceSync does
+// not apply here: that deadlock is specific to *synchronously waiting* on an
+// NSURLSession task from the iOS main thread. Fire-and-forget tasks with a
+// background delegate queue are the intended NSURLSession usage.
+//
+// The session is ephemeral with a nil URLCache — the layered cache defeats
+// in BuildModuleFetchRequest assume CFNetwork cannot satisfy any module
+// request from a cache, and an ephemeral cacheless session is the strongest
+// form of that guarantee.
+static NSURLSession* ModuleFetchSession() {
+  static NSURLSession* s_session = nil;
+  static dispatch_once_t s_once;
+  dispatch_once(&s_once, ^{
+    NSURLSessionConfiguration* config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    config.URLCache = nil;
+    config.requestCachePolicy = NSURLRequestReloadIgnoringLocalAndRemoteCacheData;
+    config.HTTPShouldSetCookies = NO;
+    config.timeoutIntervalForRequest = 10.0;
+    config.HTTPMaximumConnectionsPerHost = 16;
+    // ARC is disabled in this file: sessionWithConfiguration: returns an
+    // autoreleased object; retain it for the process-lifetime singleton.
+    s_session = [[NSURLSession sessionWithConfiguration:config] retain];
+  });
+  return s_session;
 }
 
-// Drop a specific URL set from `g_prefetchCache`. Used by
-// `InvalidateModules` so an HMR eviction purges any stale HTTP body
-// the previous kickstart wave left behind. See the doc comment in
-// HMRSupport.h for the cache-poisoning case this fixes.
-void EvictHttpModulePrefetchCacheUrls(const std::vector<std::string>& urls) {
-  if (urls.empty()) return;
-  size_t dropped = 0;
-  {
-    std::lock_guard<std::mutex> lock(g_prefetchMutex);
-    for (const auto& url : urls) {
-      if (url.empty()) continue;
-      auto it = g_prefetchCache.find(url);
-      if (it != g_prefetchCache.end()) {
-        g_prefetchCache.erase(it);
-        ++dropped;
-      }
+// One network attempt for FetchModuleBodyAsync. Takes ownership of
+// `completionHeap` (heap-allocated so the ObjC block can carry the
+// std::function across threads without ARC) and guarantees exactly one
+// invocation + delete. Retries once on transport error, mirroring the
+// single-retry policy of the synchronous path.
+static void PerformModuleFetchAsyncAttempt(
+    const std::string& url, int attempt,
+    std::function<void(bool ok, int status, std::string body)>* completionHeap) {
+  @autoreleasepool {
+    bool bustRequested = false;
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url, &bustRequested);
+    if (!request) {
+      (*completionHeap)(false, 0, std::string());
+      delete completionHeap;
+      return;
     }
-  }
-  if (dropped > 0 && IsScriptLoadingLogEnabled()) {
-    Log(@"[http-loader][prefetch][evict] dropped=%lu of %lu", (unsigned long)dropped,
-        (unsigned long)urls.size());
+
+    const std::string urlCopy = url;
+    const bool bust = bustRequested;
+    const uint64_t startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+    NSURLSessionDataTask* task = [ModuleFetchSession()
+        dataTaskWithRequest:request
+          completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
+            int status = 0;
+            if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+              status = (int)[(NSHTTPURLResponse*)response statusCode];
+            }
+            std::string body;
+            if (data && [data length] > 0) {
+              body.assign(static_cast<const char*>([data bytes]),
+                          static_cast<size_t>([data length]));
+            }
+
+            // Transport error → one retry (parity with HttpFetchText's
+            // usleep(120ms)+retry, without blocking any thread).
+            if (error != nil && attempt == 0) {
+              if (IsScriptLoadingLogEnabled()) {
+                Log(@"[http-loader][fetch-async] retrying %s after transport error: %@",
+                    urlCopy.c_str(), error.localizedDescription ?: @"<no description>");
+              }
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_MSEC)),
+                             dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                               PerformModuleFetchAsyncAttempt(urlCopy, 1, completionHeap);
+                             });
+              return;
+            }
+
+            const bool ok = (error == nil) && status >= 200 && status < 300;
+            if (ok && body.empty()) {
+              // Empty 2xx bodies are valid module responses (type-only TS
+              // modules) — same normalization as the sync path.
+              body = "export {};\n";
+            }
+            if (ok && bust) {
+              ClearCacheBustForUrl(urlCopy);
+            }
+            if (!ok && IsScriptLoadingLogEnabled()) {
+              NSString* desc =
+                  error ? (error.localizedDescription ?: @"<no description>") : @"<http status>";
+              Log(@"[http-loader][fetch-async][error] url=%s status=%d attempt=%d desc=%@",
+                  urlCopy.c_str(), status, attempt, desc);
+            }
+            if (ok && IsHttpFetchUrlLogEnabled()) {
+              const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+              const uint64_t ms = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
+              Log(@"[http-loader][fetch][async] %s bytes=%lu ms=%llu", urlCopy.c_str(),
+                  (unsigned long)body.size(), (unsigned long long)ms);
+            }
+            (*completionHeap)(ok, status, std::move(body));
+            delete completionHeap;
+          }];
+    [task resume];
   }
 }
 
-static bool LooksLikeJsSourceUrl(const std::string& url) {
-  // Strip query string for extension check.
-  size_t qpos = url.find('?');
-  std::string path = (qpos == std::string::npos) ? url : url.substr(0, qpos);
-
-  // Skip non-JS resource types that V8 either won't request through this
-  // path or that would break our content-type assumption on cache hit.
-  if (EndsWith(path, ".css") || EndsWith(path, ".scss") || EndsWith(path, ".sass") ||
-      EndsWith(path, ".less"))
-    return false;
-  if (EndsWith(path, ".png") || EndsWith(path, ".jpg") || EndsWith(path, ".jpeg") ||
-      EndsWith(path, ".gif") || EndsWith(path, ".svg") || EndsWith(path, ".webp") ||
-      EndsWith(path, ".ico"))
-    return false;
-  if (EndsWith(path, ".json")) return false;
-  if (EndsWith(path, ".html") || EndsWith(path, ".htm")) return false;
-  if (EndsWith(path, ".woff") || EndsWith(path, ".woff2") || EndsWith(path, ".ttf") ||
-      EndsWith(path, ".otf") || EndsWith(path, ".eot"))
-    return false;
-  if (EndsWith(path, ".mp4") || EndsWith(path, ".webm") || EndsWith(path, ".mp3") ||
-      EndsWith(path, ".wav"))
-    return false;
-  return true;
-}
-
-// Periodic summary of prewarm-cache counters. Logs once every
-// kPrefetchSummaryEvery hits+misses. Gated on the logScriptLoading
-// flag so it stays silent by default — flip the flag when diagnosing
-// kickstart behavior.
-static constexpr size_t kPrefetchSummaryEvery = 100;
-static void MaybeLogPrefetchSummary(const char* trigger) {
-  size_t hits = g_prefetchHits.load(std::memory_order_relaxed);
-  size_t misses = g_prefetchMisses.load(std::memory_order_relaxed);
-  size_t total = hits + misses;
-  if (total == 0) return;
-  if (total % kPrefetchSummaryEvery != 0) return;
-  if (!IsScriptLoadingLogEnabled()) return;
-
-  size_t cacheSize = 0;
-  {
-    std::lock_guard<std::mutex> lock(g_prefetchMutex);
-    cacheSize = g_prefetchCache.size();
+void FetchModuleBodyAsync(const std::string& url,
+                          std::function<void(bool ok, int status, std::string body)> completion) {
+  // Security gate: single point of enforcement, same as HttpFetchText.
+  if (!IsRemoteUrlAllowed(url)) {
+    if (IsScriptLoadingLogEnabled()) {
+      Log(@"[http-esm][security][blocked] %s", url.c_str());
+    }
+    completion(false, 403, std::string());
+    return;
   }
 
-  size_t hitPct = total ? (hits * 100 / total) : 0;
-  Log(@"[http-loader][prefetch][summary] trigger=%s totalAsks=%lu hits=%lu (%lu%%) misses=%lu "
-      @"cache=%lu",
-      trigger, (unsigned long)total, (unsigned long)hits, (unsigned long)hitPct,
-      (unsigned long)misses, (unsigned long)cacheSize);
+  auto* completionHeap = new std::function<void(bool, int, std::string)>(std::move(completion));
+  PerformModuleFetchAsyncAttempt(url, 0, completionHeap);
 }
 
 // Cold-boot JS-thread runloop pump.
@@ -763,7 +751,7 @@ static void MaybeLogPrefetchSummary(const char* trigger) {
 //
 // Gated to JS-thread + cold-boot only:
 //   - `Runtime::GetCurrentRuntime()` is thread_local; null on GCD
-//     kickstart threads, so they never pump someone else's runloop.
+//     background threads, so they never pump someone else's runloop.
 //   - `IsDevSessionBootComplete()` short-circuits once the dev client
 //     has committed its first stable view (it calls
 //     `__NS_DEV__.setDevBootComplete(true)`) — no placeholder to repaint, and
@@ -814,191 +802,7 @@ static inline void InvokeHttpFetchYield() {
   if (cb != nullptr) cb();
 }
 
-void ClearHttpModulePrefetchCache() {
-  std::lock_guard<std::mutex> lock(g_prefetchMutex);
-  g_prefetchCache.clear();
-}
-
-// List-mode kickstart prewarm.
-//
-// The dev server owns the module graph: it computes the inverse-dep
-// closure for HMR updates (`evictPaths`) and can crawl the entry graph
-// for cold boot. The client hands that explicit URL list to
-// `__NS_DEV__.prewarm(entries)`, whose string entries are fetched in one
-// parallel wave into `g_prefetchCache` before V8 starts its serial
-// synchronous walk.
-//
-// `dispatch_group_wait` provides clean "wave fully drained" semantics
-// before V8 starts walking; the per-call queue isolates this group
-// from other HMR cycles. We deliberately reuse `g_prefetchCache`
-// (rather than a kickstart-only map) so the read path in
-// `HttpFetchText` stays single-source.
-namespace {
-
-struct KickstartContext {
-  std::mutex mutex;
-  robin_hood::unordered_set<std::string> visited;
-  std::atomic<size_t> fetchedCount{0};
-  std::atomic<size_t> bytes{0};
-  dispatch_group_t group = nullptr;
-  dispatch_queue_t queue = nullptr;
-  dispatch_semaphore_t concurrency = nullptr;
-
-  // ARC-disabled file: dispatch_release is required. By the time the
-  // shared_ptr owning this context drops to zero, dispatch_group_wait
-  // has returned and every scheduled block has released its capture.
-  ~KickstartContext() {
-    if (group) dispatch_release(group);
-    if (queue) dispatch_release(queue);
-    if (concurrency) dispatch_release(concurrency);
-  }
-};
-
-}  // anonymous namespace
-
-static void KickstartScheduleUrls(std::shared_ptr<KickstartContext> ctx,
-                                  std::vector<std::string> urls) {
-  for (const std::string& urlRef : urls) {
-    if (urlRef.empty()) continue;
-    if (!StartsWith(urlRef, "http://") && !StartsWith(urlRef, "https://")) continue;
-    if (!LooksLikeJsSourceUrl(urlRef)) continue;
-    if (!IsRemoteUrlAllowed(urlRef)) continue;
-
-    bool fresh;
-    {
-      std::lock_guard<std::mutex> lock(ctx->mutex);
-      fresh = ctx->visited.insert(urlRef).second;
-    }
-    if (!fresh) continue;
-
-    // No "already cached" short-circuit here — the caller has explicitly
-    // told us "fetch these URLs fresh". Any body sitting in
-    // `g_prefetchCache` for one of them is a leftover from a previous
-    // wave that V8 didn't consume; honoring it would feed V8 a stale
-    // body on the next walk — the "1 cycle behind" symptom for `.ts`
-    // edits with many transitive importers. (`InvalidateModules`
-    // pre-clears the cache for the eviction set, so this is
-    // defense-in-depth — but the kickstart may also be invoked
-    // manually for diagnostics, and we want it to be correct in
-    // isolation.)
-
-    dispatch_group_enter(ctx->group);
-    std::string urlCopy = urlRef;
-    dispatch_async(ctx->queue, ^{
-      dispatch_semaphore_wait(ctx->concurrency, DISPATCH_TIME_FOREVER);
-
-      std::string body;
-      std::string contentType;
-      int status = 0;
-      bool ok = PerformHttpFetchOnceSync(urlCopy, body, contentType, status);
-
-      if (ok && status >= 200 && status < 300 && !body.empty()) {
-        const size_t bodySize = body.size();
-        // Overwrite unconditionally — the fresh body we just fetched is
-        // by definition the authoritative copy; any older cache entry is
-        // stale by construction (the caller has just told us so).
-        {
-          std::lock_guard<std::mutex> lock(g_prefetchMutex);
-          g_prefetchCache[urlCopy] = std::move(body);
-        }
-        ctx->fetchedCount.fetch_add(1, std::memory_order_relaxed);
-        ctx->bytes.fetch_add(bodySize, std::memory_order_relaxed);
-      }
-
-      dispatch_semaphore_signal(ctx->concurrency);
-      dispatch_group_leave(ctx->group);
-    });
-  }
-}
-
-bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls, int maxConcurrent,
-                                  double timeoutSeconds, size_t* outFetchedCount,
-                                  uint64_t* outElapsedMs) {
-  if (urls.empty()) return false;
-  // Drop empty / non-allowlisted URLs up front. We still want a
-  // truthy result even if some entries get filtered, because partial
-  // success is strictly better than the no-kickstart baseline.
-  std::vector<std::string> filtered;
-  filtered.reserve(urls.size());
-  for (const auto& u : urls) {
-    if (u.empty()) continue;
-    if (!IsRemoteUrlAllowed(u)) continue;
-    filtered.push_back(u);
-  }
-  if (filtered.empty()) return false;
-
-  if (maxConcurrent <= 0) maxConcurrent = 16;
-  if (timeoutSeconds <= 0.0) timeoutSeconds = 10.0;
-
-  const uint64_t startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
-
-  // Diagnostic seed — we record the first URL purely so the log line
-  // has a recognizable anchor when the user is correlating with their
-  // server-side `[hmr-ws][update] file=...` line.
-  const std::string diagSeed = filtered.front();
-  const size_t requestedCount = filtered.size();
-
-  auto ctx = std::make_shared<KickstartContext>();
-  ctx->group = dispatch_group_create();
-  ctx->queue = dispatch_queue_create("com.nativescript.hmr.kickstart", DISPATCH_QUEUE_CONCURRENT);
-  ctx->concurrency = dispatch_semaphore_create(maxConcurrent);
-
-  KickstartScheduleUrls(ctx, std::move(filtered));
-
-  // Cold-boot caller (JS thread, pre-bootstrap): poll `dispatch_group_wait`
-  // in 50ms slices and pump the runloop between them so the placeholder
-  // heartbeat keeps ticking. HMR-refresh caller (post-bootstrap or
-  // off-thread): plain blocking wait — no bar to animate and the wait
-  // is short.
-  long timedOut;
-  Runtime* coldBootRuntime = Runtime::GetCurrentRuntime();
-  const bool useColdBootPumpWait = coldBootRuntime != nullptr && !IsDevSessionBootComplete();
-  if (useColdBootPumpWait) {
-    const int64_t sliceNs = 50LL * NSEC_PER_MSEC;
-    const uint64_t timeoutUs = (uint64_t)(timeoutSeconds * 1000.0 * 1000.0);
-    timedOut = 1;
-    while (true) {
-      const long sliceResult =
-          dispatch_group_wait(ctx->group, dispatch_time(DISPATCH_TIME_NOW, sliceNs));
-      if (sliceResult == 0) {
-        timedOut = 0;
-        break;
-      }
-      const uint64_t nowUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
-      if (nowUs - startUs >= timeoutUs) break;
-      InvokeHttpFetchYield();
-    }
-  } else {
-    const dispatch_time_t deadline =
-        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeoutSeconds * NSEC_PER_SEC));
-    timedOut = dispatch_group_wait(ctx->group, deadline);
-  }
-
-  const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
-  const uint64_t elapsedMs = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
-  const size_t fetched = ctx->fetchedCount.load(std::memory_order_relaxed);
-  const size_t bytes = ctx->bytes.load(std::memory_order_relaxed);
-
-  if (outFetchedCount) *outFetchedCount = fetched;
-  if (outElapsedMs) *outElapsedMs = elapsedMs;
-
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[hmr-kickstart][list] first=%s urls=%lu fetched=%lu bytes=%lu ms=%llu status=%s "
-        @"concurrency=%d",
-        diagSeed.c_str(), (unsigned long)requestedCount, (unsigned long)fetched,
-        (unsigned long)bytes, (unsigned long long)elapsedMs, timedOut == 0 ? "drained" : "timeout",
-        maxConcurrent);
-  }
-
-  return timedOut == 0;
-}
-
 void CleanupHMRGlobals() {
-  // Drop any kickstart-prewarmed module sources. These are plain
-  // std::string buffers (no v8::Global), but flushing them on teardown
-  // prevents stale source from leaking into a re-launched runtime in
-  // the same process.
-  ClearHttpModulePrefetchCache();
   ClearAllCacheBustMarks();
   // Reset the boot-complete flag so a re-launched runtime in the same
   // process starts in "cold boot" mode again (runloop pump armed).
@@ -1013,11 +817,10 @@ void CleanupHMRGlobals() {
 // Dev-loader JS-callable globals
 //
 // The runtime's dev surface is deliberately small: it exposes
-// *mechanism* only (resolution config, registry eviction, parallel
-// prewarm, registry introspection, boot-complete signal). All HMR
-// *policy* — boot orchestration, `import.meta.hot`, full reload, CSS
-// apply, WebSocket protocol — lives in the JS dev client
-// (`@nativescript/vite`).
+// *mechanism* only (resolution config, registry eviction, registry
+// introspection, boot-complete signal). All HMR *policy* — boot
+// orchestration, `import.meta.hot`, full reload, CSS apply, WebSocket
+// protocol — lives in the JS dev client (`@nativescript/vite`).
 
 namespace {
 
@@ -1174,164 +977,6 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
   tns::InvalidateModules(isolate, ctx, urls);
 }
 
-//
-// `__NS_DEV__.prewarm(entries, options?)` — the single prewarm entry point.
-//
-// `entries` is an array whose elements may be mixed:
-//   - a string URL          → fetched over HTTP in one parallel wave before
-//     V8's serial synchronous walk starts;
-//   - a `{ url, body }` obj → seeded directly into the prewarm cache with
-//     zero network (the boot-archive path).
-// A single string argument is accepted as a one-element list.
-//
-// Every entry is always server-computed (the dev server owns the module
-// graph: eviction closures for HMR, entry-graph crawls / boot archives for
-// cold boot); the runtime performs no graph discovery of its own. Seeded
-// bodies pass the same gates a fetch does (scheme, JS-source shape,
-// remote-URL allowlist).
-//
-// `options` (applies to the fetch wave only):
-//   { maxConcurrent?: number, timeoutMs?: number }
-//
-// Returns `{ ok, seeded, fetched, bytes, ms }`. `ok` is true when at least
-// one entry landed and any fetch wave drained without timing out; on
-// failure callers should fall back to V8's normal synchronous walk.
-void PrewarmCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-  v8::Isolate* isolate = info.GetIsolate();
-  v8::HandleScope scope(isolate);
-  v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
-
-  auto buildResult = [&](bool ok, size_t seeded, size_t fetched, size_t bytes, uint64_t elapsedMs) {
-    v8::Local<v8::Object> result = v8::Object::New(isolate);
-    result->Set(ctx, tns::ToV8String(isolate, "ok"), v8::Boolean::New(isolate, ok)).Check();
-    result
-        ->Set(ctx, tns::ToV8String(isolate, "seeded"),
-              v8::Integer::NewFromUnsigned(isolate, (uint32_t)seeded))
-        .Check();
-    result
-        ->Set(ctx, tns::ToV8String(isolate, "fetched"),
-              v8::Integer::NewFromUnsigned(isolate, (uint32_t)fetched))
-        .Check();
-    result->Set(ctx, tns::ToV8String(isolate, "bytes"), v8::Number::New(isolate, (double)bytes))
-        .Check();
-    result->Set(ctx, tns::ToV8String(isolate, "ms"), v8::Number::New(isolate, (double)elapsedMs))
-        .Check();
-    info.GetReturnValue().Set(result);
-  };
-
-  if (info.Length() < 1 || (!info[0]->IsString() && !info[0]->IsArray())) {
-    Log(@"[__NS_DEV__.prewarm] expected (entries: Array<string | {url, body}>, options?) or "
-        @"(url: string, options?)");
-    buildResult(false, 0, 0, 0, 0);
-    return;
-  }
-
-  int maxConcurrent = 16;
-  double timeoutSeconds = 10.0;
-  if (info.Length() >= 2 && info[1]->IsObject()) {
-    v8::Local<v8::Object> options = info[1].As<v8::Object>();
-
-    v8::Local<v8::Value> mcVal;
-    if (options->Get(ctx, tns::ToV8String(isolate, "maxConcurrent")).ToLocal(&mcVal) &&
-        !mcVal.IsEmpty() && mcVal->IsNumber()) {
-      double mc = mcVal->NumberValue(ctx).FromMaybe(16.0);
-      if (mc >= 1.0 && mc <= 64.0) maxConcurrent = (int)mc;
-    }
-
-    v8::Local<v8::Value> toVal;
-    if (options->Get(ctx, tns::ToV8String(isolate, "timeoutMs")).ToLocal(&toVal) &&
-        !toVal.IsEmpty() && toVal->IsNumber()) {
-      double ms = toVal->NumberValue(ctx).FromMaybe(10000.0);
-      if (ms >= 100.0 && ms <= 60000.0) timeoutSeconds = ms / 1000.0;
-    }
-  }
-
-  v8::Local<v8::String> urlKey = tns::ToV8String(isolate, "url");
-  v8::Local<v8::String> bodyKey = tns::ToV8String(isolate, "body");
-
-  std::vector<std::string> fetchUrls;
-  size_t seeded = 0;
-  size_t bytes = 0;
-
-  // Seeds one `{url, body}` entry into the prewarm cache; returns false when
-  // the entry is malformed or fails the fetch gates.
-  auto seedEntry = [&](v8::Local<v8::Object> elem) -> bool {
-    v8::Local<v8::Value> urlVal;
-    if (!elem->Get(ctx, urlKey).ToLocal(&urlVal) || !urlVal->IsString()) return false;
-    v8::String::Utf8Value urlU8(isolate, urlVal);
-    if (!*urlU8) return false;
-    std::string url(*urlU8);
-    if (url.empty()) return false;
-
-    // Same gates a prewarm fetch passes before it may populate the cache
-    // (scheme, JS-source shape, remote-URL allowlist).
-    if (!StartsWith(url, "http://") && !StartsWith(url, "https://")) return false;
-    if (!LooksLikeJsSourceUrl(url)) return false;
-    if (!IsRemoteUrlAllowed(url)) return false;
-
-    v8::Local<v8::Value> bodyVal;
-    if (!elem->Get(ctx, bodyKey).ToLocal(&bodyVal) || !bodyVal->IsString()) return false;
-    v8::String::Utf8Value bodyU8(isolate, bodyVal);
-    if (!*bodyU8) return false;
-    // Length-aware constructor: module source may legitimately contain
-    // embedded NUL bytes (e.g. '\0' string literals compiled into the
-    // served JS). The strlen-based char* ctor would truncate the body at
-    // the first NUL and the module would later fail to compile with
-    // "Unexpected end of input".
-    std::string body(*bodyU8, bodyU8.length());
-    if (body.empty()) return false;
-
-    bytes += body.size();
-    // Overwrite unconditionally — the supplied body is the authoritative
-    // fresh copy, mirroring the fetch wave's overwrite semantics.
-    {
-      std::lock_guard<std::mutex> lock(g_prefetchMutex);
-      g_prefetchCache[url] = std::move(body);
-    }
-    return true;
-  };
-
-  if (info[0]->IsArray()) {
-    v8::Local<v8::Array> arr = info[0].As<v8::Array>();
-    const uint32_t len = arr->Length();
-    fetchUrls.reserve(len);
-    for (uint32_t i = 0; i < len; i++) {
-      v8::Local<v8::Value> elem;
-      if (!arr->Get(ctx, i).ToLocal(&elem)) continue;
-      if (elem->IsString()) {
-        v8::String::Utf8Value u8(isolate, elem);
-        if (!*u8) continue;
-        std::string s(*u8);
-        if (!s.empty()) fetchUrls.push_back(std::move(s));
-      } else if (elem->IsObject()) {
-        if (seedEntry(elem.As<v8::Object>())) seeded++;
-      }
-    }
-  } else {
-    v8::String::Utf8Value u8(isolate, info[0]);
-    if (*u8) {
-      std::string s(*u8);
-      if (!s.empty()) fetchUrls.push_back(std::move(s));
-    }
-  }
-
-  size_t fetched = 0;
-  uint64_t elapsedMs = 0;
-  bool fetchOk = true;
-  if (!fetchUrls.empty()) {
-    fetchOk = tns::KickstartHmrPrefetchUrlsSync(fetchUrls, maxConcurrent, timeoutSeconds, &fetched,
-                                                &elapsedMs);
-  }
-
-  if (tns::IsScriptLoadingLogEnabled()) {
-    Log(@"[__NS_DEV__.prewarm] seeded=%lu fetched=%lu bytes=%lu ms=%llu fetchOk=%s",
-        (unsigned long)seeded, (unsigned long)fetched, (unsigned long)bytes,
-        (unsigned long long)elapsedMs, fetchOk ? "true" : "false");
-  }
-
-  buildResult(fetchOk && (seeded + fetched > 0), seeded, fetched, bytes, elapsedMs);
-}
-
 void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
   v8::HandleScope scope(isolate);
@@ -1350,9 +995,9 @@ void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info
 // `__NS_DEV__.setDevBootComplete(value?: boolean)` — the JS dev client calls
 // this (with `true`, or no argument) once the real app root view has
 // committed. It flips both the JS-visible `__NS_HMR_BOOT_COMPLETE__`
-// global and the native atomic that disarms the cold-boot runloop pump
-// and the kickstart pump-wait. The client may also pass `false` before
-// a full JS-realm reload to re-arm the boot-time behaviors.
+// global and the native atomic that disarms the cold-boot runloop pump.
+// The client may also pass `false` before a full JS-realm reload to
+// re-arm the boot-time behaviors.
 void SetDevBootCompleteCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
   v8::HandleScope scope(isolate);
@@ -1374,7 +1019,6 @@ void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> contex
 
   InstallDevFunction(isolate, context, dev, "configureRuntime", ConfigureDevRuntimeCallback);
   InstallDevFunction(isolate, context, dev, "invalidateModules", InvalidateModulesCallback);
-  InstallDevFunction(isolate, context, dev, "prewarm", PrewarmCallback);
   InstallDevFunction(isolate, context, dev, "getLoadedModuleUrls", GetLoadedModuleUrlsCallback);
   InstallDevFunction(isolate, context, dev, "setDevBootComplete", SetDevBootCompleteCallback);
 

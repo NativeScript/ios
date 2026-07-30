@@ -275,8 +275,7 @@ Runtime::~Runtime() {
     tns::DestroyModuleStateForIsolate(isolate_);
 
     // Clear the remaining dev-loader + import-map globals (`g_importMap`,
-    // the kickstart prewarm cache, cache-bust marks, boot-complete flag)
-    // before isolate disposal.
+    // cache-bust marks, boot-complete flag) before isolate disposal.
     //
     // CRITICAL: unlike the per-isolate module maps above, these globals are
     // PROCESS-WIDE. They live in the main isolate's address space but every
