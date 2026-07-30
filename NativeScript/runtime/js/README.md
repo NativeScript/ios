@@ -63,9 +63,8 @@ module.exports = somethingTheCallSiteNeeds;
 `primordials.js` runs first in every isolate — lazily, on the first
 `RunBuiltin` call, which happens during runtime init — and its frozen,
 null-prototype export is cached per isolate (`Caches::Primordials`) and
-handed to every other builtin. Builtins that compile late (`smart-stringify`
-is compiled on the first object logged) therefore still see intrinsics as they
-were before user code ran.
+handed to every other builtin, so a builtin that compiles later in the
+isolate's life still sees intrinsics as they were before user code ran.
 
 Naming follows Node: statics keep their path (`JSONStringify`,
 `ObjectDefineProperty`), instance methods are **uncurried** so the receiver
