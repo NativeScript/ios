@@ -152,7 +152,8 @@ class Caches {
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> WeakRefClearFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
-  std::unique_ptr<v8::Persistent<v8::Function>> SmartJSONStringifyFunc =
+  // console formatter (internal/inspect.js), initialized by Console::Init.
+  std::unique_ptr<v8::Persistent<v8::Function>> InspectFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> InteropReferenceCtorFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
