@@ -160,6 +160,9 @@ require("./ErrorEventsTests");
 // interop.escapeException + JS<->native boundary hardening (Phase 3)
 require("./EscapeExceptionTests");
 
+// Runtime builtins keep working when app code replaces the intrinsics they use
+require("./PrimordialsTests");
+
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();
 

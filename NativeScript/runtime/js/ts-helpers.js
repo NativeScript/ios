@@ -1,6 +1,20 @@
+const {
+    ArrayPrototypeConcat,
+    ArrayPrototypeSlice,
+    Error,
+    FunctionPrototypeToString,
+    ObjectCreate,
+    ObjectDefineProperty,
+    ObjectPrototypeHasOwnProperty,
+    ObjectSetPrototypeOf,
+    ReflectConstruct,
+    StringPrototypeIndexOf,
+    SymbolHasInstance,
+} = primordials;
+
 var __originalExtends = global.__extends;
 var __extends = (Child, Parent) => {
-    var extendingNativeClass = !!Parent.extend && (Parent.extend.toString().indexOf("[native code]") > -1);
+    var extendingNativeClass = !!Parent.extend && (StringPrototypeIndexOf(FunctionPrototypeToString(Parent.extend), "[native code]") > -1);
     if (!extendingNativeClass) {
         __extends_ts(Child, Parent);
         return;
@@ -19,7 +33,7 @@ var __extends = (Child, Parent) => {
                 protocols: child.ObjCProtocols || [],
                 exposedMethods: child.ObjCExposedMethods || {}
             });
-            child[Symbol.hasInstance] = function (instance) {
+            child[SymbolHasInstance] = function (instance) {
                 return instance instanceof this.__extended;
             }
         }
@@ -30,7 +44,7 @@ var __extends = (Child, Parent) => {
         var Extended = extend(thiz);
         thiz.__container__ = true;
         if (arguments.length > 1) {
-            thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(Array.prototype.slice.call(arguments, 1))));
+            thiz.__proto__ = ReflectConstruct(Extended, ArrayPrototypeSlice(arguments, 1));
         } else {
             thiz.__proto__ = new Extended()
         }
@@ -41,7 +55,10 @@ var __extends = (Child, Parent) => {
         var Extended = extend(thiz);
         thiz.__container__ = true;
         if (args && args.length > 0) {
-            thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(args)));
+            // concat, not spread: a non-Array `args` (the arguments object
+            // TypeScript's `_super.apply(this, arguments)` passes) is forwarded
+            // as a single argument.
+            thiz.__proto__ = ReflectConstruct(Extended, ArrayPrototypeConcat([], args));
         } else {
             thiz.__proto__ = new Extended();
         }
@@ -73,7 +90,7 @@ var __extends_ns = function (child, parent) {
 };
 
 var extendStaticFunctions =
-    Object.setPrototypeOf
+    ObjectSetPrototypeOf
     || (hasInternalProtoProperty() && function (child, parent) { child.__proto__ = parent; })
     || assignPropertiesFromParentToChild;
 
@@ -83,7 +100,7 @@ function hasInternalProtoProperty() {
 
 function assignPropertiesFromParentToChild(parent, child) {
     for (var property in parent) {
-        if (parent.hasOwnProperty(property)) {
+        if (ObjectPrototypeHasOwnProperty(parent, property)) {
             child[property] = parent[property];
         }
     }
@@ -95,11 +112,11 @@ function assignPrototypeFromParentToChild(parent, child) {
     }
 
     if (parent === null) {
-        child.prototype = Object.create(null);
+        child.prototype = ObjectCreate(null);
     } else {
         __.prototype = parent.prototype;
         child.prototype = new __();
     }
 }
 
-Object.defineProperty(global, "__extends", { value: __extends, writable: false });
+ObjectDefineProperty(global, "__extends", { value: __extends, writable: false });
