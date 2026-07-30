@@ -63,48 +63,6 @@ describe("Node built-in and optional module resolution", function () {
     }
   });
 
-  it("resolves import-map vendor modules through the explicit vendor registry", async function () {
-    const configureRuntime = globalThis.__NS_DEV__ && globalThis.__NS_DEV__.configureRuntime;
-    expect(typeof configureRuntime).toBe("function");
-
-    const previousRegistry = globalThis.__nsVendorRegistry;
-    const vendorRegistry = new Map();
-    globalThis.__nsVendorRegistry = vendorRegistry;
-    vendorRegistry.set("__ns_test_vendor__", {
-      default: { source: "vendor-default" },
-      namedValue: 7,
-      makeValue() {
-        return "vendor-named";
-      },
-    });
-
-    try {
-      configureRuntime({
-        importMap: {
-          imports: {
-            __ns_test_vendor__: "ns-vendor://__ns_test_vendor__",
-          },
-        },
-      });
-
-      const mod = await import("__ns_test_vendor__");
-      const modAgain = await import("__ns_test_vendor__");
-
-      expect(mod).toBeDefined();
-      expect(modAgain).toBe(mod);
-      expect(mod.default).toEqual({ source: "vendor-default" });
-      expect(mod.namedValue).toBe(7);
-      expect(mod.makeValue()).toBe("vendor-named");
-    } finally {
-      configureRuntime({ importMap: { imports: {} } });
-      if (typeof previousRegistry === "undefined") {
-        delete globalThis.__nsVendorRegistry;
-      } else {
-        globalThis.__nsVendorRegistry = previousRegistry;
-      }
-    }
-  });
-
   it("reuses blob URL modules across concurrent and repeated imports", async function () {
     // `Blob` is a @nativescript/core global — the bare TestRunner realm has
     // none. Stand in a minimal one: `URL.createObjectURL` only needs the

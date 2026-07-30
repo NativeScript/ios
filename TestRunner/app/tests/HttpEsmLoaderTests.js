@@ -214,37 +214,19 @@ describe("HTTP ESM Loader", function() {
             expect(typeof global.__NS_DEV__).toBe("object");
             expect(typeof global.__NS_DEV__.configureRuntime).toBe("function");
             expect(typeof global.__NS_DEV__.invalidateModules).toBe("function");
-            expect(typeof global.__NS_DEV__.kickstartPrefetch).toBe("function");
-            expect(typeof global.__NS_DEV__.seedModuleBodies).toBe("function");
+            expect(typeof global.__NS_DEV__.prewarm).toBe("function");
             expect(typeof global.__NS_DEV__.getLoadedModuleUrls).toBe("function");
             expect(typeof global.__NS_DEV__.setDevBootComplete).toBe("function");
             expect(typeof global.__NS_DEV__.terminateAllWorkers).toBe("function");
-            // No flat `__ns*` dev globals hang off the realm — the namespace
-            // is the whole surface.
-            expect(global.__nsInvalidateModules).toBeUndefined();
-            expect(global.__nsGetLoadedModuleUrls).toBeUndefined();
-            expect(global.__nsKickstartHmrPrefetch).toBeUndefined();
-            expect(global.__nsConfigureDevRuntime).toBeUndefined();
-            expect(global.__nsConfigureRuntime).toBeUndefined();
-            expect(global.__nsSetDevBootComplete).toBeUndefined();
-            expect(global.__nsTerminateAllWorkers).toBeUndefined();
-            // The runtime installs NO orchestration globals — boot, reload,
-            // and hot-callback servicing are @nativescript/vite JS.
-            expect(global.__nsStartDevSession).toBeUndefined();
-            expect(global.__nsReloadDevApp).toBeUndefined();
-            expect(global.__nsApplyStyleUpdate).toBeUndefined();
-            expect(global.__NS_DISPATCH_HOT_EVENT__).toBeUndefined();
-            expect(global.__nsRunHmrDispose).toBeUndefined();
-            expect(global.__nsRunHmrPrune).toBeUndefined();
-            expect(global.__nsHasDeclinedModule).toBeUndefined();
         });
 
-        it("seedModuleBodies rejects invalid input without seeding", function() {
+        it("prewarm rejects invalid seed entries without seeding", function() {
             var dev = global.__NS_DEV__;
-            var noArg = dev.seedModuleBodies();
+            var noArg = dev.prewarm();
             expect(noArg.ok).toBe(false);
             expect(noArg.seeded).toBe(0);
-            var badEntries = dev.seedModuleBodies([
+            expect(noArg.fetched).toBe(0);
+            var badEntries = dev.prewarm([
                 null,
                 { body: "export {};" }, // no url
                 { url: "not-a-url", body: "export {};" }, // non-http scheme
@@ -253,6 +235,7 @@ describe("HTTP ESM Loader", function() {
             ]);
             expect(badEntries.ok).toBe(false);
             expect(badEntries.seeded).toBe(0);
+            expect(badEntries.fetched).toBe(0);
             expect(badEntries.bytes).toBe(0);
         });
     });
@@ -409,6 +392,30 @@ describe("HTTP canonical key (native __NS_DEV__.canonicalizeHttpUrlKey)", functi
 
     it("ignores URL fragments for dev endpoints", function () {
         checkKey("http://h/ns/m/foo.js#frag", "http://h/ns/m/foo.js");
+    });
+
+    it("honors a client-supplied canonicalization vocabulary via configureRuntime", function () {
+        var canon = getCanon();
+        if (typeof canon !== "function") {
+            pending("__NS_DEV__.canonicalizeHttpUrlKey not installed (release build)");
+            return;
+        }
+        // The vocabulary below matches the built-in fallback exactly, so this
+        // spec exercises the configured code path without changing the
+        // process-wide canonicalization behavior other specs rely on.
+        global.__NS_DEV__.configureRuntime({
+            canonicalization: {
+                stripParams: ["t", "v", "import"],
+                forPathPrefixes: ["/ns/", "/node_modules/.vite/", "/@id/", "/@fs/"],
+                preserveQueryFor: ["/@ng/component"],
+            },
+        });
+        // Dev endpoint: configured cache-busters stripped, real params kept.
+        expect(canon("http://h/ns/core?p=x&t=123&v=9&import=1")).toBe("http://h/ns/core?p=x");
+        // preserveQueryFor wins even under a dev-endpoint prefix.
+        expect(canon("http://h/ns/m/comp/@ng/component?c=a&t=42")).toBe("http://h/ns/m/comp/@ng/component?c=a&t=42");
+        // Non-dev URLs keep their query verbatim.
+        expect(canon("https://cdn.example.com/lib.js?token=abc")).toBe("https://cdn.example.com/lib.js?token=abc");
     });
 });
 

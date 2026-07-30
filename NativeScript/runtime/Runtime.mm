@@ -50,10 +50,10 @@ using namespace std;
 //      The URL IS the module identity;
 //      `import.meta.url` should be the URL verbatim.
 //
-//   2. Custom scheme — `ns-vendor://...`, `node:fs`, `blob:...`,
-//      `optional:...`. Synthetic / built-in modules that aren't backed
-//      by the local filesystem. Their identity is the scheme + body
-//      itself; `import.meta.url` keeps that string unchanged.
+//   2. Custom scheme — `node:fs`, `blob:...`, `optional:...`.
+//      Synthetic / built-in modules that aren't backed by the local
+//      filesystem. Their identity is the scheme + body itself;
+//      `import.meta.url` keeps that string unchanged.
 //
 //   3. Absolute filesystem path — `/Users/.../app/src/foo.js`. The
 //      production / non-HMR dev shape. Strip the runtime base dir to
@@ -127,7 +127,7 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
   // fileURLToPath(import.meta.url))`. It only makes sense for modules
   // backed by the local filesystem.
   //
-  // For URL-backed modules (HTTP, ns-vendor, blob, etc.) there is no
+  // For URL-backed modules (HTTP, blob, etc.) there is no
   // filesystem directory. We return the URL with the final segment
   // stripped — a best-effort answer that's stable across cycles and
   // useful for log lines / source maps. Consumers that genuinely need

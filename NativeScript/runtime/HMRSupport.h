@@ -7,12 +7,13 @@
 // requiring V8 headers at include sites.
 namespace v8 {
 class Isolate;
-template <class T> class Local;
+template <class T>
+class Local;
 class Object;
 class Function;
 class Context;
 class Value;
-}
+}  // namespace v8
 
 namespace tns {
 
@@ -53,7 +54,8 @@ std::string CanonicalizeHttpUrlKey(const std::string& url);
 // On a fast path, returns from the in-memory kickstart-prewarm cache
 // without touching the network (destructive one-shot read). On the slow
 // path, performs a synchronous fetch with one retry.
-bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType, int& status);
+bool HttpFetchText(const std::string& url, std::string& out,
+                   std::string& contentType, int& status);
 
 // Drop all entries in the prewarm cache. Safe to call from any thread.
 // Used by Runtime teardown and by HMR cache-poison scenarios where the
@@ -144,11 +146,12 @@ void MirrorGlobalOnGlobalThis(v8::Isolate* isolate,
 // mirrored on globalThis.
 //
 // `__NS_DEV__` members:
-//   - configureRuntime(config)        (import map + volatile patterns)
+//   - configureRuntime(config)        (import map + volatile patterns +
+//                                      canonicalization vocabulary)
 //   - invalidateModules(urls)         (registry + cache eviction)
-//   - kickstartPrefetch(urls, opts?)  (parallel HTTP prewarm, list mode)
-//   - seedModuleBodies(entries)       (batch prewarm seeding from the boot
-//   archive)
+//   - prewarm(entries, opts?)         (string entries: parallel HTTP fetch
+//                                      wave; {url, body} entries: zero-fetch
+//                                      seeding, e.g. from the boot archive)
 //   - getLoadedModuleUrls()           (registry introspection)
 //   - setDevBootComplete(value?)      (boot-complete signal)
 //   - terminateAllWorkers()           (main isolate only; see Worker.h)
@@ -156,4 +159,4 @@ void MirrorGlobalOnGlobalThis(v8::Isolate* isolate,
 void InitializeHmrDevGlobals(v8::Isolate* isolate,
                              v8::Local<v8::Context> context, bool isWorker);
 
-} // namespace tns
+}  // namespace tns

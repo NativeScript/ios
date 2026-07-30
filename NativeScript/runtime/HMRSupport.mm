@@ -79,6 +79,55 @@ void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bo
 // ─────────────────────────────────────────────────────────────
 // HTTP loader helpers
 
+// Canonicalization vocabulary (client-supplied policy).
+//
+// The canonical-key *mechanism* (fragment strip, cache-buster param drop,
+// param sort) must be native because it keys the module registry inside
+// V8's synchronous resolve walk. The *vocabulary* — which query params are
+// pure cache busters, which path prefixes identify dev endpoints whose
+// queries may be normalized, and which paths must keep their query verbatim
+// because the query IS the identity — is server/framework policy, supplied
+// by the dev client via
+// `__NS_DEV__.configureRuntime({ canonicalization: {...} })`.
+//
+// Write-before-read contract: the client configures this once, before the
+// first prewarm/import wave (session-bootstrap order), so plain statics are
+// safe here — the same convention as `g_volatilePatterns` / `g_importMap`.
+// URLs touched before configuration (the local trampoline's clean
+// `/ns/core/*` imports) carry no query, so they canonicalize identically
+// under any vocabulary.
+//
+// When unconfigured, a built-in vocabulary matching current
+// `@nativescript/vite` conventions applies.
+// TODO(feat/hmr-dev-sessions follow-up): delete the built-in vocabulary once
+// the paired `@nativescript/vite` release that sends `canonicalization` has
+// been qualified — the runtime should carry zero server/framework URL
+// strings.
+struct CanonicalizationConfig {
+  std::vector<std::string> stripParams;            // query param names to drop
+  std::vector<std::string> devPathPrefixes;        // path StartsWith → normalize query
+  std::vector<std::string> preserveQueryPrefixes;  // path contains → preserve query verbatim
+};
+static CanonicalizationConfig g_canonConfig;
+static bool g_canonConfigured = false;
+
+static void SetCanonicalizationConfig(CanonicalizationConfig config) {
+  g_canonConfig = std::move(config);
+  g_canonConfigured = true;
+  if (IsScriptLoadingLogEnabled()) {
+    Log(@"[__NS_DEV__.configureRuntime] canonicalization set (strip=%lu devPrefixes=%lu "
+        @"preserve=%lu)",
+        (unsigned long)g_canonConfig.stripParams.size(),
+        (unsigned long)g_canonConfig.devPathPrefixes.size(),
+        (unsigned long)g_canonConfig.preserveQueryPrefixes.size());
+  }
+}
+
+static void ResetCanonicalizationConfig() {
+  g_canonConfig = CanonicalizationConfig{};
+  g_canonConfigured = false;
+}
+
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // Some loaders wrap HTTP module URLs as file://http(s)://...
   std::string normalizedUrl = url;
@@ -112,8 +161,8 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // IMPORTANT: This function is used as an HTTP module registry/cache key.
   // For general-purpose HTTP module loading (public internet), the query string
   // can be part of the module's identity (auth, content versioning, routing, etc).
-  // Therefore we only apply query normalization (sorting/dropping) for known
-  // NativeScript dev endpoints where `t`/`v`/`import` are purely cache busters.
+  // Therefore query normalization (sorting/dropping) applies only to dev
+  // endpoints, per the client-supplied vocabulary above.
   //
   // The dev server serves every module under ONE canonical URL — module
   // identity IS the URL string. Freshness after an HMR edit is handled by
@@ -121,45 +170,49 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // eviction-driven fetch nonce in `PerformHttpFetchOnceSync`, never by URL
   // variation. There is deliberately no path-tag vocabulary to collapse here.
   //
-  // Special cases that LOOK like dev endpoints but aren't normalized:
-  //
-  //   `/@ng/component` (Angular HMR component-update endpoint)
-  //     The `t` (timestamp) parameter is the WHOLE POINT of the URL — it
-  //     identifies a specific recompile of the component's metadata after
-  //     a `.html`/style edit. Stripping it would collapse every HMR fetch
-  //     to the same cache key (the boot-time call uses `Date.now()` and
-  //     each subsequent save uses a new `Date.now()`), and the second
-  //     `__ns_import(...)` would hit V8's module cache, resolve the
-  //     boot-time `_UpdateMetadata` default export, and call
-  //     `ɵɵreplaceMetadata` with stale instructions. Result: server logs
-  //     `(client) hmr update`, the listener fires, but the visual never
-  //     changes because the runtime swapped the live view's metadata
-  //     with the same metadata it already had. Treat the path as a
-  //     non-dev endpoint and preserve the query verbatim so each
-  //     timestamped fetch is a distinct registry entry.
-  //
-  // Apply the special-case check BEFORE the dev-endpoint short-circuit so
-  // it covers paths under `/ns/m/<componentDir>/@ng/component` (the
-  // resolved URL Angular's compiler produces relative to the component's
-  // `import.meta.url`).
+  // Why `preserveQueryFor` exists (and is checked BEFORE the dev-endpoint
+  // prefix test, so it covers nested paths like
+  // `/ns/m/<componentDir>/@ng/component`): some endpoints' query IS the
+  // identity. Angular's `/@ng/component?c=<id>&t=<ts>` is the canonical
+  // example — each `t` identifies a specific recompile of the component's
+  // metadata, and stripping it would collapse every HMR fetch to the
+  // boot-time cache key, so `ɵɵreplaceMetadata` would forever replay stale
+  // template instructions ("server logs hmr update, screen never changes").
   {
     std::string pathOnly = originAndPath.substr(pathStart);
-    if (pathOnly.find("/@ng/component") != std::string::npos) {
-      // Preserve query as-is — `t` is the version discriminator.
-      return noHash;
-    }
-    const bool isDevEndpoint = StartsWith(pathOnly, "/ns/") ||
-                               StartsWith(pathOnly, "/node_modules/.vite/") ||
-                               StartsWith(pathOnly, "/@id/") || StartsWith(pathOnly, "/@fs/");
-    if (!isDevEndpoint) {
-      // Preserve query as-is (fragment already removed).
-      return noHash;
+    if (g_canonConfigured) {
+      for (const auto& p : g_canonConfig.preserveQueryPrefixes) {
+        if (!p.empty() && pathOnly.find(p) != std::string::npos) {
+          return noHash;  // query preserved verbatim (fragment already removed)
+        }
+      }
+      bool isDevEndpoint = false;
+      for (const auto& p : g_canonConfig.devPathPrefixes) {
+        if (!p.empty() && StartsWith(pathOnly, p.c_str())) {
+          isDevEndpoint = true;
+          break;
+        }
+      }
+      if (!isDevEndpoint) {
+        return noHash;
+      }
+    } else {
+      // Built-in fallback vocabulary — see the deletion TODO above.
+      if (pathOnly.find("/@ng/component") != std::string::npos) {
+        return noHash;
+      }
+      const bool isDevEndpoint = StartsWith(pathOnly, "/ns/") ||
+                                 StartsWith(pathOnly, "/node_modules/.vite/") ||
+                                 StartsWith(pathOnly, "/@id/") || StartsWith(pathOnly, "/@fs/");
+      if (!isDevEndpoint) {
+        return noHash;
+      }
     }
   }
 
   if (query.empty()) return originAndPath;
 
-  // Keep all params except typical import markers or t/v cache busters; sort for stability.
+  // Keep all params except the configured cache busters; sort for stability.
   std::vector<std::string> kept;
   size_t start = 0;
   while (start <= query.size()) {
@@ -169,8 +222,15 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     if (!pair.empty()) {
       size_t eq = pair.find('=');
       std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
-      // Drop import marker and common cache-busting stamps.
-      if (!(name == "import" || name == "t" || name == "v")) kept.push_back(pair);
+      bool drop;
+      if (g_canonConfigured) {
+        drop = std::find(g_canonConfig.stripParams.begin(), g_canonConfig.stripParams.end(),
+                         name) != g_canonConfig.stripParams.end();
+      } else {
+        // Built-in fallback: Vite's import marker and t/v cache stamps.
+        drop = (name == "import" || name == "t" || name == "v");
+      }
+      if (!drop) kept.push_back(pair);
     }
     if (amp == std::string::npos) break;
     start = amp + 1;
@@ -241,11 +301,13 @@ static void ClearAllCacheBustMarks() {
 // JS thread on a synchronous network turn, which forces serial fetching from
 // the JS thread's perspective.
 //
-// `__NS_DEV__.kickstartPrefetch(urls)` lets the JS dev client hand the runtime
-// a server-computed module closure (cold-boot graph or HMR eviction set)
-// to fetch in one parallel wave BEFORE V8 walks the import graph. Bodies
-// land in `g_prefetchCache` keyed by full URL; the always-on cache read in
-// `HttpFetchText` then serves V8's synchronous walk at memory speed.
+// `__NS_DEV__.prewarm(entries)` lets the JS dev client hand the runtime
+// a server-computed module closure (cold-boot graph, boot archive, or HMR
+// eviction set): string entries are fetched in one parallel wave BEFORE V8
+// walks the import graph; `{url, body}` entries are seeded with zero
+// network. Bodies land in `g_prefetchCache` keyed by full URL; the
+// always-on cache read in `HttpFetchText` then serves V8's synchronous
+// walk at memory speed.
 //
 // The runtime performs NO import scanning and NO speculative graph
 // discovery of its own — the server owns the module graph and supplies
@@ -319,7 +381,7 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   const bool urlLogEnabled = IsHttpFetchUrlLogEnabled();
 
   // Cache-read fast path. The JS dev client populates `g_prefetchCache`
-  // via `__NS_DEV__.kickstartPrefetch(urls)` right before importing (cold
+  // via `__NS_DEV__.prewarm(entries)` right before importing (cold
   // boot) or re-importing (HMR); by the time V8's synchronous walk asks
   // for a module, the body is already here and the walk runs at memory
   // speed instead of network speed.
@@ -762,7 +824,7 @@ void ClearHttpModulePrefetchCache() {
 // The dev server owns the module graph: it computes the inverse-dep
 // closure for HMR updates (`evictPaths`) and can crawl the entry graph
 // for cold boot. The client hands that explicit URL list to
-// `__NS_DEV__.kickstartPrefetch(urls)`, which fetches every entry in one
+// `__NS_DEV__.prewarm(entries)`, whose string entries are fetched in one
 // parallel wave into `g_prefetchCache` before V8 starts its serial
 // synchronous walk.
 //
@@ -941,6 +1003,10 @@ void CleanupHMRGlobals() {
   // Reset the boot-complete flag so a re-launched runtime in the same
   // process starts in "cold boot" mode again (runloop pump armed).
   g_devSessionBootComplete.store(false, std::memory_order_relaxed);
+  // Drop the client-supplied canonicalization vocabulary so a re-launched
+  // runtime starts from the built-in fallback until its own client
+  // configures it.
+  ResetCanonicalizationConfig();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1013,24 +1079,50 @@ void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info
     }
   }
 
-  // Process volatilePatterns: array of strings
-  v8::Local<v8::String> vpKey = tns::ToV8String(isolate, "volatilePatterns");
-  v8::Local<v8::Value> vpVal;
-  if (config->Get(ctx, vpKey).ToLocal(&vpVal) && vpVal->IsArray()) {
-    v8::Local<v8::Array> arr = vpVal.As<v8::Array>();
-    std::vector<std::string> patterns;
+  // Reads `obj[key]` as an array of strings into `out`; non-string elements
+  // are skipped. Returns true when the property exists and is an array.
+  auto readStringArray = [&](v8::Local<v8::Object> obj, const char* key,
+                             std::vector<std::string>& out) -> bool {
+    v8::Local<v8::Value> val;
+    if (!obj->Get(ctx, tns::ToV8String(isolate, key)).ToLocal(&val) || !val->IsArray()) {
+      return false;
+    }
+    v8::Local<v8::Array> arr = val.As<v8::Array>();
     for (uint32_t i = 0; i < arr->Length(); i++) {
       v8::Local<v8::Value> elem;
       if (arr->Get(ctx, i).ToLocal(&elem) && elem->IsString()) {
         v8::String::Utf8Value utf8(isolate, elem);
-        if (*utf8) patterns.push_back(*utf8);
+        if (*utf8) out.push_back(*utf8);
       }
     }
-    if (!patterns.empty()) {
+    return true;
+  };
+
+  // Process volatilePatterns: array of strings
+  {
+    std::vector<std::string> patterns;
+    if (readStringArray(config, "volatilePatterns", patterns) && !patterns.empty()) {
       SetVolatilePatterns(patterns);
       if (logScriptLoading) {
         Log(@"[__NS_DEV__.configureRuntime] %zu volatile patterns set", patterns.size());
       }
+    }
+  }
+
+  // Process canonicalization: { stripParams, forPathPrefixes, preserveQueryFor }
+  // — the URL vocabulary CanonicalizeHttpUrlKey applies (see its doc block).
+  // Presence of the object marks the vocabulary as configured, replacing the
+  // built-in fallback entirely (empty arrays are honored as explicit policy).
+  {
+    v8::Local<v8::Value> canonVal;
+    if (config->Get(ctx, tns::ToV8String(isolate, "canonicalization")).ToLocal(&canonVal) &&
+        canonVal->IsObject()) {
+      v8::Local<v8::Object> canonObj = canonVal.As<v8::Object>();
+      CanonicalizationConfig canon;
+      readStringArray(canonObj, "stripParams", canon.stripParams);
+      readStringArray(canonObj, "forPathPrefixes", canon.devPathPrefixes);
+      readStringArray(canonObj, "preserveQueryFor", canon.preserveQueryPrefixes);
+      SetCanonicalizationConfig(std::move(canon));
     }
   }
 }
@@ -1083,27 +1175,44 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
 }
 
 //
-// `__NS_DEV__.kickstartPrefetch(urls, options?)` lets the HMR client tell
-// the runtime "the next (re-)import will walk this module set — please
-// pre-fill the loader cache with every listed body before V8 starts
-// walking". The list is always server-computed (the dev server owns the
-// module graph: eviction closures for HMR, entry-graph crawls for cold
-// boot); the runtime performs no graph discovery of its own. A single
-// string argument is accepted as a one-element list.
+// `__NS_DEV__.prewarm(entries, options?)` — the single prewarm entry point.
 //
-// Returns `{ ok, fetched, ms }` so JS can log the result. On failure
-// callers should fall back to V8's normal synchronous walk.
-void KickstartHmrPrefetchCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+// `entries` is an array whose elements may be mixed:
+//   - a string URL          → fetched over HTTP in one parallel wave before
+//     V8's serial synchronous walk starts;
+//   - a `{ url, body }` obj → seeded directly into the prewarm cache with
+//     zero network (the boot-archive path).
+// A single string argument is accepted as a one-element list.
+//
+// Every entry is always server-computed (the dev server owns the module
+// graph: eviction closures for HMR, entry-graph crawls / boot archives for
+// cold boot); the runtime performs no graph discovery of its own. Seeded
+// bodies pass the same gates a fetch does (scheme, JS-source shape,
+// remote-URL allowlist).
+//
+// `options` (applies to the fetch wave only):
+//   { maxConcurrent?: number, timeoutMs?: number }
+//
+// Returns `{ ok, seeded, fetched, bytes, ms }`. `ok` is true when at least
+// one entry landed and any fetch wave drained without timing out; on
+// failure callers should fall back to V8's normal synchronous walk.
+void PrewarmCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
   v8::HandleScope scope(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
-  auto buildResult = [&](bool ok, size_t fetched, uint64_t elapsedMs) {
+  auto buildResult = [&](bool ok, size_t seeded, size_t fetched, size_t bytes, uint64_t elapsedMs) {
     v8::Local<v8::Object> result = v8::Object::New(isolate);
     result->Set(ctx, tns::ToV8String(isolate, "ok"), v8::Boolean::New(isolate, ok)).Check();
     result
+        ->Set(ctx, tns::ToV8String(isolate, "seeded"),
+              v8::Integer::NewFromUnsigned(isolate, (uint32_t)seeded))
+        .Check();
+    result
         ->Set(ctx, tns::ToV8String(isolate, "fetched"),
               v8::Integer::NewFromUnsigned(isolate, (uint32_t)fetched))
+        .Check();
+    result->Set(ctx, tns::ToV8String(isolate, "bytes"), v8::Number::New(isolate, (double)bytes))
         .Check();
     result->Set(ctx, tns::ToV8String(isolate, "ms"), v8::Number::New(isolate, (double)elapsedMs))
         .Check();
@@ -1111,9 +1220,9 @@ void KickstartHmrPrefetchCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
   };
 
   if (info.Length() < 1 || (!info[0]->IsString() && !info[0]->IsArray())) {
-    Log(@"[__NS_DEV__.kickstartPrefetch] expected (urls: string[], options?) or (url: string, "
-        @"options?)");
-    buildResult(false, 0, 0);
+    Log(@"[__NS_DEV__.prewarm] expected (entries: Array<string | {url, body}>, options?) or "
+        @"(url: string, options?)");
+    buildResult(false, 0, 0, 0, 0);
     return;
   }
 
@@ -1137,131 +1246,90 @@ void KickstartHmrPrefetchCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
     }
   }
 
-  std::vector<std::string> urls;
-  if (info[0]->IsArray()) {
-    v8::Local<v8::Array> arr = info[0].As<v8::Array>();
-    const uint32_t len = arr->Length();
-    urls.reserve(len);
-    for (uint32_t i = 0; i < len; i++) {
-      v8::Local<v8::Value> elem;
-      if (!arr->Get(ctx, i).ToLocal(&elem)) continue;
-      if (!elem->IsString()) continue;
-      v8::String::Utf8Value u8(isolate, elem);
-      if (!*u8) continue;
-      std::string s(*u8);
-      if (s.empty()) continue;
-      urls.push_back(std::move(s));
-    }
-  } else {
-    v8::String::Utf8Value u8(isolate, info[0]);
-    if (*u8) {
-      std::string s(*u8);
-      if (!s.empty()) urls.push_back(std::move(s));
-    }
-  }
-
-  if (urls.empty()) {
-    buildResult(false, 0, 0);
-    return;
-  }
-
-  size_t fetched = 0;
-  uint64_t elapsedMs = 0;
-  bool ok =
-      tns::KickstartHmrPrefetchUrlsSync(urls, maxConcurrent, timeoutSeconds, &fetched, &elapsedMs);
-  buildResult(ok, fetched, elapsedMs);
-}
-
-// `__NS_DEV__.seedModuleBodies(entries)` — batch prewarm-cache seeding.
-//
-// The JS bootstrap downloads `/__ns_dev__/boot-archive` (NDJSON of
-// {url, body} lines) and hands the parsed entries here. Each entry lands in
-// the one-shot prewarm cache (`g_prefetchCache`, consumed by `HttpFetchText`
-// during V8's synchronous module walk), behind the same gates as a kickstart
-// fetch. Mechanism only: the dev server computed the closure and produced
-// the bodies; the runtime just stores them.
-//
-// Accepts Array<{ url, body }>. Returns { ok, seeded, bytes }; callers fall
-// back to `kickstartPrefetch(urls)` when nothing was seeded.
-void SeedModuleBodiesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-  v8::Isolate* isolate = info.GetIsolate();
-  v8::HandleScope scope(isolate);
-  v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
-
-  auto buildResult = [&](bool ok, size_t seeded, size_t bytes) {
-    v8::Local<v8::Object> result = v8::Object::New(isolate);
-    result->Set(ctx, tns::ToV8String(isolate, "ok"), v8::Boolean::New(isolate, ok)).Check();
-    result
-        ->Set(ctx, tns::ToV8String(isolate, "seeded"),
-              v8::Integer::NewFromUnsigned(isolate, (uint32_t)seeded))
-        .Check();
-    result->Set(ctx, tns::ToV8String(isolate, "bytes"), v8::Number::New(isolate, (double)bytes))
-        .Check();
-    info.GetReturnValue().Set(result);
-  };
-
-  if (info.Length() < 1 || !info[0]->IsArray()) {
-    if (tns::IsScriptLoadingLogEnabled()) {
-      Log(@"[__NS_DEV__.seedModuleBodies] expected Array<{url, body}>");
-    }
-    buildResult(false, 0, 0);
-    return;
-  }
-
-  v8::Local<v8::Array> arr = info[0].As<v8::Array>();
-  const uint32_t len = arr->Length();
   v8::Local<v8::String> urlKey = tns::ToV8String(isolate, "url");
   v8::Local<v8::String> bodyKey = tns::ToV8String(isolate, "body");
 
+  std::vector<std::string> fetchUrls;
   size_t seeded = 0;
   size_t bytes = 0;
-  for (uint32_t i = 0; i < len; i++) {
-    v8::Local<v8::Value> elemVal;
-    if (!arr->Get(ctx, i).ToLocal(&elemVal) || !elemVal->IsObject()) continue;
-    v8::Local<v8::Object> elem = elemVal.As<v8::Object>();
 
+  // Seeds one `{url, body}` entry into the prewarm cache; returns false when
+  // the entry is malformed or fails the fetch gates.
+  auto seedEntry = [&](v8::Local<v8::Object> elem) -> bool {
     v8::Local<v8::Value> urlVal;
-    if (!elem->Get(ctx, urlKey).ToLocal(&urlVal) || !urlVal->IsString()) continue;
+    if (!elem->Get(ctx, urlKey).ToLocal(&urlVal) || !urlVal->IsString()) return false;
     v8::String::Utf8Value urlU8(isolate, urlVal);
-    if (!*urlU8) continue;
+    if (!*urlU8) return false;
     std::string url(*urlU8);
-    if (url.empty()) continue;
+    if (url.empty()) return false;
 
-    // Same gates a kickstart fetch passes before it may populate the
-    // prewarm cache (scheme, JS-source shape, remote-URL allowlist).
-    if (!StartsWith(url, "http://") && !StartsWith(url, "https://")) continue;
-    if (!LooksLikeJsSourceUrl(url)) continue;
-    if (!IsRemoteUrlAllowed(url)) continue;
+    // Same gates a prewarm fetch passes before it may populate the cache
+    // (scheme, JS-source shape, remote-URL allowlist).
+    if (!StartsWith(url, "http://") && !StartsWith(url, "https://")) return false;
+    if (!LooksLikeJsSourceUrl(url)) return false;
+    if (!IsRemoteUrlAllowed(url)) return false;
 
     v8::Local<v8::Value> bodyVal;
-    if (!elem->Get(ctx, bodyKey).ToLocal(&bodyVal) || !bodyVal->IsString()) continue;
+    if (!elem->Get(ctx, bodyKey).ToLocal(&bodyVal) || !bodyVal->IsString()) return false;
     v8::String::Utf8Value bodyU8(isolate, bodyVal);
-    if (!*bodyU8) continue;
+    if (!*bodyU8) return false;
     // Length-aware constructor: module source may legitimately contain
     // embedded NUL bytes (e.g. '\0' string literals compiled into the
     // served JS). The strlen-based char* ctor would truncate the body at
     // the first NUL and the module would later fail to compile with
     // "Unexpected end of input".
     std::string body(*bodyU8, bodyU8.length());
-    if (body.empty()) continue;
+    if (body.empty()) return false;
 
-    const size_t bodySize = body.size();
-    // Overwrite unconditionally — the archive body is the authoritative
-    // fresh copy, mirroring the kickstart's overwrite semantics.
+    bytes += body.size();
+    // Overwrite unconditionally — the supplied body is the authoritative
+    // fresh copy, mirroring the fetch wave's overwrite semantics.
     {
       std::lock_guard<std::mutex> lock(g_prefetchMutex);
       g_prefetchCache[url] = std::move(body);
     }
-    seeded++;
-    bytes += bodySize;
+    return true;
+  };
+
+  if (info[0]->IsArray()) {
+    v8::Local<v8::Array> arr = info[0].As<v8::Array>();
+    const uint32_t len = arr->Length();
+    fetchUrls.reserve(len);
+    for (uint32_t i = 0; i < len; i++) {
+      v8::Local<v8::Value> elem;
+      if (!arr->Get(ctx, i).ToLocal(&elem)) continue;
+      if (elem->IsString()) {
+        v8::String::Utf8Value u8(isolate, elem);
+        if (!*u8) continue;
+        std::string s(*u8);
+        if (!s.empty()) fetchUrls.push_back(std::move(s));
+      } else if (elem->IsObject()) {
+        if (seedEntry(elem.As<v8::Object>())) seeded++;
+      }
+    }
+  } else {
+    v8::String::Utf8Value u8(isolate, info[0]);
+    if (*u8) {
+      std::string s(*u8);
+      if (!s.empty()) fetchUrls.push_back(std::move(s));
+    }
+  }
+
+  size_t fetched = 0;
+  uint64_t elapsedMs = 0;
+  bool fetchOk = true;
+  if (!fetchUrls.empty()) {
+    fetchOk = tns::KickstartHmrPrefetchUrlsSync(fetchUrls, maxConcurrent, timeoutSeconds, &fetched,
+                                                &elapsedMs);
   }
 
   if (tns::IsScriptLoadingLogEnabled()) {
-    Log(@"[__NS_DEV__.seedModuleBodies] seeded=%lu bytes=%lu of %u entries", (unsigned long)seeded,
-        (unsigned long)bytes, len);
+    Log(@"[__NS_DEV__.prewarm] seeded=%lu fetched=%lu bytes=%lu ms=%llu fetchOk=%s",
+        (unsigned long)seeded, (unsigned long)fetched, (unsigned long)bytes,
+        (unsigned long long)elapsedMs, fetchOk ? "true" : "false");
   }
 
-  buildResult(seeded > 0, seeded, bytes);
+  buildResult(fetchOk && (seeded + fetched > 0), seeded, fetched, bytes, elapsedMs);
 }
 
 void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -1306,8 +1374,7 @@ void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> contex
 
   InstallDevFunction(isolate, context, dev, "configureRuntime", ConfigureDevRuntimeCallback);
   InstallDevFunction(isolate, context, dev, "invalidateModules", InvalidateModulesCallback);
-  InstallDevFunction(isolate, context, dev, "kickstartPrefetch", KickstartHmrPrefetchCallback);
-  InstallDevFunction(isolate, context, dev, "seedModuleBodies", SeedModuleBodiesCallback);
+  InstallDevFunction(isolate, context, dev, "prewarm", PrewarmCallback);
   InstallDevFunction(isolate, context, dev, "getLoadedModuleUrls", GetLoadedModuleUrlsCallback);
   InstallDevFunction(isolate, context, dev, "setDevBootComplete", SetDevBootCompleteCallback);
 
