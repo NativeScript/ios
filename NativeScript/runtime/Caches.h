@@ -163,6 +163,12 @@ class Caches {
   std::unique_ptr<v8::Persistent<v8::Function>> UnmanagedTypeCtorFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 
+  // Frozen intrinsics snapshot returned by internal/primordials.js, passed to
+  // every builtin as its second fixed parameter (BuiltinLoader::RunBuiltin).
+  // Per isolate, so workers snapshot their own realm's intrinsics.
+  std::unique_ptr<v8::Persistent<v8::Object>> Primordials =
+      std::unique_ptr<v8::Persistent<v8::Object>>(nullptr);
+
   // Internal EventTarget instance backing the global, returned by the generic
   // event-primitives bootstrap IIFE (Events::Init). Holds the real listener
   // store, so native layers dispatch through it without going through

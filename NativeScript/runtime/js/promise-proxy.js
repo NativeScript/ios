@@ -3,6 +3,7 @@
 // thread settles on whichever thread resolves it, because the background
 // run loop may be dormant and marshaling a resolution to it would hang.
 const { isRuntimeRunloop } = binding;
+const { FunctionPrototypeBind, Proxy } = primordials;
 
 global.Promise = new Proxy(global.Promise, {
     construct: function(target, args) {
@@ -23,7 +24,7 @@ global.Promise = new Proxy(global.Promise, {
                 if (isFulfilled()) {
                     return;
                 }
-                const resolveCall = resolve.bind(this, value);
+                const resolveCall = FunctionPrototypeBind(resolve, this, value);
                 if (!originIsRuntimeLoop || runloop === CFRunLoopGetCurrent()) {
                     markFulfilled();
                     resolveCall();
@@ -36,7 +37,7 @@ global.Promise = new Proxy(global.Promise, {
                 if (isFulfilled()) {
                     return;
                 }
-                const rejectCall = reject.bind(this, reason);
+                const rejectCall = FunctionPrototypeBind(reject, this, reason);
                 if (!originIsRuntimeLoop || runloop === CFRunLoopGetCurrent()) {
                     markFulfilled();
                     rejectCall();
@@ -52,14 +53,14 @@ global.Promise = new Proxy(global.Promise, {
             get: function(target, name) {
                 let orig = target[name];
                 if (name === "then" || name === "catch" || name === "finally") {
-                    return orig.bind(target);
+                    return FunctionPrototypeBind(orig, target);
                 }
                 return typeof orig === 'function' ? function(x) {
                     if (!originIsRuntimeLoop || runloop === CFRunLoopGetCurrent()) {
-                        orig.bind(target, x)();
+                        FunctionPrototypeBind(orig, target, x)();
                         return target;
                     }
-                    CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, orig.bind(target, x));
+                    CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, FunctionPrototypeBind(orig, target, x));
                     CFRunLoopWakeUp(runloop);
                     return target;
                 } : orig;
