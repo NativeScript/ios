@@ -22,17 +22,53 @@ global.__JUnitSaveResults = function (text) {
     }
 
     var reportUrl = NSProcessInfo.processInfo.environment.objectForKey("REPORT_BASEURL");
-    if (reportUrl) {
-        var urlRequest = NSMutableURLRequest.requestWithURL(NSURL.URLWithString(reportUrl));
+    if (!reportUrl) {
+        return;
+    }
+
+    // The results host (TestRunnerTests.swift) waits on this single POST; if it
+    // is lost the whole run times out. Retry hard, and cap the per-request
+    // timeout so all attempts fit well inside the host's wait budget.
+    var maxAttempts = 10;
+    var retryDelayMs = 5000;
+
+    var sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration;
+    sessionConfig.timeoutIntervalForRequest = 30;
+    var session = NSURLSession.sessionWithConfigurationDelegateDelegateQueue(sessionConfig, null, NSOperationQueue.mainQueue);
+
+    function post(url, body, onFailure) {
+        var urlRequest = NSMutableURLRequest.requestWithURL(NSURL.URLWithString(url));
         urlRequest.HTTPMethod = "POST";
         urlRequest.setValueForHTTPHeaderField("Content-Type", "application/xml");
-        urlRequest.HTTPBody = NSString.stringWithString(text).dataUsingEncoding(4);
-        var sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration;
-        var queue = NSOperationQueue.mainQueue;
-        var session = NSURLSession.sessionWithConfigurationDelegateDelegateQueue(sessionConfig, null, queue);
-        var dataTask = session.dataTaskWithRequestCompletionHandler(urlRequest, (data, response, error) => { });
+        urlRequest.HTTPBody = NSString.stringWithString(body).dataUsingEncoding(4);
+        var dataTask = session.dataTaskWithRequestCompletionHandler(urlRequest, (data, response, error) => {
+            if (error) {
+                onFailure("error: " + error.localizedDescription);
+            } else if (!response || response.statusCode < 200 || response.statusCode >= 300) {
+                onFailure("status: " + (response ? response.statusCode : "none"));
+            }
+        });
         dataTask.resume();
     }
+
+    function attemptReport(attempt) {
+        post(reportUrl, text, function (reason) {
+            console.log("junit report POST failed (attempt " + attempt + "/" + maxAttempts + ", " + reason + ")");
+            if (attempt < maxAttempts) {
+                setTimeout(function () {
+                    attemptReport(attempt + 1);
+                }, retryDelayMs);
+            } else {
+                // Best-effort sentinel so the host can fail immediately with a
+                // delivery diagnostic instead of waiting out its full timeout.
+                post(reportUrl + "/delivery_failed",
+                    "junit report delivery failed after " + maxAttempts + " attempts; last failure " + reason,
+                    function () { });
+            }
+        });
+    }
+
+    attemptReport(1);
 };
 
 global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
