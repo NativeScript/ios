@@ -628,7 +628,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
           tns::Assert(!script.IsEmpty(), isolate);
 
           Local<Value> result;
-          if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
+          if (!script->Run(context).ToLocal(&result)) {
             tns::Assert(false, isolate);
           }
 
