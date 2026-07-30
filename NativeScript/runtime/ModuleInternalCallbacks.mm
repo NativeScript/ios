@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <v8.h>
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <cstdio>
 #include <memory>
@@ -90,6 +91,10 @@ static inline bool StartsWith(const std::string& s, const char* prefix) {
 static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string& registryKey);
 static std::string CanonicalizeRegistryKey(const std::string& key);
 static const char* ModuleStatusToString(v8::Module::Status status);
+// Defined with the async graph pipeline below; called from
+// DestroyModuleStateForIsolate so in-flight walks can't touch a disposed
+// isolate.
+static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate);
 
 // Turn a value JS handed us into a real v8::Promise.
 //
@@ -349,6 +354,11 @@ static ModuleHandleMap& ModuleFallbackByRelativeFor(v8::Isolate* isolate) {
 // isolate is still alive (the Runtime destructor calls this under v8::Locker,
 // before isolate disposal).
 void DestroyModuleStateForIsolate(v8::Isolate* isolate) {
+  // First: neutralize any in-flight async graph loads for this isolate.
+  // Their fetch completions check the dead flag before touching V8, and
+  // their context Globals are Reset here, while the isolate is still alive.
+  KillAsyncGraphLoadsForIsolate(isolate);
+
   std::unique_ptr<PerIsolateModuleState> state;
   {
     std::lock_guard<std::mutex> lock(ModuleStateTableMutex());
@@ -738,6 +748,409 @@ void CleanupImportMapGlobals() {
   g_volatilePatterns.clear();
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Async HTTP module-graph pipeline
+//
+// See the contract comment in ModuleInternalCallbacks.h. Mechanically:
+//
+//   EnqueueUrl(root)
+//     → FetchModuleBodyAsync (NSURLSession on a
+//       background queue — see HMRSupport.mm)
+//     → hop to the isolate's JS thread (ExecuteOnRunLoop on the runtime loop)
+//     → CompileModuleForResolveRegisterOnly (registers under the canonical
+//       URL key — the exact entry ResolveModuleCallback will look up)
+//     → GetModuleRequests() → ResolveModuleRequestForWalk → EnqueueUrl(…)
+//     → when pendingFetches drains, onComplete fires on the JS thread.
+//
+// Thread discipline: `visited`, `pendingFetches`, `failed`, `completed` are
+// touched ONLY on the isolate's JS thread (every fetch completion hops there
+// first). Only raw I/O runs off-thread. The one crossing signal is `dead`,
+// an atomic set by isolate teardown so in-flight completions become no-ops
+// instead of touching a disposed isolate.
+//
+// Failure semantics are deliberately unchanged from the synchronous loader:
+// only a ROOT fetch/compile failure fails the walk (mirroring today's
+// reject on LoadHttpModuleForUrl miss). A dependency failure is logged and
+// left for the resolver's synchronous fallback to surface during
+// instantiation — so in Stage A the walk is purely an optimization layer.
+
+namespace {
+struct AsyncGraphLoad {
+  v8::Isolate* isolate = nullptr;
+  v8::Global<v8::Context> context;
+  CFRunLoopRef jsLoop = nullptr;                   // CFRetain'd for the load's lifetime
+  std::string rootKey;                             // canonical registry key of the root URL
+  robin_hood::unordered_set<std::string> visited;  // canonical keys (JS thread only)
+  int pendingFetches = 0;                          // JS thread only
+  bool failed = false;                             // JS thread only (root failure)
+  bool completed = false;                          // JS thread only
+  std::string failureMessage;
+  size_t fetchedCount = 0;
+  size_t compiledCount = 0;
+  uint64_t startUs = 0;
+  std::atomic<bool> dead{false};  // set by isolate teardown (any thread)
+  std::function<void(bool ok, const std::string& errorMessage, v8::Local<v8::Context> context)>
+      onComplete;
+
+  ~AsyncGraphLoad() {
+    // Runs on the JS thread on the normal path (the last reference is the
+    // completion block executed there). On the teardown path the context
+    // Global has already been Reset by KillAsyncGraphLoadsForIsolate, so
+    // destroying it from a background thread is a no-op.
+    g_asyncGraphLoadsInFlightCounter().fetch_sub(1, std::memory_order_acq_rel);
+    if (jsLoop != nullptr) {
+      CFRelease(jsLoop);
+    }
+  }
+
+  static std::atomic<int>& g_asyncGraphLoadsInFlightCounter() {
+    static std::atomic<int> counter{0};
+    return counter;
+  }
+};
+
+std::mutex& AsyncGraphLoadsMutex() {
+  // Leaked-on-purpose (see ModuleStateTableMutex rationale above).
+  static std::mutex* mutex = new std::mutex();
+  return *mutex;
+}
+
+robin_hood::unordered_map<v8::Isolate*, std::vector<std::weak_ptr<AsyncGraphLoad>>>&
+AsyncGraphLoadsByIsolate() {
+  static auto* table =
+      new robin_hood::unordered_map<v8::Isolate*, std::vector<std::weak_ptr<AsyncGraphLoad>>>();
+  return *table;
+}
+
+void RegisterAsyncGraphLoad(v8::Isolate* isolate, const std::shared_ptr<AsyncGraphLoad>& load) {
+  std::lock_guard<std::mutex> lock(AsyncGraphLoadsMutex());
+  auto& loads = AsyncGraphLoadsByIsolate()[isolate];
+  // Prune expired entries opportunistically so the vector stays small.
+  loads.erase(std::remove_if(loads.begin(), loads.end(),
+                             [](const std::weak_ptr<AsyncGraphLoad>& w) { return w.expired(); }),
+              loads.end());
+  loads.push_back(load);
+}
+}  // namespace
+
+bool HasPendingAsyncModuleGraphWork() {
+  return AsyncGraphLoad::g_asyncGraphLoadsInFlightCounter().load(std::memory_order_acquire) > 0;
+}
+
+// Isolate-teardown hook: mark every in-flight load owned by `isolate` dead
+// (pending fetch completions become no-ops) and Reset their context Globals
+// NOW, while the isolate is still alive — nothing may destroy a v8::Global
+// after isolate disposal. Called from DestroyModuleStateForIsolate.
+static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate) {
+  std::vector<std::shared_ptr<AsyncGraphLoad>> doomed;
+  {
+    std::lock_guard<std::mutex> lock(AsyncGraphLoadsMutex());
+    auto& table = AsyncGraphLoadsByIsolate();
+    auto it = table.find(isolate);
+    if (it == table.end()) {
+      return;
+    }
+    for (auto& weak : it->second) {
+      if (auto load = weak.lock()) {
+        doomed.push_back(std::move(load));
+      }
+    }
+    table.erase(it);
+  }
+  for (auto& load : doomed) {
+    load->dead.store(true, std::memory_order_release);
+    load->context.Reset();
+  }
+}
+
+// Resolve one static module request to an absolute HTTP(S) URL using the
+// SAME logic ResolveModuleCallback applies, in the same order: malformed
+// scheme repair → import map (direct, then Vite-normalized) → absolute
+// HTTP passthrough → relative/root-absolute resolution against an HTTP
+// referrer. Returns empty for everything the walk should NOT touch (local
+// files, tilde paths, unmapped bare specifiers, node: builtins without an
+// import-map entry) — those stay on the resolver's lazy synchronous path.
+static std::string ResolveModuleRequestForWalk(const std::string& rawSpec,
+                                               const std::string& referrerUrl) {
+  if (rawSpec.empty() || rawSpec == "@") {
+    return "";
+  }
+  std::string spec = rawSpec;
+  if (spec.rfind("http:/", 0) == 0 && spec.rfind("http://", 0) != 0) {
+    spec.insert(5, "/");
+  } else if (spec.rfind("https:/", 0) == 0 && spec.rfind("https://", 0) != 0) {
+    spec.insert(6, "/");
+  }
+
+  if (!g_importMap.empty()) {
+    std::string mapped = LookupImportMap(spec);
+    if (mapped.empty()) {
+      std::string normalized = NormalizeViteSpecifier(spec);
+      if (!normalized.empty()) {
+        mapped = LookupImportMap(normalized);
+      }
+    }
+    if (!mapped.empty()) {
+      spec = mapped;
+    }
+  }
+
+  if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
+    return spec;
+  }
+
+  const bool specIsRelative = !spec.empty() && spec[0] == '.';
+  const bool specIsRootAbs = !spec.empty() && spec[0] == '/';
+  const bool referrerIsHttp =
+      StartsWith(referrerUrl, "http://") || StartsWith(referrerUrl, "https://");
+  if ((specIsRelative || specIsRootAbs) && referrerIsHttp) {
+    std::string resolved;
+    @autoreleasepool {
+      NSString* baseStr = [NSString stringWithUTF8String:referrerUrl.c_str()];
+      NSString* specStr = [NSString stringWithUTF8String:spec.c_str()];
+      if (baseStr && specStr) {
+        NSURL* baseURL = [NSURL URLWithString:baseStr];
+        NSURL* rel = [NSURL URLWithString:specStr relativeToURL:baseURL];
+        NSURL* absURL = [rel absoluteURL];
+        if (absURL) {
+          NSString* absStr = [absURL absoluteString];
+          if (absStr) {
+            resolved = std::string([absStr UTF8String] ?: "");
+          }
+        }
+      }
+    }
+    if (StartsWith(resolved, "http://") || StartsWith(resolved, "https://")) {
+      return resolved;
+    }
+  }
+
+  return "";
+}
+
+static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
+                                 const std::string& url);
+
+// Walk `mod`'s static module requests and enqueue every HTTP-resolvable
+// dependency. JS thread only; `moduleUrl` is the canonical URL the module
+// was registered under (the referrer for relative resolution).
+static void AsyncGraphWalkModuleRequests(const std::shared_ptr<AsyncGraphLoad>& load,
+                                         v8::Local<v8::Context> context, v8::Local<v8::Module> mod,
+                                         const std::string& moduleUrl) {
+  v8::Isolate* isolate = load->isolate;
+  v8::Local<v8::FixedArray> requests = mod->GetModuleRequests();
+  const int length = requests->Length();
+  for (int i = 0; i < length; i++) {
+    v8::Local<v8::ModuleRequest> request = requests->Get(i).As<v8::ModuleRequest>();
+    if (request.IsEmpty()) {
+      continue;
+    }
+    v8::Local<v8::String> specV8 = request->GetSpecifier();
+    v8::String::Utf8Value specUtf8(isolate, specV8);
+    if (!*specUtf8) {
+      continue;
+    }
+    std::string resolved = ResolveModuleRequestForWalk(*specUtf8, moduleUrl);
+    if (resolved.empty()) {
+      continue;
+    }
+    AsyncGraphEnqueueUrl(load, resolved);
+  }
+}
+
+// Fire onComplete exactly once, when the frontier has drained. JS thread only.
+static void AsyncGraphMaybeComplete(const std::shared_ptr<AsyncGraphLoad>& load,
+                                    v8::Local<v8::Context> context) {
+  if (load->completed || load->pendingFetches > 0) {
+    return;
+  }
+  load->completed = true;
+  if (IsScriptLoadingLogEnabled()) {
+    const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+    const uint64_t ms = endUs > load->startUs ? (endUs - load->startUs) / 1000ull : 0ull;
+    Log(@"[async-graph][done] root=%s urls=%lu fetched=%lu compiled=%lu ms=%llu ok=%d",
+        load->rootKey.c_str(), (unsigned long)load->visited.size(),
+        (unsigned long)load->fetchedCount, (unsigned long)load->compiledCount,
+        (unsigned long long)ms, load->failed ? 0 : 1);
+  }
+  auto onComplete = std::move(load->onComplete);
+  load->onComplete = nullptr;
+  if (onComplete) {
+    // The completion may run outside any V8 host callback (CFRunLoop
+    // callout), where a pending exception thrown by the legacy loader's
+    // debug path (isolate->ThrowException in LoadHttpModuleForUrl) has no
+    // V8 frame to land in. Every failure path below already surfaces the
+    // error through promise rejection, so swallow anything left pending.
+    v8::TryCatch tc(load->isolate);
+    onComplete(!load->failed, load->failureMessage, context);
+  }
+}
+
+// A fetched body arrived on the isolate's JS thread: compile + register it,
+// then walk its requests. Runs outside any V8 scope (CFRunLoop callout), so
+// it enters the isolate the same way other cross-thread callbacks do.
+static void AsyncGraphOnFetchCompleted(const std::shared_ptr<AsyncGraphLoad>& load,
+                                       const std::string& url, bool ok, int status,
+                                       const std::shared_ptr<std::string>& body) {
+  if (load->dead.load(std::memory_order_acquire)) {
+    return;
+  }
+  v8::Isolate* isolate = load->isolate;
+  if (Runtime::GetRuntime(isolate) == nullptr) {
+    // Isolate torn down between scheduling and execution.
+    return;
+  }
+
+  v8::Locker locker(isolate);
+  v8::Isolate::Scope isolate_scope(isolate);
+  v8::HandleScope handle_scope(isolate);
+  v8::Local<v8::Context> context = load->context.Get(isolate);
+  if (context.IsEmpty()) {
+    return;
+  }
+  v8::Context::Scope context_scope(context);
+
+  load->pendingFetches--;
+
+  const std::string key = CanonicalizeHttpUrlKey(url);
+  const bool isRoot = (key == load->rootKey);
+
+  if (!load->failed) {
+    if (!ok) {
+      if (isRoot) {
+        load->failed = true;
+        load->failureMessage =
+            "HTTP import failed: " + url + " (status=" + std::to_string(status) + ")";
+      } else if (IsScriptLoadingLogEnabled()) {
+        Log(@"[async-graph][dep-fetch-fail] %s status=%d (left to sync resolver)", url.c_str(),
+            status);
+      }
+    } else {
+      load->fetchedCount++;
+      v8::MaybeLocal<v8::Module> maybeMod =
+          CompileModuleForResolveRegisterOnly(isolate, context, *body, key);
+      v8::Local<v8::Module> mod;
+      if (!maybeMod.ToLocal(&mod)) {
+        if (isRoot) {
+          load->failed = true;
+          load->failureMessage = "HTTP import compile failed: " + url;
+        } else if (IsScriptLoadingLogEnabled()) {
+          Log(@"[async-graph][dep-compile-fail] %s (left to sync resolver)", url.c_str());
+        }
+      } else {
+        load->compiledCount++;
+        AsyncGraphWalkModuleRequests(load, context, mod, key);
+      }
+    }
+  }
+
+  AsyncGraphMaybeComplete(load, context);
+  // Promise jobs produced by onComplete (waiter resolution, TLA chains) run
+  // now — mirrors how the sync loader's boot pump drains microtasks.
+  isolate->PerformMicrotaskCheckpoint();
+}
+
+// Enqueue one URL into the walk frontier. JS thread only.
+static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
+                                 const std::string& url) {
+  const std::string key = CanonicalizeHttpUrlKey(url);
+  if (!load->visited.insert(key).second) {
+    return;
+  }
+
+  v8::Isolate* isolate = load->isolate;
+  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto it = g_moduleRegistry.find(key);
+  if (it != g_moduleRegistry.end()) {
+    v8::Local<v8::Module> existing = it->second.Get(isolate);
+    if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
+      if (existing->GetStatus() == v8::Module::kUninstantiated) {
+        // Compiled but never linked (an earlier partial walk): its own
+        // requests may not be registered yet — keep walking through it
+        // without re-fetching.
+        v8::Local<v8::Context> context = load->context.Get(isolate);
+        if (!context.IsEmpty()) {
+          AsyncGraphWalkModuleRequests(load, context, existing, key);
+        }
+      }
+      return;  // instantiated/evaluated → its closure is already resolved
+    }
+    // Errored entry: drop and refetch, mirroring LoadHttpModuleForUrl.
+    RemoveModuleFromRegistry(key);
+  }
+
+  load->pendingFetches++;
+  CFRunLoopRef jsLoop = load->jsLoop;
+  std::shared_ptr<AsyncGraphLoad> loadRef = load;
+  FetchModuleBodyAsync(url, [loadRef, url, jsLoop](bool ok, int status, std::string body) {
+    // Arbitrary thread. Hop to the isolate's JS thread before touching any
+    // walk state or V8. If the isolate died in between, drop everything —
+    // the context Global was already Reset by the teardown hook.
+    if (loadRef->dead.load(std::memory_order_acquire) || jsLoop == nullptr) {
+      return;
+    }
+    auto bodyPtr = std::make_shared<std::string>(std::move(body));
+    tns::ExecuteOnRunLoop(jsLoop, ^{
+      AsyncGraphOnFetchCompleted(loadRef, url, ok, status, bodyPtr);
+    });
+  });
+}
+
+void StartAsyncHttpModuleGraphLoad(
+    v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& rootUrl,
+    std::function<void(bool ok, const std::string& errorMessage, v8::Local<v8::Context> context)>
+        onComplete) {
+  auto load = std::make_shared<AsyncGraphLoad>();
+  load->isolate = isolate;
+  load->context.Reset(isolate, context);
+  load->rootKey = CanonicalizeHttpUrlKey(rootUrl);
+  load->startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+  load->onComplete = std::move(onComplete);
+
+  Runtime* runtime = Runtime::GetCurrentRuntime();
+  CFRunLoopRef loop = runtime != nullptr ? runtime->RuntimeLoop() : CFRunLoopGetCurrent();
+  if (loop != nullptr) {
+    CFRetain(loop);
+  }
+  load->jsLoop = loop;
+
+  AsyncGraphLoad::g_asyncGraphLoadsInFlightCounter().fetch_add(1, std::memory_order_acq_rel);
+  RegisterAsyncGraphLoad(isolate, load);
+
+  if (IsScriptLoadingLogEnabled()) {
+    Log(@"[async-graph][start] root=%s key=%s", rootUrl.c_str(), load->rootKey.c_str());
+  }
+
+  AsyncGraphEnqueueUrl(load, rootUrl);
+  // Root already registered (or nothing fetchable): complete inline.
+  AsyncGraphMaybeComplete(load, context);
+}
+
+bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                                       const std::string& rootUrl, double timeoutSeconds) {
+  if (timeoutSeconds <= 0.0) {
+    timeoutSeconds = 60.0;
+  }
+  auto done = std::make_shared<bool>(false);
+  StartAsyncHttpModuleGraphLoad(isolate, context, rootUrl,
+                                [done](bool /*ok*/, const std::string& /*errorMessage*/,
+                                       v8::Local<v8::Context>) { *done = true; });
+
+  // Manual runloop pump ("until either all is settled or UIApplicationMain
+  // is called"): the walk's completion blocks are queued on this thread's
+  // runloop, so slicing RunInMode services them. If UIApplicationMain takes
+  // over later, its runloop services any remaining work instead.
+  const CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + timeoutSeconds;
+  while (!*done && CFAbsoluteTimeGetCurrent() < deadline) {
+    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
+  }
+  if (!*done && IsScriptLoadingLogEnabled()) {
+    Log(@"[async-graph][pumped][timeout] root=%s after %.1fs (sync loader takes over)",
+        rootUrl.c_str(), timeoutSeconds);
+  }
+  return *done;
+}
+
 // g_modulesInFlight is defined later in this translation unit (thread_local static); no extern
 // needed here.
 
@@ -921,20 +1334,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     RemoveModuleFromRegistry(url);
   }
 
-  // Drop stale HTTP bodies from the kickstart prewarm cache for
-  // every URL we just invalidated. Without this, the next
-  // `HttpFetchText` for an evicted URL would happily return a stale
-  // body a previous kickstart wave left in the cache, and V8
-  // would compile that stale source — producing the "1 cycle behind"
-  // lag for `.ts` edits with many transitive importers (e.g.
-  // constants files). The registry eviction above alone is necessary
-  // but not sufficient: V8 calls into the loader for any module no
-  // longer in the registry, and the loader's first stop is
-  // `g_prefetchCache`. Both caches must be cleared for the next
-  // compile to see fresh source.
-  EvictHttpModulePrefetchCacheUrls(uniqueUrls);
-
-  // Third layer: the OS/CFNetwork HTTP cache is outside the runtime's
+  // Second layer: the OS/CFNetwork HTTP cache is outside the runtime's
   // direct control and has been observed serving a previous save's body
   // even with `no-store` headers + a reload-ignoring cache policy
   // (iOS 18+/26+ Simulator). Mark every invalidated key so the NEXT
@@ -2483,6 +2883,133 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Completion tail for an HTTP dynamic import whose graph was loaded by the
+// async pipeline (or that needs the legacy in-line load as a fallback).
+// Assumes the caller has already marked `key` in-flight and queued at least
+// one waiter in g_httpDynamicWaiters — every exit path below settles those
+// waiters. `requestUrl` is the normalized (pre-canonicalization) request.
+//
+// When the phase-1 walk succeeded, LoadHttpModuleForUrl is a registry hit
+// and InstantiateModule's resolver runs as a pure lookup; any URL the walk
+// missed degrades to the legacy synchronous fetch inside the resolver.
+static void FinishHttpDynamicImport(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                                    const std::string& key, const std::string& requestUrl) {
+  if (IsScriptLoadingLogEnabled()) {
+    auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+    if (g_moduleRegistry.find(key) == g_moduleRegistry.end()) {
+      // The async walk was expected to have registered the root; falling
+      // back to the synchronous loader here means the walk missed it.
+      Log(@"[async-graph][fallback-sync-load] root missed walk: %s", key.c_str());
+    }
+  }
+  v8::MaybeLocal<v8::Module> modMaybe = LoadHttpModuleForUrl(isolate, context, requestUrl);
+  if (!modMaybe.IsEmpty()) {
+    v8::Local<v8::Module> mod;
+    if (modMaybe.ToLocal(&mod)) {
+      if (mod->GetStatus() == v8::Module::kUninstantiated) {
+        v8::TryCatch tcInstantiate(isolate);
+        if (!mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
+          RemoveModuleFromRegistry(key);
+          RejectHttpDynamicWaiters(
+              isolate, context, key,
+              BuildModuleFailureReason(isolate, tcInstantiate, "Instantiation failed (http-loader)",
+                                       requestUrl));
+          return;
+        }
+      }
+
+      if (IsModuleEvaluationInProgress(mod->GetStatus())) {
+        if (IsScriptLoadingLogEnabled()) {
+          Log(@"[dyn-import][http-loader] waiting on existing evaluation for %s status=%s",
+              key.c_str(), ModuleStatusToString(mod->GetStatus()));
+        }
+        return;
+      }
+
+      // Evaluate once compiled so that namespace is valid for dynamic import resolution
+      if (mod->GetStatus() != v8::Module::kEvaluated) {
+        v8::Local<v8::Value> evalResult;
+        {
+          v8::TryCatch tcEvaluate(isolate);
+          if (!mod->Evaluate(context).ToLocal(&evalResult)) {
+            // Remove broken registration and reject
+            RemoveModuleFromRegistry(key);
+            RejectHttpDynamicWaiters(
+                isolate, context, key,
+                BuildModuleFailureReason(isolate, tcEvaluate, "Evaluation failed (http-loader)",
+                                         requestUrl));
+            return;
+          }
+        }
+        // If Evaluate returned a Promise (top-level await), wait until it settles before
+        // resolving
+        if (!evalResult.IsEmpty() && evalResult->IsPromise()) {
+          v8::Local<v8::Promise> p = evalResult.As<v8::Promise>();
+          struct EvalWaitData2 {
+            std::string key;
+            v8::Global<v8::Context> ctx;
+            v8::Global<v8::Module> mod;
+          };
+          auto* data2 = new EvalWaitData2{key, v8::Global<v8::Context>(isolate, context),
+                                          v8::Global<v8::Module>(isolate, mod)};
+          auto onFulfilled2 = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            v8::Isolate* iso = info.GetIsolate();
+            v8::HandleScope hs(iso);
+            if (!info.Data()->IsExternal()) return;
+            auto* d = static_cast<EvalWaitData2*>(
+                info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
+            v8::Local<v8::Context> ctx = d->ctx.Get(iso);
+            std::string keyLocal = d->key;
+            v8::Local<v8::Module> modLocal = d->mod.Get(iso);
+            ResolveHttpDynamicWaiters(iso, ctx, keyLocal, modLocal);
+            delete d;
+          };
+          auto onRejected2 = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            v8::Isolate* iso = info.GetIsolate();
+            v8::HandleScope hs(iso);
+            if (!info.Data()->IsExternal()) return;
+            auto* d = static_cast<EvalWaitData2*>(
+                info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
+            v8::Local<v8::Context> ctx = d->ctx.Get(iso);
+            std::string keyLocal = d->key;
+            v8::Local<v8::Value> reason = (info.Length() > 0)
+                                              ? info[0]
+                                              : v8::Exception::Error(tns::ToV8String(
+                                                    iso, "Evaluation failed (http-loader TLA)"));
+            if (IsScriptLoadingLogEnabled()) {
+              v8::String::Utf8Value r(iso, reason);
+              if (*r) {
+                Log(@"[dyn-import][http-loader][tla] rejected: %s", *r);
+              }
+            }
+            RejectHttpDynamicWaiters(iso, ctx, keyLocal, reason);
+            delete d;
+          };
+          v8::Local<v8::FunctionTemplate> thenFulfillTpl2 = v8::FunctionTemplate::New(
+              isolate, onFulfilled2,
+              v8::External::New(isolate, data2, v8::kExternalPointerTypeTagDefault));
+          v8::Local<v8::Function> thenFulfill2 =
+              thenFulfillTpl2->GetFunction(context).ToLocalChecked();
+          v8::Local<v8::FunctionTemplate> thenRejectTpl2 = v8::FunctionTemplate::New(
+              isolate, onRejected2,
+              v8::External::New(isolate, data2, v8::kExternalPointerTypeTagDefault));
+          v8::Local<v8::Function> thenReject2 =
+              thenRejectTpl2->GetFunction(context).ToLocalChecked();
+          p->Then(context, thenFulfill2, thenReject2).ToLocalChecked();
+          return;
+        }
+      }
+      ResolveHttpDynamicWaiters(isolate, context, key, mod);
+      return;
+    }
+  }
+  // On fetch/compile miss: clean inflight and reject queued
+  RejectHttpDynamicWaiters(
+      isolate, context, key,
+      v8::Exception::Error(tns::ToV8String(isolate, "HTTP fetch/compile failed")));
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Dynamic import() host callback
 v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::Local<v8::Context> context, v8::Local<v8::Data> host_defined_options,
@@ -3151,7 +3678,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           }
         }
       }
-      // mark in-flight before starting network fetch
+      // mark in-flight before starting the async graph load
       g_modulesInFlight.insert(key);
       g_httpDynamicWaiters[key].emplace_back(isolate, resolver);
       // Permanent observability: surface fresh fetches so we can confirm
@@ -3162,111 +3689,26 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           (key.find("ns/m/") != std::string::npos || key.find(".component") != std::string::npos)) {
         Log(@"[ns-hmr][ios-dyn-cache] FRESH-FETCH %s", key.c_str());
       }
-      v8::MaybeLocal<v8::Module> modMaybe = LoadHttpModuleForUrl(isolate, context, normalizedSpec);
-      if (!modMaybe.IsEmpty()) {
-        v8::Local<v8::Module> mod;
-        if (modMaybe.ToLocal(&mod)) {
-          if (mod->GetStatus() == v8::Module::kUninstantiated) {
-            v8::TryCatch tcInstantiate(isolate);
-            if (!mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
-              RemoveModuleFromRegistry(key);
+      // Async pipeline: fetch + compile the transitive closure off the JS
+      // thread's critical path, then instantiate/evaluate and settle the
+      // queued waiters from the walk's completion. The promise returns to JS
+      // immediately — no synchronous fetch, no runloop pump.
+      const std::string requestUrl = normalizedSpec;
+      StartAsyncHttpModuleGraphLoad(
+          isolate, context, requestUrl,
+          [key, requestUrl, isolate](bool ok, const std::string& errorMessage,
+                                     v8::Local<v8::Context> completionContext) {
+            // JS thread; isolate entered and context scoped by the pipeline.
+            v8::Isolate* iso = isolate;
+            if (!ok) {
               RejectHttpDynamicWaiters(
-                  isolate, context, key,
-                  BuildModuleFailureReason(isolate, tcInstantiate,
-                                           "Instantiation failed (http-loader)", normalizedSpec));
-              return scope.Escape(resolver->GetPromise());
+                  iso, completionContext, key,
+                  v8::Exception::Error(tns::ToV8String(iso, errorMessage.c_str())));
+              return;
             }
-          }
-
-          if (IsModuleEvaluationInProgress(mod->GetStatus())) {
-            if (IsScriptLoadingLogEnabled()) {
-              Log(@"[dyn-import][http-loader] waiting on existing evaluation for %s status=%s",
-                  key.c_str(), ModuleStatusToString(mod->GetStatus()));
-            }
-            return scope.Escape(resolver->GetPromise());
-          }
-
-          // Evaluate once compiled so that namespace is valid for dynamic import resolution
-          if (mod->GetStatus() != v8::Module::kEvaluated) {
-            v8::Local<v8::Value> evalResult;
-            {
-              v8::TryCatch tcEvaluate(isolate);
-              if (!mod->Evaluate(context).ToLocal(&evalResult)) {
-                // Remove broken registration and reject
-                RemoveModuleFromRegistry(key);
-                RejectHttpDynamicWaiters(
-                    isolate, context, key,
-                    BuildModuleFailureReason(isolate, tcEvaluate, "Evaluation failed (http-loader)",
-                                             normalizedSpec));
-                return scope.Escape(resolver->GetPromise());
-              }
-            }
-            // If Evaluate returned a Promise (top-level await), wait until it settles before
-            // resolving
-            if (!evalResult.IsEmpty() && evalResult->IsPromise()) {
-              v8::Local<v8::Promise> p = evalResult.As<v8::Promise>();
-              struct EvalWaitData2 {
-                std::string key;
-                v8::Global<v8::Context> ctx;
-                v8::Global<v8::Module> mod;
-              };
-              auto* data2 = new EvalWaitData2{key, v8::Global<v8::Context>(isolate, context),
-                                              v8::Global<v8::Module>(isolate, mod)};
-              auto onFulfilled2 = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                v8::Isolate* iso = info.GetIsolate();
-                v8::HandleScope hs(iso);
-                if (!info.Data()->IsExternal()) return;
-                auto* d = static_cast<EvalWaitData2*>(
-                    info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
-                v8::Local<v8::Context> ctx = d->ctx.Get(iso);
-                std::string keyLocal = d->key;
-                v8::Local<v8::Module> modLocal = d->mod.Get(iso);
-                ResolveHttpDynamicWaiters(iso, ctx, keyLocal, modLocal);
-                delete d;
-              };
-              auto onRejected2 = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                v8::Isolate* iso = info.GetIsolate();
-                v8::HandleScope hs(iso);
-                if (!info.Data()->IsExternal()) return;
-                auto* d = static_cast<EvalWaitData2*>(
-                    info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
-                v8::Local<v8::Context> ctx = d->ctx.Get(iso);
-                std::string keyLocal = d->key;
-                v8::Local<v8::Value> reason =
-                    (info.Length() > 0) ? info[0]
-                                        : v8::Exception::Error(tns::ToV8String(
-                                              iso, "Evaluation failed (http-loader TLA)"));
-                if (IsScriptLoadingLogEnabled()) {
-                  v8::String::Utf8Value r(iso, reason);
-                  if (*r) {
-                    Log(@"[dyn-import][http-loader][tla] rejected: %s", *r);
-                  }
-                }
-                RejectHttpDynamicWaiters(iso, ctx, keyLocal, reason);
-                delete d;
-              };
-              v8::Local<v8::FunctionTemplate> thenFulfillTpl2 = v8::FunctionTemplate::New(
-                  isolate, onFulfilled2,
-                  v8::External::New(isolate, data2, v8::kExternalPointerTypeTagDefault));
-              v8::Local<v8::Function> thenFulfill2 =
-                  thenFulfillTpl2->GetFunction(context).ToLocalChecked();
-              v8::Local<v8::FunctionTemplate> thenRejectTpl2 = v8::FunctionTemplate::New(
-                  isolate, onRejected2,
-                  v8::External::New(isolate, data2, v8::kExternalPointerTypeTagDefault));
-              v8::Local<v8::Function> thenReject2 =
-                  thenRejectTpl2->GetFunction(context).ToLocalChecked();
-              p->Then(context, thenFulfill2, thenReject2).ToLocalChecked();
-              return scope.Escape(resolver->GetPromise());
-            }
-          }
-          ResolveHttpDynamicWaiters(isolate, context, key, mod);
-          return scope.Escape(resolver->GetPromise());
-        }
-      }
-      // On fetch/compile miss: clean inflight and reject queued
-      RejectHttpDynamicWaiters(
-          isolate, context, key,
-          v8::Exception::Error(tns::ToV8String(isolate, "HTTP fetch/compile failed")));
+            FinishHttpDynamicImport(iso, completionContext, key, requestUrl);
+          });
+      return scope.Escape(resolver->GetPromise());
     }
 
     // Attempt to resolve relative specs against the referrer's resource URL if available.
