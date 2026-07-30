@@ -1057,6 +1057,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   ScriptCompiler::CachedData* cacheData = nullptr;
   if (isHttpModule) {
     logPhase("compile", "delegate-http");
+    // Async-pipeline pre-pass: fetch + compile the entry's transitive
+    // closure with concurrent background fetches, pumping this thread's
+    // runloop until the graph settles (the "manual runloop until settled"
+    // boot handoff for static HTTP entries). Afterwards the load below is a
+    // registry hit and instantiation resolves as pure lookup. On timeout or
+    // partial coverage the legacy synchronous path still owns correctness.
+    RunAsyncHttpModuleGraphLoadPumped(isolate, context, requestPath, 60.0);
     MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
     if (!maybeMod.ToLocal(&module)) {
       logPhase("compile", "fail", "http-loader");

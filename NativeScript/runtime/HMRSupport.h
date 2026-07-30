@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -20,14 +21,14 @@ namespace tns {
 // HMRSupport: the native half of the NativeScript dev-loader contract.
 //
 // The runtime deliberately exposes *mechanism* only:
-//   - the synchronous HTTP text fetch backing the HTTP ESM loader
-//     (V8's ResolveModuleCallback is synchronous — still true as of
-//     14.9.207.39 — so the fetch must be native),
-//   - a body prewarm cache + list-mode kickstart so a server-computed
-//     module closure can be fetched in one parallel wave before V8's
-//     serial synchronous walk,
-//   - eviction plumbing (prefetch-cache evict + an eviction-driven
-//     fetch nonce that defeats CFNetwork's HTTP cache),
+//   - the synchronous HTTP text fetch backing the HTTP ESM loader's
+//     fallback path (V8's ResolveModuleCallback is synchronous — still
+//     true as of 14.9.207.39 — so the fallback must be native),
+//   - the async NSURLSession fetch behind the phase-1 module-graph walk
+//     (StartAsyncHttpModuleGraphLoad), which is how module bodies
+//     normally arrive,
+//   - eviction plumbing (an eviction-driven fetch nonce that defeats
+//     CFNetwork's HTTP cache),
 //   - the dev-boot-complete signal that disarms cold-boot-only
 //     behaviors (runloop pump, connection-recovery wait).
 //
@@ -51,16 +52,25 @@ std::string CanonicalizeHttpUrlKey(const std::string& url);
 // - contentType: Content-Type header if present
 // - status: HTTP status code
 //
-// On a fast path, returns from the in-memory kickstart-prewarm cache
-// without touching the network (destructive one-shot read). On the slow
-// path, performs a synchronous fetch with one retry.
+// Synchronous fetch with one retry — this is the fallback path for
+// anything the async module-graph walk missed.
 bool HttpFetchText(const std::string& url, std::string& out,
                    std::string& contentType, int& status);
 
-// Drop all entries in the prewarm cache. Safe to call from any thread.
-// Used by Runtime teardown and by HMR cache-poison scenarios where the
-// dev server has indicated a graph version bump.
-void ClearHttpModulePrefetchCache();
+// Asynchronous single-URL module body fetch — the I/O primitive behind the
+// phase-1 module-graph walk (see StartAsyncHttpModuleGraphLoad in
+// ModuleInternalCallbacks.h). Same semantics as HttpFetchText, minus the
+// JS-thread block:
+//   - security gate (IsRemoteUrlAllowed) checked up front,
+//   - an NSURLSession GET on a background queue with the same request
+//     shape as the sync path (cache-bust nonce, zero-cache headers,
+//     no cookies) and one retry on transport error,
+//   - empty 2xx bodies normalize to the canonical empty module.
+// `completion(ok, status, body)` is invoked exactly once, on an arbitrary
+// thread — callers must hop to their JS thread before touching V8.
+void FetchModuleBodyAsync(
+    const std::string& url,
+    std::function<void(bool ok, int status, std::string body)> completion);
 
 // Register a "yield" callback that `HttpFetchText` should invoke around its
 // synchronous network turn so the caller can pump its own runloop (e.g. the
@@ -74,15 +84,6 @@ void ClearHttpModulePrefetchCache();
 // Safe to call from any thread; reads use acquire/release ordering.
 void RegisterHttpFetchYield(void (*callback)());
 
-// Drop a specific URL set from the prewarm cache. Safe to call from any
-// thread; missing keys are silently ignored. Used by `InvalidateModules`
-// so that an HMR eviction also purges any stale HTTP body a previous
-// kickstart wave left behind. Without this, the kickstart's cache plus
-// `HttpFetchText`'s destructive-read fast path would happily serve V8 a
-// stale body from the prior save — visible to the user as a 1-cycle lag
-// between save and visual update.
-void EvictHttpModulePrefetchCacheUrls(const std::vector<std::string>& urls);
-
 // Mark a URL set (canonicalized internally) so that the NEXT network
 // fetch of each URL carries a unique `__ns_dev_nonce` query parameter,
 // guaranteeing CFNetwork cannot satisfy the request from any HTTP cache
@@ -92,42 +93,19 @@ void EvictHttpModulePrefetchCacheUrls(const std::vector<std::string>& urls);
 // The nonce is transport-only and never affects module identity.
 void MarkUrlsForCacheBust(const std::vector<std::string>& urls);
 
-// List-mode kickstart prewarm. Fetches ONLY the explicit URL list it
-// was given (no body scanning, no graph recursion — the dev server owns
-// the module graph and supplies closures: `evictPaths` for HMR, an
-// entry-graph crawl for cold boot). Fetches run in parallel (up to
-// `maxConcurrent`), each body landing in the prewarm cache that
-// `HttpFetchText` reads. Blocks the calling thread until the wave
-// drains or `timeoutSeconds` elapses.
-//
-// By feeding the precomputed list we turn N sequential
-// `LoadHttpModuleForUrl` calls (the importer chain during V8's
-// ResolveModuleCallback walk) into a single parallel wave that
-// completes before V8 starts walking.
-//
-// Cleared/blocked URLs are filtered up front; partial success is
-// reported as success (the V8 walk falls back to per-module
-// HttpFetchText for anything we couldn't pre-fill).
-//
-// `outFetchedCount` (optional) receives the number of distinct URLs
-// fetched. `outElapsedMs` (optional) receives wall-clock time.
-bool KickstartHmrPrefetchUrlsSync(const std::vector<std::string>& urls,
-                                  int maxConcurrent, double timeoutSeconds,
-                                  size_t* outFetchedCount,
-                                  uint64_t* outElapsedMs);
-
 // Flip the dev-boot-complete signal: sets the JS-visible
 // `__NS_HMR_BOOT_COMPLETE__` global and the native atomic that gates the
 // cold-boot-only behaviors (JS-thread runloop pump between synchronous
-// fetches, kickstart pump-wait). Exposed to JS as
+// fetches). Exposed to JS as
 // `__NS_DEV__.setDevBootComplete(value?: boolean)`.
 void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context,
                         bool value);
 
-// Clear process-wide dev-loader state (prewarm cache, cache-bust marks,
-// boot-complete flag). MUST be called inside Runtime::~Runtime() before
-// isolate disposal — and only for the MAIN isolate (worker teardown must
-// not wipe shared state the main isolate still uses).
+// Clear process-wide dev-loader state (cache-bust marks, boot-complete
+// flag, canonicalization vocabulary). MUST be called inside
+// Runtime::~Runtime() before isolate disposal — and only for the MAIN
+// isolate (worker teardown must not wipe shared state the main isolate
+// still uses).
 void CleanupHMRGlobals();
 
 // Mirror a globally-installed value onto `globalThis.<name>` so
@@ -149,9 +127,6 @@ void MirrorGlobalOnGlobalThis(v8::Isolate* isolate,
 //   - configureRuntime(config)        (import map + volatile patterns +
 //                                      canonicalization vocabulary)
 //   - invalidateModules(urls)         (registry + cache eviction)
-//   - prewarm(entries, opts?)         (string entries: parallel HTTP fetch
-//                                      wave; {url, body} entries: zero-fetch
-//                                      seeding, e.g. from the boot archive)
 //   - getLoadedModuleUrls()           (registry introspection)
 //   - setDevBootComplete(value?)      (boot-complete signal)
 //   - terminateAllWorkers()           (main isolate only; see Worker.h)
