@@ -618,23 +618,25 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     if (wrapper != nullptr) {
       if (wrapper->Type() == WrapperType::Enum) {
         EnumDataWrapper* enumWrapper = static_cast<EnumDataWrapper*>(wrapper);
-        Local<Context> context = isolate->GetCurrentContext();
-        std::string jsCode = enumWrapper->JSCode();
-        Local<Script> script;
-        if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
-          tns::Assert(false, isolate);
+        if (!enumWrapper->HasCachedValue()) {
+          Local<Context> context = isolate->GetCurrentContext();
+          std::string jsCode = enumWrapper->JSCode();
+          Local<Script> script;
+          if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
+            tns::Assert(false, isolate);
+          }
+          tns::Assert(!script.IsEmpty(), isolate);
+
+          Local<Value> result;
+          if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
+            tns::Assert(false, isolate);
+          }
+
+          tns::Assert(result->IsNumber(), isolate);
+
+          enumWrapper->SetCachedValue(result.As<Number>()->Value());
         }
-        tns::Assert(!script.IsEmpty(), isolate);
-
-        Local<Value> result;
-        if (!script->Run(context).ToLocal(&result) && !result.IsEmpty()) {
-          tns::Assert(false, isolate);
-        }
-
-        tns::Assert(result->IsNumber(), isolate);
-
-        double value = result.As<Number>()->Value();
-        SetValue(dest, value);
+        SetValue(dest, enumWrapper->CachedValue());
       } else if (wrapper->Type() == WrapperType::Pointer) {
         PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
         void* data = pointerWrapper->Data();
