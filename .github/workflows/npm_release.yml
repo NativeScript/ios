@@ -169,8 +169,10 @@ jobs:
           max_attempts: 2
           command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test | xcpretty
           # Keep the failed attempt's bundle — it holds the diagnostics of the
-          # failure being retried, and the retry needs the original path free.
-          on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult && mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult || true; xcrun simctl shutdown all
+          # failure being retried. Everything else at the result path must go
+          # (including extensionless staging leftovers), or the retry dies with
+          # "Existing file at -resultBundlePath".
+          on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult; mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $TEST_FOLDER/test_results*; do [ "$f" = "$TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
           new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test
       - name: Validate Test Results
         run: |

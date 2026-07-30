@@ -22,13 +22,21 @@ runs:
         cp -R ~/Library/Logs/CoreSimulator/. "$DIAG/CoreSimulator/" 2>/dev/null || true
         # Only a booted device can serve its unified log; never boot one
         # post-mortem — a fresh boot may pick the wrong device and stalls the
-        # job for minutes on an already-degraded VM.
-        UDID="$(xcrun simctl list devices booted | grep -oE '[0-9A-Fa-f-]{36}' | head -1)"
+        # job for minutes on an already-degraded VM. The pipeline must not leak
+        # grep's exit status: this shell runs with -e -o pipefail.
+        UDID="$(xcrun simctl list devices booted | grep -oE '[0-9A-Fa-f-]{36}' | head -1 || true)"
         if [ -n "$UDID" ]; then
           echo "Collecting unified log slice from booted simulator $UDID"
+          # simctl blocks forever if CoreSimulatorService is wedged — the very
+          # state this step tends to run in — so hard-cap it.
           xcrun simctl spawn "$UDID" log show --style compact --last 45m \
             --predicate 'process CONTAINS "TestRunner"' \
-            > "$DIAG/simulator-unified.log" 2>/dev/null || true
+            > "$DIAG/simulator-unified.log" 2>/dev/null &
+          LOG_PID=$!
+          ( sleep 120 && kill -9 "$LOG_PID" ) 2>/dev/null &
+          KILLER_PID=$!
+          wait "$LOG_PID" || echo "log show failed or was killed after 120s"
+          kill "$KILLER_PID" 2>/dev/null || true
         else
           echo "No booted simulator; relying on the xcresult's captured app output."
         fi

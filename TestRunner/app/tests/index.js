@@ -58,26 +58,38 @@ global.__JUnitSaveResults = function (text) {
         dataTask.resume();
     }
 
+    // Best-effort sentinel so the host can fail immediately with a delivery
+    // diagnostic instead of waiting out its full timeout.
+    function sendDeliveryFailed(attempts, reason) {
+        post(reportUrl + "/delivery_failed",
+            "junit report delivery failed after " + attempts + " attempts; last failure " + reason,
+            function () { });
+    }
+
     function attemptReport(attempt) {
         post(reportUrl, text, function (reason) {
             console.log("junit report POST failed (attempt " + attempt + "/" + maxAttempts + ", " + reason + ")");
-            // Worst case a retry costs delay + full request timeout, and the
-            // sentinel afterwards needs another request timeout.
-            var worstCaseRetryMs = retryDelayMs + 2 * requestTimeoutS * 1000;
-            if (attempt < maxAttempts && Date.now() + worstCaseRetryMs <= deadlineMs) {
-                setTimeout(function () {
-                    attemptReport(attempt + 1);
-                }, retryDelayMs);
-            } else {
-                // Best-effort sentinel so the host can fail immediately with a
-                // delivery diagnostic instead of waiting out its full timeout.
-                post(reportUrl + "/delivery_failed",
-                    "junit report delivery failed after " + attempt + " attempts; last failure " + reason,
-                    function () { });
+            if (attempt >= maxAttempts) {
+                sendDeliveryFailed(attempt, reason);
+                return;
             }
+            setTimeout(function () {
+                // Deadline is checked when the timer fires, not when it is
+                // scheduled: under load timers run late, and a retry started
+                // past this window would eat the sentinel's slot.
+                var worstCaseRetryMs = 2 * requestTimeoutS * 1000;
+                if (Date.now() + worstCaseRetryMs <= deadlineMs) {
+                    attemptReport(attempt + 1);
+                } else {
+                    sendDeliveryFailed(attempt, reason);
+                }
+            }, retryDelayMs);
         });
     }
 
+    // The first attempt intentionally has no deadline guard: even past the
+    // deadline a one-shot report is still the most valuable outcome, and a
+    // late fulfill is harmless to the host.
     attemptReport(1);
 };
 
