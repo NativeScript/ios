@@ -376,15 +376,16 @@ void DestroyModuleStateForIsolate(v8::Isolate* isolate) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Import map: bare specifier → resolved URL (populated by __NS_DEV__.configureRuntime)
+// Import map: bare specifier → resolved URL (populated by ns:runtime configureRuntime)
 // Instead of rewriting import statements in source code on the Vite side, the runtime
 // resolves bare specifiers through this map to HTTP module URLs. Source code
 // is served as Vite transformed it.
 static robin_hood::unordered_map<std::string, std::string> g_importMap;
 
 // Volatile URL patterns: URLs matching these substrings are always re-fetched
-// (cache is evicted before loading). Configured by Vite at boot instead of
-// being hardcoded. Replaces hardcoded /@ns/sfc/ and __webpack_* checks.
+// (cache is evicted before loading). Configured by Vite at boot — the
+// vocabulary is server/framework policy, so the runtime carries no
+// framework-specific URL strings here.
 static std::vector<std::string> g_volatilePatterns;
 
 static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string& registryKey) {
@@ -2039,7 +2040,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       normalizedSpec;  // use normalized spec for the rest of the resolution logic
 
   // Import map resolution
-  // If the import map is populated (set by __NS_DEV__.configureRuntime), check it
+  // If the import map is populated (set by ns:runtime configureRuntime), check it
   // before any other resolution. This is the highest-leverage change from
   // the HMR architecture review: bare specifiers resolve through the map
   // to either vendor URLs or HTTP module URLs, eliminating the need for
@@ -3509,7 +3510,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // Volatile pattern check: if the URL matches any configured volatile
       // pattern, evict the cached module so we always re-fetch. The pattern
       // list is policy and is supplied exclusively by the dev client via
-      // `__NS_DEV__.configureRuntime({ volatilePatterns })` — the runtime
+      // ns:runtime `configureRuntime({ volatilePatterns })` — the runtime
       // carries no framework or server URL vocabulary of its own. (Framework
       // strategies ship their own endpoints, e.g. Angular's `/@ng/component`
       // whose per-save `t` param would otherwise accumulate one stale

@@ -5,6 +5,7 @@
 #include "BuiltinLoader.h"
 #include "Caches.h"
 #include "Console.h"
+#include "HMRSupport.h"
 #include "Helpers.h"
 #include "Runtime.h"
 
@@ -109,15 +110,10 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
 
   switch (builtin) {
     case BuiltinId::kNsRuntime: {
-      Local<v8::Function> setConfig, getConfig;
-      if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
-          !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
-          !binding
-               ->Set(context, tns::ToV8String(isolate, "setConfig"), setConfig)
-               .FromMaybe(false) ||
-          !binding
-               ->Set(context, tns::ToV8String(isolate, "getConfig"), getConfig)
-               .FromMaybe(false)) {
+      // The dev-loader control surface (HMRSupport.mm). The binding builder
+      // decides realm/build-dependent membership; ns-runtime.js only shapes
+      // and freezes whatever arrives.
+      if (!BuildNsRuntimeBinding(context, binding)) {
         return MaybeLocal<Object>();
       }
       break;

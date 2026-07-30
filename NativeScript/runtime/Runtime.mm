@@ -280,7 +280,7 @@ Runtime::~Runtime() {
     // CRITICAL: unlike the per-isolate module maps above, these globals are
     // PROCESS-WIDE. They live in the main isolate's address space but every
     // Runtime destructor would clear them. That's wrong for worker-isolate
-    // teardown: when a worker dies (e.g. via `__NS_DEV__.terminateAllWorkers` during an
+    // teardown: when a worker dies (e.g. via ns:runtime `terminateAllWorkers` during an
     // HMR cycle), its Runtime destructor MUST NOT wipe the main isolate's import
     // map — doing so silently breaks the next HMR cycle's bare-specifier
     // resolution (vendor packages fall back to filesystem and fail with
@@ -430,13 +430,13 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   Console::Init(context);
   WeakRef::Init(context);
 
-  // Install the `__NS_DEV__` namespace object carrying every JS-callable
-  // dev primitive tooling can depend on; see
-  // `InitializeHmrDevGlobals` in HMRSupport.mm for the member list.
-  tns::InitializeHmrDevGlobals(isolate, context, isWorker);
+  // The dev primitives (configureRuntime, invalidateModules, …) live in the
+  // `ns:runtime` builtin module, materialized lazily per realm on first
+  // resolution (see `BuildNsRuntimeBinding` in HMRSupport.mm for the member
+  // list) — nothing to install here.
 
-  // URL blob support (internal/blob-url.js); failures are tolerated, matching
-  // the previous compile-and-run-if-possible behavior.
+  // URL blob support (internal/blob-url.js); failures are tolerated —
+  // compile-and-run-if-possible.
   v8::Local<v8::Value> blobMethodsResult;
   bool blobMethodsOk =
       BuiltinLoader::RunBuiltin(context, BuiltinId::kBlobUrl).ToLocal(&blobMethodsResult);
