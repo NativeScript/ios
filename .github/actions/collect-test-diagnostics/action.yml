@@ -1,0 +1,42 @@
+name: Collect test diagnostics
+description: >
+  Gather what a failed simulator test run leaves outside the xcresult bundle:
+  host-side crash reports (.ips), CoreSimulator logs, and — when a device is
+  still booted — a targeted slice of the unified log. The xcresult itself
+  already carries the app's stdout/stderr and testmanagerd logs
+  (xcrun xcresulttool export diagnostics), so none of that is duplicated here.
+inputs:
+  test-folder:
+    description: Folder the diagnostics directory is created in
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Collect crash reports and simulator logs
+      shell: bash
+      run: |
+        DIAG="${{ inputs.test-folder }}/diagnostics"
+        mkdir -p "$DIAG"
+        # Crashes of simulator apps land in the *host's* DiagnosticReports.
+        cp -R ~/Library/Logs/DiagnosticReports/. "$DIAG/DiagnosticReports/" 2>/dev/null || true
+        cp -R ~/Library/Logs/CoreSimulator/. "$DIAG/CoreSimulator/" 2>/dev/null || true
+        # Only a booted device can serve its unified log; never boot one
+        # post-mortem — a fresh boot may pick the wrong device and stalls the
+        # job for minutes on an already-degraded VM.
+        UDID="$(xcrun simctl list devices booted | grep -oE '[0-9A-Fa-f-]{36}' | head -1)"
+        if [ -n "$UDID" ]; then
+          echo "Collecting unified log slice from booted simulator $UDID"
+          xcrun simctl spawn "$UDID" log show --style compact --last 45m \
+            --predicate 'process CONTAINS "TestRunner"' \
+            > "$DIAG/simulator-unified.log" 2>/dev/null || true
+        else
+          echo "No booted simulator; relying on the xcresult's captured app output."
+        fi
+        echo "Collected diagnostics:"
+        du -sh "$DIAG"/* 2>/dev/null || true
+    - name: Upload test diagnostics
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      with:
+        name: test-diagnostics
+        path: ${{ inputs.test-folder }}/diagnostics
+        if-no-files-found: ignore
