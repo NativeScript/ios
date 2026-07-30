@@ -6,9 +6,12 @@
 #include <string>
 #include <vector>
 
+#include "BuiltinLoader.h"
 #include "Caches.h"
+#include "DataWrapper.h"
 #include "Helpers.h"
 #include "NativeScriptException.h"
+#include "NsBuiltinModules.h"
 #include "RuntimeConfig.h"
 // #include "v8-log-agent-impl.h"
 #include <sstream>
@@ -34,6 +37,8 @@ void Console::Init(Local<Context> context) {
   Console::AttachLogFunction(context, console, "dir", DirCallback);
   Console::AttachLogFunction(context, console, "time", TimeCallback);
   Console::AttachLogFunction(context, console, "timeEnd", TimeEndCallback);
+
+  Console::InitInspect(context);
 
   Local<Object> global = context->Global();
   PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(
@@ -155,7 +160,6 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  int argsLen = args.Length();
   Isolate* isolate = args.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
 
@@ -163,66 +167,13 @@ void Console::DirCallback(const FunctionCallbackInfo<Value>& args) {
   std::string scriptUrl = tns::GetCurrentScriptUrl(isolate);
   ss << scriptUrl << ":";
 
-  if (argsLen > 0) {
-    if (!args[0]->IsObject()) {
-      std::string logString = BuildStringFromArgs(args);
-      ss << " " << logString;
-    } else {
-      ss << std::endl << "==== object dump start ====" << std::endl;
-      Local<Object> argObject = args[0].As<Object>();
-
-      Local<v8::Array> propNames;
-      bool success = argObject->GetPropertyNames(context).ToLocal(&propNames);
-      tns::Assert(success, isolate);
-      uint32_t propertiesLength = propNames->Length();
-      for (uint32_t i = 0; i < propertiesLength; i++) {
-        Local<Value> propertyName = propNames->Get(context, i).ToLocalChecked();
-        Local<Value> propertyValue;
-        bool success =
-            argObject->Get(context, propertyName).ToLocal(&propertyValue);
-        if (!success || propertyValue.IsEmpty() ||
-            propertyValue->IsUndefined()) {
-          continue;
-        }
-
-        bool propIsFunction = propertyValue->IsFunction();
-
-        ss << tns::ToString(isolate,
-                            propertyName->ToString(context).ToLocalChecked())
-           << ": ";
-
-        if (propIsFunction) {
-          ss << "()";
-        } else if (propertyValue->IsArray()) {
-          Local<v8::String> stringResult =
-              BuildStringFromArg(context, propertyValue);
-          std::string jsonStringifiedArray =
-              tns::ToString(isolate, stringResult);
-          ss << jsonStringifiedArray;
-        } else if (propertyValue->IsObject()) {
-          Local<Object> obj = propertyValue->ToObject(context).ToLocalChecked();
-          Local<v8::String> objString = TransformJSObject(obj);
-          std::string jsonStringifiedObject = tns::ToString(isolate, objString);
-          // if object prints out as the error string for circular references,
-          // replace with #CR instead for brevity
-          if (jsonStringifiedObject.find("circular structure") !=
-              std::string::npos) {
-            jsonStringifiedObject = "#CR";
-          }
-          ss << jsonStringifiedObject;
-        } else {
-          ss << "\""
-             << tns::ToString(
-                    isolate,
-                    propertyValue->ToDetailString(context).ToLocalChecked())
-             << "\"";
-        }
-
-        ss << std::endl;
-      }
-
-      ss << "==== object dump end ====" << std::endl;
-    }
+  if (args.Length() > 0 && args[0]->IsObject()) {
+    ss << std::endl << "==== object dump start ====" << std::endl;
+    ss << tns::ToString(isolate, Console::InspectValue(context, args[0], 4))
+       << std::endl;
+    ss << "==== object dump end ====" << std::endl;
+  } else if (args.Length() > 0) {
+    ss << " " << BuildStringFromArgs(args);
   } else {
     ss << "";
   }
@@ -322,6 +273,30 @@ std::string Console::BuildStringFromArgs(
   Isolate* isolate = args.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
   int argLen = args.Length();
+
+  // console.* follows Node: the arguments go through util.format, so the first
+  // one may carry %-substitutions and the rest are appended space-separated.
+  Local<v8::Function> format = argLen > startingIndex
+                                   ? NsBuiltinModules::GetFormatFunc(context)
+                                   : Local<v8::Function>();
+  if (!format.IsEmpty()) {
+    std::vector<Local<Value>> formatArgs;
+    formatArgs.reserve(argLen - startingIndex);
+    for (int i = startingIndex; i < argLen; i++) {
+      formatArgs.push_back(args[i]);
+    }
+    TryCatch tc(isolate);
+    Local<Value> result;
+    if (format
+            ->Call(context, v8::Undefined(isolate),
+                   static_cast<int>(formatArgs.size()), formatArgs.data())
+            .ToLocal(&result) &&
+        result->IsString()) {
+      return tns::ToString(isolate, result.As<v8::String>());
+    }
+  }
+
+  // ns:util unavailable or the formatter threw: per-argument rendering.
   std::stringstream ss;
 
   if (argLen > 0) {
@@ -348,88 +323,109 @@ std::string Console::BuildStringFromArgs(
 const Local<v8::String> Console::BuildStringFromArg(Local<Context> context,
                                                     const Local<Value>& val) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  Local<v8::String> argString;
-  if (val->IsFunction()) {
-    bool success = val->ToDetailString(context).ToLocal(&argString);
-    tns::Assert(success, isolate);
-  } else if (val->IsArray()) {
-    Local<Value> cachedSelf = val;
-    Local<Object> array = val->ToObject(context).ToLocalChecked();
-    Local<v8::Array> arrayEntryKeys =
-        array->GetPropertyNames(context).ToLocalChecked();
-
-    uint32_t arrayLength = arrayEntryKeys->Length();
-
-    argString = tns::ToV8String(isolate, "[");
-
-    for (int i = 0; i < arrayLength; i++) {
-      Local<Value> propertyName =
-          arrayEntryKeys->Get(context, i).ToLocalChecked();
-
-      Local<Value> propertyValue =
-          array->Get(context, propertyName).ToLocalChecked();
-
-      // avoid bottomless recursion with cyclic reference to the same array
-      if (propertyValue->StrictEquals(cachedSelf)) {
-        argString = v8::String::Concat(isolate, argString,
-                                       tns::ToV8String(isolate, "[Circular]"));
-        continue;
-      }
-
-      Local<v8::String> objectString =
-          BuildStringFromArg(context, propertyValue);
-
-      argString = v8::String::Concat(isolate, argString, objectString);
-
-      if (i != arrayLength - 1) {
-        argString = v8::String::Concat(isolate, argString,
-                                       tns::ToV8String(isolate, ", "));
-      }
-    }
-
-    argString =
-        v8::String::Concat(isolate, argString, tns::ToV8String(isolate, "]"));
-  } else if (val->IsObject()) {
-    Local<Object> obj = val.As<Object>();
-
-    argString = TransformJSObject(obj);
-  } else {
-    bool success =
-        val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
-    tns::Assert(success, isolate);
+  // Top-level strings print raw (console.log("hi") -> hi); everything else
+  // that can carry structure goes through the inspect builtin.
+  if (val->IsString()) {
+    return val.As<v8::String>();
+  }
+  if (val->IsObject() || val->IsFunction()) {
+    return Console::InspectValue(context, val);
   }
 
+  Local<v8::String> argString;
+  bool success = val->ToDetailString(context).ToLocal(&argString);
+  tns::Assert(success, isolate);
   return argString;
 }
 
-const Local<v8::String> Console::TransformJSObject(Local<Object> object) {
-  Local<Context> context;
-  bool success =
-      object->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success);
+static void GetNativeWrapperHintCallback(
+    const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() < 1) {
+    return;
+  }
+  std::string hint = tns::GetNativeWrapperHint(isolate, info[0]);
+  if (!hint.empty()) {
+    info.GetReturnValue().Set(tns::ToV8String(isolate, hint));
+  }
+}
+
+void Console::InitInspect(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  Local<Value> value;
-  {
+  if (Caches::Get(isolate)->InspectFunc != nullptr) {
+    // inspect.js installs a non-configurable global.__inspect, so a second run
+    // in the same realm would throw.
+    return;
+  }
+
+  Local<v8::Function> hintFunc;
+  if (!v8::Function::New(context, GetNativeWrapperHintCallback)
+           .ToLocal(&hintFunc)) {
+    Log("Warning: Console failed to create the native-hint binding");
+    return;
+  }
+  Local<Object> binding = Object::New(isolate);
+  if (!binding
+           ->Set(context, tns::ToV8String(isolate, "getNativeWrapperHint"),
+                 hintFunc)
+           .FromMaybe(false)) {
+    Log("Warning: Console failed to populate the inspect binding");
+    return;
+  }
+
+  TryCatch tc(isolate);
+  Local<Value> result;
+  if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kInspect, binding)
+           .ToLocal(&result) ||
+      !result->IsFunction()) {
+    if (tc.HasCaught()) {
+      tns::LogError(isolate, tc);
+    }
+    Log("Warning: Console failed to initialize the inspect builtin");
+    return;
+  }
+
+  Caches::Get(isolate)->InspectFunc =
+      std::make_unique<Persistent<v8::Function>>(isolate,
+                                                 result.As<v8::Function>());
+}
+
+Local<v8::String> Console::InspectValue(Local<Context> context,
+                                        const Local<Value>& val, int depth) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  auto cache = Caches::Get(isolate);
+
+  if (cache->InspectFunc != nullptr) {
+    Local<v8::Function> inspect = cache->InspectFunc->Get(isolate);
+    Local<Value> arg = val;
+    Local<Value> args[2];
+    int argc = 1;
+    args[0] = arg;
+    if (depth >= 0) {
+      Local<Object> options = Object::New(isolate);
+      if (options
+              ->Set(context, tns::ToV8String(isolate, "depth"),
+                    v8::Number::New(isolate, depth))
+              .FromMaybe(false)) {
+        args[1] = options;
+        argc = 2;
+      }
+    }
     TryCatch tc(isolate);
-    bool success = object->ToString(context).ToLocal(&value);
-    if (!success) {
-      return tns::ToV8String(isolate, "");
+    Local<Value> result;
+    if (inspect->Call(context, v8::Undefined(isolate), argc, args)
+            .ToLocal(&result) &&
+        result->IsString()) {
+      return result.As<v8::String>();
     }
   }
-  Local<v8::String> objToString = value.As<v8::String>();
 
-  Local<v8::String> resultString;
-  bool hasCustomToStringImplementation =
-      tns::ToString(isolate, objToString).find("[object Object]") ==
-      std::string::npos;
-
-  if (hasCustomToStringImplementation) {
-    resultString = objToString;
-  } else {
-    resultString = tns::JsonStringifyObject(context, object);
+  // Init failed or the formatter threw: degrade to V8's own short description.
+  Local<v8::String> fallback;
+  if (val->ToDetailString(context).ToLocal(&fallback)) {
+    return fallback;
   }
-
-  return resultString;
+  return v8::String::Empty(isolate);
 }
 
 v8_inspector::ConsoleAPIType Console::VerbosityToInspectorMethod(

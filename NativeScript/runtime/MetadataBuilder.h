@@ -127,6 +127,11 @@ class MetadataBuilder {
     GlobalHandlerContext(bool isWorkerThread)
         : isWorkerThread_(isWorkerThread) {}
     bool isWorkerThread_;
+    // Name currently being defined as a real own property on the global from
+    // inside GlobalPropertyGetter. CreateDataProperty performs a lookup that
+    // re-enters the (kNonMasking) interceptor before the property exists, so
+    // the getter must decline for this name to avoid infinite recursion.
+    std::string definingProperty_;
   };
 
   template <class T>

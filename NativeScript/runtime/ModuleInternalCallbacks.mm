@@ -18,6 +18,7 @@
 #include "Helpers.h"         // for tns::Exists
 #include "ModuleInternal.h"  // for LoadScript(...)
 #include "NativeScriptException.h"
+#include "NsBuiltinModules.h"
 #include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
 
@@ -1996,6 +1997,20 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     return v8::MaybeLocal<v8::Module>();
   }
 
+  // Builtin modules resolve before any path handling. Unshimmed "node:" names
+  // fall through to the legacy node:url polyfill below.
+  if (NsBuiltinModules::IsRegistered(rawSpec) || NsBuiltinModules::IsNsScheme(rawSpec)) {
+    v8::Local<v8::Module> builtin;
+    if (NsBuiltinModules::GetModule(context, rawSpec).ToLocal(&builtin)) {
+      return v8::MaybeLocal<v8::Module>(builtin);
+    }
+    if (!NsBuiltinModules::IsRegistered(rawSpec)) {
+      isolate->ThrowException(v8::Exception::Error(
+          tns::ToV8String(isolate, NsBuiltinModules::NotFoundMessage(rawSpec))));
+    }
+    return v8::MaybeLocal<v8::Module>();
+  }
+
   std::string normalizedSpec = rawSpec;
 
   // Normalize malformed HTTP(S) schemes that sometimes appear as 'http:/host' (single slash)
@@ -2496,11 +2511,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                           "  return new URL('file://' + encoded);\n"
                           "}\n";
       } else {
-        // Generic polyfill for other Node.js built-in modules
-        polyfillContent = "// In-memory polyfill for node:" + builtinName + "\n" +
-                          "console.warn('Node.js built-in module \\'node:" + builtinName +
-                          "\\' is not fully supported in NativeScript');\n" +
-                          "export default {};\n";
+        isolate->ThrowException(v8::Exception::Error(
+            tns::ToV8String(isolate, NsBuiltinModules::NotFoundMessage(spec))));
+        return v8::MaybeLocal<v8::Module>();
       }
 
       v8::MaybeLocal<v8::Module> m =
@@ -3022,6 +3035,29 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   // Normalize spec: only strip ?query/hash for non-HTTP specs so SFC HTTP keys keep
   // version tags
   std::string rawSpec = cSpec ? std::string(cSpec) : std::string();
+
+  // Builtin modules never reach the loader below; the namespace comes straight
+  // from the realm's synthetic module.
+  if (NsBuiltinModules::IsRegistered(rawSpec) || NsBuiltinModules::IsNsScheme(rawSpec)) {
+    v8::EscapableHandleScope builtinScope(isolate);
+    v8::Local<v8::Promise::Resolver> builtinResolver;
+    if (!v8::Promise::Resolver::New(context).ToLocal(&builtinResolver)) {
+      return v8::MaybeLocal<v8::Promise>();
+    }
+    v8::TryCatch tc(isolate);
+    v8::Local<v8::Module> builtin;
+    if (NsBuiltinModules::GetModule(context, rawSpec).ToLocal(&builtin)) {
+      builtinResolver->Resolve(context, builtin->GetModuleNamespace()).FromMaybe(false);
+    } else {
+      v8::Local<v8::Value> error = tc.HasCaught()
+                                       ? tc.Exception()
+                                       : v8::Exception::Error(tns::ToV8String(
+                                             isolate, NsBuiltinModules::NotFoundMessage(rawSpec)));
+      builtinResolver->Reject(context, error).FromMaybe(false);
+    }
+    return builtinScope.Escape(builtinResolver->GetPromise());
+  }
+
   std::string normalizedSpec = rawSpec;
   // remove query/hash ONLY for non-HTTP specs
   bool isHttpLike = (!normalizedSpec.empty() && (StartsWith(normalizedSpec, "http://") ||

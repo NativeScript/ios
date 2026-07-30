@@ -301,10 +301,9 @@ static inline void TNS_FormatAndLog(const char* fmt, ...) {
 // Keep the existing Log(...) macro name for call-site compatibility.
 #define Log(...) tns::TNS_FormatAndLog(__VA_ARGS__)
 
-v8::Local<v8::String> JsonStringifyObject(v8::Local<v8::Context> context,
-                                          v8::Local<v8::Value> value,
-                                          bool handleCircularReferences = true);
-v8::Local<v8::Function> GetSmartJSONStringifyFunction(v8::Isolate* isolate);
+// Short identification for objects backed by a native wrapper (ObjC class
+// name etc.); empty when the value is a plain JS object. Never runs JS.
+std::string GetNativeWrapperHint(v8::Isolate* isolate, const v8::Local<v8::Value>& value);
 
 std::string ReplaceAll(const std::string source, std::string find, std::string replacement);
 

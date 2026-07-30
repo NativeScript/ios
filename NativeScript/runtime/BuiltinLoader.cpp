@@ -1,0 +1,212 @@
+#include "BuiltinLoader.h"
+
+#include <mutex>
+#include <vector>
+
+#include "Caches.h"
+#include "Helpers.h"
+#include "NsBuiltinModules.h"
+
+using namespace v8;
+
+namespace tns {
+
+namespace {
+
+// Process-wide bytecode cache shared across isolates (main + workers).
+std::mutex builtinCacheMutex;
+std::vector<uint8_t> builtinCache[static_cast<unsigned>(BuiltinId::kCount)];
+
+// Every builtin is compiled as a function body receiving these fixed
+// parameters, mirroring Node's module wrapper: a file exports through
+// `module.exports`/`exports`, reaches sibling builtin modules through
+// `require`, natives arrive as properties of the `binding` bag (Node's
+// internalBinding idiom) and intrinsics as properties of `primordials`; each
+// file destructures what it needs.
+constexpr const char* kExportsParamName = "exports";
+constexpr const char* kRequireParamName = "require";
+constexpr const char* kModuleParamName = "module";
+constexpr const char* kBindingParamName = "binding";
+constexpr const char* kPrimordialsParamName = "primordials";
+constexpr int kParamCount = 5;
+
+// The `require` every builtin receives: builtin specifiers only, so a builtin
+// can never reach application code or the filesystem.
+void BuiltinRequireCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() < 1 || !info[0]->IsString()) {
+    isolate->ThrowException(Exception::TypeError(
+        tns::ToV8String(isolate, "require() expects a specifier string")));
+    return;
+  }
+
+  Local<Context> context = isolate->GetCurrentContext();
+  std::string specifier = tns::ToString(isolate, info[0].As<v8::String>());
+  Local<Object> exports;
+  if (NsBuiltinModules::GetExports(context, specifier).ToLocal(&exports)) {
+    info.GetReturnValue().Set(exports);
+  } else if (!NsBuiltinModules::IsRegistered(specifier)) {
+    isolate->ThrowException(Exception::Error(tns::ToV8String(
+        isolate, NsBuiltinModules::NotFoundMessage(specifier))));
+  }
+}
+
+MaybeLocal<v8::Function> GetBuiltinRequire(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  if (cache->BuiltinRequire != nullptr) {
+    return cache->BuiltinRequire->Get(isolate);
+  }
+
+  Local<v8::Function> require;
+  if (!v8::Function::New(context, BuiltinRequireCallback, Local<Value>(), 1,
+                         ConstructorBehavior::kThrow)
+           .ToLocal(&require)) {
+    return MaybeLocal<v8::Function>();
+  }
+  cache->BuiltinRequire =
+      std::make_unique<Persistent<v8::Function>>(isolate, require);
+  return require;
+}
+
+MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  const BuiltinSource& builtin = GetBuiltinSource(id);
+  const unsigned index = static_cast<unsigned>(id);
+
+  // Copy the blob out so the shared slot can be refreshed concurrently while
+  // this compile still reads from the copy.
+  std::vector<uint8_t> blob;
+  {
+    std::lock_guard<std::mutex> lock(builtinCacheMutex);
+    blob = builtinCache[index];
+  }
+
+  ScriptOrigin origin(tns::ToV8String(isolate, builtin.name),
+                      0,      // line offset
+                      0,      // column offset
+                      false,  // shared_cross_origin
+                      -1,     // script_id
+                      Local<Value>(),
+                      false,  // is_opaque
+                      false,  // is_wasm
+                      false   // is_module
+  );
+  Local<v8::String> sourceText = tns::ToV8String(
+      isolate, builtin.source, static_cast<int>(builtin.length));
+  Local<v8::String> params[] = {
+      tns::ToV8String(isolate, kExportsParamName),
+      tns::ToV8String(isolate, kRequireParamName),
+      tns::ToV8String(isolate, kModuleParamName),
+      tns::ToV8String(isolate, kBindingParamName),
+      tns::ToV8String(isolate, kPrimordialsParamName)};
+
+  Local<v8::Function> fn;
+  if (!blob.empty()) {
+    // The Source owns and deletes the CachedData object; BufferNotOwned keeps
+    // the underlying bytes (our copy) out of its hands.
+    auto* cachedData = new ScriptCompiler::CachedData(
+        blob.data(), static_cast<int>(blob.size()),
+        ScriptCompiler::CachedData::BufferNotOwned);
+    ScriptCompiler::Source source(sourceText, origin, cachedData);
+    if (ScriptCompiler::CompileFunction(context, &source, kParamCount, params,
+                                        0, nullptr,
+                                        ScriptCompiler::kConsumeCodeCache)
+            .ToLocal(&fn) &&
+        !cachedData->rejected) {
+      return fn;
+    }
+    // Rejected cache (e.g. produced under different flags): fall through and
+    // recompile eagerly so the refreshed blob covers inner functions again.
+  }
+
+  ScriptCompiler::Source source(sourceText, origin);
+  if (!ScriptCompiler::CompileFunction(context, &source, kParamCount, params, 0,
+                                       nullptr, ScriptCompiler::kEagerCompile)
+           .ToLocal(&fn)) {
+    return MaybeLocal<v8::Function>();
+  }
+
+  std::unique_ptr<ScriptCompiler::CachedData> produced(
+      ScriptCompiler::CreateCodeCacheForFunction(fn));
+  if (produced != nullptr && produced->data != nullptr &&
+      produced->length > 0) {
+    std::lock_guard<std::mutex> lock(builtinCacheMutex);
+    builtinCache[index].assign(produced->data,
+                               produced->data + produced->length);
+  }
+
+  return fn;
+}
+
+MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id,
+                              Local<Value> binding, Local<Value> primordials) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+
+  Local<v8::Function> fn;
+  if (!CompileBuiltin(context, id).ToLocal(&fn)) {
+    return MaybeLocal<Value>();
+  }
+
+  Local<v8::Function> require;
+  if (!GetBuiltinRequire(context).ToLocal(&require)) {
+    return MaybeLocal<Value>();
+  }
+
+  Local<Object> exportsObj = Object::New(isolate);
+  Local<Object> moduleObj = Object::New(isolate);
+  Local<v8::String> exportsKey = tns::ToV8String(isolate, kExportsParamName);
+  if (!moduleObj->Set(context, exportsKey, exportsObj).FromMaybe(false)) {
+    return MaybeLocal<Value>();
+  }
+
+  Local<Value> args[] = {
+      exportsObj, require, moduleObj,
+      binding.IsEmpty() ? v8::Undefined(isolate).As<Value>() : binding,
+      primordials};
+  if (fn->Call(context, v8::Undefined(isolate), kParamCount, args).IsEmpty()) {
+    return MaybeLocal<Value>();
+  }
+
+  return moduleObj->Get(context, exportsKey);
+}
+
+// Snapshot of the intrinsics, taken the first time any builtin runs in this
+// isolate — during runtime init, before user code can replace a global.
+// Builtins compiled later in the isolate's life get the same pristine
+// snapshot.
+MaybeLocal<Object> GetPrimordials(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  if (cache->Primordials != nullptr) {
+    return cache->Primordials->Get(isolate);
+  }
+
+  Local<Value> result;
+  if (!CallBuiltin(context, BuiltinId::kPrimordials, Local<Value>(),
+                   v8::Undefined(isolate))
+           .ToLocal(&result) ||
+      !result->IsObject()) {
+    return MaybeLocal<Object>();
+  }
+
+  Local<Object> primordials = result.As<Object>();
+  cache->Primordials =
+      std::make_unique<Persistent<Object>>(isolate, primordials);
+  return primordials;
+}
+
+}  // namespace
+
+MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context,
+                                            BuiltinId id,
+                                            Local<Value> binding) {
+  Local<Object> primordials;
+  if (!GetPrimordials(context).ToLocal(&primordials)) {
+    return MaybeLocal<Value>();
+  }
+
+  return CallBuiltin(context, id, binding, primordials);
+}
+
+}  // namespace tns

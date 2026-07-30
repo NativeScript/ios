@@ -12,6 +12,10 @@ class TestRunnerTests: XCTestCase {
     private let progressLock = NSLock()
     private var lastSpecSeen = "(no spec reported yet)"
 
+    // Reason from the app's delivery-failure sentinel: it POSTs here when it
+    // exhausted its junit-report retries (human-readable text, not XML).
+    private var reportDeliveryFailureReason: String?
+
     override func setUp() {
         continueAfterFailure = false
 
@@ -102,8 +106,12 @@ class TestRunnerTests: XCTestCase {
                 return
             }
 
-            // Collect Jasmine JUnit report.
-            if method == "POST" && path == "/junit_report" {
+            // Collect the Jasmine JUnit report — or the delivery-failure
+            // sentinel (/junit_report/delivery_failed) the app POSTs when it
+            // exhausted its report retries, whose payload is a human-readable
+            // reason instead of junit XML.
+            if method == "POST" && path.hasPrefix("/junit_report") {
+                let isDeliveryFailure = path.hasSuffix("/delivery_failed")
                 var buffer = Data()
                 let input = environ["swsgi.input"] as! SWSGIInput
                 var finished = false
@@ -112,9 +120,13 @@ class TestRunnerTests: XCTestCase {
                     if data.isEmpty && !finished {
                         finished = true
 
-                        let report = XCTAttachment(uniformTypeIdentifier: "junit.xml", name: "junit.xml", payload: buffer, userInfo: nil)
-                        report.lifetime = .keepAlways
-                        self.add(report)
+                        if isDeliveryFailure {
+                            self.reportDeliveryFailureReason = String(data: buffer, encoding: .utf8) ?? "unknown"
+                        } else {
+                            let report = XCTAttachment(uniformTypeIdentifier: "junit.xml", name: "junit.xml", payload: buffer, userInfo: nil)
+                            report.lifetime = .keepAlways
+                            self.add(report)
+                        }
 
                         startResponse("204 No Content", [])
                         sendBody(Data())
@@ -130,7 +142,10 @@ class TestRunnerTests: XCTestCase {
 
         try! server.start()
 
-        DispatchQueue.global(qos: .background).async {
+        // Not .background: CI VMs throttle background-QoS threads hard enough
+        // to starve this accept loop, and it is the only channel through which
+        // results ever arrive.
+        DispatchQueue.global(qos: .userInitiated).async {
             self.loop.runForever()
         }
     }
@@ -151,6 +166,10 @@ class TestRunnerTests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchEnvironment["REPORT_BASEURL"] = "http://127.0.0.1:\(port)/junit_report"
+        // The app's report retries and delivery_failed sentinel count from its
+        // launch, which precedes the wait below — keep a margin so delivery
+        // gives up (and the sentinel lands) before our timeout fires.
+        app.launchEnvironment["REPORT_DEADLINE_SECONDS"] = String(Int(jasmineTestsTimeout) - 60)
         app.launch()
 
         // Watchdog: if the runtime crashes (e.g. EXC_BAD_ACCESS) it never
@@ -179,6 +198,8 @@ class TestRunnerTests: XCTestCase {
         case .completed:
             if didCrash {
                 XCTFail("TestRunner exited before reporting Jasmine results (the runtime CRASHED). Check the 'test-diagnostics' artifact (DiagnosticReports/TestRunner-*.ips) for the native stack.")
+            } else if let reason = reportDeliveryFailureReason {
+                XCTFail("TestRunner finished the Jasmine suite but could not deliver the junit report: \(reason)")
             }
             return
         case .timedOut:

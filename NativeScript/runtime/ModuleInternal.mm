@@ -6,12 +6,14 @@
 #include <utime.h>
 #include <cstring>
 #include <string>
+#include "BuiltinLoader.h"
 #include "Caches.h"
 #include "DevFlags.h"
 #include "HMRSupport.h"
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
+#include "NsBuiltinModules.h"
 #include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
 
@@ -161,32 +163,14 @@ std::string ResolveMainEntryFromPackageJson(const std::string& baseDir) {
 }
 
 ModuleInternal::ModuleInternal(Local<Context> context) {
-  std::string requireFactoryScript = "(function() { "
-                                     "    function require_factory(requireInternal, dirName) { "
-                                     "        return function require(modulePath) { "
-                                     "            if(global.__pauseOnNextRequire) {  debugger; "
-                                     "global.__pauseOnNextRequire = false; }"
-                                     "            return requireInternal(modulePath, dirName); "
-                                     "        } "
-                                     "    } "
-                                     "    return require_factory; "
-                                     "})()";
-
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> global = context->Global();
-  Local<Script> script;
   TryCatch tc(isolate);
-  if (!Script::Compile(context, tns::ToV8String(isolate, requireFactoryScript.c_str()))
-           .ToLocal(&script) &&
-      tc.HasCaught()) {
-    tns::LogError(isolate, tc);
-    Log(@"FATAL: Failed to compile require factory script");
-    return;
-  }
-
   Local<Value> result;
-  if (!script->Run(context).ToLocal(&result) && tc.HasCaught()) {
-    tns::LogError(isolate, tc);
+  if (!BuiltinLoader::RunBuiltin(context, BuiltinId::kRequireFactory).ToLocal(&result)) {
+    if (tc.HasCaught()) {
+      tns::LogError(isolate, tc);
+    }
     Log(@"FATAL: Failed to run require factory script");
     return;
   }
@@ -427,6 +411,25 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
 
 void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
+
+  // Builtin modules resolve before any path handling, so they can never be
+  // shadowed by a file or a package, and an unknown one fails as a missing
+  // builtin rather than as a missing file. Only prefixed specifiers get here:
+  // a bare `util` still resolves through npm.
+  if (info.Length() > 0 && info[0]->IsString()) {
+    std::string specifier = tns::ToString(isolate, info[0].As<v8::String>());
+    if (NsBuiltinModules::IsBuiltinScheme(specifier)) {
+      Local<Context> context = isolate->GetCurrentContext();
+      Local<Object> exports;
+      if (NsBuiltinModules::GetExports(context, specifier).ToLocal(&exports)) {
+        info.GetReturnValue().Set(exports);
+      } else if (!NsBuiltinModules::IsRegistered(specifier)) {
+        isolate->ThrowException(Exception::Error(
+            tns::ToV8String(isolate, NsBuiltinModules::NotFoundMessage(specifier))));
+      }
+      return;
+    }
+  }
 
   // Declare these outside try block so they're available in catch
   std::string moduleName;

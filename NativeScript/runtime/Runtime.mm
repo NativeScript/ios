@@ -2,6 +2,7 @@
 #include <chrono>
 #include <string>
 #include "ArgConverter.h"
+#include "BuiltinLoader.h"
 #include "Caches.h"
 #include "Console.h"
 #include "Constants.h"
@@ -431,7 +432,12 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   // `InitializeHmrDevGlobals` in HMRSupport.mm for the member list.
   tns::InitializeHmrDevGlobals(isolate, context, isWorker);
 
-  URLImpl::InstallBlobMethods(context);
+  // URL blob support (internal/blob-url.js); failures are tolerated, matching
+  // the previous compile-and-run-if-possible behavior.
+  v8::Local<v8::Value> blobMethodsResult;
+  bool blobMethodsOk =
+      BuiltinLoader::RunBuiltin(context, BuiltinId::kBlobUrl).ToLocal(&blobMethodsResult);
+  (void)blobMethodsOk;
 
   this->moduleInternal_ = std::make_unique<ModuleInternal>(context);
 

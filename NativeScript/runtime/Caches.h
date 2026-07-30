@@ -152,8 +152,13 @@ class Caches {
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> WeakRefClearFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
-  std::unique_ptr<v8::Persistent<v8::Function>> SmartJSONStringifyFunc =
+  // console formatter (internal/inspect.js), initialized by Console::Init.
+  std::unique_ptr<v8::Persistent<v8::Function>> InspectFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+  // ns:util's format, used by console.* for %-substitution.
+  std::unique_ptr<v8::Persistent<v8::Function>> FormatFunc =
+      std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+  bool FormatFuncUnavailable = false;
   std::unique_ptr<v8::Persistent<v8::Function>> InteropReferenceCtorFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> PointerCtorFunc =
@@ -162,6 +167,28 @@ class Caches {
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> UnmanagedTypeCtorFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+
+  // `ns:`/`node:` builtin modules (NsBuiltinModules), keyed by specifier. Both
+  // are per isolate: a builtin module is a singleton per realm, so workers get
+  // their own exports objects and their own synthetic modules.
+  robin_hood::unordered_map<std::string,
+                            std::unique_ptr<v8::Persistent<v8::Object>>>
+      BuiltinModuleExports;
+  robin_hood::unordered_map<std::string,
+                            std::unique_ptr<v8::Persistent<v8::Module>>>
+      BuiltinModules;
+  // Specifiers currently being built, so a shim requiring back into the module
+  // that is loading it fails instead of recursing.
+  robin_hood::unordered_set<std::string> BuiltinModulesInProgress;
+  // The `require` handed to every builtin, resolving builtin specifiers only.
+  std::unique_ptr<v8::Persistent<v8::Function>> BuiltinRequire =
+      std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+
+  // Frozen intrinsics snapshot returned by internal/primordials.js, passed to
+  // every builtin as its second fixed parameter (BuiltinLoader::RunBuiltin).
+  // Per isolate, so workers snapshot their own realm's intrinsics.
+  std::unique_ptr<v8::Persistent<v8::Object>> Primordials =
+      std::unique_ptr<v8::Persistent<v8::Object>>(nullptr);
 
   // Internal EventTarget instance backing the global, returned by the generic
   // event-primitives bootstrap IIFE (Events::Init). Holds the real listener
