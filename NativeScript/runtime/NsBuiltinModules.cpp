@@ -5,6 +5,7 @@
 #include "BuiltinLoader.h"
 #include "Caches.h"
 #include "Console.h"
+#include "HMRSupport.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -26,6 +27,7 @@ struct Registration {
 // adapts, so the two module objects stay distinct and the standard module
 // never carries compatibility code.
 constexpr Registration kRegistry[] = {
+    {"ns:runtime", BuiltinId::kNsRuntime},
     {"ns:util", BuiltinId::kNsUtil},
     {"node:util", BuiltinId::kNodeUtil},
 };
@@ -48,6 +50,15 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
   Local<Object> binding = Object::New(isolate);
 
   switch (builtin) {
+    case BuiltinId::kNsRuntime: {
+      // The dev-loader control surface (HMRSupport.mm). The binding builder
+      // decides realm/build-dependent membership; ns-runtime.js only shapes
+      // and freezes whatever arrives.
+      if (!BuildNsRuntimeBinding(context, binding)) {
+        return MaybeLocal<Object>();
+      }
+      break;
+    }
     case BuiltinId::kNsUtil: {
       // The console formatter is built once per realm; ns:util re-exports that
       // instance instead of creating a second one.
