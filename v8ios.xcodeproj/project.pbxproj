@@ -1970,7 +1970,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nexport PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"\nif ! command -v node >/dev/null 2>&1; then\n  echo \"error: node is required to generate the runtime builtins (tools/js2c.mjs); install Node.js or add it to PATH\" >&2\n  exit 1\nfi\ncd \"${SRCROOT}\"\nnode tools/js2c.mjs --out-dir NativeScript/runtime/generated NativeScript/runtime/js/*.js\n";
+			shellScript = "set -e\nexport PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"\nif ! command -v node >/dev/null 2>&1; then\n  echo \"error: node is required to generate the runtime builtins (tools/js2c.mjs); install Node.js or add it to PATH\" >&2\n  exit 1\nfi\ncd \"${SRCROOT}\"\nnode tools/js2c.mjs --out-dir NativeScript/runtime/generated --filelist tools/js2c-inputs.xcfilelist NativeScript/runtime/js/*.js\n";
 		};
 		2BFE21F02AC1B28000307752 /* Add default metadata */ = {
 			isa = PBXShellScriptBuildPhase;

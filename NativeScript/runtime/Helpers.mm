@@ -494,8 +494,12 @@ Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
 
   Local<Context> context = isolate->GetCurrentContext();
 
+  TryCatch tc(isolate);
   Local<Value> result;
   bool success = BuiltinLoader::RunBuiltin(context, BuiltinId::kSmartStringify).ToLocal(&result);
+  if (!success && tc.HasCaught()) {
+    tns::LogError(isolate, tc);
+  }
   tns::Assert(success, isolate);
 
   if (result.IsEmpty() || !result->IsFunction()) {

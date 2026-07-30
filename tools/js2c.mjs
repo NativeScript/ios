@@ -6,16 +6,21 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 
-const USAGE = `usage: node tools/js2c.mjs --out-dir <dir> [--minify] <file.js>...
+const USAGE = `usage: node tools/js2c.mjs --out-dir <dir> [--minify] [--filelist <xcfilelist>] <file.js>...
 
 Generates <dir>/RuntimeBuiltins.h and <dir>/RuntimeBuiltins.cpp from the given
 builtin JavaScript sources. Builtin ids and script-origin names derive from the
 file names (promise-proxy.js -> BuiltinId::kPromiseProxy, "internal/promise-proxy.js").
 
 options:
-  --out-dir <dir>  output directory for the generated files (required)
-  --minify         minify sources with esbuild (whitespace + syntax only)
-  --help           show this message`;
+  --out-dir <dir>        output directory for the generated files (required)
+  --minify               minify sources with esbuild (whitespace + syntax only)
+  --filelist <file>      xcfilelist whose .js entries must exactly match the
+                         inputs; drift fails the build (Xcode's incremental
+                         change detection reads the xcfilelist, so a new
+                         builtin missing from it would otherwise be skipped
+                         silently on incremental builds)
+  --help                 show this message`;
 
 let args;
 try {
@@ -23,6 +28,7 @@ try {
     options: {
       'out-dir': { type: 'string' },
       minify: { type: 'boolean', default: false },
+      filelist: { type: 'string' },
       help: { type: 'boolean', default: false },
     },
     allowPositionals: true,
@@ -46,6 +52,24 @@ if (!outDir || inputs.length === 0) {
 
 // Stable ordering regardless of shell glob order, so output never churns.
 inputs.sort((a, b) => basename(a).localeCompare(basename(b)));
+
+if (args.values.filelist) {
+  const listed = readFileSync(args.values.filelist, 'utf8')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.endsWith('.js'))
+    .map((l) => basename(l))
+    .sort();
+  const actual = inputs.map((f) => basename(f)).sort();
+  if (JSON.stringify(listed) !== JSON.stringify(actual)) {
+    const missing = actual.filter((f) => !listed.includes(f));
+    const stale = listed.filter((f) => !actual.includes(f));
+    console.error(`error: ${args.values.filelist} is out of sync with the input files`);
+    if (missing.length) console.error(`  add:    ${missing.join(', ')}`);
+    if (stale.length) console.error(`  remove: ${stale.join(', ')}`);
+    process.exit(1);
+  }
+}
 
 const builtins = [];
 for (const file of inputs) {

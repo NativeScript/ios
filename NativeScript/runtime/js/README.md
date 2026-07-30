@@ -28,10 +28,13 @@ const { someNative, anotherNative } = binding;
 
 - Run at isolate init, before any user code: capture any global you rely on
   (e.g. `globalThis.Event`) eagerly so later monkey-patching can't break you.
+  (Planned: a frozen `primordials` namespace as a second fixed parameter,
+  Node-style, to make this systematic for closures that outlive init.)
 - No `import`/`export` — these are classic function bodies, not modules.
 - ESLint (`eslint.config.mjs` at the repo root, run by lint-staged) declares
   `binding` and the reachable native globals; `no-undef` is the typo net.
   If a builtin starts using a new native global, add it there.
 - File names are kebab-case; the name determines the `BuiltinId` enum value
   (`promise-proxy.js` → `kPromiseProxy`) and the script origin. New files must
-  also be added to `tools/js2c-inputs.xcfilelist`.
+  also be added to `tools/js2c-inputs.xcfilelist` — the build fails with an
+  explicit message if that list drifts out of sync (`js2c.mjs --filelist`).
