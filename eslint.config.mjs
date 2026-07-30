@@ -12,12 +12,17 @@ import globals from 'globals';
 // no-restricted-properties on the receiver, so uncurried use of those stays a
 // review rule.
 const capturedStatics = [
+  ['Array', 'isArray', 'ArrayIsArray'],
+  ['ArrayBuffer', 'isView', 'ArrayBufferIsView'],
   ['JSON', 'stringify', 'JSONStringify'],
   ['Object', 'assign', 'ObjectAssign'],
   ['Object', 'create', 'ObjectCreate'],
   ['Object', 'defineProperty', 'ObjectDefineProperty'],
   ['Object', 'freeze', 'ObjectFreeze'],
   ['Object', 'getOwnPropertyDescriptor', 'ObjectGetOwnPropertyDescriptor'],
+  ['Object', 'getOwnPropertySymbols', 'ObjectGetOwnPropertySymbols'],
+  ['Object', 'getPrototypeOf', 'ObjectGetPrototypeOf'],
+  ['Object', 'is', 'ObjectIs'],
   ['Object', 'keys', 'ObjectKeys'],
   ['Object', 'setPrototypeOf', 'ObjectSetPrototypeOf'],
   ['Reflect', 'construct', 'ReflectConstruct'],
@@ -33,7 +38,7 @@ const capturedStatics = [
 // fills in after init). Array.from has no primordial: copying `arguments` goes
 // through an index loop instead, because Array.from depends on the tamperable
 // array iterator protocol.
-const restrictedGlobals = ['Error', 'Map', 'Proxy', 'String', 'TypeError'].map((name) => ({
+const restrictedGlobals = ['Error', 'Map', 'Proxy', 'Set', 'String', 'TypeError'].map((name) => ({
   name,
   message: `Destructure ${name} from primordials — builtins must not read intrinsics off globals user code can replace.`,
 }));

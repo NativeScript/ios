@@ -31,6 +31,10 @@ module.exports = somethingTheCallSiteNeeds;
   every tool that isn't reading this repo's ESLint config (editors' TS server,
   prettier, review bots) rejects the file as invalid JavaScript.
 - Strict mode is per-file: start the file with `"use strict";` to opt in.
+- `inspect.js` is the console formatter (util.inspect-lite, exposed as the
+  internal `__inspect` global): budgeted output, no getter invocation,
+  tamper-immune via primordials. Console routes all object formatting
+  through it.
 - Destructure `binding` and `primordials` once, at the top of the file, so the
   file's dependencies are visible and greppable.
 

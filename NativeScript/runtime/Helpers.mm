@@ -4,13 +4,13 @@
 #include <dispatch/dispatch.h>
 #include <dlfcn.h>
 #include <execinfo.h>
+#include <objc/runtime.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <codecvt>
 #include <fstream>
 #include <locale>
 #include <sstream>
-#include "BuiltinLoader.h"
 #include "Caches.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
@@ -447,71 +447,36 @@ void tns::LogError(Isolate* isolate, TryCatch& tc) {
   Log(@"%s", stackTraceStr.c_str());
 }
 
-Local<v8::String> tns::JsonStringifyObject(Local<Context> context, Local<Value> value,
-                                           bool handleCircularReferences) {
-  Isolate* isolate = v8::Isolate::GetCurrent();
-  if (value.IsEmpty()) {
-    return v8::String::Empty(isolate);
+std::string tns::GetNativeWrapperHint(Isolate* isolate, const Local<Value>& value) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+  if (wrapper == nullptr) {
+    return std::string();
   }
 
-  if (handleCircularReferences) {
-    Local<v8::Function> smartJSONStringifyFunction = tns::GetSmartJSONStringifyFunction(isolate);
-
-    if (!smartJSONStringifyFunction.IsEmpty()) {
-      if (value->IsObject()) {
-        Local<Value> resultValue;
-        TryCatch tc(isolate);
-
-        Local<Value> args[] = {value->ToObject(context).ToLocalChecked()};
-        bool success = smartJSONStringifyFunction->Call(context, v8::Undefined(isolate), 1, args)
-                           .ToLocal(&resultValue);
-
-        if (success && !tc.HasCaught()) {
-          return resultValue->ToString(context).ToLocalChecked();
-        }
-      }
+  switch (wrapper->Type()) {
+    case WrapperType::ObjCObject: {
+      id data = static_cast<ObjCDataWrapper*>(wrapper)->Data();
+      return data != nil ? std::string(object_getClassName(data)) : "ObjCObject";
     }
+    case WrapperType::ObjCClass: {
+      Class klass = static_cast<ObjCClassWrapper*>(wrapper)->Klass();
+      return klass != nil ? "class " + std::string(class_getName(klass)) : "ObjCClass";
+    }
+    case WrapperType::ObjCProtocol: {
+      Protocol* proto = static_cast<ObjCProtocolWrapper*>(wrapper)->Proto();
+      return proto != nil ? "protocol " + std::string(protocol_getName(proto)) : "ObjCProtocol";
+    }
+    case WrapperType::Pointer:
+      return "Pointer";
+    case WrapperType::Block:
+      return "Block";
+    case WrapperType::Function:
+      return "NativeFunction";
+    default:
+      // Remaining wrapper kinds (structs, references, enums, ...) format fine
+      // through the ordinary object path.
+      return std::string();
   }
-
-  Local<v8::String> resultString;
-  TryCatch tc(isolate);
-  bool success = v8::JSON::Stringify(context, value->ToObject(context).ToLocalChecked())
-                     .ToLocal(&resultString);
-
-  if (!success && tc.HasCaught()) {
-    tns::LogError(isolate, tc);
-    return Local<v8::String>();
-  }
-
-  return resultString;
-}
-
-Local<v8::Function> tns::GetSmartJSONStringifyFunction(Isolate* isolate) {
-  std::shared_ptr<Caches> caches = Caches::Get(isolate);
-  if (caches->SmartJSONStringifyFunc != nullptr) {
-    return caches->SmartJSONStringifyFunc->Get(isolate);
-  }
-
-  Local<Context> context = isolate->GetCurrentContext();
-
-  TryCatch tc(isolate);
-  Local<Value> result;
-  bool success = BuiltinLoader::RunBuiltin(context, BuiltinId::kSmartStringify).ToLocal(&result);
-  if (!success && tc.HasCaught()) {
-    tns::LogError(isolate, tc);
-  }
-  tns::Assert(success, isolate);
-
-  if (result.IsEmpty() || !result->IsFunction()) {
-    return Local<v8::Function>();
-  }
-
-  Local<v8::Function> smartStringifyFunction = result.As<v8::Function>();
-
-  caches->SmartJSONStringifyFunc =
-      std::make_unique<Persistent<v8::Function>>(isolate, smartStringifyFunction);
-
-  return smartStringifyFunction;
 }
 
 std::string tns::ReplaceAll(const std::string source, std::string find, std::string replacement) {

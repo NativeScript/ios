@@ -24,17 +24,26 @@ const intrinsics = {
   Error,
   Map,
   Proxy,
+  Set,
   String,
   TypeError,
   SymbolHasInstance: Symbol.hasInstance,
 
+  // Namespaces / prototypes.
+  ObjectPrototype: Object.prototype,
+
   // Statics.
+  ArrayBufferIsView: ArrayBuffer.isView,
+  ArrayIsArray: Array.isArray,
   JSONStringify: JSON.stringify,
   ObjectAssign: Object.assign,
   ObjectCreate: Object.create,
   ObjectDefineProperty: Object.defineProperty,
   ObjectFreeze: Object.freeze,
   ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor,
+  ObjectGetOwnPropertySymbols: Object.getOwnPropertySymbols,
+  ObjectGetPrototypeOf: Object.getPrototypeOf,
+  ObjectIs: Object.is,
   ObjectKeys: Object.keys,
   ObjectSetPrototypeOf: Object.setPrototypeOf,
   ReflectConstruct: Reflect.construct,
@@ -49,12 +58,43 @@ const intrinsics = {
   FunctionPrototypeBind: uncurryThis(FunctionPrototypeBind),
   FunctionPrototypeCall: uncurryThis(FunctionPrototypeCall),
   FunctionPrototypeToString: uncurryThis(Function.prototype.toString),
+  DatePrototypeGetTime: uncurryThis(Date.prototype.getTime),
+  DatePrototypeToISOString: uncurryThis(Date.prototype.toISOString),
   MapPrototypeDelete: uncurryThis(Map.prototype.delete),
+  MapPrototypeEntries: uncurryThis(Map.prototype.entries),
   MapPrototypeGet: uncurryThis(Map.prototype.get),
   MapPrototypeSet: uncurryThis(Map.prototype.set),
   ObjectPrototypeHasOwnProperty: uncurryThis(Object.prototype.hasOwnProperty),
+  ObjectPrototypePropertyIsEnumerable: uncurryThis(Object.prototype.propertyIsEnumerable),
+  ObjectPrototypeToString: uncurryThis(Object.prototype.toString),
+  RegExpPrototypeTest: uncurryThis(RegExp.prototype.test),
+  RegExpPrototypeToString: uncurryThis(RegExp.prototype.toString),
+  SetPrototypeAdd: uncurryThis(Set.prototype.add),
+  SetPrototypeDelete: uncurryThis(Set.prototype.delete),
+  SetPrototypeHas: uncurryThis(Set.prototype.has),
+  SetPrototypeValues: uncurryThis(Set.prototype.values),
   StringPrototypeIndexOf: uncurryThis(String.prototype.indexOf),
+  StringPrototypeSlice: uncurryThis(String.prototype.slice),
   StringPrototypeToLowerCase: uncurryThis(String.prototype.toLowerCase),
+  SymbolPrototypeToString: uncurryThis(Symbol.prototype.toString),
+
+  // Iterator-protocol escape hatches: the captured `next` of the live map/set
+  // iterator prototypes, so entries can be walked with early exit even after
+  // user code tampers %MapIteratorPrototype%/%SetIteratorPrototype%.
+  MapIteratorPrototypeNext: uncurryThis(
+      Object.getPrototypeOf(new Map()[Symbol.iterator]()).next),
+  SetIteratorPrototypeNext: uncurryThis(
+      Object.getPrototypeOf(new Set()[Symbol.iterator]()).next),
+
+  // Captured accessor getters: reading .length/.byteLength off a view via the
+  // prototype would invoke whatever getter user code installed there.
+  TypedArrayPrototypeGetLength: uncurryThis(
+      Object.getOwnPropertyDescriptor(
+          Object.getPrototypeOf(Uint8Array.prototype), "length").get),
+  ArrayBufferPrototypeGetByteLength: uncurryThis(
+      Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength").get),
+  DataViewPrototypeGetByteLength: uncurryThis(
+      Object.getOwnPropertyDescriptor(DataView.prototype, "byteLength").get),
 };
 
 Object.setPrototypeOf(intrinsics, null);
