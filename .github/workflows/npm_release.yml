@@ -130,8 +130,6 @@ jobs:
 
   test:
     name: Test
-    # Don't pin the simulator destination back to iOS 17.x: a worker-teardown
-    # stress spec deadlocks the JS thread there and hangs the whole suite.
     runs-on: macos-15
     needs: build
     steps:

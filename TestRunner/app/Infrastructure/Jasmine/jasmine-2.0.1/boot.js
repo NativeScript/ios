@@ -224,7 +224,6 @@ var TerminalReporter = require('../jasmine-reporters/terminal_reporter').Termina
     // answer the runtime's synchronous (NSURLConnection) GET, which it can't
     // (getPeerName EINVAL / no response). The loader itself works; this is a
     // test-harness limitation. See QUARANTINED_TESTS.md.
-    "HMR hot.data",
     "URL Key Canonicalization",
   ];
   env.specFilter = function(spec) {

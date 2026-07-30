@@ -36,12 +36,17 @@ the two candidate fix directions).
 
 ---
 
-## 2. `HTTP ESM Loader` → "HMR hot.data" and "URL Key Canonicalization" describes
+## 2. `HTTP ESM Loader` → "URL Key Canonicalization" describe
 
-(8 specs: `should expose import.meta.hot.data and stable API`, `should share
-hot.data across …` ×3, `preserves query for non-dev/public URLs`, `drops
-t/v/import for NativeScript dev endpoints`, `sorts query params for NativeScript
-dev endpoints`, `ignores URL fragments for cache identity`.)
+(4 specs: `preserves query for non-dev/public URLs`, `drops t/v/import for
+NativeScript dev endpoints`, `sorts query params for NativeScript dev
+endpoints`, `ignores URL fragments for cache identity`.)
+
+> This entry originally also quarantined the "HMR hot.data" describe. Those
+> specs were **deleted** (not un-quarantined) when `import.meta.hot` moved to
+> userland — the runtime no longer implements a native hot-context, and the
+> suite now asserts its *absence* instead
+> (`should NOT attach a native import.meta.hot`, which runs un-quarantined).
 
 **Symptom:** each spec times out; the dynamic `import()` of an `http://127.0.0.1:<port>/…`
 URL never resolves. (Previously masked by quarantine #1 hanging the suite first.)
@@ -79,8 +84,8 @@ filter once the server is fixed):
   dead socket would otherwise crash the runner.
 - `/esm/timeout.mjs` responds via a non-blocking `loop.call(withDelay:)` instead
   of `Thread.sleep` (which wedged the single-threaded server).
-- The server also serves the `/ns/m/…` hot-data aliases and `/ns/core` bridge
-  endpoints the identity specs import.
+- The server also serves the `/ns/m/…` dev-endpoint paths and `/ns/core`
+  bridge endpoints the canonicalization specs import.
 
 **Re-enable when:** the Embassy test server reliably answers the runtime's
 synchronous (`NSURLConnection`) GET — e.g. fix the IPv6/IPv4 socket handling, or
