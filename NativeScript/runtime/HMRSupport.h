@@ -96,8 +96,8 @@ void MarkUrlsForCacheBust(const std::vector<std::string>& urls);
 // Flip the dev-boot-complete signal: sets the JS-visible
 // `__NS_HMR_BOOT_COMPLETE__` global and the native atomic that gates the
 // cold-boot-only behaviors (JS-thread runloop pump between synchronous
-// fetches). Exposed to JS as
-// `__NS_DEV__.setDevBootComplete(value?: boolean)`.
+// fetches). Exposed to JS as ns:runtime
+// `setDevBootComplete(value?: boolean)`.
 void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context,
                         bool value);
 
@@ -108,30 +108,27 @@ void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context,
 // still uses).
 void CleanupHMRGlobals();
 
-// Mirror a globally-installed value onto `globalThis.<name>` so
-// `globalThis.<name>` lookups resolve when the runtime installs the
-// canonical value on the realm's global object.
-void MirrorGlobalOnGlobalThis(v8::Isolate* isolate,
-                              v8::Local<v8::Context> context, const char* name);
-
 // ─────────────────────────────────────────────────────────────
-// Dev host namespace installer
+// The `ns:runtime` builtin binding
 //
-// Installs the single `__NS_DEV__` namespace object that carries every
-// JS-callable dev primitive that any tooling can depend on.
-// Idempotent per realm; safe to call from any place that has a fresh
-// context + isolate scope. Installed on the realm's global object AND
-// mirrored on globalThis.
+// Populates the native half of the `ns:runtime` builtin module — the one
+// namespace carrying every JS-callable dev primitive that any tooling can
+// depend on. Called from NsBuiltinModules::BuildBinding the first time a
+// realm resolves `ns:runtime` (via require, static import, or import());
+// ns-runtime.js shapes and freezes the exports.
 //
-// `__NS_DEV__` members:
+// `ns:runtime` members:
 //   - configureRuntime(config)        (import map + volatile patterns +
 //                                      canonicalization vocabulary)
 //   - invalidateModules(urls)         (registry + cache eviction)
 //   - getLoadedModuleUrls()           (registry introspection)
 //   - setDevBootComplete(value?)      (boot-complete signal)
-//   - terminateAllWorkers()           (main isolate only; see Worker.h)
+//   - terminateAllWorkers()           (main realm only; see Worker.h)
 //   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
-void InitializeHmrDevGlobals(v8::Isolate* isolate,
-                             v8::Local<v8::Context> context, bool isWorker);
+//
+// Returns false (with an exception pending or a failed Set) when the
+// binding could not be populated.
+bool BuildNsRuntimeBinding(v8::Local<v8::Context> context,
+                           v8::Local<v8::Object> binding);
 
 }  // namespace tns

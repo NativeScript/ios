@@ -9,6 +9,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include "Caches.h"
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
@@ -25,22 +26,6 @@ static inline bool StartsWith(const std::string& s, const char* prefix) {
   return s.size() >= n && s.compare(0, n, prefix) == 0;
 }
 
-void MirrorGlobalOnGlobalThis(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                              const char* name) {
-  std::string src = "if (typeof globalThis !== 'undefined' && typeof globalThis." +
-                    std::string(name) +
-                    " === 'undefined') {"
-                    "  Object.defineProperty(globalThis, '" +
-                    std::string(name) + "', { value: this." + std::string(name) +
-                    ", writable: true, configurable: true, enumerable: false });"
-                    "}";
-
-  v8::Local<v8::Script> script;
-  if (v8::Script::Compile(context, tns::ToV8String(isolate, src.c_str())).ToLocal(&script)) {
-    script->Run(context).FromMaybe(v8::Local<v8::Value>());
-  }
-}
-
 static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> context, const char* key,
                              bool value) {
   context->Global()
@@ -54,8 +39,8 @@ static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> contex
 // Native-side mirror of `__NS_HMR_BOOT_COMPLETE__`. Read by the
 // runloop pump in `MaybePumpJSThreadDuringBoot` so its gate is a
 // single relaxed atomic load on the HMR-time hot path. The JS dev
-// client flips this via the
-// `__NS_DEV__.setDevBootComplete(bool)` global once the real app root view
+// client flips this via ns:runtime
+// `setDevBootComplete(bool)` once the real app root view
 // commits; boot orchestration itself is entirely userland.
 static std::atomic<bool> g_devSessionBootComplete{false};
 
@@ -83,7 +68,7 @@ void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bo
 // queries may be normalized, and which paths must keep their query verbatim
 // because the query IS the identity — is server/framework policy, supplied
 // by the dev client via
-// `__NS_DEV__.configureRuntime({ canonicalization: {...} })`.
+// ns:runtime `configureRuntime({ canonicalization: {...} })`.
 //
 // Write-before-read contract: the client configures this once, before the
 // first import wave (session-bootstrap order), so plain statics are
@@ -94,10 +79,6 @@ void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bo
 //
 // When unconfigured, a built-in vocabulary matching current
 // `@nativescript/vite` conventions applies.
-// TODO(feat/hmr-dev-sessions follow-up): delete the built-in vocabulary once
-// the paired `@nativescript/vite` release that sends `canonicalization` has
-// been qualified — the runtime should carry zero server/framework URL
-// strings.
 struct CanonicalizationConfig {
   std::vector<std::string> stripParams;            // query param names to drop
   std::vector<std::string> devPathPrefixes;        // path StartsWith → normalize query
@@ -110,7 +91,7 @@ static void SetCanonicalizationConfig(CanonicalizationConfig config) {
   g_canonConfig = std::move(config);
   g_canonConfigured = true;
   if (IsScriptLoadingLogEnabled()) {
-    Log(@"[__NS_DEV__.configureRuntime] canonicalization set (strip=%lu devPrefixes=%lu "
+    Log(@"[ns:runtime configureRuntime] canonicalization set (strip=%lu devPrefixes=%lu "
         @"preserve=%lu)",
         (unsigned long)g_canonConfig.stripParams.size(),
         (unsigned long)g_canonConfig.devPathPrefixes.size(),
@@ -161,7 +142,7 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   //
   // The dev server serves every module under ONE canonical URL — module
   // identity IS the URL string. Freshness after an HMR edit is handled by
-  // `__NS_DEV__.invalidateModules` (registry evict) plus the
+  // ns:runtime `invalidateModules` (registry evict) plus the
   // eviction-driven fetch nonce in `PerformHttpFetchOnceSync`, never by URL
   // variation. There is deliberately no path-tag vocabulary to collapse here.
   //
@@ -192,7 +173,8 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
         return noHash;
       }
     } else {
-      // Built-in fallback vocabulary — see the deletion TODO above.
+      // Unconfigured: built-in vocabulary matching `@nativescript/vite`
+      // conventions.
       if (pathOnly.find("/@ng/component") != std::string::npos) {
         return noHash;
       }
@@ -300,12 +282,10 @@ static void ClearAllCacheBustMarks() {
 //     which fetches the transitive closure concurrently off the JS
 //     thread before instantiation begins.
 //
-// There is deliberately NO body prewarm cache and NO JS-driven prefetch
-// API here. Measurement (see docs/knowledge/hmr-simplification-pass.md)
-// showed the async discovery walk beats server-computed
-// closure/archive seeding on real apps — concurrent fetches overlap
-// with on-device compile, while seeding serializes a full server-side
-// transform pass before the entry can start.
+// These two are the loader's complete fetch surface: the async graph walk
+// owns all body fetching. Concurrent per-module fetches overlap with
+// on-device compile, which measured fastest on real apps
+// (HMR_API_NECESSITY_REVIEW.md §8.3).
 
 // Forward declarations — these helpers are defined below their first use,
 // matching the existing convention in this file.
@@ -754,7 +734,7 @@ void FetchModuleBodyAsync(const std::string& url,
 //     background threads, so they never pump someone else's runloop.
 //   - `IsDevSessionBootComplete()` short-circuits once the dev client
 //     has committed its first stable view (it calls
-//     `__NS_DEV__.setDevBootComplete(true)`) — no placeholder to repaint, and
+//     ns:runtime `setDevBootComplete(true)`) — no placeholder to repaint, and
 //     HMR-time fetches must not pay the pump cost.
 //   - The runloop identity check survives any future change that
 //     decouples the runtime's captured runloop from the current thread.
@@ -814,18 +794,20 @@ void CleanupHMRGlobals() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Dev-loader JS-callable globals
+// The `ns:runtime` dev surface
 //
 // The runtime's dev surface is deliberately small: it exposes
 // *mechanism* only (resolution config, registry eviction, registry
 // introspection, boot-complete signal). All HMR *policy* — boot
 // orchestration, `import.meta.hot`, full reload, CSS apply, WebSocket
 // protocol — lives in the JS dev client (`@nativescript/vite`).
+// The surface is reachable exclusively through the `ns:runtime` builtin
+// module (require / static import / import()); there is no global.
 
 namespace {
 
 // Sets the function name on the v8 Function for nicer stack traces and
-// attaches it as a method of the `__NS_DEV__` namespace object.
+// attaches it as a member of the `ns:runtime` binding object.
 void InstallDevFunction(v8::Isolate* isolate, v8::Local<v8::Context> context,
                         v8::Local<v8::Object> target, const char* name,
                         v8::FunctionCallback callback) {
@@ -843,7 +825,7 @@ void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info
 
   if (info.Length() < 1 || !info[0]->IsObject()) {
     if (logScriptLoading) {
-      Log(@"[__NS_DEV__.configureRuntime] expected config object argument");
+      Log(@"[ns:runtime configureRuntime] expected config object argument");
     }
     return;
   }
@@ -877,7 +859,7 @@ void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info
     if (!jsonStr.empty()) {
       SetImportMap(jsonStr);
       if (logScriptLoading) {
-        Log(@"[__NS_DEV__.configureRuntime] import map set (%zu bytes)", jsonStr.size());
+        Log(@"[ns:runtime configureRuntime] import map set (%zu bytes)", jsonStr.size());
       }
     }
   }
@@ -907,7 +889,7 @@ void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info
     if (readStringArray(config, "volatilePatterns", patterns) && !patterns.empty()) {
       SetVolatilePatterns(patterns);
       if (logScriptLoading) {
-        Log(@"[__NS_DEV__.configureRuntime] %zu volatile patterns set", patterns.size());
+        Log(@"[ns:runtime configureRuntime] %zu volatile patterns set", patterns.size());
       }
     }
   }
@@ -936,7 +918,7 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
   if (info.Length() < 1 || !info[0]->IsArray()) {
-    Log(@"[__NS_DEV__.invalidateModules] expected array of URL strings");
+    Log(@"[ns:runtime invalidateModules] expected array of URL strings");
     return;
   }
 
@@ -992,7 +974,7 @@ void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info
   info.GetReturnValue().Set(result);
 }
 
-// `__NS_DEV__.setDevBootComplete(value?: boolean)` — the JS dev client calls
+// ns:runtime `setDevBootComplete(value?: boolean)` — the JS dev client calls
 // this (with `true`, or no argument) once the real app root view has
 // committed. It flips both the JS-visible `__NS_HMR_BOOT_COMPLETE__`
 // global and the native atomic that disarms the cold-boot runloop pump.
@@ -1013,48 +995,48 @@ void SetDevBootCompleteCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 
 }  // namespace
 
-void InitializeHmrDevGlobals(v8::Isolate* isolate, v8::Local<v8::Context> context, bool isWorker) {
-  // The dev host API lives here: `__NS_DEV__`.
-  v8::Local<v8::Object> dev = v8::Object::New(isolate);
+bool BuildNsRuntimeBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> binding) {
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
 
-  InstallDevFunction(isolate, context, dev, "configureRuntime", ConfigureDevRuntimeCallback);
-  InstallDevFunction(isolate, context, dev, "invalidateModules", InvalidateModulesCallback);
-  InstallDevFunction(isolate, context, dev, "getLoadedModuleUrls", GetLoadedModuleUrlsCallback);
-  InstallDevFunction(isolate, context, dev, "setDevBootComplete", SetDevBootCompleteCallback);
+  InstallDevFunction(isolate, context, binding, "configureRuntime", ConfigureDevRuntimeCallback);
+  InstallDevFunction(isolate, context, binding, "invalidateModules", InvalidateModulesCallback);
+  InstallDevFunction(isolate, context, binding, "getLoadedModuleUrls", GetLoadedModuleUrlsCallback);
+  InstallDevFunction(isolate, context, binding, "setDevBootComplete", SetDevBootCompleteCallback);
 
-  // Main-isolate only: terminating workers from inside a worker would let
-  // a stuck worker take down its peers (see Worker.h).
-  if (!isWorker) {
-    InstallDevFunction(isolate, context, dev, "terminateAllWorkers",
+  // Main-realm only: terminating workers from inside a worker would let
+  // a stuck worker take down its peers (see Worker.h). A worker realm's
+  // `ns:runtime` simply has no such member, so feature checks work.
+  if (!Caches::Get(isolate)->isWorker) {
+    InstallDevFunction(isolate, context, binding, "terminateAllWorkers",
                        Worker::TerminateAllWorkersCallback);
   }
 
   if (RuntimeConfig.IsDebug) {
-    try {
-      // Debug-only diagnostic: expose the HTTP canonical-key function to JS so
-      // the test harness can pin its identity behavior across cache-busters
-      // and dev-endpoint query normalization.
-      auto canonicalizeCb = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-        v8::Isolate* iso = info.GetIsolate();
-        if (info.Length() < 1 || !info[0]->IsString()) {
-          info.GetReturnValue().SetEmptyString();
-          return;
-        }
-        v8::String::Utf8Value u(iso, info[0]);
-        std::string key = CanonicalizeHttpUrlKey(*u ? std::string(*u) : std::string());
-        info.GetReturnValue().Set(tns::ToV8String(iso, key.c_str()));
-      };
-      v8::Local<v8::Function> fn = v8::Function::New(context, canonicalizeCb).ToLocalChecked();
+    // Debug-only diagnostic: expose the HTTP canonical-key function to JS so
+    // the test harness can pin its identity behavior across cache-busters
+    // and dev-endpoint query normalization.
+    auto canonicalizeCb = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+      v8::Isolate* iso = info.GetIsolate();
+      if (info.Length() < 1 || !info[0]->IsString()) {
+        info.GetReturnValue().SetEmptyString();
+        return;
+      }
+      v8::String::Utf8Value u(iso, info[0]);
+      std::string key = CanonicalizeHttpUrlKey(*u ? std::string(*u) : std::string());
+      info.GetReturnValue().Set(tns::ToV8String(iso, key.c_str()));
+    };
+    v8::Local<v8::Function> fn;
+    if (v8::Function::New(context, canonicalizeCb).ToLocal(&fn)) {
       fn->SetName(tns::ToV8String(isolate, "canonicalizeHttpUrlKey"));
-      dev->CreateDataProperty(context, tns::ToV8String(isolate, "canonicalizeHttpUrlKey"), fn)
-          .Check();
-    } catch (...) {
-      // Don't crash if debug-diagnostic setup fails
+      if (!binding
+               ->CreateDataProperty(context, tns::ToV8String(isolate, "canonicalizeHttpUrlKey"), fn)
+               .FromMaybe(false)) {
+        return false;
+      }
     }
   }
 
-  context->Global()->Set(context, tns::ToV8String(isolate, "__NS_DEV__"), dev).FromMaybe(false);
-  MirrorGlobalOnGlobalThis(isolate, context, "__NS_DEV__");
+  return true;
 }
 
 }  // namespace tns
