@@ -163,22 +163,39 @@ describe("HTTP ESM Loader", function() {
             });
         });
         
-        it("should handle network timeouts", function(done) {
-            // Prefer the local XCTest-hosted HTTP server (when available) to avoid ATS restrictions
-            // and make this test deterministic.
-            var origin = getHostOrigin();
-            // Prefer the local XCTest server's delayed endpoint (deterministic, hermetic).
-            // The fallback is a closed local port (fast connection-refused), never a live
-            // external/TEST-NET host whose connect timeout would stall the JS thread on CI.
-            var spec = origin ? (origin + "/esm/timeout.mjs?delayMs=6500") : "http://127.0.0.1:59999/timeout-test.js";
+        describe("network timeouts", function() {
+            // The async loader's NSURLSession request timeout is 10s, so the
+            // rejection lands ~10s after the import — beyond jasmine's default
+            // 5s spec timeout. Jasmine 2.0 has no per-spec timeout argument;
+            // widen the global interval for just this describe.
+            var originalTimeout;
+            beforeEach(function() {
+                originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = 15000;
+            });
+            afterEach(function() {
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+            });
 
-            import(spec).then(function(module) {
-                fail("Should not have succeeded for unreachable server");
-                done();
-            }).catch(function(error) {
-                expect(error.message).toBeDefined();
-                console.log("Timeout handling test passed:", error.message);
-                done();
+            it("should handle network timeouts", function(done) {
+                // Prefer the local XCTest-hosted HTTP server (when available) to avoid ATS restrictions
+                // and make this test deterministic.
+                var origin = getHostOrigin();
+                // Prefer the local XCTest server's delayed endpoint (deterministic, hermetic).
+                // The fallback is a closed local port (fast connection-refused), never a live
+                // external/TEST-NET host whose connect timeout would stall the JS thread on CI.
+                // delayMs must exceed the async loader's 10s request timeout so the
+                // fetch rejects (~10s) instead of completing late but successfully.
+                var spec = origin ? (origin + "/esm/timeout.mjs?delayMs=12000") : "http://127.0.0.1:59999/timeout-test.js";
+
+                import(spec).then(function(module) {
+                    fail("Should not have succeeded for unreachable server");
+                    done();
+                }).catch(function(error) {
+                    expect(error.message).toBeDefined();
+                    console.log("Timeout handling test passed:", error.message);
+                    done();
+                });
             });
         });
         
