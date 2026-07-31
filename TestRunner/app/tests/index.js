@@ -140,6 +140,7 @@ require("./Timers");
 
 require("./URL");
 require("./URLSearchParams");
+require("./UrlSearchParamsTests");
 require("./URLPattern");
 
 // HTTP ESM Loader tests
