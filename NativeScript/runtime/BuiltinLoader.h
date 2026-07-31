@@ -9,10 +9,12 @@ namespace tns {
 class BuiltinLoader {
  public:
   // Compiles the builtin identified by id as a function body with the fixed
-  // parameters `exports`, `module`, `binding` (Node's module wrapper plus its
-  // internalBinding idiom) and `primordials`, calls it with the given bag of
-  // natives (or undefined when omitted) plus this isolate's frozen intrinsics
-  // snapshot, and returns the resulting `module.exports`. The snapshot is
+  // parameters `exports`, `require`, `module`, `binding` (Node's module wrapper
+  // plus its internalBinding idiom) and `primordials`, calls it with the given
+  // bag of natives (or undefined when omitted) plus this isolate's frozen
+  // intrinsics snapshot, and returns the resulting `module.exports`. `require`
+  // reaches the builtin modules (NsBuiltinModules) and nothing else. The
+  // snapshot is
   // produced by the kPrimordials builtin on first use and cached per isolate,
   // so it is taken before any user code can replace a global. Scripts carry
   // an "internal/<name>.js" origin so runtime

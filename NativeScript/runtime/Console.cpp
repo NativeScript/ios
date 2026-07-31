@@ -11,6 +11,7 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "NativeScriptException.h"
+#include "NsBuiltinModules.h"
 #include "RuntimeConfig.h"
 // #include "v8-log-agent-impl.h"
 #include <sstream>
@@ -272,6 +273,30 @@ std::string Console::BuildStringFromArgs(
   Isolate* isolate = args.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
   int argLen = args.Length();
+
+  // console.* follows Node: the arguments go through util.format, so the first
+  // one may carry %-substitutions and the rest are appended space-separated.
+  Local<v8::Function> format = argLen > startingIndex
+                                   ? NsBuiltinModules::GetFormatFunc(context)
+                                   : Local<v8::Function>();
+  if (!format.IsEmpty()) {
+    std::vector<Local<Value>> formatArgs;
+    formatArgs.reserve(argLen - startingIndex);
+    for (int i = startingIndex; i < argLen; i++) {
+      formatArgs.push_back(args[i]);
+    }
+    TryCatch tc(isolate);
+    Local<Value> result;
+    if (format
+            ->Call(context, v8::Undefined(isolate),
+                   static_cast<int>(formatArgs.size()), formatArgs.data())
+            .ToLocal(&result) &&
+        result->IsString()) {
+      return tns::ToString(isolate, result.As<v8::String>());
+    }
+  }
+
+  // ns:util unavailable or the formatter threw: per-argument rendering.
   std::stringstream ss;
 
   if (argLen > 0) {
@@ -327,6 +352,11 @@ static void GetNativeWrapperHintCallback(
 
 void Console::InitInspect(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  if (Caches::Get(isolate)->InspectFunc != nullptr) {
+    // inspect.js installs a non-configurable global.__inspect, so a second run
+    // in the same realm would throw.
+    return;
+  }
 
   Local<v8::Function> hintFunc;
   if (!v8::Function::New(context, GetNativeWrapperHintCallback)

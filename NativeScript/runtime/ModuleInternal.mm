@@ -11,6 +11,7 @@
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
+#include "NsBuiltinModules.h"
 #include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
 
@@ -213,6 +214,25 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
 
 void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
+
+  // Builtin modules resolve before any path handling, so they can never be
+  // shadowed by a file or a package, and an unknown one fails as a missing
+  // builtin rather than as a missing file. Only prefixed specifiers get here:
+  // a bare `util` still resolves through npm.
+  if (info.Length() > 0 && info[0]->IsString()) {
+    std::string specifier = tns::ToString(isolate, info[0].As<v8::String>());
+    if (NsBuiltinModules::IsBuiltinScheme(specifier)) {
+      Local<Context> context = isolate->GetCurrentContext();
+      Local<Object> exports;
+      if (NsBuiltinModules::GetExports(context, specifier).ToLocal(&exports)) {
+        info.GetReturnValue().Set(exports);
+      } else if (!NsBuiltinModules::IsRegistered(specifier)) {
+        isolate->ThrowException(Exception::Error(
+            tns::ToV8String(isolate, NsBuiltinModules::NotFoundMessage(specifier))));
+      }
+      return;
+    }
+  }
 
   // Declare these outside try block so they're available in catch
   std::string moduleName;
