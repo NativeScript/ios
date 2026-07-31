@@ -63,6 +63,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
 
     Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName,
                                                          std::to_string(isolateId) + "_");
+    tns::Assert(extendedClass != nil, isolate);
     class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
     class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 
@@ -222,6 +223,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         auto isolateId = cache->getIsolateId();
         __block Class extendedClass = ClassBuilder::GetExtendedClass(
             baseClassName, extendedClassName, std::to_string(isolateId) + "_");
+        tns::Assert(extendedClass != nil, isolate);
         class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
         class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 
