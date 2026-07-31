@@ -67,8 +67,11 @@ describe("WHATWG error events", function () {
         expect(received.error).toBe(err);
         expect(received.message).toBe("x");
         // preventDefault() in the listener must suppress the __onUncaughtError shim.
+        // The hook is process-wide, so assert on this error rather than on the
+        // spy being empty: async failures from earlier suites can still drain
+        // into it while this test waits.
         afterQuietTurns(function () {
-            expect(uncaught.length).toBe(0);
+            expect(uncaught.indexOf(err)).toBe(-1);
             done();
         });
     });
@@ -154,7 +157,7 @@ describe("WHATWG error events", function () {
             expect(typeof received.reason.stackTrace).toBe("string");
             expect(received.reason.stackTrace.length).toBeGreaterThan(0);
             afterQuietTurns(function () {
-                expect(uncaught.length).toBe(0);
+                expect(uncaught.indexOf(reason)).toBe(-1);
                 done();
             });
         });
@@ -326,7 +329,7 @@ describe("WHATWG error events", function () {
         expect(received).not.toBeNull();
         expect(received.error).toBe(err);
         afterQuietTurns(function () {
-            expect(uncaught.length).toBe(0);
+            expect(uncaught.indexOf(err)).toBe(-1);
             done();
         });
     });
