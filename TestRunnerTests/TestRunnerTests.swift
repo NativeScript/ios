@@ -75,14 +75,15 @@ class TestRunnerTests: XCTestCase {
                 if path == "/esm/timeout.mjs" {
                     // Delay the response WITHOUT blocking the event loop. A
                     // Thread.sleep here runs on the server's single event-loop
-                    // thread and WEDGES it: the loader's ~5s client timeout fires
+                    // thread and WEDGES it: the loader's client timeout fires
                     // first, the client resets the connection, and the blocked
                     // loop never recovers — so every later module fetch fails with
                     // "could not connect" and the whole HTTP-ESM suite times out.
                     // Schedule the response on the loop instead; the loader still
-                    // hits its client-side timeout because delayMs (6500) exceeds
-                    // the request timeout, and the server stays responsive.
-                    var delayMs = 6500
+                    // hits its client-side timeout when delayMs exceeds the async
+                    // loader's 10s request timeout (HttpEsmLoaderTests passes
+                    // delayMs=12000), and the server stays responsive.
+                    var delayMs = 12000
                     if let pair = query
                         .split(separator: "&")
                         .first(where: { $0.hasPrefix("delayMs=") }),
