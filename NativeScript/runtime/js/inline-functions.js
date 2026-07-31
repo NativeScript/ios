@@ -1,4 +1,13 @@
-Object.assign(global, {
+const {
+    ArrayPrototypeConcat,
+    FunctionPrototypeApply,
+    ObjectAssign,
+    ObjectDefineProperty,
+    ObjectGetOwnPropertyDescriptor,
+    ObjectKeys,
+} = primordials;
+
+ObjectAssign(global, {
     CGPointMake(x, y) {
         return new CGPoint({ x, y });
     },
@@ -16,20 +25,26 @@ Object.assign(global, {
     },
 
     __decorate(decorators, target, key, desc) {
-        var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+        var c = arguments.length, r = c < 3 ? target : desc === null ? desc = ObjectGetOwnPropertyDescriptor(target, key) : desc, d;
         if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
         else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-        return c > 3 && r && Object.defineProperty(target, key, r), r;
+        return c > 3 && r && ObjectDefineProperty(target, key, r), r;
     },
     __param(paramIndex, decorator) {
         return function (target, key) { decorator(target, key, paramIndex); }
     },
 
     ObjCClass() {
-        var protocols = Array.from(arguments);
+        // Index loop, not ArrayFrom/spread: this runs at class-definition
+        // time, when user code could already have tampered the array
+        // iterator protocol.
+        var protocols = [];
+        for (var pi = 0; pi < arguments.length; pi++) {
+            protocols[pi] = arguments[pi];
+        }
         return function (target) {
             if (protocols.length > 0) {
-                target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? target.ObjCProtocols.concat(protocols) : protocols);
+                target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, protocols) : protocols);
             }
         }
     },
@@ -52,20 +67,23 @@ Object.assign(global, {
                 delete target.constructor.ObjCExposedMethods[propertyKey];
 
                 target[name] = function () { 
-                    return this[propertyKey].apply(this, arguments);
+                    return FunctionPrototypeApply(this[propertyKey], this, arguments);
                 }
             }
         }
     },
     ObjC() {
-        var args = Array.from(arguments);
+        var args = [];
+        for (var ai = 0; ai < arguments.length; ai++) {
+            args[ai] = arguments[ai];
+        }
 
         return function (target, propertyKey, descriptor) {
             if (propertyKey === undefined) {
-                return ObjCClass.apply(this, args)(target);
+                return FunctionPrototypeApply(ObjCClass, this, args)(target);
             }
 
-            ObjCMethod.apply(this, args)(target, propertyKey, descriptor);
+            FunctionPrototypeApply(ObjCMethod, this, args)(target, propertyKey, descriptor);
         };
     },
     ObjCParam(type) {
@@ -86,13 +104,17 @@ Object.assign(global, {
 
 });
 
-Object.defineProperty(global, "__tsEnum", {
+ObjectDefineProperty(global, "__tsEnum", {
     writable: false,
     enumerable: false,
     configurable: false,
     value: function(obj) {
         var result = {};
-        for (var key of Object.keys(obj)) {
+        // Index loop, not for...of: enum globals evaluate lazily on first
+        // access, after user code could have tampered the array iterator.
+        var keys = ObjectKeys(obj);
+        for (var i = 0; i < keys.length; i++) {
+            var key = keys[i];
             result[key] = obj[key];
             result[obj[key]] = key;
         }
