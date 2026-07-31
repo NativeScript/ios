@@ -5,8 +5,8 @@ $(SRCROOT)/NativeScript/runtime/js/error-events.js
 $(SRCROOT)/NativeScript/runtime/js/events.js
 $(SRCROOT)/NativeScript/runtime/js/inline-functions.js
 $(SRCROOT)/NativeScript/runtime/js/primordials.js
+$(SRCROOT)/NativeScript/runtime/js/inspect.js
 $(SRCROOT)/NativeScript/runtime/js/promise-proxy.js
 $(SRCROOT)/NativeScript/runtime/js/require-factory.js
-$(SRCROOT)/NativeScript/runtime/js/smart-stringify.js
 $(SRCROOT)/NativeScript/runtime/js/ts-helpers.js
 $(SRCROOT)/NativeScript/runtime/js/weak-ref.js
