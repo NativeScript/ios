@@ -49,15 +49,17 @@ constexpr int kMaxConsecutiveAllocFailures = 100;
 
 // Moved this method in a separate .cpp file because ARC destroys the class
 // created with objc_allocateClassPair when the control leaves this method scope
-Class ClassBuilder::GetExtendedClass(std::string baseClassName,
-                                     std::string staticClassName,
-                                     std::string suffix) {
+Class ClassBuilder::GetExtendedClass(const std::string& baseClassName,
+                                     const std::string& staticClassName,
+                                     int isolateId) {
   Class baseClass = objc_getClass(baseClassName.c_str());
-  std::string name =
-      !staticClassName.empty()
-          ? staticClassName
-          : baseClassName + suffix + "_" +
-                std::to_string(++ClassBuilder::classNameCounter_);
+  std::string name = staticClassName;
+  if (name.empty()) {
+    name = baseClassName;
+    name += std::to_string(isolateId);
+    name += "__";
+    name += std::to_string(++ClassBuilder::classNameCounter_);
+  }
   // Allocation failure is the collision signal (objc_getClass beforehand
   // would race), but that only detects *registered* names — hence the lock
   // spanning allocate -> register.
