@@ -168,6 +168,9 @@ require("./InspectTests");
 // The ns:/node: builtin modules
 require("./NsUtilTests");
 
+// Worker-isolate scoping of extended objc class names
+require("./ExtendedClassNamingTests");
+
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();
 
