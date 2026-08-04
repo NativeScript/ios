@@ -46,7 +46,7 @@ int64_t unzip(const char* syncZipPath, const char* destination)
         assetFullname.append("/");
         assetFullname.append(name);
 
-        strcpy(pathcopy, name);
+        snprintf(pathcopy, PATH_MAX, "%s", name);
         auto path = dirname(pathcopy);
         std::string dirFullname(destination);
         dirFullname.append("/");
