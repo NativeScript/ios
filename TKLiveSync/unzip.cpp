@@ -1,7 +1,6 @@
 #include "unzip.h"
 #include "libzip/zip.h"
 #include <assert.h>
-#include <libgen.h>
 #include <limits.h>
 #include <string>
 #include <sys/stat.h>
@@ -36,7 +35,6 @@ int64_t unzip(const char* syncZipPath, const char* destination)
     struct zip_stat sb;
     struct zip_file* zf;
     char buf[65536];
-    auto pathcopy = new char[PATH_MAX];
 
     for (zip_int64_t i = 0; i < num; i++) {
         zip_stat_index(z, i, ZIP_STAT_MTIME, &sb);
@@ -46,12 +44,15 @@ int64_t unzip(const char* syncZipPath, const char* destination)
         assetFullname.append("/");
         assetFullname.append(name);
 
-        snprintf(pathcopy, PATH_MAX, "%s", name);
-        auto path = dirname(pathcopy);
-        std::string dirFullname(destination);
-        dirFullname.append("/");
-        dirFullname.append(path);
-        mkdir_rec(dirFullname.c_str());
+        std::string entryName{ name };
+        auto separator = entryName.find_last_of('/');
+
+        if (separator != std::string::npos) {
+            std::string dirFullname{ destination };
+            dirFullname.append("/");
+            dirFullname.append(entryName.substr(0, separator));
+            mkdir_rec(dirFullname.c_str());
+        }
 
         zf = zip_fopen_index(z, i, 0);
         assert(zf != nullptr);
@@ -72,7 +73,6 @@ int64_t unzip(const char* syncZipPath, const char* destination)
 
         zip_fclose(zf);
     }
-    delete[] pathcopy;
     zip_close(z);
 
     return num;
