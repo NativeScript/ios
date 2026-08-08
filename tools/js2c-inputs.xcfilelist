@@ -7,6 +7,7 @@ $(SRCROOT)/NativeScript/runtime/js/inline-functions.js
 $(SRCROOT)/NativeScript/runtime/js/primordials.js
 $(SRCROOT)/NativeScript/runtime/js/inspect.js
 $(SRCROOT)/NativeScript/runtime/js/node-util.js
+$(SRCROOT)/NativeScript/runtime/js/ns-runtime.js
 $(SRCROOT)/NativeScript/runtime/js/ns-util.js
 $(SRCROOT)/NativeScript/runtime/js/promise-proxy.js
 $(SRCROOT)/NativeScript/runtime/js/require-factory.js

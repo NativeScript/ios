@@ -30,6 +30,7 @@ WorkerWrapper::WorkerWrapper(
       isTerminating_(false),
       isDisposed_(false),
       isWeak_(false),
+      drainRetryPending_(false),
       onMessage_(onMessage) {}
 
 const WrapperType WorkerWrapper::Type() { return WrapperType::Worker; }
@@ -67,12 +68,63 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
 }
 
 void WorkerWrapper::DrainPendingTasks() {
-  std::vector<std::shared_ptr<worker::Message>> messages = this->queue_.PopAll();
+  // The drain source is armed (and can be signaled by a main-thread
+  // PostMessage) BEFORE `workerIsolate_` is assigned in BackgroundLooper —
+  // and worker creation can spin its runloop inside that window: under an
+  // HMR dev session the worker's own script loads over HTTP, and
+  // HttpFetchText's boot pump (MaybePumpJSThreadDuringBoot) runs the current
+  // runloop, firing this source with a null isolate (crash in
+  // v8::Locker::Initialize). Bail until the isolate exists — the messages
+  // stay queued and the explicit DrainPendingTasks() call right after
+  // isolate creation delivers them.
+  if (this->workerIsolate_ == nullptr) {
+    return;
+  }
   v8::Locker locker(this->workerIsolate_);
   Isolate::Scope isolate_scope(this->workerIsolate_);
   HandleScope handle_scope(this->workerIsolate_);
   Local<Context> context = Caches::Get(this->workerIsolate_)->GetContext();
   Local<Object> global = context->Global();
+
+  // WHATWG parity: a worker buffers inbound messages until its entry script
+  // has installed a handler. With synchronous classic-script entries that
+  // held for free (the entry fully evaluated inside the creation func before
+  // the first drain). Async ESM entries (HTTP dev sessions, top-level await in
+  // the graph) finish evaluating after the wrapper starts draining, and
+  // OnMessageCallback silently drops messages with no `onmessage` — the
+  // sender then waits forever (observed: a worker's second request can post
+  // while the fresh worker was still fetching its module graph). Leave the
+  // queue intact and re-poke the drain shortly; the retry stops as soon as
+  // the handler exists, the queue empties, or the worker terminates.
+  if (!this->isTerminating_ && !this->isClosing_ && !this->queue_.IsEmpty()) {
+    Local<Value> onMessageValue;
+    bool gotHandler = global->Get(context, tns::ToV8String(this->workerIsolate_, "onmessage"))
+                          .ToLocal(&onMessageValue);
+    if (!gotHandler || !onMessageValue->IsFunction()) {
+      bool expected = false;
+      if (this->drainRetryPending_.compare_exchange_strong(expected, true)) {
+        const int workerId = this->workerId_;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(50 * NSEC_PER_MSEC)),
+                       dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+                         // Resolve the wrapper by id — never capture `this`
+                         // across the delay; the worker may be gone by now.
+                         bool found = false;
+                         int lookupId = workerId;  // Get() wants a mutable ref
+                         auto state = Caches::Workers->Get(lookupId, found);
+                         if (found && state != nullptr) {
+                           WorkerWrapper* w = static_cast<WorkerWrapper*>(state->UserData());
+                           if (w != nullptr) {
+                             w->drainRetryPending_ = false;
+                             w->SignalMessageDrain();
+                           }
+                         }
+                       });
+      }
+      return;
+    }
+  }
+
+  std::vector<std::shared_ptr<worker::Message>> messages = this->queue_.PopAll();
 
   for (std::shared_ptr<worker::Message> message : messages) {
     if (this->isTerminating_ || this->isClosing_) {
@@ -135,6 +187,8 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
     }
   }
 }
+
+void WorkerWrapper::SignalMessageDrain() { this->queue_.Signal(); }
 
 void WorkerWrapper::Close() { this->isClosing_ = true; }
 

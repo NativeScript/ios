@@ -26,6 +26,7 @@
 
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 #include "DevFlags.h"
 #include "HMRSupport.h"
 #include "ModuleBinding.hpp"
@@ -41,6 +42,24 @@ using namespace v8;
 using namespace std;
 
 // Import meta callback to support import.meta.url
+//
+// `g_moduleRegistry` keys are normalized by `CanonicalizeRegistryKey`
+// (in ModuleInternalCallbacks.mm) to one of:
+//
+//   1. HTTP / HTTPS URL — `http://host:port/path` or `https://...`.
+//      The URL IS the module identity;
+//      `import.meta.url` should be the URL verbatim.
+//
+//   2. Custom scheme — `node:fs`, `blob:...`, `optional:...`.
+//      Synthetic / built-in modules that aren't backed by the local
+//      filesystem. Their identity is the scheme + body itself;
+//      `import.meta.url` keeps that string unchanged.
+//
+//   3. Absolute filesystem path — `/Users/.../app/src/foo.js`. The
+//      production / non-HMR dev shape. Strip the runtime base dir to
+//      recover the canonical "/app/<rel>" shape JS consumers see, then
+//      prepend `file://` so the result is a well-formed URL.
+//
 static void InitializeImportMetaObject(Local<Context> context, Local<Module> module,
                                        Local<Object> meta) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -49,7 +68,7 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
   std::string modulePath;
 
   try {
-    for (auto& kv : tns::g_moduleRegistry) {
+    for (auto& kv : tns::ModuleRegistryFor(isolate)) {
       // Check if Global handle is empty before accessing
       if (kv.second.IsEmpty()) {
         continue;
@@ -66,23 +85,31 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
     modulePath = "";  // Will use fallback path
   }
 
-  // Debug logging
-  // NSLog(@"[import.meta] Module lookup: found path = %s",
-  //       modulePath.empty() ? "(empty)" : modulePath.c_str());
-  // NSLog(@"[import.meta] Registry size: %zu", tns::g_moduleRegistry.size());
+  auto hasUrlScheme = [](const std::string& s) -> bool {
+    if (s.empty()) return false;
+    size_t colonPos = s.find(':');
+    if (colonPos == 0 || colonPos == std::string::npos) return false;
+    size_t slashPos = s.find('/');
+    if (slashPos != std::string::npos && slashPos < colonPos) return false;
+    for (size_t i = 0; i < colonPos; i++) {
+      char c = s[i];
+      const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                      c == '+' || c == '-' || c == '.';
+      if (!ok) return false;
+    }
+    return true;
+  };
 
-  // Convert file path to file:// URL
+  // Compute import.meta.url.
   std::string moduleUrl;
-  if (!modulePath.empty()) {
-    // Remove base directory and create file:// URL
+  if (modulePath.empty()) {
+    moduleUrl = "file:///app/";
+  } else if (hasUrlScheme(modulePath)) {
+    moduleUrl = modulePath;
+  } else {
     std::string base = tns::ReplaceAll(modulePath, RuntimeConfig.BaseDir, "");
     moduleUrl = "file://" + base;
-  } else {
-    // Fallback URL if module not found in registry
-    moduleUrl = "file:///app/";
   }
-
-  // NSLog(@"[import.meta] Final URL: %s", moduleUrl.c_str());
 
   Local<String> url =
       String::NewFromUtf8(isolate, moduleUrl.c_str(), NewStringType::kNormal).ToLocalChecked();
@@ -93,17 +120,41 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
           url)
       .Check();
 
-  // Add import.meta.dirname support (extract directory from path)
+  // Compute import.meta.dirname.
+  //
+  // Spec (Node.js): `import.meta.dirname` is the OS-path of the
+  // directory containing the module — equivalent to `path.dirname(
+  // fileURLToPath(import.meta.url))`. It only makes sense for modules
+  // backed by the local filesystem.
+  //
+  // For URL-backed modules (HTTP, blob, etc.) there is no
+  // filesystem directory. We return the URL with the final segment
+  // stripped — a best-effort answer that's stable across cycles and
+  // useful for log lines / source maps. Consumers that genuinely need
+  // a filesystem path should already be guarding on `meta.url`'s
+  // scheme before using `meta.dirname`.
   std::string dirname;
-  if (!modulePath.empty()) {
+  if (modulePath.empty()) {
+    dirname = "/app";
+  } else if (hasUrlScheme(modulePath)) {
+    size_t schemeEnd = modulePath.find("://");
+    size_t pathStart =
+        (schemeEnd == std::string::npos) ? std::string::npos : modulePath.find('/', schemeEnd + 3);
+    size_t lastSlash = modulePath.find_last_of('/');
+    if (pathStart != std::string::npos && lastSlash != std::string::npos && lastSlash > pathStart) {
+      dirname = modulePath.substr(0, lastSlash);
+    } else {
+      // No path beyond the host (`http://host`) or scheme without `//`
+      // (`node:fs`, `blob:abc`). Keep the identity intact.
+      dirname = modulePath;
+    }
+  } else {
     size_t lastSlash = modulePath.find_last_of("/\\");
     if (lastSlash != std::string::npos) {
       dirname = modulePath.substr(0, lastSlash);
     } else {
       dirname = "/app";  // fallback
     }
-  } else {
-    dirname = "/app";  // fallback
   }
 
   Local<String> dirnameStr =
@@ -114,15 +165,6 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
           context, String::NewFromUtf8(isolate, "dirname", NewStringType::kNormal).ToLocalChecked(),
           dirnameStr)
       .Check();
-
-  if (RuntimeConfig.IsDebug) {
-    // Attach minimal import.meta.hot only in dev
-    try {
-      tns::InitializeImportMetaHot(isolate, context, meta, modulePath);
-    } catch (...) {
-      // If anything fails, keep meta without hot to avoid crashing
-    }
-  }
 }
 
 namespace tns {
@@ -210,6 +252,8 @@ Runtime::~Runtime() {
   }
   this->isolate_->TerminateExecution();
 
+  // TODO: fix race condition on workers where a queue can leak (maybe calling Terminate before
+  // Initialize?)
   Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
     auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
     if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
@@ -221,13 +265,31 @@ Runtime::~Runtime() {
   {
     v8::Locker lock(isolate_);
 
-    // Clear module registry before disposing other handles
-    // This prevents crashes during g_moduleRegistry cleanup
-    extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
-    for (auto& kv : g_moduleRegistry) {
-      kv.second.Reset();
+    // Tear down this isolate's module maps (registry / fallback /
+    // fallbackByRelative / vendor) before disposing other handles. The maps are
+    // keyed by v8::Isolate* (see ModuleInternalCallbacks.mm), so this resets and
+    // drops only the handles this isolate created — while it is still alive,
+    // under the Locker above. Worker isolates' maps are freed the same way.
+    tns::DestroyModuleStateForIsolate(isolate_);
+
+    // Clear the remaining dev-loader + import-map globals (`g_importMap`,
+    // cache-bust marks, boot-complete flag) before isolate disposal.
+    //
+    // CRITICAL: unlike the per-isolate module maps above, these globals are
+    // PROCESS-WIDE. They live in the main isolate's address space but every
+    // Runtime destructor would clear them. That's wrong for worker-isolate
+    // teardown: when a worker dies (e.g. via ns:runtime `terminateAllWorkers` during an
+    // HMR cycle), its Runtime destructor MUST NOT wipe the main isolate's import
+    // map — doing so silently breaks the next HMR cycle's bare-specifier
+    // resolution (vendor packages fall back to filesystem and fail with
+    // `Cannot find module @scope/pkg`). So we gate this cleanup on "this is
+    // the main isolate"; worker teardown leaves the shared globals intact and
+    // the main isolate keeps serving HMR cycles. Real process-teardown still
+    // routes through the main isolate's destructor, so the cleanup fires.
+    if (!IsRuntimeWorker()) {
+      tns::CleanupHMRGlobals();
+      tns::CleanupImportMapGlobals();
     }
-    g_moduleRegistry.clear();
 
     ObjectManager::DisposeAllRegistered(isolate_);
 
@@ -365,8 +427,13 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   Console::Init(context);
   WeakRef::Init(context);
 
-  // URL blob support (internal/blob-url.js); failures are tolerated, matching
-  // the previous compile-and-run-if-possible behavior.
+  // The dev primitives (configureRuntime, invalidateModules, …) live in the
+  // `ns:runtime` builtin module, materialized lazily per realm on first
+  // resolution (see `BuildNsRuntimeBinding` in HMRSupport.mm for the member
+  // list) — nothing to install here.
+
+  // URL blob support (internal/blob-url.js); failures are tolerated —
+  // compile-and-run-if-possible.
   v8::Local<v8::Value> blobMethodsResult;
   bool blobMethodsOk =
       BuiltinLoader::RunBuiltin(context, BuiltinId::kBlobUrl).ToLocal(&blobMethodsResult);
@@ -399,11 +466,11 @@ void Runtime::RunMainScript() {
   this->moduleInternal_->RunModule(isolate, "./");
 }
 
-void Runtime::RunModule(const std::string moduleName) {
+bool Runtime::RunModule(const std::string moduleName, std::string* outErrorMessage) {
   Isolate* isolate = this->GetIsolate();
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
-  this->moduleInternal_->RunModule(isolate, moduleName);
+  return this->moduleInternal_->RunModule(isolate, moduleName, outErrorMessage);
 }
 
 void Runtime::RunScript(const std::string script) {

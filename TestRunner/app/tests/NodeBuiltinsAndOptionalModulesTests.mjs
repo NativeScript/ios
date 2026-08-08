@@ -2,8 +2,10 @@ describe("Node built-in and optional module resolution", function () {
   it("provides an in-memory polyfill for node:url", async function () {
     // Dynamic import to exercise ResolveModuleCallback ESM path.
     const mod = await import("node:url");
+    const modAgain = await import("node:url");
 
     expect(mod).toBeDefined();
+    expect(modAgain).toBe(mod);
     expect(typeof mod.fileURLToPath).toBe("function");
     expect(typeof mod.pathToFileURL).toBe("function");
 
@@ -15,21 +17,109 @@ describe("Node built-in and optional module resolution", function () {
     expect(u.protocol).toBe("file:");
   });
 
-  it("creates an in-memory placeholder for likely-optional modules", async function () {
-    // Use a name that IsLikelyOptionalModule will treat as optional (no slashes, no extension).
-    const mod = await import("__ns_optional_test_module__");
+  // The optional-module placeholder is require()-path policy only (its specs live in
+  // shared/Require/index.js, pending review — docs/knowledge/optional-module-placeholder.md).
+  // import() deliberately diverges: a missing bare specifier rejects, package-shaped or not,
+  // so a dev-session import-map miss fails loudly instead of resolving to a lazily-throwing
+  // proxy. ESM callers that want optionality can `try { await import(x) } catch {}`.
+  it("rejects a missing bare specifier instead of resolving a placeholder", async function () {
+    const names = [
+      "__ns_optional_test_module__",
+      // A dot that isn't a recognized file extension (e.g. an npm name shaped like
+      // "lodash.debounce") gets no special treatment either.
+      "__ns_optional_test_module.dotted__",
+    ];
 
-    expect(mod).toBeDefined();
-    expect(typeof mod.default).toBe("object");
-
-    let threw = false;
-    try {
-      // Any property access should throw according to the placeholder implementation.
-      // eslint-disable-next-line no-unused-expressions
-      mod.default.someProperty;
-    } catch (e) {
-      threw = true;
+    for (const name of names) {
+      let error = null;
+      try {
+        await import(name);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).not.toBe(null);
+      expect(String(error)).toContain("Cannot find module");
     }
-    expect(threw).toBe(true);
+  });
+
+  it("rejects immediately for a missing bare specifier that carries an explicit file extension", async function () {
+    // Extension-qualified names ("video.js") resolve through the filesystem-candidate
+    // walk rather than the bare-specifier path; pin that they reject the same way.
+    const names = [
+      "__ns_missing_import_test__.js",
+      "__ns_missing_import_test__.json",
+      "__ns_missing_import_test__.mjs",
+      "video.js",
+    ];
+
+    for (const name of names) {
+      let threw = false;
+      try {
+        await import(name);
+      } catch (e) {
+        threw = true;
+      }
+      expect(threw).toBe(true);
+    }
+  });
+
+  it("reuses blob URL modules across concurrent and repeated imports", async function () {
+    // `Blob` is a @nativescript/core global — the bare TestRunner realm has
+    // none. Stand in a minimal one: `URL.createObjectURL` only needs the
+    // argument to be `instanceof Blob` and to carry `type`, and the loader only
+    // ever calls `.text()` on it.
+    const previousBlob = globalThis.Blob;
+    globalThis.Blob = class Blob {
+      constructor(parts, options) {
+        this._text = (parts || []).join("");
+        this.type = (options && options.type) || "";
+      }
+
+      text() {
+        return Promise.resolve(this._text);
+      }
+    };
+
+    delete globalThis.__nsBlobEvalCount;
+
+    const blobSource = [
+      "globalThis.__nsBlobEvalCount = (globalThis.__nsBlobEvalCount || 0) + 1;",
+      "export const evalCount = globalThis.__nsBlobEvalCount;",
+      "export const kind = 'blob-module';",
+      "export default { evalCount, kind };",
+    ].join("\n");
+
+    let url;
+
+    try {
+      url = URL.createObjectURL(new Blob([blobSource], { type: "text/javascript" }), {
+        ext: ".mjs",
+      });
+
+      expect(typeof url).toBe("string");
+      expect(url.indexOf("blob:nativescript/")).toBe(0);
+
+      const [first, second] = await Promise.all([import(url), import(url)]);
+      const third = await import(url);
+
+      expect(first).toBeDefined();
+      expect(second).toBe(first);
+      expect(third).toBe(first);
+      expect(first.evalCount).toBe(1);
+      expect(second.evalCount).toBe(1);
+      expect(third.evalCount).toBe(1);
+      expect(first.kind).toBe("blob-module");
+      expect(globalThis.__nsBlobEvalCount).toBe(1);
+    } finally {
+      if (typeof url === "string") {
+        URL.revokeObjectURL(url);
+      }
+      delete globalThis.__nsBlobEvalCount;
+      if (typeof previousBlob === "undefined") {
+        delete globalThis.Blob;
+      } else {
+        globalThis.Blob = previousBlob;
+      }
+    }
   });
 });
