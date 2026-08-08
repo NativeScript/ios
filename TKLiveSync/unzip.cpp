@@ -1,7 +1,6 @@
 #include "unzip.h"
 #include "libzip/zip.h"
 #include <assert.h>
-#include <libgen.h>
 #include <limits.h>
 #include <string>
 #include <sys/stat.h>
@@ -26,6 +25,26 @@ static void mkdir_rec(const char* dir)
     mkdir(opath, S_IRWXU);
 }
 
+// ZIP entry names are untrusted input: reject absolute paths and ".."
+// components so extraction can never write outside `destination`.
+static bool is_safe_entry_name(const char* name)
+{
+    if (name == nullptr || *name == '\0' || *name == '/')
+        return false;
+
+    for (const char* p = name; *p;) {
+        const char* component = p;
+        while (*p && *p != '/')
+            p++;
+        if (p - component == 2 && component[0] == '.' && component[1] == '.')
+            return false;
+        if (*p == '/')
+            p++;
+    }
+
+    return true;
+}
+
 int64_t unzip(const char* syncZipPath, const char* destination)
 {
     int err = 0;
@@ -36,22 +55,27 @@ int64_t unzip(const char* syncZipPath, const char* destination)
     struct zip_stat sb;
     struct zip_file* zf;
     char buf[65536];
-    auto pathcopy = new char[PATH_MAX];
 
     for (zip_int64_t i = 0; i < num; i++) {
         zip_stat_index(z, i, ZIP_STAT_MTIME, &sb);
         auto name = sb.name;
 
+        if (!is_safe_entry_name(name))
+            continue;
+
         std::string assetFullname{ destination };
         assetFullname.append("/");
         assetFullname.append(name);
 
-        strcpy(pathcopy, name);
-        auto path = dirname(pathcopy);
-        std::string dirFullname(destination);
-        dirFullname.append("/");
-        dirFullname.append(path);
-        mkdir_rec(dirFullname.c_str());
+        std::string entryName{ name };
+        auto separator = entryName.find_last_of('/');
+
+        if (separator != std::string::npos) {
+            std::string dirFullname{ destination };
+            dirFullname.append("/");
+            dirFullname.append(entryName.substr(0, separator));
+            mkdir_rec(dirFullname.c_str());
+        }
 
         zf = zip_fopen_index(z, i, 0);
         assert(zf != nullptr);
@@ -72,7 +96,6 @@ int64_t unzip(const char* syncZipPath, const char* destination)
 
         zip_fclose(zf);
     }
-    delete[] pathcopy;
     zip_close(z);
 
     return num;
