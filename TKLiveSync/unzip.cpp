@@ -25,6 +25,26 @@ static void mkdir_rec(const char* dir)
     mkdir(opath, S_IRWXU);
 }
 
+// ZIP entry names are untrusted input: reject absolute paths and ".."
+// components so extraction can never write outside `destination`.
+static bool is_safe_entry_name(const char* name)
+{
+    if (name == nullptr || *name == '\0' || *name == '/')
+        return false;
+
+    for (const char* p = name; *p;) {
+        const char* component = p;
+        while (*p && *p != '/')
+            p++;
+        if (p - component == 2 && component[0] == '.' && component[1] == '.')
+            return false;
+        if (*p == '/')
+            p++;
+    }
+
+    return true;
+}
+
 int64_t unzip(const char* syncZipPath, const char* destination)
 {
     int err = 0;
@@ -39,6 +59,9 @@ int64_t unzip(const char* syncZipPath, const char* destination)
     for (zip_int64_t i = 0; i < num; i++) {
         zip_stat_index(z, i, ZIP_STAT_MTIME, &sb);
         auto name = sb.name;
+
+        if (!is_safe_entry_name(name))
+            continue;
 
         std::string assetFullname{ destination };
         assetFullname.append("/");
