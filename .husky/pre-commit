@@ -1,10 +1,29 @@
-# Fail early with an accurate message when the repo is not set up — a missing
-# toolchain must block the commit, not silently skip validation. Bypass
+# Fail early with an accurate message when the toolchain is not set up — a
+# missing tool must block the commit, not silently skip validation. Bypass
 # deliberately with `git commit --no-verify` if you must.
 if [ ! -x node_modules/.bin/eslint ]; then
   echo "pre-commit: node_modules missing — run 'npm install' first (or bypass explicitly with --no-verify)" >&2
   exit 1
 fi
+if ! command -v git-clang-format >/dev/null 2>&1; then
+  echo "pre-commit: git-clang-format not found — install clang-format (e.g. 'brew install clang-format')" >&2
+  exit 1
+fi
+
+# Check (not rewrite) the staged hunks of native sources: formatting only the
+# changed lines keeps commits free of whole-file churn in not-yet-conformant
+# files, and a check that never mutates the tree stays safe with partial
+# staging (git add -p). The extension list matters: git-clang-format's default
+# set includes .js, which eslint owns here.
+if ! git clang-format --staged --diff \
+    --extensions h,hpp,c,cpp,mm,m \
+    -- NativeScript metadata-generator/src TestFixtures >/dev/null; then
+  echo "pre-commit: staged native changes need formatting — run:" >&2
+  echo "  git clang-format --staged --extensions h,hpp,c,cpp,mm,m -- NativeScript metadata-generator/src TestFixtures" >&2
+  echo "then review and re-stage the affected files." >&2
+  exit 1
+fi
+
 # --no-install: only the repo-pinned lint-staged may run; a bare npx would
 # fetch an arbitrary cached version when the local one is absent.
 npx --no-install lint-staged

@@ -41,9 +41,6 @@
     "semver": "^7.5.0"
   },
   "lint-staged": {
-    "{NativeScript,metadata-generator/src,TestFixtures}/**/*.{h,hpp,c,cpp,mm,m}": [
-      "clang-format -i"
-    ],
     "NativeScript/runtime/js/**/*.js": [
       "eslint"
     ]
