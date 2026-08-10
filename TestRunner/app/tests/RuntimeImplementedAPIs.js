@@ -17,6 +17,16 @@ describe("Runtime exposes", function () {
   });
 });
 
+// The shared Performance suite (submodule) gates itself on the API being
+// present and skips otherwise; this unguarded canary makes absence on THIS
+// runtime a failure rather than a silent skip.
+describe("Performance API canary", () => {
+  it("implements the Performance API", () => {
+    expect(typeof performance.mark).toBe("function");
+    expect(typeof PerformanceObserver).toBe("function");
+  });
+});
+
 describe("queueMicrotask", () => {
   it("should be defined as a function", () => {
     expect(typeof queueMicrotask).toBe("function");

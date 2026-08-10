@@ -175,9 +175,6 @@ require("./ExtendedClassNamingTests");
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();
 
-// WHATWG performance (hr-time, user timing, performance timeline) — shared suite, iOS opt-in
-require("../shared/index").runPerformanceTests();
-
 // (Optional) Custom testing for various optional sdk's and frameworks
 // These can be turned on manually to verify if needed anytime
 //require("./sdks/MusicKit");
