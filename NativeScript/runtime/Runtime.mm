@@ -278,7 +278,8 @@ Runtime::~Runtime() {
     // CRITICAL: unlike the per-isolate module maps above, these globals are
     // PROCESS-WIDE. They live in the main isolate's address space but every
     // Runtime destructor would clear them. That's wrong for worker-isolate
-    // teardown: when a worker dies (e.g. via ns:runtime `terminateAllWorkers` during an
+    // teardown: when a worker dies (e.g. terminated by the dev client's
+    // worker sweep during an
     // HMR cycle), its Runtime destructor MUST NOT wipe the main isolate's import
     // map — doing so silently breaks the next HMR cycle's bare-specifier
     // resolution (vendor packages fall back to filesystem and fail with
@@ -427,9 +428,9 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   Console::Init(context);
   WeakRef::Init(context);
 
-  // The dev primitives (configureRuntime, invalidateModules, …) live in the
-  // `ns:runtime` builtin module, materialized lazily per realm on first
-  // resolution (see `BuildNsRuntimeBinding` in HMRSupport.mm for the member
+  // The dev primitives (configureLoader, invalidateModules, …) live in the
+  // `ns:module` builtin module, materialized lazily per realm on first
+  // resolution (see `BuildNsModuleBinding` in HMRSupport.mm for the member
   // list) — nothing to install here.
 
   // URL blob support (internal/blob-url.js); failures are tolerated —

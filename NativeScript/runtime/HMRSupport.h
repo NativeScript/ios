@@ -96,7 +96,7 @@ void MarkUrlsForCacheBust(const std::vector<std::string>& urls);
 // Flip the dev-boot-complete signal: sets the JS-visible
 // `__NS_HMR_BOOT_COMPLETE__` global and the native atomic that gates the
 // cold-boot-only behaviors (JS-thread runloop pump between synchronous
-// fetches). Exposed to JS as ns:runtime
+// fetches). Exposed to JS as ns:module
 // `setDevBootComplete(value?: boolean)`.
 void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context,
                         bool value);
@@ -109,26 +109,29 @@ void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context,
 void CleanupHMRGlobals();
 
 // ─────────────────────────────────────────────────────────────
-// The `ns:runtime` builtin binding
+// The `ns:module` builtin binding
 //
-// Populates the native half of the `ns:runtime` builtin module — the one
+// Populates the native half of the `ns:module` builtin module — the one
 // namespace carrying every JS-callable dev primitive that any tooling can
 // depend on. Called from NsBuiltinModules::BuildBinding the first time a
-// realm resolves `ns:runtime` (via require, static import, or import());
-// ns-runtime.js shapes and freezes the exports.
+// realm resolves `ns:module` (via require, static import, or import());
+// ns-module.js shapes and freezes the exports.
 //
-// `ns:runtime` members:
-//   - configureRuntime(config)        (import map + volatile patterns +
+// `ns:module` members:
+//   - configureLoader(config)         (import map + volatile patterns +
 //                                      canonicalization vocabulary)
 //   - invalidateModules(urls)         (registry + cache eviction)
 //   - getLoadedModuleUrls()           (registry introspection)
 //   - setDevBootComplete(value?)      (boot-complete signal)
-//   - terminateAllWorkers()           (main realm only; see Worker.h)
 //   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
+//
+// Worker teardown across HMR cycles is userland: the dev client intercepts
+// the global `Worker` constructor and terminates tracked instances
+// (worker.terminate() cascades to nested workers via Runtime::~Runtime).
 //
 // Returns false (with an exception pending or a failed Set) when the
 // binding could not be populated.
-bool BuildNsRuntimeBinding(v8::Local<v8::Context> context,
-                           v8::Local<v8::Object> binding);
+bool BuildNsModuleBinding(v8::Local<v8::Context> context,
+                          v8::Local<v8::Object> binding);
 
 }  // namespace tns

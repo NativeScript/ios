@@ -14,7 +14,6 @@
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
-#include "Worker.h"
 #include "robin_hood.h"
 
 // Use centralized dev flags helper for logging
@@ -39,7 +38,7 @@ static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> contex
 // Native-side mirror of `__NS_HMR_BOOT_COMPLETE__`. Read by the
 // runloop pump in `MaybePumpJSThreadDuringBoot` so its gate is a
 // single relaxed atomic load on the HMR-time hot path. The JS dev
-// client flips this via ns:runtime
+// client flips this via ns:module
 // `setDevBootComplete(bool)` once the real app root view
 // commits; boot orchestration itself is entirely userland.
 static std::atomic<bool> g_devSessionBootComplete{false};
@@ -68,7 +67,7 @@ void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bo
 // queries may be normalized, and which paths must keep their query verbatim
 // because the query IS the identity — is server/framework policy, supplied
 // by the dev client via
-// ns:runtime `configureRuntime({ canonicalization: {...} })`.
+// ns:module `configureLoader({ canonicalization: {...} })`.
 //
 // Write-before-read contract: the client configures this once, before the
 // first import wave (session-bootstrap order), so plain statics are
@@ -91,7 +90,7 @@ static void SetCanonicalizationConfig(CanonicalizationConfig config) {
   g_canonConfig = std::move(config);
   g_canonConfigured = true;
   if (IsScriptLoadingLogEnabled()) {
-    Log(@"[ns:runtime configureRuntime] canonicalization set (strip=%lu devPrefixes=%lu "
+    Log(@"[ns:module configureLoader] canonicalization set (strip=%lu devPrefixes=%lu "
         @"preserve=%lu)",
         (unsigned long)g_canonConfig.stripParams.size(),
         (unsigned long)g_canonConfig.devPathPrefixes.size(),
@@ -142,7 +141,7 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   //
   // The dev server serves every module under ONE canonical URL — module
   // identity IS the URL string. Freshness after an HMR edit is handled by
-  // ns:runtime `invalidateModules` (registry evict) plus the
+  // ns:module `invalidateModules` (registry evict) plus the
   // eviction-driven fetch nonce in `PerformHttpFetchOnceSync`, never by URL
   // variation. There is deliberately no path-tag vocabulary to collapse here.
   //
@@ -734,7 +733,7 @@ void FetchModuleBodyAsync(const std::string& url,
 //     background threads, so they never pump someone else's runloop.
 //   - `IsDevSessionBootComplete()` short-circuits once the dev client
 //     has committed its first stable view (it calls
-//     ns:runtime `setDevBootComplete(true)`) — no placeholder to repaint, and
+//     ns:module `setDevBootComplete(true)`) — no placeholder to repaint, and
 //     HMR-time fetches must not pay the pump cost.
 //   - The runloop identity check survives any future change that
 //     decouples the runtime's captured runloop from the current thread.
@@ -794,20 +793,21 @@ void CleanupHMRGlobals() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// The `ns:runtime` dev surface
+// The `ns:module` dev surface
 //
 // The runtime's dev surface is deliberately small: it exposes
 // *mechanism* only (resolution config, registry eviction, registry
 // introspection, boot-complete signal). All HMR *policy* — boot
 // orchestration, `import.meta.hot`, full reload, CSS apply, WebSocket
-// protocol — lives in the JS dev client (`@nativescript/vite`).
-// The surface is reachable exclusively through the `ns:runtime` builtin
+// protocol, worker teardown — lives in the JS dev client
+// (`@nativescript/vite`).
+// The surface is reachable exclusively through the `ns:module` builtin
 // module (require / static import / import()); there is no global.
 
 namespace {
 
 // Sets the function name on the v8 Function for nicer stack traces and
-// attaches it as a member of the `ns:runtime` binding object.
+// attaches it as a member of the `ns:module` binding object.
 void InstallDevFunction(v8::Isolate* isolate, v8::Local<v8::Context> context,
                         v8::Local<v8::Object> target, const char* name,
                         v8::FunctionCallback callback) {
@@ -817,7 +817,7 @@ void InstallDevFunction(v8::Isolate* isolate, v8::Local<v8::Context> context,
   target->CreateDataProperty(context, tns::ToV8String(isolate, name), fn).Check();
 }
 
-void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
   v8::HandleScope scope(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
@@ -825,7 +825,7 @@ void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info
 
   if (info.Length() < 1 || !info[0]->IsObject()) {
     if (logScriptLoading) {
-      Log(@"[ns:runtime configureRuntime] expected config object argument");
+      Log(@"[ns:module configureLoader] expected config object argument");
     }
     return;
   }
@@ -859,7 +859,7 @@ void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info
     if (!jsonStr.empty()) {
       SetImportMap(jsonStr);
       if (logScriptLoading) {
-        Log(@"[ns:runtime configureRuntime] import map set (%zu bytes)", jsonStr.size());
+        Log(@"[ns:module configureLoader] import map set (%zu bytes)", jsonStr.size());
       }
     }
   }
@@ -889,7 +889,7 @@ void ConfigureDevRuntimeCallback(const v8::FunctionCallbackInfo<v8::Value>& info
     if (readStringArray(config, "volatilePatterns", patterns) && !patterns.empty()) {
       SetVolatilePatterns(patterns);
       if (logScriptLoading) {
-        Log(@"[ns:runtime configureRuntime] %zu volatile patterns set", patterns.size());
+        Log(@"[ns:module configureLoader] %zu volatile patterns set", patterns.size());
       }
     }
   }
@@ -918,7 +918,7 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
   if (info.Length() < 1 || !info[0]->IsArray()) {
-    Log(@"[ns:runtime invalidateModules] expected array of URL strings");
+    Log(@"[ns:module invalidateModules] expected array of URL strings");
     return;
   }
 
@@ -974,7 +974,7 @@ void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info
   info.GetReturnValue().Set(result);
 }
 
-// ns:runtime `setDevBootComplete(value?: boolean)` — the JS dev client calls
+// ns:module `setDevBootComplete(value?: boolean)` — the JS dev client calls
 // this (with `true`, or no argument) once the real app root view has
 // committed. It flips both the JS-visible `__NS_HMR_BOOT_COMPLETE__`
 // global and the native atomic that disarms the cold-boot runloop pump.
@@ -995,21 +995,13 @@ void SetDevBootCompleteCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 
 }  // namespace
 
-bool BuildNsRuntimeBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> binding) {
+bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> binding) {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
 
-  InstallDevFunction(isolate, context, binding, "configureRuntime", ConfigureDevRuntimeCallback);
+  InstallDevFunction(isolate, context, binding, "configureLoader", ConfigureLoaderCallback);
   InstallDevFunction(isolate, context, binding, "invalidateModules", InvalidateModulesCallback);
   InstallDevFunction(isolate, context, binding, "getLoadedModuleUrls", GetLoadedModuleUrlsCallback);
   InstallDevFunction(isolate, context, binding, "setDevBootComplete", SetDevBootCompleteCallback);
-
-  // Main-realm only: terminating workers from inside a worker would let
-  // a stuck worker take down its peers (see Worker.h). A worker realm's
-  // `ns:runtime` simply has no such member, so feature checks work.
-  if (!Caches::Get(isolate)->isWorker) {
-    InstallDevFunction(isolate, context, binding, "terminateAllWorkers",
-                       Worker::TerminateAllWorkersCallback);
-  }
 
   if (RuntimeConfig.IsDebug) {
     // Debug-only diagnostic: expose the HTTP canonical-key function to JS so
