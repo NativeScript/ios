@@ -283,6 +283,14 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
       return;
     }
 
+    // Resolved before anything is serialized: serializing a transfer list
+    // detaches the caller's buffers, so bailing out afterwards would destroy
+    // their contents without ever delivering the message.
+    auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
+    if (runtime == nullptr) {
+      return;
+    }
+
     auto context = Caches::Get(isolate)->GetContext();
     auto message = std::make_shared<worker::Message>();
     Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
@@ -303,10 +311,6 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
       return;
     }
 
-    auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
-    if (runtime == nullptr) {
-      return;
-    }
     tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [state, message]() {
       Isolate* isolate = state->GetIsolate();
       v8::Locker locker(isolate);

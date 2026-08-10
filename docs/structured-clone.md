@@ -43,7 +43,7 @@ worker.postMessage({ pixels: buffer }, [buffer]);  // buffer is detached here,
 
 Two differences are intentional:
 
-- **The transfer list must be an array.** Nothing else is accepted (anything non-array is a `TypeError`). The WebIDL iterable-to-sequence conversion that lets `structuredClone` take a `Set` or any iterable lives in the JavaScript wrapper around `structuredClone`; `postMessage` is native all the way down and has no such wrapper.
+- **The transfer list must be an array.** Omitting it, or passing `undefined` or `null`, means "transfer nothing"; every other non-array value is a `TypeError`. The WebIDL iterable-to-sequence conversion that lets `structuredClone` take a `Set` or any iterable lives in the JavaScript wrapper around `structuredClone`; `postMessage` is native all the way down and has no such wrapper.
 - **Host objects degrade instead of throwing.** Posting a native/interop object delivers an empty object to the receiver rather than raising a `DataCloneError`. This is long-standing shipped behavior that predates the V8 port, and app code relies on it; `structuredClone`, being new, follows the spec and rejects. The asymmetry is encoded in exactly one place — the `HostObjectPolicy` enum in `NativeScript/runtime/StructuredSerialization.h` — and unifying the two on rejection is a breaking change that needs the Android runtime to move at the same time.
 
 ## Deviations from the specification

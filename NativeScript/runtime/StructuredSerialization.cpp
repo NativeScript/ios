@@ -184,9 +184,16 @@ Maybe<bool> SerializedValue::Serialize(Isolate* isolate, Local<Context> context,
   // reference to it.
   for (Local<ArrayBuffer> buffer : transfers) {
     std::shared_ptr<BackingStore> backingStore = buffer->GetBackingStore();
-    // A null key is accepted for buffers without a detach key. The result is
-    // deliberately discarded: a key mismatch must not abort the process.
-    buffer->Detach(Local<Value>()).FromMaybe(false);
+    // Detach rejects a null key only for a buffer carrying an
+    // [[ArrayBufferDetachKey]]: script cannot set one, this runtime never calls
+    // SetDetachKey, and the WebAssembly memory buffers that have one are
+    // already turned away as non-detachable above. Unreachable, then — but
+    // claiming success without moving the memory would hand the receiver an
+    // empty buffer, so the failure propagates carrying V8's TypeError, which
+    // names the key mismatch.
+    if (buffer->Detach(Local<Value>()).IsNothing()) {
+      return Nothing<bool>();
+    }
     transferredBuffers_.push_back(std::move(backingStore));
   }
 
