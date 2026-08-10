@@ -16,6 +16,7 @@
     "email": "oss@nativescript.org"
   },
   "directories": {},
+  "types": "./types/index.d.ts",
   "files": [
     "**/*"
   ],

@@ -7,6 +7,12 @@ describe("ns:runtime", function () {
         expect(typeof runtime.getConfig).toBe("function");
     });
 
+    // The export set is public API, declared in types/ns-runtime.d.ts and
+    // docs/ns-builtin-modules.md — all three must change together.
+    it("exposes exactly the declared surface", function () {
+        expect(Object.keys(runtime).sort()).toEqual(["getConfig", "setConfig"]);
+    });
+
     // Registered before GCFinalizerTests (which toggles the policy and
     // restores it) so this observes the pristine default.
     it("defaults releasedObjectPolicy to 'report'", function () {
