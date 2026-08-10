@@ -271,7 +271,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
       throw NativeScriptException("Not enough arguments.");
     }
 
-    if (info.Length() > 1) {
+    if (info.Length() > 2) {
       throw NativeScriptException("Too many arguments passed.");
     }
 
@@ -293,8 +293,9 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
     success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
     tns::Assert(success, isolate);
 
+    Local<Value> transferList = info.Length() > 1 ? info[1] : v8::Undefined(isolate).As<Value>();
     if (message
-            ->Serialize(isolate, context, obj, v8::Undefined(isolate),
+            ->Serialize(isolate, context, obj, transferList,
                         serialization::HostObjectPolicy::kDegrade)
             .IsNothing()) {
       // The transfer list was rejected or the value could not be cloned; the
@@ -329,7 +330,7 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
       return;
     }
 
-    if (info.Length() > 1) {
+    if (info.Length() > 2) {
       throw NativeScriptException("Too many arguments passed.");
       return;
     }
@@ -352,8 +353,9 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
     success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
     tns::Assert(success, isolate);
 
+    Local<Value> transferList = info.Length() > 1 ? info[1] : v8::Undefined(isolate).As<Value>();
     if (message
-            ->Serialize(isolate, context, obj, v8::Undefined(isolate),
+            ->Serialize(isolate, context, obj, transferList,
                         serialization::HostObjectPolicy::kDegrade)
             .IsNothing()) {
       // The transfer list was rejected or the value could not be cloned; the
