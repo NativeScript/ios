@@ -10,20 +10,8 @@ if ! command -v git-clang-format >/dev/null 2>&1; then
   exit 1
 fi
 
-# Check (not rewrite) the staged hunks of native sources: formatting only the
-# changed lines keeps commits free of whole-file churn in not-yet-conformant
-# files, and a check that never mutates the tree stays safe with partial
-# staging (git add -p). The extension list matters: git-clang-format's default
-# set includes .js, which eslint owns here.
-if ! git clang-format --staged --diff \
-    --extensions h,hpp,c,cpp,mm,m \
-    -- NativeScript metadata-generator/src TestFixtures >/dev/null; then
-  echo "pre-commit: staged native changes need formatting — run:" >&2
-  echo "  git clang-format --staged --extensions h,hpp,c,cpp,mm,m -- NativeScript metadata-generator/src TestFixtures" >&2
-  echo "then review and re-stage the affected files." >&2
-  exit 1
-fi
-
 # --no-install: only the repo-pinned lint-staged may run; a bare npx would
 # fetch an arbitrary cached version when the local one is absent.
+# Native sources are auto-formatted on the staged hunks only (see
+# tools/format-staged-native.sh); JS goes through eslint.
 npx --no-install lint-staged
