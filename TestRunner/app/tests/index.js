@@ -175,6 +175,9 @@ require("./ExtendedClassNamingTests");
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();
 
+// Opt-in shared suite: structuredClone is not shipped by every runtime yet.
+require("../shared/index").runStructuredCloneTests();
+
 // (Optional) Custom testing for various optional sdk's and frameworks
 // These can be turned on manually to verify if needed anytime
 //require("./sdks/MusicKit");

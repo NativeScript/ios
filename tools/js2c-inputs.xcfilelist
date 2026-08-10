@@ -11,5 +11,6 @@ $(SRCROOT)/NativeScript/runtime/js/ns-runtime.js
 $(SRCROOT)/NativeScript/runtime/js/ns-util.js
 $(SRCROOT)/NativeScript/runtime/js/promise-proxy.js
 $(SRCROOT)/NativeScript/runtime/js/require-factory.js
+$(SRCROOT)/NativeScript/runtime/js/structured-clone.js
 $(SRCROOT)/NativeScript/runtime/js/ts-helpers.js
 $(SRCROOT)/NativeScript/runtime/js/weak-ref.js
