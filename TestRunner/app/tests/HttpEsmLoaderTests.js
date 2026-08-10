@@ -224,29 +224,32 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
-        it("should expose the dev-loader primitives via the ns:runtime builtin", function() {
-            // The dev surface is ONE builtin module — `ns:runtime` —
+        it("should expose the dev-loader primitives via the ns:module builtin", function() {
+            // The dev surface is ONE builtin module — `ns:module` —
             // carrying the mechanism primitives; everything else (boot,
-            // hot contexts, full reload, CSS) is @nativescript/vite JS.
-            var runtime = require("ns:runtime");
-            expect(Object.isFrozen(runtime)).toBe(true);
-            expect(typeof runtime.configureRuntime).toBe("function");
-            expect(typeof runtime.invalidateModules).toBe("function");
-            expect(typeof runtime.getLoadedModuleUrls).toBe("function");
-            expect(typeof runtime.setDevBootComplete).toBe("function");
-            // Main realm only — a worker's ns:runtime has no such member.
-            expect(typeof runtime.terminateAllWorkers).toBe("function");
+            // hot contexts, full reload, CSS, worker teardown) is
+            // @nativescript/vite JS.
+            var nsModule = require("ns:module");
+            expect(Object.isFrozen(nsModule)).toBe(true);
+            expect(typeof nsModule.configureLoader).toBe("function");
+            expect(typeof nsModule.invalidateModules).toBe("function");
+            expect(typeof nsModule.getLoadedModuleUrls).toBe("function");
+            expect(typeof nsModule.setDevBootComplete).toBe("function");
+            // Worker teardown is userland (the dev client intercepts the
+            // Worker constructor); the runtime deliberately exposes no
+            // terminateAllWorkers member.
+            expect(nsModule.terminateAllWorkers).toBeUndefined();
         });
 
-        it("resolves ns:runtime to the same members for require and import()", function(done) {
-            var runtime = require("ns:runtime");
-            import("ns:runtime").then(function(ns) {
-                expect(ns.default).toBe(runtime);
-                expect(ns.invalidateModules).toBe(runtime.invalidateModules);
-                expect(ns.configureRuntime).toBe(runtime.configureRuntime);
+        it("resolves ns:module to the same members for require and import()", function(done) {
+            var nsModule = require("ns:module");
+            import("ns:module").then(function(ns) {
+                expect(ns.default).toBe(nsModule);
+                expect(ns.invalidateModules).toBe(nsModule.invalidateModules);
+                expect(ns.configureLoader).toBe(nsModule.configureLoader);
                 done();
             }).catch(function(error) {
-                fail("import('ns:runtime') rejected: " + error.message);
+                fail("import('ns:module') rejected: " + error.message);
                 done();
             });
         });
@@ -358,19 +361,19 @@ describe("HTTP ESM Loader", function() {
 });
 
 // Focused, deterministic coverage for the native HTTP canonical-key function.
-// These run only in debug builds, where the ns:runtime builtin carries the
+// These run only in debug builds, where the ns:module builtin carries the
 // `canonicalizeHttpUrlKey` diagnostic; in release the member is simply absent
 // and they self-skip via pending(). They require no HTTP host — they pin pure
 // string identity behavior.
-describe("HTTP canonical key (ns:runtime canonicalizeHttpUrlKey)", function () {
+describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
     function getCanon() {
-        return require("ns:runtime").canonicalizeHttpUrlKey;
+        return require("ns:module").canonicalizeHttpUrlKey;
     }
 
     function checkKey(input, expected) {
         var canon = getCanon();
         if (typeof canon !== "function") {
-            pending("ns:runtime.canonicalizeHttpUrlKey not exposed (release build)");
+            pending("ns:module.canonicalizeHttpUrlKey not exposed (release build)");
             return;
         }
         expect(canon(input)).toBe(expected);
@@ -379,7 +382,7 @@ describe("HTTP canonical key (ns:runtime canonicalizeHttpUrlKey)", function () {
     it("is exposed as a function in debug builds", function () {
         var canon = getCanon();
         if (typeof canon !== "function") {
-            pending("ns:runtime.canonicalizeHttpUrlKey not exposed (release build)");
+            pending("ns:module.canonicalizeHttpUrlKey not exposed (release build)");
             return;
         }
         expect(typeof canon).toBe("function");
@@ -407,16 +410,16 @@ describe("HTTP canonical key (ns:runtime canonicalizeHttpUrlKey)", function () {
         checkKey("http://h/ns/m/foo.js#frag", "http://h/ns/m/foo.js");
     });
 
-    it("honors a client-supplied canonicalization vocabulary via configureRuntime", function () {
+    it("honors a client-supplied canonicalization vocabulary via configureLoader", function () {
         var canon = getCanon();
         if (typeof canon !== "function") {
-            pending("ns:runtime.canonicalizeHttpUrlKey not exposed (release build)");
+            pending("ns:module.canonicalizeHttpUrlKey not exposed (release build)");
             return;
         }
         // The vocabulary below matches the built-in fallback exactly, so this
         // spec exercises the configured code path without changing the
         // process-wide canonicalization behavior other specs rely on.
-        require("ns:runtime").configureRuntime({
+        require("ns:module").configureLoader({
             canonicalization: {
                 stripParams: ["t", "v", "import"],
                 forPathPrefixes: ["/ns/", "/node_modules/.vite/", "/@id/", "/@fs/"],
