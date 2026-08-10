@@ -63,9 +63,16 @@ function toTransferList(value) {
     throw new TypeError("structuredClone: transfer is not iterable");
   }
 
+  // The iterator record captures `next` once, when it is created — re-reading
+  // it per step would expose a `next` that changes mid-iteration.
+  var next = iterator.next;
+  if (typeof next !== "function") {
+    throw new TypeError("structuredClone: transfer is not iterable");
+  }
+
   var list = [];
   for (;;) {
-    var step = iterator.next();
+    var step = FunctionPrototypeCall(next, iterator);
     if (step === null || typeof step !== "object") {
       throw new TypeError("structuredClone: transfer iterator returned a non-object");
     }
