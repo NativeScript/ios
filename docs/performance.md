@@ -1,6 +1,6 @@
 # Performance API
 
-The runtime implements the WHATWG/WinterTC Performance surface: [High
+The runtime implements the WHATWG/WinterTC-standard Performance surface: [High
 Resolution Time](https://w3c.github.io/hr-time/), [User Timing Level
 3](https://w3c.github.io/user-timing/) and the [Performance
 Timeline](https://w3c.github.io/performance-timeline/) with
@@ -19,7 +19,9 @@ in main and worker isolates alike): `performance`, `Performance`,
 - `performance.timeOrigin` — readonly accessor; wall-clock milliseconds since
   the Unix epoch, sampled once when the isolate's runtime is created. Each
   worker gets its own time origin at worker-thread start, so
-  `timeOrigin + now()` tracks `Date.now()` per isolate.
+  `timeOrigin + now()` approximates `Date.now()` per isolate while the device
+  stays awake; it drifts behind after device sleep (the monotonic clock does
+  not tick then) and diverges under wall-clock adjustments.
 - `performance.toJSON()`, `Symbol.toStringTag`, and `Performance extends
   EventTarget` per spec; `performance`, `PerformanceEntry`,
   `PerformanceMeasure` and `PerformanceObserverEntryList` are not

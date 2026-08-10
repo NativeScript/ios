@@ -29,6 +29,7 @@ const intrinsics = {
   String,
   TypeError,
   SymbolHasInstance: Symbol.hasInstance,
+  SymbolIterator: Symbol.iterator,
   SymbolToStringTag: Symbol.toStringTag,
 
   // Namespaces / prototypes.

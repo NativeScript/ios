@@ -32,6 +32,7 @@ const {
   ObjectFreeze,
   ObjectGetOwnPropertyDescriptor,
   String,
+  SymbolIterator,
   SymbolToStringTag,
   TypeError,
 } = primordials;
@@ -55,6 +56,24 @@ function domException(message, name) {
   const e = new Error(message);
   e.name = name;
   return e;
+}
+
+// WebIDL sequence<DOMString> conversion: only an object with a callable
+// @@iterator converts (so a Set works and a string primitive does not);
+// anything else is a TypeError, never a silent no-op.
+function convertStringSequence(value, context) {
+  if (
+    value === null ||
+    (typeof value !== "object" && typeof value !== "function") ||
+    typeof value[SymbolIterator] !== "function"
+  ) {
+    throw new TypeError(context + " is not iterable");
+  }
+  const result = [];
+  for (const item of value) {
+    ArrayPrototypePush(result, String(item));
+  }
+  return result;
 }
 
 class PerformanceEntry {
@@ -355,10 +374,10 @@ class PerformanceObserver {
       );
     }
     if (hasEntryTypes) {
-      const requested = options.entryTypes;
+      const requested = convertStringSequence(options.entryTypes, "entryTypes");
       const supported = [];
       for (let i = 0; i < requested.length; i++) {
-        const t = String(requested[i]);
+        const t = requested[i];
         if (
           ArrayPrototypeIndexOf(SUPPORTED_ENTRY_TYPES, t) !== -1 &&
           ArrayPrototypeIndexOf(supported, t) === -1
