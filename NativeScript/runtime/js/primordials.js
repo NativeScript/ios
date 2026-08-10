@@ -29,6 +29,7 @@ const intrinsics = {
   String,
   TypeError,
   SymbolHasInstance: Symbol.hasInstance,
+  SymbolToStringTag: Symbol.toStringTag,
 
   // Namespaces / prototypes.
   ObjectPrototype: Object.prototype,
@@ -37,6 +38,7 @@ const intrinsics = {
   ArrayBufferIsView: ArrayBuffer.isView,
   ArrayIsArray: Array.isArray,
   JSONStringify: JSON.stringify,
+  NumberIsFinite: Number.isFinite,
   NumberParseFloat: Number.parseFloat,
   NumberParseInt: Number.parseInt,
   ObjectAssign: Object.assign,
@@ -56,6 +58,7 @@ const intrinsics = {
   ArrayPrototypeIndexOf: uncurryThis(Array.prototype.indexOf),
   ArrayPrototypePush: uncurryThis(Array.prototype.push),
   ArrayPrototypeSlice: uncurryThis(Array.prototype.slice),
+  ArrayPrototypeSort: uncurryThis(Array.prototype.sort),
   ArrayPrototypeSplice: uncurryThis(Array.prototype.splice),
   FunctionPrototypeApply: uncurryThis(FunctionPrototypeApply),
   FunctionPrototypeBind: uncurryThis(FunctionPrototypeBind),

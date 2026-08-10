@@ -9,6 +9,7 @@ $(SRCROOT)/NativeScript/runtime/js/inspect.js
 $(SRCROOT)/NativeScript/runtime/js/node-util.js
 $(SRCROOT)/NativeScript/runtime/js/ns-runtime.js
 $(SRCROOT)/NativeScript/runtime/js/ns-util.js
+$(SRCROOT)/NativeScript/runtime/js/performance.js
 $(SRCROOT)/NativeScript/runtime/js/promise-proxy.js
 $(SRCROOT)/NativeScript/runtime/js/require-factory.js
 $(SRCROOT)/NativeScript/runtime/js/ts-helpers.js
