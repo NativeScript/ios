@@ -180,6 +180,30 @@ v8::Local<v8::Value> GetPrivateValue(const v8::Local<v8::Object>& obj,
 
 void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
 BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
+
+// What happens when JS touches a wrapper whose native counterpart has already
+// been released (its internal field was neutered by DisposeValue) — a state a
+// resurrected object can expose by outliving a referenced object's native
+// half; see docs/knowledge/v8-resurrecting-finalizers.md. Process-wide,
+// configured via the `releasedObjectPolicy` key of ns:runtime's setConfig.
+enum class ReleasedObjectPolicy {
+  // No-op the operation and fire the `releasednativeaccess` global event
+  // (console.warn additionally in debug). The default.
+  kReport = 0,
+  // Throw a catchable JS ReferenceError at the touch site.
+  kThrow = 1,
+};
+ReleasedObjectPolicy GetReleasedObjectPolicy();
+void SetReleasedObjectPolicy(ReleasedObjectPolicy policy);
+
+// Like GetValue, but applies ReleasedObjectPolicy when the object carries no
+// wrapper: throws (kThrow) or schedules a `releasednativeaccess` event
+// (kReport, deduplicated per object), returning nullptr either way.
+// `operation` names the API surface for the event payload / error message.
+// Callers must no-op on nullptr; paths that would otherwise read the internal
+// field unchecked must go through this.
+BaseDataWrapper* GetValueOrReport(v8::Isolate* isolate, const v8::Local<v8::Value>& val,
+                                  const char* operation);
 void DeleteValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 bool DeleteWrapperIfUnused(v8::Isolate* isolate, const v8::Local<v8::Value>& obj,
                            BaseDataWrapper* value);

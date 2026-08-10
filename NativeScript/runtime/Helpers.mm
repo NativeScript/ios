@@ -7,11 +7,13 @@
 #include <objc/runtime.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <atomic>
 #include <codecvt>
 #include <fstream>
 #include <locale>
 #include <sstream>
 #include "Caches.h"
+#include "ErrorEvents.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
@@ -275,6 +277,73 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
 
   return static_cast<BaseDataWrapper*>(
       metadataProp.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+}
+
+namespace {
+
+std::atomic<int> releasedObjectPolicy_{static_cast<int>(tns::ReleasedObjectPolicy::kReport)};
+
+struct ReleasedAccessReport {
+  v8::Isolate* isolate;
+  v8::Global<v8::Value> error;
+  std::string operation;
+};
+
+// Runs on the isolate's microtask queue: dispatching from the touch site
+// itself would run arbitrary app JS in the middle of an interop marshal.
+void DispatchReleasedAccessMicrotask(void* data) {
+  std::unique_ptr<ReleasedAccessReport> report(static_cast<ReleasedAccessReport*>(data));
+  v8::Isolate* isolate = report->isolate;
+  v8::HandleScope scope(isolate);
+  tns::ErrorEvents::DispatchReleasedNativeAccess(isolate, report->error.Get(isolate),
+                                                 report->operation);
+}
+
+}  // namespace
+
+tns::ReleasedObjectPolicy tns::GetReleasedObjectPolicy() {
+  return static_cast<ReleasedObjectPolicy>(releasedObjectPolicy_.load(std::memory_order_relaxed));
+}
+
+void tns::SetReleasedObjectPolicy(ReleasedObjectPolicy policy) {
+  releasedObjectPolicy_.store(static_cast<int>(policy), std::memory_order_relaxed);
+}
+
+tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,
+                                            const char* operation) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, val);
+  if (wrapper != nullptr) {
+    return wrapper;
+  }
+
+  std::string message =
+      std::string("The native object has been released or is not a valid native object (") +
+      operation + ")";
+
+  if (GetReleasedObjectPolicy() == ReleasedObjectPolicy::kThrow) {
+    isolate->ThrowException(v8::Exception::ReferenceError(tns::ToV8String(isolate, message)));
+    return nullptr;
+  }
+
+  Local<Context> context = isolate->GetCurrentContext();
+  if (val->IsObject()) {
+    // One report per husk object: a released buffer touched in a tight loop
+    // must not flood the event queue.
+    Local<Private> reported =
+        Private::ForApi(isolate, tns::ToV8String(isolate, "ns:releasedAccessReported"));
+    Local<Object> obj = val.As<Object>();
+    if (obj->HasPrivate(context, reported).FromMaybe(false)) {
+      return nullptr;
+    }
+    obj->SetPrivate(context, reported, v8::True(isolate)).FromMaybe(false);
+  }
+
+  // The error is created here so its stack names the touch site.
+  Local<Value> error = v8::Exception::ReferenceError(tns::ToV8String(isolate, message));
+  auto* report =
+      new ReleasedAccessReport{isolate, v8::Global<v8::Value>(isolate, error), operation};
+  isolate->EnqueueMicrotask(DispatchReleasedAccessMicrotask, report);
+  return nullptr;
 }
 
 void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {

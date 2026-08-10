@@ -1438,10 +1438,13 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
   const TypeEncoding* fieldEncoding = field.Encoding();
   switch (fieldEncoding->type) {
     case BinaryTypeEncodingType::StructDeclarationReference: {
-      Local<Object> obj = value.As<Object>();
-      Local<External> ext = obj->GetInternalField(0).As<External>();
-      StructWrapper* targetStruct =
-          static_cast<StructWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
+      BaseDataWrapper* sourceWrapper =
+          tns::GetValueOrReport(isolate, value, "struct field assignment");
+      if (sourceWrapper == nullptr) {
+        return;
+      }
+      tns::Assert(sourceWrapper->Type() == WrapperType::Struct, isolate);
+      StructWrapper* targetStruct = static_cast<StructWrapper*>(sourceWrapper);
 
       void* sourceBuffer = targetStruct->Data();
       size_t fieldSize = field.FFIType()->size;
@@ -1453,8 +1456,11 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
       break;
     }
     case BinaryTypeEncodingType::PointerEncoding: {
-      BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-      tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Struct, isolate);
+      BaseDataWrapper* wrapper = tns::GetValueOrReport(isolate, value, "struct field assignment");
+      if (wrapper == nullptr) {
+        return;
+      }
+      tns::Assert(wrapper->Type() == WrapperType::Struct, isolate);
       StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
       void* data = structWrapper->Data();
       Interop::SetValue(destBuffer, data);

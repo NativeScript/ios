@@ -303,10 +303,9 @@ std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Local<Context> contex
     data = malloc(ffiType->size);
     Interop::InitializeStruct(context, data, structInfo.Fields(), initializer);
   } else {
-    Local<External> ext = initializer->GetInternalField(0).As<External>();
-    BaseDataWrapper* wrapper =
-        static_cast<BaseDataWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
-    if (wrapper->Type() != WrapperType::Struct) {
+    Isolate* isolate = v8::Isolate::GetCurrent();
+    BaseDataWrapper* wrapper = tns::GetValueOrReport(isolate, initializer, "struct initializer");
+    if (wrapper == nullptr || wrapper->Type() != WrapperType::Struct) {
       return std::make_pair(ffiType, data);
     }
 
@@ -880,8 +879,12 @@ Intercepted MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> proper
     return Intercepted::kYes;
   }
 
-  BaseDataWrapper* baseWrapper = tns::GetValue(isolate, thiz);
-  tns::Assert(baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Struct, isolate);
+  BaseDataWrapper* baseWrapper = tns::GetValueOrReport(isolate, thiz, "struct property get");
+  if (baseWrapper == nullptr) {
+    info.GetReturnValue().SetUndefined();
+    return Intercepted::kYes;
+  }
+  tns::Assert(baseWrapper->Type() == WrapperType::Struct, isolate);
   StructWrapper* wrapper = static_cast<StructWrapper*>(baseWrapper);
 
   StructInfo structInfo = wrapper->StructInfo();
@@ -928,9 +931,12 @@ Intercepted MetadataBuilder::StructPropertySetterCallback(
     return Intercepted::kYes;
   }
 
-  Local<External> ext = thiz->GetInternalField(0).As<External>();
-  StructWrapper* wrapper =
-      static_cast<StructWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
+  BaseDataWrapper* baseWrapper = tns::GetValueOrReport(isolate, thiz, "struct property set");
+  if (baseWrapper == nullptr) {
+    return Intercepted::kYes;
+  }
+  tns::Assert(baseWrapper->Type() == WrapperType::Struct, isolate);
+  StructWrapper* wrapper = static_cast<StructWrapper*>(baseWrapper);
 
   StructInfo structInfo = wrapper->StructInfo();
   std::vector<StructField> fields = structInfo.Fields();

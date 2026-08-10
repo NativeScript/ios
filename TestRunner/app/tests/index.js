@@ -128,6 +128,7 @@ require("./ObjCConstructors");
 require("./MetadataTests");
 //
 require("./ApiTests");
+require("./NsRuntimeTests");
 require("./GCFinalizerTests");
 require("./DeclarationConflicts");
 //

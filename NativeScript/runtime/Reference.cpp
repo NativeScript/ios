@@ -122,6 +122,11 @@ v8::Intercepted Reference::IndexedPropertyGetCallback(
   const TypeEncoding* typeEncoding = pair.typeEncoding_;
   size_t size = pair.size_;
   void* data = pair.data_;
+  if (data == nullptr && typeEncoding == nullptr &&
+      pair.typeWrapper_ == nullptr) {
+    // GetDataPair threw (released native object).
+    return v8::Intercepted::kYes;
+  }
 
   void* ptr = (uint8_t*)data + index * size;
   BaseCall call((uint8_t*)ptr);
@@ -147,6 +152,11 @@ v8::Intercepted Reference::IndexedPropertySetCallback(
   const TypeEncoding* typeEncoding = pair.typeEncoding_;
   size_t size = pair.size_;
   void* data = pair.data_;
+  if (data == nullptr && typeEncoding == nullptr &&
+      pair.typeWrapper_ == nullptr) {
+    // GetDataPair threw (released native object).
+    return v8::Intercepted::kYes;
+  }
   void* ptr = (uint8_t*)data + index * size;
 
   if (typeEncoding != nullptr) {
@@ -174,7 +184,11 @@ void Reference::GetValueCallback(const FunctionCallbackInfo<Value>& info) {
 void Reference::SetValueCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Value> value = info[0];
-  BaseDataWrapper* baseWrapper = tns::GetValue(isolate, info.This());
+  BaseDataWrapper* baseWrapper =
+      tns::GetValueOrReport(isolate, info.This(), "Reference value set");
+  if (baseWrapper == nullptr) {
+    return;
+  }
   tns::Assert(baseWrapper->Type() == WrapperType::Reference, isolate);
   ReferenceWrapper* wrapper = static_cast<ReferenceWrapper*>(baseWrapper);
   Persistent<Value>* poValue = new Persistent<Value>(isolate, value);
@@ -253,9 +267,12 @@ void* Reference::GetWrappedPointer(Local<Context> context,
   }
 
   Isolate* isolate = v8::Isolate::GetCurrent();
-  BaseDataWrapper* wrapper = tns::GetValue(isolate, reference);
-  tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference,
-              isolate);
+  BaseDataWrapper* wrapper =
+      tns::GetValueOrReport(isolate, reference, "Reference pointer access");
+  if (wrapper == nullptr) {
+    return nullptr;
+  }
+  tns::Assert(wrapper->Type() == WrapperType::Reference, isolate);
   ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
   if (refWrapper->Data() != nullptr) {
     return refWrapper->Data();
@@ -345,10 +362,17 @@ void Reference::RegisterToStringMethod(Local<Context> context,
   Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(
       isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
-        tns::Assert(
-            wrapper != nullptr && wrapper->Type() == WrapperType::Reference,
-            isolate);
+        BaseDataWrapper* wrapper =
+            tns::GetValueOrReport(isolate, info.This(), "Reference.toString");
+        if (wrapper == nullptr) {
+          if (tns::GetReleasedObjectPolicy() ==
+              tns::ReleasedObjectPolicy::kReport) {
+            info.GetReturnValue().Set(
+                tns::ToV8String(isolate, "<Reference: released>"));
+          }
+          return;
+        }
+        tns::Assert(wrapper->Type() == WrapperType::Reference, isolate);
         ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
         Persistent<Value>* value = refWrapper->Value();
 
@@ -378,9 +402,12 @@ Reference::DataPair Reference::GetDataPair(Local<Object> obj) {
       obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
   tns::Assert(success);
   Isolate* isolate = v8::Isolate::GetCurrent();
-  BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
-  tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::Reference,
-              isolate);
+  BaseDataWrapper* wrapper =
+      tns::GetValueOrReport(isolate, obj, "Reference indexed access");
+  if (wrapper == nullptr) {
+    return DataPair(nullptr, nullptr, nullptr, 0);
+  }
+  tns::Assert(wrapper->Type() == WrapperType::Reference, isolate);
   ReferenceWrapper* refWrapper = static_cast<ReferenceWrapper*>(wrapper);
   BaseDataWrapper* typeWrapper = refWrapper->TypeWrapper();
 

@@ -209,6 +209,9 @@ class Caches {
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> DispatchRejectionHandledFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
+  std::unique_ptr<v8::Persistent<v8::Function>>
+      DispatchReleasedNativeAccessFunc =
+          std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 
   // Phase 3 per-isolate brand for interop.escapeException. An isolate-private
   // symbol (v8::Private, not a plain Symbol) so user code cannot discover or

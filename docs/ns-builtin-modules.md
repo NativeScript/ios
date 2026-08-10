@@ -52,6 +52,37 @@ Rules:
 versions for readability; it is intended for humans and must not be parsed
 programmatically.
 
+### `ns:runtime` (v1)
+
+Runtime-level configuration. Keys, value domains, and scope are defined and
+validated natively; the module surface is a thin frozen wrapper.
+
+| export | description |
+|---|---|
+| `setConfig(key, value)` | Sets a runtime config key. Throws `TypeError` on an unknown key, an invalid value, or (for process-wide keys) when called from a worker isolate. |
+| `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
+
+Config keys:
+
+| key | values | scope | default |
+|---|---|---|---|
+| `releasedObjectPolicy` | `"report"` \| `"throw"` | process-wide (main-isolate writes only; read live by every isolate) | `"report"` |
+
+`releasedObjectPolicy` controls what happens when JS touches a wrapper whose
+native counterpart has already been released (a state a resurrected object can
+expose — see the iOS runtime's `docs/knowledge/v8-resurrecting-finalizers.md`):
+
+- `"report"` (default): the operation no-ops — reads produce `undefined`,
+  writes are skipped, `toString` yields a `<Pointer: released>`-style
+  placeholder — and a cancelable `releasednativeaccess` event fires on
+  `globalThis` (`event.error` carries a `ReferenceError` whose stack names the
+  touch site; `event.operation` names the API surface, e.g.
+  `"struct field assignment"`). Reports are deduplicated per released object.
+  In debug builds the event's default action is a `console.warn`; a listener
+  that handles the report suppresses it with `preventDefault()`.
+- `"throw"`: the touch throws a catchable `ReferenceError` synchronously, and
+  no event fires.
+
 ## `node:` compatibility shims
 
 The same registry serves the `node:` scheme with **compatibility shims** so

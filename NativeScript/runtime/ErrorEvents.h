@@ -39,6 +39,16 @@ class ErrorEvents {
   static void DispatchRejectionHandled(v8::Isolate* isolate,
                                        v8::Local<v8::Promise> promise,
                                        v8::Local<v8::Value> reason);
+  // Fires the cancelable `releasednativeaccess` event: JS touched a wrapper
+  // whose native counterpart was already released while the
+  // `releasedObjectPolicy` runtime config (ns:runtime) is "report". `error`
+  // carries the stack captured at the touch site; `operation` names the API
+  // surface. The debug console warning is the event's default action, so a
+  // listener that handles the report suppresses it with preventDefault().
+  // A dispatch that throws is swallowed after logging.
+  static void DispatchReleasedNativeAccess(v8::Isolate* isolate,
+                                           v8::Local<v8::Value> error,
+                                           const std::string& operation);
 };
 
 }  // namespace tns
