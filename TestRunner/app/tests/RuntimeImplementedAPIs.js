@@ -78,3 +78,12 @@ describe("queueMicrotask", () => {
     }, 0);
   });
 });
+
+// The shared StructuredClone suite skips itself where the API is missing, which
+// would turn this runtime losing structuredClone into a green run. This spec is
+// deliberately unguarded so that regression fails instead.
+describe("structuredClone canary", () => {
+  it("is implemented by this runtime", () => {
+    expect(typeof structuredClone).toBe("function");
+  });
+});
