@@ -15,7 +15,6 @@
 		3C1850542A6DCB2D002ACC81 /* Timers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C1850522A6DCB2D002ACC81 /* Timers.cpp */; };
 		3C1850552A6DCB2D002ACC81 /* Timers.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C1850532A6DCB2D002ACC81 /* Timers.hpp */; };
 		3C48F68D2F57905500C14231 /* json.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C48F68B2F57905500C14231 /* json.hpp */; };
-		3C5333342B0E683100BE0C47 /* Message.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C5333322B0E683100BE0C47 /* Message.cpp */; };
 		3C5333352B0E683100BE0C47 /* Message.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C5333332B0E683100BE0C47 /* Message.hpp */; };
 		3C78BA5C2A0D600100C20A88 /* ModuleBinding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C78BA5A2A0D600100C20A88 /* ModuleBinding.cpp */; };
 		3C78BA5D2A0D600100C20A88 /* ModuleBinding.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C78BA5B2A0D600100C20A88 /* ModuleBinding.hpp */; };
@@ -295,6 +294,7 @@
 		4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */; };
 		4A5C201A2E2B000200000006 /* NsBuiltinModules.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000200000001 /* NsBuiltinModules.cpp */; };
 		4A5C201A2E2B000400000003 /* StructuredClone.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000400000001 /* StructuredClone.cpp */; };
+		4A5C201A2E2B000500000003 /* StructuredSerialization.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000500000001 /* StructuredSerialization.cpp */; };
 		C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */; };
 		C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6B229EAC8200345BFE /* Console.cpp */; };
 		C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */; };
@@ -467,7 +467,6 @@
 		3C1850522A6DCB2D002ACC81 /* Timers.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Timers.cpp; sourceTree = "<group>"; };
 		3C1850532A6DCB2D002ACC81 /* Timers.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Timers.hpp; sourceTree = "<group>"; };
 		3C48F68B2F57905500C14231 /* json.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = json.hpp; sourceTree = "<group>"; };
-		3C5333322B0E683100BE0C47 /* Message.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Message.cpp; sourceTree = "<group>"; };
 		3C5333332B0E683100BE0C47 /* Message.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Message.hpp; sourceTree = "<group>"; };
 		3C78BA5A2A0D600100C20A88 /* ModuleBinding.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ModuleBinding.cpp; sourceTree = "<group>"; };
 		3C78BA5B2A0D600100C20A88 /* ModuleBinding.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ModuleBinding.hpp; sourceTree = "<group>"; };
@@ -818,6 +817,8 @@
 		4A5C201A2E2B000100000005 /* js */ = {isa = PBXFileReference; lastKnownFileType = folder; path = js; sourceTree = "<group>"; };
 		4A5C201A2E2B000400000001 /* StructuredClone.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StructuredClone.cpp; sourceTree = "<group>"; };
 		4A5C201A2E2B000400000002 /* StructuredClone.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StructuredClone.h; sourceTree = "<group>"; };
+		4A5C201A2E2B000500000001 /* StructuredSerialization.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StructuredSerialization.cpp; sourceTree = "<group>"; };
+		4A5C201A2E2B000500000002 /* StructuredSerialization.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StructuredSerialization.h; sourceTree = "<group>"; };
 		C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ArgConverter.mm; sourceTree = "<group>"; };
 		C2DDEB6B229EAC8200345BFE /* Console.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
 		C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SetTimeout.cpp; sourceTree = "<group>"; };
@@ -1521,6 +1522,8 @@
 				C2DDEB87229EAC8300345BFE /* StringHasher.h */,
 				4A5C201A2E2B000400000002 /* StructuredClone.h */,
 				4A5C201A2E2B000400000001 /* StructuredClone.cpp */,
+				4A5C201A2E2B000500000002 /* StructuredSerialization.h */,
+				4A5C201A2E2B000500000001 /* StructuredSerialization.cpp */,
 				C2F4D0AC232F85E20008A2EB /* SymbolIterator.h */,
 				C2F4D0AB232F85E20008A2EB /* SymbolIterator.mm */,
 				C2DDEB7F229EAC8200345BFE /* SymbolLoader.h */,
@@ -1555,7 +1558,6 @@
 				3C78BA5B2A0D600100C20A88 /* ModuleBinding.hpp */,
 				3C1850522A6DCB2D002ACC81 /* Timers.cpp */,
 				3C1850532A6DCB2D002ACC81 /* Timers.hpp */,
-				3C5333322B0E683100BE0C47 /* Message.cpp */,
 				3C5333332B0E683100BE0C47 /* Message.hpp */,
 			);
 			path = runtime;
@@ -2294,6 +2296,7 @@
 				4A5C201A2E2B000100000006 /* BuiltinLoader.cpp in Sources */,
 				4A5C201A2E2B000200000006 /* NsBuiltinModules.cpp in Sources */,
 				4A5C201A2E2B000400000003 /* StructuredClone.cpp in Sources */,
+				4A5C201A2E2B000500000003 /* StructuredSerialization.cpp in Sources */,
 				4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */,
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */,
@@ -2343,7 +2346,6 @@
 				F1F30E752B58FC74006A62C0 /* URLSearchParamsImpl.cpp in Sources */,
 				F1F30E742B58FC74006A62C0 /* URLImpl.cpp in Sources */,
 				C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */,
-				3C5333342B0E683100BE0C47 /* Message.cpp in Sources */,
 				C2C8EE7422CE3266001F8CEC /* ConcurrentQueue.cpp in Sources */,
 				C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */,
 				C2D7E9D623F42C1100DB289C /* PromiseProxy.cpp in Sources */,

@@ -283,13 +283,6 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
       return;
     }
 
-    //        Local<Value> error;
-    //        Local<Value> result = Worker::Serialize(isolate, info[0], error);
-    //        if (result.IsEmpty()) {
-    //            isolate->ThrowException(error);
-    //            return;
-    //        }
-
     auto context = Caches::Get(isolate)->GetContext();
     auto message = std::make_shared<worker::Message>();
     Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
@@ -300,8 +293,14 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
     success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
     tns::Assert(success, isolate);
 
-    message->Serialize(isolate, context, obj);
-    // std::string message = tns::ToString(isolate, result);
+    if (message
+            ->Serialize(isolate, context, obj, v8::Undefined(isolate),
+                        serialization::HostObjectPolicy::kDegrade)
+            .IsNothing()) {
+      // The transfer list was rejected or the value could not be cloned; the
+      // exception is already pending and nothing may be posted.
+      return;
+    }
 
     auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
     if (runtime == nullptr) {
@@ -353,15 +352,15 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
     success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
     tns::Assert(success, isolate);
 
-    message->Serialize(isolate, context, obj);
+    if (message
+            ->Serialize(isolate, context, obj, v8::Undefined(isolate),
+                        serialization::HostObjectPolicy::kDegrade)
+            .IsNothing()) {
+      // The transfer list was rejected or the value could not be cloned; the
+      // exception is already pending and nothing may be posted.
+      return;
+    }
 
-    //        Local<Value> result = Worker::Serialize(isolate, info[0], error);
-    //        if (result.IsEmpty()) {
-    //            isolate->ThrowException(error);
-    //            return;
-    //        }
-
-    // std::string message = tns::ToString(isolate, result);
     worker->PostMessage(message);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
@@ -432,30 +431,6 @@ void Worker::TerminateCallback(const FunctionCallbackInfo<Value>& info) {
 
   WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
   worker->Terminate();
-}
-
-Local<v8::String> Worker::Serialize(Isolate* isolate, Local<Value> value, Local<Value>& error) {
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-
-  Local<Object> obj;
-  bool success = objTemplate->NewInstance(context).ToLocal(&obj);
-  tns::Assert(success, isolate);
-
-  success = obj->Set(context, tns::ToV8String(isolate, "data"), value).FromMaybe(false);
-  tns::Assert(success, isolate);
-
-  Local<Value> result;
-  TryCatch tc(isolate);
-  success = v8::JSON::Stringify(context, obj).ToLocal(&result);
-  if (!success && tc.HasCaught()) {
-    error = tc.Exception();
-    return Local<v8::String>();
-  }
-
-  tns::Assert(success, isolate);
-
-  return result.As<v8::String>();
 }
 
 void Worker::SetWorkerId(Isolate* isolate, int workerId) {
