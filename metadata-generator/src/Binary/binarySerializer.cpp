@@ -140,7 +140,10 @@ void binary::BinarySerializer::serializeBaseClass(::Meta::BaseClassMeta* meta, b
 void binary::BinarySerializer::serializeMember(::Meta::Meta* meta, binary::MemberMeta& binaryMetaStruct)
 {
     this->serializeBase(meta, binaryMetaStruct);
-    binaryMetaStruct._flags &= 0b11111000; // this clears the type information written in the lower 3 bits
+    // Clear only the type information in the lower 3 bits. The old mask also
+    // dropped bits 8 and up, which would silently discard any member flag
+    // stored there.
+    binaryMetaStruct._flags &= ~0b111;
 
     if (meta->getFlags(::Meta::MetaFlags::MemberIsOptional))
         binaryMetaStruct._flags |= BinaryFlags::MemberIsOptional;
@@ -163,7 +166,11 @@ void binary::BinarySerializer::serializeMethod(::Meta::MethodMeta* meta, binary:
         binaryMetaStruct._flags |= BinaryFlags::MethodIsInitializer;
 
     binaryMetaStruct._encoding = this->typeEncodingSerializer.visit(meta->signature);
-    binaryMetaStruct._constructorTokens = this->heapWriter.push_string(meta->constructorTokens);
+    if (!meta->constructorTokens.empty()) {
+      binaryMetaStruct._flags |= BinaryFlags::MethodHasConstructorTokens;
+      binaryMetaStruct._constructorTokens =
+          this->heapWriter.push_string(meta->constructorTokens);
+    }
 }
 
 void binary::BinarySerializer::serializeProperty(::Meta::PropertyMeta* meta, binary::PropertyMeta& binaryMetaStruct)

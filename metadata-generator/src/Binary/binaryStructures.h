@@ -61,25 +61,26 @@ enum BinaryMetaType : uint8_t {
 };
 
 enum BinaryFlags : uint16_t {
-    // Common
-    HasDemangledName = 1 << 8,
-    HasName = 1 << 7,
-    IsIosAppExtensionAvailable = 1 << 6,
-    // Function
-    FunctionIsVariadic = 1 << 5,
-    FunctionOwnsReturnedCocoaObject = 1 << 4,
-    FunctionReturnsUnmanaged = 1 << 3,
-    // Member
-    MemberIsOptional = 1 << 0,
-    // Method
-    MethodIsInitializer = 1 << 1,
-    MethodIsVariadic = 1 << 2,
-    MethodIsNullTerminatedVariadic = 1 << 3,
-    MethodOwnsReturnedCocoaObject = 1 << 4,
-    MethodHasErrorOutParameter = 1 << 5,
-    // Property
-    PropertyHasGetter = 1 << 2,
-    PropertyHasSetter = 1 << 3
+  // Common
+  HasDemangledName = 1 << 8,
+  HasName = 1 << 7,
+  IsIosAppExtensionAvailable = 1 << 6,
+  // Function
+  FunctionIsVariadic = 1 << 5,
+  FunctionOwnsReturnedCocoaObject = 1 << 4,
+  FunctionReturnsUnmanaged = 1 << 3,
+  // Member
+  MemberIsOptional = 1 << 0,
+  // Method
+  MethodIsInitializer = 1 << 1,
+  MethodIsVariadic = 1 << 2,
+  MethodIsNullTerminatedVariadic = 1 << 3,
+  MethodOwnsReturnedCocoaObject = 1 << 4,
+  MethodHasErrorOutParameter = 1 << 5,
+  MethodHasConstructorTokens = 1 << 9,
+  // Property
+  PropertyHasGetter = 1 << 2,
+  PropertyHasSetter = 1 << 3
 };
 
 #pragma pack(push, 1)
