@@ -122,6 +122,7 @@ require("./Inheritance/TypeScriptTests");
 require("./Inheritance/ESClassTests");
 //
 require("./MethodCallsTests");
+require("./StaleWrapperCacheTests");
 //import "./FunctionsTests";
 require("./VersionDiffTests");
 require("./ObjCConstructors");

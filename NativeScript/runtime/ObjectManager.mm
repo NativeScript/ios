@@ -204,7 +204,16 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
       ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
       id target = objCObjectWrapper->Data();
       if (target != nil) {
-        cache->Instances.erase(target);
+        // Instances is keyed on the raw address, so an entry rebuilt for a
+        // later object living there must survive this wrapper going away —
+        // only the entry that still points back at this object is ours.
+        auto it = cache->Instances.find(target);
+        if (it != cache->Instances.end()) {
+          Local<Value> cached = it->second->Get(isolate);
+          if (cached.IsEmpty() || cached == value) {
+            cache->Instances.erase(it);
+          }
+        }
         [target release];
       }
       break;

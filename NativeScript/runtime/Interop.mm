@@ -1262,9 +1262,9 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     }
 
     auto cache = Caches::Get(isolate);
-    auto it = cache->Instances.find(result);
-    if (it != cache->Instances.end()) {
-      return it->second->Get(isolate);
+    auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
+    if (poInstance != nullptr) {
+      return poInstance->Get(isolate);
     }
 
     // For NSProxy we will try to read the metadata from
