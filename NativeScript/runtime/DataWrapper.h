@@ -1,6 +1,8 @@
 #ifndef DataWrapper_h
 #define DataWrapper_h
 
+#include <objc/runtime.h>
+
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -365,7 +367,9 @@ class UnmanagedTypeWrapper : public BaseDataWrapper {
 class ObjCDataWrapper : public BaseDataWrapper {
  public:
   ObjCDataWrapper(id data, const TypeEncoding* typeEncoding = nullptr)
-      : data_(data), typeEncoding_(typeEncoding) {}
+      : data_(data),
+        typeEncoding_(typeEncoding),
+        klass_(object_getClass(data)) {}
 
   const WrapperType Type() { return WrapperType::ObjCObject; }
 
@@ -373,9 +377,15 @@ class ObjCDataWrapper : public BaseDataWrapper {
 
   const TypeEncoding* TypeEncoding() { return this->typeEncoding_; }
 
+  // The class Data() had when this wrapper was built. Data() alone cannot tell
+  // whether the wrapper still describes the object living at that address, so
+  // anything keyed on the raw pointer needs this to detect a recycled slot.
+  Class Klass() { return this->klass_; }
+
  private:
   id data_;
   const tns::TypeEncoding* typeEncoding_;
+  Class klass_;
 };
 
 class ObjCClassWrapper : public BaseDataWrapper {

@@ -121,6 +121,7 @@ require("./Inheritance/ProtocolImplementationTests");
 require("./Inheritance/TypeScriptTests");
 //
 require("./MethodCallsTests");
+require("./StaleWrapperCacheTests");
 //import "./FunctionsTests";
 require("./VersionDiffTests");
 require("./ObjCConstructors");
