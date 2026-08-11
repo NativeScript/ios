@@ -55,6 +55,21 @@ bool binary::MetaFile::internClassName(const std::string& name,
   return true;
 }
 
+bool binary::MetaFile::tryGetEncodingList(const std::string& bytes,
+                                          binary::MetaFileOffset& offset) {
+  auto it = this->_encodingLists.find(bytes);
+  if (it == this->_encodingLists.end()) {
+    return false;
+  }
+  offset = it->second;
+  return true;
+}
+
+void binary::MetaFile::recordEncodingList(const std::string& bytes,
+                                          binary::MetaFileOffset offset) {
+  this->_encodingLists.emplace(bytes, offset);
+}
+
 binary::BinaryWriter binary::MetaFile::heap_writer()
 {
     return binary::BinaryWriter(this->_heap);

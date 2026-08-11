@@ -33,6 +33,10 @@ private:
     // order, alongside the reverse map used to assign those indices.
     std::vector<MetaFileOffset> _classNames;
     std::map<std::string, uint16_t> _classNameIndices;
+    // Serialized encoding lists keyed by their exact bytes. The bytes hold
+    // absolute heap offsets but none that depend on where the list itself
+    // lands, so identical lists are interchangeable.
+    std::map<std::string, MetaFileOffset> _encodingLists;
     std::shared_ptr<utils::MemoryStream> _heap;
 
 public:
@@ -101,6 +105,19 @@ public:
      */
     bool internClassName(const std::string& name, BinaryWriter& heapWriter,
                          uint16_t& index);
+
+    /// type encodings
+    /*
+     * \brief Looks up an already-written encoding list with identical bytes.
+     * \return true and sets \c offset when one exists
+     */
+    bool tryGetEncodingList(const std::string& bytes, MetaFileOffset& offset);
+
+    /*
+     * \brief Records the offset an encoding list was written at, so identical
+     *        lists can share it.
+     */
+    void recordEncodingList(const std::string& bytes, MetaFileOffset offset);
 
     /// heap
     /*

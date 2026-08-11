@@ -29,10 +29,28 @@ binary::MetaFileOffset binary::BinaryTypeEncodingSerializer::visit(
     binaryEncodings.push_back(std::move(binaryEncoding));
   }
 
-  binary::MetaFileOffset offset =
-      this->_heapWriter.push_arrayCount(types.size());
+  // Serialize to scratch first so identical lists can share one copy. Nothing
+  // in the bytes depends on where the list lands, so they are interchangeable.
+  auto scratch = std::make_shared<utils::MemoryStream>();
+  binary::BinaryWriter scratchWriter(scratch);
+  scratchWriter.push_arrayCount(types.size());
   for (unique_ptr<binary::TypeEncoding>& binaryEncoding : binaryEncodings) {
-    binaryEncoding->save(this->_heapWriter);
+    binaryEncoding->save(scratchWriter);
+  }
+  std::string bytes(scratch->begin(), scratch->end());
+
+  binary::MetaFileOffset offset = 0;
+  if (this->_file != nullptr &&
+      this->_file->tryGetEncodingList(bytes, offset)) {
+    return offset;
+  }
+
+  offset = this->_heapWriter.currentPosition();
+  for (char byte : bytes) {
+    this->_heapWriter.push_byte((uint8_t)byte);
+  }
+  if (this->_file != nullptr) {
+    this->_file->recordEncodingList(bytes, offset);
   }
   return offset;
 }
