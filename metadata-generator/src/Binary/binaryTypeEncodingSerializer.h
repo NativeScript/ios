@@ -17,7 +17,10 @@ namespace binary {
 class BinaryTypeEncodingSerializer
     : public ::Meta::TypeVisitor<unique_ptr<binary::TypeEncoding> > {
  private:
-  BinaryWriter _heapWriter;
+  // Must alias the serializer's writer, not copy it: BinaryWriter owns the
+  // string-interning map, and a copy interns into a second map, emitting a
+  // duplicate copy of every string reachable from both paths.
+  BinaryWriter& _heapWriter;
 
   unique_ptr<TypeEncoding> serializeRecordEncoding(
       const binary::BinaryTypeEncodingType encodingType,
