@@ -14,14 +14,6 @@ class Worker {
   static void Init(v8::Isolate* isolate,
                    v8::Local<v8::ObjectTemplate> globalTemplate);
   static std::vector<std::string> GlobalFunctions;
-  // HMR-oriented helper: terminate every worker the runtime currently knows
-  // about, snapshotted from `Caches::Workers`. Exposed by HMRSupport in the
-  // main realm's `ns:runtime` builtin as `terminateAllWorkers` (returns the
-  // count of workers terminated, as a number). Worker realms do NOT receive
-  // this member — terminating workers from inside a worker would let a stuck
-  // worker take down its peers.
-  static void TerminateAllWorkersCallback(
-      const v8::FunctionCallbackInfo<v8::Value>& info);
 
  private:
   static void ConstructorCallback(

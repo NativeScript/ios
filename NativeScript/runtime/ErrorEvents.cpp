@@ -4,6 +4,7 @@
 #include "Caches.h"
 #include "Helpers.h"
 #include "NativeScriptException.h"
+#include "RuntimeConfig.h"
 
 using namespace v8;
 
@@ -51,6 +52,10 @@ void ErrorEvents::Init(Local<Context> context) {
       binding
           ->Set(context, tns::ToV8String(isolate, "nativeReportFatal"),
                 nativeReportFatal)
+          .FromMaybe(false) &&
+      binding
+          ->Set(context, tns::ToV8String(isolate, "isDebug"),
+                v8::Boolean::New(isolate, RuntimeConfig.IsDebug))
           .FromMaybe(false);
   tns::Assert(success, isolate);
 
@@ -79,6 +84,14 @@ void ErrorEvents::Init(Local<Context> context) {
   cache->DispatchRejectionHandledFunc =
       std::make_unique<Persistent<v8::Function>>(isolate,
                                                  handledFn.As<v8::Function>());
+
+  Local<Value> releasedFn;
+  tns::Assert(closures->Get(context, 3).ToLocal(&releasedFn) &&
+                  releasedFn->IsFunction(),
+              isolate);
+  cache->DispatchReleasedNativeAccessFunc =
+      std::make_unique<Persistent<v8::Function>>(isolate,
+                                                 releasedFn.As<v8::Function>());
 }
 
 // Dispatches the cancelable `error` ErrorEvent through the JS listener store.
@@ -139,6 +152,25 @@ void ErrorEvents::DispatchRejectionHandled(Isolate* isolate,
   Local<v8::Function> dispatch =
       cache->DispatchRejectionHandledFunc->Get(isolate);
   Local<Value> args[] = {promise, reason};
+  Local<Value> result;
+  TryCatch tc(isolate);
+  if (!dispatch->Call(context, context->Global(), 2, args).ToLocal(&result) &&
+      tc.HasCaught()) {
+    tns::LogError(isolate, tc);
+  }
+}
+
+void ErrorEvents::DispatchReleasedNativeAccess(Isolate* isolate,
+                                               Local<Value> error,
+                                               const std::string& operation) {
+  auto cache = Caches::Get(isolate);
+  if (cache == nullptr || cache->DispatchReleasedNativeAccessFunc == nullptr) {
+    return;
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<v8::Function> dispatch =
+      cache->DispatchReleasedNativeAccessFunc->Get(isolate);
+  Local<Value> args[] = {error, tns::ToV8String(isolate, operation)};
   Local<Value> result;
   TryCatch tc(isolate);
   if (!dispatch->Call(context, context->Global(), 2, args).ToLocal(&result) &&

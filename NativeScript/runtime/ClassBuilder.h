@@ -30,9 +30,9 @@ class ClassBuilder {
  public:
   static v8::Local<v8::FunctionTemplate> GetExtendFunction(
       v8::Isolate* isolate, const InterfaceMeta* interfaceMeta);
-  static Class GetExtendedClass(std::string baseClassName,
-                                std::string staticClassName,
-                                std::string suffix);
+  static Class GetExtendedClass(const std::string& baseClassName,
+                                const std::string& staticClassName,
+                                int isolateId);
 
   static void RegisterBaseTypeScriptExtendsFunction(
       v8::Local<v8::Context> context);

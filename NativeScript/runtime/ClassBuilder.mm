@@ -17,6 +17,20 @@ using namespace v8;
 
 namespace tns {
 
+namespace {
+// Worker-created named classes must not claim process-global objc names:
+// verbatim names are the main isolate's contract (storyboards,
+// NSClassFromString and other name-based native lookups), and a worker
+// winning the registration race for one would nondeterministically demote the
+// main isolate's class to a collision suffix.
+void ScopeClassNameToIsolate(std::string& name, int isolateId) {
+  if (!name.empty() && Runtime::IsWorker()) {
+    name += '_';
+    name += std::to_string(isolateId);
+  }
+}
+}  // namespace
+
 Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate,
                                                         const InterfaceMeta* interfaceMeta) {
   CacheItem* item = new CacheItem(interfaceMeta, nullptr);
@@ -62,8 +76,9 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     auto cache = Caches::Get(isolate);
     auto isolateId = cache->getIsolateId();
 
-    Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName,
-                                                         std::to_string(isolateId) + "_");
+    ScopeClassNameToIsolate(staticClassName, isolateId);
+    Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName, isolateId);
+    tns::Assert(extendedClass != nil, isolate);
     class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
     class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 
@@ -204,8 +219,10 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
 
         auto isolateId = cache->getIsolateId();
-        __block Class extendedClass = ClassBuilder::GetExtendedClass(
-            baseClassName, extendedClassName, std::to_string(isolateId) + "_");
+        ScopeClassNameToIsolate(extendedClassName, isolateId);
+        __block Class extendedClass =
+            ClassBuilder::GetExtendedClass(baseClassName, extendedClassName, isolateId);
+        tns::Assert(extendedClass != nil, isolate);
         class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
         class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 

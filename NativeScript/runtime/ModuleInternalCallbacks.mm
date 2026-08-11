@@ -376,7 +376,7 @@ void DestroyModuleStateForIsolate(v8::Isolate* isolate) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Import map: bare specifier → resolved URL (populated by ns:runtime configureRuntime)
+// Import map: bare specifier → resolved URL (populated by ns:module configureLoader)
 // Instead of rewriting import statements in source code on the Vite side, the runtime
 // resolves bare specifiers through this map to HTTP module URLs. Source code
 // is served as Vite transformed it.
@@ -2040,7 +2040,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       normalizedSpec;  // use normalized spec for the rest of the resolution logic
 
   // Import map resolution
-  // If the import map is populated (set by ns:runtime configureRuntime), check it
+  // If the import map is populated (set by ns:module configureLoader), check it
   // before any other resolution. This is the highest-leverage change from
   // the HMR architecture review: bare specifiers resolve through the map
   // to either vendor URLs or HTTP module URLs, eliminating the need for
@@ -3510,7 +3510,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // Volatile pattern check: if the URL matches any configured volatile
       // pattern, evict the cached module so we always re-fetch. The pattern
       // list is policy and is supplied exclusively by the dev client via
-      // ns:runtime `configureRuntime({ volatilePatterns })` — the runtime
+      // ns:module `configureLoader({ volatilePatterns })` — the runtime
       // carries no framework or server URL vocabulary of its own. (Framework
       // strategies ship their own endpoints, e.g. Angular's `/@ng/component`
       // whose per-save `t` param would otherwise accumulate one stale

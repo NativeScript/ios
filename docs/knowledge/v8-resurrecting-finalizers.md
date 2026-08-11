@@ -183,9 +183,26 @@ option is gone: `EmbedderRootsHandler::IsRoot()`, which used to let an embedder 
 `TracedReference` a root per-GC, no longer exists in 14.9 — only `ResetRoot`/`TryResetRoot`
 remain.
 
-Until then, the cheap mitigation is to give the husk defined behaviour: throw "native object
-has already been released" from a single checked accessor rather than letting each call site
-read `Undefined` as a pointer.
+Until then, the husk has defined behaviour: `tns::GetValueOrReport()` (Helpers) applies
+the `releasedObjectPolicy` runtime config (ns:runtime, docs/ns-builtin-modules.md) on a
+missing wrapper — default `"report"` no-ops the operation and fires the
+`releasednativeaccess` global event with the touch site's stack; `"throw"` raises a
+catchable JS `ReferenceError` — and every internal-field read that could otherwise see a
+neutered field goes through it — `Pointer.cpp`'s methods, `ExtVector.cpp` toString,
+`Interop::SetStructPropertyValue` (both struct cases), `MetadataBuilder::GetStructData` and
+both struct property interceptors, the two `InteropTypes.mm` argument readers, and the
+`Reference.cpp` accessors (`SetValueCallback`, `GetWrappedPointer`, `GetDataPair` → indexed
+get/set, toString). Regression spec: *"throws instead of crashing when touching a released
+object through a resurrected parent"* in `GCFinalizerTests.js`.
+
+Two facts worth knowing when reasoning about which objects can husk:
+
+- `Pointer`/`interop.alloc` objects never husk at runtime — `Caches::PointerInstances`
+  holds them behind strong persistents, so their finalizers cannot fire. Struct instances
+  and `Reference`s are held only by their own weak finalizer handle and do husk.
+- Only the TypeScript `__extends` path installs the retain/release swizzles that drive
+  `GcProtect()`; a class from plain `.extend()` is never protected, so its instances are
+  disposed rather than resurrected when natively retained.
 
 ## Verified so far
 

@@ -85,3 +85,8 @@ NativeScript/include/**
 NativeScript/inspector/src/
 NativeScript/inspector/third_party/
 NativeScript/inspector/absl/
+
+
+#AI agents
+.claude/*
+!.claude/settings.json

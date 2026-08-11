@@ -129,6 +129,7 @@ require("./ObjCConstructors");
 require("./MetadataTests");
 //
 require("./ApiTests");
+require("./NsRuntimeTests");
 require("./GCFinalizerTests");
 require("./DeclarationConflicts");
 //
@@ -141,6 +142,7 @@ require("./Timers");
 
 require("./URL");
 require("./URLSearchParams");
+require("./UrlSearchParamsTests");
 require("./URLPattern");
 
 // HTTP ESM Loader tests
@@ -167,6 +169,9 @@ require("./InspectTests");
 
 // The ns:/node: builtin modules
 require("./NsUtilTests");
+
+// Worker-isolate scoping of extended objc class names
+require("./ExtendedClassNamingTests");
 
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();

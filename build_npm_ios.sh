@@ -27,6 +27,7 @@ rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/framework"
 cp ./package.json "$OUTPUT_DIR"
+cp -r ./types "$OUTPUT_DIR/types"
 
 cp -r "./project-template-ios/" "$OUTPUT_DIR/framework"
 

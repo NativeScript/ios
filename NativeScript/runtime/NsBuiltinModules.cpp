@@ -7,6 +7,7 @@
 #include "Console.h"
 #include "HMRSupport.h"
 #include "Helpers.h"
+#include "Runtime.h"
 
 using namespace v8;
 
@@ -27,10 +28,69 @@ struct Registration {
 // adapts, so the two module objects stay distinct and the standard module
 // never carries compatibility code.
 constexpr Registration kRegistry[] = {
+    {"ns:module", BuiltinId::kNsModule},
     {"ns:runtime", BuiltinId::kNsRuntime},
     {"ns:util", BuiltinId::kNsUtil},
     {"node:util", BuiltinId::kNodeUtil},
 };
+
+// ns:runtime config keys. Each key defines its value domain and scope here;
+// `releasedObjectPolicy` is process-wide (see ReleasedObjectPolicy in
+// Helpers.h), so setting it anywhere affects every isolate — which is why
+// writes are restricted to the main isolate.
+constexpr const char* kReleasedObjectPolicyKey = "releasedObjectPolicy";
+
+void ThrowTypeError(Isolate* isolate, const std::string& message) {
+  isolate->ThrowException(
+      Exception::TypeError(tns::ToV8String(isolate, message)));
+}
+
+void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() < 2 || !info[0]->IsString()) {
+    ThrowTypeError(isolate, "setConfig expects (key: string, value)");
+    return;
+  }
+  std::string key = tns::ToString(isolate, info[0]);
+  if (key == kReleasedObjectPolicyKey) {
+    if (Runtime::IsWorker()) {
+      ThrowTypeError(isolate,
+                     "'" + key +
+                         "' is process-wide and can only be set from the main "
+                         "isolate");
+      return;
+    }
+    std::string value =
+        info[1]->IsString() ? tns::ToString(isolate, info[1]) : std::string();
+    if (value == "report") {
+      tns::SetReleasedObjectPolicy(tns::ReleasedObjectPolicy::kReport);
+    } else if (value == "throw") {
+      tns::SetReleasedObjectPolicy(tns::ReleasedObjectPolicy::kThrow);
+    } else {
+      ThrowTypeError(isolate, "'" + key + "' must be 'report' or 'throw'");
+    }
+    return;
+  }
+  ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
+}
+
+void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() < 1 || !info[0]->IsString()) {
+    ThrowTypeError(isolate, "getConfig expects (key: string)");
+    return;
+  }
+  std::string key = tns::ToString(isolate, info[0]);
+  if (key == kReleasedObjectPolicyKey) {
+    const char* value =
+        tns::GetReleasedObjectPolicy() == tns::ReleasedObjectPolicy::kThrow
+            ? "throw"
+            : "report";
+    info.GetReturnValue().Set(tns::ToV8String(isolate, value));
+    return;
+  }
+  ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
+}
 
 const Registration* Find(const std::string& specifier) {
   for (const Registration& registration : kRegistry) {
@@ -50,11 +110,25 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
   Local<Object> binding = Object::New(isolate);
 
   switch (builtin) {
-    case BuiltinId::kNsRuntime: {
+    case BuiltinId::kNsModule: {
       // The dev-loader control surface (HMRSupport.mm). The binding builder
-      // decides realm/build-dependent membership; ns-runtime.js only shapes
+      // decides build-dependent membership; ns-module.js only shapes
       // and freezes whatever arrives.
-      if (!BuildNsRuntimeBinding(context, binding)) {
+      if (!BuildNsModuleBinding(context, binding)) {
+        return MaybeLocal<Object>();
+      }
+      break;
+    }
+    case BuiltinId::kNsRuntime: {
+      Local<v8::Function> setConfig, getConfig;
+      if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
+          !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
+          !binding
+               ->Set(context, tns::ToV8String(isolate, "setConfig"), setConfig)
+               .FromMaybe(false) ||
+          !binding
+               ->Set(context, tns::ToV8String(isolate, "getConfig"), getConfig)
+               .FromMaybe(false)) {
         return MaybeLocal<Object>();
       }
       break;

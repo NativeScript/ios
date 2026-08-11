@@ -16,6 +16,7 @@
     "email": "oss@nativescript.org"
   },
   "directories": {},
+  "types": "./types/index.d.ts",
   "files": [
     "**/*"
   ],
@@ -42,7 +43,7 @@
   },
   "lint-staged": {
     "{NativeScript,metadata-generator/src,TestFixtures}/**/*.{h,hpp,c,cpp,mm,m}": [
-      "clang-format -i"
+      "tools/format-staged-native.sh"
     ],
     "NativeScript/runtime/js/**/*.js": [
       "eslint"

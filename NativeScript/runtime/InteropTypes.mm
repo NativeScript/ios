@@ -181,13 +181,14 @@ void Interop::RegisterBufferFromDataFunction(Local<Context> context, Local<Objec
         Isolate* isolate = info.GetIsolate();
         tns::Assert(info.Length() == 1 && info[0]->IsObject(), isolate);
         Local<Object> arg = info[0].As<Object>();
-        tns::Assert(
-            arg->InternalFieldCount() > 0 && arg->GetInternalField(0).As<v8::Value>()->IsExternal(),
-            isolate);
 
-        Local<External> ext = arg->GetInternalField(0).As<External>();
-        ObjCDataWrapper* wrapper =
-            static_cast<ObjCDataWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
+        BaseDataWrapper* baseWrapper =
+            tns::GetValueOrReport(isolate, arg, "interop.bufferFromData");
+        if (baseWrapper == nullptr) {
+          return;
+        }
+        tns::Assert(baseWrapper->Type() == WrapperType::ObjCObject, isolate);
+        ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(baseWrapper);
 
         id obj = wrapper->Data();
         tns::Assert([obj isKindOfClass:[NSData class]], isolate);
@@ -235,14 +236,10 @@ void Interop::RegisterStringFromCString(Local<Context> context, Local<Object> in
             stringLength = desiredLength;
           }
         }
-        tns::Assert(
-            arg->InternalFieldCount() > 0 && arg->GetInternalField(0).As<v8::Value>()->IsExternal(),
-            isolate);
-
-        Local<External> ext = arg->GetInternalField(0).As<External>();
-        BaseDataWrapper* wrapper =
-            static_cast<BaseDataWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
-        tns::Assert(wrapper != nullptr);
+        BaseDataWrapper* wrapper = tns::GetValueOrReport(isolate, arg, "interop.stringFromCString");
+        if (wrapper == nullptr) {
+          return;
+        }
         char* data = nullptr;
         switch (wrapper->Type()) {
           case WrapperType::Pointer: {

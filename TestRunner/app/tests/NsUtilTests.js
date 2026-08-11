@@ -8,6 +8,12 @@ describe("ns:util", function () {
         expect(util.inspect({ a: 1 })).toBe("{ a: 1 }");
     });
 
+    // The export set is public API, declared in types/ns-util.d.ts and
+    // docs/ns-builtin-modules.md — all three must change together.
+    it("exposes exactly the declared surface", function () {
+        expect(Object.keys(util).sort()).toEqual(["format", "inspect"]);
+    });
+
     it("is a singleton per realm", function () {
         expect(require("ns:util")).toBe(util);
     });

@@ -1,6 +1,6 @@
 "use strict";
 
-const { globalTarget, nativeReportFatal } = binding;
+const { globalTarget, nativeReportFatal, isDebug } = binding;
 const { FunctionPrototypeCall, ObjectCreate, String, TypeError } = primordials;
 var g = globalThis;
 var Event = g.Event;
@@ -79,4 +79,35 @@ function dispatchRejectionHandled(promise, reason) {
   globalTarget.dispatchEvent(ev);
 }
 
-module.exports = [dispatchErrorEvent, dispatchUnhandledRejection, dispatchRejectionHandled];
+// Fired when JS touches a wrapper whose native counterpart was already
+// released (see docs/knowledge/v8-resurrecting-finalizers.md) and the
+// `releasedObjectPolicy` runtime config (ns:runtime) is "report". The
+// operation itself no-ops; this event is the observability channel.
+function ReleasedNativeAccessEvent(type, opts) {
+  opts = opts || {};
+  FunctionPrototypeCall(Event, this, type, opts);
+  this.error = opts.error !== undefined ? opts.error : null;
+  this.operation = opts.operation !== undefined ? String(opts.operation) : "";
+}
+ReleasedNativeAccessEvent.prototype = ObjectCreate(Event.prototype);
+ReleasedNativeAccessEvent.prototype.constructor = ReleasedNativeAccessEvent;
+
+function dispatchReleasedNativeAccess(error, operation) {
+  var ev = new ReleasedNativeAccessEvent("releasednativeaccess", {
+    error: error,
+    operation: operation,
+    cancelable: true
+  });
+  // The debug console warning is the event's default action: a listener that
+  // handles the report (e.g. forwards it to a crash reporter) suppresses it
+  // with preventDefault().
+  if (globalTarget.dispatchEvent(ev) && isDebug) {
+    // Deliberately a dynamic lookup: logging pipelines legitimately replace
+    // console, and this warning should flow through whatever is installed.
+    try {
+      g.console.warn("Access to a released native object (" + operation + ")", error);
+    } catch (ignored) { /* console gone or throwing must not break dispatch */ }
+  }
+}
+
+module.exports = [dispatchErrorEvent, dispatchUnhandledRejection, dispatchRejectionHandled, dispatchReleasedNativeAccess];

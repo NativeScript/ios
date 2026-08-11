@@ -156,9 +156,12 @@ void Pointer::RegisterAddMethod(Local<Context> context,
         Local<Context> context = isolate->GetCurrentContext();
         tns::Assert(info.Length() == 1 && tns::IsNumber(info[0]), isolate);
 
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(
-            info.This()->GetInternalField(0).As<External>()->Value(
-                v8::kExternalPointerTypeTagDefault));
+        BaseDataWrapper* baseWrapper =
+            tns::GetValueOrReport(isolate, info.This(), "Pointer.add");
+        if (baseWrapper == nullptr) {
+          return;
+        }
+        PointerWrapper* wrapper = static_cast<PointerWrapper*>(baseWrapper);
         void* value = wrapper->Data();
         int32_t offset;
         tns::Assert(info[0].As<Number>()->Int32Value(context).To(&offset),
@@ -187,9 +190,12 @@ void Pointer::RegisterSubtractMethod(Local<Context> context,
         Local<Context> context = isolate->GetCurrentContext();
         tns::Assert(info.Length() == 1 && tns::IsNumber(info[0]), isolate);
 
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(
-            info.This()->GetInternalField(0).As<External>()->Value(
-                v8::kExternalPointerTypeTagDefault));
+        BaseDataWrapper* baseWrapper =
+            tns::GetValueOrReport(isolate, info.This(), "Pointer.subtract");
+        if (baseWrapper == nullptr) {
+          return;
+        }
+        PointerWrapper* wrapper = static_cast<PointerWrapper*>(baseWrapper);
         void* value = wrapper->Data();
         int32_t offset;
         tns::Assert(info[0].As<Number>()->Int32Value(context).To(&offset),
@@ -225,9 +231,19 @@ void Pointer::RegisterToStringMethod(Local<Context> context,
   Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(
       isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(
-            info.This()->GetInternalField(0).As<External>()->Value(
-                v8::kExternalPointerTypeTagDefault));
+        BaseDataWrapper* baseWrapper =
+            tns::GetValueOrReport(isolate, info.This(), "Pointer.toString");
+        if (baseWrapper == nullptr) {
+          // Logging paths stringify objects incidentally; string coercion of
+          // a released Pointer must stay total under the report policy.
+          if (tns::GetReleasedObjectPolicy() ==
+              tns::ReleasedObjectPolicy::kReport) {
+            info.GetReturnValue().Set(
+                tns::ToV8String(isolate, "<Pointer: released>"));
+          }
+          return;
+        }
+        PointerWrapper* wrapper = static_cast<PointerWrapper*>(baseWrapper);
         void* value = wrapper->Data();
 
         char buffer[100];
@@ -252,9 +268,12 @@ void Pointer::RegisterToHexStringMethod(Local<Context> context,
   Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(
       isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(
-            info.This()->GetInternalField(0).As<External>()->Value(
-                v8::kExternalPointerTypeTagDefault));
+        BaseDataWrapper* baseWrapper =
+            tns::GetValueOrReport(isolate, info.This(), "Pointer.toHexString");
+        if (baseWrapper == nullptr) {
+          return;
+        }
+        PointerWrapper* wrapper = static_cast<PointerWrapper*>(baseWrapper);
         const void* value = wrapper->Data();
 
         char buffer[100];
@@ -279,9 +298,12 @@ void Pointer::RegisterToDecimalStringMethod(Local<Context> context,
   Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(
       isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(
-            info.This()->GetInternalField(0).As<External>()->Value(
-                v8::kExternalPointerTypeTagDefault));
+        BaseDataWrapper* baseWrapper = tns::GetValueOrReport(
+            isolate, info.This(), "Pointer.toDecimalString");
+        if (baseWrapper == nullptr) {
+          return;
+        }
+        PointerWrapper* wrapper = static_cast<PointerWrapper*>(baseWrapper);
         const void* value = wrapper->Data();
         intptr_t ptr = static_cast<intptr_t>(reinterpret_cast<size_t>(value));
 
@@ -307,9 +329,12 @@ void Pointer::RegisterToNumberMethod(Local<Context> context,
   Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(
       isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(
-            info.This()->GetInternalField(0).As<External>()->Value(
-                v8::kExternalPointerTypeTagDefault));
+        BaseDataWrapper* baseWrapper =
+            tns::GetValueOrReport(isolate, info.This(), "Pointer.toNumber");
+        if (baseWrapper == nullptr) {
+          return;
+        }
+        PointerWrapper* wrapper = static_cast<PointerWrapper*>(baseWrapper);
         const void* value = wrapper->Data();
         size_t number = reinterpret_cast<size_t>(value);
         Local<Number> result = Number::New(isolate, number);
@@ -331,9 +356,12 @@ void Pointer::RegisterToBigIntMethod(Local<Context> context,
   Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(
       isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        PointerWrapper* wrapper = static_cast<PointerWrapper*>(
-            info.This()->GetInternalField(0).As<External>()->Value(
-                v8::kExternalPointerTypeTagDefault));
+        BaseDataWrapper* baseWrapper =
+            tns::GetValueOrReport(isolate, info.This(), "Pointer.toBigInt");
+        if (baseWrapper == nullptr) {
+          return;
+        }
+        PointerWrapper* wrapper = static_cast<PointerWrapper*>(baseWrapper);
         const void* value = wrapper->Data();
         size_t number = reinterpret_cast<size_t>(value);
         Local<BigInt> result = BigInt::NewFromUnsigned(isolate, number);

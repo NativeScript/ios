@@ -101,9 +101,17 @@ void ExtVector::RegisterToStringMethod(
   Local<FunctionTemplate> funcTemplate = FunctionTemplate::New(
       isolate, [](const FunctionCallbackInfo<Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        ExtVectorWrapper* wrapper = static_cast<ExtVectorWrapper*>(
-            info.This()->GetInternalField(0).As<External>()->Value(
-                v8::kExternalPointerTypeTagDefault));
+        BaseDataWrapper* baseWrapper =
+            tns::GetValueOrReport(isolate, info.This(), "ExtVector.toString");
+        if (baseWrapper == nullptr) {
+          if (tns::GetReleasedObjectPolicy() ==
+              tns::ReleasedObjectPolicy::kReport) {
+            info.GetReturnValue().Set(
+                tns::ToV8String(isolate, "<Vector: released>"));
+          }
+          return;
+        }
+        ExtVectorWrapper* wrapper = static_cast<ExtVectorWrapper*>(baseWrapper);
         void* value = wrapper->Data();
 
         char buffer[100];
