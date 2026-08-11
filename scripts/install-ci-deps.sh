@@ -45,5 +45,5 @@ fi
 
 if [ "$TEST_TOOLS" = "1" ]; then
   brew install chargepoint/xcparse/xcparse
-  npm install -g @edusperoni/junit-cli-report-viewer verify-junit-xml
+  npm install -g junit-cli-report-viewer@2.8.1 verify-junit-xml
 fi
