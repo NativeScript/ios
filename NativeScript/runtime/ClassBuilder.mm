@@ -483,8 +483,8 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Functi
   std::string baseClassName = class_getName(baseClass);
   std::string className = tns::ToString(isolate, ctorFunc->GetName());
 
-  Class extendedClass =
-      ClassBuilder::GetExtendedClass(baseClassName, className, std::to_string(isolateId) + "_");
+  ScopeClassNameToIsolate(className, isolateId);
+  Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, className, isolateId);
   class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
   class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 
