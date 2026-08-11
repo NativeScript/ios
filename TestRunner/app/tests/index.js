@@ -167,6 +167,8 @@ require("./EscapeExceptionTests");
 require("./PrimordialsTests");
 require("./InspectTests");
 
+require("./PerformanceTests");
+
 // The ns:/node: builtin modules
 require("./NsUtilTests");
 
