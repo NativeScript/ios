@@ -1893,6 +1893,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                                        ? tc.Exception()
                                        : v8::Exception::Error(tns::ToV8String(
                                              isolate, NsBuiltinModules::NotFoundMessage(rawSpec)));
+      // Reject must not run with the exception still pending on the isolate.
+      tc.Reset();
       builtinResolver->Reject(context, error).FromMaybe(false);
     }
     return builtinScope.Escape(builtinResolver->GetPromise());
