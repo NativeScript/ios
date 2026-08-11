@@ -17,31 +17,13 @@ describe("Runtime exposes", function () {
   });
 });
 
-describe("Performance object", () => {
-  it("should be available", () => {
-    expect(performance).toBeDefined();
-  });
-  it("should have a now function", () => {
-    expect(performance.now).toBeDefined();
-  });
-  it("should have a now function that returns a number", () => {
-    expect(typeof performance.now()).toBe("number");
-  });
-  it("should have timeOrigin", () => {
-    expect(performance.timeOrigin).toBeDefined();
-  });
-  it("should have timeOrigin that is a number", () => {
-    expect(typeof performance.timeOrigin).toBe("number");
-  });
-  it("should have timeOrigin that is greater than 0", () => {
-    expect(performance.timeOrigin).toBeGreaterThan(0);
-  });
-  it("should be close to the current time", () => {
-    const dateNow = Date.now();
-    const performanceNow = performance.now();
-    const timeOrigin = performance.timeOrigin;
-    const performanceAccurateNow = timeOrigin + performanceNow;
-    expect(Math.abs(dateNow - performanceAccurateNow)).toBeLessThan(10);
+// The shared Performance suite (submodule) gates itself on the API being
+// present and skips otherwise; this unguarded canary makes absence on THIS
+// runtime a failure rather than a silent skip.
+describe("Performance API canary", () => {
+  it("implements the Performance API", () => {
+    expect(typeof performance.mark).toBe("function");
+    expect(typeof PerformanceObserver).toBe("function");
   });
 });
 
@@ -76,5 +58,14 @@ describe("queueMicrotask", () => {
       expect(order).toEqual(["qm1", "p", "qm2"]);
       done();
     }, 0);
+  });
+});
+
+// The shared StructuredClone suite skips itself where the API is missing, which
+// would turn this runtime losing structuredClone into a green run. This spec is
+// deliberately unguarded so that regression fails instead.
+describe("structuredClone canary", () => {
+  it("is implemented by this runtime", () => {
+    expect(typeof structuredClone).toBe("function");
   });
 });

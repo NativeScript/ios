@@ -1,6 +1,12 @@
 # Runtime documentation
 
+- [Performance API](performance.md) — WHATWG `performance` (hr-time, user
+  timing, performance timeline with `PerformanceObserver`), per-isolate time
+  origins for workers, the native clock hook that future `requestAnimationFrame`
+  work must share, and the documented spec deviations.
 - [Error handling](error-handling.md) — global `error`/`unhandledrejection` events, `reportError`, catching native exceptions in JS (`error.nativeException`), forwarding JS throws to native (`interop.escapeException`), JS stacks on `NSException`, configuration flags, and crash-reporter integration.
+
+- [structuredClone](structured-clone.md) — the WHATWG `structuredClone(value, { transfer })` global: what clones, how graph identity and cycles are preserved, `ArrayBuffer` transfer, and the `DataCloneError`-named `Error` that stands in for `DOMException`.
 
 ## Knowledge
 
