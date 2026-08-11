@@ -18,6 +18,7 @@
 #include "RuntimeConfig.h"
 #include "SimpleAllocator.h"
 #include "SpinLock.h"
+#include "StructuredClone.h"
 #include "TSHelpers.h"
 #include "WeakRef.h"
 #include "Worker.h"
@@ -362,6 +363,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   PromiseProxy::Init(context);
   Events::Init(context);
   ErrorEvents::Init(context);
+  StructuredClone::Init(context);
   Performance::Init(context);
   Console::Init(context);
   WeakRef::Init(context);

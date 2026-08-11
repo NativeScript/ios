@@ -6,6 +6,8 @@
   work must share, and the documented spec deviations.
 - [Error handling](error-handling.md) — global `error`/`unhandledrejection` events, `reportError`, catching native exceptions in JS (`error.nativeException`), forwarding JS throws to native (`interop.escapeException`), JS stacks on `NSException`, configuration flags, and crash-reporter integration.
 
+- [structuredClone](structured-clone.md) — the WHATWG `structuredClone(value, { transfer })` global: what clones, how graph identity and cycles are preserved, `ArrayBuffer` transfer, and the `DataCloneError`-named `Error` that stands in for `DOMException`.
+
 ## Knowledge
 
 Notes on work that is done, kept because the reasoning is expensive to

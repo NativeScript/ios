@@ -271,7 +271,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
       throw NativeScriptException("Not enough arguments.");
     }
 
-    if (info.Length() > 1) {
+    if (info.Length() > 2) {
       throw NativeScriptException("Too many arguments passed.");
     }
 
@@ -283,12 +283,13 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
       return;
     }
 
-    //        Local<Value> error;
-    //        Local<Value> result = Worker::Serialize(isolate, info[0], error);
-    //        if (result.IsEmpty()) {
-    //            isolate->ThrowException(error);
-    //            return;
-    //        }
+    // Resolved before anything is serialized: serializing a transfer list
+    // detaches the caller's buffers, so bailing out afterwards would destroy
+    // their contents without ever delivering the message.
+    auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
+    if (runtime == nullptr) {
+      return;
+    }
 
     auto context = Caches::Get(isolate)->GetContext();
     auto message = std::make_shared<worker::Message>();
@@ -300,13 +301,16 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
     success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
     tns::Assert(success, isolate);
 
-    message->Serialize(isolate, context, obj);
-    // std::string message = tns::ToString(isolate, result);
-
-    auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
-    if (runtime == nullptr) {
+    Local<Value> transferList = info.Length() > 1 ? info[1] : v8::Undefined(isolate).As<Value>();
+    if (message
+            ->Serialize(isolate, context, obj, transferList,
+                        serialization::HostObjectPolicy::kDegrade)
+            .IsNothing()) {
+      // The transfer list was rejected or the value could not be cloned; the
+      // exception is already pending and nothing may be posted.
       return;
     }
+
     tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [state, message]() {
       Isolate* isolate = state->GetIsolate();
       v8::Locker locker(isolate);
@@ -330,7 +334,7 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
       return;
     }
 
-    if (info.Length() > 1) {
+    if (info.Length() > 2) {
       throw NativeScriptException("Too many arguments passed.");
       return;
     }
@@ -353,15 +357,16 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
     success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
     tns::Assert(success, isolate);
 
-    message->Serialize(isolate, context, obj);
+    Local<Value> transferList = info.Length() > 1 ? info[1] : v8::Undefined(isolate).As<Value>();
+    if (message
+            ->Serialize(isolate, context, obj, transferList,
+                        serialization::HostObjectPolicy::kDegrade)
+            .IsNothing()) {
+      // The transfer list was rejected or the value could not be cloned; the
+      // exception is already pending and nothing may be posted.
+      return;
+    }
 
-    //        Local<Value> result = Worker::Serialize(isolate, info[0], error);
-    //        if (result.IsEmpty()) {
-    //            isolate->ThrowException(error);
-    //            return;
-    //        }
-
-    // std::string message = tns::ToString(isolate, result);
     worker->PostMessage(message);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
@@ -432,30 +437,6 @@ void Worker::TerminateCallback(const FunctionCallbackInfo<Value>& info) {
 
   WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
   worker->Terminate();
-}
-
-Local<v8::String> Worker::Serialize(Isolate* isolate, Local<Value> value, Local<Value>& error) {
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-
-  Local<Object> obj;
-  bool success = objTemplate->NewInstance(context).ToLocal(&obj);
-  tns::Assert(success, isolate);
-
-  success = obj->Set(context, tns::ToV8String(isolate, "data"), value).FromMaybe(false);
-  tns::Assert(success, isolate);
-
-  Local<Value> result;
-  TryCatch tc(isolate);
-  success = v8::JSON::Stringify(context, obj).ToLocal(&result);
-  if (!success && tc.HasCaught()) {
-    error = tc.Exception();
-    return Local<v8::String>();
-  }
-
-  tns::Assert(success, isolate);
-
-  return result.As<v8::String>();
 }
 
 void Worker::SetWorkerId(Isolate* isolate, int workerId) {
