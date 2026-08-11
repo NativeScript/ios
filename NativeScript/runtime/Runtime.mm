@@ -32,6 +32,7 @@
 #include "HMRSupport.h"
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
+#include "napi/NapiEnv.h"
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
@@ -238,6 +239,11 @@ Runtime::~Runtime() {
     }
     g_moduleRegistry.clear();
 
+    // Before DisposeAllRegistered: the env's reference lists hold v8::Globals,
+    // so its teardown needs the isolate alive and locked.
+    NapiEnv::Destroy(static_cast<NapiEnv*>(this->napiEnv_));
+    this->napiEnv_ = nullptr;
+
     ObjectManager::DisposeAllRegistered(isolate_);
 
     if (IsRuntimeWorker()) {
@@ -416,6 +422,8 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   InlineFunctions::Init(context);
 
   cache->SetContext(context);
+
+  this->napiEnv_ = NapiEnv::Create(context);
 
   this->isolate_ = isolate;
 }

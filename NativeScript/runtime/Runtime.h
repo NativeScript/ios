@@ -9,6 +9,10 @@
 #include "SpinLock.h"
 #include "libplatform/libplatform.h"
 
+// Declared rather than included: js_native_api_types.h pins NAPI_VERSION for
+// the whole translation unit, and Runtime.h reaches nearly all of them.
+typedef struct napi_env__* napi_env;
+
 namespace tns {
 
 class Runtime {
@@ -42,6 +46,10 @@ class Runtime {
   static Runtime* GetCurrentRuntime() { return currentRuntime_; }
 
   static Runtime* GetRuntime(v8::Isolate* isolate);
+
+  // The Node-API environment for this runtime's context. Null before Init
+  // creates it and after ~Runtime destroys it.
+  inline napi_env GetNapiEnv() { return napiEnv_; }
 
   static bool IsWorker() {
     if (currentRuntime_ == nullptr) {
@@ -104,6 +112,7 @@ class Runtime {
   static void DrainRejectionsObserver(CFRunLoopObserverRef observer,
                                       CFRunLoopActivity activity, void* info);
   v8::Isolate* isolate_;
+  napi_env napiEnv_ = nullptr;
   std::unique_ptr<ModuleInternal> moduleInternal_;
   int workerId_;
   CFRunLoopRef runtimeLoop_;

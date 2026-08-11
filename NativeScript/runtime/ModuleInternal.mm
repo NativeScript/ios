@@ -11,6 +11,7 @@
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
+#include "napi/NapiModules.h"
 #include "NsBuiltinModules.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
@@ -23,6 +24,17 @@ namespace tns {
 bool IsESModule(const std::string& path) {
   return path.size() >= 4 && path.compare(path.size() - 4, 4, ".mjs") == 0 &&
          !(path.size() >= 8 && path.compare(path.size() - 8, 8, ".mjs.map") == 0);
+}
+
+// A package-style specifier: neither a path nor a scheme, so it may be claimed
+// by a registry rather than resolved on disk.
+static bool IsBareSpecifier(const std::string& specifier) {
+  if (specifier.empty() || specifier[0] == '.' || specifier[0] == '/' ||
+      specifier[0] == '~') {
+    return false;
+  }
+
+  return specifier.find(':') == std::string::npos;
 }
 
 // Normalize file system paths to a canonical representation so lookups in
@@ -229,6 +241,17 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
       } else if (!NsBuiltinModules::IsRegistered(specifier)) {
         isolate->ThrowException(Exception::Error(
             tns::ToV8String(isolate, NsBuiltinModules::NotFoundMessage(specifier))));
+      }
+      return;
+    }
+
+    // Node-API addons claim a bare name only, so a path can never be diverted
+    // into the addon registry, and builtins keep priority over both.
+    if (IsBareSpecifier(specifier) && NapiModules::IsRegistered(specifier)) {
+      Local<Context> context = isolate->GetCurrentContext();
+      Local<Object> exports;
+      if (NapiModules::GetExports(context, specifier).ToLocal(&exports)) {
+        info.GetReturnValue().Set(exports);
       }
       return;
     }
