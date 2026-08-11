@@ -12,6 +12,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
         }
         case BinaryTypeEncodingType::IdEncoding:
         case BinaryTypeEncodingType::InterfaceDeclarationReference:
+        case BinaryTypeEncodingType::InterfaceIndexReference:
         case BinaryTypeEncodingType::InstanceTypeEncoding:
         case BinaryTypeEncodingType::SelectorEncoding:
         case BinaryTypeEncodingType::BlockEncoding:
@@ -277,10 +278,11 @@ StructInfo FFICall::GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldE
 }
 
 ParametrizedCall* ParametrizedCall::Get(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) {
-    auto it = callsCache_.find(typeEncoding);
-    if (it != callsCache_.end()) {
-        return it->second;
-    }
+  CallKey key{typeEncoding, initialParameterIndex, argsCount};
+  auto it = callsCache_.find(key);
+  if (it != callsCache_.end()) {
+    return it->second;
+  }
 
     const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount]();
     ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
@@ -300,12 +302,14 @@ ParametrizedCall* ParametrizedCall::Get(const TypeEncoding* typeEncoding, const 
     tns::Assert(status == FFI_OK);
 
     ParametrizedCall* call = new ParametrizedCall(cif);
-    callsCache_.emplace(typeEncoding, call);
+    callsCache_.emplace(key, call);
 
     return call;
 }
 
-robin_hood::unordered_map<const TypeEncoding*, ParametrizedCall*> ParametrizedCall::callsCache_;
+robin_hood::unordered_map<ParametrizedCall::CallKey, ParametrizedCall*,
+                          ParametrizedCall::CallKeyHash>
+    ParametrizedCall::callsCache_;
 robin_hood::unordered_map<std::string, StructInfo> FFICall::structInfosCache_;
 
 }

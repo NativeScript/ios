@@ -55,17 +55,27 @@ public:
     MetaFileOffset push_arrayCount(MetaArrayCount count);
 
     /*
-         * \brief Writes a binary array
-         * A binary array is a collection of offsets
-         * \param binaryArray
-         */
-    MetaFileOffset push_binaryArray(std::vector<MetaFileOffset>& binaryArray);
+     * \brief Writes a binary array
+     * A binary array is a collection of offsets
+     * \param binaryArray
+     * \param shouldIntern Whether an empty array may reuse a previously
+     *        written one. Only safe where the array is reached by offset;
+     *        pass \c false when writing a table that is located positionally.
+     */
+    MetaFileOffset push_binaryArray(std::vector<MetaFileOffset>& binaryArray,
+                                    bool shouldIntern = true);
 
     /*
          * \brief Writes a 4 byte integer.
          * \param value
          */
     MetaFileOffset push_int(int32_t value);
+
+    /*
+     * \brief Writes an 8 byte integer.
+     * \param value
+     */
+    MetaFileOffset push_long(int64_t value);
 
     /*
          * \brief Writes a 2 byte short.

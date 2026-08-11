@@ -33,12 +33,11 @@ private:
     void serializeLibrary(clang::Module::LinkLibrary* library, binary::LibraryMeta& binaryLib);
 
 public:
-    BinarySerializer(MetaFile* file)
-        : heapWriter(file->heap_writer())
-        , typeEncodingSerializer(heapWriter)
-    {
-        this->file = file;
-    }
+ BinarySerializer(MetaFile* file)
+     : heapWriter(file->heap_writer()),
+       typeEncodingSerializer(heapWriter, file) {
+   this->file = file;
+ }
 
     void serializeContainer(std::vector<std::pair<clang::Module*, std::vector< ::Meta::Meta*> > >& container);
 

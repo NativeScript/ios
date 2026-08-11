@@ -134,16 +134,33 @@ v8::Intercepted MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
     info.GetReturnValue().Set(result);
   } else if (meta->type() == MetaType::JsCode) {
     const JsCodeMeta* jsCodeMeta = static_cast<const JsCodeMeta*>(meta);
-    std::string jsCode = jsCodeMeta->jsCode();
-    Local<Script> script;
-    if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
-      tns::Assert(false, isolate);
-    }
-    tns::Assert(!script.IsEmpty(), isolate);
-
     Local<Value> result;
-    if (!script->Run(context).ToLocal(&result)) {
-      tns::Assert(false, isolate);
+    if (jsCodeMeta->isEnumTable()) {
+      // Mirrors __tsEnum: a bidirectional map, built in stored order so that
+      // when several names share a value the last one wins the reverse entry.
+      Local<Object> enumObject = Object::New(isolate);
+      const Array<EnumField>* fields = jsCodeMeta->enumFields();
+      for (int i = 0; i < fields->count; i++) {
+        const EnumField& field = (*fields)[i];
+        Local<Value> name = tns::ToV8String(isolate, field.name.valuePtr());
+        Local<Value> value = Number::New(isolate, static_cast<double>(field.value));
+        if (enumObject->Set(context, name, value).IsNothing() ||
+            enumObject->Set(context, value, name).IsNothing()) {
+          tns::Assert(false, isolate);
+        }
+      }
+      result = enumObject;
+    } else {
+      std::string jsCode = jsCodeMeta->jsCode();
+      Local<Script> script;
+      if (!Script::Compile(context, tns::ToV8String(isolate, jsCode)).ToLocal(&script)) {
+        tns::Assert(false, isolate);
+      }
+      tns::Assert(!script.IsEmpty(), isolate);
+
+      if (!script->Run(context).ToLocal(&result)) {
+        tns::Assert(false, isolate);
+      }
     }
     // Memoize the evaluated value as a real own property: the interceptor is
     // registered kNonMasking, so later reads of this global bypass it (and the

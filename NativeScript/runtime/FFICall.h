@@ -67,7 +67,31 @@ class ParametrizedCall {
   std::vector<size_t> ArgValueOffsets;
 
  private:
-  static robin_hood::unordered_map<const TypeEncoding*, ParametrizedCall*>
+  // The cif is built from the encoding *and* the two counts, so all three
+  // identify it. Keying on the encoding alone aliases distinct call shapes onto
+  // one cif, which mis-describes the stack rather than failing outright.
+  struct CallKey {
+    const TypeEncoding* encoding;
+    int initialParameterIndex;
+    int argsCount;
+
+    bool operator==(const CallKey& other) const {
+      return encoding == other.encoding &&
+             initialParameterIndex == other.initialParameterIndex &&
+             argsCount == other.argsCount;
+    }
+  };
+
+  struct CallKeyHash {
+    size_t operator()(const CallKey& key) const {
+      size_t hash = robin_hood::hash<const void*>()(key.encoding);
+      hash = hash * 31 + static_cast<size_t>(key.initialParameterIndex);
+      hash = hash * 31 + static_cast<size_t>(key.argsCount);
+      return hash;
+    }
+  };
+
+  static robin_hood::unordered_map<CallKey, ParametrizedCall*, CallKeyHash>
       callsCache_;
 };
 

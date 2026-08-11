@@ -4,10 +4,12 @@ binary::MetaFileOffset binary::BinaryWriter::push_number(long number, int bytesC
 {
     binary::MetaFileOffset offset = this->_stream->position();
 
+    // Shift the value, not a 32-bit mask: `255 << pad` overflows int once pad
+    // reaches 24, so anything past the fourth byte came out as zero.
+    uint64_t bits = (uint64_t)number;
     for (int i = 0; i < bytesCount; i++) {
-        int pad = 8 * i;
-        uint8_t current = (uint8_t)((number & (255 << pad)) >> pad);
-        this->_stream->push_byte(current);
+      uint8_t current = (uint8_t)((bits >> (8 * i)) & 0xFF);
+      this->_stream->push_byte(current);
     }
 
     return offset;
@@ -43,12 +45,12 @@ binary::MetaFileOffset binary::BinaryWriter::push_arrayCount(MetaArrayCount coun
     return this->push_number(count, sizeof(MetaArrayCount));
 }
 
-binary::MetaFileOffset binary::BinaryWriter::push_binaryArray(std::vector<binary::MetaFileOffset>& binaryArray)
-{
+binary::MetaFileOffset binary::BinaryWriter::push_binaryArray(
+    std::vector<binary::MetaFileOffset>& binaryArray, bool shouldIntern) {
   // Empty arrays carry no payload, so every one of them can share a single
   // count-of-zero in the heap. Offset 0 is the null sentinel and the heap
   // reserves a marker byte there, so a real array never lands on it.
-  if (binaryArray.empty() && this->emptyArrayOffset != 0) {
+  if (shouldIntern && binaryArray.empty() && this->emptyArrayOffset != 0) {
     return this->emptyArrayOffset;
   }
 
@@ -58,7 +60,7 @@ binary::MetaFileOffset binary::BinaryWriter::push_binaryArray(std::vector<binary
         this->push_pointer(element);
     }
 
-    if (binaryArray.empty()) {
+    if (shouldIntern && binaryArray.empty()) {
       this->emptyArrayOffset = offset;
     }
 
@@ -68,6 +70,10 @@ binary::MetaFileOffset binary::BinaryWriter::push_binaryArray(std::vector<binary
 binary::MetaFileOffset binary::BinaryWriter::push_int(int32_t value)
 {
     return this->push_number(value, 4);
+}
+
+binary::MetaFileOffset binary::BinaryWriter::push_long(int64_t value) {
+  return this->push_number(value, 8);
 }
 
 binary::MetaFileOffset binary::BinaryWriter::push_short(int16_t value)

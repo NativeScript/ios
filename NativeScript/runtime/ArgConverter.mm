@@ -500,8 +500,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
         return;
     }
   } else if (value->IsString()) {
-    if (type == BinaryTypeEncodingType::IdEncoding ||
-        type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+    if (type == BinaryTypeEncodingType::IdEncoding || typeEncoding->isInterfaceReference()) {
       id data = tns::ToNSString(isolate, value);
       // this feels wrong but follows the other CFBridgingRetain calls
       // and also solves a leak
@@ -511,7 +510,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
       return;
     }
   } else if (value->IsObject()) {
-    if (type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
+    if (typeEncoding->isInterfaceReference() ||
         type == BinaryTypeEncodingType::InstanceTypeEncoding ||
         type == BinaryTypeEncodingType::IdEncoding) {
       BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
@@ -720,8 +719,8 @@ bool ArgConverter::CanInvoke(Local<Context> context, const TypeEncoding* typeEnc
   }
 
   Isolate* isolate = v8::Isolate::GetCurrent();
-  if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-    const char* name = typeEncoding->details.declarationReference.name.valuePtr();
+  if (typeEncoding->isInterfaceReference()) {
+    const char* name = typeEncoding->interfaceName();
     if (strcmp(name, "NSNumber") == 0 && tns::IsNumber(arg)) {
       return true;
     }
@@ -978,9 +977,8 @@ std::shared_ptr<Persistent<Value>> ArgConverter::FindCachedInstance(
 }
 
 const Meta* ArgConverter::FindMeta(Class klass, const TypeEncoding* typeEncoding) {
-  if (typeEncoding != nullptr &&
-      typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-    const char* name = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
+  if (typeEncoding != nullptr && typeEncoding->isInterfaceReference()) {
+    const char* name = typeEncoding->interfaceName();
     const Meta* result = GetMeta(name);
     if (result != nullptr && result->type() == MetaType::Interface) {
       return result;
@@ -1259,11 +1257,11 @@ bool ArgConverter::IsErrorOutParameter(const TypeEncoding* typeEncoding) {
   }
 
   const TypeEncoding* innerTypeEncoding = typeEncoding->details.pointer.getInnerType();
-  if (innerTypeEncoding->type != BinaryTypeEncodingType::InterfaceDeclarationReference) {
+  if (!innerTypeEncoding->isInterfaceReference()) {
     return false;
   }
 
-  const char* name = innerTypeEncoding->details.declarationReference.name.valuePtr();
+  const char* name = innerTypeEncoding->interfaceName();
   if (name == nullptr) {
     return false;
   }

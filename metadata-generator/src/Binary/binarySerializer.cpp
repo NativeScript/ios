@@ -413,21 +413,28 @@ void binary::BinarySerializer::visit(::Meta::EnumMeta* meta)
     binary::JsCodeMeta binaryStruct;
     serializeBase(meta, binaryStruct);
 
-    // generate JsCode from enum names and values
-    std::ostringstream jsCodeStream;
-    jsCodeStream << "__tsEnum({";
-    bool isFirstField = true;
-    for (::Meta::EnumField& field : meta->swiftNameFields) {
-        jsCodeStream << (isFirstField ? "" : ",") << "\"" << field.name << "\":" << field.value;
-        isFirstField = false;
-    }
-    for (::Meta::EnumField& field : meta->fullNameFields) {
-        jsCodeStream << (isFirstField ? "" : ",") << "\"" << field.name << "\":" << field.value;
-        isFirstField = false;
-    }
-    jsCodeStream << "})";
+    // Names are interned, so the great majority cost nothing here: the same
+    // strings already back this enum's constants as standalone globals.
+    std::vector<std::pair<MetaFileOffset, int64_t>> entries;
+    auto addFields = [&](std::vector<::Meta::EnumField>& fields) {
+      for (::Meta::EnumField& field : fields) {
+        // Values that would not fit signed are already emitted signed by
+        // MetaFactory, so this round-trips the full range.
+        entries.emplace_back(
+            this->heapWriter.push_string(field.name),
+            (int64_t)std::strtoll(field.value.c_str(), nullptr, 10));
+      }
+    };
+    addFields(meta->swiftNameFields);
+    addFields(meta->fullNameFields);
 
-    binaryStruct._jsCode = this->heapWriter.push_string(jsCodeStream.str());
+    binaryStruct._flags |= BinaryFlags::JsCodeIsEnumTable;
+    binaryStruct._jsCode =
+        this->heapWriter.push_arrayCount((MetaArrayCount)entries.size());
+    for (std::pair<MetaFileOffset, int64_t>& entry : entries) {
+      this->heapWriter.push_pointer(entry.first);
+      this->heapWriter.push_long(entry.second);
+    }
     this->file->registerInGlobalTables(*meta, binaryStruct.save(this->heapWriter));
 }
 

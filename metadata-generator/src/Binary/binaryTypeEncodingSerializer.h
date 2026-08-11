@@ -21,14 +21,15 @@ class BinaryTypeEncodingSerializer
   // string-interning map, and a copy interns into a second map, emitting a
   // duplicate copy of every string reachable from both paths.
   BinaryWriter& _heapWriter;
+  MetaFile* _file;
 
   unique_ptr<TypeEncoding> serializeRecordEncoding(
       const binary::BinaryTypeEncodingType encodingType,
       const std::vector< ::Meta::RecordField>& fields);
 
  public:
-  BinaryTypeEncodingSerializer(BinaryWriter& heapWriter)
-      : _heapWriter(heapWriter) {}
+  BinaryTypeEncodingSerializer(BinaryWriter& heapWriter, MetaFile* file)
+      : _heapWriter(heapWriter), _file(file) {}
 
   MetaFileOffset visit(std::vector< ::Meta::Type*>& types);
 
