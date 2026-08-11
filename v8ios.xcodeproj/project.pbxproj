@@ -13,6 +13,7 @@
 		4E10A9100000000000000204 /* NapiRuntime.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000011 /* NapiRuntime.mm */; };
 		4E10A9100000000000000205 /* NapiRuntime.h in Headers */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000010 /* NapiRuntime.h */; };
 		4E10A9100000000000000206 /* NapiTestModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000012 /* NapiTestModule.mm */; };
+		4E10A9100000000000000208 /* NapiCoverageModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000015 /* NapiCoverageModule.mm */; };
 		4E10A9100000000000000207 /* NapiThreadSafeFunction.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000014 /* NapiThreadSafeFunction.mm */; };
 		2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */; };
 		2B5088A72BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
@@ -479,6 +480,8 @@
 		4E10A9100000000000000010 /* NapiRuntime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiRuntime.h; sourceTree = "<group>"; };
 		4E10A9100000000000000011 /* NapiRuntime.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiRuntime.mm; sourceTree = "<group>"; };
 		4E10A9100000000000000012 /* NapiTestModule.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiTestModule.mm; sourceTree = "<group>"; };
+		4E10A9100000000000000015 /* NapiCoverageModule.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiCoverageModule.mm; sourceTree = "<group>"; };
+		4E10A9100000000000000016 /* NapiTestSupport.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiTestSupport.h; sourceTree = "<group>"; };
 		4E10A9100000000000000013 /* NapiThreadSafeFunction.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiThreadSafeFunction.h; sourceTree = "<group>"; };
 		4E10A9100000000000000014 /* NapiThreadSafeFunction.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiThreadSafeFunction.mm; sourceTree = "<group>"; };
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
@@ -1241,6 +1244,8 @@
 				C2937508229FC1600075CB16 /* TNSTestCommon.h */,
 				C29374F8229FC1600075CB16 /* TNSTestCommon.m */,
 				4E10A9100000000000000012 /* NapiTestModule.mm */,
+				4E10A9100000000000000015 /* NapiCoverageModule.mm */,
+				4E10A9100000000000000016 /* NapiTestSupport.h */,
 				C2937507229FC1600075CB16 /* TNSTestNativeCallbacks.h */,
 				C29374F4229FC1600075CB16 /* TNSTestNativeCallbacks.m */,
 				C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */,
@@ -2333,6 +2338,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4E10A9100000000000000206 /* NapiTestModule.mm in Sources */,
+				4E10A9100000000000000208 /* NapiCoverageModule.mm in Sources */,
 				C22EF68B2379412100D67CBF /* TNSSwiftLike.m in Sources */,
 				C293751A229FC1600075CB16 /* TNSMethodCalls.m in Sources */,
 				C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */,

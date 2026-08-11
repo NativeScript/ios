@@ -7,34 +7,7 @@
 #include <chrono>
 #include <thread>
 
-#include "napi/vendor/node_api.h"
-
-// A failed call leaves either a pending JS exception or only an extended error
-// info record; JS must see a throw either way.
-static void NapiThrowLastError(napi_env env) {
-  bool pending = false;
-  if (napi_is_exception_pending(env, &pending) == napi_ok && pending) {
-    return;
-  }
-
-  const napi_extended_error_info* info = NULL;
-  napi_get_last_error_info(env, &info);
-  napi_throw_error(
-      env, NULL,
-      (info != NULL && info->error_message != NULL) ? info->error_message : "napi call failed");
-}
-
-#define NAPI_CALL(env, call)   \
-  do {                         \
-    if ((call) != napi_ok) {   \
-      NapiThrowLastError(env); \
-      return NULL;             \
-    }                          \
-  } while (0)
-
-#define NAPI_METHOD(name, fn) {(name), NULL, (fn), NULL, NULL, NULL, napi_default, NULL}
-#define NAPI_GETTER(name, fn) {(name), NULL, NULL, (fn), NULL, NULL, napi_enumerable, NULL}
-#define NAPI_VALUE(name, val) {(name), NULL, NULL, NULL, NULL, (val), napi_enumerable, NULL}
+#include "NapiTestSupport.h"
 
 typedef struct {
   double value;
@@ -267,34 +240,6 @@ static napi_value GetWrapCount(napi_env env, napi_callback_info info) {
   (void)info;
   napi_value result = NULL;
   NAPI_CALL(env, napi_create_double(env, (double)sWrapCount, &result));
-  return result;
-}
-
-// Statuses cross into JS as names so a spec can assert on them.
-static const char* NapiStatusName(napi_status status) {
-  switch (status) {
-    case napi_ok:
-      return "ok";
-    case napi_invalid_arg:
-      return "invalid_arg";
-    case napi_generic_failure:
-      return "generic_failure";
-    case napi_cancelled:
-      return "cancelled";
-    case napi_queue_full:
-      return "queue_full";
-    case napi_closing:
-      return "closing";
-    case napi_would_deadlock:
-      return "would_deadlock";
-    default:
-      return "other";
-  }
-}
-
-static napi_value NapiStatusValue(napi_env env, napi_status status) {
-  napi_value result = NULL;
-  napi_create_string_utf8(env, NapiStatusName(status), NAPI_AUTO_LENGTH, &result);
   return result;
 }
 
