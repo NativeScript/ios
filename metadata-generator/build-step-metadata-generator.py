@@ -85,13 +85,23 @@ conf_build_dir = env("CONFIGURATION_BUILD_DIR")
 sdk_root = env("SDKROOT")
 src_root = env("SRCROOT")
 deployment_target_flag_name = env_or_empty("DEPLOYMENT_TARGET_CLANG_FLAG_NAME") or default_deployment_target_flag_name
-deployment_target = env(env_or_empty("DEPLOYMENT_TARGET_CLANG_ENV_NAME") or default_deployment_target_clang_env_name)
+# Xcode does not export MACCATALYST_DEPLOYMENT_TARGET unless the project sets it,
+# so fall back to the iOS deployment target rather than dying with a KeyError.
+deployment_target = env_or_none(env_or_empty("DEPLOYMENT_TARGET_CLANG_ENV_NAME") or default_deployment_target_clang_env_name) \
+    or env("IPHONEOS_DEPLOYMENT_TARGET")
 std = env("GCC_C_LANGUAGE_STANDARD")
 header_search_paths = env_or_empty("HEADER_SEARCH_PATHS")
 header_search_paths_parsed = map_and_list((lambda s: "-I" + s), shlex.split(header_search_paths))
 framework_search_paths = shlex.split(env_or_empty("FRAMEWORK_SEARCH_PATHS"))
 # Add extra framework search path for newer Xcode versions
 framework_search_paths.append(os.path.join(sdk_root, "System/Library/SubFrameworks"))
+if effective_platform_name == "-maccatalyst":
+    # UIKit and the rest of the iOS-flavoured frameworks live under iOSSupport in
+    # the macOS SDK. Xcode passes these to the real compile via -iframework, which
+    # never reaches FRAMEWORK_SEARCH_PATHS, so without them the generated metadata
+    # contains no UIKit at all ("ReferenceError: UIDevice is not defined").
+    framework_search_paths.append(os.path.join(sdk_root, "System/iOSSupport/System/Library/Frameworks"))
+    framework_search_paths.append(os.path.join(sdk_root, "System/iOSSupport/System/Library/SubFrameworks"))
 framework_search_paths_parsed = map_and_list((lambda s: "-F" + s), framework_search_paths)
 other_cflags = env_or_empty("OTHER_CFLAGS")
 other_cflags_parsed = shlex.split(other_cflags)
