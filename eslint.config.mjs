@@ -15,6 +15,7 @@ const capturedStatics = [
   ['Array', 'isArray', 'ArrayIsArray'],
   ['ArrayBuffer', 'isView', 'ArrayBufferIsView'],
   ['JSON', 'stringify', 'JSONStringify'],
+  ['Number', 'isFinite', 'NumberIsFinite'],
   ['Number', 'parseFloat', 'NumberParseFloat'],
   ['Number', 'parseInt', 'NumberParseInt'],
   ['Object', 'assign', 'ObjectAssign'],

@@ -55,6 +55,24 @@ class Runtime {
 
   static bool IsAlive(const v8::Isolate* isolate);
 
+  // Milliseconds since this runtime's time origin, on the monotonic clock.
+  // Not inline on purpose: an inline definition would have to reach the
+  // platform through GetPlatform(), which copies a shared_ptr on every call,
+  // while the out-of-line definition reads platform_ directly.
+  double PerformanceNowMillis();
+
+  // Wall-clock milliseconds since the Unix epoch at the moment the time origin
+  // was captured, on the same base as Date.now(); this is
+  // performance.timeOrigin.
+  inline double TimeOriginMillis() const { return timeOriginRealtimeMs_; }
+
+  // The monotonic clock reading (seconds, V8 platform units) of the time
+  // origin, for mapping platform-supplied timestamps onto the performance
+  // timeline.
+  inline double TimeOriginMonotonicSeconds() const {
+    return timeOriginMonotonic_;
+  }
+
  private:
   static thread_local Runtime* currentRuntime_;
   static std::shared_ptr<v8::Platform> platform_;
@@ -67,8 +85,6 @@ class Runtime {
   void DefineCollectFunction(v8::Local<v8::Context> context);
   void DefineNativeScriptVersion(v8::Isolate* isolate,
                                  v8::Local<v8::ObjectTemplate> globalTemplate);
-  void DefinePerformanceObject(v8::Isolate* isolate,
-                               v8::Local<v8::ObjectTemplate> globalTemplate);
   void DefineTimeMethod(v8::Isolate* isolate,
                         v8::Local<v8::ObjectTemplate> globalTemplate);
   void DefineDrainMicrotaskMethod(v8::Isolate* isolate,
@@ -76,8 +92,6 @@ class Runtime {
   void DefineDateTimeConfigurationChangeNotificationMethod(
       v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
 
-  static void PerformanceNowCallback(
-      const v8::FunctionCallbackInfo<v8::Value>& args);
   static void DrainRejectionsObserver(CFRunLoopObserverRef observer,
                                       CFRunLoopActivity activity, void* info);
   v8::Isolate* isolate_;
@@ -87,8 +101,8 @@ class Runtime {
   // Drains unhandled promise rejections once per runloop turn
   // (kCFRunLoopBeforeWaiting). Torn down before isolate disposal in ~Runtime.
   CFRunLoopObserverRef rejectionObserver_ = nullptr;
-  double startTime;
-  double realtimeOrigin;
+  double timeOriginMonotonic_;
+  double timeOriginRealtimeMs_;
   // TODO: refactor this. This is only needed because, during program
   // termination (UIApplicationMain not called) the Cache::Workers is released
   // (static initialization order fiasco

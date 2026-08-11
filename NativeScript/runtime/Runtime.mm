@@ -13,6 +13,7 @@
 #include "Interop.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
+#include "Performance.h"
 #include "PromiseProxy.h"
 #include "RuntimeConfig.h"
 #include "SimpleAllocator.h"
@@ -275,8 +276,8 @@ Isolate* Runtime::CreateIsolate() {
     v8Initialized_ = true;
   }
 
-  startTime = platform_->MonotonicallyIncreasingTime();
-  realtimeOrigin = platform_->CurrentClockTimeMillis();
+  timeOriginMonotonic_ = platform_->MonotonicallyIncreasingTime();
+  timeOriginRealtimeMs_ = platform_->CurrentClockTimeMillis();
 
   // auto version = v8::V8::GetVersion();
 
@@ -310,7 +311,6 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   DefineNativeScriptVersion(isolate, globalTemplate);
 
   // Worker::Init(isolate, globalTemplate, isWorker);
-  DefinePerformanceObject(isolate, globalTemplate);
   DefineTimeMethod(isolate, globalTemplate);
   DefineDrainMicrotaskMethod(isolate, globalTemplate);
   // queueMicrotask(callback) per spec
@@ -364,6 +364,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   Events::Init(context);
   ErrorEvents::Init(context);
   StructuredClone::Init(context);
+  Performance::Init(context);
   Console::Init(context);
   WeakRef::Init(context);
 
@@ -514,23 +515,8 @@ void Runtime::DefineCollectFunction(Local<Context> context) {
   tns::Assert(success, isolate);
 }
 
-void Runtime::DefinePerformanceObject(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
-  Local<ObjectTemplate> performanceTemplate = ObjectTemplate::New(isolate);
-
-  Local<FunctionTemplate> nowFuncTemplate = FunctionTemplate::New(isolate, PerformanceNowCallback);
-  performanceTemplate->Set(tns::ToV8String(isolate, "now"), nowFuncTemplate);
-
-  performanceTemplate->Set(tns::ToV8String(isolate, "timeOrigin"),
-                           v8::Number::New(isolate, realtimeOrigin));
-
-  Local<v8::String> performancePropertyName = ToV8String(isolate, "performance");
-  globalTemplate->Set(performancePropertyName, performanceTemplate);
-}
-
-void Runtime::PerformanceNowCallback(const FunctionCallbackInfo<Value>& args) {
-  auto runtime = Runtime::GetRuntime(args.GetIsolate());
-  args.GetReturnValue().Set(
-      (runtime->platform_->MonotonicallyIncreasingTime() - runtime->startTime) * 1000.0);
+double Runtime::PerformanceNowMillis() {
+  return (platform_->MonotonicallyIncreasingTime() - timeOriginMonotonic_) * 1000.0;
 }
 
 void Runtime::DefineNativeScriptVersion(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
