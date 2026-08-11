@@ -16,12 +16,6 @@ class TestRunnerTests: XCTestCase {
     // exhausted its junit-report retries (human-readable text, not XML).
     private var reportDeliveryFailureReason: String?
 
-    // Most recent spec reported by the in-app Jasmine progress beacon (see the
-    // /progress handler below). When the suite hangs and never POSTs results,
-    // this names the spec that was running when the JS thread stalled.
-    private let progressLock = NSLock()
-    private var lastSpecSeen = "(no spec reported yet)"
-
     override func setUp() {
         continueAfterFailure = false
 
