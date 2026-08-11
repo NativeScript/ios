@@ -34,6 +34,10 @@ describe("ns:util", function () {
     });
 
     it("leaves bare specifiers to npm resolution", function () {
+        // Bare "util" must never resolve to the ns:util builtin. In this app
+        // no npm "util" package exists, so the loader yields an optional-module
+        // placeholder whose members throw on access — both the require and the
+        // member read need guarding.
         var resolved;
         try {
             resolved = require("util");
@@ -41,7 +45,13 @@ describe("ns:util", function () {
             resolved = undefined;
         }
         expect(resolved).not.toBe(util);
-        expect(resolved && resolved.format).not.toBe(util.format);
+        var resolvedFormat;
+        try {
+            resolvedFormat = resolved && resolved.format;
+        } catch (e) {
+            resolvedFormat = undefined;
+        }
+        expect(resolvedFormat).not.toBe(util.format);
     });
 
     describe("format", function () {
