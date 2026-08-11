@@ -14,6 +14,7 @@ namespace binary {
 class BinaryWriter : public BinaryOperation {
 private:
     std::map<std::string, MetaFileOffset> uniqueStrings;
+    MetaFileOffset emptyArrayOffset = 0;
 
     MetaFileOffset push_number(long number, int bytesCount);
 
