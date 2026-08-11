@@ -12,6 +12,14 @@ namespace tns {
 // Controlled by package.json setting: "logScriptLoading": true|false
 bool IsScriptLoadingLogEnabled();
 
+// HTTP module loader flags
+//
+// Returns true when one log line should be emitted per HTTP fetch URL.
+// Default OFF because the volume is high (one line per fetch, hundreds per
+// cold boot, hundreds per HMR refresh). Opt in via package.json /
+// nativescript.config: "httpFetchUrlLog": true|false
+bool IsHttpFetchUrlLogEnabled();
+
 // Security config
 
 // In debug mode (RuntimeConfig.IsDebug): always returns true.
