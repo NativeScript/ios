@@ -9,12 +9,18 @@
 #define NAPI_EXPERIMENTAL
 #define NODE_API_EXPERIMENTAL_NO_WARNING
 
+#include <dispatch/dispatch.h>
+
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "node_api.h"
 
@@ -336,22 +342,89 @@ napi_status NAPI_CDECL napi_get_buffer_info(napi_env env,
   return napi_clear_last_error(env);
 }
 
-//=== Phase 2 ==============================================================
-// Async work, callback scopes, threadsafe functions, cleanup hooks and the
-// module file name are not implemented yet.
+//=== Async contexts and callback scopes ===================================
+//
+// There is no async_hooks here, so an async context is an opaque token that
+// keeps its resource objects alive for as long as the addon holds it, and a
+// callback scope is the depth counter the vendored sources balance against.
+
+struct napi_async_context__ {
+  napi_env env = nullptr;
+  napi_ref resource = nullptr;
+};
+
+struct napi_callback_scope__ {
+  napi_env env = nullptr;
+};
 
 napi_status NAPI_CDECL napi_async_init(napi_env env,
                                        napi_value async_resource,
                                        napi_value async_resource_name,
                                        napi_async_context* result) {
   CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
+  CHECK_ARG(env, async_resource_name);
+  CHECK_ARG(env, result);
+
+  std::unique_ptr<napi_async_context__> context(new napi_async_context__());
+  context->env = env;
+
+  if (async_resource != nullptr) {
+    STATUS_CALL(
+        napi_create_reference(env, async_resource, 1, &context->resource));
+  }
+  // The name only feeds async_hooks, which don't exist here — and referencing
+  // it would fail anyway: a string ref needs module API version >= 10 and envs
+  // default to 8.
+
+  *result = context.release();
+  return napi_clear_last_error(env);
 }
 
 napi_status NAPI_CDECL napi_async_destroy(napi_env env,
                                           napi_async_context async_context) {
   CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
+  CHECK_ARG(env, async_context);
+  RETURN_STATUS_IF_FALSE(env, async_context->env == env, napi_invalid_arg);
+
+  if (async_context->resource != nullptr) {
+    napi_delete_reference(env, async_context->resource);
+  }
+  delete async_context;
+
+  return napi_clear_last_error(env);
+}
+
+napi_status NAPI_CDECL napi_open_callback_scope(napi_env env,
+                                                napi_value resource_object,
+                                                napi_async_context context,
+                                                napi_callback_scope* result) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, result);
+
+  // Both only matter to async_hooks listeners, which do not exist here.
+  (void)resource_object;
+  (void)context;
+
+  napi_callback_scope__* scope = new napi_callback_scope__();
+  scope->env = env;
+  env->open_callback_scopes++;
+
+  *result = scope;
+  return napi_clear_last_error(env);
+}
+
+napi_status NAPI_CDECL napi_close_callback_scope(napi_env env,
+                                                 napi_callback_scope scope) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, scope);
+  RETURN_STATUS_IF_FALSE(env, scope->env == env, napi_callback_scope_mismatch);
+  RETURN_STATUS_IF_FALSE(env, env->open_callback_scopes > 0,
+                         napi_callback_scope_mismatch);
+
+  env->open_callback_scopes--;
+  delete scope;
+
+  return napi_clear_last_error(env);
 }
 
 napi_status NAPI_CDECL napi_make_callback(napi_env env,
@@ -361,9 +434,119 @@ napi_status NAPI_CDECL napi_make_callback(napi_env env,
                                           size_t argc,
                                           const napi_value* argv,
                                           napi_value* result) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
+  NAPI_PREAMBLE(env);
+  CHECK_ARG(env, recv);
+  if (argc > 0) {
+    CHECK_ARG(env, argv);
+  }
+
+  // Entering the isolate is only ever legal from the thread that owns it;
+  // reaching JS from anywhere else is what threadsafe functions are for.
+  RETURN_STATUS_IF_FALSE(
+      env,
+      CFRunLoopGetCurrent() == static_cast<tns::NapiEnv*>(env)->RuntimeLoop(),
+      napi_generic_failure);
+
+  (void)async_context;
+
+  v8::Local<v8::Context> context = env->context();
+
+  v8::Local<v8::Object> v8recv;
+  CHECK_TO_OBJECT(env, context, v8recv, recv);
+
+  v8::Local<v8::Function> v8func;
+  CHECK_TO_FUNCTION(env, v8func, func);
+
+  env->open_callback_scopes++;
+  v8::MaybeLocal<v8::Value> callback_result = v8func->Call(
+      context, v8recv, static_cast<int>(argc),
+      reinterpret_cast<v8::Local<v8::Value>*>(const_cast<napi_value*>(argv)));
+  env->open_callback_scopes--;
+
+  // Node drains microtasks as the outermost callback scope closes; this
+  // isolate is left on V8's automatic policy, which already does that when the
+  // call returns to native code.
+
+  if (try_catch.HasCaught()) {
+    return napi_set_last_error(env, napi_pending_exception);
+  }
+
+  CHECK_MAYBE_EMPTY(env, callback_result, napi_generic_failure);
+  if (result != nullptr) {
+    *result = v8impl::JsValueFromV8LocalValue(callback_result.ToLocalChecked());
+  }
+
+  return GET_RETURN_STATUS(env);
 }
+
+//=== Async work ===========================================================
+
+struct napi_async_work__ {
+  enum class State { idle, queued, executing, completed };
+
+  ~napi_async_work__() {
+    if (loop != nullptr) {
+      CFRelease(loop);
+    }
+  }
+
+  tns::NapiEnv* env = nullptr;
+  v8::Isolate* isolate = nullptr;
+  // Retained: the execute callback can outlive the thread that owns the loop,
+  // and posting the completion to a deallocated one is fatal.
+  CFRunLoopRef loop = nullptr;
+  napi_async_execute_callback execute = nullptr;
+  napi_async_complete_callback complete = nullptr;
+  void* data = nullptr;
+
+  std::mutex mutex;
+  State state = State::idle;
+  bool cancelled = false;
+};
+
+namespace {
+
+// The env's thread. `work` belongs to the addon, which is free to delete it
+// from the complete callback, so nothing may touch it afterwards.
+void CompleteAsyncWork(napi_async_work work, napi_status status) {
+  v8::Isolate* isolate = work->isolate;
+  tns::NapiEnv* env = work->env;
+  {
+    std::lock_guard<std::mutex> lock(work->mutex);
+    work->state = napi_async_work__::State::completed;
+  }
+
+  // The env died while the work was in flight. The complete callback is the
+  // only thing that would have freed whatever the addon hung off `data`, so
+  // this drops it — the same trade Node makes at environment shutdown.
+  if (!tns::Runtime::IsAlive(isolate) ||
+      tns::NapiEnv::ForIsolate(isolate) != env) {
+    return;
+  }
+
+  napi_async_complete_callback complete = work->complete;
+  if (complete == nullptr) {
+    return;
+  }
+
+  v8::Locker locker(isolate);
+  v8::Isolate::Scope isolate_scope(isolate);
+  v8::HandleScope handle_scope(isolate);
+  v8::Context::Scope context_scope(env->context());
+
+  void* data = work->data;
+  env->CallIntoModule(
+      [&](napi_env moduleEnv) { complete(moduleEnv, status, data); },
+      [](napi_env moduleEnv, v8::Local<v8::Value> exception) {
+        if (moduleEnv->terminatedOrTerminating()) {
+          return;
+        }
+        tns::NativeScriptException::ReportToJsHandlersAndLog(
+            moduleEnv->isolate, exception, v8::Local<v8::Message>());
+      });
+}
+
+}  // namespace
 
 napi_status NAPI_CDECL
 napi_create_async_work(napi_env env,
@@ -374,127 +557,314 @@ napi_create_async_work(napi_env env,
                        void* data,
                        napi_async_work* result) {
   CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
+  CHECK_ARG(env, async_resource_name);
+  CHECK_ARG(env, execute);
+  CHECK_ARG(env, result);
+
+  // Only async_hooks listeners would observe the resource, and there are none.
+  (void)async_resource;
+
+  tns::NapiEnv* tnsEnv = static_cast<tns::NapiEnv*>(env);
+  RETURN_STATUS_IF_FALSE(env, tnsEnv->RuntimeLoop() != nullptr,
+                         napi_generic_failure);
+
+  napi_async_work__* work = new napi_async_work__();
+  work->env = tnsEnv;
+  work->isolate = env->isolate;
+  work->loop = tnsEnv->RuntimeLoop();
+  CFRetain(work->loop);
+  work->execute = execute;
+  work->complete = complete;
+  work->data = data;
+
+  *result = work;
+  return napi_clear_last_error(env);
 }
 
 napi_status NAPI_CDECL napi_delete_async_work(napi_env env,
                                               napi_async_work work) {
   CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
+  CHECK_ARG(env, work);
+
+  {
+    // Node deletes unconditionally, which leaves the pointer the queued work
+    // still holds dangling. Refusing leaks the work instead, which an addon
+    // deleting straight after a cancel will notice.
+    std::lock_guard<std::mutex> lock(work->mutex);
+    RETURN_STATUS_IF_FALSE(env,
+                           work->state == napi_async_work__::State::idle ||
+                               work->state ==
+                                   napi_async_work__::State::completed,
+                           napi_generic_failure);
+  }
+
+  delete work;
+  return napi_clear_last_error(env);
 }
 
-napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env env,
+napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env basic_env,
                                              napi_async_work work) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
+  CHECK_ENV(basic_env);
+  CHECK_ARG(basic_env, work);
+
+  napi_env env = const_cast<napi_env>(basic_env);
+  RETURN_STATUS_IF_FALSE(env, work->env == env, napi_invalid_arg);
+
+  {
+    std::lock_guard<std::mutex> lock(work->mutex);
+    RETURN_STATUS_IF_FALSE(env, work->state == napi_async_work__::State::idle ||
+                                    work->state ==
+                                        napi_async_work__::State::completed,
+                           napi_generic_failure);
+    work->state = napi_async_work__::State::queued;
+    work->cancelled = false;
+  }
+
+  CFRunLoopRef loop = work->loop;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    napi_status status = napi_ok;
+    {
+      std::lock_guard<std::mutex> lock(work->mutex);
+      if (work->cancelled) {
+        status = napi_cancelled;
+      } else {
+        work->state = napi_async_work__::State::executing;
+      }
+    }
+
+    // Off the env's thread: the execute callback may not touch the isolate,
+    // which is exactly the contract Node states for it.
+    if (status == napi_ok) {
+      work->execute(work->env, work->data);
+    }
+
+    tns::ExecuteOnRunLoop(loop, ^{
+      CompleteAsyncWork(work, status);
+    });
+  });
+
+  return napi_clear_last_error(env);
 }
 
-napi_status NAPI_CDECL napi_cancel_async_work(node_api_basic_env env,
+napi_status NAPI_CDECL napi_cancel_async_work(node_api_basic_env basic_env,
                                               napi_async_work work) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
+  CHECK_ENV(basic_env);
+  CHECK_ARG(basic_env, work);
+
+  napi_env env = const_cast<napi_env>(basic_env);
+  RETURN_STATUS_IF_FALSE(env, work->env == env, napi_invalid_arg);
+
+  std::lock_guard<std::mutex> lock(work->mutex);
+  // Once the execute callback is running there is nothing to cancel; the same
+  // mutex is what makes the answer truthful.
+  RETURN_STATUS_IF_FALSE(env, work->state == napi_async_work__::State::queued,
+                         napi_generic_failure);
+  work->cancelled = true;
+
+  return napi_clear_last_error(env);
 }
 
 napi_status NAPI_CDECL napi_get_uv_event_loop(node_api_basic_env env,
                                               struct uv_loop_s** loop) {
+  // This runtime drives a CFRunLoop; there is no uv_loop_t to hand out, and
+  // inventing one would be worse than saying so.
   CHECK_ENV(env);
   return napi_set_last_error(env, napi_generic_failure);
 }
 
-napi_status NAPI_CDECL napi_add_env_cleanup_hook(node_api_basic_env env,
+//=== Cleanup hooks ========================================================
+
+struct napi_async_cleanup_hook_handle__ {
+  napi_env env = nullptr;
+  napi_async_cleanup_hook hook = nullptr;
+  void* data = nullptr;
+};
+
+namespace {
+
+// One entry per registered hook, in registration order: Node runs both kinds
+// off a single list, most recently added first, and addons rely on that to
+// undo their work in the reverse order they set it up.
+struct CleanupEntry {
+  napi_cleanup_hook hook = nullptr;
+  void* arg = nullptr;
+  napi_async_cleanup_hook_handle__* asyncHandle = nullptr;
+};
+
+struct CleanupRegistry {
+  std::mutex mutex;
+  std::unordered_map<napi_env, std::vector<CleanupEntry>> byEnv;
+  // Handles outlive their env's entry, so removal can be answered without
+  // reading through a `napi_env` that may already be gone.
+  std::unordered_set<napi_async_cleanup_hook_handle__*> liveHandles;
+};
+
+CleanupRegistry& Cleanups() {
+  static CleanupRegistry* registry = new CleanupRegistry();
+  return *registry;
+}
+
+}  // namespace
+
+napi_status NAPI_CDECL napi_add_env_cleanup_hook(node_api_basic_env basic_env,
                                                  napi_cleanup_hook fun,
                                                  void* arg) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
+  CHECK_ENV(basic_env);
+  CHECK_ARG(basic_env, fun);
+
+  napi_env env = const_cast<napi_env>(basic_env);
+
+  CleanupRegistry& registry = Cleanups();
+  std::lock_guard<std::mutex> lock(registry.mutex);
+  registry.byEnv[env].push_back(CleanupEntry{fun, arg, nullptr});
+
+  return napi_clear_last_error(env);
 }
 
-napi_status NAPI_CDECL napi_remove_env_cleanup_hook(node_api_basic_env env,
-                                                    napi_cleanup_hook fun,
-                                                    void* arg) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
-}
+napi_status NAPI_CDECL napi_remove_env_cleanup_hook(
+    node_api_basic_env basic_env, napi_cleanup_hook fun, void* arg) {
+  CHECK_ENV(basic_env);
+  CHECK_ARG(basic_env, fun);
 
-napi_status NAPI_CDECL napi_open_callback_scope(napi_env env,
-                                                napi_value resource_object,
-                                                napi_async_context context,
-                                                napi_callback_scope* result) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
-}
+  napi_env env = const_cast<napi_env>(basic_env);
 
-napi_status NAPI_CDECL napi_close_callback_scope(napi_env env,
-                                                 napi_callback_scope scope) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
-}
+  CleanupRegistry& registry = Cleanups();
+  std::lock_guard<std::mutex> lock(registry.mutex);
+  auto it = registry.byEnv.find(env);
+  if (it == registry.byEnv.end()) {
+    return napi_set_last_error(env, napi_invalid_arg);
+  }
 
-napi_status NAPI_CDECL
-napi_create_threadsafe_function(napi_env env,
-                                napi_value func,
-                                napi_value async_resource,
-                                napi_value async_resource_name,
-                                size_t max_queue_size,
-                                size_t initial_thread_count,
-                                void* thread_finalize_data,
-                                napi_finalize thread_finalize_cb,
-                                void* context,
-                                napi_threadsafe_function_call_js call_js_cb,
-                                napi_threadsafe_function* result) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
-}
+  std::vector<CleanupEntry>& entries = it->second;
+  auto entry = std::find_if(
+      entries.rbegin(), entries.rend(), [&](const CleanupEntry& candidate) {
+        return candidate.asyncHandle == nullptr && candidate.hook == fun &&
+               candidate.arg == arg;
+      });
+  if (entry == entries.rend()) {
+    return napi_set_last_error(env, napi_invalid_arg);
+  }
 
-napi_status NAPI_CDECL napi_get_threadsafe_function_context(
-    napi_threadsafe_function func, void** result) {
-  return napi_generic_failure;
+  entries.erase(std::next(entry).base());
+  return napi_clear_last_error(env);
 }
 
 napi_status NAPI_CDECL
-napi_call_threadsafe_function(napi_threadsafe_function func,
-                              void* data,
-                              napi_threadsafe_function_call_mode is_blocking) {
-  return napi_generic_failure;
-}
-
-napi_status NAPI_CDECL
-napi_acquire_threadsafe_function(napi_threadsafe_function func) {
-  return napi_generic_failure;
-}
-
-napi_status NAPI_CDECL napi_release_threadsafe_function(
-    napi_threadsafe_function func, napi_threadsafe_function_release_mode mode) {
-  return napi_generic_failure;
-}
-
-napi_status NAPI_CDECL napi_unref_threadsafe_function(
-    node_api_basic_env env, napi_threadsafe_function func) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
-}
-
-napi_status NAPI_CDECL napi_ref_threadsafe_function(
-    node_api_basic_env env, napi_threadsafe_function func) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
-}
-
-napi_status NAPI_CDECL
-napi_add_async_cleanup_hook(node_api_basic_env env,
+napi_add_async_cleanup_hook(node_api_basic_env basic_env,
                             napi_async_cleanup_hook hook,
                             void* arg,
                             napi_async_cleanup_hook_handle* remove_handle) {
-  CHECK_ENV(env);
-  return napi_set_last_error(env, napi_generic_failure);
+  CHECK_ENV(basic_env);
+  CHECK_ARG(basic_env, hook);
+
+  napi_env env = const_cast<napi_env>(basic_env);
+
+  napi_async_cleanup_hook_handle__* handle =
+      new napi_async_cleanup_hook_handle__();
+  handle->env = env;
+  handle->hook = hook;
+  handle->data = arg;
+
+  {
+    CleanupRegistry& registry = Cleanups();
+    std::lock_guard<std::mutex> lock(registry.mutex);
+    registry.byEnv[env].push_back(CleanupEntry{nullptr, nullptr, handle});
+    registry.liveHandles.insert(handle);
+  }
+
+  if (remove_handle != nullptr) {
+    *remove_handle = handle;
+  }
+
+  return napi_clear_last_error(env);
 }
 
 napi_status NAPI_CDECL napi_remove_async_cleanup_hook(
     napi_async_cleanup_hook_handle remove_handle) {
-  return napi_generic_failure;
+  if (remove_handle == nullptr) {
+    return napi_invalid_arg;
+  }
+
+  CleanupRegistry& registry = Cleanups();
+  {
+    std::lock_guard<std::mutex> lock(registry.mutex);
+    if (registry.liveHandles.erase(remove_handle) == 0) {
+      return napi_invalid_arg;
+    }
+
+    auto it = registry.byEnv.find(remove_handle->env);
+    if (it != registry.byEnv.end()) {
+      std::vector<CleanupEntry>& entries = it->second;
+      entries.erase(std::remove_if(entries.begin(), entries.end(),
+                                   [&](const CleanupEntry& candidate) {
+                                     return candidate.asyncHandle ==
+                                            remove_handle;
+                                   }),
+                    entries.end());
+    }
+  }
+
+  delete remove_handle;
+  return napi_ok;
 }
+
+namespace tns {
+
+void NapiRunEnvCleanupHooks(NapiEnv* env) {
+  CleanupRegistry& registry = Cleanups();
+
+  // A hook reaches back into Node-API through an env it stashed away, and
+  // teardown holds the isolate's lock but opens no scopes of its own. Note
+  // that execution is already terminating by then: a hook can still release
+  // env-bound resources, but nothing it does will reach JS.
+  v8::HandleScope handle_scope(env->isolate);
+  v8::Context::Scope context_scope(env->context());
+
+  // Hooks add and remove other hooks as they run, so each round is taken from
+  // the live list rather than a snapshot — one that dropped an entry would
+  // call through a hook another hook already deleted.
+  for (;;) {
+    CleanupEntry entry;
+    {
+      std::lock_guard<std::mutex> lock(registry.mutex);
+      auto it = registry.byEnv.find(env);
+      if (it == registry.byEnv.end()) {
+        return;
+      }
+
+      std::vector<CleanupEntry>& entries = it->second;
+      if (entries.empty()) {
+        registry.byEnv.erase(it);
+        return;
+      }
+
+      entry = entries.back();
+      entries.pop_back();
+    }
+
+    if (entry.asyncHandle == nullptr) {
+      entry.hook(entry.arg);
+      continue;
+    }
+
+    // Node waits for every async hook to report back through
+    // napi_remove_async_cleanup_hook before the env goes away. Nothing can
+    // wait here: the thread running this teardown is the one that would have
+    // to run the completion, so a hook that defers is simply not awaited. Its
+    // handle stays live so a late removal is still safe, and it can no longer
+    // reach JS.
+    entry.asyncHandle->hook(entry.asyncHandle, entry.asyncHandle->data);
+  }
+}
+
+}  // namespace tns
+
+//=== Not implemented ======================================================
 
 napi_status NAPI_CDECL node_api_get_module_file_name(node_api_basic_env env,
                                                      const char** result) {
+  // Addons are linked into the app binary rather than loaded from a file, and
+  // nothing identifies the calling module at this point.
   CHECK_ENV(env);
   return napi_set_last_error(env, napi_generic_failure);
 }

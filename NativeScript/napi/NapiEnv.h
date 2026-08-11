@@ -40,6 +40,11 @@ class NapiEnv : public napi_env__ {
 
   v8::Local<v8::Private> PrivateKey(NapiPrivateKeySlot slot);
 
+  // The runloop of the thread that owns this env. Everything the async surface
+  // schedules from another thread has to be posted there, because that is the
+  // only thread allowed to enter the isolate.
+  CFRunLoopRef RuntimeLoop() const { return runtimeLoop_; }
+
   // Exports of an addon already initialized in this env, or an empty handle.
   v8::MaybeLocal<v8::Object> CachedModuleExports(const std::string& name);
   void CacheModuleExports(const std::string& name,
@@ -56,6 +61,10 @@ class NapiEnv : public napi_env__ {
   v8::Eternal<v8::Private> privateKeys_[2];
   std::unordered_map<std::string, v8::Global<v8::Object>> moduleExports_;
 };
+
+// Runs the env's cleanup hooks, most recently added first, at the head of
+// teardown. Defined in NodeApiEmbed.mm, next to the hook registry.
+void NapiRunEnvCleanupHooks(NapiEnv* env);
 
 }  // namespace tns
 

@@ -20,8 +20,9 @@ Files, all from `src/` at that commit:
 | `node_api_types.h` | Node-specific public types |
 
 `src/node_api.cc` is deliberately *not* vendored: it is bound to Node's event
-loop and environment. Its role is filled by `../NodeApiEmbed.mm` and
-`../NapiEnv.mm`, and the idioms `js_native_api_v8.cc` expects from Node's
+loop and environment. Its role is filled by `../NodeApiEmbed.mm`,
+`../NapiThreadSafeFunction.mm` and `../NapiEnv.mm`, and the idioms
+`js_native_api_v8.cc` expects from Node's
 internal headers are supplied by `../shim/`.
 
 ## Local deviations
@@ -54,4 +55,6 @@ Then update the tag and commit above, re-check `../shim/` against upstream's
 `src/js_native_api_v8_internals.h` and `src/node_version.h` (the shim mirrors
 `NODE_API_SUPPORTED_VERSION_MAX/MIN` and
 `NODE_API_DEFAULT_MODULE_API_VERSION`), and cover any new `node_api.h` entry
-point in `../NodeApiEmbed.mm` — nothing declared there may be left undefined.
+point in `../NodeApiEmbed.mm` (or `../NapiThreadSafeFunction.mm`, which owns
+the threadsafe function surface) — nothing declared there may be left
+undefined.

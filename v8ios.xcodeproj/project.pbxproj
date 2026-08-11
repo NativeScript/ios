@@ -13,6 +13,7 @@
 		4E10A9100000000000000204 /* NapiRuntime.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000011 /* NapiRuntime.mm */; };
 		4E10A9100000000000000205 /* NapiRuntime.h in Headers */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000010 /* NapiRuntime.h */; };
 		4E10A9100000000000000206 /* NapiTestModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000012 /* NapiTestModule.mm */; };
+		4E10A9100000000000000207 /* NapiThreadSafeFunction.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000014 /* NapiThreadSafeFunction.mm */; };
 		2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */; };
 		2B5088A72BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
@@ -478,6 +479,8 @@
 		4E10A9100000000000000010 /* NapiRuntime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiRuntime.h; sourceTree = "<group>"; };
 		4E10A9100000000000000011 /* NapiRuntime.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiRuntime.mm; sourceTree = "<group>"; };
 		4E10A9100000000000000012 /* NapiTestModule.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiTestModule.mm; sourceTree = "<group>"; };
+		4E10A9100000000000000013 /* NapiThreadSafeFunction.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiThreadSafeFunction.h; sourceTree = "<group>"; };
+		4E10A9100000000000000014 /* NapiThreadSafeFunction.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiThreadSafeFunction.mm; sourceTree = "<group>"; };
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
 		2BFE21F22AC1B7D500307752 /* UIView+NativeScript.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIView+NativeScript.h"; sourceTree = "<group>"; };
@@ -1019,6 +1022,8 @@
 				4E10A910000000000000000C /* NapiEnv.h */,
 				4E10A910000000000000000D /* NapiEnv.mm */,
 				4E10A910000000000000000E /* NapiModules.h */,
+				4E10A9100000000000000013 /* NapiThreadSafeFunction.h */,
+				4E10A9100000000000000014 /* NapiThreadSafeFunction.mm */,
 				4E10A910000000000000000F /* NodeApiEmbed.mm */,
 			);
 			path = napi;
@@ -2367,6 +2372,7 @@
 			files = (
 				4E10A9100000000000000201 /* js_native_api_v8.cc in Sources */,
 				4E10A9100000000000000202 /* NapiEnv.mm in Sources */,
+				4E10A9100000000000000207 /* NapiThreadSafeFunction.mm in Sources */,
 				4E10A9100000000000000203 /* NodeApiEmbed.mm in Sources */,
 				4E10A9100000000000000204 /* NapiRuntime.mm in Sources */,
 				F1F30E8C2B58FE28006A62C0 /* ada.cpp in Sources */,
@@ -2914,6 +2920,7 @@
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
 					"-ObjC",
+					"-lc++",
 					"-framework",
 					NativeScript,
 					"-framework",
@@ -2969,6 +2976,7 @@
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
 					"-ObjC",
+					"-lc++",
 					"-framework",
 					NativeScript,
 					"-framework",

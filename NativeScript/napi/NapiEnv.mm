@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "NapiThreadSafeFunction.h"
 #include "runtime/Helpers.h"
 #include "runtime/NativeScriptException.h"
 #include "runtime/Runtime.h"
@@ -95,6 +96,20 @@ void NapiEnv::DrainFinalizers() {
 }
 
 void NapiEnv::DeleteMe() {
+  // ~Runtime holds the Locker but never enters the isolate (same situation
+  // ObjectManager::DisposeAllRegistered handles), so teardown enters it here
+  // before anything below touches handles or the context.
+  Isolate::Scope isolate_scope(this->isolate);
+  HandleScope handle_scope(this->isolate);
+
+  // Cleanup hooks come first, so an addon gets to release its threadsafe
+  // functions and other env-bound resources itself. Execution is already
+  // terminating by now, so those releases work but nothing a hook does reaches
+  // JS. Whatever survives is closed below, before any reference is finalized —
+  // a threadsafe function holds one to its JS callback.
+  NapiRunEnvCleanupHooks(this);
+  NapiAbortThreadSafeFunctions(this);
+
   this->DrainFinalizers();
 
   // Finalizers may still touch the env, so the drain runs before teardown is

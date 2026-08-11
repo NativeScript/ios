@@ -16,6 +16,13 @@ describe("Node-API addon", function () {
         expect(typeof napi.holdRef).toBe("function");
         expect(typeof napi.getRef).toBe("function");
         expect(typeof napi.releaseRef).toBe("function");
+        expect(typeof napi.startAsyncWork).toBe("function");
+        expect(typeof napi.startCancelledWork).toBe("function");
+        expect(typeof napi.startTsfn).toBe("function");
+        expect(typeof napi.pushTsfn).toBe("function");
+        expect(typeof napi.probeTsfnAbort).toBe("function");
+        expect(typeof napi.invokeViaMakeCallback).toBe("function");
+        expect(typeof napi.exerciseCleanupHooks).toBe("function");
     });
 
     it("is instantiated once per env", function () {
@@ -119,6 +126,159 @@ describe("Node-API addon", function () {
                 expect(napi.finalizerRan()).toBe(true);
                 done();
             }, 0);
+        });
+    });
+
+    describe("napi_make_callback", function () {
+        it("calls the function and returns its result", function () {
+            var seen;
+            var result = napi.invokeViaMakeCallback(function (value) {
+                seen = value;
+                return value + 1;
+            }, 41);
+
+            expect(seen).toBe(41);
+            expect(result).toBe(42);
+        });
+
+        it("propagates a throw from the callback", function () {
+            var error;
+            try {
+                napi.invokeViaMakeCallback(function () {
+                    throw new Error("boom");
+                }, 1);
+            } catch (e) {
+                error = e;
+            }
+
+            expect(error instanceof Error).toBe(true);
+            expect(error.message).toBe("boom");
+        });
+    });
+
+    describe("napi_async_work", function () {
+        it("executes off the JS thread and completes on it", function (done) {
+            napi.startAsyncWork(21, function (status, result, ranOffJsThread) {
+                expect(status).toBe("ok");
+                expect(result).toBe(42);
+                expect(ranOffJsThread).toBe(true);
+                done();
+            });
+        });
+
+        it("completes cancelled work with a cancelled status", function (done) {
+            // Whether the cancel wins the race against the queue is not ours to
+            // decide; both outcomes have to hold up.
+            var cancelStatus = napi.startCancelledWork(function (status) {
+                if (cancelStatus === "ok") {
+                    expect(status).toBe("cancelled");
+                } else {
+                    expect(cancelStatus).toBe("generic_failure");
+                    expect(status).toBe("ok");
+                }
+                done();
+            });
+        });
+    });
+
+    describe("napi_threadsafe_function", function () {
+        it("delivers every value in order, then finalizes", function (done) {
+            var values = [];
+
+            napi.startTsfn(
+                5,
+                0,
+                function (value) {
+                    values.push(value);
+                },
+                function (lastCallStatus) {
+                    expect(lastCallStatus).toBe("ok");
+                    expect(values).toEqual([1, 2, 3, 4, 5]);
+                    done();
+                }
+            );
+        });
+
+        it("blocks the producer on a full queue instead of dropping values", function (done) {
+            var values = [];
+
+            napi.startTsfn(
+                50,
+                2,
+                function (value) {
+                    values.push(value);
+                },
+                function (lastCallStatus) {
+                    expect(lastCallStatus).toBe("ok");
+                    expect(values.length).toBe(50);
+                    expect(values[0]).toBe(1);
+                    expect(values[49]).toBe(50);
+                    done();
+                }
+            );
+        });
+
+        it("accepts a call made from inside its own callback", function (done) {
+            var values = [];
+            var pushStatus;
+
+            napi.startTsfn(
+                3,
+                0,
+                function (value) {
+                    values.push(value);
+                    if (value === 1) {
+                        pushStatus = napi.pushTsfn(100);
+                    }
+                },
+                function () {
+                    expect(pushStatus).toBe("ok");
+                    expect(values.length).toBe(4);
+                    // The producer may already have queued 2 and 3 by then, so
+                    // only "after the first value" is guaranteed.
+                    expect(values.indexOf(100)).toBeGreaterThan(0);
+                    done();
+                }
+            );
+        });
+
+        it("reports closing after an abort and drops the queued call", function (done) {
+            var delivered = [];
+            var probe = napi.probeTsfnAbort(function (value) {
+                delivered.push(value);
+            });
+
+            expect(probe.queued).toBe("ok");
+            expect(probe.released).toBe("ok");
+            expect(probe.afterAbort).toBe("closing");
+
+            setTimeout(function () {
+                expect(delivered).toEqual([]);
+                done();
+            }, 0);
+        });
+    });
+
+    describe("cleanup hooks", function () {
+        it("rejects removing a hook that is no longer registered", function () {
+            expect(napi.exerciseCleanupHooks()).toBe("invalid_arg");
+        });
+    });
+
+    describe("workers", function () {
+        it("instantiates the addon separately in each isolate", function (done) {
+            var worker = new Worker("~/shared/Workers/EvalWorker.js");
+            worker.onmessage = function (msg) {
+                worker.terminate();
+                expect(msg.data.doubled).toBe(42);
+                expect(msg.data.cached).toBe(true);
+                done();
+            };
+            worker.postMessage({
+                eval:
+                    "var m = require('napitestmodule'); " +
+                    "postMessage({ doubled: m.doubleNumber(21), cached: require('napitestmodule') === m });"
+            });
         });
     });
 
