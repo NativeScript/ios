@@ -56,13 +56,10 @@ shares `performance.timeOrigin` as its base.
 
 ## Deviations from the specs
 
-- **`detail` is held by reference.** The runtime has no `structuredClone`, so
-  `mark`/`measure` `detail` values are stored as-is. Mutating the object later
-  is visible through the entry, and entries retain whatever `detail`
-  references until `clearMarks()`/`clearMeasures()`.
-- **Buffers are unbounded.** Per spec for user timing, but combined with
-  by-reference `detail` it means a long-lived app marking in a loop should
-  clear entries periodically.
+- **Buffers are unbounded.** Per spec for user timing. `detail` is
+  structured-cloned at entry creation (per spec — an uncloneable `detail`
+  throws the `DataCloneError`-named error), so entries hold snapshots, but a
+  long-lived app marking in a loop should still clear entries periodically.
 - **Observer callbacks run from a microtask**, not a queued task: delivery is
   asynchronous relative to `mark()`/`measure()` but precedes timer callbacks
   scheduled in the same turn. Callback exceptions are routed to

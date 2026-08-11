@@ -8,9 +8,6 @@
 // against an equivalent bag.
 //
 // Deliberate deviations from the specs:
-// - mark/measure `detail` is held by reference (this runtime has no
-//   structuredClone), so entries retain whatever the caller passed until
-//   clearMarks()/clearMeasures(); the user-timing buffers are unbounded.
 // - Observer callbacks are delivered from a microtask rather than a queued
 //   task. Delivery is still asynchronous relative to mark()/measure(), but it
 //   precedes timer callbacks scheduled in the same turn.
@@ -42,6 +39,18 @@ var g = globalThis;
 const EventTarget = g.EventTarget;
 const enqueueMicrotask = g.queueMicrotask;
 const reportException = g.reportError;
+// mark/measure `detail` is structured-cloned per spec, so an entry holds a
+// snapshot and an uncloneable detail throws DataCloneError. The identity
+// fallback keeps this file portable to a runtime that ships the Performance
+// API before structuredClone — there, detail degrades to by-reference; the
+// user-timing buffers are unbounded either way, so entries retain their
+// detail until clearMarks()/clearMeasures().
+const cloneDetail =
+  typeof g.structuredClone === "function"
+    ? g.structuredClone
+    : function (value) {
+        return value;
+      };
 
 // Construction token: interfaces whose constructors the spec marks as not
 // user-invocable accept instances only from factories inside this module.
@@ -135,7 +144,7 @@ class PerformanceMark extends PerformanceEntry {
         }
       }
       if (markOptions.detail !== undefined && markOptions.detail !== null) {
-        detail = markOptions.detail;
+        detail = cloneDetail(markOptions.detail);
       }
     }
     super(kInternal, name, "mark", startTime === undefined ? now() : startTime, 0);
@@ -516,7 +525,7 @@ class Performance extends EventTarget {
         startTime = 0;
       }
       if (o.detail !== undefined && o.detail !== null) {
-        detail = o.detail;
+        detail = cloneDetail(o.detail);
       }
     } else {
       endTime = endMark !== undefined ? convertMarkToTimestamp(endMark) : now();
