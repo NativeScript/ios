@@ -11,6 +11,7 @@
 #include "Helpers.h"
 #include "InlineFunctions.h"
 #include "Interop.h"
+#include "IsolateTracked.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Performance.h"
@@ -232,6 +233,7 @@ Runtime::~Runtime() {
     g_moduleRegistry.clear();
 
     ObjectManager::DisposeAllRegistered(isolate_);
+    IsolateTracked::SweepAll(isolate_);
 
     if (IsRuntimeWorker()) {
       auto currentWorker =

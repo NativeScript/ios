@@ -7,11 +7,12 @@
 #include <vector>
 
 #include "Common.h"
+#include "IsolateTracked.h"
 #include "ada/ada.h"
 
 using namespace ada;
 namespace tns {
-class URLImpl {
+class URLImpl : public IsolateTracked {
  public:
   URLImpl(url_aggregator url);
 
@@ -99,21 +100,7 @@ class URLImpl {
 
   static void CanParse(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-  void BindFinalizer(v8::Isolate* isolate,
-                     const v8::Local<v8::Object>& object) {
-    v8::HandleScope scopedHandle(isolate);
-    weakHandle_.Reset(isolate, object);
-    weakHandle_.SetWeak(this, Finalizer, v8::WeakCallbackType::kParameter);
-  }
-
-  static void Finalizer(const v8::WeakCallbackInfo<URLImpl>& data) {
-    auto* pThis = data.GetParameter();
-    pThis->weakHandle_.Reset();
-    delete pThis;
-  }
-
  private:
   url_aggregator url_;
-  v8::Global<v8::Object> weakHandle_;
 };
 }  // namespace tns
