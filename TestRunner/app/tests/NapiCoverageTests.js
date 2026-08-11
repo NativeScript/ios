@@ -355,13 +355,10 @@ describe("Node-API value surface", function () {
             expect(napi.predicates({ then: function () {} }).promise).toBe(false);
         });
 
-        it("reflects the runtime's proxied global Promise", function () {
-            // promise-proxy.js wraps constructed promises in a Proxy, which
-            // V8 does not consider a Promise; async-function promises bypass
-            // the patched constructor.
-            expect(napi.predicates(Promise.resolve()).promise).toBe(false);
-            var asyncFnPromise = (async function () {})();
-            expect(napi.predicates(asyncFnPromise).promise).toBe(true);
+        it("sees every kind of JS promise as a promise", function () {
+            expect(napi.predicates(Promise.resolve()).promise).toBe(true);
+            expect(napi.predicates(new Promise(function () {})).promise).toBe(true);
+            expect(napi.predicates((async function () {})()).promise).toBe(true);
         });
     });
 
