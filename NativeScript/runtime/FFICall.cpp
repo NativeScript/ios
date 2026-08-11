@@ -12,6 +12,7 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
         }
         case BinaryTypeEncodingType::IdEncoding:
         case BinaryTypeEncodingType::InterfaceDeclarationReference:
+        case BinaryTypeEncodingType::InterfaceIndexReference:
         case BinaryTypeEncodingType::InstanceTypeEncoding:
         case BinaryTypeEncodingType::SelectorEncoding:
         case BinaryTypeEncodingType::BlockEncoding:

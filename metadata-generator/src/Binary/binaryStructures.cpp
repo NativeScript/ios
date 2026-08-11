@@ -140,6 +140,15 @@ binary::MetaFileOffset binary::DeclarationReferenceEncoding::save(binary::Binary
     return offset;
 }
 
+binary::MetaFileOffset binary::InterfaceIndexReferenceEncoding::save(
+    binary::BinaryWriter& writer) {
+  binary::MetaFileOffset offset = TypeEncoding::save(writer);
+  // push_short only fixes the width; push_number masks each byte, so the full
+  // uint16 range round-trips regardless of the signed parameter type.
+  writer.push_short((int16_t)this->_index);
+  return offset;
+}
+
 binary::MetaFileOffset binary::InterfaceDeclarationReferenceEncoding::save(binary::BinaryWriter& writer)
 {
     binary::MetaFileOffset offset = DeclarationReferenceEncoding::save(writer);

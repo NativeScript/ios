@@ -153,8 +153,8 @@ void Interop::SetFFIParams(Local<Context> context, const TypeEncoding* typeEncod
 }
 
 bool Interop::isRefTypeEqual(const TypeEncoding* typeEncoding, const char* clazz) {
-  std::string n(&typeEncoding->details.interfaceDeclarationReference.name.value());
-  return n.compare(clazz) == 0;
+  const char* name = typeEncoding->interfaceName();
+  return name != nullptr && std::string(name).compare(clazz) == 0;
 }
 
 // this is experimental. Maybe we can have something like this to wrap all Local<Value> to avoid
@@ -246,8 +246,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     FFICall::DisposeFFIType(ffiType, typeEncoding);
     memset(dest, 0, size);
   } else if (argHelper.isBool()) {
-    if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference &&
-        isRefTypeEqual(typeEncoding, "NSNumber")) {
+    if (typeEncoding->isInterfaceReference() && isRefTypeEqual(typeEncoding, "NSNumber")) {
       bool value = tns::ToBool(arg);
       NSNumber* num = [NSNumber numberWithBool:value];
       Interop::SetValue(dest, num);
@@ -321,15 +320,14 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     }
     unichar c = (vector.size() == 0) ? 0 : vector[0];
     Interop::SetValue(dest, c);
-  } else if (argHelper.isString() &&
-             (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
-              typeEncoding->type == BinaryTypeEncodingType::IdEncoding)) {
+  } else if (argHelper.isString() && (typeEncoding->isInterfaceReference() ||
+                                      typeEncoding->type == BinaryTypeEncodingType::IdEncoding)) {
     NSString* result = tns::ToNSString(isolate, arg);
     Interop::SetValue(dest, result);
   } else if (Interop::IsNumbericType(typeEncoding->type) || tns::IsNumber(arg)) {
     double value = tns::ToNumber(isolate, arg);
 
-    if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
+    if (typeEncoding->isInterfaceReference() ||
         typeEncoding->type == BinaryTypeEncodingType::IdEncoding) {
       // NSNumber
       NSNumber* num = [NSNumber numberWithDouble:value];
@@ -657,8 +655,8 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     }
 
     bool isNSArray = false;
-    if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-      std::string name = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
+    if (typeEncoding->isInterfaceReference()) {
+      std::string name = typeEncoding->interfaceName();
       isNSArray = name == "NSArray";
     }
 
@@ -1189,7 +1187,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     return instance;
   }
 
-  if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
+  if (typeEncoding->isInterfaceReference() ||
       typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
       typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding) {
     id result = call->GetResult<id>();
@@ -1222,8 +1220,8 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     }
 
     if (marshalToPrimitive && [result isKindOfClass:[NSString class]]) {
-      if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-        const char* returnClassName = typeEncoding->details.declarationReference.name.valuePtr();
+      if (typeEncoding->isInterfaceReference()) {
+        const char* returnClassName = typeEncoding->interfaceName();
         Class returnClass = objc_getClass(returnClassName);
         if (returnClass != nil && returnClass == [NSMutableString class]) {
           marshalToPrimitive = false;
@@ -1249,9 +1247,9 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
       return poInstance->Get(isolate);
     }
 
-    // For NSProxy we will try to read the metadata from
-    // typeEncoding->details.interfaceDeclarationReference.name because class_getSuperclass will
-    // directly return NSProxy and thus missing to attach all instance members
+    // For NSProxy we will try to read the metadata from the encoding's interface name because
+    // class_getSuperclass will directly return NSProxy and thus missing to attach all instance
+    // members
     const TypeEncoding* te = [result isProxy] ? typeEncoding : nullptr;
 
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
@@ -1398,9 +1396,7 @@ std::vector<std::string> Interop::GetAdditionalProtocols(const TypeEncoding* typ
       const char* protocolName = (*it).valuePtr();
       additionalProtocols.push_back(protocolName);
     }
-  } else if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference &&
-             typeEncoding->details.interfaceDeclarationReference._protocols.offset > 0) {
-    PtrTo<Array<String>> protocols = typeEncoding->details.interfaceDeclarationReference._protocols;
+  } else if (const Array<String>* protocols = typeEncoding->interfaceProtocols()) {
     for (auto it = protocols->begin(); it != protocols->end(); it++) {
       const char* protocolName = (*it).valuePtr();
       additionalProtocols.push_back(protocolName);
@@ -1767,9 +1763,9 @@ void ExecuteWriteValueValidationsAndStopExecutionAndLogStackTrace(Local<Context>
                                                                   const TypeEncoding* typeEncoding,
                                                                   void* dest, Local<Value> arg) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
   Local<Value> originArg = arg;
-  if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+  if (typeEncoding->isInterfaceReference()) {
+    std::string destName = typeEncoding->interfaceName();
     if (originArg->IsObject()) {
       Local<Object> originObj = originArg.As<Object>();
       if ((originObj->IsArrayBuffer() || originObj->IsArrayBufferView() ||
@@ -1791,7 +1787,7 @@ void ExecuteWriteValueValidationsAndStopExecutionAndLogStackTrace(Local<Context>
 }
 
 bool IsTypeEncondingHandldedByDebugMessages(const TypeEncoding* typeEncoding) {
-  if (typeEncoding->type != BinaryTypeEncodingType::InterfaceDeclarationReference &&
+  if (!typeEncoding->isInterfaceReference() &&
       typeEncoding->type != BinaryTypeEncodingType::StructDeclarationReference &&
       typeEncoding->type != BinaryTypeEncodingType::IdEncoding) {
     return true;
@@ -1803,7 +1799,9 @@ bool IsTypeEncondingHandldedByDebugMessages(const TypeEncoding* typeEncoding) {
 void LogWriteValueTraceMessage(Local<Context> context, const TypeEncoding* typeEncoding, void* dest,
                                Local<Value> arg) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  std::string destName = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
+  std::string destName = typeEncoding->isInterfaceReference()
+                             ? typeEncoding->interfaceName()
+                             : typeEncoding->details.declarationReference.name.valuePtr();
   std::string originName = tns::ToString(isolate, arg);
   if (originName == "") {
     // empty string

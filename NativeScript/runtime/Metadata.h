@@ -100,40 +100,46 @@ enum MemberType {
 };
 
 enum BinaryTypeEncodingType : uint8_t {
-    VoidEncoding,
-    BoolEncoding,
-    ShortEncoding,
-    UShortEncoding,
-    IntEncoding,
-    UIntEncoding,
-    LongEncoding,
-    ULongEncoding,
-    LongLongEncoding,
-    ULongLongEncoding,
-    CharEncoding,
-    UCharEncoding,
-    UnicharEncoding,
-    CharSEncoding,
-    CStringEncoding,
-    FloatEncoding,
-    DoubleEncoding,
-    InterfaceDeclarationReference,
-    StructDeclarationReference,
-    UnionDeclarationReference,
-    PointerEncoding,
-    VaListEncoding,
-    SelectorEncoding,
-    ClassEncoding,
-    ProtocolEncoding,
-    InstanceTypeEncoding,
-    IdEncoding,
-    ConstantArrayEncoding,
-    IncompleteArrayEncoding,
-    FunctionPointerEncoding,
-    BlockEncoding,
-    AnonymousStructEncoding,
-    AnonymousUnionEncoding,
-    ExtVectorEncoding
+  VoidEncoding,
+  BoolEncoding,
+  ShortEncoding,
+  UShortEncoding,
+  IntEncoding,
+  UIntEncoding,
+  LongEncoding,
+  ULongEncoding,
+  LongLongEncoding,
+  ULongLongEncoding,
+  CharEncoding,
+  UCharEncoding,
+  UnicharEncoding,
+  CharSEncoding,
+  CStringEncoding,
+  FloatEncoding,
+  DoubleEncoding,
+  InterfaceDeclarationReference,
+  StructDeclarationReference,
+  UnionDeclarationReference,
+  PointerEncoding,
+  VaListEncoding,
+  SelectorEncoding,
+  ClassEncoding,
+  ProtocolEncoding,
+  InstanceTypeEncoding,
+  IdEncoding,
+  ConstantArrayEncoding,
+  IncompleteArrayEncoding,
+  FunctionPointerEncoding,
+  BlockEncoding,
+  AnonymousStructEncoding,
+  AnonymousUnionEncoding,
+  ExtVectorEncoding,
+  // Same meaning as InterfaceDeclarationReference with an empty protocol list,
+  // but names the class by index into MetaFile::classNames() instead of
+  // carrying a name pointer and a protocols pointer. Positionally mirrored in
+  // the generator's binary::BinaryTypeEncodingType — append only, never
+  // reorder.
+  InterfaceIndexReference
 };
 
 #pragma pack(push, 1)
@@ -324,6 +330,14 @@ struct ModuleTable {
     }
 };
 
+/// Class names referenced by InterfaceIndexReference encodings, so a reference
+/// costs a 2-byte index instead of a 4-byte name pointer.
+struct ClassNameTable {
+  Array<String> names;
+
+  int sizeInBytes() const { return names.sizeInBytes(); }
+};
+
 struct MetaFile {
 private:
     GlobalTable<GlobalTableType::ByJsName> _globalTableJs;
@@ -332,6 +346,11 @@ public:
     static MetaFile* instance();
 
     static MetaFile* setInstance(void* metadataPtr);
+
+    /// Resolved once by setInstance. Locating the table means walking every
+    /// preceding table, which is too much work to repeat per marshalled
+    /// argument.
+    static const ClassNameTable* classNames();
 
     const GlobalTable<GlobalTableType::ByJsName>* globalTableJs() const {
         return &this->_globalTableJs;
@@ -352,9 +371,15 @@ public:
         return reinterpret_cast<const ModuleTable*>(offset(gt, gt->sizeInBytes()));
     }
 
+    const ClassNameTable* classNamesTable() const {
+      const ModuleTable* mt = this->topLevelModulesTable();
+      return reinterpret_cast<const ClassNameTable*>(
+          offset(mt, mt->sizeInBytes()));
+    }
+
     const void* heap() const {
-        const ModuleTable* mt = this->topLevelModulesTable();
-        return offset(mt, mt->sizeInBytes());
+      const ClassNameTable* ct = this->classNamesTable();
+      return offset(ct, ct->sizeInBytes());
     }
 };
 
@@ -426,6 +451,9 @@ union TypeEncodingDetails {
         String name;
         PtrTo<Array<String>> _protocols;
     } interfaceDeclarationReference;
+    struct InterfaceIndexReferenceDetails {
+      uint16_t index;
+    } interfaceIndexReference;
     struct PointerDetails {
         const TypeEncoding* getInnerType() const {
             return reinterpret_cast<const TypeEncoding*>(this);
@@ -451,6 +479,39 @@ union TypeEncodingDetails {
 struct TypeEncoding {
     BinaryTypeEncodingType type;
     TypeEncodingDetails details;
+
+    /// An interface reference has two spellings; test with this rather than
+    /// comparing against InterfaceDeclarationReference, or the indexed form
+    /// silently falls through to whatever the default branch does.
+    bool isInterfaceReference() const {
+      return this->type ==
+                 BinaryTypeEncodingType::InterfaceDeclarationReference ||
+             this->type == BinaryTypeEncodingType::InterfaceIndexReference;
+    }
+
+    /// Referenced class name, for either spelling. nullptr if not an interface
+    /// reference.
+    const char* interfaceName() const {
+      switch (this->type) {
+        case BinaryTypeEncodingType::InterfaceDeclarationReference:
+          return this->details.interfaceDeclarationReference.name.valuePtr();
+        case BinaryTypeEncodingType::InterfaceIndexReference:
+          return MetaFile::classNames()
+              ->names[this->details.interfaceIndexReference.index]
+              .valuePtr();
+        default:
+          return nullptr;
+      }
+    }
+
+    /// Conformed protocols, for either spelling. The indexed form only encodes
+    /// references that had none, so it reports an empty list.
+    const Array<String>* interfaceProtocols() const {
+      return this->type == BinaryTypeEncodingType::InterfaceDeclarationReference
+                 ? this->details.interfaceDeclarationReference._protocols
+                       .valuePtr()
+                 : nullptr;
+    }
 
     const TypeEncoding* next() const {
         const TypeEncoding* afterTypePtr = reinterpret_cast<const TypeEncoding*>(offset(this, sizeof(type)));
@@ -487,6 +548,11 @@ struct TypeEncoding {
         }
         case BinaryTypeEncodingType::InterfaceDeclarationReference: {
             return reinterpret_cast<const TypeEncoding*>(offset(afterTypePtr, sizeof(TypeEncodingDetails::InterfaceDeclarationReferenceDetails)));
+        }
+        case BinaryTypeEncodingType::InterfaceIndexReference: {
+          return reinterpret_cast<const TypeEncoding*>(offset(
+              afterTypePtr,
+              sizeof(TypeEncodingDetails::InterfaceIndexReferenceDetails)));
         }
         case BinaryTypeEncodingType::StructDeclarationReference:
         case BinaryTypeEncodingType::UnionDeclarationReference: {

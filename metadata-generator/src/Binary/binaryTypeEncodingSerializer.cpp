@@ -3,6 +3,23 @@
 #include <llvm/ADT/STLExtras.h>
 
 #include "../Meta/MetaEntities.h"
+#include "metaFile.h"
+
+// An interface reference with no protocols is by far the common case, so it is
+// encoded as a 2-byte index into the class name table instead of a name pointer
+// plus a protocols pointer. Falls back to the pointer form if the table is
+// full.
+static unique_ptr<binary::TypeEncoding> makeIndexedInterface(
+    binary::MetaFile* file, binary::BinaryWriter& writer,
+    const std::string& name) {
+  uint16_t index = 0;
+  if (file == nullptr || !file->internClassName(name, writer, index)) {
+    return nullptr;
+  }
+  auto* s = new binary::InterfaceIndexReferenceEncoding();
+  s->_index = index;
+  return unique_ptr<binary::TypeEncoding>(s);
+}
 
 binary::MetaFileOffset binary::BinaryTypeEncodingSerializer::visit(
     std::vector< ::Meta::Type*>& types) {
@@ -179,6 +196,13 @@ binary::BinaryTypeEncodingSerializer::visitIncompleteArray(
 unique_ptr<binary::TypeEncoding>
 binary::BinaryTypeEncodingSerializer::visitInterface(
     const ::Meta::InterfaceType& type) {
+  if (type.protocols.empty()) {
+    if (auto indexed = makeIndexedInterface(this->_file, this->_heapWriter,
+                                            type.interface->name)) {
+      return indexed;
+    }
+  }
+
   auto* s = new binary::InterfaceDeclarationReferenceEncoding();
   s->_name = this->_heapWriter.push_string(type.interface->name);
 
@@ -202,6 +226,11 @@ binary::BinaryTypeEncodingSerializer::visitBridgedInterface(
                                   "BridgedInterfaceType with name '") +
                       type.name + "'.");
   }
+  if (auto indexed = makeIndexedInterface(this->_file, this->_heapWriter,
+                                          type.bridgedInterface->name)) {
+    return indexed;
+  }
+
   auto s = new binary::InterfaceDeclarationReferenceEncoding();
   s->_name = this->_heapWriter.push_string(type.bridgedInterface->name);
 

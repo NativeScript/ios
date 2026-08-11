@@ -12,40 +12,43 @@ class MetaFile;
 class BinaryWriter;
 
 enum BinaryTypeEncodingType : uint8_t {
-    Void,
-    Bool,
-    Short,
-    UShort,
-    Int,
-    UInt,
-    Long,
-    ULong,
-    LongLong,
-    ULongLong,
-    Char,
-    UChar,
-    Unichar,
-    CharS,
-    CString,
-    Float,
-    Double,
-    InterfaceDeclarationReference,
-    StructDeclarationReference,
-    UnionDeclarationReference,
-    Pointer,
-    VaList,
-    Selector,
-    Class,
-    ProtocolType,
-    InstanceType,
-    Id,
-    ConstantArray,
-    IncompleteArray,
-    FunctionPointer,
-    Block,
-    AnonymousStruct,
-    AnonymousUnion,
-    Vector
+  Void,
+  Bool,
+  Short,
+  UShort,
+  Int,
+  UInt,
+  Long,
+  ULong,
+  LongLong,
+  ULongLong,
+  Char,
+  UChar,
+  Unichar,
+  CharS,
+  CString,
+  Float,
+  Double,
+  InterfaceDeclarationReference,
+  StructDeclarationReference,
+  UnionDeclarationReference,
+  Pointer,
+  VaList,
+  Selector,
+  Class,
+  ProtocolType,
+  InstanceType,
+  Id,
+  ConstantArray,
+  IncompleteArray,
+  FunctionPointer,
+  Block,
+  AnonymousStruct,
+  AnonymousUnion,
+  Vector,
+  // Mirrors tns::BinaryTypeEncodingType in the runtime's Metadata.h by
+  // position — append only, never reorder.
+  InterfaceIndexReference
 };
 
 // BinaryMetaType values must not exceed
@@ -318,6 +321,16 @@ public:
     MetaFileOffset _name;
     
     virtual MetaFileOffset save(BinaryWriter& writer) override;
+};
+
+struct InterfaceIndexReferenceEncoding : public TypeEncoding {
+ public:
+  InterfaceIndexReferenceEncoding()
+      : TypeEncoding(BinaryTypeEncodingType::InterfaceIndexReference) {}
+
+  uint16_t _index = 0;
+
+  virtual MetaFileOffset save(BinaryWriter& writer) override;
 };
 
 struct InterfaceDeclarationReferenceEncoding : public DeclarationReferenceEncoding {

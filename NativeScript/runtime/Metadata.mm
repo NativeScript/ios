@@ -324,8 +324,13 @@ static MetaFile* metaFileInstance(nullptr);
 
 MetaFile* MetaFile::instance() { return metaFileInstance; }
 
+static const ClassNameTable* classNamesInstance = nullptr;
+
+const ClassNameTable* MetaFile::classNames() { return classNamesInstance; }
+
 MetaFile* MetaFile::setInstance(void* metadataPtr) {
   metaFileInstance = reinterpret_cast<MetaFile*>(metadataPtr);
+  classNamesInstance = metaFileInstance->classNamesTable();
   return metaFileInstance;
 }
 }  // namespace tns

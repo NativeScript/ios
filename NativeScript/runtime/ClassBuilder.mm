@@ -537,6 +537,7 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
     }
     case BinaryTypeEncodingType::ProtocolEncoding:
     case BinaryTypeEncodingType::InterfaceDeclarationReference:
+    case BinaryTypeEncodingType::InterfaceIndexReference:
     case BinaryTypeEncodingType::InstanceTypeEncoding:
     case BinaryTypeEncodingType::IdEncoding: {
       return "@";

@@ -29,6 +29,10 @@ private:
     std::unique_ptr<BinaryHashtable> _globalTableSymbolsNativeInterfaces;
 
     std::map<std::string, MetaFileOffset> _topLevelModules;
+    // Class names referenced by InterfaceIndexReference encodings, in index
+    // order, alongside the reverse map used to assign those indices.
+    std::vector<MetaFileOffset> _classNames;
+    std::map<std::string, uint16_t> _classNameIndices;
     std::shared_ptr<utils::MemoryStream> _heap;
 
 public:
@@ -84,6 +88,19 @@ public:
          * \return The offset in the heap
          */
     binary::MetaFileOffset getFromTopLevelModulesTable(const std::string& moduleName);
+
+    /// class name table
+    /*
+     * \brief Interns a class name and returns its index in the class name
+     * table.
+     * \param name The native class name
+     * \param heapWriter Writer used to intern the name string in the heap
+     * \param index Receives the assigned index
+     * \return false if the table is full, in which case the caller must fall
+     *         back to an encoding that carries a name pointer
+     */
+    bool internClassName(const std::string& name, BinaryWriter& heapWriter,
+                         uint16_t& index);
 
     /// heap
     /*
