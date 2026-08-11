@@ -5,6 +5,7 @@
 #include "BuiltinLoader.h"
 #include "Caches.h"
 #include "Console.h"
+#include "HMRSupport.h"
 #include "Helpers.h"
 #include "Runtime.h"
 
@@ -27,6 +28,7 @@ struct Registration {
 // adapts, so the two module objects stay distinct and the standard module
 // never carries compatibility code.
 constexpr Registration kRegistry[] = {
+    {"ns:module", BuiltinId::kNsModule},
     {"ns:runtime", BuiltinId::kNsRuntime},
     {"ns:util", BuiltinId::kNsUtil},
     {"node:util", BuiltinId::kNodeUtil},
@@ -108,6 +110,15 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
   Local<Object> binding = Object::New(isolate);
 
   switch (builtin) {
+    case BuiltinId::kNsModule: {
+      // The dev-loader control surface (HMRSupport.mm). The binding builder
+      // decides build-dependent membership; ns-module.js only shapes
+      // and freezes whatever arrives.
+      if (!BuildNsModuleBinding(context, binding)) {
+        return MaybeLocal<Object>();
+      }
+      break;
+    }
     case BuiltinId::kNsRuntime: {
       Local<v8::Function> setConfig, getConfig;
       if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
