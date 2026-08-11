@@ -559,12 +559,21 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
   tns::Assert(klass != nullptr, isolate);
 
   id result = nil;
+  // A Caches::Instances entry owns exactly one reference to the object it maps
+  // (ObjectManager::DisposeValue gives it back, and ClassBuilder's swizzled
+  // retain/release read a retainCount of 1 as "only the map holds this"), so
+  // this function must hand the entry a +1 and no more. Tracks whether `result`
+  // already carries one: the alloc/init paths do, a pointer handed in from JS
+  // does not. Constructing from a pointer is non-consuming — interop.handleof
+  // hands out a retain-neutral address, and a +1 reaches JS as an Unmanaged to
+  // be claimed with takeRetainedValue — so that path takes its own reference.
+  bool resultIsOwned = false;
 
   if (info.Length() == 1) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, info[0]);
     if (wrapper != nullptr && wrapper->Type() == WrapperType::Pointer) {
       PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
-      result = CFBridgingRelease(pointerWrapper->Data());
+      result = (__bridge id)pointerWrapper->Data();
     }
   }
 
@@ -583,17 +592,24 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
 
     V8VectorArgs vectorArgs(args);
     result = Interop::CallInitializer(context, initializer, result, klass, vectorArgs);
+    resultIsOwned = true;
   }
 
   if (result == nil) {
     result = [[klass alloc] init];
+    resultIsOwned = true;
   }
 
   auto cache = Caches::Get(isolate);
-  auto it = cache->Instances.find(result);
-  if (it != cache->Instances.end()) {
-    Local<Value> obj = it->second->Get(isolate);
-    info.GetReturnValue().Set(obj);
+  auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
+  if (poInstance != nullptr) {
+    // An initializer that answered with an already wrapped object (a singleton,
+    // a tagged pointer, a cached cluster instance) leaves us holding a +1 the
+    // existing entry has no use for.
+    if (resultIsOwned) {
+      [result release];
+    }
+    info.GetReturnValue().Set(poInstance->Get(isolate));
   } else {
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
     Local<Object> thiz = info.This();
@@ -601,7 +617,9 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
     tns::SetValue(isolate, thiz, wrapper);
     std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
     cache->Instances.emplace(result, poThiz);
-    // [result retain];
+    if (!resultIsOwned) {
+      [result retain];
+    }
   }
 }
 
@@ -933,6 +951,30 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
   }
 
   return receiver;
+}
+
+std::shared_ptr<Persistent<Value>> ArgConverter::FindCachedInstance(
+    Isolate* isolate, const std::shared_ptr<Caches>& cache, id target) {
+  auto it = cache->Instances.find(target);
+  if (it == cache->Instances.end()) {
+    return nullptr;
+  }
+
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, it->second->Get(isolate));
+  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+    Class expected = static_cast<ObjCDataWrapper*>(wrapper)->Klass();
+    // A KVO-style isa swizzle replaces the class in place but keeps -class
+    // answering the original, so only an address that now belongs to a
+    // different object fails both comparisons. Dropping such an entry turns a
+    // wrapper that would otherwise be handed out with the wrong prototype into
+    // a plain cache miss, which rebuilds it correctly.
+    if (expected != nil && object_getClass(target) != expected && [target class] != expected) {
+      cache->Instances.erase(it);
+      return nullptr;
+    }
+  }
+
+  return it->second;
 }
 
 const Meta* ArgConverter::FindMeta(Class klass, const TypeEncoding* typeEncoding) {

@@ -58,6 +58,14 @@ class ArgConverter {
       v8::Local<v8::Context> context);
   static const Meta* FindMeta(Class klass,
                               const TypeEncoding* typeEncoding = nullptr);
+  // Looks up the JS wrapper cached for `target` in Caches::Instances, dropping
+  // the entry and reporting a miss when it no longer describes the object at
+  // that address. Every read of Instances that hands the wrapper straight back
+  // to JS must go through here: entries are keyed on the raw pointer, so an
+  // entry that outlived its object would otherwise alias whatever allocation
+  // recycled the address and give it a foreign prototype.
+  static std::shared_ptr<v8::Persistent<v8::Value>> FindCachedInstance(
+      v8::Isolate* isolate, const std::shared_ptr<Caches>& cache, id target);
   static const Meta* GetMeta(std::string name);
   static const ProtocolMeta* FindProtocolMeta(Protocol* protocol);
   static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues,
