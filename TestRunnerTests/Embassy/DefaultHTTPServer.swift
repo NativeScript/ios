@@ -78,13 +78,44 @@ public final class DefaultHTTPServer: HTTPServer {
             self.stop()
             semaphore.signal()
         }
-        _ = semaphore.wait(timeout: DispatchTime.distantFuture)
+        // Finite timeout, not .distantFuture: this runs on the (User-interactive)
+        // main thread during tearDown and waits on the event-loop thread. If that
+        // thread is starved (e.g. under CI load), waiting forever would hang the
+        // whole test process in teardown. The stop is best-effort at teardown, so
+        // bail after a few seconds rather than deadlock.
+        _ = semaphore.wait(timeout: .now() + 10)
     }
 
     // called to handle new connections
     private func handleNewConnection() {
-        let clientSocket = try! acceptSocket.accept()
-        let (address, port) = try! clientSocket.getPeerName()
+        // Resilience: a single bad inbound connection must NEVER crash the server.
+        // This server runs inside the XCUITest runner; a fatal error here aborts
+        // the entire run ("Executed 0 tests"). A client can reset/close in the
+        // window between accept() and getPeerName() — common with rapid
+        // fire-and-forget requests — which surfaces as OSError (EINVAL/ENOTCONN);
+        // accept() itself can also transiently fail under connection churn. Drop
+        // the offending connection instead of `try!`-trapping the whole process.
+        let clientSocket: TCPSocket
+        do {
+            clientSocket = try acceptSocket.accept()
+        } catch {
+            logger.error("accept() failed; dropping inbound connection: \(error)")
+            return
+        }
+
+        // getPeerName() is used ONLY for the diagnostic log line below, yet it
+        // fails with EINVAL for some legitimate client connections — notably the
+        // runtime's synchronous HTTP module loader (NSURLConnection). Do NOT drop
+        // the connection on failure: that leaves every module GET unanswered and
+        // hangs the HTTP-ESM tests. Fall back to a placeholder peer and serve it.
+        var address = "?"
+        var port = 0
+        do {
+            (address, port) = try clientSocket.getPeerName()
+        } catch {
+            logger.error("getPeerName() failed; serving with placeholder peer: \(error)")
+        }
+
         let transport = Transport(socket: clientSocket, eventLoop: eventLoop)
         let connection = HTTPConnection(
             app: appForConnection,
