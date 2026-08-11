@@ -81,6 +81,9 @@ enum BinaryFlags : uint16_t {
   MethodOwnsReturnedCocoaObject = 1 << 4,
   MethodHasErrorOutParameter = 1 << 5,
   MethodHasConstructorTokens = 1 << 9,
+  // JsCode
+  // Marks _jsCode as a binary name/value table rather than a JS source string.
+  JsCodeIsEnumTable = 1 << 10,
   // Property
   PropertyHasGetter = 1 << 2,
   PropertyHasSetter = 1 << 3

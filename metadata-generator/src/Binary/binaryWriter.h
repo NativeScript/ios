@@ -72,6 +72,12 @@ public:
     MetaFileOffset push_int(int32_t value);
 
     /*
+     * \brief Writes an 8 byte integer.
+     * \param value
+     */
+    MetaFileOffset push_long(int64_t value);
+
+    /*
          * \brief Writes a 2 byte short.
          * \param value
          */

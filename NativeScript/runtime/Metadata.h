@@ -74,6 +74,7 @@ enum MetaFlags {
   MethodOwnsReturnedCocoaObject = 4,
   MethodHasErrorOutParameter = 5,
   MethodHasConstructorTokens = 9,
+  JsCodeIsEnumTable = 10,
   PropertyHasGetter = 2,
   PropertyHasSetter = 3,
 
@@ -773,14 +774,29 @@ public:
     }
 };
 
+struct EnumField {
+  String name;
+  int64_t value;
+};
+
 struct JsCodeMeta : Meta {
 
 private:
     String _jsCode;
 
 public:
+ /// Enums carry a name/value table here instead of JS source; the two are
+ /// mutually exclusive, so check this before reading either.
+ inline bool isEnumTable() const {
+   return this->flag(MetaFlags::JsCodeIsEnumTable);
+ }
+
     inline const char* jsCode() const {
         return _jsCode.valuePtr();
+    }
+
+    inline const Array<EnumField>* enumFields() const {
+      return reinterpret_cast<const Array<EnumField>*>(_jsCode.valuePtr());
     }
 };
 
