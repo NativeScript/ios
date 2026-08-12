@@ -104,6 +104,16 @@ class EventLoop : public std::enable_shared_from_this<EventLoop> {
   void PostOrderedToken(double dueTimeMs);
 
   /**
+   * Removes one not-yet-matured ordered token at this due time, un-arming its
+   * wakeup. Returns false when no such token is pending - it already went out
+   * as a performed block (or matured), which cannot be recalled; the caller
+   * must leave a tombstone for it instead. Tokens are anonymous and counted,
+   * so cancelling one token plus one item keeps slots 1:1 no matter which
+   * producer's token is physically removed.
+   */
+  bool TryCancelOrderedToken(double dueTimeMs);
+
+  /**
    * Registers the ordered lane's external source. Home thread only; pass
    * nullptr to unregister (the source is being destroyed).
    */

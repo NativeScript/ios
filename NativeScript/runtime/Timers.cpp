@@ -137,7 +137,15 @@ class TimerState : public OrderedTaskSource {
                            });
       while (sit != sortedTimers_.end() && sit->dueTime == dueTime) {
         if (sit->id == taskId) {
-          sit->cancelled = true;
+          // a future-due token is still in the loop's own bookkeeping and can
+          // be recalled outright, un-arming its wakeup (the pre-event-loop
+          // behavior of CFRunLoopTimerInvalidate). One already sent out as a
+          // performed block cannot - its slot gets the tombstone instead.
+          if (eventLoop_->TryCancelOrderedToken(dueTime)) {
+            sortedTimers_.erase(sit);
+          } else {
+            sit->cancelled = true;
+          }
           break;
         }
         ++sit;

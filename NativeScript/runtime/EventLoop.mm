@@ -229,6 +229,25 @@ void EventLoop::PostOrderedToken(double dueTimeMs) {
   PostOrderedTokenLocked(dueTimeMs, NowMs());
 }
 
+bool EventLoop::TryCancelOrderedToken(double dueTimeMs) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (stopped_) {
+    return false;
+  }
+  auto bufferedIt = std::find(bufferedTokens_.begin(), bufferedTokens_.end(), dueTimeMs);
+  if (bufferedIt != bufferedTokens_.end()) {
+    bufferedTokens_.erase(bufferedIt);
+    return true;
+  }
+  auto pendingIt = pendingTokens_.find(dueTimeMs);
+  if (pendingIt == pendingTokens_.end()) {
+    return false;
+  }
+  pendingTokens_.erase(pendingIt);
+  ArmOrderedTimerLocked(NowMs());
+  return true;
+}
+
 void EventLoop::SetTimerSource(OrderedTaskSource* source) {
   // home thread only, like every consumer of timerSource_
   timerSource_ = source;
@@ -460,21 +479,23 @@ void EventLoop::InternalTimerFired(CFRunLoopTimerRef timer, void* info) {
 
 void EventLoop::OrderedTimerFired(CFRunLoopTimerRef timer, void* info) {
   auto self = static_cast<EventLoop*>(info);
-  size_t due = 0;
+  bool due = false;
   {
     std::lock_guard<std::mutex> lock(self->mutex_);
     if (self->stopped_) {
       return;
     }
     auto now = NowMs();
-    while (!self->pendingTokens_.empty() && *self->pendingTokens_.begin() <= now) {
+    if (!self->pendingTokens_.empty() && *self->pendingTokens_.begin() <= now) {
       self->pendingTokens_.erase(self->pendingTokens_.begin());
-      due++;
+      due = true;
     }
+    // one matured token per fire: re-arming with an already-past due time
+    // fires again on the next runloop pass, so foreign timers and blocks due
+    // between two matured tokens interleave instead of waiting out a batch
     self->ArmOrderedTimerLocked(now);
   }
-  // tokens and slots stay 1:1: each matured token gets exactly one drain
-  while (due-- > 0) {
+  if (due) {
     self->RunOrderedTask();
   }
 }
