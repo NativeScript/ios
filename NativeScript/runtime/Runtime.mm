@@ -586,8 +586,8 @@ void Runtime::DefineQueueMacrotaskMethod(v8::Isolate* isolate,
         }
         auto callback =
             std::make_shared<Persistent<v8::Function>>(isolate, info[0].As<v8::Function>());
-        // the ordered lane rides the home runloop's performed-block order, so
-        // the callback runs as a macrotask in strict FIFO order with JS timers
+        // the ordered lane is one due-ordered domain with JS timers, so the
+        // callback runs as a macrotask in strict FIFO order with them
         runtime->GetEventLoop()->PostOrdered([isolate, callback]() {
           auto cache = Caches::Get(isolate);
           Local<Context> context = cache->GetContext();

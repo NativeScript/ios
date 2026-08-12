@@ -377,7 +377,14 @@ describe("event loop workers", function () {
 
     it("survives terminating a worker with queued loop work", function (done) {
         const worker = new Worker("./eventLoopEchoWorker.js");
+        let handled = false;
         worker.onmessage = function () {
+            // echoes of the queued messages can arrive before the terminate
+            // lands; only the first delivery drives the spec
+            if (handled) {
+                return;
+            }
+            handled = true;
             // several messages are still queued on the worker's loop when the
             // terminate lands; none of them may crash or hang teardown
             for (let i = 0; i < 20; i++) {

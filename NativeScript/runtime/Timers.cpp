@@ -108,10 +108,13 @@ class TimerState : public OrderedTaskSource {
     sortedTimers_.insert(it, TimerReference{id, dueTime});
   }
 
-  void postToken(double dueTime, double now) {
-    // an overdue timer's token goes out at `now`: it must not jump items
-    // already queued ahead of it
-    eventLoop_->PostOrderedToken(dueTime <= now ? now : dueTime);
+  void postToken(const std::shared_ptr<TimerTask>& task) {
+    if (eventLoop_ == nullptr) {
+      return;
+    }
+    // the loop clamps an overdue due time to its own `now`; remember the key
+    // it actually recorded so cancellation can recall this exact token
+    task->postedTokenTime_ = eventLoop_->PostOrderedToken(task->dueTime_);
   }
 
   void addTask(const std::shared_ptr<TimerTask>& task) {
@@ -141,7 +144,8 @@ class TimerState : public OrderedTaskSource {
           // be recalled outright, un-arming its wakeup (the pre-event-loop
           // behavior of CFRunLoopTimerInvalidate). One already sent out as a
           // performed block cannot - its slot gets the tombstone instead.
-          if (eventLoop_->TryCancelOrderedToken(dueTime)) {
+          if (eventLoop_ != nullptr &&
+              eventLoop_->TryCancelOrderedToken(it->second->postedTokenTime_)) {
             sortedTimers_.erase(sit);
           } else {
             sit->cancelled = true;
@@ -198,7 +202,7 @@ class TimerState : public OrderedTaskSource {
     if (task->repeats_) {
       task->dueTime_ = task->NextTime(now_ms());
       insertSorted(task->id_, task->dueTime_);
-      postToken(task->dueTime_, now_ms());
+      postToken(task);
     }
 
     v8::Local<v8::Function> cb = task->callback_.Get(isolate);
@@ -232,9 +236,14 @@ void Timers::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
   auto timerState = new TimerState();
   timerState->isolate_ = isolate;
   // Runtime::CreateIsolate bound the loop to this thread's runloop before
-  // any builtin initialization runs
-  timerState->eventLoop_ = Runtime::GetRuntime(isolate)->GetEventLoop();
-  timerState->eventLoop_->SetTimerSource(timerState);
+  // any builtin initialization runs; guard anyway so an embedding path with
+  // no runtime degrades to inert timers instead of crashing
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  timerState->eventLoop_ =
+      runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+  if (timerState->eventLoop_ != nullptr) {
+    timerState->eventLoop_->SetTimerSource(timerState);
+  }
   Caches::Get(isolate)->registerCacheBoundObject(timerState);
   tns::SetMethod(isolate, globalTemplate, "__ns__setTimeout",
                  Timers::SetTimeoutCallback,
@@ -300,7 +309,7 @@ void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value>& args,
     task->repeats_ = repeatable;
     task->dueTime_ = now + (double)timeout;
     state->addTask(task);
-    state->postToken(task->dueTime_, now);
+    state->postToken(task);
   }
   args.GetReturnValue().Set(id);
 }

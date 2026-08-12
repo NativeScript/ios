@@ -20,8 +20,8 @@ __attribute__((constructor)) void staticInitMethod() {
 }
 
 // Posts to the target runtime's internal lane from the worker thread. When
-// async is false, blocks until the entry ran; a post that raced the runtime's
-// shutdown is dropped and not waited on.
+// async is false, blocks until the entry ran - or until it is destroyed
+// unrun by a shutdown that raced the post, which must release the waiter too.
 static void PostToRuntimeLoop(Runtime* runtime, std::function<void()> fn, bool async) {
   auto loop = runtime->GetEventLoop();
   if (loop == nullptr) {
@@ -32,10 +32,11 @@ static void PostToRuntimeLoop(Runtime* runtime, std::function<void()> fn, bool a
     return;
   }
   dispatch_semaphore_t done = dispatch_semaphore_create(0);
-  bool posted = loop->PostInternal([fn = std::move(fn), done]() {
-    fn();
-    dispatch_semaphore_signal(done);
-  });
+  // signals when the LAST reference dies: after fn ran, or when Shutdown
+  // clears the queue and destroys the entry without running it
+  std::shared_ptr<void> completion(nullptr, [done](void*) { dispatch_semaphore_signal(done); });
+  bool posted = loop->PostInternal([fn = std::move(fn), completion]() { fn(); });
+  completion.reset();
   if (posted) {
     dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
   }

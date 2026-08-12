@@ -53,6 +53,10 @@ public:
     bool queued_ = false;
 
     double dueTime_ = -1;
+    // the ordered-token key actually posted for the current cycle: dueTime_,
+    // or the (later) post time when the timer was already overdue - the value
+    // cancellation must use to recall the token
+    double postedTokenTime_ = -1;
     double startTime_ = -1;
     int id_;
     IsolateWrapper wrapper;

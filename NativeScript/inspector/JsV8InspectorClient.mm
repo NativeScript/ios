@@ -438,8 +438,13 @@ void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
     }
 
     // JS frames are on the stack, so only nestable v8 foreground tasks may
-    // run; everything else fires from its own wakeup after resume
-    tns::NativeScriptPlatform::Instance()->GetEventLoop(isolate_)->RunNestableV8Tasks();
+    // run; everything else fires from its own wakeup after resume. Lookup,
+    // never create: a create here could mint a registry entry for an isolate
+    // whose runtime is already gone
+    auto eventLoop = tns::NativeScriptPlatform::Instance()->LookupEventLoop(isolate_);
+    if (eventLoop != nullptr) {
+      eventLoop->RunNestableV8Tasks();
+    }
     if (shouldWait && !terminated_) {
       dispatch_semaphore_wait(messageArrived_,
                               dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_MSEC));  // 1ms

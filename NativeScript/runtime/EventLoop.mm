@@ -151,10 +151,10 @@ void EventLoop::PostOrderedLocked(Entry entry, double delayMs) {
   }
 }
 
-void EventLoop::PostOrderedTokenLocked(double dueTimeMs, double now) {
+double EventLoop::PostOrderedTokenLocked(double dueTimeMs, double now) {
   if (loop_ == nullptr) {
     bufferedTokens_.push_back(dueTimeMs);
-    return;
+    return dueTimeMs;
   }
   // every token rides the timer phase, even due-now ones (a past fire date
   // fires on the next runloop pass). Performed blocks would deliver sooner,
@@ -163,9 +163,11 @@ void EventLoop::PostOrderedTokenLocked(double dueTimeMs, double now) {
   // pool and the rejection drain - while a due timer still yields a full
   // pass between fires. This also keeps due-now tokens in fire-date order
   // with foreign NSTimers, like the per-timer CFRunLoopTimers this replaces.
-  pendingTokens_.insert(std::max(dueTimeMs, now));
+  double key = std::max(dueTimeMs, now);
+  pendingTokens_.insert(key);
   ArmOrderedTimerLocked(now);
   CFRunLoopWakeUp(loop_);
+  return key;
 }
 
 bool EventLoop::PostInternal(std::function<void()> fn) {
@@ -213,12 +215,12 @@ bool EventLoop::PostOrderedDelayed(std::function<void()> fn, double delayMs) {
   return true;
 }
 
-void EventLoop::PostOrderedToken(double dueTimeMs) {
+double EventLoop::PostOrderedToken(double dueTimeMs) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopped_) {
-    return;
+    return dueTimeMs;
   }
-  PostOrderedTokenLocked(dueTimeMs, NowMs());
+  return PostOrderedTokenLocked(dueTimeMs, NowMs());
 }
 
 bool EventLoop::TryCancelOrderedToken(double dueTimeMs) {

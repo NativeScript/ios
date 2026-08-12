@@ -91,8 +91,9 @@ class EventLoop {
    */
   void Shutdown();
 
-  // ordered lane: strictly FIFO with CFRunLoopPerformBlock work on the home
-  // runloop. Returns false if the post was dropped (loop already shut down).
+  // ordered lane: one due-ordered domain with JS timers, in fire-date order
+  // with foreign runloop timers. Returns false if the post was dropped (loop
+  // already shut down).
   bool PostOrdered(std::function<void()> fn);
   bool PostOrderedDelayed(std::function<void()> fn, double delayMs);
 
@@ -101,15 +102,17 @@ class EventLoop {
    * (NowMs() units) for an item the OrderedTaskSource keeps in its own
    * bookkeeping (Timers). One token per item; the drain picks the earliest
    * due item across the source and the ordered entries, so the token needn't
-   * name what it will run.
+   * name what it will run. Returns the key actually recorded (an overdue due
+   * time is clamped to now) - the value TryCancelOrderedToken must be given
+   * to recall this token.
    */
-  void PostOrderedToken(double dueTimeMs);
+  double PostOrderedToken(double dueTimeMs);
 
   /**
    * Removes one not-yet-matured ordered token at this due time, un-arming its
-   * wakeup. Returns false when no such token is pending - it already went out
-   * as a performed block (or matured), which cannot be recalled; the caller
-   * must leave a tombstone for it instead. Tokens are anonymous and counted,
+   * wakeup. Returns false when no such token is pending - it already matured,
+   * so its slot cannot be recalled; the caller must leave a tombstone for it
+   * instead. Tokens are anonymous and counted,
    * so cancelling one token plus one item keeps slots 1:1 no matter which
    * producer's token is physically removed.
    */
@@ -189,7 +192,7 @@ class EventLoop {
   // all *Locked members require mutex_ to be held
   void PostInternalLocked(Entry entry, double delayMs);
   void PostOrderedLocked(Entry entry, double delayMs);
-  void PostOrderedTokenLocked(double dueTimeMs, double now);
+  double PostOrderedTokenLocked(double dueTimeMs, double now);
   static std::unique_ptr<Entry> TakeDueLocked(Lane& lane, bool nestableOnly,
                                               bool v8Only, double now);
   // earliest due entry time in the lane, or a negative value if none is due
