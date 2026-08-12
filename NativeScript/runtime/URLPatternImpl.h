@@ -5,6 +5,7 @@
 
 #include "Common.h"
 #include "Helpers.h"
+#include "IsolateTracked.h"
 #include "ada/ada.h"
 using namespace ada;
 namespace tns {
@@ -22,7 +23,7 @@ class v8_regex_provider {
   static bool regex_match(std::string_view input, const regex_type& pattern);
 };
 
-class URLPatternImpl {
+class URLPatternImpl : public IsolateTracked {
  public:
   URLPatternImpl(url_pattern<v8_regex_provider> pattern);
 
@@ -69,22 +70,8 @@ class URLPatternImpl {
 
   static void Exec(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-  void BindFinalizer(v8::Isolate* isolate,
-                     const v8::Local<v8::Object>& object) {
-    v8::HandleScope scopedHandle(isolate);
-    weakHandle_.Reset(isolate, object);
-    weakHandle_.SetWeak(this, Finalizer, v8::WeakCallbackType::kParameter);
-  }
-
-  static void Finalizer(const v8::WeakCallbackInfo<URLPatternImpl>& data) {
-    auto* pThis = data.GetParameter();
-    pThis->weakHandle_.Reset();
-    delete pThis;
-  }
-
  private:
   url_pattern<v8_regex_provider> pattern_;
-  v8::Global<v8::Object> weakHandle_;
 
   static std::optional<ada::url_pattern_init> ParseInput(
       v8::Isolate* isolate, const v8::Local<v8::Value>& input);

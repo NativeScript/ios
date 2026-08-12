@@ -14,6 +14,7 @@ namespace tns {
 struct StructInfo;
 struct ObjectWeakCallbackState;
 class PromiseRejectionTracker;
+class IsolateTracked;
 
 struct pair_hash {
   template <class T1, class T2>
@@ -131,6 +132,11 @@ class Caches {
   robin_hood::unordered_map<const void*,
                             std::shared_ptr<v8::Persistent<v8::Object>>>
       PointerInstances;
+
+  // Live IsolateTracked instances (URL, URLSearchParams, URLPattern). Their
+  // weak-callback finalizers never fire at isolate disposal, so teardown
+  // sweeps this set to delete whatever GC didn't get to.
+  robin_hood::unordered_set<IsolateTracked*> TrackedInstances;
 
   std::function<v8::Local<v8::FunctionTemplate>(
       v8::Local<v8::Context>, const BaseClassMeta*, KnownUnknownClassPair,

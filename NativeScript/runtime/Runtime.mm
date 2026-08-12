@@ -11,6 +11,7 @@
 #include "Helpers.h"
 #include "InlineFunctions.h"
 #include "Interop.h"
+#include "IsolateTracked.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
 #include "ObjectManager.h"
@@ -245,6 +246,7 @@ Runtime::~Runtime() {
     this->napiEnv_ = nullptr;
 
     ObjectManager::DisposeAllRegistered(isolate_);
+    IsolateTracked::SweepAll(isolate_);
 
     if (IsRuntimeWorker()) {
       auto currentWorker =

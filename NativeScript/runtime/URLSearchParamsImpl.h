@@ -4,11 +4,12 @@
 #pragma once
 
 #include "Common.h"
+#include "IsolateTracked.h"
 #include "ada/ada.h"
 
 namespace tns {
 
-class URLSearchParamsImpl {
+class URLSearchParamsImpl : public IsolateTracked {
  public:
   URLSearchParamsImpl(ada::url_search_params params);
 
@@ -50,22 +51,8 @@ class URLSearchParamsImpl {
 
   static void Values(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-  void BindFinalizer(v8::Isolate* isolate,
-                     const v8::Local<v8::Object>& object) {
-    v8::HandleScope scopedHandle(isolate);
-    weakHandle_.Reset(isolate, object);
-    weakHandle_.SetWeak(this, Finalizer, v8::WeakCallbackType::kParameter);
-  }
-
-  static void Finalizer(const v8::WeakCallbackInfo<URLSearchParamsImpl>& data) {
-    auto* pThis = data.GetParameter();
-    pThis->weakHandle_.Reset();
-    delete pThis;
-  }
-
  private:
   ada::url_search_params params_;
-  v8::Global<v8::Object> weakHandle_;
 };
 
 }  // namespace tns
