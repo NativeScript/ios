@@ -18,7 +18,8 @@ class Value;
 
 namespace tns {
 
-// HMRSupport: the native half of the NativeScript dev-loader contract.
+// HttpLoader: the native half of the NativeScript HTTP module-loader
+// contract.
 //
 // The runtime deliberately exposes *mechanism* only:
 //   - the synchronous HTTP text fetch backing the HTTP ESM loader's
@@ -30,8 +31,9 @@ namespace tns {
 //   - eviction plumbing (an eviction-driven fetch nonce that defeats
 //     CFNetwork's HTTP cache),
 //   - the dev-boot-complete signal that disarms cold-boot-only
-//     behaviors (runloop pump, connection-recovery wait).
-//
+//     behaviors (runloop pump, connection-recovery wait),
+//   - the remote-module security gate, seeded once from nativescript.config
+//     at boot and never exposed on ns:runtime getConfig/setConfig.
 
 // ─────────────────────────────────────────────────────────────
 // HTTP loader helpers (used by dev/HMR and general-purpose HTTP module loading)
@@ -77,7 +79,7 @@ void FetchModuleBodyAsync(
 // JS-thread runloop so a placeholder UI can repaint during cold-boot).
 //
 // Default: a built-in pump that no-ops outside the JS thread / after the
-// dev boot completes (see `MaybePumpJSThreadDuringBoot` in HMRSupport.mm).
+// dev boot completes (see `MaybePumpJSThreadDuringBoot` in HttpLoader.mm).
 //
 // Pass `nullptr` to disable any yielding (used by hosts that drive their own
 // run loop or by tests that want bit-for-bit deterministic fetch timing).
@@ -101,12 +103,29 @@ void MarkUrlsForCacheBust(const std::vector<std::string>& urls);
 void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context,
                         bool value);
 
-// Clear process-wide dev-loader state (cache-bust marks, boot-complete
+// Clear process-wide HTTP-loader state (cache-bust marks, boot-complete
 // flag, canonicalization vocabulary). MUST be called inside
 // Runtime::~Runtime() before isolate disposal — and only for the MAIN
 // isolate (worker teardown must not wipe shared state the main isolate
 // still uses).
-void CleanupHMRGlobals();
+void CleanupHttpLoaderGlobals();
+
+// ─────────────────────────────────────────────────────────────
+// Remote-module security gate
+//
+// Seeded once from nativescript.config / package.json (`security.allowRemoteModules`,
+// `security.remoteModuleAllowlist`) the first time a fetch is gated. Debug
+// builds always allow. These values are not readable or writable through
+// ns:runtime getConfig/setConfig — only nativescript.config at boot.
+
+// In debug mode (RuntimeConfig.IsDebug): always returns true.
+// Otherwise returns the boot-time `security.allowRemoteModules` value.
+bool IsRemoteModulesAllowed();
+
+// Whether `url` may be fetched as a remote ES module. Debug builds always
+// allow. Production requires allowRemoteModules, then an allowlist match
+// (or all URLs if the allowlist is empty).
+bool IsRemoteUrlAllowed(const std::string& url);
 
 // ─────────────────────────────────────────────────────────────
 // The `ns:module` builtin binding

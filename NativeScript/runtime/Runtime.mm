@@ -30,8 +30,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <vector>
-#include "DevFlags.h"
-#include "HMRSupport.h"
+#include "HttpLoader.h"
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
 #include "napi/NapiEnv.h"
@@ -299,7 +298,7 @@ Runtime::~Runtime() {
     // the main isolate keeps serving HMR cycles. Real process-teardown still
     // routes through the main isolate's destructor, so the cleanup fires.
     if (!IsRuntimeWorker()) {
-      tns::CleanupHMRGlobals();
+      tns::CleanupHttpLoaderGlobals();
       tns::CleanupImportMapGlobals();
     }
 
@@ -467,7 +466,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
 
   // The dev primitives (configureLoader, invalidateModules, …) live in the
   // `ns:module` builtin module, materialized lazily per realm on first
-  // resolution (see `BuildNsModuleBinding` in HMRSupport.mm for the member
+  // resolution (see `BuildNsModuleBinding` in HttpLoader.mm for the member
   // list) — nothing to install here.
 
   // URL blob support (internal/blob-url.js); failures are tolerated —

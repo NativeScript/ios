@@ -1,9 +1,8 @@
-#include "HMRSupport.h"
+#include "HttpLoader.h"
 #import <Foundation/Foundation.h>
 #include <algorithm>
 #include <cctype>
 #include <cstring>
-#include "DevFlags.h"
 
 #include <atomic>
 #include <mutex>
@@ -16,13 +15,106 @@
 #include "RuntimeConfig.h"
 #include "robin_hood.h"
 
-// Use centralized dev flags helper for logging
-
 namespace tns {
 
 static inline bool StartsWith(const std::string& s, const char* prefix) {
   size_t n = strlen(prefix);
   return s.size() >= n && s.compare(0, n, prefix) == 0;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Remote-module security gate
+//
+// Boot-time only: values come from nativescript.config / package.json
+// (`security.allowRemoteModules`, `security.remoteModuleAllowlist`) and
+// are never registered on ns:runtime getConfig/setConfig.
+
+static std::once_flag s_securityConfigInitFlag;
+static bool s_allowRemoteModules = false;
+static std::vector<std::string> s_remoteModuleAllowlist;
+
+// Returns true when `url` is authorized by allowlist `entry`.
+//
+// This is intentionally stricter than a raw string-prefix test: after the
+// matched entry text, the next character in `url` must be a URL-component
+// boundary ('/', '?', or '#'), the URL must end exactly at the entry, or the
+// entry must itself end in '/'. That refuses lookalike-host and lookalike-port
+// bypasses — an entry of "https://cdn.example.com" must NOT authorize
+// "https://cdn.example.com.attacker.com/x.js" or
+// "https://cdn.example.com:9999/x.js". To allow a specific port, include it in
+// the allowlist entry (deny-by-default for anything not explicitly listed).
+static bool RemoteUrlMatchesAllowlistEntry(const std::string& url, const std::string& entry) {
+  if (entry.empty()) return false;
+  if (url.size() < entry.size()) return false;
+  if (url.compare(0, entry.size(), entry) != 0) return false;
+  if (url.size() == entry.size()) return true;  // exact match
+  if (entry.back() == '/') return true;         // entry ended at a boundary
+  const char next = url[entry.size()];
+  return next == '/' || next == '?' || next == '#';
+}
+
+static void InitializeSecurityConfig() {
+  std::call_once(s_securityConfigInitFlag, []() {
+    @autoreleasepool {
+      id securityValue = Runtime::GetAppConfigValue("security");
+      if (!securityValue || ![securityValue isKindOfClass:[NSDictionary class]]) {
+        return;
+      }
+
+      NSDictionary* security = (NSDictionary*)securityValue;
+
+      id allowRemote = security[@"allowRemoteModules"];
+      if (allowRemote && [allowRemote respondsToSelector:@selector(boolValue)]) {
+        s_allowRemoteModules = [allowRemote boolValue];
+      }
+
+      id allowlist = security[@"remoteModuleAllowlist"];
+      if (allowlist && [allowlist isKindOfClass:[NSArray class]]) {
+        NSArray* list = (NSArray*)allowlist;
+        for (id item in list) {
+          if ([item isKindOfClass:[NSString class]]) {
+            NSString* str = (NSString*)item;
+            if (str.length > 0) {
+              s_remoteModuleAllowlist.push_back(std::string([str UTF8String]));
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+bool IsRemoteModulesAllowed() {
+  if (RuntimeConfig.IsDebug) {
+    return true;
+  }
+
+  InitializeSecurityConfig();
+  return s_allowRemoteModules;
+}
+
+bool IsRemoteUrlAllowed(const std::string& url) {
+  if (RuntimeConfig.IsDebug) {
+    return true;
+  }
+
+  InitializeSecurityConfig();
+  if (!s_allowRemoteModules) {
+    return false;
+  }
+
+  // If no allowlist is configured, allow all URLs (user explicitly enabled remote modules)
+  if (s_remoteModuleAllowlist.empty()) {
+    return true;
+  }
+
+  for (const std::string& entry : s_remoteModuleAllowlist) {
+    if (RemoteUrlMatchesAllowlistEntry(url, entry)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> context, const char* key,
@@ -781,7 +873,7 @@ static inline void InvokeHttpFetchYield() {
   if (cb != nullptr) cb();
 }
 
-void CleanupHMRGlobals() {
+void CleanupHttpLoaderGlobals() {
   ClearAllCacheBustMarks();
   // Reset the boot-complete flag so a re-launched runtime in the same
   // process starts in "cold boot" mode again (runloop pump armed).

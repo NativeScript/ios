@@ -21,7 +21,7 @@ describe("Remote Module Security", function() {
 
     // Hermetic by design: never touch live external hosts (esm.sh, TEST-NET
     // 192.0.2.1, example.com). HTTP module fetches are SYNCHRONOUS on the JS
-    // thread (HMRSupport.mm: NSURLConnection sendSynchronousRequest), so a slow
+    // thread (HttpLoader.mm: NSURLConnection sendSynchronousRequest), so a slow
     // or transitively-fanning remote import (e.g. esm.sh pulling a graph of
     // sub-modules) blocks the event loop and, accumulated, runs the whole suite
     // past its timeout on CI -> false "hang". A closed local port fails fast

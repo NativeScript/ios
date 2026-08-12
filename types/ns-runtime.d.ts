@@ -21,6 +21,18 @@ declare module "ns:runtime" {
    */
   export interface RuntimeConfig {
     releasedObjectPolicy: ReleasedObjectPolicy;
+    /**
+     * Verbose script/module-loading diagnostics. Boot default is the
+     * `logScriptLoading` value from nativescript.config / package.json
+     * (`false` when absent). Process-wide; main-isolate writes only.
+     */
+    logScriptLoading: boolean;
+    /**
+     * One log line per HTTP fetch URL (high volume). Boot default is the
+     * `httpFetchUrlLog` value from nativescript.config / package.json
+     * (`false` when absent). Process-wide; main-isolate writes only.
+     */
+    httpFetchUrlLog: boolean;
   }
 
   /**
@@ -28,7 +40,9 @@ declare module "ns:runtime" {
    *
    * Throws `TypeError` on an unknown key, an invalid value, or — for
    * process-wide keys such as `releasedObjectPolicy` — when called from a
-   * worker isolate.
+   * worker isolate. Remote-module security (`security.allowRemoteModules`,
+   * `security.remoteModuleAllowlist`) is not a runtime config key: it is
+   * read once from nativescript.config at boot and cannot be changed here.
    */
   export function setConfig<K extends keyof RuntimeConfig | (string & {})>(
     key: K,
