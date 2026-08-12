@@ -10,14 +10,25 @@ An addon written for this runtime is ordinary C or Objective-C++ compiled into t
 static napi_value Add(napi_env env, napi_callback_info info) {
   size_t argc = 2;
   napi_value args[2];
-  napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+  if (napi_get_cb_info(env, info, &argc, args, NULL, NULL) != napi_ok) {
+    return NULL;
+  }
+  if (argc < 2) {
+    napi_throw_type_error(env, NULL, "add expects two numbers");
+    return NULL;
+  }
 
   double a = 0, b = 0;
-  napi_get_value_double(env, args[0], &a);
-  napi_get_value_double(env, args[1], &b);
+  if (napi_get_value_double(env, args[0], &a) != napi_ok ||
+      napi_get_value_double(env, args[1], &b) != napi_ok) {
+    napi_throw_type_error(env, NULL, "add expects two numbers");
+    return NULL;
+  }
 
   napi_value result = NULL;
-  napi_create_double(env, a + b, &result);
+  if (napi_create_double(env, a + b, &result) != napi_ok) {
+    return NULL;
+  }
   return result;
 }
 
@@ -45,7 +56,26 @@ addon.add(1, 2); // 3
 
 `TestFixtures/NapiTestModule.mm` and `TestFixtures/NapiCoverageModule.mm` are complete working addons in this shape, and `TestRunner/app/tests/NapiTests.js` / `NapiCoverageTests.js` are their specs.
 
-`NapiRuntime.h` is Objective-C, so a plain `.c` addon should include `<NativeScript/napi/vendor/node_api.h>` instead — it is the same header `NapiRuntime.h` pulls in, and it ships in the framework alongside it. `NapiRuntime.h` is only needed for `NativeScriptNapiEnv()`.
+### Including the headers
+
+Write the ecosystem-standard bare include, exactly as an addon for Node.js or the napi-ios runtime would:
+
+```c
+#include <node_api.h>
+```
+
+and add one header search path to your plugin target (podspec `pod_target_xcconfig` / Xcode build setting):
+
+```
+HEADER_SEARCH_PATHS = $(inherited) "<path to>/NativeScript.framework/Headers/napi/vendor"
+```
+
+This is the portable form: the same source compiles against Node itself, napi-ios, and this runtime, and it is required if you use the `node-addon-api` C++ wrapper (its `napi.h` hard-codes `#include <node_api.h>`).
+
+Two framework-style spellings also work with **no** search-path configuration, at the cost of being NativeScript-specific:
+
+- `#include <NativeScript/node_api.h>` — a stable alias for the vendored header (there is a `<NativeScript/js_native_api.h>` alias too).
+- `#import <NativeScript/NapiRuntime.h>` — Objective-C; pulls in `node_api.h` and additionally declares `NativeScriptNapiEnv()`, which is the only thing it is needed for.
 
 ## Registering a module
 
@@ -56,7 +86,7 @@ The working pattern is the one above: fill in a `napi_module` and call `napi_mod
 - `nm_version` must be `NAPI_MODULE_VERSION`.
 - `nm_modname` is the name JS passes to `require()`. It is the key in a process-wide registry, so it must be unique across every addon linked into the app.
 - `nm_register_func` is called once per environment, lazily, the first time that environment requires the module.
-- `node_module_register` is accepted as an alias, for addons that self-register through Node's older `NODE_MODULE` path.
+- `napi_module_register` is the only registration entry point. There is deliberately no `node_module_register` alias: Node's symbol of that name takes a `node_module*` with a different field layout, so accepting it would misread the struct rather than help old `NODE_MODULE`-style addons.
 
 ## Loading from JS
 

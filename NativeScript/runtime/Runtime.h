@@ -70,6 +70,11 @@ class Runtime {
 
   static bool IsAlive(const v8::Isolate* isolate);
 
+  // Liveness by registry scan only — never dereferences `runtime`, so it is
+  // safe to call with a possibly-stale pointer (e.g. a thread-local left
+  // behind when a Runtime was destroyed on another thread).
+  static bool IsAlive(const Runtime* runtime);
+
   // Milliseconds since this runtime's time origin, on the monotonic clock.
   // Not inline on purpose: an inline definition would have to reach the
   // platform through GetPlatform(), which copies a shared_ptr on every call,

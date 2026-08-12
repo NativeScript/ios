@@ -661,6 +661,20 @@ bool Runtime::IsAlive(const Isolate* isolate) {
          Runtime::isolates_.end();
 }
 
+bool Runtime::IsAlive(const Runtime* runtime) {
+  if (runtime == nullptr) {
+    return false;
+  }
+
+  SpinLock lock(isolatesMutex_);
+  for (Isolate* isolate : Runtime::isolates_) {
+    if (GetRuntime(isolate) == runtime) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::shared_ptr<Platform> Runtime::platform_;
 std::vector<Isolate*> Runtime::isolates_;
 bool Runtime::v8Initialized_ = false;

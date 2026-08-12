@@ -68,13 +68,10 @@ void NAPI_CDECL napi_module_register(napi_module* mod) {
   registry.modules[mod->nm_modname] = mod;
 }
 
-// The symbol node-gyp addons built against Node's internal registration path
-// emit instead of napi_module_register.
-extern "C" NAPI_MODULE_EXPORT void node_module_register(void* mod);
-
-extern "C" NAPI_MODULE_EXPORT void node_module_register(void* mod) {
-  napi_module_register(static_cast<napi_module*>(mod));
-}
+// No `node_module_register` alias is exported: Node's symbol of that name
+// takes a `node_module*` (a different layout than `napi_module`) and
+// napi-ios's takes (name, init) — a single-pointer cast would misread both.
+// Addons register through `napi_module_register`.
 
 namespace tns {
 
@@ -168,6 +165,7 @@ napi_status NAPI_CDECL napi_fatal_exception(napi_env env, napi_value err) {
   CHECK_ARG(env, err);
 
   v8::HandleScope scope(env->isolate);
+  v8::Context::Scope context_scope(env->context());
   tns::NativeScriptException::ReportToJsHandlersAndLog(
       env->isolate,
       v8impl::V8LocalValueFromJsValue(err),
@@ -620,8 +618,19 @@ napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env basic_env,
     work->cancelled = false;
   }
 
+  // Node runs async work on a fixed libuv pool (4 threads by default) and
+  // addons write execute callbacks that assume a bounded worker count — an
+  // unbounded GCD queue would let N blocking callbacks spawn N threads.
+  static NSOperationQueue* workPool;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    workPool = [[NSOperationQueue alloc] init];
+    workPool.name = @"org.nativescript.napi.asyncwork";
+    workPool.maxConcurrentOperationCount = 4;
+  });
+
   CFRunLoopRef loop = work->loop;
-  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+  [workPool addOperationWithBlock:^{
     napi_status status = napi_ok;
     {
       std::lock_guard<std::mutex> lock(work->mutex);
@@ -641,7 +650,7 @@ napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env basic_env,
     tns::ExecuteOnRunLoop(loop, ^{
       CompleteAsyncWork(work, status);
     });
-  });
+  }];
 
   return napi_clear_last_error(env);
 }

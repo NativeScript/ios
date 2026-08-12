@@ -102,22 +102,24 @@ void NapiEnv::DeleteMe() {
   Isolate::Scope isolate_scope(this->isolate);
   HandleScope handle_scope(this->isolate);
 
+  // From here on can_call_into_js() is false: hooks and finalizers still run
+  // and may release env-bound resources (delete refs, release threadsafe
+  // functions), but any Node-API call that would enter JS is refused, matching
+  // Node's teardown contract.
+  this->tearingDown_ = true;
+
   // Cleanup hooks come first, so an addon gets to release its threadsafe
-  // functions and other env-bound resources itself. Execution is already
-  // terminating by now, so those releases work but nothing a hook does reaches
-  // JS. Whatever survives is closed below, before any reference is finalized —
-  // a threadsafe function holds one to its JS callback.
+  // functions and other env-bound resources itself. Whatever survives is
+  // closed below, before any reference is finalized — a threadsafe function
+  // holds one to its JS callback.
   NapiRunEnvCleanupHooks(this);
   NapiAbortThreadSafeFunctions(this);
 
   this->DrainFinalizers();
 
-  // Finalizers may still touch the env, so the drain runs before teardown is
-  // announced; past this point nothing an addon does may reach JS.
   v8impl::RefTracker::FinalizeAll(&this->finalizing_reflist);
   v8impl::RefTracker::FinalizeAll(&this->reflist);
 
-  this->tearingDown_ = true;
   this->moduleExports_.clear();
 
   delete this;

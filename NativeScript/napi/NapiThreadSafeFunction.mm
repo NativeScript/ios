@@ -131,18 +131,19 @@ void FinalizeOnJsThread(const TsfnRef& tsfn) {
     tsfn->callbackRef = nullptr;
   }
 
-  if (tsfn->finalizeCb != nullptr) {
-    tsfn->env->CallFinalizer(tsfn->finalizeCb, tsfn->finalizeData,
-                             tsfn->context);
-  }
-
   // Node hands undelivered items back with a null env so the producer's data
-  // can still be freed; there is no JS left to run for them.
+  // can still be freed; there is no JS left to run for them. This must happen
+  // before the finalize callback, which is where addons free the context these
+  // calls receive.
   while (!undelivered.empty()) {
     if (tsfn->callJs != nullptr) {
       tsfn->callJs(nullptr, nullptr, tsfn->context, undelivered.front());
     }
     undelivered.pop();
+  }
+
+  if (tsfn->finalizeCb != nullptr) {
+    tsfn->env->CallFinalizer(tsfn->finalizeCb, tsfn->finalizeData, tsfn->context);
   }
 }
 
@@ -305,6 +306,7 @@ void NapiAbortThreadSafeFunctions(NapiEnv* env) {
 
     v8::Isolate::Scope isolate_scope(env->isolate);
     v8::HandleScope handle_scope(env->isolate);
+    v8::Context::Scope context_scope(env->context());
     FinalizeOnJsThread(tsfn);
 
     // The runloop stays retained until the object dies; a producer may still
