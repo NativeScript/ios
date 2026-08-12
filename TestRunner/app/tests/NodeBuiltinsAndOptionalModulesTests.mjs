@@ -17,11 +17,8 @@ describe("Node built-in and optional module resolution", function () {
     expect(u.protocol).toBe("file:");
   });
 
-  // The optional-module placeholder is require()-path policy only (its specs live in
-  // shared/Require/index.js, pending review — docs/knowledge/optional-module-placeholder.md).
-  // import() deliberately diverges: a missing bare specifier rejects, package-shaped or not,
-  // so a dev-session import-map miss fails loudly instead of resolving to a lazily-throwing
-  // proxy. ESM callers that want optionality can `try { await import(x) } catch {}`.
+  // Missing bare specifiers fail at the request site on both require() and
+  // import(). ESM callers that want optionality can `try { await import(x) } catch {}`.
   it("rejects a missing bare specifier instead of resolving a placeholder", async function () {
     const names = [
       "__ns_optional_test_module__",
@@ -39,6 +36,15 @@ describe("Node built-in and optional module resolution", function () {
       }
       expect(error).not.toBe(null);
       expect(String(error)).toContain("Cannot find module");
+
+      let requireError = null;
+      try {
+        globalThis.require(name);
+      } catch (e) {
+        requireError = e;
+      }
+      expect(requireError).not.toBe(null);
+      expect(String(requireError)).toContain("Cannot find module");
     }
   });
 
