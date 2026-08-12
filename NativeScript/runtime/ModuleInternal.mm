@@ -8,9 +8,8 @@
 #include <string>
 #include "BuiltinLoader.h"
 #include "Caches.h"
-#include "DevFlags.h"
-#include "HMRSupport.h"
 #include "Helpers.h"
+#include "HttpLoader.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
 #include "napi/NapiModules.h"

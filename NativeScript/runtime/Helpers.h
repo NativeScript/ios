@@ -269,6 +269,19 @@ enum class ReleasedObjectPolicy {
 ReleasedObjectPolicy GetReleasedObjectPolicy();
 void SetReleasedObjectPolicy(ReleasedObjectPolicy policy);
 
+// Verbose script/module-loading diagnostics. Process-wide ns:runtime key
+// `logScriptLoading`; boot default is the nativescript.config / package.json
+// value (false when absent). Live value is readable via getConfig and
+// writable via setConfig from the main isolate.
+bool IsScriptLoadingLogEnabled();
+void SetScriptLoadingLogEnabled(bool enabled);
+
+// One log line per HTTP fetch URL (high volume). Process-wide ns:runtime
+// key `httpFetchUrlLog`; boot default is the nativescript.config /
+// package.json value (false when absent).
+bool IsHttpFetchUrlLogEnabled();
+void SetHttpFetchUrlLogEnabled(bool enabled);
+
 // Like GetValue, but applies ReleasedObjectPolicy when the object carries no
 // wrapper: throws (kThrow) or schedules a `releasednativeaccess` event
 // (kReport, deduplicated per object), returning nullptr either way.

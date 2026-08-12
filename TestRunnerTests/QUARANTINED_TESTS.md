@@ -57,7 +57,7 @@ server: it *accepts* the connection but never delivers a response, so every GET
 hits the loader's ~5s client timeout (×2 with retry).
 
 The runtime's HTTP module loader fetches **synchronously via the deprecated
-`NSURLConnection`** (`HMRSupport.mm`). For those accepted sockets the Embassy
+`NSURLConnection`** (`HttpLoader.mm`). For those accepted sockets the Embassy
 server's `getPeerName()` returns **EINVAL** — the exact crash originally seen at
 `DefaultHTTPServer.swift:87` — and the socket can't be served. The JUnit POST
 works only because it uses `NSURLSession`. The Embassy server is an IPv6 socket

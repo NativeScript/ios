@@ -67,6 +67,14 @@ Config keys:
 | key | values | scope | default |
 |---|---|---|---|
 | `releasedObjectPolicy` | `"report"` \| `"throw"` | process-wide (main-isolate writes only; read live by every isolate) | `"report"` |
+| `logScriptLoading` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | `false`, or the `logScriptLoading` value from nativescript.config / package.json at boot |
+| `httpFetchUrlLog` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | `false`, or the `httpFetchUrlLog` value from nativescript.config / package.json at boot |
+
+Remote-module security (`security.allowRemoteModules`,
+`security.remoteModuleAllowlist`) is **not** part of this surface. Those
+values are read once from nativescript.config / package.json the first time
+the HTTP loader gates a fetch, and they cannot be inspected or changed
+through `getConfig` / `setConfig`.
 
 `releasedObjectPolicy` controls what happens when JS touches a wrapper whose
 native counterpart has already been released (a state a resurrected object can
@@ -102,8 +110,9 @@ Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure test
 diagnostic; release builds omit it. Missing members are simply absent —
 never present-but-throwing — so feature checks work. The module is
 registered in every build; the security boundary for remote module loading
-sits at the network layer (`security.allowRemoteModules`), not the module
-registry.
+sits at the network layer (`security.allowRemoteModules` in
+nativescript.config, enforced inside `HttpLoader`), not the module
+registry and not `ns:runtime` getConfig/setConfig.
 
 Note: `ns:module` (loader policy, structured, boot-time) is deliberately
 separate from `ns:runtime` (live key-value runtime flags, `setConfig`/

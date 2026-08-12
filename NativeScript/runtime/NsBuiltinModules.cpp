@@ -5,8 +5,8 @@
 #include "BuiltinLoader.h"
 #include "Caches.h"
 #include "Console.h"
-#include "HMRSupport.h"
 #include "Helpers.h"
+#include "HttpLoader.h"
 #include "Runtime.h"
 
 using namespace v8;
@@ -35,14 +35,37 @@ constexpr Registration kRegistry[] = {
 };
 
 // ns:runtime config keys. Each key defines its value domain and scope here;
-// `releasedObjectPolicy` is process-wide (see ReleasedObjectPolicy in
-// Helpers.h), so setting it anywhere affects every isolate — which is why
-// writes are restricted to the main isolate.
+// process-wide keys (see Helpers.h) affect every isolate, so writes are
+// restricted to the main isolate. Remote-module security
+// (`security.allowRemoteModules`, `security.remoteModuleAllowlist`) is
+// deliberately not registered — it is boot-time nativescript.config only.
 constexpr const char* kReleasedObjectPolicyKey = "releasedObjectPolicy";
+constexpr const char* kLogScriptLoadingKey = "logScriptLoading";
+constexpr const char* kHttpFetchUrlLogKey = "httpFetchUrlLog";
 
 void ThrowTypeError(Isolate* isolate, const std::string& message) {
   isolate->ThrowException(
       Exception::TypeError(tns::ToV8String(isolate, message)));
+}
+
+bool EnsureMainIsolateWrite(Isolate* isolate, const std::string& key) {
+  if (Runtime::IsWorker()) {
+    ThrowTypeError(isolate, "'" + key +
+                                "' is process-wide and can only be set from the main "
+                                "isolate");
+    return false;
+  }
+  return true;
+}
+
+bool ParseBooleanValue(Isolate* isolate, const FunctionCallbackInfo<Value>& info,
+                       const std::string& key, bool* out) {
+  if (!info[1]->IsBoolean()) {
+    ThrowTypeError(isolate, "'" + key + "' must be a boolean");
+    return false;
+  }
+  *out = info[1].As<v8::Boolean>()->Value();
+  return true;
 }
 
 void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
@@ -53,11 +76,7 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
   }
   std::string key = tns::ToString(isolate, info[0]);
   if (key == kReleasedObjectPolicyKey) {
-    if (Runtime::IsWorker()) {
-      ThrowTypeError(isolate,
-                     "'" + key +
-                         "' is process-wide and can only be set from the main "
-                         "isolate");
+    if (!EnsureMainIsolateWrite(isolate, key)) {
       return;
     }
     std::string value =
@@ -69,6 +88,28 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     } else {
       ThrowTypeError(isolate, "'" + key + "' must be 'report' or 'throw'");
     }
+    return;
+  }
+  if (key == kLogScriptLoadingKey) {
+    if (!EnsureMainIsolateWrite(isolate, key)) {
+      return;
+    }
+    bool value = false;
+    if (!ParseBooleanValue(isolate, info, key, &value)) {
+      return;
+    }
+    tns::SetScriptLoadingLogEnabled(value);
+    return;
+  }
+  if (key == kHttpFetchUrlLogKey) {
+    if (!EnsureMainIsolateWrite(isolate, key)) {
+      return;
+    }
+    bool value = false;
+    if (!ParseBooleanValue(isolate, info, key, &value)) {
+      return;
+    }
+    tns::SetHttpFetchUrlLogEnabled(value);
     return;
   }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
@@ -87,6 +128,16 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
             ? "throw"
             : "report";
     info.GetReturnValue().Set(tns::ToV8String(isolate, value));
+    return;
+  }
+  if (key == kLogScriptLoadingKey) {
+    info.GetReturnValue().Set(
+        v8::Boolean::New(isolate, tns::IsScriptLoadingLogEnabled()));
+    return;
+  }
+  if (key == kHttpFetchUrlLogKey) {
+    info.GetReturnValue().Set(
+        v8::Boolean::New(isolate, tns::IsHttpFetchUrlLogEnabled()));
     return;
   }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
@@ -111,7 +162,7 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
 
   switch (builtin) {
     case BuiltinId::kNsModule: {
-      // The dev-loader control surface (HMRSupport.mm). The binding builder
+      // The HTTP-loader control surface (HttpLoader.mm). The binding builder
       // decides build-dependent membership; ns-module.js only shapes
       // and freezes whatever arrives.
       if (!BuildNsModuleBinding(context, binding)) {

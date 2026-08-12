@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <atomic>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include "Caches.h"
 #include "ErrorEvents.h"
@@ -293,6 +294,55 @@ tns::ReleasedObjectPolicy tns::GetReleasedObjectPolicy() {
 
 void tns::SetReleasedObjectPolicy(ReleasedObjectPolicy policy) {
   releasedObjectPolicy_.store(static_cast<int>(policy), std::memory_order_relaxed);
+}
+
+namespace {
+
+std::atomic<bool> scriptLoadingLog_{false};
+std::atomic<bool> httpFetchUrlLog_{false};
+std::once_flag logFlagsInitFlag_;
+
+bool BoolFromAppConfig(const char* key) {
+  id value = tns::Runtime::GetAppConfigValue(key);
+  if (value && [value respondsToSelector:@selector(boolValue)]) {
+    return [value boolValue];
+  }
+  return false;
+}
+
+void EnsureLogFlagsInitialized() {
+  std::call_once(logFlagsInitFlag_, []() {
+    @autoreleasepool {
+      scriptLoadingLog_.store(BoolFromAppConfig("logScriptLoading"), std::memory_order_relaxed);
+      httpFetchUrlLog_.store(BoolFromAppConfig("httpFetchUrlLog"), std::memory_order_relaxed);
+    }
+    if (scriptLoadingLog_.load(std::memory_order_relaxed)) {
+      Log(@"[http-loader] fetch-url-log=%s",
+          httpFetchUrlLog_.load(std::memory_order_relaxed) ? "enabled" : "disabled");
+    }
+  });
+}
+
+}  // namespace
+
+bool tns::IsScriptLoadingLogEnabled() {
+  EnsureLogFlagsInitialized();
+  return scriptLoadingLog_.load(std::memory_order_relaxed);
+}
+
+void tns::SetScriptLoadingLogEnabled(bool enabled) {
+  EnsureLogFlagsInitialized();
+  scriptLoadingLog_.store(enabled, std::memory_order_relaxed);
+}
+
+bool tns::IsHttpFetchUrlLogEnabled() {
+  EnsureLogFlagsInitialized();
+  return httpFetchUrlLog_.load(std::memory_order_relaxed);
+}
+
+void tns::SetHttpFetchUrlLogEnabled(bool enabled) {
+  EnsureLogFlagsInitialized();
+  httpFetchUrlLog_.store(enabled, std::memory_order_relaxed);
 }
 
 tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,

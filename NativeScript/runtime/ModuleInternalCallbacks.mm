@@ -13,9 +13,8 @@
 #include <queue>
 #include <string>
 #include <vector>
-#include "DevFlags.h"
-#include "HMRSupport.h"
 #include "Helpers.h"         // for tns::Exists
+#include "HttpLoader.h"
 #include "ModuleInternal.h"  // for LoadScript(...)
 #include "NativeScriptException.h"
 #include "NsBuiltinModules.h"
@@ -756,7 +755,7 @@ void CleanupImportMapGlobals() {
 //
 //   EnqueueUrl(root)
 //     → FetchModuleBodyAsync (NSURLSession on a
-//       background queue — see HMRSupport.mm)
+//       background queue — see HttpLoader.mm)
 //     → hop to the isolate's JS thread (ExecuteOnRunLoop on the runtime loop)
 //     → CompileModuleForResolveRegisterOnly (registers under the canonical
 //       URL key — the exact entry ResolveModuleCallback will look up)
