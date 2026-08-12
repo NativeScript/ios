@@ -79,11 +79,15 @@ void EventLoop::BindToCurrentThread() {
     SignalInternalLocked();
   }
   ArmInternalTimerLocked(now);
+  // replay buffered tokens under their original keys - PostOrderedToken
+  // already returned those to producers as the recall handle, so the flush
+  // must not re-clamp them (a past key simply fires on the next pass)
   auto tokens = std::move(bufferedTokens_);
   bufferedTokens_.clear();
   for (double due : tokens) {
-    PostOrderedTokenLocked(due, now);
+    pendingTokens_.insert(due);
   }
+  ArmOrderedTimerLocked(now);
 }
 
 void EventLoop::Shutdown() {

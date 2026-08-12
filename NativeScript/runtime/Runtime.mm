@@ -305,6 +305,10 @@ Isolate* Runtime::CreateIsolate() {
   // the registry may hold an unbound loop - or a stopped one, when a worker
   // isolate reuses a disposed isolate's address. Refresh, then attach to this
   // thread; foreground tasks buffered so far start flowing from here on.
+  // (In the reused-address case, tasks v8 posted DURING Isolate::New landed
+  // in the stale stopped loop and were dropped - refreshing any earlier is
+  // impossible (the address isn't known) and refreshing on runner lookup
+  // would defeat the matched-erase teardown protection.)
   eventLoop_ = NativeScriptPlatform::Instance()->RefreshEventLoop(isolate);
   eventLoop_->BindToCurrentThread();
   isolate->SetData(Constants::RUNTIME_SLOT, this);

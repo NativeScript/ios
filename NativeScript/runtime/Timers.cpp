@@ -27,11 +27,11 @@
  * Scheduling model: every scheduled timer posts one anonymous "due token"
  * through the runtime EventLoop's ordered lane, at a due time >= the timer's.
  * Timers therefore share one due-ordered domain with ordered macrotasks and
- * stay FIFO with CFRunLoopPerformBlock work on the same runloop. The token
- * does not name a timer: the EventLoop drain consumes the earliest due item
- * across this list and its own ordered entries. Cancelled timers leave a
- * tombstone so their token consumes a slot as a no-op instead of lending its
- * position to a later item.
+ * stay in fire-date order with foreign runloop timers. The token does not
+ * name a timer: the EventLoop drain consumes the earliest due item across
+ * this list and its own ordered entries. Cancelling recalls the pending
+ * token when possible and otherwise leaves a tombstone so the matured token
+ * consumes a slot as a no-op instead of lending its position to a later item.
  */
 
 using namespace v8;
@@ -140,10 +140,10 @@ class TimerState : public OrderedTaskSource {
                            });
       while (sit != sortedTimers_.end() && sit->dueTime == dueTime) {
         if (sit->id == taskId) {
-          // a future-due token is still in the loop's own bookkeeping and can
-          // be recalled outright, un-arming its wakeup (the pre-event-loop
-          // behavior of CFRunLoopTimerInvalidate). One already sent out as a
-          // performed block cannot - its slot gets the tombstone instead.
+          // a not-yet-matured token is still in the loop's own bookkeeping
+          // and can be recalled outright, un-arming its wakeup (the
+          // pre-event-loop behavior of CFRunLoopTimerInvalidate). A matured
+          // one cannot - its slot gets the tombstone instead.
           if (eventLoop_ != nullptr &&
               eventLoop_->TryCancelOrderedToken(it->second->postedTokenTime_)) {
             sortedTimers_.erase(sit);
