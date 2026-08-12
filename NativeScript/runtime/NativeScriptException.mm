@@ -227,14 +227,13 @@ static void ScheduleDeferredThrow(Isolate* isolate, NSException* e) {
   if (rt == nullptr) {
     return;
   }
-  CFRunLoopRef loop = rt->RuntimeLoop();
+  auto loop = rt->GetEventLoop();
   if (loop == nullptr) {
     return;
   }
-  CFRunLoopPerformBlock(loop, kCFRunLoopCommonModes, ^{
-    @throw e;
-  });
-  CFRunLoopWakeUp(loop);
+  // bare entry: runs with no V8 scopes and outside the loop's exception
+  // guard, so the NSException unwinds into the runloop frame
+  loop->PostInternalBare([e]() { @throw e; });
 }
 
 void NativeScriptException::DepositPendingPolicyThrow(Isolate* isolate, id exception) {
@@ -441,15 +440,16 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
       // scheduled for.
       DepositPendingPolicyThrow(isolate, fatal);
       Runtime* rt = Runtime::GetRuntime(isolate);
-      CFRunLoopRef loop = rt != nullptr ? rt->RuntimeLoop() : nullptr;
+      auto loop = rt != nullptr ? rt->GetEventLoop() : nullptr;
       if (loop != nullptr) {
-        CFRunLoopPerformBlock(loop, kCFRunLoopCommonModes, ^{
+        // bare entry: clean, V8-scope-free frame, outside the loop's
+        // exception guard
+        loop->PostInternalBare([isolate, fatal]() {
           id e = ClaimPendingPolicyThrowIfEqual(isolate, fatal);
           if (e != nil) {
             @throw e;
           }
         });
-        CFRunLoopWakeUp(loop);
       }
     } else if (policy != "report") {
       static std::once_flag warnedPolicy;

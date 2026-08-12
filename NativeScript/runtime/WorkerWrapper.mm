@@ -19,6 +19,28 @@ __attribute__((constructor)) void staticInitMethod() {
   workers_.maxConcurrentOperationCount = 100;
 }
 
+// Posts to the target runtime's internal lane from the worker thread. When
+// async is false, blocks until the entry ran; a post that raced the runtime's
+// shutdown is dropped and not waited on.
+static void PostToRuntimeLoop(Runtime* runtime, std::function<void()> fn, bool async) {
+  auto loop = runtime->GetEventLoop();
+  if (loop == nullptr) {
+    return;
+  }
+  if (async) {
+    loop->PostInternal(std::move(fn));
+    return;
+  }
+  dispatch_semaphore_t done = dispatch_semaphore_create(0);
+  bool posted = loop->PostInternal([fn = std::move(fn), done]() {
+    fn();
+    dispatch_semaphore_signal(done);
+  });
+  if (posted) {
+    dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
+  }
+}
+
 WorkerWrapper::WorkerWrapper(
     v8::Isolate* mainIsolate,
     std::function<void(v8::Isolate*, v8::Local<v8::Object> thiz, std::shared_ptr<worker::Message>)>
@@ -284,8 +306,8 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context
   if (runtime == nullptr) {
     return;
   }
-  tns::ExecuteOnRunLoop(
-      runtime->RuntimeLoop(),
+  PostToRuntimeLoop(
+      runtime,
       [this, message, src, stackTrace, lineNumber]() {
         v8::Locker locker(this->mainIsolate_);
         Isolate::Scope isolate_scope(this->mainIsolate_);
@@ -341,8 +363,8 @@ void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const 
   if (runtime == nullptr) {
     return;
   }
-  tns::ExecuteOnRunLoop(
-      runtime->RuntimeLoop(),
+  PostToRuntimeLoop(
+      runtime,
       [this, message, source, stackTrace, lineNumber]() {
         v8::Locker locker(this->mainIsolate_);
         Isolate::Scope isolate_scope(this->mainIsolate_);

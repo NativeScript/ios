@@ -12,6 +12,7 @@
 #include "InlineFunctions.h"
 #include "Interop.h"
 #include "NativeScriptException.h"
+#include "NativeScriptPlatform.h"
 #include "ObjectManager.h"
 #include "Performance.h"
 #include "PromiseProxy.h"
@@ -223,6 +224,13 @@ Runtime::~Runtime() {
   {
     v8::Locker lock(isolate_);
 
+    // Stop the event loop before any handle disposal: queued entries touch
+    // caches and persistents that go away below, and posts from other threads
+    // must start dropping now.
+    if (eventLoop_ != nullptr) {
+      eventLoop_->Shutdown();
+    }
+
     // Clear module registry before disposing other handles
     // This prevents crashes during g_moduleRegistry cleanup
     extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
@@ -249,6 +257,13 @@ Runtime::~Runtime() {
 
   DisposeIsolateWhenPossible(this->isolate_);
 
+  // Matched erase: only removes the registry entry while it still maps to
+  // this runtime's loop, so a worker isolate that reuses this pointer after
+  // the (possibly deferred) Dispose can't be evicted by us.
+  if (eventLoop_ != nullptr) {
+    NativeScriptPlatform::Instance()->IsolateDisposed(currentIsolate, eventLoop_);
+  }
+
   currentRuntime_ = nullptr;
 }
 
@@ -269,7 +284,9 @@ Isolate* Runtime::CreateIsolate() {
     std::string flags = RuntimeConfig.IsDebug ? "--expose_gc" : "--expose_gc --no-lazy";
     V8::SetFlagsFromString(flags.c_str(), flags.size());
 
-    Runtime::platform_ = platform::NewDefaultPlatform();
+    // wrap the default platform so foreground tasks ride each runtime
+    // thread's CFRunLoop instead of sitting in never-pumped libplatform queues
+    Runtime::platform_ = std::make_shared<NativeScriptPlatform>(platform::NewDefaultPlatform());
 
     V8::InitializePlatform(Runtime::platform_.get());
     V8::Initialize();
@@ -285,6 +302,12 @@ Isolate* Runtime::CreateIsolate() {
   create_params.array_buffer_allocator = &allocator_;
   Isolate* isolate = Isolate::New(create_params);
   runtimeLoop_ = CFRunLoopGetCurrent();
+  // v8 already asked for this isolate's task runner during Isolate::New, so
+  // the registry may hold an unbound loop - or a stopped one, when a worker
+  // isolate reuses a disposed isolate's address. Refresh, then attach to this
+  // thread; foreground tasks buffered so far start flowing from here on.
+  eventLoop_ = NativeScriptPlatform::Instance()->RefreshEventLoop(isolate);
+  eventLoop_->BindToCurrentThread();
   isolate->SetData(Constants::RUNTIME_SLOT, this);
 
   {
@@ -313,6 +336,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   // Worker::Init(isolate, globalTemplate, isWorker);
   DefineTimeMethod(isolate, globalTemplate);
   DefineDrainMicrotaskMethod(isolate, globalTemplate);
+  DefineQueueMacrotaskMethod(isolate, globalTemplate);
   // queueMicrotask(callback) per spec
   {
     Local<FunctionTemplate> qmtTemplate =
@@ -544,6 +568,40 @@ void Runtime::DefineDrainMicrotaskMethod(v8::Isolate* isolate,
         info.GetIsolate()->PerformMicrotaskCheckpoint();
       });
   globalTemplate->Set(ToV8String(isolate, "__drainMicrotaskQueue"), drainMicrotaskTemplate);
+}
+
+// TODO: remove the __ns__ prefix once the event loop's ordered lane backs
+// public macrotask APIs (performance observers etc.)
+void Runtime::DefineQueueMacrotaskMethod(v8::Isolate* isolate,
+                                         v8::Local<v8::ObjectTemplate> globalTemplate) {
+  Local<FunctionTemplate> queueMacrotaskTemplate =
+      FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+        auto* isolate = info.GetIsolate();
+        if (info.Length() < 1 || !info[0]->IsFunction()) {
+          isolate->ThrowException(Exception::TypeError(
+              tns::ToV8String(isolate, "__ns__queueMacrotask: callback must be a function")));
+          return;
+        }
+        Runtime* runtime = Runtime::GetRuntime(isolate);
+        if (runtime == nullptr || runtime->GetEventLoop() == nullptr) {
+          return;
+        }
+        auto callback =
+            std::make_shared<Persistent<v8::Function>>(isolate, info[0].As<v8::Function>());
+        // the ordered lane rides the home runloop's performed-block order, so
+        // the callback runs as a macrotask in strict FIFO order with JS timers
+        runtime->GetEventLoop()->PostOrdered([isolate, callback]() {
+          auto cache = Caches::Get(isolate);
+          Local<Context> context = cache->GetContext();
+          Context::Scope context_scope(context);
+          Local<v8::Function> cb = callback->Get(isolate);
+          callback->Reset();
+          // no TryCatch: like timer callbacks, uncaught errors surface
+          // through the isolate's message listener
+          (void)cb->Call(context, context->Global(), 0, nullptr);
+        });
+      });
+  globalTemplate->Set(ToV8String(isolate, "__ns__queueMacrotask"), queueMacrotaskTemplate);
 }
 
 void Runtime::DefineDateTimeConfigurationChangeNotificationMethod(

@@ -321,7 +321,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
             auto runtime = Runtime::GetRuntime(isolate);
             auto runtimeLoop = runtime->RuntimeLoop();
             void* weakSelf = (__bridge void*)self;
-            auto gcProtect = ^() {
+            auto gcProtect = [isolateWrapper, weakSelf, isolate]() {
               auto innerCache = isolateWrapper.GetCache();
               auto it = innerCache->Instances.find((id)weakSelf);
               if (it != innerCache->Instances.end()) {
@@ -337,7 +337,9 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
               }
             };
             if (CFRunLoopGetCurrent() != runtimeLoop) {
-              tns::ExecuteOnRunLoop(runtimeLoop, gcProtect);
+              // bare entry: the closure does its own Locker ceremony, exactly
+              // like the performed block it replaces
+              runtime->GetEventLoop()->PostInternalBare(gcProtect);
             } else {
               gcProtect();
             }
@@ -357,7 +359,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
 
           if ([self retainCount] == 2) {
             void* weakSelf = (__bridge void*)self;
-            auto gcUnprotect = ^() {
+            auto gcUnprotect = [isolateWrapper, weakSelf, isolate]() {
               auto innerCache = isolateWrapper.GetCache();
               auto it = innerCache->Instances.find((id)weakSelf);
               if (it != innerCache->Instances.end()) {
@@ -377,7 +379,9 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
             auto runtime = Runtime::GetRuntime(isolate);
             auto runtimeLoop = runtime->RuntimeLoop();
             if (CFRunLoopGetCurrent() != runtimeLoop) {
-              tns::ExecuteOnRunLoop(runtimeLoop, gcUnprotect);
+              // bare entry: the closure does its own Locker ceremony, exactly
+              // like the performed block it replaces
+              runtime->GetEventLoop()->PostInternalBare(gcUnprotect);
             } else {
               auto innerCache = isolateWrapper.GetCache();
               auto it = innerCache->Instances.find(self);

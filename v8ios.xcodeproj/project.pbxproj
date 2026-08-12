@@ -294,6 +294,8 @@
 		4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */; };
 		4A5C201A2E2B000300000006 /* Performance.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000300000001 /* Performance.cpp */; };
 		4A5C201A2E2B000200000006 /* NsBuiltinModules.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000200000001 /* NsBuiltinModules.cpp */; };
+		4AE7100A2E2B000400000003 /* EventLoop.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4AE7100A2E2B000400000001 /* EventLoop.mm */; };
+		4AE7100A2E2B000400000006 /* NativeScriptPlatform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4AE7100A2E2B000400000004 /* NativeScriptPlatform.mm */; };
 		4A5C201A2E2B000400000003 /* StructuredClone.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000400000001 /* StructuredClone.cpp */; };
 		4A5C201A2E2B000500000003 /* StructuredSerialization.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000500000001 /* StructuredSerialization.cpp */; };
 		C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */; };
@@ -816,6 +818,10 @@
 		4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = RuntimeBuiltins.cpp; path = generated/RuntimeBuiltins.cpp; sourceTree = "<group>"; };
 		4A5C201A2E2B000100000004 /* RuntimeBuiltins.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RuntimeBuiltins.h; path = generated/RuntimeBuiltins.h; sourceTree = "<group>"; };
 		4A5C201A2E2B000100000005 /* js */ = {isa = PBXFileReference; lastKnownFileType = folder; path = js; sourceTree = "<group>"; };
+		4AE7100A2E2B000400000001 /* EventLoop.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = EventLoop.mm; sourceTree = "<group>"; };
+		4AE7100A2E2B000400000002 /* EventLoop.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EventLoop.h; sourceTree = "<group>"; };
+		4AE7100A2E2B000400000004 /* NativeScriptPlatform.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptPlatform.mm; sourceTree = "<group>"; };
+		4AE7100A2E2B000400000005 /* NativeScriptPlatform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptPlatform.h; sourceTree = "<group>"; };
 		4A5C201A2E2B000400000001 /* StructuredClone.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StructuredClone.cpp; sourceTree = "<group>"; };
 		4A5C201A2E2B000400000002 /* StructuredClone.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StructuredClone.h; sourceTree = "<group>"; };
 		4A5C201A2E2B000500000001 /* StructuredSerialization.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StructuredSerialization.cpp; sourceTree = "<group>"; };
@@ -1525,6 +1531,10 @@
 				C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */,
 				C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */,
 				C2DDEB87229EAC8300345BFE /* StringHasher.h */,
+				4AE7100A2E2B000400000002 /* EventLoop.h */,
+				4AE7100A2E2B000400000001 /* EventLoop.mm */,
+				4AE7100A2E2B000400000005 /* NativeScriptPlatform.h */,
+				4AE7100A2E2B000400000004 /* NativeScriptPlatform.mm */,
 				4A5C201A2E2B000400000002 /* StructuredClone.h */,
 				4A5C201A2E2B000400000001 /* StructuredClone.cpp */,
 				4A5C201A2E2B000500000002 /* StructuredSerialization.h */,
@@ -2300,6 +2310,8 @@
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
 				4A5C201A2E2B000100000006 /* BuiltinLoader.cpp in Sources */,
 				4A5C201A2E2B000200000006 /* NsBuiltinModules.cpp in Sources */,
+				4AE7100A2E2B000400000003 /* EventLoop.mm in Sources */,
+				4AE7100A2E2B000400000006 /* NativeScriptPlatform.mm in Sources */,
 				4A5C201A2E2B000400000003 /* StructuredClone.cpp in Sources */,
 				4A5C201A2E2B000500000003 /* StructuredSerialization.cpp in Sources */,
 				4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */,

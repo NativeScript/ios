@@ -13,6 +13,7 @@
 #include "Helpers.h"
 #include "InspectorServer.h"
 #include "JsV8InspectorClient.h"
+#include "NativeScriptPlatform.h"
 #include "RuntimeConfig.h"
 #include "WorkerInspectorClient.h"
 #include "include/libplatform/libplatform.h"
@@ -436,9 +437,9 @@ void JsV8InspectorClient::runMessageLoopOnPause(int contextGroupId) {
       shouldWait = true;
     }
 
-    std::shared_ptr<Platform> platform = tns::Runtime::GetPlatform();
-    Isolate* isolate = isolate_;
-    platform::PumpMessageLoop(platform.get(), isolate, platform::MessageLoopBehavior::kDoNotWait);
+    // JS frames are on the stack, so only nestable v8 foreground tasks may
+    // run; everything else fires from its own wakeup after resume
+    tns::NativeScriptPlatform::Instance()->GetEventLoop(isolate_)->RunNestableV8Tasks();
     if (shouldWait && !terminated_) {
       dispatch_semaphore_wait(messageArrived_,
                               dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_MSEC));  // 1ms

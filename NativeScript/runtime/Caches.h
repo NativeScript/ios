@@ -81,6 +81,9 @@ class Caches {
 
   void SetContext(v8::Local<v8::Context> context);
   v8::Local<v8::Context> GetContext();
+  // GetContext crashes before SetContext; work can run in that window (v8
+  // posts foreground tasks during Isolate::New)
+  inline bool HasContext() { return context_ != nullptr; }
 
   // Per-isolate unhandled promise rejection tracking. Fed by
   // NativeScriptException::OnPromiseRejected and drained once per runloop turn.

@@ -311,7 +311,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
       return;
     }
 
-    tns::ExecuteOnRunLoop(runtime->RuntimeLoop(), [state, message]() {
+    runtime->GetEventLoop()->PostInternal([state, message]() {
       Isolate* isolate = state->GetIsolate();
       v8::Locker locker(isolate);
       Isolate::Scope isolate_scope(isolate);
