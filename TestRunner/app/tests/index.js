@@ -139,6 +139,7 @@ require("./Modules");
 require("./RuntimeImplementedAPIs");
 
 require("./Timers");
+require("./EventLoopTests");
 
 require("./URL");
 require("./URLSearchParams");
