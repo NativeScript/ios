@@ -138,6 +138,24 @@ describe("event loop ordered macrotasks", function () {
         expect(() => __ns__queueMacrotask("nope")).toThrowError(TypeError);
         expect(() => __ns__queueMacrotask()).toThrowError(TypeError);
     });
+
+    // the global setTimeout is the harness's NSTimer polyfill - a foreign
+    // CFRunLoopTimer on the same runloop. A foreign timer due between two of
+    // our matured tokens must fire between them (one token drains per fire;
+    // the runloop orders due timers by fire date), not after the batch.
+    it("interleaves with foreign NSTimer timeouts by due time", function (done) {
+        const order = [];
+        __ns__setTimeout(() => order.push("ns20"), 20);
+        setTimeout(() => order.push("nstimer25"), 25);
+        __ns__setTimeout(() => order.push("ns30"), 30);
+        // make all three overdue so they drain from the same runloop burst
+        const start = Date.now();
+        while (Date.now() - start < 45) { }
+        setTimeout(() => {
+            expect(order).toEqual(["ns20", "nstimer25", "ns30"]);
+            done();
+        }, 30);
+    });
 });
 
 // clearTimeout leaves a tombstone in the merged ordered domain, so the
@@ -171,6 +189,33 @@ describe("event loop ordered tombstones", function () {
             expect(order).toEqual(["late", "macro"]);
             done();
         });
+    });
+
+    // The exact hazard the tombstone exists for: a foreign runloop block
+    // queued between two timer tokens. Without the tombstone, the cleared
+    // timer's token would fire the later timer ahead of the native block.
+    it("does not run a later timer ahead of native blocks queued between the tokens", function (done) {
+        const order = [];
+        const first = __ns__setTimeout(() => order.push("cleared"), 0);
+        CFRunLoopPerformBlock(CFRunLoopGetCurrent(), kCFRunLoopCommonModes, () => order.push("native"));
+        __ns__setTimeout(() => {
+            order.push("t3");
+            expect(order).toEqual(["native", "t3"]);
+            done();
+        }, 0);
+        __ns__clearTimeout(first);
+    });
+
+    it("does not run a queued macrotask ahead of native blocks queued between the tokens", function (done) {
+        const order = [];
+        const first = __ns__setTimeout(() => order.push("cleared"), 0);
+        CFRunLoopPerformBlock(CFRunLoopGetCurrent(), kCFRunLoopCommonModes, () => order.push("native"));
+        __ns__queueMacrotask(() => {
+            order.push("macro");
+            expect(order).toEqual(["native", "macro"]);
+            done();
+        });
+        __ns__clearTimeout(first);
     });
 
     it("keeps interval callbacks running after an unrelated clear", function (done) {
