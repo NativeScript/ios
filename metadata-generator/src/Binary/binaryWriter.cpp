@@ -45,11 +45,23 @@ binary::MetaFileOffset binary::BinaryWriter::push_arrayCount(MetaArrayCount coun
 
 binary::MetaFileOffset binary::BinaryWriter::push_binaryArray(std::vector<binary::MetaFileOffset>& binaryArray)
 {
+  // Empty arrays carry no payload, so every one of them can share a single
+  // count-of-zero in the heap. Offset 0 is the null sentinel and the heap
+  // reserves a marker byte there, so a real array never lands on it.
+  if (binaryArray.empty() && this->emptyArrayOffset != 0) {
+    return this->emptyArrayOffset;
+  }
+
     binary::MetaFileOffset offset = this->_stream->position();
     this->push_arrayCount((binary::MetaArrayCount)binaryArray.size());
     for (binary::MetaFileOffset element : binaryArray) {
         this->push_pointer(element);
     }
+
+    if (binaryArray.empty()) {
+      this->emptyArrayOffset = offset;
+    }
+
     return offset;
 }
 

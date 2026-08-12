@@ -59,20 +59,23 @@ inline uint8_t getMinorVersion(uint8_t encodedVersion) {
 
 // Bit indices in flags section
 enum MetaFlags {
-    HasDemangledName = 8,
-    HasName = 7,
-    // IsIosAppExtensionAvailable = 6, the flag exists in metadata generator but we never use it in the runtime
-    FunctionReturnsUnmanaged = 3,
-    FunctionIsVariadic = 5,
-    FunctionOwnsReturnedCocoaObject = 4,
-    MemberIsOptional = 0, // Mustn't equal any Method or Property flag since it can be applicable to both
-    MethodIsInitializer = 1,
-    MethodIsVariadic = 2,
-    MethodIsNullTerminatedVariadic = 3,
-    MethodOwnsReturnedCocoaObject = 4,
-    MethodHasErrorOutParameter = 5,
-    PropertyHasGetter = 2,
-    PropertyHasSetter = 3,
+  HasDemangledName = 8,
+  HasName = 7,
+  // IsIosAppExtensionAvailable = 6, the flag exists in metadata generator but
+  // we never use it in the runtime
+  FunctionReturnsUnmanaged = 3,
+  FunctionIsVariadic = 5,
+  FunctionOwnsReturnedCocoaObject = 4,
+  MemberIsOptional = 0,  // Mustn't equal any Method or Property flag since it
+                         // can be applicable to both
+  MethodIsInitializer = 1,
+  MethodIsVariadic = 2,
+  MethodIsNullTerminatedVariadic = 3,
+  MethodOwnsReturnedCocoaObject = 4,
+  MethodHasErrorOutParameter = 5,
+  MethodHasConstructorTokens = 9,
+  PropertyHasGetter = 2,
+  PropertyHasSetter = 3,
 
 };
 
@@ -788,8 +791,13 @@ public:
         return this->_encodings.valuePtr();
     }
 
+    // The trailing _constructorTokens slot is only written when the flag is
+    // set, so it must not be read otherwise — the bytes past _encodings belong
+    // to whatever the generator emitted next.
     inline const char* constructorTokens() const {
-        return this->_constructorTokens.valuePtr();
+      return this->flag(MetaFlags::MethodHasConstructorTokens)
+                 ? this->_constructorTokens.valuePtr()
+                 : "";
     }
 
     bool isImplementedInClass(Class klass, bool isStatic) const;
