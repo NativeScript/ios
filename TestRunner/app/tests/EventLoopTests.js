@@ -280,6 +280,40 @@ describe("event loop ordered tombstones", function () {
     });
 });
 
+// Top-level await whose continuation arrives as a v8 foreground task. The
+// waitAsync wakeup is a NON-nestable task (v8 futex-emulation), so the
+// synchronous require spin must not run it while JS frames are on the stack:
+// require returns a namespace still in its TDZ, and the module completes from
+// the loop right after the turn - on main it stayed incomplete forever.
+describe("event loop top-level await", function () {
+    it("require() of a TLA module blocked on a foreground task completes after the turn", function (done) {
+        const mod = require("./esm/tla-foreground-task.mjs");
+        expect(() => mod.value).toThrowError(ReferenceError);
+        __ns__setTimeout(() => {
+            expect(mod.value).toBe("ok");
+            done();
+        }, 100);
+    });
+
+    it("dynamic import of a TLA module blocked on a foreground task settles", function (done) {
+        let importSettled = false;
+        import("~/tests/esm/tla-foreground-task-import.mjs").then(mod => {
+            importSettled = true;
+            expect(mod.value).toBe("ok");
+        }).catch(e => {
+            importSettled = true;
+            fail("dynamic import rejected: " + e);
+        });
+        __ns__setTimeout(() => {
+            // the module itself must have completed from the loop by now...
+            expect(globalThis.__tlaImportProbeDone).toBe("ok");
+            // ...and the import promise must have observed that completion
+            expect(importSettled).toBe(true);
+            done();
+        }, 300);
+    });
+});
+
 describe("event loop workers", function () {
     beforeEach(function () {
         this.originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;

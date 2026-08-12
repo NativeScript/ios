@@ -12,7 +12,7 @@
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
 #include "NsBuiltinModules.h"
-#include "Runtime.h"  // for GetAppConfigValue
+#include "Runtime.h"
 #include "RuntimeConfig.h"
 
 using namespace v8;
@@ -851,7 +851,17 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       int maxAttempts = 100;
       int attempts = 0;
 
+      // an await whose resolution arrives as a v8 foreground task (e.g.
+      // Atomics.waitAsync, streaming compilation) never settles from
+      // checkpoints alone; JS frames are on the stack, so like the inspector
+      // pause loops only nestable tasks may run here
+      Runtime* runtime = Runtime::GetRuntime(isolate);
+      std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+
       while (attempts < maxAttempts && !promiseTc.HasCaught()) {
+        if (eventLoop != nullptr) {
+          eventLoop->RunNestableV8Tasks();
+        }
         isolate->PerformMicrotaskCheckpoint();
 
         if (promiseTc.HasCaught()) {
