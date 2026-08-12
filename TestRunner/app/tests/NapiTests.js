@@ -120,12 +120,21 @@ describe("Node-API addon", function () {
             expect(sink).toBeGreaterThan(0);
 
             // Node-API finalizers are queued from the weak callback and drained
-            // on the next runloop turn, never inside the collection itself.
+            // on a later event-loop entry, never inside the collection itself.
             expect(napi.finalizerRan()).toBe(false);
-            setTimeout(function () {
-                expect(napi.finalizerRan()).toBe(true);
-                done();
-            }, 0);
+
+            // The drain shares the internal lane with V8's own GC tasks and
+            // runs one entry per pass, so there is no ordering guarantee
+            // against timers — poll instead of assuming the first tick.
+            var attempts = 0;
+            (function poll() {
+                if (napi.finalizerRan() || ++attempts > 50) {
+                    expect(napi.finalizerRan()).toBe(true);
+                    done();
+                    return;
+                }
+                setTimeout(poll, 0);
+            })();
         });
     });
 

@@ -482,17 +482,11 @@ napi_status NAPI_CDECL napi_make_callback(napi_env env,
 struct napi_async_work__ {
   enum class State { idle, queued, executing, completed };
 
-  ~napi_async_work__() {
-    if (loop != nullptr) {
-      CFRelease(loop);
-    }
-  }
-
   tns::NapiEnv* env = nullptr;
   v8::Isolate* isolate = nullptr;
-  // Retained: the execute callback can outlive the thread that owns the loop,
-  // and posting the completion to a deallocated one is fatal.
-  CFRunLoopRef loop = nullptr;
+  // Goes null once the runtime shuts the loop down; a completion that finds
+  // it null is dropped, the same fate Shutdown gives already-queued entries.
+  std::weak_ptr<tns::EventLoop> eventLoop;
   napi_async_execute_callback execute = nullptr;
   napi_async_complete_callback complete = nullptr;
   void* data = nullptr;
@@ -506,31 +500,21 @@ namespace {
 
 // The env's thread. `work` belongs to the addon, which is free to delete it
 // from the complete callback, so nothing may touch it afterwards.
+// Runs as an internal-lane entry, under the loop's Locker/scopes. Shutdown
+// drops queued completions before the env dies (the addon's `data` is dropped
+// with them — the same trade Node makes at environment shutdown), so no
+// liveness check or isolate ceremony is needed here.
 void CompleteAsyncWork(napi_async_work work, napi_status status) {
-  v8::Isolate* isolate = work->isolate;
   tns::NapiEnv* env = work->env;
   {
     std::lock_guard<std::mutex> lock(work->mutex);
     work->state = napi_async_work__::State::completed;
   }
 
-  // The env died while the work was in flight. The complete callback is the
-  // only thing that would have freed whatever the addon hung off `data`, so
-  // this drops it — the same trade Node makes at environment shutdown.
-  if (!tns::Runtime::IsAlive(isolate) ||
-      tns::NapiEnv::ForIsolate(isolate) != env) {
-    return;
-  }
-
   napi_async_complete_callback complete = work->complete;
   if (complete == nullptr) {
     return;
   }
-
-  v8::Locker locker(isolate);
-  v8::Isolate::Scope isolate_scope(isolate);
-  v8::HandleScope handle_scope(isolate);
-  v8::Context::Scope context_scope(env->context());
 
   void* data = work->data;
   env->CallIntoModule(
@@ -569,8 +553,7 @@ napi_create_async_work(napi_env env,
   napi_async_work__* work = new napi_async_work__();
   work->env = tnsEnv;
   work->isolate = env->isolate;
-  work->loop = tnsEnv->RuntimeLoop();
-  CFRetain(work->loop);
+  work->eventLoop = tnsEnv->GetEventLoop();
   work->execute = execute;
   work->complete = complete;
   work->data = data;
@@ -632,7 +615,6 @@ napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env basic_env,
     workPool.qualityOfService = NSQualityOfServiceDefault;
   });
 
-  CFRunLoopRef loop = work->loop;
   [workPool addOperationWithBlock:^{
     napi_status status = napi_ok;
     {
@@ -650,9 +632,10 @@ napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env basic_env,
       work->execute(work->env, work->data);
     }
 
-    tns::ExecuteOnRunLoop(loop, ^{
-      CompleteAsyncWork(work, status);
-    });
+    std::shared_ptr<tns::EventLoop> loop = work->eventLoop.lock();
+    if (loop != nullptr) {
+      loop->PostInternal([work, status]() { CompleteAsyncWork(work, status); });
+    }
   }];
 
   return napi_clear_last_error(env);

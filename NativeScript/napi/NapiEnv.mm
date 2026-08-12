@@ -14,7 +14,8 @@ namespace tns {
 
 NapiEnv::NapiEnv(Local<Context> context)
     : napi_env__(context, NODE_API_DEFAULT_MODULE_API_VERSION),
-      runtimeLoop_(CFRunLoopGetCurrent()) {}
+      runtimeLoop_(CFRunLoopGetCurrent()),
+      eventLoop_(Runtime::GetCurrentRuntime()->GetEventLoop()) {}
 
 NapiEnv::~NapiEnv() = default;
 
@@ -63,28 +64,25 @@ void NapiEnv::CallFinalizer(napi_finalize cb, void* data, void* hint) {
 
 void NapiEnv::EnqueueFinalizer(v8impl::RefTracker* finalizer) {
   // Runs inside V8's weak callback, where calling into JS is forbidden. The
-  // queue is drained on the next runloop turn instead, which is where Node
-  // puts it too (a SetImmediate there, a posted block here). One drain is
-  // scheduled per non-empty stretch of the queue.
+  // queue is drained on a later event-loop entry instead, which is where Node
+  // puts it too (a SetImmediate there, an internal-lane post here). One drain
+  // is scheduled per non-empty stretch of the queue.
   bool scheduled = !this->pending_finalizers.empty();
   napi_env__::EnqueueFinalizer(finalizer);
 
-  if (scheduled || this->tearingDown_ || this->runtimeLoop_ == nullptr) {
+  if (scheduled || this->tearingDown_) {
     return;
   }
 
-  Isolate* isolate = this->isolate;
-  NapiEnv* env = this;
-  tns::ExecuteOnRunLoop(this->runtimeLoop_, ^{
-    if (!Runtime::IsAlive(isolate) || NapiEnv::ForIsolate(isolate) != env) {
-      return;
-    }
+  std::shared_ptr<tns::EventLoop> loop = this->GetEventLoop();
+  if (loop == nullptr) {
+    return;
+  }
 
-    Locker locker(isolate);
-    Isolate::Scope isolate_scope(isolate);
-    HandleScope handle_scope(isolate);
-    env->DrainFinalizers();
-  });
+  // The entry runs under the loop's Locker/scopes; EventLoop::Shutdown drops
+  // queued entries before ~Runtime destroys this env, so `this` is live here.
+  NapiEnv* env = this;
+  loop->PostInternal([env]() { env->DrainFinalizers(); });
 }
 
 void NapiEnv::DrainFinalizers() {

@@ -40,11 +40,15 @@ struct napi_threadsafe_function__
 
   // Read from producer threads, so they are fixed at construction and only
   // cleared once the function is closed for good. The runloop is retained for
-  // the object's lifetime: a producer may still be holding it when the owning
-  // thread exits, and CFRunLoopPerformBlock on a deallocated loop is fatal.
+  // the object's lifetime and used for thread-identity checks only: a producer
+  // may compare against it after the owning thread exits, and comparing a
+  // deallocated pointer is fine where calling into it would not be. Work is
+  // posted through the event loop, whose weak_ptr goes null once the runtime
+  // shuts it down.
   tns::NapiEnv* env = nullptr;
   v8::Isolate* isolate = nullptr;
   CFRunLoopRef loop = nullptr;
+  std::weak_ptr<tns::EventLoop> eventLoop;
 
   // Touched on the env's thread only, which is where the abort path and every
   // dispatch run.
@@ -243,39 +247,29 @@ void RunDispatch(const TsfnRef& tsfn) {
 }
 
 void PostDispatch(const TsfnRef& tsfn) {
-  v8::Isolate* isolate = nullptr;
-  tns::NapiEnv* env = nullptr;
-  CFRunLoopRef loop = nullptr;
+  std::weak_ptr<tns::EventLoop> weakLoop;
   {
-    // Read under the mutex: this runs on producer threads, and teardown clears
-    // all three as soon as it has closed the function.
+    // Read under the mutex: this runs on producer threads, and teardown
+    // closes the function as soon as the env starts tearing down.
     std::lock_guard<std::mutex> lock(tsfn->mutex);
-    if (tsfn->dispatchPosted || !tsfn->envAlive || tsfn->loop == nullptr) {
+    if (tsfn->dispatchPosted || !tsfn->envAlive) {
       return;
     }
     tsfn->dispatchPosted = true;
-    isolate = tsfn->isolate;
-    env = tsfn->env;
-    loop = tsfn->loop;
+    weakLoop = tsfn->eventLoop;
   }
 
-  // The block owns a reference: the handle may be released, and the queue
-  // drained by an earlier dispatch, before this one runs.
+  // The entry owns a reference: the handle may be released, and the queue
+  // drained by an earlier dispatch, before this one runs. It runs under the
+  // loop's Locker/scopes, and EventLoop::Shutdown drops queued entries before
+  // the env dies, so no liveness re-check is needed inside.
   TsfnRef ref = tsfn;
 
-  tns::ExecuteOnRunLoop(loop, ^{
-    if (!tns::Runtime::IsAlive(isolate) ||
-        tns::NapiEnv::ForIsolate(isolate) != env) {
-      std::lock_guard<std::mutex> lock(ref->mutex);
-      ref->dispatchPosted = false;
-      return;
-    }
-
-    v8::Locker locker(isolate);
-    v8::Isolate::Scope isolate_scope(isolate);
-    v8::HandleScope handle_scope(isolate);
-    RunDispatch(ref);
-  });
+  std::shared_ptr<tns::EventLoop> loop = weakLoop.lock();
+  if (loop == nullptr || !loop->PostInternal([ref]() { RunDispatch(ref); })) {
+    std::lock_guard<std::mutex> lock(ref->mutex);
+    ref->dispatchPosted = false;
+  }
 }
 
 }  // namespace
@@ -358,6 +352,7 @@ napi_create_threadsafe_function(napi_env env,
   tsfn->isolate = env->isolate;
   tsfn->loop = tnsEnv->RuntimeLoop();
   CFRetain(tsfn->loop);
+  tsfn->eventLoop = tnsEnv->GetEventLoop();
   tsfn->callJs = call_js_cb;
   tsfn->finalizeCb = thread_finalize_cb;
   tsfn->finalizeData = thread_finalize_data;

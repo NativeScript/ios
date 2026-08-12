@@ -12,12 +12,15 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 
 #include "js_native_api_v8.h"
 
 namespace tns {
+
+class EventLoop;
 
 // The napi_env behind every Node-API call, one per runtime isolate/context.
 // Node's equivalent (node_napi_env__) lives in node_api.cc, which is not
@@ -40,10 +43,14 @@ class NapiEnv : public napi_env__ {
 
   v8::Local<v8::Private> PrivateKey(NapiPrivateKeySlot slot);
 
-  // The runloop of the thread that owns this env. Everything the async surface
-  // schedules from another thread has to be posted there, because that is the
-  // only thread allowed to enter the isolate.
+  // The runloop of the thread that owns this env — identity checks only
+  // (is-this-the-env's-thread); work is posted through GetEventLoop().
   CFRunLoopRef RuntimeLoop() const { return runtimeLoop_; }
+
+  // The runtime's event loop, or null once the runtime shut it down. Posted
+  // internal-lane entries run on the env's thread under the loop's
+  // Locker/scopes and end with a microtask checkpoint.
+  std::shared_ptr<EventLoop> GetEventLoop() const { return eventLoop_.lock(); }
 
   // Exports of an addon already initialized in this env, or an empty handle.
   v8::MaybeLocal<v8::Object> CachedModuleExports(const std::string& name);
@@ -57,6 +64,7 @@ class NapiEnv : public napi_env__ {
   void DrainFinalizers();
 
   CFRunLoopRef runtimeLoop_ = nullptr;
+  std::weak_ptr<EventLoop> eventLoop_;
   bool tearingDown_ = false;
   v8::Eternal<v8::Private> privateKeys_[2];
   std::unordered_map<std::string, v8::Global<v8::Object>> moduleExports_;
