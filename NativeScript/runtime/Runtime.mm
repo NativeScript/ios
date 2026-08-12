@@ -32,6 +32,7 @@
 #include "HMRSupport.h"
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
+#include "napi/NapiEnv.h"
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
@@ -238,6 +239,11 @@ Runtime::~Runtime() {
     }
     g_moduleRegistry.clear();
 
+    // Before DisposeAllRegistered: the env's reference lists hold v8::Globals,
+    // so its teardown needs the isolate alive and locked.
+    NapiEnv::Destroy(static_cast<NapiEnv*>(this->napiEnv_));
+    this->napiEnv_ = nullptr;
+
     ObjectManager::DisposeAllRegistered(isolate_);
 
     if (IsRuntimeWorker()) {
@@ -416,6 +422,8 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   InlineFunctions::Init(context);
 
   cache->SetContext(context);
+
+  this->napiEnv_ = NapiEnv::Create(context);
 
   this->isolate_ = isolate;
 }
@@ -651,6 +659,26 @@ bool Runtime::IsAlive(const Isolate* isolate) {
   SpinLock lock(isolatesMutex_);
   return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) !=
          Runtime::isolates_.end();
+}
+
+napi_env Runtime::GetNapiEnvIfAlive(const Runtime* runtime) {
+  if (runtime == nullptr) {
+    return nullptr;
+  }
+
+  SpinLock lock(isolatesMutex_);
+  for (Isolate* isolate : Runtime::isolates_) {
+    Runtime* candidate = GetRuntime(isolate);
+    // The home-loop comparison closes the allocator-reuse (ABA) hole: a stale
+    // thread-local can only exist on the dead runtime's home thread, and a
+    // recycled same-address Runtime homed on this thread would have
+    // overwritten that thread-local — so an address match with a foreign home
+    // loop can only be a recycled pointer.
+    if (candidate == runtime && candidate->RuntimeLoop() == CFRunLoopGetCurrent()) {
+      return candidate->GetNapiEnv();
+    }
+  }
+  return nullptr;
 }
 
 std::shared_ptr<Platform> Runtime::platform_;

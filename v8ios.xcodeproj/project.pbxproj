@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4E10A9100000000000000201 /* js_native_api_v8.cc in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000001 /* js_native_api_v8.cc */; settings = {COMPILER_FLAGS = "-Wno-deprecated-declarations -Wno-shorten-64-to-32"; }; };
+		4E10A9100000000000000202 /* NapiEnv.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A910000000000000000D /* NapiEnv.mm */; };
+		4E10A9100000000000000203 /* NodeApiEmbed.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A910000000000000000F /* NodeApiEmbed.mm */; };
+		4E10A9100000000000000204 /* NapiRuntime.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000011 /* NapiRuntime.mm */; };
+		4E10A9100000000000000205 /* NapiRuntime.h in Headers */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000010 /* NapiRuntime.h */; };
+		4E10A9100000000000000206 /* NapiTestModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000012 /* NapiTestModule.mm */; };
+		4E10A9100000000000000208 /* NapiCoverageModule.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000015 /* NapiCoverageModule.mm */; };
+		4E10A9100000000000000207 /* NapiThreadSafeFunction.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4E10A9100000000000000014 /* NapiThreadSafeFunction.mm */; };
 		2B5088A62BBEB92300F6EB68 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE21ED2AC1AC3100307752 /* metadata-arm64.bin */; };
 		2B5088A72BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
@@ -454,6 +462,28 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4E10A9100000000000000001 /* js_native_api_v8.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = js_native_api_v8.cc; sourceTree = "<group>"; };
+		4E10A9100000000000000002 /* js_native_api_v8.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = js_native_api_v8.h; sourceTree = "<group>"; };
+		4E10A9100000000000000003 /* js_native_api.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = js_native_api.h; sourceTree = "<group>"; };
+		4E10A9100000000000000004 /* js_native_api_types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = js_native_api_types.h; sourceTree = "<group>"; };
+		4E10A9100000000000000005 /* node_api.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = node_api.h; sourceTree = "<group>"; };
+		4E10A9100000000000000006 /* node_api_types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = node_api_types.h; sourceTree = "<group>"; };
+		4E10A9100000000000000007 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		4E10A9100000000000000008 /* NOTICE */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = NOTICE; sourceTree = "<group>"; };
+		4E10A9100000000000000009 /* env-inl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "env-inl.h"; sourceTree = "<group>"; };
+		4E10A910000000000000000A /* js_native_api_v8_internals.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = js_native_api_v8_internals.h; sourceTree = "<group>"; };
+		4E10A910000000000000000B /* util-inl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "util-inl.h"; sourceTree = "<group>"; };
+		4E10A910000000000000000C /* NapiEnv.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiEnv.h; sourceTree = "<group>"; };
+		4E10A910000000000000000D /* NapiEnv.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiEnv.mm; sourceTree = "<group>"; };
+		4E10A910000000000000000E /* NapiModules.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiModules.h; sourceTree = "<group>"; };
+		4E10A910000000000000000F /* NodeApiEmbed.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NodeApiEmbed.mm; sourceTree = "<group>"; };
+		4E10A9100000000000000010 /* NapiRuntime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiRuntime.h; sourceTree = "<group>"; };
+		4E10A9100000000000000011 /* NapiRuntime.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiRuntime.mm; sourceTree = "<group>"; };
+		4E10A9100000000000000012 /* NapiTestModule.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiTestModule.mm; sourceTree = "<group>"; };
+		4E10A9100000000000000015 /* NapiCoverageModule.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiCoverageModule.mm; sourceTree = "<group>"; };
+		4E10A9100000000000000016 /* NapiTestSupport.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiTestSupport.h; sourceTree = "<group>"; };
+		4E10A9100000000000000013 /* NapiThreadSafeFunction.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NapiThreadSafeFunction.h; sourceTree = "<group>"; };
+		4E10A9100000000000000014 /* NapiThreadSafeFunction.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NapiThreadSafeFunction.mm; sourceTree = "<group>"; };
 		2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptException.mm; sourceTree = "<group>"; };
 		2B7EA6AE2353477000E5184E /* NativeScriptException.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptException.h; sourceTree = "<group>"; };
 		2BFE21F22AC1B7D500307752 /* UIView+NativeScript.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIView+NativeScript.h"; sourceTree = "<group>"; };
@@ -987,6 +1017,46 @@
 			path = v8runtime;
 			sourceTree = "<group>";
 		};
+		4E10A9100000000000000100 /* napi */ = {
+			isa = PBXGroup;
+			children = (
+				4E10A9100000000000000102 /* vendor */,
+				4E10A9100000000000000101 /* shim */,
+				4E10A910000000000000000C /* NapiEnv.h */,
+				4E10A910000000000000000D /* NapiEnv.mm */,
+				4E10A910000000000000000E /* NapiModules.h */,
+				4E10A9100000000000000013 /* NapiThreadSafeFunction.h */,
+				4E10A9100000000000000014 /* NapiThreadSafeFunction.mm */,
+				4E10A910000000000000000F /* NodeApiEmbed.mm */,
+			);
+			path = napi;
+			sourceTree = "<group>";
+		};
+		4E10A9100000000000000101 /* shim */ = {
+			isa = PBXGroup;
+			children = (
+				4E10A9100000000000000009 /* env-inl.h */,
+				4E10A910000000000000000A /* js_native_api_v8_internals.h */,
+				4E10A910000000000000000B /* util-inl.h */,
+			);
+			path = shim;
+			sourceTree = "<group>";
+		};
+		4E10A9100000000000000102 /* vendor */ = {
+			isa = PBXGroup;
+			children = (
+				4E10A9100000000000000003 /* js_native_api.h */,
+				4E10A9100000000000000004 /* js_native_api_types.h */,
+				4E10A9100000000000000001 /* js_native_api_v8.cc */,
+				4E10A9100000000000000002 /* js_native_api_v8.h */,
+				4E10A9100000000000000005 /* node_api.h */,
+				4E10A9100000000000000006 /* node_api_types.h */,
+				4E10A9100000000000000008 /* NOTICE */,
+				4E10A9100000000000000007 /* README.md */,
+			);
+			path = vendor;
+			sourceTree = "<group>";
+		};
 		6573B9D8291FE2A700B0ED7C /* jsi */ = {
 			isa = PBXGroup;
 			children = (
@@ -1173,6 +1243,9 @@
 				C29374F9229FC1600075CB16 /* TestFixtures.h */,
 				C2937508229FC1600075CB16 /* TNSTestCommon.h */,
 				C29374F8229FC1600075CB16 /* TNSTestCommon.m */,
+				4E10A9100000000000000012 /* NapiTestModule.mm */,
+				4E10A9100000000000000015 /* NapiCoverageModule.mm */,
+				4E10A9100000000000000016 /* NapiTestSupport.h */,
 				C2937507229FC1600075CB16 /* TNSTestNativeCallbacks.h */,
 				C29374F4229FC1600075CB16 /* TNSTestNativeCallbacks.m */,
 				C24ECA9222C4FF3700AEBA9A /* exported-symbols.txt */,
@@ -1426,6 +1499,7 @@
 				6573B9D8291FE2A700B0ED7C /* jsi */,
 				6573B9C1291FE29F00B0ED7C /* v8runtime */,
 				C247C14C22F82842001D2CA2 /* include */,
+				4E10A9100000000000000100 /* napi */,
 				C2DDEB3B229EAB8600345BFE /* runtime */,
 				C2DDEB35229EAB3B00345BFE /* Info.plist */,
 				C2DDEB34229EAB3B00345BFE /* NativeScript.h */,
@@ -1433,6 +1507,8 @@
 				C298C029233DEB8C000DDF54 /* NativeScript-Prefix.pch */,
 				6573B9EB291FE5B700B0ED7C /* JSIRuntime.h */,
 				6573B9EC291FE5B700B0ED7C /* JSIRuntime.m */,
+				4E10A9100000000000000010 /* NapiRuntime.h */,
+				4E10A9100000000000000011 /* NapiRuntime.mm */,
 			);
 			path = NativeScript;
 			sourceTree = "<group>";
@@ -1632,6 +1708,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E10A9100000000000000205 /* NapiRuntime.h in Headers */,
 				F6191AB629C0FF87003F588F /* utils.h in Headers */,
 				C298C028233C9AEA000DDF54 /* TSHelpers.h in Headers */,
 				9160C065291ED41F000641C0 /* SpinLock.h in Headers */,
@@ -2260,6 +2337,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E10A9100000000000000206 /* NapiTestModule.mm in Sources */,
+				4E10A9100000000000000208 /* NapiCoverageModule.mm in Sources */,
 				C22EF68B2379412100D67CBF /* TNSSwiftLike.m in Sources */,
 				C293751A229FC1600075CB16 /* TNSMethodCalls.m in Sources */,
 				C2937518229FC1600075CB16 /* TNSClassWithPlaceholder.m in Sources */,
@@ -2297,6 +2376,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E10A9100000000000000201 /* js_native_api_v8.cc in Sources */,
+				4E10A9100000000000000202 /* NapiEnv.mm in Sources */,
+				4E10A9100000000000000207 /* NapiThreadSafeFunction.mm in Sources */,
+				4E10A9100000000000000203 /* NodeApiEmbed.mm in Sources */,
+				4E10A9100000000000000204 /* NapiRuntime.mm in Sources */,
 				F1F30E8C2B58FE28006A62C0 /* ada.cpp in Sources */,
 				C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */,
 				6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */,
@@ -2776,6 +2860,10 @@
 				DEFINES_MODULE = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/NativeScript",
+					"$(SRCROOT)/TestFixtures",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2795,6 +2883,10 @@
 				ENABLE_NS_ASSERTIONS = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "$(SRCROOT)/TestFixtures/TestFixtures-Prefix.h";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/NativeScript",
+					"$(SRCROOT)/TestFixtures",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -2834,6 +2926,7 @@
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
 					"-ObjC",
+					"-lc++",
 					"-framework",
 					NativeScript,
 					"-framework",
@@ -2889,6 +2982,7 @@
 				OTHER_LDFLAGS = (
 					"-Wl,-search_paths_first",
 					"-ObjC",
+					"-lc++",
 					"-framework",
 					NativeScript,
 					"-framework",
@@ -3004,6 +3098,8 @@
 					"$(SRCROOT)/NativeScript/v8runtime",
 					"$(SRCROOT)/NativeScript/jsi",
 					"$(SRCROOT)/NativeScript/runtime/generated",
+					"$(SRCROOT)/NativeScript/napi/shim",
+					"$(SRCROOT)/NativeScript/napi/vendor",
 				);
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
@@ -3098,6 +3194,8 @@
 					"$(SRCROOT)/NativeScript/v8runtime",
 					"$(SRCROOT)/NativeScript/jsi",
 					"$(SRCROOT)/NativeScript/runtime/generated",
+					"$(SRCROOT)/NativeScript/napi/shim",
+					"$(SRCROOT)/NativeScript/napi/vendor",
 				);
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";

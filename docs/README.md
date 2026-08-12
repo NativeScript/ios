@@ -8,6 +8,8 @@
 
 - [structuredClone](structured-clone.md) — the WHATWG `structuredClone(value, { transfer })` global: what clones, how graph identity and cycles are preserved, `ArrayBuffer` transfer, and the `DataCloneError`-named `Error` that stands in for `DOMException`.
 
+- [Node-API](node-api.md) — writing a Node-API addon for this runtime: registering a module and loading it with `require()`, getting the `napi_env` from native code, the threading contract, finalizer timing, which Node-API version applies, and the divergences from Node's `node_api.h`.
+
 ## Knowledge
 
 Notes on work that is done, kept because the reasoning is expensive to

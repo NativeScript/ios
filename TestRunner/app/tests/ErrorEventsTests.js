@@ -182,10 +182,6 @@ describe("WHATWG error events", function () {
         });
         // Prevent the report so it does not hit the shim; the promise still counts
         // as reported and becomes outstanding for rejectionhandled purposes.
-        // Capture the promise carried by the unhandledrejection event: the runtime
-        // events carry the underlying V8 promise (the PromiseProxy wrapper the
-        // user holds is a different object), so "same promise" is verified by
-        // comparing the two events' promise, which must be identical.
         let reportedPromise = null;
         onGlobal("unhandledrejection", function (e) {
             reportedPromise = e.promise;
@@ -204,6 +200,7 @@ describe("WHATWG error events", function () {
                     expect(rejectionHandled.type).toBe("rejectionhandled");
                     expect(typeof rejectionHandled.promise.then).toBe("function");
                     expect(rejectionHandled.promise).toBe(reportedPromise);
+                    expect(rejectionHandled.promise).toBe(p);
                     // The original rejection reason is retained past reporting
                     // and carried on the rejectionhandled event, per spec.
                     expect(rejectionHandled.reason).toBe(reason);

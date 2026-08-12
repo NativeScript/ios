@@ -173,6 +173,10 @@ require("./PerformanceTests");
 // The ns:/node: builtin modules
 require("./NsUtilTests");
 
+// Node-API addon surface
+require("./NapiTests");
+require("./NapiCoverageTests");
+
 // Worker-isolate scoping of extended objc class names
 require("./ExtendedClassNamingTests");
 

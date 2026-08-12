@@ -49,22 +49,9 @@ global.Promise = new Proxy(global.Promise, {
             });
         });
 
-        return new Proxy(promise, {
-            get: function(target, name) {
-                let orig = target[name];
-                if (name === "then" || name === "catch" || name === "finally") {
-                    return FunctionPrototypeBind(orig, target);
-                }
-                return typeof orig === 'function' ? function(x) {
-                    if (!originIsRuntimeLoop || runloop === CFRunLoopGetCurrent()) {
-                        FunctionPrototypeBind(orig, target, x)();
-                        return target;
-                    }
-                    CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, FunctionPrototypeBind(orig, target, x));
-                    CFRunLoopWakeUp(runloop);
-                    return target;
-                } : orig;
-            }
-        });
+        // The marshaling lives entirely in the wrapped executor above, so the
+        // real promise goes out untouched — engine-level checks (IsPromise,
+        // Node-API, rejection tracking) see the same object user code holds.
+        return promise;
     }
 });
