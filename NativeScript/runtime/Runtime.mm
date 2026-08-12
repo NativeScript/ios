@@ -23,7 +23,6 @@
 #include "TSHelpers.h"
 #include "WeakRef.h"
 #include "Worker.h"
-// #include "SetTimeout.h"
 
 #include "IsolateWrapper.h"
 
@@ -353,7 +352,6 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     globalTemplate->Set(tns::ToV8String(isolate, "queueMicrotask"), qmtTemplate);
   }
   ObjectManager::Init(isolate, globalTemplate);
-  //    SetTimeout::Init(isolate, globalTemplate);
   MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
   isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
