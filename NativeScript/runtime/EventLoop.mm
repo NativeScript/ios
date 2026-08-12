@@ -151,29 +151,21 @@ void EventLoop::PostOrderedLocked(Entry entry, double delayMs) {
   }
 }
 
-void EventLoop::PostTokenBlockLocked() {
-  // the block can outlive this object (a performed block cannot be
-  // cancelled), so it holds a weak reference and no-ops once the loop is gone
-  std::weak_ptr<EventLoop> weakSelf = weak_from_this();
-  CFRunLoopPerformBlock(loop_, kCFRunLoopCommonModes, ^{
-    if (auto self = weakSelf.lock()) {
-      self->RunOrderedTask();
-    }
-  });
-  CFRunLoopWakeUp(loop_);
-}
-
 void EventLoop::PostOrderedTokenLocked(double dueTimeMs, double now) {
   if (loop_ == nullptr) {
     bufferedTokens_.push_back(dueTimeMs);
     return;
   }
-  if (dueTimeMs <= now) {
-    PostTokenBlockLocked();
-  } else {
-    pendingTokens_.insert(dueTimeMs);
-    ArmOrderedTimerLocked(now);
-  }
+  // every token rides the timer phase, even due-now ones (a past fire date
+  // fires on the next runloop pass). Performed blocks would deliver sooner,
+  // but a self-rescheduling chain of them never lets the loop reach its
+  // before-waiting phase - starving CA rendering commits, the autorelease
+  // pool and the rejection drain - while a due timer still yields a full
+  // pass between fires. This also keeps due-now tokens in fire-date order
+  // with foreign NSTimers, like the per-timer CFRunLoopTimers this replaces.
+  pendingTokens_.insert(std::max(dueTimeMs, now));
+  ArmOrderedTimerLocked(now);
+  CFRunLoopWakeUp(loop_);
 }
 
 bool EventLoop::PostInternal(std::function<void()> fn) {

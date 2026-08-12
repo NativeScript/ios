@@ -158,6 +158,53 @@ describe("event loop ordered macrotasks", function () {
     });
 });
 
+// A self-rescheduling immediate timer must not starve the rest of the
+// runloop: foreign timers, the GCD main queue and the before-waiting phase
+// all have to keep running between steps. The before-waiting probe is the
+// runtime's own rejection drain (a native kCFRunLoopBeforeWaiting observer):
+// a rejection created mid-chain must be reported while the chain is still
+// running, not after it ends.
+describe("event loop immediate timer yielding", function () {
+    it("yields to native work between immediate timer chain steps", function (done) {
+        let step = 0;
+        let nstimerStep = -1;
+        let mainQueueStep = -1;
+        let drainStep = -1;
+        const onRejection = (e) => {
+            e.preventDefault();
+            drainStep = step;
+        };
+        global.addEventListener("unhandledrejection", onRejection);
+        setTimeout(() => { nstimerStep = step; }, 0); // foreign NSTimer
+        NSOperationQueue.mainQueue.addOperationWithBlock(() => { mainQueueStep = step; });
+
+        (function chain() {
+            step++;
+            if (step === 5) {
+                Promise.reject(new Error("event loop yield probe"));
+            }
+            if (step < 50) {
+                __ns__setTimeout(chain, 0);
+                return;
+            }
+            // NSTimer wait: guarantees the loop reaches before-waiting at
+            // least once after the chain, so a starved drain still fires
+            // before the assertions instead of leaking into later specs
+            setTimeout(() => {
+                global.removeEventListener("unhandledrejection", onRejection);
+                expect(nstimerStep).toBeGreaterThan(0);
+                expect(nstimerStep).toBeLessThan(25);
+                expect(mainQueueStep).toBeGreaterThan(0);
+                expect(mainQueueStep).toBeLessThan(25);
+                expect(drainStep).toBeGreaterThan(4);
+                expect(drainStep).toBeLessThan(45);
+                done();
+            }, 100);
+        })();
+    });
+
+});
+
 // clearTimeout leaves a tombstone in the merged ordered domain, so the
 // cleared timer's already-posted token consumes its own slot as a no-op
 // instead of running a later-scheduled item ahead of foreign runloop work

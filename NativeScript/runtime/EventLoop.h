@@ -44,13 +44,15 @@ class OrderedTaskSource {
  * runtime's EventLoop; both descend from ExecuteOnRunLoop):
  *
  * Ordered lane - work whose ordering is observable against other app-level
- * runloop work (spec'd macrotasks, JS timers). Due-now posts ride
- * CFRunLoopPerformBlock as anonymous "task due" tokens, so they are strictly
- * FIFO with foreign performed blocks on the same runloop; future-due tokens
- * (delayed posts and Timers' tokens) arrive through one CFRunLoopTimer armed
- * at the earliest pending due time. Each token runs the earliest due item
- * across the ordered entries and the OrderedTaskSource (Timers) - one
- * due-ordered domain, and a leftover token is a cheap no-op.
+ * runloop work (spec'd macrotasks, JS timers). Every post is an anonymous
+ * "task due" token on ONE CFRunLoopTimer armed at the earliest pending due
+ * time (a due-now token gets a past fire date and fires on the next pass), so
+ * tokens stay in fire-date order with foreign NSTimers and each fire yields a
+ * full runloop pass - performed-block delivery would be sooner but a
+ * self-rescheduling chain of blocks starves the before-waiting phase (CA
+ * rendering, autorelease pool, the rejection drain). Each token runs the
+ * earliest due item across the ordered entries and the OrderedTaskSource
+ * (Timers) - one due-ordered domain, and a leftover token is a cheap no-op.
  *
  * Internal lane - work in its own ordering domain: v8 platform foreground
  * tasks (Atomics.waitAsync wakeups, GC tasks, streaming-compilation
@@ -68,7 +70,7 @@ class OrderedTaskSource {
  * replaces. Producers only post; entries run exclusively on the home thread,
  * which is the only place the isolate's Locker is taken.
  */
-class EventLoop : public std::enable_shared_from_this<EventLoop> {
+class EventLoop {
  public:
   explicit EventLoop(v8::Isolate* isolate) : isolate_(isolate) {}
 
@@ -188,7 +190,6 @@ class EventLoop : public std::enable_shared_from_this<EventLoop> {
   void PostInternalLocked(Entry entry, double delayMs);
   void PostOrderedLocked(Entry entry, double delayMs);
   void PostOrderedTokenLocked(double dueTimeMs, double now);
-  void PostTokenBlockLocked();
   static std::unique_ptr<Entry> TakeDueLocked(Lane& lane, bool nestableOnly,
                                               bool v8Only, double now);
   // earliest due entry time in the lane, or a negative value if none is due
