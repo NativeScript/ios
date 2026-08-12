@@ -43,9 +43,7 @@ public:
         isolate_ = nullptr;
         queued_ = false;
     }
-    
-    // unused for now as we're using CFRunLoopTimers
-    //
+
     int nestingLevel_ = 0;
     v8::Isolate *isolate_;
     v8::Persistent<v8::Function> callback_;
@@ -53,12 +51,11 @@ public:
     double frequency_ = 0;
     bool repeats_ = false;
     bool queued_ = false;
-    
+
     double dueTime_ = -1;
     double startTime_ = -1;
     int id_;
     IsolateWrapper wrapper;
-    CFRunLoopTimerRef timer = nullptr;
 };
 class Timers {
 public:
