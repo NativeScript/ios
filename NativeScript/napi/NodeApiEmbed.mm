@@ -627,6 +627,9 @@ napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env basic_env,
     workPool = [[NSOperationQueue alloc] init];
     workPool.name = @"org.nativescript.napi.asyncwork";
     workPool.maxConcurrentOperationCount = 4;
+    // Self-created NSOperationQueues default to Background QoS, which is
+    // CPU/IO-throttled; keep the QOS_CLASS_DEFAULT the GCD global queue gave.
+    workPool.qualityOfService = NSQualityOfServiceDefault;
   });
 
   CFRunLoopRef loop = work->loop;

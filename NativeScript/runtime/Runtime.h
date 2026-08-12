@@ -70,10 +70,12 @@ class Runtime {
 
   static bool IsAlive(const v8::Isolate* isolate);
 
-  // Liveness by registry scan only — never dereferences `runtime`, so it is
-  // safe to call with a possibly-stale pointer (e.g. a thread-local left
-  // behind when a Runtime was destroyed on another thread).
-  static bool IsAlive(const Runtime* runtime);
+  // Resolves the env while holding the registry lock, so a possibly-stale
+  // pointer (e.g. a thread-local left behind when a Runtime was destroyed on
+  // another thread) is never dereferenced outside it. The returned env's
+  // validity is governed by the Node-API threading contract: it is only safe
+  // to use on the runtime's own thread, where teardown cannot race it.
+  static napi_env GetNapiEnvIfAlive(const Runtime* runtime);
 
   // Milliseconds since this runtime's time origin, on the monotonic clock.
   // Not inline on purpose: an inline definition would have to reach the

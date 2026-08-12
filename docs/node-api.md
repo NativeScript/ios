@@ -121,7 +121,7 @@ The lookup is thread-local: it returns the env of the runtime running **on the c
 
 Two supported ways to get work off that thread:
 
-- **`napi_create_async_work` / `napi_queue_async_work`** for background compute. The `execute` callback runs on a GCD global concurrent queue and must not touch the isolate or the `napi_env` at all; the `complete` callback is posted back to the env's runloop and may. Note the divergence on `napi_delete_async_work` below.
+- **`napi_create_async_work` / `napi_queue_async_work`** for background compute. The `execute` callback runs on a shared worker pool bounded at 4 concurrent tasks — matching Node's default libuv pool, so an addon that fans out more than 4 *interdependent* blocking executes deadlocks here exactly as it would on Node — and must not touch the isolate or the `napi_env` at all; the `complete` callback is posted back to the env's runloop and may. Note the divergence on `napi_delete_async_work` below.
 - **Threadsafe functions** for calling into JS from a thread you own. `napi_create_threadsafe_function` on the JS thread, then `napi_call_threadsafe_function` from anywhere. Calls are queued and drained on the env's runloop, at most 64 per turn so a fast producer cannot starve timers or the UI.
 
 Finalizers, threadsafe-function callbacks, async-work completions and cleanup hooks all re-check that the env is still alive before running, so work in flight when a `Worker` terminates is dropped rather than delivered to a dead isolate.

@@ -661,18 +661,19 @@ bool Runtime::IsAlive(const Isolate* isolate) {
          Runtime::isolates_.end();
 }
 
-bool Runtime::IsAlive(const Runtime* runtime) {
+napi_env Runtime::GetNapiEnvIfAlive(const Runtime* runtime) {
   if (runtime == nullptr) {
-    return false;
+    return nullptr;
   }
 
   SpinLock lock(isolatesMutex_);
   for (Isolate* isolate : Runtime::isolates_) {
-    if (GetRuntime(isolate) == runtime) {
-      return true;
+    Runtime* candidate = GetRuntime(isolate);
+    if (candidate == runtime) {
+      return candidate->GetNapiEnv();
     }
   }
-  return false;
+  return nullptr;
 }
 
 std::shared_ptr<Platform> Runtime::platform_;
