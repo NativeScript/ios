@@ -19,6 +19,29 @@ __attribute__((constructor)) void staticInitMethod() {
   workers_.maxConcurrentOperationCount = 100;
 }
 
+// Posts to the target runtime's internal lane from the worker thread. When
+// async is false, blocks until the entry ran - or until it is destroyed
+// unrun by a shutdown that raced the post, which must release the waiter too.
+static void PostToRuntimeLoop(Runtime* runtime, std::function<void()> fn, bool async) {
+  auto loop = runtime->GetEventLoop();
+  if (loop == nullptr) {
+    return;
+  }
+  if (async) {
+    loop->PostInternal(std::move(fn));
+    return;
+  }
+  dispatch_semaphore_t done = dispatch_semaphore_create(0);
+  // signals when the LAST reference dies: after fn ran, or when Shutdown
+  // clears the queue and destroys the entry without running it
+  std::shared_ptr<void> completion(nullptr, [done](void*) { dispatch_semaphore_signal(done); });
+  bool posted = loop->PostInternal([fn = std::move(fn), completion]() { fn(); });
+  completion.reset();
+  if (posted) {
+    dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
+  }
+}
+
 WorkerWrapper::WorkerWrapper(
     v8::Isolate* mainIsolate,
     std::function<void(v8::Isolate*, v8::Local<v8::Object> thiz, std::shared_ptr<worker::Message>)>
@@ -284,8 +307,8 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context
   if (runtime == nullptr) {
     return;
   }
-  tns::ExecuteOnRunLoop(
-      runtime->RuntimeLoop(),
+  PostToRuntimeLoop(
+      runtime,
       [this, message, src, stackTrace, lineNumber]() {
         v8::Locker locker(this->mainIsolate_);
         Isolate::Scope isolate_scope(this->mainIsolate_);
@@ -341,8 +364,8 @@ void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const 
   if (runtime == nullptr) {
     return;
   }
-  tns::ExecuteOnRunLoop(
-      runtime->RuntimeLoop(),
+  PostToRuntimeLoop(
+      runtime,
       [this, message, source, stackTrace, lineNumber]() {
         v8::Locker locker(this->mainIsolate_);
         Isolate::Scope isolate_scope(this->mainIsolate_);

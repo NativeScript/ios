@@ -294,11 +294,12 @@
 		4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */; };
 		4A5C201A2E2B000300000006 /* Performance.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000300000001 /* Performance.cpp */; };
 		4A5C201A2E2B000200000006 /* NsBuiltinModules.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000200000001 /* NsBuiltinModules.cpp */; };
+		4AE7100A2E2B000400000003 /* EventLoop.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4AE7100A2E2B000400000001 /* EventLoop.mm */; };
+		4AE7100A2E2B000400000006 /* NativeScriptPlatform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4AE7100A2E2B000400000004 /* NativeScriptPlatform.mm */; };
 		4A5C201A2E2B000400000003 /* StructuredClone.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000400000001 /* StructuredClone.cpp */; };
 		4A5C201A2E2B000500000003 /* StructuredSerialization.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C201A2E2B000500000001 /* StructuredSerialization.cpp */; };
 		C2DDEB93229EAC8300345BFE /* ArgConverter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */; };
 		C2DDEB94229EAC8300345BFE /* Console.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6B229EAC8200345BFE /* Console.cpp */; };
-		C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */; };
 		C2DDEB96229EAC8300345BFE /* Helpers.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB6D229EAC8200345BFE /* Helpers.h */; };
 		C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB6E229EAC8200345BFE /* Metadata.h */; };
 		C2DDEB98229EAC8300345BFE /* ArrayAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */; };
@@ -306,7 +307,6 @@
 		C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */; };
 		C2DDEB9B229EAC8300345BFE /* DataWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB72229EAC8200345BFE /* DataWrapper.h */; };
 		C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB73229EAC8200345BFE /* ClassBuilder.cpp */; };
-		C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB74229EAC8200345BFE /* SetTimeout.h */; };
 		C2DDEB9E229EAC8300345BFE /* SymbolLoader.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB75229EAC8200345BFE /* SymbolLoader.mm */; };
 		C2DDEB9F229EAC8300345BFE /* Tasks.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB76229EAC8200345BFE /* Tasks.h */; };
 		C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB77229EAC8200345BFE /* Interop.mm */; };
@@ -816,6 +816,10 @@
 		4A5C201A2E2B000100000003 /* RuntimeBuiltins.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = RuntimeBuiltins.cpp; path = generated/RuntimeBuiltins.cpp; sourceTree = "<group>"; };
 		4A5C201A2E2B000100000004 /* RuntimeBuiltins.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RuntimeBuiltins.h; path = generated/RuntimeBuiltins.h; sourceTree = "<group>"; };
 		4A5C201A2E2B000100000005 /* js */ = {isa = PBXFileReference; lastKnownFileType = folder; path = js; sourceTree = "<group>"; };
+		4AE7100A2E2B000400000001 /* EventLoop.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = EventLoop.mm; sourceTree = "<group>"; };
+		4AE7100A2E2B000400000002 /* EventLoop.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EventLoop.h; sourceTree = "<group>"; };
+		4AE7100A2E2B000400000004 /* NativeScriptPlatform.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptPlatform.mm; sourceTree = "<group>"; };
+		4AE7100A2E2B000400000005 /* NativeScriptPlatform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NativeScriptPlatform.h; sourceTree = "<group>"; };
 		4A5C201A2E2B000400000001 /* StructuredClone.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StructuredClone.cpp; sourceTree = "<group>"; };
 		4A5C201A2E2B000400000002 /* StructuredClone.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StructuredClone.h; sourceTree = "<group>"; };
 		4A5C201A2E2B000500000001 /* StructuredSerialization.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StructuredSerialization.cpp; sourceTree = "<group>"; };
@@ -824,7 +828,6 @@
 		4A5C201A2E2B000300000002 /* Performance.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Performance.h; sourceTree = "<group>"; };
 		C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ArgConverter.mm; sourceTree = "<group>"; };
 		C2DDEB6B229EAC8200345BFE /* Console.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
-		C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SetTimeout.cpp; sourceTree = "<group>"; };
 		C2DDEB6D229EAC8200345BFE /* Helpers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Helpers.h; sourceTree = "<group>"; };
 		C2DDEB6E229EAC8200345BFE /* Metadata.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
 		C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayAdapter.h; sourceTree = "<group>"; };
@@ -832,7 +835,6 @@
 		C2DDEB71229EAC8200345BFE /* MetadataBuilder.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MetadataBuilder.mm; sourceTree = "<group>"; };
 		C2DDEB72229EAC8200345BFE /* DataWrapper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DataWrapper.h; sourceTree = "<group>"; };
 		C2DDEB73229EAC8200345BFE /* ClassBuilder.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ClassBuilder.cpp; sourceTree = "<group>"; };
-		C2DDEB74229EAC8200345BFE /* SetTimeout.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SetTimeout.h; sourceTree = "<group>"; };
 		C2DDEB75229EAC8200345BFE /* SymbolLoader.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = SymbolLoader.mm; sourceTree = "<group>"; };
 		C2DDEB76229EAC8200345BFE /* Tasks.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Tasks.h; sourceTree = "<group>"; };
 		C2DDEB77229EAC8200345BFE /* Interop.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Interop.mm; sourceTree = "<group>"; };
@@ -1520,11 +1522,13 @@
 				C2DDEB7C229EAC8200345BFE /* Runtime.mm */,
 				C2F4D0C92334A6E70008A2EB /* RuntimeConfig.h */,
 				C2F4D0CC2334B1BC0008A2EB /* RuntimeConfig.cpp */,
-				C2DDEB74229EAC8200345BFE /* SetTimeout.h */,
-				C2DDEB6C229EAC8200345BFE /* SetTimeout.cpp */,
 				C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */,
 				C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */,
 				C2DDEB87229EAC8300345BFE /* StringHasher.h */,
+				4AE7100A2E2B000400000002 /* EventLoop.h */,
+				4AE7100A2E2B000400000001 /* EventLoop.mm */,
+				4AE7100A2E2B000400000005 /* NativeScriptPlatform.h */,
+				4AE7100A2E2B000400000004 /* NativeScriptPlatform.mm */,
 				4A5C201A2E2B000400000002 /* StructuredClone.h */,
 				4A5C201A2E2B000400000001 /* StructuredClone.cpp */,
 				4A5C201A2E2B000500000002 /* StructuredSerialization.h */,
@@ -1663,7 +1667,6 @@
 				C2DDEBAD229EAC8300345BFE /* Caches.h in Headers */,
 				3C48F68D2F57905500C14231 /* json.hpp in Headers */,
 				C247C17022F82842001D2CA2 /* libffi.h in Headers */,
-				C2DDEB9D229EAC8300345BFE /* SetTimeout.h in Headers */,
 				C2DDEB90229EAC8300345BFE /* MetadataBuilder.h in Headers */,
 				C266569F22B282BA00EE15CC /* FunctionReference.h in Headers */,
 				C2FEA17022A3C75C00A5C0FC /* InlineFunctions.h in Headers */,
@@ -2300,6 +2303,8 @@
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
 				4A5C201A2E2B000100000006 /* BuiltinLoader.cpp in Sources */,
 				4A5C201A2E2B000200000006 /* NsBuiltinModules.cpp in Sources */,
+				4AE7100A2E2B000400000003 /* EventLoop.mm in Sources */,
+				4AE7100A2E2B000400000006 /* NativeScriptPlatform.mm in Sources */,
 				4A5C201A2E2B000400000003 /* StructuredClone.cpp in Sources */,
 				4A5C201A2E2B000500000003 /* StructuredSerialization.cpp in Sources */,
 				4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */,
@@ -2327,7 +2332,6 @@
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,
 				C2DDEB9A229EAC8300345BFE /* MetadataBuilder.mm in Sources */,
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
-				C2DDEB95229EAC8300345BFE /* SetTimeout.cpp in Sources */,
 				6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */,
 				F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */,
 				6573B9D3291FE29F00B0ED7C /* HostProxy.cpp in Sources */,

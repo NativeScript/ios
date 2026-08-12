@@ -8,14 +8,31 @@
 
 #include "Timers.hpp"
 
-#include <CoreFoundation/CoreFoundation.h>
-
+#include <algorithm>
 #include <vector>
 
 #include "Caches.h"
+#include "EventLoop.h"
 #include "Helpers.h"
 #include "ModuleBinding.hpp"
 #include "Runtime.h"
+
+/*
+ * Overall rules when modifying this file:
+ * Everything runs on the isolate's home thread under its v8::Locker.
+ * `sortedTimers_` must always be sorted by dueTime (stable for equal
+ * dueTimes) and in sync with `timerMap_` (except tombstones, which only live
+ * in `sortedTimers_`).
+ *
+ * Scheduling model: every scheduled timer posts one anonymous "due token"
+ * through the runtime EventLoop's ordered lane, at a due time >= the timer's.
+ * Timers therefore share one due-ordered domain with ordered macrotasks and
+ * stay in fire-date order with foreign runloop timers. The token does not
+ * name a timer: the EventLoop drain consumes the earliest due item across
+ * this list and its own ordered entries. Cancelling recalls the pending
+ * token when possible and otherwise leaves a tombstone so the matured token
+ * consumes a slot as a no-op instead of lending its position to a later item.
+ */
 
 using namespace v8;
 
@@ -46,88 +63,188 @@ static double now_ms() {
 
 namespace tns {
 
-class TimerState {
+struct TimerReference {
+  int id;
+  double dueTime;
+  // clearTimeout/clearInterval tombstones the entry instead of erasing it:
+  // its already-posted token then consumes this slot as a no-op, so no token
+  // gains surplus capacity to run a LATER-scheduled item ahead of foreign
+  // runloop work queued between the two token positions
+  bool cancelled = false;
+};
+
+class TimerState : public OrderedTaskSource {
  public:
-  std::mutex timerMutex_;
   std::atomic<int> currentTimerId = 0;
   robin_hood::unordered_map<int, std::shared_ptr<TimerTask>> timerMap_;
-  CFRunLoopRef runloop;
+  // scheduled timers (and tombstones) sorted by exact (sub-millisecond)
+  // dueTime, stable for equal dueTimes; touched only on the home thread
+  std::vector<TimerReference> sortedTimers_;
+  v8::Isolate* isolate_ = nullptr;
+  std::shared_ptr<EventLoop> eventLoop_;
+  bool stopped_ = false;
 
-  void removeTask(const std::shared_ptr<TimerTask>& task) {
-    removeTask(task->id_);
+  ~TimerState() override {
+    stopped_ = true;
+    if (eventLoop_ != nullptr) {
+      // the loop is already shut down by ~Runtime at this point (every
+      // pending token dropped), but the source pointer must not outlive us
+      eventLoop_->SetTimerSource(nullptr);
+      eventLoop_.reset();
+    }
+    for (auto& entry : timerMap_) {
+      entry.second->Unschedule();
+    }
+    timerMap_.clear();
+    sortedTimers_.clear();
+  }
+
+  void insertSorted(int id, double dueTime) {
+    auto it =
+        std::upper_bound(sortedTimers_.begin(), sortedTimers_.end(), dueTime,
+                         [](double due, const TimerReference& ref) {
+                           return due < ref.dueTime;
+                         });
+    sortedTimers_.insert(it, TimerReference{id, dueTime});
+  }
+
+  void postToken(const std::shared_ptr<TimerTask>& task) {
+    if (eventLoop_ == nullptr) {
+      return;
+    }
+    // the loop clamps an overdue due time to its own `now`; remember the key
+    // it actually recorded so cancellation can recall this exact token
+    task->postedTokenTime_ = eventLoop_->PostOrderedToken(task->dueTime_);
+  }
+
+  void addTask(const std::shared_ptr<TimerTask>& task) {
+    if (task->queued_) {
+      return;
+    }
+    task->queued_ = true;
+    timerMap_.emplace(task->id_, task);
+    insertSorted(task->id_, task->dueTime_);
   }
 
   void removeTask(const int& taskId) {
     auto it = timerMap_.find(taskId);
-    if (it != timerMap_.end()) {
-      // auto wasScheduled = it->second->queued_;
-      auto timer = it->second->timer;
-      it->second->Unschedule();
-      timerMap_.erase(it);
-      CFRunLoopTimerInvalidate(timer);
-      // CFRunLoopTimerInvalidate triggers our TimerRelease callback, which
-      // deletes TimerContext, whose destructor calls CFRelease(task->timer)
-    }
-  }
-
-  // this all comes from the android runtime implementation
-  void addTask(std::shared_ptr<TimerTask> task) {
-    if (task->queued_) {
+    if (it == timerMap_.end()) {
       return;
     }
-    //        auto now = now_ms();
-    // task->nestingLevel_ = nesting + 1;
-    task->queued_ = true;
-    // theoretically this should be >5 on the spec, but we're following chromium
-    // behavior here again
-    //        if (task->nestingLevel_ >= 5 && task->frequency_ < 4) {
-    //            task->frequency_ = 4;
-    //            task->startTime_ = now;
-    //        }
-    timerMap_.emplace(task->id_, task);
-    // not needed on the iOS runtime for now
-    //        auto newTime = task->NextTime(now);
-    //        task->dueTime_ = newTime;
-  }
-};
-
-// this class is attached to the timer object itself
-// we use a retain/release flow because we want to bind this to the Timer itself
-// additionally it helps if we deal with timers on different threads
-// The current implementation puts the timers on the runtime's runloop, so it
-// shouldn't be necessary.
-class TimerContext {
- public:
-  std::atomic<int> retainCount{0};
-  std::shared_ptr<TimerTask> task;
-  TimerState* state;
-  ~TimerContext() {
-    task->Unschedule();
-    CFRelease(task->timer);
+    if (it->second->queued_) {
+      auto dueTime = it->second->dueTime_;
+      auto sit =
+          std::lower_bound(sortedTimers_.begin(), sortedTimers_.end(), dueTime,
+                           [](const TimerReference& ref, double due) {
+                             return ref.dueTime < due;
+                           });
+      while (sit != sortedTimers_.end() && sit->dueTime == dueTime) {
+        if (sit->id == taskId) {
+          // a not-yet-matured token is still in the loop's own bookkeeping
+          // and can be recalled outright, un-arming its wakeup (the
+          // pre-event-loop behavior of CFRunLoopTimerInvalidate). A matured
+          // one cannot - its slot gets the tombstone instead.
+          if (eventLoop_ != nullptr &&
+              eventLoop_->TryCancelOrderedToken(it->second->postedTokenTime_)) {
+            sortedTimers_.erase(sit);
+          } else {
+            sit->cancelled = true;
+          }
+          break;
+        }
+        ++sit;
+      }
+    }
+    it->second->Unschedule();
+    timerMap_.erase(it);
   }
 
-  static const void* TimerRetain(const void* ret) {
-    auto v = (TimerContext*)(ret);
-    v->retainCount++;
-    return ret;
-  }
+  /**
+   * Invoked by the EventLoop's ordered-lane token drain on the isolate's
+   * thread: if the front slot is due and earlier-or-equal to the loop's own
+   * earliest entry, consume it - firing the earliest due timer (exact
+   * sub-millisecond order, not necessarily the timer that enqueued the token)
+   * or swallowing a tombstone left by clearTimeout/clearInterval.
+   */
+  bool RunIfEarliest(double now, double otherDue) override {
+    auto isolate = isolate_;
+    if (stopped_ || isolate == nullptr || isolate->IsDead()) {
+      return false;
+    }
+    v8::Locker locker(isolate);
+    v8::Isolate::Scope isolate_scope(isolate);
+    v8::HandleScope handleScope(isolate);
+    if (sortedTimers_.empty()) {
+      return false;
+    }
+    auto ref = sortedTimers_.front();
+    if (ref.dueTime > now_ms() || (otherDue >= 0 && ref.dueTime > otherDue)) {
+      // not due, or the loop's own entry is earlier - not this source's slot
+      return false;
+    }
+    sortedTimers_.erase(sortedTimers_.begin());
+    if (ref.cancelled) {
+      // tombstone: this slot's token is spent doing nothing, keeping tokens
+      // and slots 1:1
+      return true;
+    }
+    auto it = timerMap_.find(ref.id);
+    if (it == timerMap_.end()) {
+      return true;
+    }
+    auto task = it->second;
+    if (!task->queued_ || !task->wrapper.IsValid()) {
+      return true;
+    }
 
-  static void TimerRelease(const void* ret) {
-    auto v = (TimerContext*)(ret);
-    if (--v->retainCount <= 0) {
-      delete v;
-    };
+    // reschedule before invoking, so a throwing callback can't kill the
+    // interval - matching the repeating CFRunLoopTimer behavior this replaces
+    if (task->repeats_) {
+      task->dueTime_ = task->NextTime(now_ms());
+      insertSorted(task->id_, task->dueTime_);
+      postToken(task);
+    }
+
+    v8::Local<v8::Function> cb = task->callback_.Get(isolate);
+    v8::Local<v8::Context> context =
+        cb->GetCreationContextChecked(v8::Isolate::GetCurrent());
+    Context::Scope context_scope(context);
+    int argc = task->args_ ? static_cast<int>(task->args_->size()) : 0;
+    if (argc > 0) {
+      std::vector<Local<Value>> argv(argc);
+      for (int i = 0; i < argc; ++i) {
+        argv[i] = task->args_->at(i)->Get(isolate);
+      }
+      (void)cb->Call(context, context->Global(), argc, argv.data());
+    } else {
+      (void)cb->Call(context, context->Global(), 0, nullptr);
+    }
+
+    if (!task->repeats_) {
+      // re-resolve: the callback may have cleared this id itself
+      auto post = timerMap_.find(ref.id);
+      if (post != timerMap_.end() && post->second == task) {
+        post->second->Unschedule();
+        timerMap_.erase(post);
+      }
+    }
+    return true;
   }
 };
 
 void Timers::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
   auto timerState = new TimerState();
-  timerState->runloop = Runtime::GetRuntime(isolate)->RuntimeLoop();
+  timerState->isolate_ = isolate;
+  // Runtime::CreateIsolate bound the loop to this thread's runloop before
+  // any builtin initialization runs; guard anyway so an embedding path with
+  // no runtime degrades to inert timers instead of crashing
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  timerState->eventLoop_ =
+      runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+  if (timerState->eventLoop_ != nullptr) {
+    timerState->eventLoop_->SetTimerSource(timerState);
+  }
   Caches::Get(isolate)->registerCacheBoundObject(timerState);
-  tns::NewFunctionTemplate(
-      isolate, Timers::SetTimeoutCallback,
-      v8::External::New(isolate, timerState,
-                        v8::kExternalPointerTypeTagDefault));
   tns::SetMethod(isolate, globalTemplate, "__ns__setTimeout",
                  Timers::SetTimeoutCallback,
                  v8::External::New(isolate, timerState,
@@ -144,51 +261,6 @@ void Timers::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
                  Timers::ClearTimeoutCallback,
                  v8::External::New(isolate, timerState,
                                    v8::kExternalPointerTypeTagDefault));
-  Caches::Get(isolate)->registerCacheBoundObject(new TimerState());
-}
-
-void TimerCallback(CFRunLoopTimerRef timer, void* info) {
-  TimerContext* data = (TimerContext*)info;
-  auto task = data->task;
-  // we check for this first so we can be 100% sure that this task is still
-  // alive since we're always dealing with the runtime's runloop, it should
-  // always work if we even support firing the timers in a another runloop, then
-  // this is useful as it'll avoid use-after-free issues
-  if (!task->queued_ || !task->wrapper.IsValid()) {
-    return;
-  }
-  auto isolate = task->isolate_;
-
-  v8::Locker locker(isolate);
-  v8::Isolate::Scope isolate_scope(isolate);
-  v8::HandleScope handleScope(isolate);
-  // ensure we're still queued after locking
-  if (!task->queued_) {
-    return;
-  }
-
-  v8::Local<v8::Function> cb = task->callback_.Get(isolate);
-  v8::Local<v8::Context> context =
-      cb->GetCreationContextChecked(v8::Isolate::GetCurrent());
-  Context::Scope context_scope(context);
-  int argc = task->args_ ? static_cast<int>(task->args_->size()) : 0;
-  if (argc > 0) {
-    // allocate an array of the right size
-    std::vector<Local<Value>> argv(argc);
-
-    for (int i = 0; i < argc; ++i) {
-      argv[i] = task->args_->at(i)->Get(isolate);
-    }
-
-    // pass pointer to the first element
-    (void)cb->Call(context, context->Global(), argc, argv.data());
-  } else {
-    (void)cb->Call(context, context->Global(), 0, nullptr);
-  }
-
-  if (!task->repeats_) {
-    data->state->removeTask(task);
-  }
 }
 
 void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value>& args,
@@ -228,41 +300,16 @@ void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value>& args,
       }
     }
 
+    auto now = now_ms();
     auto task = std::make_shared<TimerTask>(isolate, handler, timeout,
-                                            repeatable, argArray, id, now_ms());
+                                            repeatable, argArray, id, now);
 #ifdef DEBUG
     task->callback_.AnnotateStrongRetainer("timer");
 #endif
     task->repeats_ = repeatable;
-
-    CFRunLoopTimerContext timerContext = {0, NULL, NULL, NULL, NULL};
-    auto timerData = new TimerContext();
-    timerData->task = task;
-    timerData->state = state;
-    timerContext.info = timerData;
-    timerContext.retain = TimerContext::TimerRetain;
-    timerContext.release = TimerContext::TimerRelease;
-
-    // we do this because the timer should take hold of exactly 1 retaincount
-    // after scheduling so if by our manual release the retain is 0 then we need
-    // to cleanup the TimerContext
-    TimerContext::TimerRetain(timerData);
-
-    // timeout should be bigger than 0 if it's repeatable and 0
-    auto timeoutInSeconds =
-        repeatable && timeout == 0 ? 0.0000001f : timeout / 1000.f;
-    auto timer = CFRunLoopTimerCreate(
-        kCFAllocatorDefault, CFAbsoluteTimeGetCurrent() + timeoutInSeconds,
-        repeatable ? timeoutInSeconds : 0, 0, 0, TimerCallback, &timerContext);
+    task->dueTime_ = now + (double)timeout;
     state->addTask(task);
-    // set the actual timer we created
-    task->timer = timer;
-    CFRunLoopAddTimer(state->runloop, timer, kCFRunLoopCommonModes);
-    TimerContext::TimerRelease(timerData);
-    //        auto task = std::make_shared<TimerTask>(isolate, handler, timeout,
-    //        repeatable,
-    //                                                argArray, id, now_ms());
-    // thiz->addTask(task);
+    state->postToken(task);
   }
   args.GetReturnValue().Set(id);
 }

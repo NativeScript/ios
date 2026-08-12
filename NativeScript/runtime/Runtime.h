@@ -3,6 +3,7 @@
 
 #include "Caches.h"
 #include "Common.h"
+#include "EventLoop.h"
 #include "MetadataBuilder.h"
 #include "ModuleInternal.h"
 #include "SpinLock.h"
@@ -25,6 +26,12 @@ class Runtime {
   inline bool IsRuntimeWorker() { return workerId_ > 0; }
 
   inline CFRunLoopRef RuntimeLoop() { return runtimeLoop_; }
+
+  /*
+   * Scheduler bound to this runtime's runloop. Producers on any thread post;
+   * entries run only on the runtime's home thread.
+   */
+  inline std::shared_ptr<EventLoop> GetEventLoop() const { return eventLoop_; }
 
   void RunModule(const std::string moduleName);
 
@@ -89,6 +96,8 @@ class Runtime {
                         v8::Local<v8::ObjectTemplate> globalTemplate);
   void DefineDrainMicrotaskMethod(v8::Isolate* isolate,
                                   v8::Local<v8::ObjectTemplate> globalTemplate);
+  void DefineQueueMacrotaskMethod(v8::Isolate* isolate,
+                                  v8::Local<v8::ObjectTemplate> globalTemplate);
   void DefineDateTimeConfigurationChangeNotificationMethod(
       v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
 
@@ -98,6 +107,7 @@ class Runtime {
   std::unique_ptr<ModuleInternal> moduleInternal_;
   int workerId_;
   CFRunLoopRef runtimeLoop_;
+  std::shared_ptr<EventLoop> eventLoop_;
   // Drains unhandled promise rejections once per runloop turn
   // (kCFRunLoopBeforeWaiting). Torn down before isolate disposal in ~Runtime.
   CFRunLoopObserverRef rejectionObserver_ = nullptr;
