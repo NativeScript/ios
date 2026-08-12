@@ -56,7 +56,7 @@ addon.add(1, 2); // 3
 
 `TestFixtures/NapiTestModule.mm` and `TestFixtures/NapiCoverageModule.mm` are complete working addons in this shape, and `TestRunner/app/tests/NapiTests.js` / `NapiCoverageTests.js` are their specs.
 
-### Including the headers
+## Including the headers
 
 Write the ecosystem-standard bare include, exactly as an addon for Node.js or the napi-ios runtime would:
 
@@ -66,7 +66,7 @@ Write the ecosystem-standard bare include, exactly as an addon for Node.js or th
 
 and add one header search path to your plugin target (podspec `pod_target_xcconfig` / Xcode build setting):
 
-```
+```text
 HEADER_SEARCH_PATHS = $(inherited) "<path to>/NativeScript.framework/Headers/napi/vendor"
 ```
 
@@ -124,7 +124,7 @@ Two supported ways to get work off that thread:
 - **`napi_create_async_work` / `napi_queue_async_work`** for background compute. The `execute` callback runs on a shared worker pool bounded at 4 concurrent tasks — matching Node's default libuv pool, so an addon that fans out more than 4 *interdependent* blocking executes deadlocks here exactly as it would on Node — and must not touch the isolate or the `napi_env` at all; the `complete` callback is posted to the env's event loop and may. Every such entry ends with a microtask checkpoint, so a promise resolved from `complete` settles promptly even if nothing else enters JS. Note the divergence on `napi_delete_async_work` below.
 - **Threadsafe functions** for calling into JS from a thread you own. `napi_create_threadsafe_function` on the JS thread, then `napi_call_threadsafe_function` from anywhere. Calls are queued and drained on the env's event loop, at most 64 per entry so a fast producer cannot starve timers or the UI.
 
-Finalizers, threadsafe-function callbacks, async-work completions and cleanup hooks all re-check that the env is still alive before running, so work in flight when a `Worker` terminates is dropped rather than delivered to a dead isolate.
+Finalizer drains, threadsafe-function callbacks and async-work completions ride the runtime's event loop, which drops everything still queued when the runtime shuts down — so work in flight when a `Worker` terminates is dropped rather than delivered to a dead isolate.
 
 ## Finalizers
 
@@ -134,14 +134,18 @@ Practically this means code that drops the last reference to a wrapped object an
 
 ```js
 __collect();
-setTimeout(() => {
-  // the finalizer has run by now
-}, 0);
+(function poll() {
+  if (!finalizerRan()) {
+    setTimeout(poll, 0);
+    return;
+  }
+  // the finalizer has run
+})();
 ```
 
 At environment teardown the queue is flushed synchronously instead, so nothing is left unfinalized when a `Worker` exits.
 
-External `ArrayBuffer`s are the exception: `napi_create_external_buffer` and `napi_create_external_arraybuffer` hand the pointer to V8 without copying, and their finalizer runs from V8's backing-store deleter rather than from this queue. If the isolate is already being disposed when the deleter fires, the callback is skipped — the data leaks rather than being freed through an env that no longer exists.
+External `ArrayBuffer`s (`napi_create_external_buffer`, `napi_create_external_arraybuffer`) hand the pointer to V8 without copying, and V8's backing-store deleter can fire on any thread — so the deleter never runs the callback itself. The finalizer is registered with the env: the deleter posts it to the event loop, and anything still unclaimed when the environment tears down runs in the teardown sweep, while the env is alive. Either way it runs exactly once, on the env's thread.
 
 ## Versions
 

@@ -85,6 +85,19 @@ void NapiEnv::EnqueueFinalizer(v8impl::RefTracker* finalizer) {
   loop->PostInternal([env]() { env->DrainFinalizers(); });
 }
 
+void NapiEnv::RegisterExternalFinalizer(const std::shared_ptr<NapiExternalFinalizer>& finalizer) {
+  this->externalFinalizers_.insert(finalizer);
+}
+
+void NapiEnv::RunExternalFinalizer(const std::shared_ptr<NapiExternalFinalizer>& finalizer) {
+  if (finalizer->claimed.exchange(true)) {
+    return;
+  }
+
+  this->CallFinalizer(finalizer->cb, finalizer->data, finalizer->hint);
+  this->externalFinalizers_.erase(finalizer);
+}
+
 void NapiEnv::DrainFinalizers() {
   while (!this->pending_finalizers.empty()) {
     v8impl::RefTracker* finalizer = *this->pending_finalizers.begin();
@@ -117,6 +130,13 @@ void NapiEnv::DeleteMe() {
 
   v8impl::RefTracker::FinalizeAll(&this->finalizing_reflist);
   v8impl::RefTracker::FinalizeAll(&this->reflist);
+
+  // External-buffer finalizers whose backing-store deleter has not fired (or
+  // whose posted run was dropped by Shutdown) run here, while the env can
+  // still make the callback; the deleter finds them claimed and does nothing.
+  while (!this->externalFinalizers_.empty()) {
+    this->RunExternalFinalizer(*this->externalFinalizers_.begin());
+  }
 
   this->moduleExports_.clear();
 

@@ -231,33 +231,41 @@ napi_create_external_buffer(napi_env env,
   NAPI_PREAMBLE(env);
   CHECK_ARG(env, result);
 
-  struct FinalizerData {
-    v8::Isolate* isolate;
-    napi_env env;
-    napi_finalize cb;
-    void* hint;
+  // The deleter can fire on any thread, including during isolate disposal
+  // after the env died, so it never runs the callback itself: it posts the
+  // env-registered finalizer to the event loop, and whatever the post cannot
+  // reach (loop shut down, or already gone) the env teardown sweep has run or
+  // will run. DeleterState carries one strong ref so the finalizer outlives a
+  // posted run even after teardown erased the registry entry.
+  struct DeleterState {
+    tns::NapiEnv* env;
+    std::shared_ptr<tns::NapiExternalFinalizer> finalizer;
+    std::weak_ptr<tns::EventLoop> loop;
   };
-  // Nothing keeps the env alive for the backing store, and V8 also runs
-  // deleters while disposing the isolate — past the point where the env was
-  // destroyed. Dropping the callback there leaks the addon's data, which beats
-  // calling through a dangling env.
-  auto deleter = [](void* external_data, size_t, void* deleter_data) {
-    std::unique_ptr<FinalizerData> fd(
-        static_cast<FinalizerData*>(deleter_data));
-    if (fd == nullptr || !tns::Runtime::IsAlive(fd->isolate) ||
-        tns::NapiEnv::ForIsolate(fd->isolate) != fd->env) {
+  auto deleter = [](void*, size_t, void* deleter_data) {
+    std::unique_ptr<DeleterState> state(static_cast<DeleterState*>(deleter_data));
+    if (state == nullptr || state->finalizer->claimed.load()) {
       return;
     }
 
-    fd->env->CallFinalizer(fd->cb, external_data, fd->hint);
+    std::shared_ptr<tns::EventLoop> loop = state->loop.lock();
+    if (loop == nullptr) {
+      return;
+    }
+    tns::NapiEnv* stateEnv = state->env;
+    std::shared_ptr<tns::NapiExternalFinalizer> finalizer = state->finalizer;
+    loop->PostInternal([stateEnv, finalizer]() { stateEnv->RunExternalFinalizer(finalizer); });
   };
 
-  FinalizerData* deleter_data = nullptr;
+  tns::NapiEnv* tnsEnv = static_cast<tns::NapiEnv*>(env);
+  DeleterState* deleter_data = nullptr;
   if (finalize_cb != nullptr) {
-    deleter_data =
-        new FinalizerData{env->isolate, env,
-                          reinterpret_cast<napi_finalize>(finalize_cb),
-                          finalize_hint};
+    auto finalizer = std::make_shared<tns::NapiExternalFinalizer>();
+    finalizer->cb = reinterpret_cast<napi_finalize>(finalize_cb);
+    finalizer->data = data;
+    finalizer->hint = finalize_hint;
+    tnsEnv->RegisterExternalFinalizer(finalizer);
+    deleter_data = new DeleterState{tnsEnv, std::move(finalizer), tnsEnv->GetEventLoop()};
   }
 
   std::unique_ptr<v8::BackingStore> backing_store =
