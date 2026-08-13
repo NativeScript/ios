@@ -42,34 +42,59 @@ inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const char* value,
       .ToLocalChecked();
 }
 #ifdef __OBJC__
+// Both sides store text as either 8-bit or UTF-16, never UTF-8, so the buffer is
+// handed to V8 in whichever width CFString already holds. Going through
+// -UTF8String instead would encode the string twice (once for the bytes, once
+// for -lengthOfBytesUsingEncoding:), allocate, and return nil for strings
+// containing a lone surrogate — silently turning them into "".
 inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const NSString* value) {
-  /*
-   // TODO: profile if this is faster
-   // maybe have multiple conversion
-   if([value fastestEncoding] == NSUTF16StringEncoding) {
-      uint16_t static_buffer[256];
-      uint16_t* targetBuffer = static_buffer;
-      bool isDynamic = false;
-      auto length = [value
-  maximumLengthOfBytesUsingEncoding:NSUTF16StringEncoding]; auto numberOfBytes =
-  length * sizeof(uint16_t); if (length > 256) { targetBuffer =
-  (uint16_t*)malloc(numberOfBytes); isDynamic = true;
-      }
-      NSUInteger usedLength = 0;
-      NSRange range = NSMakeRange(0, [value length]);
-      [value getBytes:targetBuffer maxLength:numberOfBytes
-  usedLength:&usedLength encoding:NSUTF16StringEncoding options:0 range:range
-  remainingRange:NULL];
-
-      auto result = v8::String::NewFromTwoByte(isolate, targetBuffer,
-  v8::NewStringType::kNormal, (int)[value length]).ToLocalChecked(); if
-  (isDynamic) { free(targetBuffer);
-      }
-      return result;
+  if (value == nil) {
+    return v8::String::Empty(isolate);
   }
-   */
-  return v8::String::NewFromUtf8(isolate, [value UTF8String], v8::NewStringType::kNormal,
-                                 (int)[value lengthOfBytesUsingEncoding:NSUTF8StringEncoding])
+
+  CFStringRef str = (__bridge CFStringRef)value;
+  CFIndex length = CFStringGetLength(str);
+  if (length == 0) {
+    return v8::String::Empty(isolate);
+  }
+
+  // An ASCII pointer is handed back only when every code unit is < 0x80, so the
+  // code unit count doubles as the byte count.
+  if (const char* ascii = CFStringGetCStringPtr(str, kCFStringEncodingASCII)) {
+    return v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(ascii),
+                                      v8::NewStringType::kNormal, (int)length)
+        .ToLocalChecked();
+  }
+
+  if (const UniChar* utf16 = CFStringGetCharactersPtr(str)) {
+    return v8::String::NewFromTwoByte(isolate, reinterpret_cast<const uint16_t*>(utf16),
+                                      v8::NewStringType::kNormal, (int)length)
+        .ToLocalChecked();
+  }
+
+  // Tagged pointers and some bridged strings expose neither buffer, so the
+  // contents have to be copied out. The narrow attempt writes at most `length`
+  // bytes, which always fits the UTF-16-sized buffer.
+  constexpr CFIndex kStackUnits = 256;
+  uint16_t stackBuffer[kStackUnits];
+  std::vector<uint16_t> heapBuffer;
+  uint16_t* buffer = stackBuffer;
+  if (length > kStackUnits) {
+    heapBuffer.resize((size_t)length);
+    buffer = heapBuffer.data();
+  }
+
+  CFRange range = CFRangeMake(0, length);
+  CFIndex usedLength = 0;
+  if (CFStringGetBytes(str, range, kCFStringEncodingASCII, 0, false,
+                       reinterpret_cast<UInt8*>(buffer), length, &usedLength) == length) {
+    return v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(buffer),
+                                      v8::NewStringType::kNormal, (int)length)
+        .ToLocalChecked();
+  }
+
+  CFStringGetCharacters(str, range, reinterpret_cast<UniChar*>(buffer));
+  return v8::String::NewFromTwoByte(isolate, buffer, v8::NewStringType::kNormal, (int)length)
       .ToLocalChecked();
 }
 #endif
