@@ -525,6 +525,10 @@ void CompleteAsyncWork(napi_async_work work, napi_status status) {
   }
 
   void* data = work->data;
+  // Node runs `complete` with the env's context entered; the loop entry only
+  // supplies Locker + Isolate::Scope + HandleScope.
+  v8::HandleScope handle_scope(env->isolate);
+  v8::Context::Scope context_scope(env->context());
   env->CallIntoModule(
       [&](napi_env moduleEnv) { complete(moduleEnv, status, data); },
       [](napi_env moduleEnv, v8::Local<v8::Value> exception) {
