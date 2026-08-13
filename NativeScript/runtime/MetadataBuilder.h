@@ -69,7 +69,7 @@ class MetadataBuilder {
                                            const MethodMeta* meta,
                                            v8::Local<v8::Object> receiver,
                                            V8Args& args,
-                                           std::string containingClass,
+                                           const std::string& containingClass,
                                            bool isMethodCallback);
   static void RegisterAllocMethod(
       v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate,

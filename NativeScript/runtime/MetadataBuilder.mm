@@ -764,21 +764,25 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   bool instanceMethod = info.This()->InternalFieldCount() > 0;
   V8FunctionCallbackArgs args(info);
 
-  std::string className = item->className_;
+  // Only the class-side call rewrites the name, so the common path reads
+  // item->className_ in place rather than copying it on every invocation.
+  const std::string* className = &item->className_;
+  std::string classWrapperName;
 
   Local<Object> thiz = info.This();
   if (thiz->IsFunction()) {
     if (BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz)) {
       ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
-      className = class_getName(classWrapper->Klass());
+      classWrapperName = class_getName(classWrapper->Klass());
+      className = &classWrapperName;
     }
   }
 
   Local<Context> context = isolate->GetCurrentContext();
   Local<Value> result =
       instanceMethod
-          ? MetadataBuilder::InvokeMethod(context, item->meta_, info.This(), args, className, true)
-          : MetadataBuilder::InvokeMethod(context, item->meta_, Local<Object>(), args, className,
+          ? MetadataBuilder::InvokeMethod(context, item->meta_, info.This(), args, *className, true)
+          : MetadataBuilder::InvokeMethod(context, item->meta_, Local<Object>(), args, *className,
                                           true);
 
   if (!result.IsEmpty()) {
@@ -967,7 +971,8 @@ void MetadataBuilder::DefineFunctionLengthProperty(Local<Context> context,
 
 Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodMeta* meta,
                                            Local<Object> receiver, V8Args& args,
-                                           std::string containingClass, bool isMethodCallback) {
+                                           const std::string& containingClass,
+                                           bool isMethodCallback) {
   Class klass = objc_getClass(containingClass.c_str());
   // TODO: Find out if the isMethodCallback property can be determined based on a
   // UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call

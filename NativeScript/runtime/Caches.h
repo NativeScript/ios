@@ -2,6 +2,7 @@
 #define Caches_h
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "Common.h"
@@ -15,6 +16,23 @@ struct StructInfo;
 struct ObjectWeakCallbackState;
 class PromiseRejectionTracker;
 class IsolateTracked;
+
+// Declaring both halves transparent lets robin_hood probe a map keyed by
+// std::string with a string_view, so callers holding a const char* from the
+// Obj-C runtime do not have to allocate one just to look up.
+struct TransparentStringHash {
+  using is_transparent = void;
+  size_t operator()(std::string_view key) const {
+    return robin_hood::hash_bytes(key.data(), key.size());
+  }
+};
+
+struct TransparentStringEqual {
+  using is_transparent = void;
+  bool operator()(std::string_view lhs, std::string_view rhs) const {
+    return lhs == rhs;
+  }
+};
 
 struct pair_hash {
   template <class T1, class T2>
@@ -101,7 +119,8 @@ class Caches {
                             std::unique_ptr<v8::Persistent<v8::Value>>>
       Prototypes;
   robin_hood::unordered_map<std::string,
-                            std::unique_ptr<v8::Persistent<v8::Object>>>
+                            std::unique_ptr<v8::Persistent<v8::Object>>,
+                            TransparentStringHash, TransparentStringEqual>
       ClassPrototypes;
   robin_hood::unordered_map<
       const BaseClassMeta*,

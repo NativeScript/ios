@@ -61,9 +61,8 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
       ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
       target = objcWrapper->Data();
 
-      std::string className = object_getClassName(target);
       auto cache = Caches::Get(isolate);
-      auto it = cache->ClassPrototypes.find(className);
+      auto it = cache->ClassPrototypes.find(std::string_view(object_getClassName(target)));
       // For extended classes we will call the base method
       callSuper = isMethodCallback && it != cache->ClassPrototypes.end();
     } else {
@@ -910,8 +909,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
   Class klass = [target class];
   const Meta* meta = FindMeta(klass, typeEncoding);
   if (meta != nullptr) {
-    std::string className = object_getClassName(target);
-    auto it = cache->ClassPrototypes.find(className);
+    auto it = cache->ClassPrototypes.find(std::string_view(object_getClassName(target)));
     if (it != cache->ClassPrototypes.end()) {
       // for debugging rlv cell handling:
       // NSString* message = [NSString stringWithFormat:@"ArgConverter::CreateJsWrapper FindMeta:
