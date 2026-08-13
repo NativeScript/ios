@@ -710,7 +710,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       // A plain ES subclass of a native type passed where a Class is expected
       // (e.g. `tableView.registerClassForCellReuseIdentifier(JSClass, ...)`) - lazily
       // register its derived class first.
-      Class ensured = ClassBuilder::EnsureExtendedClass(context, obj.As<v8::Function>());
+      Class ensured = ClassBuilder::EnsureExtendedClass(context, obj.As<v8::Function>(), true);
       if (ensured != nil) {
         wrapper = tns::GetValue(isolate, obj);
       }
@@ -888,7 +888,7 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
       if (arg->IsFunction()) {
         // A plain ES subclass of a native type passed where an `id` is expected - lazily
         // register its derived class and marshal the Objective-C Class object.
-        Class ensured = ClassBuilder::EnsureExtendedClass(context, arg.As<v8::Function>());
+        Class ensured = ClassBuilder::EnsureExtendedClass(context, arg.As<v8::Function>(), true);
         if (ensured != nil) {
           return ensured;
         }

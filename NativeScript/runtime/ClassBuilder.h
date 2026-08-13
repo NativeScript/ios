@@ -3,6 +3,7 @@
 
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 #include "Common.h"
 #include "Metadata.h"
@@ -41,14 +42,22 @@ class ClassBuilder {
   static std::string GetTypeEncoding(const TypeEncoding* typeEncoding,
                                      int argsCount);
 
+  // Defines the global `__registerNativeClass(ctor)` used by NativeClass to
+  // register eagerly. No-ops on worker isolates, whose class names are
+  // isolate-suffixed and so cannot answer name-based native lookups.
+  static void RegisterNativeClassFunction(v8::Local<v8::Context> context);
+
   // Lazily registers an Objective-C subclass for a plain ES
   // `class X extends NativeBase {}` constructor function. Returns the
   // registered class, or nil when ctorFunc is not part of a native inheritance
-  // chain (or the chain goes through a legacy `.extend()`-created class).
-  // Idempotent: subsequent calls return the cached class from the ctor's
-  // ObjCClassWrapper.
+  // chain; throws when the chain goes through a legacy `.extend()`-created
+  // class. Idempotent: subsequent calls return the cached class from the ctor's
+  // ObjCClassWrapper. Pass nativeAllocates when the caller is handing the class
+  // to Objective-C (or allocating through it), which is what makes the JS
+  // constructor unreachable and gates the debug diagnostic.
   static Class EnsureExtendedClass(v8::Local<v8::Context> context,
-                                   v8::Local<v8::Function> ctorFunc);
+                                   v8::Local<v8::Function> ctorFunc,
+                                   bool nativeAllocates = false);
 
   // Resolves the Objective-C class that should be instantiated for a construct
   // call, honoring `new.target` so that plain ES subclasses of native classes
@@ -56,6 +65,13 @@ class ClassBuilder {
   static Class ResolveConstructedClass(v8::Local<v8::Context> context,
                                        v8::Local<v8::Value> newTarget,
                                        Class fallback);
+
+  // Throws unless a super(...) call from a plain ES subclass uses a form that
+  // names exactly one initializer. Call after ResolveConstructedClass, which
+  // is what marks new.target as ES-derived.
+  static void ValidateEsClassSuperArgs(
+      v8::Local<v8::Context> context,
+      const v8::FunctionCallbackInfo<v8::Value>& info);
 
  private:
   static std::atomic<unsigned long long> classNameCounter_;
@@ -67,6 +83,9 @@ class ClassBuilder {
       const v8::FunctionCallbackInfo<v8::Value>& info);
 
   static void SwizzleRetainRelease(v8::Isolate* isolate, Class extendedClass);
+  static void WarnIfConstructorIsUnreachable(
+      v8::Local<v8::Context> context,
+      const std::vector<v8::Local<v8::Function>>& chainCtors, Class extendedClass);
   static void ExposeDynamicMethods(
       v8::Local<v8::Context> context, Class extendedClass,
       v8::Local<v8::Value> exposedMethods,

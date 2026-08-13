@@ -7,6 +7,39 @@ const {
     ObjectKeys,
 } = primordials;
 
+function applyNativeClass(target, context, options) {
+    if (options.name) {
+        // Read back by ClassBuilder::EnsureExtendedClass. Survives minifiers,
+        // which mangle the inferred constructor name and with it every
+        // name-based native lookup.
+        target.ObjCClassName = options.name;
+    }
+
+    if (options.protocols && options.protocols.length > 0) {
+        target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, options.protocols) : ArrayPrototypeConcat([], options.protocols));
+    }
+
+    if (options.exposedMethods) {
+        // Fresh object: ObjCExposedMethods may be inherited through the static
+        // chain, and assigning into it would edit the base class's.
+        target.ObjCExposedMethods = ObjectAssign({}, target.ObjCExposedMethods, options.exposedMethods);
+    }
+
+    if (options.eager) {
+        // Standard decorators run before static field initializers, so a class
+        // whose protocols/exposedMethods come from `static` fields would be
+        // registered without them. addInitializer defers to after the class is
+        // fully defined. Legacy decorators and plain calls already run late.
+        if (context && typeof context.addInitializer === 'function') {
+            context.addInitializer(function () { __registerNativeClass(this); });
+        } else {
+            __registerNativeClass(target);
+        }
+    }
+
+    return target;
+}
+
 ObjectAssign(global, {
     CGPointMake(x, y) {
         return new CGPoint({ x, y });
@@ -34,16 +67,18 @@ ObjectAssign(global, {
         return function (target, key) { decorator(target, key, paramIndex); }
     },
 
-    NativeClass(arg) {
+    NativeClass(arg, maybeContext) {
+        // Usable three ways, and the shapes are indistinguishable at the call
+        // site: `@NativeClass` / `@NativeClass({...})` under either decorator
+        // proposal, and the plain call `NativeClass(class X {})`. A standard
+        // (TC39) decorator is handed (value, context); a legacy one and a plain
+        // call are handed just the class.
         if (typeof arg === 'function') {
-            return arg;
+            return applyNativeClass(arg, maybeContext, {});
         }
         var options = arg || {};
-        return function (target) {
-            if (options.protocols && options.protocols.length > 0) {
-                target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, options.protocols) : ArrayPrototypeConcat([], options.protocols));
-            }
-            return target;
+        return function (target, context) {
+            return applyNativeClass(target, context, options);
         }
     },
     ObjCClass() {

@@ -11,6 +11,7 @@
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
+#include "RuntimeConfig.h"
 #include "TNSDerivedClass.h"
 
 using namespace v8;
@@ -28,6 +29,84 @@ void ScopeClassNameToIsolate(std::string& name, int isolateId) {
     name += '_';
     name += std::to_string(isolateId);
   }
+}
+
+// Both an explicit constructor and class fields are erased from the prototype,
+// and V8 exposes no API for either, so source text is the only signal. Only
+// ever gates a debug warning - a miss costs a log line, never behavior.
+bool DeclaresConstructorOrFields(const std::string& src) {
+  size_t i = src.find('{');
+  if (i == std::string::npos) {
+    return false;
+  }
+
+  int depth = 0;
+  bool pendingStatic = false;
+  for (++i; i < src.size(); i++) {
+    char c = src[i];
+    if (c == '/' && i + 1 < src.size()) {
+      if (src[i + 1] == '/') {
+        i = src.find('\n', i);
+        if (i == std::string::npos) break;
+        continue;
+      }
+      if (src[i + 1] == '*') {
+        i = src.find("*/", i);
+        if (i == std::string::npos) break;
+        i++;
+        continue;
+      }
+    }
+    if (c == '"' || c == '\'' || c == '`') {
+      for (++i; i < src.size() && src[i] != c; i++) {
+        if (src[i] == '\\') i++;
+      }
+      continue;
+    }
+    if (c == '{' || c == '(' || c == '[') {
+      depth++;
+      continue;
+    }
+    if (c == '}' || c == ')' || c == ']') {
+      if (c == '}' && depth == 0) break;
+      depth--;
+      continue;
+    }
+    if (depth != 0) {
+      continue;
+    }
+
+    if (isalpha(c) || c == '_' || c == '$' || c == '#') {
+      size_t start = i;
+      while (i < src.size() && (isalnum(src[i]) || src[i] == '_' || src[i] == '$' || src[i] == '#'))
+        i++;
+      std::string word = src.substr(start, i - start);
+      size_t j = i;
+      while (j < src.size() && isspace(src[j])) j++;
+      if (j >= src.size()) break;
+
+      // Static fields initialize with the class itself, so they survive native
+      // allocation - only the instance members are at risk.
+      if (word == "static" && src[j] != '=' && src[j] != '(') {
+        pendingStatic = true;
+        i--;
+        continue;
+      }
+
+      if (word == "constructor" && src[j] == '(') {
+        return true;
+      }
+      // `name = value` at class-body top level is a field initializer;
+      // `==`/`=>` are not.
+      if (!pendingStatic && src[j] == '=' && j + 1 < src.size() && src[j + 1] != '=' &&
+          src[j + 1] != '>') {
+        return true;
+      }
+      pendingStatic = false;
+      i--;
+    }
+  }
+  return false;
 }
 }  // namespace
 
@@ -421,7 +500,49 @@ void ClassBuilder::SwizzleRetainRelease(Isolate* isolate, Class extendedClass) {
   class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
 }
 
-Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Function> ctorFunc) {
+void ClassBuilder::RegisterNativeClassFunction(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Object> global = context->Global();
+
+  Local<v8::Function> registerFunc =
+      v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Local<Context> context = isolate->GetCurrentContext();
+
+        if (info.Length() < 1 || !info[0]->IsFunction()) {
+          info.GetReturnValue().Set(false);
+          return;
+        }
+
+        // Eager registration exists so the class answers to its source name
+        // (storyboards, NSClassFromString, UIApplicationMain). A worker's
+        // classes are isolate-suffixed, so there is no name to claim and the
+        // request is dropped; the class still registers lazily on first use.
+        if (Runtime::IsWorker()) {
+          info.GetReturnValue().Set(false);
+          return;
+        }
+
+        try {
+          Class klass =
+              ClassBuilder::EnsureExtendedClass(context, info[0].As<v8::Function>(), true);
+          info.GetReturnValue().Set(klass != nil);
+        } catch (NativeScriptException& ex) {
+          ex.ReThrowToV8(isolate);
+        }
+      }).ToLocalChecked();
+
+  PropertyAttribute flags =
+      static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::DontEnum);
+  bool success = global
+                     ->DefineOwnProperty(context, tns::ToV8String(isolate, "__registerNativeClass"),
+                                         registerFunc, flags)
+                     .FromMaybe(false);
+  tns::Assert(success, isolate);
+}
+
+Class ClassBuilder::EnsureExtendedClass(Local<Context> context,
+                                        Local<v8::Function> ctorFunc, bool nativeAllocates) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
   // Already registered (or a native/extended constructor that carries a class wrapper)
@@ -473,8 +594,13 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Functi
       continue;
     }
 
-    // Legacy `.extend()`-created base - not supported for ES class chaining.
-    return nil;
+    // Legacy `.extend()`-created base. Falling back to the parent's class would
+    // register nothing and silently dispatch this class's overrides to the
+    // parent's implementations, so refuse instead.
+    throw NativeScriptException(
+        std::string("Cannot extend \"") + class_getName(parentClassWrapper->Klass()) +
+        "\" with an ES class: it was created by the legacy .extend() API. Convert the base class "
+        "to an ES class, or declare this one with .extend() as well.");
   }
 
   if (baseClass == nil) {
@@ -485,7 +611,25 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Functi
   auto isolateId = cache->getIsolateId();
 
   std::string baseClassName = class_getName(baseClass);
-  std::string className = tns::ToString(isolate, ctorFunc->GetName());
+
+  // An explicit name survives minification, which mangles the inferred ctor
+  // name and with it any name-based native lookup.
+  // Own property only: an inherited ObjCClassName would make a subclass try to
+  // register under its base's name.
+  std::string className;
+  Local<v8::Name> classNameKey = tns::ToV8String(isolate, "ObjCClassName");
+  bool hasOwnName = false;
+  if (ctorFunc->HasOwnProperty(context, classNameKey.As<v8::String>()).To(&hasOwnName) &&
+      hasOwnName) {
+    Local<Value> explicitName;
+    if (ctorFunc->Get(context, classNameKey).ToLocal(&explicitName) && !explicitName.IsEmpty() &&
+        explicitName->IsString()) {
+      className = tns::ToString(isolate, explicitName);
+    }
+  }
+  if (className.empty()) {
+    className = tns::ToString(isolate, ctorFunc->GetName());
+  }
 
   ScopeClassNameToIsolate(className, isolateId);
   Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, className, isolateId);
@@ -535,7 +679,54 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Functi
 
   ClassBuilder::SwizzleRetainRelease(isolate, extendedClass);
 
+  if (nativeAllocates && RuntimeConfig.IsDebug) {
+    WarnIfConstructorIsUnreachable(context, chainCtors, extendedClass);
+  }
+
   return extendedClass;
+}
+
+// Objects Objective-C allocates itself (cell reuse, storyboards, NSCoding,
+// alloc/init) reach JS as a bare object with the class prototype grafted on -
+// they never run [[Construct]], so class fields and the constructor body are
+// absent and `#private` access throws. Overriding `init` is the only hook both
+// paths share.
+void ClassBuilder::WarnIfConstructorIsUnreachable(Local<Context> context,
+                                                  const std::vector<Local<v8::Function>>& chainCtors,
+                                                  Class extendedClass) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<v8::String> initKey = tns::ToV8String(isolate, "init");
+
+  for (Local<v8::Function> levelCtor : chainCtors) {
+    Local<Value> prototypeValue;
+    if (!levelCtor->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue) ||
+        !prototypeValue->IsObject()) {
+      continue;
+    }
+    bool hasInit = false;
+    if (prototypeValue.As<Object>()->HasOwnProperty(context, initKey).To(&hasInit) && hasInit) {
+      // The class opts into the construction path Objective-C also takes.
+      return;
+    }
+  }
+
+  for (Local<v8::Function> levelCtor : chainCtors) {
+    Local<Value> src;
+    if (!levelCtor->ToString(context).ToLocal(&src) || src.IsEmpty()) {
+      continue;
+    }
+    if (!DeclaresConstructorOrFields(tns::ToString(isolate, src))) {
+      continue;
+    }
+
+    Log(@"NativeScript warning: class %s declares a constructor or class fields, but it is now "
+        @"registered with the Objective-C runtime, so instances Objective-C creates itself "
+        @"(alloc/init, cell reuse, storyboards, NSCoding) never run them - those objects will be "
+        @"missing the fields, and reading a #private field on one throws. Override init() instead: "
+        @"init() { const self = super.init(); /* setup */ return self; }",
+        class_getName(extendedClass));
+    return;
+  }
 }
 
 Class ClassBuilder::ResolveConstructedClass(Local<Context> context, Local<Value> newTarget,
@@ -557,6 +748,45 @@ Class ClassBuilder::ResolveConstructedClass(Local<Context> context, Local<Value>
 
   Class ensured = ClassBuilder::EnsureExtendedClass(context, newTargetFunc);
   return ensured != nil ? ensured : fallback;
+}
+
+void ClassBuilder::ValidateEsClassSuperArgs(Local<Context> context,
+                                            const FunctionCallbackInfo<Value>& info) {
+  if (info.Length() == 0) {
+    return;
+  }
+
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Value> newTarget = info.NewTarget();
+  if (newTarget.IsEmpty() || !newTarget->IsFunction()) {
+    return;
+  }
+
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, newTarget.As<v8::Function>());
+  if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCClass ||
+      !static_cast<ObjCClassWrapper*>(wrapper)->ESDerivedClass()) {
+    return;
+  }
+
+  if (info.Length() == 1 && info[0]->IsObject()) {
+    BaseDataWrapper* argWrapper = tns::GetValue(isolate, info[0]);
+    // A token object carries no wrapper; a pointer is the adopt-an-existing-
+    // instance form. Both name exactly one initializer.
+    if (argWrapper == nullptr || argWrapper->Type() == WrapperType::Pointer) {
+      return;
+    }
+  }
+
+  // Positional arguments pick an initializer by matching JS value shapes, so
+  // `initWithInt:` and `initWithDouble:` are indistinguishable and the winner
+  // depends on the call site. The token form names one selector outright, and
+  // is the only form the generated .d.ts can type.
+  throw NativeScriptException(
+      std::string("super(...) on a class extending \"") +
+      class_getName(static_cast<ObjCClassWrapper*>(wrapper)->Klass()) +
+      "\" must be called with no arguments or with a single initializer-token object, e.g. "
+      "super({ frame: rect }) for initWithFrame:. Positional arguments are ambiguous and are not "
+      "supported.");
 }
 
 void ClassBuilder::ExposeDynamicMembers(v8::Local<v8::Context> context, Class extendedClass,

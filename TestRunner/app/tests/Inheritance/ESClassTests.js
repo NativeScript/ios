@@ -1,6 +1,7 @@
-// Tests for native ES class support: plain `class X extends NativeType {}` without the
-// @NativeClass decorator or ES5 downleveling. The Objective-C class is registered lazily by
-// the runtime on first use (construction, alloc/new, static dispatch or Class marshalling).
+// Tests for native ES class support: plain `class X extends NativeType {}` without ES5
+// downleveling. The Objective-C class is registered lazily by the runtime on first use
+// (construction, alloc/new, static dispatch or Class marshalling), or eagerly via
+// NativeClass({ eager: true }).
 describe(module.id, function () {
     afterEach(function () {
         TNSClearOutput();
@@ -56,12 +57,12 @@ describe(module.id, function () {
         expect(NSStringFromClass(object.class())).toBe('ESConstructorObject');
     });
 
-    it('ESClassSuperArgsSelectInitializer', function () {
+    it('ESClassSuperTokenObjectSelectsInitializer', function () {
         class ESCtorArgsObject extends TNSCInterface {
             constructor(name, x) {
-                // Arguments passed to super(...) drive native initializer resolution;
-                // arguments passed to `new` are only seen by the JS constructor.
-                super(x);
+                // The token object names one selector outright. Arguments passed to `new` are
+                // only seen by the JS constructor.
+                super({ primitive: x });
                 this.name = name;
             }
         }
@@ -74,7 +75,7 @@ describe(module.id, function () {
 
         class ESCtorTwoArgsObject extends TNSCInterface {
             constructor(a, b) {
-                super(a, b);
+                super({ int: a, andInt: b });
             }
         }
 
@@ -93,6 +94,30 @@ describe(module.id, function () {
         var object3 = new ESCtorNoArgsObject();
         expect(object3 instanceof ESCtorNoArgsObject).toBe(true);
         expect(TNSGetOutput()).toBe('init called');
+    });
+
+    it('ESClassPositionalSuperArgsThrow', function () {
+        class ESPositionalSuperObject extends TNSCInterface {
+            constructor() {
+                super(7);
+            }
+        }
+
+        // Positional args match on JS value shape, so initWithInt: and initWithPrimitive:
+        // are indistinguishable. The token form is the only supported spelling.
+        expect(function () {
+            new ESPositionalSuperObject();
+        }).toThrowError(/initializer-token object/);
+
+        class ESPositionalSuperTwoObject extends TNSCInterface {
+            constructor() {
+                super(5, 10);
+            }
+        }
+
+        expect(function () {
+            new ESPositionalSuperTwoObject();
+        }).toThrowError(/initializer-token object/);
     });
 
     it('ESClassInstanceMethodsAndSuper', function () {
@@ -164,8 +189,10 @@ describe(module.id, function () {
             }
         }
 
-        // alloc().init() is purely native initialization: the JS constructor body and
-        // class field initializers only run through `new`, never through alloc/init.
+        // Objects Objective-C allocates - alloc/init here, but equally cell reuse,
+        // storyboards or NSCoding - are handed to JS as a bare object with the class
+        // prototype grafted on. They never run [[Construct]], so class fields and the
+        // constructor body are absent. Override init() (below) to run on both paths.
         var allocated = ESAllocNoCtorObject.alloc().init();
         expect(constructorRuns).toBe(0);
         expect(allocated.field).toBe(undefined);
@@ -177,6 +204,25 @@ describe(module.id, function () {
         expect(constructorRuns).toBe(1);
         expect(constructed.field).toBe(42);
         expect(constructed.initializedFromJs).toBe(true);
+    });
+
+    it('ESClassInitOverrideRunsOnNativeAllocation', function () {
+        class ESInitOverrideObject extends NSObject {
+            init() {
+                var self = super.init();
+                self.readyFromInit = true;
+                return self;
+            }
+        }
+
+        // init() is the one construction hook both paths share
+        var allocated = ESInitOverrideObject.alloc().init();
+        expect(allocated.readyFromInit).toBe(true);
+        expect(allocated instanceof ESInitOverrideObject).toBe(true);
+
+        var constructed = new ESInitOverrideObject();
+        expect(constructed.readyFromInit).toBe(true);
+        expect(constructed instanceof ESInitOverrideObject).toBe(true);
     });
 
     it('ESClassNewBeforeConstruction', function () {
@@ -327,14 +373,37 @@ describe(module.id, function () {
         expect(object instanceof PlainBase).toBe(true);
     });
 
-    it('NativeClassGlobalDecoratorNoop', function () {
+    it('ESClassExtendingLegacyExtendClassThrows', function () {
+        var LegacyBase = NSObject.extend({
+            legacyMethod: function () {
+                TNSLog('legacyMethod called');
+            }
+        }, { name: 'ESLegacyBaseForChaining' });
+
+        class ESFromLegacy extends LegacyBase {
+            legacyMethod() {
+                TNSLog('overridden');
+            }
+        }
+
+        // Falling back to the parent's class would register nothing and silently dispatch
+        // this class's overrides to the parent's implementations
+        expect(function () {
+            new ESFromLegacy();
+        }).toThrowError(/legacy \.extend\(\) API/);
+    });
+
+    it('NativeClassPlainCallForm', function () {
         expect(typeof global.NativeClass).toBe('function');
 
         const ESDecoratedPlain = NativeClass(class ESDecoratedPlainObject extends NSObject {
         });
         var instance = new ESDecoratedPlain();
         expect(instance instanceof ESDecoratedPlain).toBe(true);
+        expect(NSStringFromClass(instance.class())).toBe('ESDecoratedPlainObject');
+    });
 
+    it('NativeClassProtocolsOption', function () {
         const ESDecoratedProtocols = NativeClass({ protocols: [TNSBaseProtocol2] })(
             class ESDecoratedProtocolsObject extends NSObject {
                 baseProtocolMethod1() {
@@ -350,5 +419,87 @@ describe(module.id, function () {
         TNSTestNativeCallbacks.protocolImplementationProtocolInheritance(object);
         expect(TNSGetOutput()).toBe('baseProtocolMethod1 called' +
             'baseProtocolMethod2 called');
+    });
+
+    it('NativeClassExposedMethodsOption', function () {
+        const ESDecoratedExposed = NativeClass({
+            exposedMethods: {
+                'voidSelector': { returns: interop.types.void }
+            }
+        })(class ESDecoratedExposedObject extends NSObject {
+            voidSelector() {
+                TNSLog('voidSelector called');
+            }
+        });
+
+        var object = new ESDecoratedExposed();
+        TNSTestNativeCallbacks.inheritanceVoidSelector(object);
+        expect(TNSGetOutput()).toBe('voidSelector called');
+    });
+
+    it('NativeClassNameOption', function () {
+        // An explicit name survives minification, which mangles the inferred ctor name
+        const ESRenamed = NativeClass({ name: 'ESExplicitlyNamedObject' })(
+            class WouldBeMangled extends NSObject {
+            }
+        );
+
+        var object = new ESRenamed();
+        expect(NSStringFromClass(object.class())).toBe('ESExplicitlyNamedObject');
+        expect(NSClassFromString('ESExplicitlyNamedObject')).toBe(ESRenamed);
+    });
+
+    it('NativeClassEagerOption', function () {
+        const ESEager = NativeClass({ eager: true, name: 'ESEagerlyRegistered' })(
+            class ESEagerSource extends NSObject {
+            }
+        );
+
+        // Registered at definition time, with no instance and no other native touch,
+        // so name-based native lookup (storyboards, NSClassFromString) resolves it
+        expect(NSClassFromString('ESEagerlyRegistered')).toBe(ESEager);
+    });
+
+    it('NativeClassLegacyDecoratorEmit', function () {
+        // What TypeScript emits for `@NativeClass({...})` with experimentalDecorators
+        class ESLegacyDecorated extends NSObject {
+            baseProtocolMethod1() {
+                TNSLog('baseProtocolMethod1 called');
+            }
+            baseProtocolMethod2() {
+                TNSLog('baseProtocolMethod2 called');
+            }
+        }
+        var Decorated = __decorate([NativeClass({ protocols: [TNSBaseProtocol2] })], ESLegacyDecorated);
+
+        var object = new Decorated();
+        TNSTestNativeCallbacks.protocolImplementationProtocolInheritance(object);
+        expect(TNSGetOutput()).toBe('baseProtocolMethod1 called' +
+            'baseProtocolMethod2 called');
+    });
+
+    it('NativeClassStandardDecoratorEmit', function () {
+        // What a TC39 class decorator is handed: (value, context). Class decorators run
+        // before static field initializers, so eager registration defers via addInitializer.
+        var initializers = [];
+        var context = {
+            kind: 'class',
+            name: 'ESStandardDecorated',
+            addInitializer: function (fn) { initializers.push(fn); }
+        };
+
+        class ESStandardDecorated extends NSObject {
+        }
+
+        var result = NativeClass({ eager: true, name: 'ESStandardDecoratedNamed' })(
+            ESStandardDecorated, context);
+        expect(result).toBe(ESStandardDecorated);
+
+        // Deferred, not run yet
+        expect(initializers.length).toBe(1);
+        expect(NSClassFromString('ESStandardDecoratedNamed')).toBeNull();
+
+        initializers[0].call(ESStandardDecorated);
+        expect(NSClassFromString('ESStandardDecoratedNamed')).toBe(ESStandardDecorated);
     });
 });

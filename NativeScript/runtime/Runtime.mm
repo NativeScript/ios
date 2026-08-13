@@ -490,6 +490,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
       context);  // Register the __extends function to the global object
   ClassBuilder::RegisterNativeTypeScriptExtendsFunction(
       context);  // Override the __extends function for native objects
+  ClassBuilder::RegisterNativeClassFunction(context);  // Backs NativeClass({ eager: true })
   TSHelpers::Init(context);
 
   InlineFunctions::Init(context);
