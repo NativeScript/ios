@@ -41,6 +41,13 @@ inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const char* value,
   return v8::String::NewFromUtf8(isolate, value, v8::NewStringType::kNormal, length)
       .ToLocalChecked();
 }
+
+// Without this overload a bare `const char*` — every string literal, every
+// c_str(), every jsName() — picks the std::string one and pays for a temporary
+// just to reach V8.
+inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const char* value) {
+  return v8::String::NewFromUtf8(isolate, value).ToLocalChecked();
+}
 #ifdef __OBJC__
 // Both sides store text as either 8-bit or UTF-16, never UTF-8, so the buffer is
 // handed to V8 in whichever width CFString already holds. Going through
@@ -225,8 +232,6 @@ inline bool ToBool(const v8::Local<v8::Value>& value) {
 
   return result;
 }
-std::vector<uint16_t> ToVector(const std::string& value);
-
 bool Exists(const char* fullPath);
 v8::Local<v8::String> ReadModule(v8::Isolate* isolate, const std::string& filePath);
 const char* ReadText(const std::string& filePath, long& length, bool& isNew);

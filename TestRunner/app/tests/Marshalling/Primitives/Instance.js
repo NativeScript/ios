@@ -231,6 +231,12 @@ describe(module.id, function () {
         // Both outcomes are acceptable depending on build configuration
         expect(threw === true || threw === false).toBe(true);
     });
+
+    it("InstanceMethodWithNonAsciiUnichar", function () {
+        var instance = TNSPrimitives.alloc().init();
+        expect(instance.methodWithUnichar('é')).toBe('é');
+        expect(instance.methodWithUnichar('✓')).toBe('✓');
+    });
     
     it("InstanceMethodWithNSNumber1", function () {
         var result = TNSPrimitives.alloc().init().methodWithNSNumber(0);
