@@ -1013,7 +1013,7 @@ const Meta* ArgConverter::FindMeta(Class klass, const TypeEncoding* typeEncoding
   return nullptr;
 }
 
-const Meta* ArgConverter::GetMeta(std::string name) {
+const Meta* ArgConverter::GetMeta(const std::string& name) {
   bool found;
   const Meta* meta = Caches::Metadata->Get(name, found);
   if (meta != nullptr || found) {

@@ -98,24 +98,60 @@ inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const NSString* va
       .ToLocalChecked();
 }
 #endif
-inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
+// Unwraps a value to the v8::String the text conversions below read from.
+// A throwing toString() is swallowed rather than left pending, which is the
+// contract v8::String::Utf8Value offered and callers were written against.
+inline bool ToStringLocal(v8::Isolate* isolate, const v8::Local<v8::Value>& value,
+                          v8::Local<v8::String>& out) {
   if (value.IsEmpty()) {
-    return std::string();
+    return false;
+  }
+
+  if (value->IsString()) {
+    out = value.As<v8::String>();
+    return true;
   }
 
   if (value->IsStringObject()) {
-    v8::Local<v8::String> obj = value.As<v8::StringObject>()->ValueOf();
-    return tns::ToString(isolate, obj);
+    out = value.As<v8::StringObject>()->ValueOf();
+    return true;
   }
 
-  v8::String::Utf8Value result(isolate, value);
+  v8::TryCatch tc(isolate);
+  return value->ToString(isolate->GetCurrentContext()).ToLocal(&out);
+}
 
-  const char* val = *result;
-  if (val == nullptr) {
+inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
+  v8::Local<v8::String> str;
+  if (!ToStringLocal(isolate, value, str)) {
     return std::string();
   }
 
-  return std::string(*result, result.length());
+  {
+    v8::String::ValueView view(isolate, str);
+    if (view.is_one_byte()) {
+      const uint8_t* data = view.data8();
+      uint32_t length = view.length();
+      uint32_t i = 0;
+      while (i < length && data[i] < 0x80) {
+        i++;
+      }
+      // Pure ASCII already is its own UTF-8 encoding, so it can be copied
+      // straight out. A one-byte string with a high byte is Latin-1 and still
+      // needs widening, which the encode below handles.
+      if (i == length) {
+        return std::string(reinterpret_cast<const char*>(data), length);
+      }
+    }
+  }
+
+  size_t length = str->Utf8LengthV2(isolate);
+  std::string result(length, '\0');
+  if (length > 0) {
+    str->WriteUtf8V2(isolate, result.data(), length, v8::String::WriteFlags::kReplaceInvalidUtf8);
+  }
+
+  return result;
 }
 
 #ifdef __OBJC__

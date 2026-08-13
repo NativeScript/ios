@@ -66,7 +66,7 @@ class ArgConverter {
   // recycled the address and give it a foreign prototype.
   static std::shared_ptr<v8::Persistent<v8::Value>> FindCachedInstance(
       v8::Isolate* isolate, const std::shared_ptr<Caches>& cache, id target);
-  static const Meta* GetMeta(std::string name);
+  static const Meta* GetMeta(const std::string& name);
   static const ProtocolMeta* FindProtocolMeta(Protocol* protocol);
   static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues,
                              void* userData);

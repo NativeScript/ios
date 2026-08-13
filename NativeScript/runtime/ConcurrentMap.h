@@ -9,36 +9,36 @@ namespace tns {
 template<class TKey, class TValue>
 class ConcurrentMap {
 public:
-    inline void Insert(TKey& key, TValue value) {
-        std::lock_guard<std::mutex> writerLock(this->containerMutex_);
-        this->container_[key] = value;
-    }
+ inline void Insert(const TKey& key, TValue value) {
+   std::lock_guard<std::mutex> writerLock(this->containerMutex_);
+   this->container_[key] = value;
+ }
 
-    inline TValue Get(TKey& key) {
-        bool found;
-        return this->Get(key, found);
-    }
+ inline TValue Get(const TKey& key) {
+   bool found;
+   return this->Get(key, found);
+ }
 
-    inline TValue Get(TKey& key, bool& found) {
-        std::lock_guard<std::mutex> writerLock(this->containerMutex_);
-        auto it = this->container_.find(key);
-        found = it != this->container_.end();
-        if (found) {
-            return it->second;
-        }
-        return nullptr;
-    }
+ inline TValue Get(const TKey& key, bool& found) {
+   std::lock_guard<std::mutex> writerLock(this->containerMutex_);
+   auto it = this->container_.find(key);
+   found = it != this->container_.end();
+   if (found) {
+     return it->second;
+   }
+   return nullptr;
+ }
 
-    inline bool ContainsKey(TKey& key) {
-        std::lock_guard<std::mutex> writerLock(this->containerMutex_);
-        auto it = this->container_.find(key);
-        return it != this->container_.end();
-    }
+ inline bool ContainsKey(const TKey& key) {
+   std::lock_guard<std::mutex> writerLock(this->containerMutex_);
+   auto it = this->container_.find(key);
+   return it != this->container_.end();
+ }
 
-    inline void Remove(TKey& key) {
-        std::lock_guard<std::mutex> writerLock(this->containerMutex_);
-        this->container_.erase(key);
-    }
+ inline void Remove(const TKey& key) {
+   std::lock_guard<std::mutex> writerLock(this->containerMutex_);
+   this->container_.erase(key);
+ }
 
     inline void ForEach(const std::function<bool(TKey&, TValue&)>& func) {
         std::lock_guard<std::mutex> writerLock(this->containerMutex_);
