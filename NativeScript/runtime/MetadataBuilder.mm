@@ -482,8 +482,7 @@ void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>
     return;
   }
 
-  std::string description = [[target description] UTF8String];
-  Local<v8::String> returnValue = tns::ToV8String(info.GetIsolate(), description);
+  Local<v8::String> returnValue = tns::ToV8String(info.GetIsolate(), [target description]);
   info.GetReturnValue().Set(returnValue);
 }
 

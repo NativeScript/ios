@@ -1679,15 +1679,12 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
     Local<Object> jsErrObj = jsErrVal.As<Object>();
     if (nsName != nil) {
-      jsErrObj
-          ->Set(context, tns::ToV8String(isolate, "name"),
-                tns::ToV8String(isolate, [nsName UTF8String]))
+      jsErrObj->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, nsName))
           .FromMaybe(false);
     }
     if (nsReason != nil) {
       jsErrObj
-          ->Set(context, tns::ToV8String(isolate, "message"),
-                tns::ToV8String(isolate, [nsReason UTF8String]))
+          ->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, nsReason))
           .FromMaybe(false);
     }
 
@@ -1711,7 +1708,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
       Local<Context> context = isolate->GetCurrentContext();
 
       Local<Value> jsErrVal =
-          Exception::Error(tns::ToV8String(isolate, [[error localizedDescription] UTF8String]));
+          Exception::Error(tns::ToV8String(isolate, [error localizedDescription]));
       if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
         // Fallback: if for some reason we cannot create an Error object, throw a generic
         // NativeScriptException
@@ -1728,7 +1725,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
       if (error.domain) {
         jsErrObj
             ->Set(context, tns::ToV8String(isolate, "domain"),
-                  tns::ToV8String(isolate, [error.domain UTF8String]))
+                  tns::ToV8String(isolate, error.domain))
             .FromMaybe(false);
       } else {
         jsErrObj->Set(context, tns::ToV8String(isolate, "domain"), Null(isolate)).FromMaybe(false);
