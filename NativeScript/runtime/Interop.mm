@@ -1668,13 +1668,13 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
     NSString* nsName = [e name];
     NSString* nsReason = [e reason];
-    std::string message =
-        nsReason ? [nsReason UTF8String] : (nsName ? [nsName UTF8String] : "NSException");
+    Local<v8::String> messageV8 = tns::ToV8String(isolate, nsReason ?: (nsName ?: @"NSException"));
+    std::string message = tns::ToString(isolate, messageV8);
 
-    Local<Value> jsErrVal = Exception::Error(tns::ToV8String(isolate, message));
+    Local<Value> jsErrVal = Exception::Error(messageV8);
     if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
       // Fallback: keep the description-only behavior if Error creation fails.
-      throw NativeScriptException([[e description] UTF8String]);
+      throw NativeScriptException(tns::ToString(isolate, [e description]));
     }
 
     Local<Object> jsErrObj = jsErrVal.As<Object>();
@@ -1712,7 +1712,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
       if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
         // Fallback: if for some reason we cannot create an Error object, throw a generic
         // NativeScriptException
-        throw NativeScriptException([[error localizedDescription] UTF8String]);
+        throw NativeScriptException(tns::ToString(isolate, [error localizedDescription]));
       }
 
       Local<Object> jsErrObj = jsErrVal.As<Object>();

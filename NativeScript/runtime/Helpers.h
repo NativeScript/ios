@@ -162,6 +162,13 @@ inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& va
 }
 
 #ifdef __OBJC__
+// Encodes via V8 rather than -UTF8String, which returns nil for a string holding
+// a lone surrogate — leaving callers to construct a std::string from nullptr.
+// The unpaired half becomes U+FFFD, since it has no UTF-8 spelling.
+inline std::string ToString(v8::Isolate* isolate, const NSString* value) {
+  return tns::ToString(isolate, tns::ToV8String(isolate, value));
+}
+
 inline NSString* ToNSString(const std::string& v) {
   return [[[NSString alloc] initWithBytes:v.c_str() length:v.length()
                                  encoding:NSUTF8StringEncoding] S_AUTORELEASE];
