@@ -41,59 +41,134 @@ inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const char* value,
   return v8::String::NewFromUtf8(isolate, value, v8::NewStringType::kNormal, length)
       .ToLocalChecked();
 }
-#ifdef __OBJC__
-inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const NSString* value) {
-  /*
-   // TODO: profile if this is faster
-   // maybe have multiple conversion
-   if([value fastestEncoding] == NSUTF16StringEncoding) {
-      uint16_t static_buffer[256];
-      uint16_t* targetBuffer = static_buffer;
-      bool isDynamic = false;
-      auto length = [value
-  maximumLengthOfBytesUsingEncoding:NSUTF16StringEncoding]; auto numberOfBytes =
-  length * sizeof(uint16_t); if (length > 256) { targetBuffer =
-  (uint16_t*)malloc(numberOfBytes); isDynamic = true;
-      }
-      NSUInteger usedLength = 0;
-      NSRange range = NSMakeRange(0, [value length]);
-      [value getBytes:targetBuffer maxLength:numberOfBytes
-  usedLength:&usedLength encoding:NSUTF16StringEncoding options:0 range:range
-  remainingRange:NULL];
 
-      auto result = v8::String::NewFromTwoByte(isolate, targetBuffer,
-  v8::NewStringType::kNormal, (int)[value length]).ToLocalChecked(); if
-  (isDynamic) { free(targetBuffer);
-      }
-      return result;
+// Without this overload a bare `const char*` — every string literal, every
+// c_str(), every jsName() — picks the std::string one and pays for a temporary
+// just to reach V8.
+inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const char* value) {
+  return v8::String::NewFromUtf8(isolate, value).ToLocalChecked();
+}
+#ifdef __OBJC__
+// Both sides store text as either 8-bit or UTF-16, never UTF-8, so the buffer is
+// handed to V8 in whichever width CFString already holds. Going through
+// -UTF8String instead would encode the string twice (once for the bytes, once
+// for -lengthOfBytesUsingEncoding:), allocate, and return nil for strings
+// containing a lone surrogate — silently turning them into "".
+inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const NSString* value) {
+  if (value == nil) {
+    return v8::String::Empty(isolate);
   }
-   */
-  return v8::String::NewFromUtf8(isolate, [value UTF8String], v8::NewStringType::kNormal,
-                                 (int)[value lengthOfBytesUsingEncoding:NSUTF8StringEncoding])
+
+  CFStringRef str = (__bridge CFStringRef)value;
+  CFIndex length = CFStringGetLength(str);
+  if (length == 0) {
+    return v8::String::Empty(isolate);
+  }
+
+  // An ASCII pointer is handed back only when every code unit is < 0x80, so the
+  // code unit count doubles as the byte count.
+  if (const char* ascii = CFStringGetCStringPtr(str, kCFStringEncodingASCII)) {
+    return v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(ascii),
+                                      v8::NewStringType::kNormal, (int)length)
+        .ToLocalChecked();
+  }
+
+  if (const UniChar* utf16 = CFStringGetCharactersPtr(str)) {
+    return v8::String::NewFromTwoByte(isolate, reinterpret_cast<const uint16_t*>(utf16),
+                                      v8::NewStringType::kNormal, (int)length)
+        .ToLocalChecked();
+  }
+
+  // Tagged pointers and some bridged strings expose neither buffer, so the
+  // contents have to be copied out. The narrow attempt writes at most `length`
+  // bytes, which always fits the UTF-16-sized buffer.
+  constexpr CFIndex kStackUnits = 256;
+  uint16_t stackBuffer[kStackUnits];
+  std::vector<uint16_t> heapBuffer;
+  uint16_t* buffer = stackBuffer;
+  if (length > kStackUnits) {
+    heapBuffer.resize((size_t)length);
+    buffer = heapBuffer.data();
+  }
+
+  CFRange range = CFRangeMake(0, length);
+  CFIndex usedLength = 0;
+  if (CFStringGetBytes(str, range, kCFStringEncodingASCII, 0, false,
+                       reinterpret_cast<UInt8*>(buffer), length, &usedLength) == length) {
+    return v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(buffer),
+                                      v8::NewStringType::kNormal, (int)length)
+        .ToLocalChecked();
+  }
+
+  CFStringGetCharacters(str, range, reinterpret_cast<UniChar*>(buffer));
+  return v8::String::NewFromTwoByte(isolate, buffer, v8::NewStringType::kNormal, (int)length)
       .ToLocalChecked();
 }
 #endif
-inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
+// Unwraps a value to the v8::String the text conversions below read from.
+// A throwing toString() is swallowed rather than left pending, which is the
+// contract v8::String::Utf8Value offered and callers were written against.
+inline bool ToStringLocal(v8::Isolate* isolate, const v8::Local<v8::Value>& value,
+                          v8::Local<v8::String>& out) {
   if (value.IsEmpty()) {
-    return std::string();
+    return false;
+  }
+
+  if (value->IsString()) {
+    out = value.As<v8::String>();
+    return true;
   }
 
   if (value->IsStringObject()) {
-    v8::Local<v8::String> obj = value.As<v8::StringObject>()->ValueOf();
-    return tns::ToString(isolate, obj);
+    out = value.As<v8::StringObject>()->ValueOf();
+    return true;
   }
 
-  v8::String::Utf8Value result(isolate, value);
+  v8::TryCatch tc(isolate);
+  return value->ToString(isolate->GetCurrentContext()).ToLocal(&out);
+}
 
-  const char* val = *result;
-  if (val == nullptr) {
+inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
+  v8::Local<v8::String> str;
+  if (!ToStringLocal(isolate, value, str)) {
     return std::string();
   }
 
-  return std::string(*result, result.length());
+  {
+    v8::String::ValueView view(isolate, str);
+    if (view.is_one_byte()) {
+      const uint8_t* data = view.data8();
+      uint32_t length = view.length();
+      uint32_t i = 0;
+      while (i < length && data[i] < 0x80) {
+        i++;
+      }
+      // Pure ASCII already is its own UTF-8 encoding, so it can be copied
+      // straight out. A one-byte string with a high byte is Latin-1 and still
+      // needs widening, which the encode below handles.
+      if (i == length) {
+        return std::string(reinterpret_cast<const char*>(data), length);
+      }
+    }
+  }
+
+  size_t length = str->Utf8LengthV2(isolate);
+  std::string result(length, '\0');
+  if (length > 0) {
+    str->WriteUtf8V2(isolate, result.data(), length, v8::String::WriteFlags::kReplaceInvalidUtf8);
+  }
+
+  return result;
 }
 
 #ifdef __OBJC__
+// Encodes via V8 rather than -UTF8String, which returns nil for a string holding
+// a lone surrogate — leaving callers to construct a std::string from nullptr.
+// The unpaired half becomes U+FFFD, since it has no UTF-8 spelling.
+inline std::string ToString(v8::Isolate* isolate, const NSString* value) {
+  return tns::ToString(isolate, tns::ToV8String(isolate, value));
+}
+
 inline NSString* ToNSString(const std::string& v) {
   return [[[NSString alloc] initWithBytes:v.c_str() length:v.length()
                                  encoding:NSUTF8StringEncoding] S_AUTORELEASE];
@@ -164,8 +239,6 @@ inline bool ToBool(const v8::Local<v8::Value>& value) {
 
   return result;
 }
-std::vector<uint16_t> ToVector(const std::string& value);
-
 bool Exists(const char* fullPath);
 v8::Local<v8::String> ReadModule(v8::Isolate* isolate, const std::string& filePath);
 const char* ReadText(const std::string& filePath, long& length, bool& isNew);

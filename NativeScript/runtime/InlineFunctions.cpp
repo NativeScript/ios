@@ -17,7 +17,7 @@ void InlineFunctions::Init(Local<Context> context) {
   }
 }
 
-bool InlineFunctions::IsGlobalFunction(std::string name) {
+bool InlineFunctions::IsGlobalFunction(const std::string& name) {
   return name == "CGPointMake" || name == "CGRectMake" ||
          name == "CGSizeMake" || name == "UIEdgeInsetsMake" ||
          name == "NSMakeRange" || name == "__decorate" || name == "__param" ||

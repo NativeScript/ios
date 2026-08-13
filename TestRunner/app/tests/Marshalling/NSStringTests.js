@@ -39,6 +39,46 @@ describe(module.id, function () {
         expect(instance.valueForKey('x')).toBe(data);
     });
 
+    function roundTrip(value) {
+        var JSObject = NSObject.extend({
+            'x': function () {
+                return this._x;
+            }, 'setX:': function (x) {
+                this._x = x;
+            }
+        }, {
+            exposedMethods: {
+                x: { returns: NSString },
+                'setX:': { returns: interop.types.void, params: [NSString] }
+            }
+        });
+
+        var instance = JSObject.alloc().init();
+        instance.setValueForKey(value, 'x');
+        return instance.valueForKey('x');
+    }
+
+    it("Marshals NSString with a lone surrogate", function () {
+        const data = 'a' + String.fromCharCode(0xD800) + 'b';
+        expect(roundTrip(data)).toBe(data);
+    });
+
+    it("Marshals NSString across both storage widths", function () {
+        // ASCII, Latin-1 and non-BMP exercise the one-byte, two-byte and
+        // surrogate-pair paths respectively.
+        expect(roundTrip('plain ascii')).toBe('plain ascii');
+        expect(roundTrip('café naïve')).toBe('café naïve');
+        expect(roundTrip('你好世界')).toBe('你好世界');
+        expect(roundTrip('emoji 👋🏽 here')).toBe('emoji 👋🏽 here');
+    });
+
+    it("Marshals NSString longer than the conversion stack buffer", function () {
+        const ascii = 'a'.repeat(1000);
+        const wide = '𝄞'.repeat(1000);
+        expect(roundTrip(ascii)).toBe(ascii);
+        expect(roundTrip(wide)).toBe(wide);
+    });
+
     it("String", function () {
         var str = NSString.string();
         expect(str.isKindOfClass(NSString)).toBe(true);

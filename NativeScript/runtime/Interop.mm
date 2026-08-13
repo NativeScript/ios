@@ -262,9 +262,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
   } else if (argHelper.isString() &&
              typeEncoding->type == BinaryTypeEncodingType::SelectorEncoding) {
     std::string str = tns::ToString(isolate, arg);
-    NSString* selStr = [NSString stringWithUTF8String:str.c_str()];
-    SEL selector = NSSelectorFromString(selStr);
-    Interop::SetValue(dest, selector);
+    Interop::SetValue(dest, sel_registerName(str.c_str()));
   } else if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
     if (arg->IsString()) {
       const char* value = nullptr;
@@ -314,12 +312,21 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     }
   } else if (argHelper.isString() &&
              typeEncoding->type == BinaryTypeEncodingType::UnicharEncoding) {
-    v8::String::Utf8Value utf8Value(isolate, arg);
-    std::vector<uint16_t> vector = tns::ToVector(*utf8Value);
-    if (vector.size() > 1) {
+    Local<v8::String> str;
+    uint32_t length = 0;
+    unichar c = 0;
+    if (tns::ToStringLocal(isolate, arg, str)) {
+      // Scoped so the view's no-GC window closes before anything can throw.
+      v8::String::ValueView view(isolate, str);
+      length = view.length();
+      if (length == 1) {
+        c = view.is_one_byte() ? view.data8()[0] : view.data16()[0];
+      }
+    }
+
+    if (length > 1) {
       throw NativeScriptException("Only one character string can be converted to unichar.");
     }
-    unichar c = (vector.size() == 0) ? 0 : vector[0];
     Interop::SetValue(dest, c);
   } else if (argHelper.isString() &&
              (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
@@ -980,8 +987,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
       return Null(isolate);
     }
 
-    NSString* selStr = NSStringFromSelector(result);
-    return tns::ToV8String(isolate, [selStr UTF8String]);
+    return tns::ToV8String(isolate, sel_getName(result));
   }
 
   if (typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
@@ -1355,18 +1361,10 @@ Local<Value> Interop::GetPrimitiveReturnType(Local<Context> context, BinaryTypeE
   }
 
   if (type == BinaryTypeEncodingType::UnicharEncoding) {
-    unichar result = call->GetResult<unichar>();
-    char chars[2];
-
-    if (result > 127) {
-      chars[0] = (result >> 8) & (1 << 8) - 1;
-      chars[1] = result & (1 << 8) - 1;
-    } else {
-      chars[0] = result;
-      chars[1] = 0;
-    }
-
-    return tns::ToV8String(isolate, chars);
+    // A unichar is a single UTF-16 code unit, so it goes over as one.
+    uint16_t result = call->GetResult<unichar>();
+    return v8::String::NewFromTwoByte(isolate, &result, v8::NewStringType::kNormal, 1)
+        .ToLocalChecked();
   }
 
   if (type == BinaryTypeEncodingType::UCharEncoding) {
@@ -1670,26 +1668,23 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
     NSString* nsName = [e name];
     NSString* nsReason = [e reason];
-    std::string message =
-        nsReason ? [nsReason UTF8String] : (nsName ? [nsName UTF8String] : "NSException");
+    Local<v8::String> messageV8 = tns::ToV8String(isolate, nsReason ?: (nsName ?: @"NSException"));
+    std::string message = tns::ToString(isolate, messageV8);
 
-    Local<Value> jsErrVal = Exception::Error(tns::ToV8String(isolate, message));
+    Local<Value> jsErrVal = Exception::Error(messageV8);
     if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
       // Fallback: keep the description-only behavior if Error creation fails.
-      throw NativeScriptException([[e description] UTF8String]);
+      throw NativeScriptException(tns::ToString(isolate, [e description]));
     }
 
     Local<Object> jsErrObj = jsErrVal.As<Object>();
     if (nsName != nil) {
-      jsErrObj
-          ->Set(context, tns::ToV8String(isolate, "name"),
-                tns::ToV8String(isolate, [nsName UTF8String]))
+      jsErrObj->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, nsName))
           .FromMaybe(false);
     }
     if (nsReason != nil) {
       jsErrObj
-          ->Set(context, tns::ToV8String(isolate, "message"),
-                tns::ToV8String(isolate, [nsReason UTF8String]))
+          ->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, nsReason))
           .FromMaybe(false);
     }
 
@@ -1713,11 +1708,11 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
       Local<Context> context = isolate->GetCurrentContext();
 
       Local<Value> jsErrVal =
-          Exception::Error(tns::ToV8String(isolate, [[error localizedDescription] UTF8String]));
+          Exception::Error(tns::ToV8String(isolate, [error localizedDescription]));
       if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
         // Fallback: if for some reason we cannot create an Error object, throw a generic
         // NativeScriptException
-        throw NativeScriptException([[error localizedDescription] UTF8String]);
+        throw NativeScriptException(tns::ToString(isolate, [error localizedDescription]));
       }
 
       Local<Object> jsErrObj = jsErrVal.As<Object>();
@@ -1730,7 +1725,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
       if (error.domain) {
         jsErrObj
             ->Set(context, tns::ToV8String(isolate, "domain"),
-                  tns::ToV8String(isolate, [error.domain UTF8String]))
+                  tns::ToV8String(isolate, error.domain))
             .FromMaybe(false);
       } else {
         jsErrObj->Set(context, tns::ToV8String(isolate, "domain"), Null(isolate)).FromMaybe(false);

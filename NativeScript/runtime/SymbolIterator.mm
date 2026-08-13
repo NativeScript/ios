@@ -86,7 +86,7 @@ void SymbolIterator::NextCallback(const v8::FunctionCallbackInfo<v8::Value>& arg
     if ([item isKindOfClass:[NSNumber class]]) {
       val = Number::New(isolate, [item doubleValue]);
     } else if ([item isKindOfClass:[NSString class]]) {
-      val = tns::ToV8String(isolate, [item UTF8String]);
+      val = tns::ToV8String(isolate, (NSString*)item);
     } else {
       auto wrapper = new ObjCDataWrapper(item);
       val = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>());
