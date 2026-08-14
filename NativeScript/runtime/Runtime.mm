@@ -588,6 +588,13 @@ void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
     tns::Assert(false, isolate);
   }
 
+  if (isWorker && !global
+                       ->DefineOwnProperty(context, ToV8String(isolate, "__ns__worker"),
+                                           v8::True(isolate), readOnlyFlags)
+                       .FromMaybe(false)) {
+    tns::Assert(false, isolate);
+  }
+
   if (isWorker) {
     // Register proper interop types for worker context
     // Worker bundles need full interop functionality, not just simple stubs

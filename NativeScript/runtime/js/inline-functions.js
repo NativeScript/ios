@@ -9,6 +9,10 @@ const {
 } = primordials;
 
 function applyNativeClassOptions(target, options) {
+    // Workers must not mint or rename process-global native classes.
+    if (global.__ns__worker) {
+        return target;
+    }
     var ios = options && options.ios;
     var protocols = (ios && ios.protocols) || (options && options.protocols);
     var methods = (ios && ios.methods) || (options && options.methods);
