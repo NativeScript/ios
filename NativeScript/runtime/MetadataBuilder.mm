@@ -861,7 +861,7 @@ static std::string ResolveStaticReceiverClassName(Local<Context> context, Local<
     return fallback;
   }
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
   if (wrapper != nullptr) {
     if (wrapper->Type() == WrapperType::ObjCClass) {
