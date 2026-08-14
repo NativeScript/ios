@@ -835,7 +835,7 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj,
 }
 
 static bool TryConstructESDerivedInstance(Local<Context> context, id target, Local<Value>& out) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   if (cache->PendingESAdopt != nullptr) {
     return false;
@@ -846,7 +846,7 @@ static bool TryConstructESDerivedInstance(Local<Context> context, id target, Loc
     return false;
   }
 
-  auto it = cache->CtorFuncs.find(std::string_view(className));
+  auto it = cache->CtorFuncs.find(className);
   if (it == cache->CtorFuncs.end()) {
     return false;
   }
