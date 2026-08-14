@@ -444,6 +444,23 @@ describe(module.id, function () {
         expect(new ESEagerNamed() instanceof ESEagerNamed).toBe(true);
     });
 
+    it('NativeClassIsNoOpOnWorkers', function (done) {
+        var worker = new Worker('~/shared/Workers/EvalWorker.js');
+        worker.onmessage = function (msg) {
+            worker.terminate();
+            expect(msg.data.isFunction).toBe(true);
+            expect(msg.data.isWorker).toBe(true);
+            expect(msg.data.hasName).toBe(false);
+            expect(msg.data.registered).toBe(false);
+            expect(NSClassFromString('TNSWorkerNativeClassName')).toBeNull();
+            done();
+        };
+        worker.postMessage({
+            eval: "var C = NativeClass({ ios: { name: 'TNSWorkerNativeClassName' } })(class TNSWorkerNativeClass extends NSObject {}); " +
+                  "postMessage({ isFunction: typeof NativeClass === 'function', isWorker: !!__ns__worker, hasName: C.ObjCClassName === 'TNSWorkerNativeClassName', registered: NSClassFromString('TNSWorkerNativeClassName') !== null });"
+        });
+    });
+
     it('NativeClassExposedMethodsFromIOSOptions', function () {
         const ESDecoratedExposed = NativeClass({
             ios: {
