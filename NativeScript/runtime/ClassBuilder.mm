@@ -485,7 +485,14 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Functi
   auto isolateId = cache->getIsolateId();
 
   std::string baseClassName = class_getName(baseClass);
-  std::string className = tns::ToString(isolate, ctorFunc->GetName());
+  std::string className;
+  Local<Value> explicitName;
+  if (ctorFunc->Get(context, tns::ToV8String(isolate, "ObjCClassName")).ToLocal(&explicitName) &&
+      !explicitName.IsEmpty() && explicitName->IsString()) {
+    className = tns::ToString(isolate, explicitName);
+  } else {
+    className = tns::ToString(isolate, ctorFunc->GetName());
+  }
 
   ScopeClassNameToIsolate(className, isolateId);
   Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, className, isolateId);
