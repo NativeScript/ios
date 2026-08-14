@@ -4,6 +4,8 @@
  *
  * `@NativeClass` and `@NativeClass({ ios: { ... } })` are both valid.
  * Passing the class directly (`NativeClass(MyClass)`) applies empty options.
+ * On worker isolates this is a no-op; only the main isolate registers
+ * native ES classes.
  */
 interface NativeClassIOSMethodSignature {
   returns?: any;

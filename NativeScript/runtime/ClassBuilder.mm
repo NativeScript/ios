@@ -433,6 +433,13 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Functi
     return nil;
   }
 
+  // Only the main isolate mints ES-derived ObjC classes. Workers keep
+  // NativeClass / lazy registration as a no-op so they cannot claim
+  // process-global names. Legacy `.extend()` still scopes names per isolate.
+  if (Runtime::IsWorker()) {
+    return nil;
+  }
+
   // Walk the constructor prototype chain (mirrors the `class X extends Y` chain) and collect
   // every plain (unregistered) ES constructor level until we reach a constructor holding an
   // ObjCClassWrapper. ES-registered ancestors are flattened into this registration; legacy
