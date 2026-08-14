@@ -151,10 +151,10 @@ describe(module.id, function () {
         expect(NSStringFromClass(object.class())).toBe('ESAllocObject');
     });
 
-    it('ESClassAllocInitDoesNotRunJsConstructor', function () {
+    it('ESClassAllocInitRunsJsConstructor', function () {
         var constructorRuns = 0;
 
-        class ESAllocNoCtorObject extends NSObject {
+        class ESAllocCtorObject extends NSObject {
             field = 42;
 
             constructor() {
@@ -164,19 +164,94 @@ describe(module.id, function () {
             }
         }
 
-        // alloc().init() is purely native initialization: the JS constructor body and
-        // class field initializers only run through `new`, never through alloc/init.
-        var allocated = ESAllocNoCtorObject.alloc().init();
-        expect(constructorRuns).toBe(0);
-        expect(allocated.field).toBe(undefined);
-        expect(allocated.initializedFromJs).toBe(undefined);
-        expect(allocated instanceof ESAllocNoCtorObject).toBe(true);
-        expect(NSStringFromClass(allocated.class())).toBe('ESAllocNoCtorObject');
-
-        var constructed = new ESAllocNoCtorObject();
+        // Objects Objective-C allocates — alloc/init here, but equally cell reuse,
+        // storyboards or NSCoding — are adopted into a real ES construct so class
+        // fields and the constructor body run on both paths.
+        var allocated = ESAllocCtorObject.alloc().init();
         expect(constructorRuns).toBe(1);
+        expect(allocated.field).toBe(42);
+        expect(allocated.initializedFromJs).toBe(true);
+        expect(allocated instanceof ESAllocCtorObject).toBe(true);
+        expect(NSStringFromClass(allocated.class())).toBe('ESAllocCtorObject');
+
+        var constructed = new ESAllocCtorObject();
+        expect(constructorRuns).toBe(2);
         expect(constructed.field).toBe(42);
         expect(constructed.initializedFromJs).toBe(true);
+    });
+
+    it('ESClassAllocInitPrivateFields', function () {
+        class ESPrivateAllocObject extends NSObject {
+            #a = 1;
+
+            constructor() {
+                super();
+            }
+
+            someMethod() {
+                return this.#a;
+            }
+        }
+
+        expect(new ESPrivateAllocObject().someMethod()).toBe(1);
+        expect(ESPrivateAllocObject.alloc().init().someMethod()).toBe(1);
+    });
+
+    it('ESClassAllocInitDoesNotDoubleAlloc', function () {
+        class ESAdoptOnceObject extends TNSCInterface {
+            constructor() {
+                super({ primitive: 7 });
+            }
+        }
+
+        TNSClearOutput();
+        var allocated = ESAdoptOnceObject.alloc().init();
+        // Native already called init; adopt must not run initWithPrimitive.
+        expect(TNSGetOutput()).toBe('init called');
+        expect(allocated instanceof ESAdoptOnceObject).toBe(true);
+
+        TNSClearOutput();
+        var constructed = new ESAdoptOnceObject();
+        expect(TNSGetOutput()).toBe('initWithPrimitive:7 called');
+        expect(constructed instanceof ESAdoptOnceObject).toBe(true);
+    });
+
+    it('ESClassSuperObjectTokensSelectInitializer', function () {
+        class ESTokenCtorObject extends TNSCInterface {
+            constructor() {
+                super({ primitive: 7 });
+            }
+        }
+
+        TNSClearOutput();
+        var object = new ESTokenCtorObject();
+        expect(object instanceof ESTokenCtorObject).toBe(true);
+        expect(TNSGetOutput()).toBe('initWithPrimitive:7 called');
+    });
+
+    it('ESClassAllocInitThrowingConstructor', function () {
+        class ESThrowingCtorObject extends NSObject {
+            constructor() {
+                super();
+                throw new Error('adopt construct failed');
+            }
+        }
+
+        var threw = false;
+        try {
+            ESThrowingCtorObject.alloc().init();
+        } catch (e) {
+            threw = true;
+        }
+        expect(threw).toBe(true);
+
+        threw = false;
+        try {
+            new ESThrowingCtorObject();
+        } catch (e) {
+            threw = true;
+        }
+        expect(threw).toBe(true);
     });
 
     it('ESClassNewBeforeConstruction', function () {
@@ -327,7 +402,7 @@ describe(module.id, function () {
         expect(object instanceof PlainBase).toBe(true);
     });
 
-    it('NativeClassGlobalDecoratorNoop', function () {
+    it('NativeClassDecoratorAppliesIOSOptions', function () {
         expect(typeof global.NativeClass).toBe('function');
 
         const ESDecoratedPlain = NativeClass(class ESDecoratedPlainObject extends NSObject {
@@ -335,7 +410,11 @@ describe(module.id, function () {
         var instance = new ESDecoratedPlain();
         expect(instance instanceof ESDecoratedPlain).toBe(true);
 
-        const ESDecoratedProtocols = NativeClass({ protocols: [TNSBaseProtocol2] })(
+        const ESDecoratedProtocols = NativeClass({
+            ios: {
+                protocols: [TNSBaseProtocol2]
+            }
+        })(
             class ESDecoratedProtocolsObject extends NSObject {
                 baseProtocolMethod1() {
                     TNSLog('baseProtocolMethod1 called');
@@ -350,5 +429,38 @@ describe(module.id, function () {
         TNSTestNativeCallbacks.protocolImplementationProtocolInheritance(object);
         expect(TNSGetOutput()).toBe('baseProtocolMethod1 called' +
             'baseProtocolMethod2 called');
+    });
+
+    it('NativeClassEagerNameRegistersImmediately', function () {
+        const ESEagerNamed = NativeClass({
+            ios: {
+                name: 'ESEagerNamedObject'
+            }
+        })(class UnusedJsNameForEager extends NSObject {
+        });
+
+        expect(NSClassFromString('ESEagerNamedObject')).toBe(ESEagerNamed);
+        expect(NSStringFromClass(ESEagerNamed)).toBe('ESEagerNamedObject');
+        expect(new ESEagerNamed() instanceof ESEagerNamed).toBe(true);
+    });
+
+    it('NativeClassExposedMethodsFromIOSOptions', function () {
+        const ESDecoratedExposed = NativeClass({
+            ios: {
+                methods: {
+                    'voidSelector': { returns: interop.types.void }
+                }
+            }
+        })(
+            class ESDecoratedExposedObject extends NSObject {
+                voidSelector() {
+                    TNSLog('voidSelector called');
+                }
+            }
+        );
+
+        var object = new ESDecoratedExposed();
+        TNSTestNativeCallbacks.inheritanceVoidSelector(object);
+        expect(TNSGetOutput()).toBe('voidSelector called');
     });
 });

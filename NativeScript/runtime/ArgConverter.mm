@@ -15,6 +15,8 @@ using namespace std;
 
 namespace tns {
 
+static bool TryConstructESDerivedInstance(Local<Context> context, id target, Local<Value>& out);
+
 void ArgConverter::Init(Local<Context> context, NamedPropertyGetterCallback structPropertyGetter,
                         NamedPropertySetterCallbackV2 structPropertySetter) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -576,7 +578,16 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
   // be claimed with takeRetainedValue — so that path takes its own reference.
   bool resultIsOwned = false;
 
-  if (info.Length() == 1) {
+  auto cache = Caches::Get(isolate);
+  if (cache->PendingESAdopt != nullptr) {
+    // Adopt path: native already created this object. Bind it to the ES
+    // construct and do not alloc/init again (that would be N2, or recurse).
+    result = (__bridge id)cache->PendingESAdopt;
+    cache->PendingESAdopt = nullptr;
+    resultIsOwned = false;
+  }
+
+  if (result == nil && info.Length() == 1) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, info[0]);
     if (wrapper != nullptr && wrapper->Type() == WrapperType::Pointer) {
       PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
@@ -607,7 +618,6 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
     resultIsOwned = true;
   }
 
-  auto cache = Caches::Get(isolate);
   auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
   if (poInstance != nullptr) {
     // An initializer that answered with an already wrapped object (a singleton,
@@ -824,6 +834,53 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj,
   return args;
 }
 
+static bool TryConstructESDerivedInstance(Local<Context> context, id target, Local<Value>& out) {
+  Isolate* isolate = context->GetIsolate();
+  auto cache = Caches::Get(isolate);
+  if (cache->PendingESAdopt != nullptr) {
+    return false;
+  }
+
+  const char* className = object_getClassName(target);
+  if (className == nullptr) {
+    return false;
+  }
+
+  auto it = cache->CtorFuncs.find(std::string_view(className));
+  if (it == cache->CtorFuncs.end()) {
+    return false;
+  }
+
+  Local<v8::Function> ctor = it->second->Get(isolate);
+  BaseDataWrapper* ctorWrapper = tns::GetValue(isolate, ctor);
+  if (ctorWrapper == nullptr || ctorWrapper->Type() != WrapperType::ObjCClass) {
+    return false;
+  }
+  if (!static_cast<ObjCClassWrapper*>(ctorWrapper)->ESDerivedClass()) {
+    return false;
+  }
+
+  cache->PendingESAdopt = (__bridge void*)target;
+  TryCatch tc(isolate);
+  Local<Value> constructed;
+  bool ok = ctor->CallAsConstructor(context, 0, nullptr).ToLocal(&constructed);
+  cache->PendingESAdopt = nullptr;
+  if (!ok) {
+    throw NativeScriptException(isolate, tc, "Failed to construct ES class for native instance");
+  }
+
+  auto cached = ArgConverter::FindCachedInstance(isolate, cache, target);
+  if (cached != nullptr) {
+    out = cached->Get(isolate);
+    return true;
+  }
+  if (!constructed.IsEmpty() && constructed->IsObject()) {
+    out = constructed;
+    return true;
+  }
+  return false;
+}
+
 Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapper* wrapper,
                                            Local<Object> receiver, bool skipGCRegistration,
                                            const std::vector<std::string>& additionalProtocols) {
@@ -900,10 +957,17 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
 
   auto cache = Caches::Get(isolate);
   if (receiver.IsEmpty()) {
-    auto it = cache->Instances.find(target);
-    if (it != cache->Instances.end()) {
-      receiver = it->second->Get(isolate).As<Object>();
+    auto cached = ArgConverter::FindCachedInstance(isolate, cache, target);
+    if (cached != nullptr) {
+      receiver = cached->Get(isolate).As<Object>();
     } else {
+      tns::Assert(cache->PendingESAdopt != (__bridge void*)target, isolate);
+
+      Local<Value> constructed;
+      if (TryConstructESDerivedInstance(context, target, constructed)) {
+        return constructed;
+      }
+
       std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, skipGCRegistration);
       receiver = poValue->Get(isolate).As<Object>();
       tns::SetValue(isolate, receiver, wrapper);
