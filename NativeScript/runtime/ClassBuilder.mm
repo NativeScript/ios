@@ -422,7 +422,7 @@ void ClassBuilder::SwizzleRetainRelease(Isolate* isolate, Class extendedClass) {
 }
 
 Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Function> ctorFunc) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
 
   // Already registered (or a native/extended constructor that carries a class wrapper)
   BaseDataWrapper* existingWrapper = tns::GetValue(isolate, ctorFunc);
@@ -552,7 +552,7 @@ Class ClassBuilder::ResolveConstructedClass(Local<Context> context, Local<Value>
     return fallback;
   }
 
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Function> newTargetFunc = newTarget.As<v8::Function>();
 
   BaseDataWrapper* wrapper = tns::GetValue(isolate, newTargetFunc);
@@ -743,7 +743,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
                                         Local<Value> exposedMethods, Local<Value> exposedProtocols,
                                         Local<Object> implementationObject,
                                         std::unordered_set<std::string>* visitedNames) {
-  Isolate* isolate = context->GetIsolate();
+  Isolate* isolate = v8::Isolate::GetCurrent();
   std::vector<const ProtocolMeta*> protocols;
   if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
     Local<v8::Array> protocolsArray = exposedProtocols.As<v8::Array>();
