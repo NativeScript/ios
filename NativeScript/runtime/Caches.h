@@ -144,6 +144,12 @@ class Caches {
 
   robin_hood::unordered_map<id, std::shared_ptr<v8::Persistent<v8::Value>>>
       Instances;
+
+  // Native object being adopted by an in-flight ES construct (CreateJsWrapper
+  // → CallAsConstructor → super()). void* so this header stays includable
+  // from C++ TUs; .mm files cast to/from id. ConstructObject consumes it
+  // so super() binds that id and does not alloc/init again.
+  void* PendingESAdopt = nullptr;
   robin_hood::unordered_map<std::pair<void*, std::string>,
                             std::shared_ptr<v8::Persistent<v8::Value>>,
                             pair_hash>
