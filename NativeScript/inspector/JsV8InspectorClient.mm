@@ -278,6 +278,74 @@ void JsV8InspectorClient::onFrontendMessageReceived(const std::string& message) 
     return;
   }
 
+  // The Tracing domain never touches the isolate, so it is answered here
+  // instead of on the main-thread message queue: flushing a large trace to the
+  // frontend must not wait for (or block) JS. The dataCollected chunks are
+  // pre-serialized by the trace writer and cannot carry a sessionId without
+  // re-parsing them, so only the main session is served; V8 traces the whole
+  // process anyway.
+  if (sessionId.empty() && method == "Tracing.start") {
+    std::vector<std::string> categories;
+    double bufferSizeInKb = 0;
+
+    const json* traceConfig = nullptr;
+    if (parsed.contains("params") && parsed["params"].is_object()) {
+      const auto& params = parsed["params"];
+      if (params.contains("traceConfig") && params["traceConfig"].is_object()) {
+        traceConfig = &params["traceConfig"];
+      } else if (params.contains("categories") && params["categories"].is_array()) {
+        // deprecated flat format
+        traceConfig = &params;
+      }
+    }
+
+    if (traceConfig != nullptr) {
+      const char* categoriesKey =
+          traceConfig->contains("includedCategories") ? "includedCategories" : "categories";
+      if (traceConfig->contains(categoriesKey) && (*traceConfig)[categoriesKey].is_array()) {
+        for (const auto& category : (*traceConfig)[categoriesKey]) {
+          if (category.is_string()) {
+            categories.push_back(category.get<std::string>());
+          }
+        }
+      }
+      if (traceConfig->contains("traceBufferSizeInKb") &&
+          (*traceConfig)["traceBufferSizeInKb"].is_number()) {
+        bufferSizeInKb = (*traceConfig)["traceBufferSizeInKb"].get<double>();
+      }
+    }
+
+    json reply = {{"id", msgId}};
+    if (tracing_agent_->start(categories, bufferSizeInKb)) {
+      reply["result"] = json::object();
+    } else {
+      reply["error"] = {{"code", -32000}, {"message", "Tracing is already started"}};
+    }
+    this->SendRawToFrontend(reply.dump());
+    return;
+  }
+
+  if (sessionId.empty() && method == "Tracing.end") {
+    tns::inspector::TracingAgentImpl::Result trace;
+    if (!tracing_agent_->end(trace)) {
+      json error = {{"id", msgId},
+                    {"error", {{"code", -32000}, {"message", "Tracing is not started"}}}};
+      this->SendRawToFrontend(error.dump());
+      return;
+    }
+
+    // The ack must reach the frontend before the events it asked for.
+    json ack = {{"id", msgId}, {"result", json::object()}};
+    this->SendRawToFrontend(ack.dump());
+    for (const auto& traceMessage : trace.messages) {
+      this->SendRawToFrontend(traceMessage);
+    }
+    json complete = {{"method", "Tracing.tracingComplete"},
+                     {"params", {{"dataLossOccurred", trace.dataLossOccurred}}}};
+    this->SendRawToFrontend(complete.dump());
+    return;
+  }
+
   // Messages carrying a sessionId belong to a worker target (flat-session
   // protocol); route them to the worker's own thread.
   if (!sessionId.empty()) {
@@ -485,13 +553,17 @@ void JsV8InspectorClient::notify(std::unique_ptr<StringBuffer> message) {
 void JsV8InspectorClient::notify(const std::string& message) { this->SendToFrontend(message); }
 
 void JsV8InspectorClient::SendToFrontend(const std::string& message) {
+  this->SendRawToFrontend(MaybeRewriteSourceMapURL(message));
+}
+
+void JsV8InspectorClient::SendRawToFrontend(const std::string& message) {
   std::function<void(const std::string&)> sender;
   {
     std::lock_guard<std::mutex> lock(this->senderMutex_);
     sender = this->sender_;
   }
   if (sender) {
-    sender(MaybeRewriteSourceMapURL(message));
+    sender(message);
   }
 }
 
@@ -499,66 +571,8 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
   auto json_message = json::parse(message);
   std::string method = json_message["method"];
 
-  // The Tracing domain never touches the isolate, so it is handled before the
-  // Locker below; flushing a large trace to the frontend must not block JS.
-  if (method == "Tracing.start") {
-    std::vector<std::string> categories;
-    double bufferSizeInKb = 0;
-
-    // Support new traceConfig format
-    if (json_message.contains("params") && json_message["params"].contains("traceConfig")) {
-      auto traceConfig = json_message["params"]["traceConfig"];
-      if (traceConfig.contains("includedCategories")) {
-        for (const auto& category : traceConfig["includedCategories"]) {
-          categories.push_back(category.get<std::string>());
-        }
-      }
-      if (traceConfig.contains("traceBufferSizeInKb") &&
-          traceConfig["traceBufferSizeInKb"].is_number()) {
-        bufferSizeInKb = traceConfig["traceBufferSizeInKb"].get<double>();
-      }
-    }
-    // Fall back to deprecated categories format
-    else if (json_message.contains("params") && json_message["params"].contains("categories")) {
-      for (const auto& category : json_message["params"]["categories"]) {
-        categories.push_back(category.get<std::string>());
-      }
-    }
-
-    if (!tracing_agent_->start(categories, bufferSizeInKb)) {
-      json error = {{"id", json_message["id"]},
-                    {"error", {{"code", -32000}, {"message", "Tracing is already started"}}}};
-      this->notify(error.dump());
-      return;
-    }
-
-    json json_response = {
-        {"id", json_message["id"]},
-        {"result", json::object()},
-    };
-    this->notify(json_response.dump());
-    return;
-  }
-
-  if (method == "Tracing.end") {
-    tns::inspector::TracingAgentImpl::Result trace;
-    if (!tracing_agent_->end(trace)) {
-      json error = {{"id", json_message["id"]},
-                    {"error", {{"code", -32000}, {"message", "Tracing is not started"}}}};
-      this->notify(error.dump());
-      return;
-    }
-
-    json ack = {{"id", json_message["id"]}, {"result", json::object()}};
-    this->notify(ack.dump());
-    for (const auto& traceMessage : trace.messages) {
-      notify(traceMessage);
-    }
-    json complete = {{"method", "Tracing.tracingComplete"},
-                     {"params", {{"dataLossOccurred", trace.dataLossOccurred}}}};
-    notify(complete.dump());
-    return;
-  }
+  // Note: the Tracing domain is handled in onFrontendMessageReceived, so it
+  // never waits on the message queue or takes the Locker below.
 
   StringView messageView = Make8BitStringView(message);
   Isolate* isolate = isolate_;

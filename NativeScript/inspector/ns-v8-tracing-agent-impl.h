@@ -55,6 +55,30 @@ class NSInMemoryTraceWriter : public TraceWriter {
   std::vector<std::string> traces_;
 };
 
+// Indirection between the TracingController and the ring buffer a trace
+// actually records into.
+//
+// TracingController::Initialize() swaps trace_buffer_ with no lock, and
+// UpdateTraceEventDuration() dereferences it with neither a lock nor a null
+// check, so handing the controller a different (or null) buffer while another
+// thread sits in a TRACE_EVENT scope is a use-after-free -- and every scope
+// still open when a trace stops takes that path on its way out. One instance is
+// therefore installed on the controller once and never replaced; arming and
+// disarming swap only the ring inside it, under this class's own lock.
+class NSTraceBuffer : public TraceBuffer {
+ public:
+  TraceObject* AddTraceEvent(uint64_t* handle) override;
+  TraceObject* GetEventByHandle(uint64_t handle) override;
+  bool Flush() override;
+
+  void Arm(std::unique_ptr<TraceBuffer> ring);
+  void Disarm();
+
+ private:
+  std::mutex mutex_;
+  std::unique_ptr<TraceBuffer> ring_;
+};
+
 class TracingAgentImpl {
  public:
   struct Result {
@@ -81,15 +105,16 @@ class TracingAgentImpl {
   void stopLocked(Result* result);
 
   TracingController* tracing_controller_;
-  // Owned by the TraceBuffer installed on the controller; only valid while
-  // active_ == this.
+  // Owned by the ring armed on buffer_; only valid while active_ == this.
   NSInMemoryTraceWriter* current_trace_writer_ = nullptr;
 
   // The TracingController is process-global, so only one agent may trace at
-  // a time; a concurrent start would destroy the running trace's buffer (and
+  // a time; a concurrent start would disarm the running trace's ring (and
   // writer) out from under its owner.
   static std::mutex mutex_;
   static TracingAgentImpl* active_;
+  // Installed on the controller on first use and owned by it from then on.
+  static NSTraceBuffer* buffer_;
 };
 
 }  // namespace inspector

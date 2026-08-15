@@ -33,6 +33,10 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   // Thread-safe write to the connected frontend (no-op when disconnected).
   void SendToFrontend(const std::string& message);
 
+  // As SendToFrontend, but skips the source map rewrite (and the full-message
+  // scan and copy it costs) for payloads that cannot contain a sourceMapURL.
+  void SendRawToFrontend(const std::string& message);
+
   // Worker targets (Chrome DevTools Target domain, flat-session mode).
   // Register/Unregister are called on the worker's own thread.
   void RegisterWorkerTarget(int workerId, WorkerInspectorClient* client);

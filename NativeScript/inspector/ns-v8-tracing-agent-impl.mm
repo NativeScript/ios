@@ -75,8 +75,38 @@ bool NSInMemoryTraceWriter::bufferWasFull() const {
   return total_traces_ >= ring_capacity_floor_;
 }
 
+TraceObject* NSTraceBuffer::AddTraceEvent(uint64_t* handle) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (ring_ == nullptr) {
+    *handle = 0;
+    return nullptr;
+  }
+  return ring_->AddTraceEvent(handle);
+}
+
+TraceObject* NSTraceBuffer::GetEventByHandle(uint64_t handle) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return ring_ == nullptr ? nullptr : ring_->GetEventByHandle(handle);
+}
+
+bool NSTraceBuffer::Flush() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return ring_ == nullptr ? true : ring_->Flush();
+}
+
+void NSTraceBuffer::Arm(std::unique_ptr<TraceBuffer> ring) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  ring_ = std::move(ring);
+}
+
+void NSTraceBuffer::Disarm() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  ring_.reset();
+}
+
 std::mutex TracingAgentImpl::mutex_;
 TracingAgentImpl* TracingAgentImpl::active_ = nullptr;
+NSTraceBuffer* TracingAgentImpl::buffer_ = nullptr;
 
 TracingAgentImpl::TracingAgentImpl() {
   // Runtime installs libplatform's default platform, whose controller is the
@@ -110,10 +140,17 @@ bool TracingAgentImpl::start(const std::vector<std::string>& categories, double 
                      : std::max<size_t>(static_cast<size_t>(requestedChunks), 2);
   }
 
+  if (buffer_ == nullptr) {
+    // Handed to the controller, which owns it for the rest of the process; see
+    // the NSTraceBuffer comment for why it is never replaced.
+    buffer_ = new NSTraceBuffer();
+    tracing_controller_->Initialize(buffer_);
+  }
+
   current_trace_writer_ = new NSInMemoryTraceWriter(
       R"({"method": "Tracing.dataCollected", "params":)", "}", ringChunks);
-  tracing_controller_->Initialize(
-      TraceBuffer::CreateTraceBufferRingBuffer(ringChunks, current_trace_writer_));
+  buffer_->Arm(std::unique_ptr<TraceBuffer>(
+      TraceBuffer::CreateTraceBufferRingBuffer(ringChunks, current_trace_writer_)));
   // Of the CDP TraceConfig, only includedCategories and traceBufferSizeInKb
   // are honored. recordMode, excludedCategories and bufferUsage reporting
   // would need a custom TraceBuffer (libplatform's ring buffer always records
@@ -152,18 +189,23 @@ void TracingAgentImpl::stopAndDiscard() {
 }
 
 void TracingAgentImpl::stopLocked(Result* result) {
-  // StopTracing flushes the ring buffer into the writer.
+  // StopTracing flushes the ring into the writer, under the ring's own lock, and
+  // is the only thing that hands events to the writer; once it returns the
+  // writer belongs to this thread alone.
   tracing_controller_->StopTracing();
 
+  // Read either way so a discarded trace does not hold on to its chunks.
+  std::vector<std::string> messages = current_trace_writer_->getTrace();
   if (result != nullptr) {
-    result->messages = current_trace_writer_->getTrace();
+    result->messages = std::move(messages);
     result->dataLossOccurred = current_trace_writer_->bufferWasFull();
   }
 
-  // Destroys the buffer and with it the writer.
-  tracing_controller_->Initialize(nullptr);
+  // Frees the ring and the writer it owns, so a finished trace stops costing
+  // what it recorded.
   current_trace_writer_ = nullptr;
   active_ = nullptr;
+  buffer_->Disarm();
 }
 
 }  // namespace inspector
