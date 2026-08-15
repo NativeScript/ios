@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -30,16 +31,23 @@ using v8::platform::tracing::TracingController;
 
 class NSInMemoryTraceWriter : public TraceWriter {
  public:
-  NSInMemoryTraceWriter(const std::string& prefix, const std::string& suffix)
-      : stream_(), prefix_(prefix), suffix_(suffix) {};
+  NSInMemoryTraceWriter(const std::string& prefix, const std::string& suffix,
+                        size_t ringChunks)
+      : ring_capacity_floor_(
+            static_cast<int>((ringChunks - 1) * TraceBufferChunk::kChunkSize)),
+        stream_(),
+        prefix_(prefix),
+        suffix_(suffix) {};
   void AppendTraceEvent(TraceObject* trace_event);
   void Flush();
   std::vector<std::string> getTrace();
+  bool bufferWasFull() const;
 
  private:
   void MaybeCreateChunk();
   void MaybeFinalizeChunk();
   int total_traces_ = 0;
+  int ring_capacity_floor_;
   std::ostringstream stream_;
   std::unique_ptr<TraceWriter> json_trace_writer_;
   std::string prefix_;
@@ -49,17 +57,39 @@ class NSInMemoryTraceWriter : public TraceWriter {
 
 class TracingAgentImpl {
  public:
+  struct Result {
+    // Tracing.dataCollected notifications, ready to send to the frontend.
+    std::vector<std::string> messages;
+    bool dataLossOccurred = false;
+  };
+
   TracingAgentImpl();
-  bool start(const std::vector<std::string>& categories = {});
-  bool end();
-  const std::vector<std::string>& getLastTrace() { return lastTrace_; }
+  ~TracingAgentImpl();
+
+  // Returns false when a trace is already running (started by any agent).
+  // bufferSizeInKb <= 0 means the default ring buffer size.
+  bool start(const std::vector<std::string>& categories = {},
+             double bufferSizeInKb = 0);
+  // Returns false unless this agent owns the running trace.
+  bool end(Result& result);
+  // Stops and drops the running trace if this agent owns it; for frontend
+  // disconnect and teardown.
+  void stopAndDiscard();
 
  private:
-  bool tracing_ = false;
-  TracingController* tracing_controller_;
-  NSInMemoryTraceWriter* current_trace_writer_;
+  // Requires mutex_ held and active_ == this; pass null to drop the trace.
+  void stopLocked(Result* result);
 
-  std::vector<std::string> lastTrace_;
+  TracingController* tracing_controller_;
+  // Owned by the TraceBuffer installed on the controller; only valid while
+  // active_ == this.
+  NSInMemoryTraceWriter* current_trace_writer_ = nullptr;
+
+  // The TracingController is process-global, so only one agent may trace at
+  // a time; a concurrent start would destroy the running trace's buffer (and
+  // writer) out from under its owner.
+  static std::mutex mutex_;
+  static TracingAgentImpl* active_;
 };
 
 }  // namespace inspector

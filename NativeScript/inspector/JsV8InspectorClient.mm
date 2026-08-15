@@ -387,6 +387,10 @@ void JsV8InspectorClient::disconnect() {
     this->resourceStreams_.clear();
   }
 
+  // Drop any trace the departing frontend left running so the process-global
+  // controller is free for the next frontend's Tracing.start.
+  tracing_agent_->stopAndDiscard();
+
   Isolate* isolate = isolate_;
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
@@ -492,6 +496,70 @@ void JsV8InspectorClient::SendToFrontend(const std::string& message) {
 }
 
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
+  auto json_message = json::parse(message);
+  std::string method = json_message["method"];
+
+  // The Tracing domain never touches the isolate, so it is handled before the
+  // Locker below; flushing a large trace to the frontend must not block JS.
+  if (method == "Tracing.start") {
+    std::vector<std::string> categories;
+    double bufferSizeInKb = 0;
+
+    // Support new traceConfig format
+    if (json_message.contains("params") && json_message["params"].contains("traceConfig")) {
+      auto traceConfig = json_message["params"]["traceConfig"];
+      if (traceConfig.contains("includedCategories")) {
+        for (const auto& category : traceConfig["includedCategories"]) {
+          categories.push_back(category.get<std::string>());
+        }
+      }
+      if (traceConfig.contains("traceBufferSizeInKb") &&
+          traceConfig["traceBufferSizeInKb"].is_number()) {
+        bufferSizeInKb = traceConfig["traceBufferSizeInKb"].get<double>();
+      }
+    }
+    // Fall back to deprecated categories format
+    else if (json_message.contains("params") && json_message["params"].contains("categories")) {
+      for (const auto& category : json_message["params"]["categories"]) {
+        categories.push_back(category.get<std::string>());
+      }
+    }
+
+    if (!tracing_agent_->start(categories, bufferSizeInKb)) {
+      json error = {{"id", json_message["id"]},
+                    {"error", {{"code", -32000}, {"message", "Tracing is already started"}}}};
+      this->notify(error.dump());
+      return;
+    }
+
+    json json_response = {
+        {"id", json_message["id"]},
+        {"result", json::object()},
+    };
+    this->notify(json_response.dump());
+    return;
+  }
+
+  if (method == "Tracing.end") {
+    tns::inspector::TracingAgentImpl::Result trace;
+    if (!tracing_agent_->end(trace)) {
+      json error = {{"id", json_message["id"]},
+                    {"error", {{"code", -32000}, {"message", "Tracing is not started"}}}};
+      this->notify(error.dump());
+      return;
+    }
+
+    json ack = {{"id", json_message["id"]}, {"result", json::object()}};
+    this->notify(ack.dump());
+    for (const auto& traceMessage : trace.messages) {
+      notify(traceMessage);
+    }
+    json complete = {{"method", "Tracing.tracingComplete"},
+                     {"params", {{"dataLossOccurred", trace.dataLossOccurred}}}};
+    notify(complete.dump());
+    return;
+  }
+
   StringView messageView = Make8BitStringView(message);
   Isolate* isolate = isolate_;
   v8::Locker locker(isolate);
@@ -504,9 +572,6 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
   Context::Scope context_scope(context);
   bool success;
 
-  auto json_message = json::parse(message);
-  std::string method = json_message["method"];
-
   // livesync uses the inspector socket for HMR/LiveSync...
   if (method == "Page.reload") {
     success = tns::LiveSync(this->isolate_);
@@ -514,43 +579,6 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
       NSLog(@"LiveSync failed");
     }
     // todo: should we return here, or is it OK to pass onto a possible Page.reload domain handler?
-  }
-
-  if (method == "Tracing.start") {
-    std::vector<std::string> categories;
-
-    // Support new traceConfig format
-    if (json_message.contains("params") && json_message["params"].contains("traceConfig")) {
-      auto traceConfig = json_message["params"]["traceConfig"];
-      if (traceConfig.contains("includedCategories")) {
-        for (const auto& category : traceConfig["includedCategories"]) {
-          categories.push_back(category.get<std::string>());
-        }
-      }
-    }
-    // Fall back to deprecated categories format
-    else if (json_message.contains("params") && json_message["params"].contains("categories")) {
-      for (const auto& category : json_message["params"]["categories"]) {
-        categories.push_back(category.get<std::string>());
-      }
-    }
-
-    tracing_agent_->start(categories);
-
-    json json_response = {
-        {"id", json_message["id"]},
-        {"result", json::object()},
-    };
-    this->notify(json_response.dump());
-    return;
-  }
-
-  if (method == "Tracing.end") {
-    tracing_agent_->end();
-    for (const auto& traceMessage : tracing_agent_->getLastTrace()) {
-      notify(traceMessage);
-    }
-    return;
   }
 
   // Note: Network.loadNetworkResource and IO.read/IO.close are handled
