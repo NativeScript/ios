@@ -487,7 +487,13 @@ void Runtime::RunMainScript() {
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
-  this->moduleInternal_->RunModule(isolate, "./");
+  std::string errorMessage;
+  if (!this->moduleInternal_->RunModule(isolate, "./", &errorMessage)) {
+    // A failed entry module is fatal in every build — an app whose main
+    // module did not run has no defined state to continue in.
+    throw NativeScriptException(errorMessage.empty() ? "Failed to run the main module"
+                                                     : errorMessage);
+  }
 }
 
 bool Runtime::RunModule(const std::string moduleName, std::string* outErrorMessage) {

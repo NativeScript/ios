@@ -524,11 +524,9 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
       Log(@"[http-esm][load][fetch-fail] request=%s key=%s status=%d", requestedUrl.c_str(),
           registryKey.c_str(), status);
     }
-    if (RuntimeConfig.IsDebug) {
-      std::string msg =
-          "HTTP import failed: " + requestedUrl + " (status=" + std::to_string(status) + ")";
-      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
-    }
+    std::string msg =
+        "HTTP import failed: " + requestedUrl + " (status=" + std::to_string(status) + ")";
+    isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
     return v8::MaybeLocal<v8::Module>();
   }
 
@@ -539,10 +537,8 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
       Log(@"[http-esm][load][compile-fail] request=%s key=%s bytes=%zu", requestedUrl.c_str(),
           registryKey.c_str(), body.size());
     }
-    if (RuntimeConfig.IsDebug) {
-      std::string msg = "HTTP import compile failed: " + requestedUrl;
-      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
-    }
+    std::string msg = "HTTP import compile failed: " + requestedUrl;
+    isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
     return v8::MaybeLocal<v8::Module>();
   }
 
@@ -1655,14 +1651,9 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(v8::Isolate* isolate,
   v8::Local<v8::String> urlString;
   if (!v8::String::NewFromUtf8(isolate, url.c_str(), v8::NewStringType::kNormal)
            .ToLocal(&urlString)) {
-    if (RuntimeConfig.IsDebug) {
-      Log(@"Debug mode - Failed to create URL string for JSON module");
-      return v8::MaybeLocal<v8::Module>();
-    } else {
-      isolate->ThrowException(v8::Exception::Error(
-          tns::ToV8String(isolate, "Failed to create URL string for JSON module")));
-      return v8::MaybeLocal<v8::Module>();
-    }
+    isolate->ThrowException(v8::Exception::Error(
+        tns::ToV8String(isolate, "Failed to create URL string for JSON module")));
+    return v8::MaybeLocal<v8::Module>();
   }
 
   v8::ScriptOrigin origin(urlString, 0, 0, false, -1, v8::Local<v8::Value>(), false, false,
@@ -1672,14 +1663,9 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(v8::Isolate* isolate,
 
   v8::Local<v8::Module> jsonModule;
   if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&jsonModule)) {
-    if (RuntimeConfig.IsDebug) {
-      Log(@"Debug mode - Failed to compile JSON module");
-      return v8::MaybeLocal<v8::Module>();
-    } else {
-      isolate->ThrowException(
-          v8::Exception::SyntaxError(tns::ToV8String(isolate, "Failed to compile JSON module")));
-      return v8::MaybeLocal<v8::Module>();
-    }
+    isolate->ThrowException(
+        v8::Exception::SyntaxError(tns::ToV8String(isolate, "Failed to compile JSON module")));
+    return v8::MaybeLocal<v8::Module>();
   }
 
   // No imports inside this module, so instantiate directly

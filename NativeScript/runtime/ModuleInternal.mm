@@ -222,29 +222,21 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path, std::string* 
             NormalizeHttpModuleUrl(path).c_str(), ex.getMessage().c_str());
       }
       if (RuntimeConfig.IsDebug && !isHttpModule) {
-        Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+        Log(@"***** JavaScript exception occurred *****");
         Log(@"Error loading ES module: %s", path.c_str());
         Log(@"Exception: %s", ex.getMessage().c_str());
-        Log(@"***** End stack trace - continuing execution *****");
-        Log(@"Debug mode - ES module loading failed, but telling iOS it succeeded to prevent app "
-            @"termination");
-        return true;  // avoid termination in debug
-      } else {
-        // Surface the inner exception's message so callers passing
-        // `outErrorMessage` see the real cause instead of just a
-        // false return.
-        SetOutErrorMessage(outErrorMessage, ex.getMessage());
-        return false;
       }
+      // Surface the inner exception's message so callers passing
+      // `outErrorMessage` see the real cause instead of just a
+      // false return.
+      SetOutErrorMessage(outErrorMessage, ex.getMessage());
+      return false;
     }
     if (moduleNamespace.IsEmpty()) {
       if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
         Log(@"[run-module][http-esm][empty] %s", NormalizeHttpModuleUrl(path).c_str());
       }
-      if (RuntimeConfig.IsDebug && !isHttpModule) {
-        Log(@"Debug mode - ES module returned empty namespace, but telling iOS it succeeded");
-        return true;
-      } else {
+      {
         // `LoadESModule` returned an empty value without throwing —
         // typically a HTTP TLA timeout / rejection swallowed by the
         // debug-modal path. Provide a directional hint so the JS
@@ -284,59 +276,43 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path, std::string* 
   success = requireFunc->Call(context, globalObject, 1, args).ToLocal(&result);
 
   if (!success || tc.HasCaught()) {
-    // Main isolate stays alive in debug for HMR; worker isolates must surface
-    // the failure so `worker.onerror` fires (handled in the else branch).
-    if (RuntimeConfig.IsDebug && !cache->isWorker) {
-      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+    if (RuntimeConfig.IsDebug) {
+      Log(@"***** JavaScript exception occurred *****");
       Log(@"Error in require() call:");
       Log(@"  Requested module: '%s'", path.c_str());
       Log(@"  Called from: %s", RuntimeConfig.ApplicationPath.c_str());
-
       if (tc.HasCaught()) {
         tns::LogError(isolate, tc);
       }
+    }
 
-      Log(@"***** End stack trace - continuing execution *****");
-      Log(@"Debug mode - Main script execution failed, but telling iOS it succeeded to prevent "
-          @"app termination");
-
-      // Add a small delay to ensure error modal has time to render before we return
-      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
-                     dispatch_get_main_queue(), ^{
-                       Log(@"🛡️ Debug mode - Crash prevention complete, app should remain stable");
-                     });
-
-      return true;  // LIE TO iOS - return success to prevent app termination
-    } else {
-      // Best-effort extract the V8 exception text so the rejection
-      // upstream isn't empty. Leaves the out-param empty when the
-      // TryCatch has no exception to stringify; callers that need a
-      // placeholder string are expected to substitute one themselves.
-      std::string requireFailureMessage;
-      if (tc.HasCaught()) {
-        Local<Value> ex = tc.Exception();
-        if (!ex.IsEmpty()) {
-          v8::Local<v8::String> exStr;
-          if (ex->ToString(context).ToLocal(&exStr)) {
-            v8::String::Utf8Value utf8(isolate, exStr);
-            if (*utf8) {
-              requireFailureMessage.assign(*utf8, utf8.length());
-            }
+    // Best-effort extract the V8 exception text so the rejection
+    // upstream isn't empty. Leaves the out-param empty when the
+    // TryCatch has no exception to stringify; callers that need a
+    // placeholder string are expected to substitute one themselves.
+    std::string requireFailureMessage;
+    if (tc.HasCaught()) {
+      Local<Value> ex = tc.Exception();
+      if (!ex.IsEmpty()) {
+        v8::Local<v8::String> exStr;
+        if (ex->ToString(context).ToLocal(&exStr)) {
+          v8::String::Utf8Value utf8(isolate, exStr);
+          if (*utf8) {
+            requireFailureMessage.assign(*utf8, utf8.length());
           }
         }
       }
-      if (requireFailureMessage.empty()) {
-        requireFailureMessage = std::string("require() failed for module ") + path;
-      }
-      SetOutErrorMessage(outErrorMessage, requireFailureMessage);
-      // For worker isolates, keep the V8 exception pending so the worker entry's
-      // TryCatch (Worker.mm) catches it and routes it to worker.onerror. The
-      // main isolate's release path is unchanged (no rethrow).
-      if (cache->isWorker && tc.HasCaught()) {
-        tc.ReThrow();
-      }
-      return false;
     }
+    if (requireFailureMessage.empty()) {
+      requireFailureMessage = std::string("require() failed for module ") + path;
+    }
+    SetOutErrorMessage(outErrorMessage, requireFailureMessage);
+    // For worker isolates, keep the V8 exception pending so the worker entry's
+    // TryCatch (Worker.mm) catches it and routes it to worker.onerror.
+    if (cache->isWorker && tc.HasCaught()) {
+      tc.ReThrow();
+    }
+    return false;
   }
 
   return success;
@@ -359,29 +335,18 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
       tns::LogError(isolate, tc);
     }
     Log(@"FATAL: Failed to call require factory function");
-    // Return a dummy function to avoid further crashes
+    // A require that cannot exist must throw when called, in every build.
     result = v8::Function::New(context, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-               if (RuntimeConfig.IsDebug) {
-                 Log(@"Debug mode - Require function unavailable (factory failed)");
-                 info.GetReturnValue().SetUndefined();
-               } else {
-                 info.GetIsolate()->ThrowException(v8::Exception::Error(
-                     tns::ToV8String(info.GetIsolate(), "Require function unavailable")));
-               }
+               info.GetIsolate()->ThrowException(v8::Exception::Error(
+                   tns::ToV8String(info.GetIsolate(), "Require function unavailable")));
              }).ToLocalChecked();
   }
 
   if (result.IsEmpty() || !result->IsFunction()) {
     Log(@"FATAL: Require factory did not return a function");
-    // Return a dummy function
     result = v8::Function::New(context, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-               if (RuntimeConfig.IsDebug) {
-                 Log(@"Debug mode - Require function unavailable (no function returned)");
-                 info.GetReturnValue().SetUndefined();
-               } else {
-                 info.GetIsolate()->ThrowException(v8::Exception::Error(
-                     tns::ToV8String(info.GetIsolate(), "Require function unavailable")));
-               }
+               info.GetIsolate()->ThrowException(v8::Exception::Error(
+                   tns::ToV8String(info.GetIsolate(), "Require function unavailable")));
              }).ToLocalChecked();
   }
 
@@ -648,15 +613,8 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   // Compile/load the JavaScript/ESM source
   Local<Value> scriptValue = LoadScript(isolate, modulePath);
 
-  // Check if script loading failed (debug mode graceful returns)
   if (scriptValue.IsEmpty()) {
-    if (RuntimeConfig.IsDebug) {
-      // NSLog(@"Debug mode - Script loading returned empty value, returning gracefully: %s",
-      //       modulePath.c_str());
-      return Local<Object>();
-    } else {
-      throw NativeScriptException(isolate, "Script loading failed for " + modulePath);
-    }
+    throw NativeScriptException(isolate, "Script loading failed for " + modulePath);
   }
 
   // Check if this is an ES module
@@ -666,25 +624,12 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   if (isESM) {
     // For ES modules, the returned value is the namespace object
 
-    // First check if scriptValue is empty (from debug mode graceful returns)
     if (scriptValue.IsEmpty()) {
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - ES module returned empty value, returning gracefully: %s",
-            modulePath.c_str());
-        return Local<Object>();
-      } else {
-        throw NativeScriptException(isolate, "ES module load returned empty value " + modulePath);
-      }
+      throw NativeScriptException(isolate, "ES module load returned empty value " + modulePath);
     }
 
     if (!scriptValue->IsObject()) {
-      if (RuntimeConfig.IsDebug) {
-        Log(@"Debug mode - ES module load failed, returning gracefully: %s", modulePath.c_str());
-        // Return empty module object to prevent crashes
-        return Local<Object>();
-      } else {
-        throw NativeScriptException(isolate, "Failed to load ES module " + modulePath);
-      }
+      throw NativeScriptException(isolate, "Failed to load ES module " + modulePath);
     }
 
     // Debug: Check if we're in a worker context and if self.onmessage is set
@@ -831,16 +776,8 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
 
   Local<Script> script = ModuleInternal::LoadClassicScript(isolate, canonicalPath);
 
-  // Check if script compilation failed (debug mode graceful returns)
   if (script.IsEmpty()) {
-    if (RuntimeConfig.IsDebug) {
-      Log(@"Debug mode - Classic script compilation returned empty, returning gracefully: %s",
-          canonicalPath.c_str());
-      return Local<Value>();
-    } else {
-      throw NativeScriptException(isolate,
-                                  "Classic script compilation failed for " + canonicalPath);
-    }
+    throw NativeScriptException(isolate, "Classic script compilation failed for " + canonicalPath);
   }
 
   // run it and return the value with proper exception handling
@@ -849,46 +786,17 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
   Local<Value> result;
 
   if (!script->Run(context).ToLocal(&result)) {
-    // Script execution failed, throw a proper exception instead of aborting V8
     if (RuntimeConfig.IsDebug) {
-      // Log the detailed JavaScript error with full stack trace
-      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+      Log(@"***** JavaScript exception occurred *****");
       Log(@"Error executing script: %s", canonicalPath.c_str());
       if (tc.HasCaught()) {
         tns::LogError(isolate, tc);
       }
-      Log(@"***** End stack trace - continuing execution *****");
-      Log(@"Debug mode - Script execution failed, returning gracefully: %s", path.c_str());
-
-      std::string errorTitle = "Uncaught JavaScript Exception";
-      std::string errorMessage = "Error executing script.";
-
-      // Extract error message for modal when available
-      if (tc.HasCaught()) {
-        Local<Value> exception = tc.Exception();
-        if (!exception.IsEmpty()) {
-          Local<Context> ctx = isolate->GetCurrentContext();
-          Local<v8::String> excStr;
-          if (exception->ToString(ctx).ToLocal(&excStr)) {
-            std::string excMsg = tns::ToString(isolate, excStr);
-            if (!excMsg.empty()) {
-              errorMessage = excMsg;
-            }
-          }
-        }
-      }
-
-      std::string stackTrace = tns::GetSmartStackTrace(isolate, &tc, tc.Exception());
-
-      NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
-      return Local<Value>();
-    } else {
-      if (tc.HasCaught()) {
-        throw NativeScriptException(isolate, tc, "Cannot execute script " + canonicalPath);
-      } else {
-        throw NativeScriptException(isolate, "Script execution failed for " + canonicalPath);
-      }
     }
+    if (tc.HasCaught()) {
+      throw NativeScriptException(isolate, tc, "Cannot execute script " + canonicalPath);
+    }
+    throw NativeScriptException(isolate, "Script execution failed for " + canonicalPath);
   }
 
   return result;
@@ -937,25 +845,14 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
   TryCatch tc(isolate);
   Local<Script> script;
   if (!ScriptCompiler::Compile(context, &source, opts).ToLocal(&script) || tc.HasCaught()) {
-    // The main isolate swallows compile errors in debug and continues so a bad
-    // HMR edit doesn't abort the app (the dev overlay surfaces it). Worker
-    // isolates must NOT swallow: a worker entry-script error has to propagate so
-    // `worker.onerror` fires. So fall through to the throw path for workers.
-    if (RuntimeConfig.IsDebug && !Caches::Get(isolate)->isWorker) {
-      // Log the detailed JavaScript error with full stack trace
-      Log(@"***** JavaScript exception occurred - detailed stack trace follows *****");
+    if (RuntimeConfig.IsDebug) {
+      Log(@"***** JavaScript exception occurred *****");
       Log(@"Error compiling classic script: %s", canonicalPath.c_str());
       if (tc.HasCaught()) {
         tns::LogError(isolate, tc);
       }
-      Log(@"***** End stack trace - continuing execution *****");
-      Log(@"Debug mode - Script compilation failed, returning gracefully: %s",
-          canonicalPath.c_str());
-      // Return empty script to prevent crashes
-      return Local<Script>();
-    } else {
-      throw NativeScriptException(isolate, tc, "Cannot compile script " + canonicalPath);
     }
+    throw NativeScriptException(isolate, tc, "Cannot compile script " + canonicalPath);
   }
 
   if (cacheData == nullptr) {
@@ -1135,9 +1032,6 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
     if (!maybeMod.ToLocal(&module)) {
       logPhase("compile", "fail", "http-loader");
-      if (RuntimeConfig.IsDebug) {
-        return Local<Value>();
-      }
       throw NativeScriptException("Cannot load ES module " + canonicalPath);
     }
     logPhase("compile", "ok", "http-loader");
@@ -1169,22 +1063,15 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
           }
         }
         logPhase("compile", "fail", classification);
-        // V8 threw a syntax error or similar
         if (RuntimeConfig.IsDebug) {
-          // Log the detailed JavaScript error with full stack trace
           Log(@"***** JavaScript exception occurred *****");
           Log(@"Error compiling ES module: %s", canonicalPath.c_str());
           if (tcCompile.HasCaught()) {
             tns::LogError(isolate, tcCompile);
           }
-          Log(@"***** Debug mode - continuing execution *****");
-          Log(@"ES module compilation failed: %s", canonicalPath.c_str());
-          // Return empty to prevent crashes
-          return Local<Value>();
-        } else {
-          throw NativeScriptException(isolate, tcCompile,
-                                      "Cannot compile ES module " + canonicalPath);
         }
+        throw NativeScriptException(isolate, tcCompile,
+                                    "Cannot compile ES module " + canonicalPath);
       }
     }
     logPhase("compile", "ok");
@@ -1225,24 +1112,17 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       }
       logPhase("instantiate", "fail", classification);
       if (RuntimeConfig.IsDebug) {
-        // Log the detailed JavaScript error with full stack trace
         Log(@"***** JavaScript exception occurred *****");
         Log(@"Error instantiating module: %s", canonicalPath.c_str());
         if (tcLink.HasCaught()) {
           tns::LogError(isolate, tcLink);
         }
-        Log(@"***** Debug mode - continuing execution *****");
-        Log(@"Module instantiation failed: %s", canonicalPath.c_str());
-        return Local<Value>();
-      } else {
-        if (tcLink.HasCaught()) {
-          throw NativeScriptException(isolate, tcLink,
-                                      "Cannot instantiate module " + canonicalPath);
-        } else {
-          // V8 gave no exception object—throw plain text
-          throw NativeScriptException(isolate, "Cannot instantiate module " + canonicalPath);
-        }
       }
+      if (tcLink.HasCaught()) {
+        throw NativeScriptException(isolate, tcLink, "Cannot instantiate module " + canonicalPath);
+      }
+      // V8 gave no exception object—throw plain text
+      throw NativeScriptException(isolate, "Cannot instantiate module " + canonicalPath);
     }
   }
   logPhase("instantiate", "ok");
@@ -1273,18 +1153,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       }
       logPhase("evaluate", "fail", classification);
       if (RuntimeConfig.IsDebug) {
-        // Log the detailed JavaScript error with full stack trace
         Log(@"***** JavaScript exception occurred *****");
         Log(@"Error evaluating ES module: %s", canonicalPath.c_str());
         if (tcEval.HasCaught()) {
           tns::LogError(isolate, tcEval);
         }
-        Log(@"***** Debug mode - continuing execution *****");
-        Log(@"Module evaluation failed: %s", canonicalPath.c_str());
-        return Local<Value>();
-      } else {
-        throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + canonicalPath);
       }
+      throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + canonicalPath);
     }
     logPhase("evaluate", "ok");
 
@@ -1418,28 +1293,18 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
               NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
               logPhase("evaluate", "promise-rejected-handled");
 
-              // For HTTP modules we throw even in debug so the
-              // rejection reason can propagate back through
-              // `ModuleInternal::RunModule`'s catch handler into the
-              // caller's `outErrorMessage`; otherwise the caller sees
-              // only a generic failure with no detail. Non-HTTP debug
-              // shows the modal and returns an empty namespace —
-              // `RunModule`'s empty-namespace branch then returns true
-              // so the app keeps running.
-              if (isHttpModule) {
-                std::string detail =
-                    std::string("HTTP module evaluation promise rejected: ") + canonicalPath;
-                if (!errorMessage.empty()) {
-                  detail += " — ";
-                  detail += errorMessage;
-                }
-                throw NativeScriptException(detail);
+              // Throw with the rejection detail so it propagates through
+              // `ModuleInternal::RunModule`'s catch handler into the caller's
+              // `outErrorMessage` — debug adds the modal above, never
+              // recovery.
+              std::string detail =
+                  std::string("Module evaluation promise rejected: ") + canonicalPath;
+              if (!errorMessage.empty()) {
+                detail += " — ";
+                detail += errorMessage;
               }
-
-              // Non-HTTP debug: don't throw, just return empty.
-              return Local<Value>();
+              throw NativeScriptException(detail);
             } else {
-              // Release mode - throw exceptions as before
               if (!promiseTc.HasCaught()) {
                 Local<Value> reason = promise->Result();
                 isolate->ThrowException(reason);
