@@ -227,6 +227,109 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        // Module scripts are strict about MIME on the web, and so is the
+        // loader: the response policy lives in one classifier shared by the
+        // synchronous fallback and the graph walk.
+        describe("module MIME gate", function () {
+            function rejectionOf(url, callback) {
+                import(url).then(function () {
+                    callback("<resolved>");
+                }).catch(function (error) {
+                    callback(String((error && error.message) || error));
+                });
+            }
+
+            it("rejects an SPA fallback that answers with text/html", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var url = origin + "/esm/html-fallback.mjs";
+                rejectionOf(url, function (message) {
+                    // The DX win: the cause is the MIME type, not a syntax
+                    // error from HTML reaching the JS parser.
+                    expect(message.indexOf("text/html") >= 0 ? "names the MIME" : message)
+                        .toBe("names the MIME");
+                    expect(message.indexOf(url) >= 0 ? "names the URL" : message)
+                        .toBe("names the URL");
+                    expect(message.indexOf("Unexpected token") >= 0 ? message : "no parse error")
+                        .toBe("no parse error");
+                    done();
+                });
+            });
+
+            it("rejects a response that carries no MIME type", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var url = origin + "/esm/no-mime.mjs";
+                rejectionOf(url, function (message) {
+                    expect(message.indexOf("no MIME type") >= 0 ? "names the missing MIME" : message)
+                        .toBe("names the missing MIME");
+                    expect(message.indexOf(url) >= 0 ? "names the URL" : message)
+                        .toBe("names the URL");
+                    done();
+                });
+            });
+
+            it("still serves an empty 200 with a JS MIME as the empty module", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                // Type-only modules transform to zero runtime code; dev servers
+                // serve them as empty 200s and they must stay valid.
+                import(origin + "/esm/empty.mjs").then(function (mod) {
+                    expect(typeof mod).toBe("object");
+                    expect(Object.keys(mod)).toEqual([]);
+                    done();
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+
+            it("routes a served JSON module through the JSON path, with stable identity",
+               function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var url = origin + "/esm/data.json";
+                import(url).then(function (first) {
+                    expect(first.default.kind).toBe("json-module");
+                    expect(first.default.n).toBe(41);
+                    // The re-import is scheduled as its own task rather than
+                    // issued from inside this handler — re-importing the same
+                    // HTTP JSON URL from within its own resolution never
+                    // settles (see the open finding); everything else about
+                    // JSON identity holds.
+                    __ns__setTimeout(function () {
+                        import(url).then(function (second) {
+                            expect(second).toBe(first);
+                            expect(second.default).toBe(first.default);
+                            done();
+                        }).catch(function (error) {
+                            expect("re-import rejected: " + formatError(error)).toBe("resolved");
+                            done();
+                        });
+                    }, 0);
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+        });
+
         it("links and evaluates cyclic disk imports", function(done) {
             import("~/tests/esm/graph/cycle-a.mjs").then(function(module) {
                 expect(module.aValue).toBe("a");

@@ -70,6 +70,38 @@ class TestRunnerTests: XCTestCase {
                     return
                 }
 
+                // ── MIME-gate routes ──────────────────────────────
+                if path == "/esm/html-fallback.mjs" {
+                    // The SPA-fallback shape: an unknown path answered with the
+                    // index document, 200 OK. The module loader must reject it
+                    // on MIME rather than hand HTML to the JS parser.
+                    let body = "<!doctype html>\n<html><body>index</body></html>\n"
+                    startResponse("200 OK", [("Content-Type", "text/html; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
+                if path == "/esm/data.json" {
+                    let body = "{\"kind\":\"json-module\",\"n\":41}"
+                    startResponse("200 OK", [("Content-Type", "application/json; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
+                if path == "/esm/empty.mjs" {
+                    // A type-only module: zero runtime code, valid JS MIME.
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(Data())
+                    return
+                }
+
+                if path == "/esm/no-mime.mjs" {
+                    // Deliberately no Content-Type header.
+                    startResponse("200 OK", [])
+                    sendBody("export const ok = true;\n".data(using: .utf8) ?? Data())
+                    return
+                }
+
                 if path == "/esm/graph-leaf.mjs" {
                     // Leaf of a mixed local->local->http graph. The `k` param
                     // gives each importer its own module identity (the query is

@@ -122,7 +122,7 @@ bool IsRemoteUrlAllowed(const std::string& url) {
 // Boot-evaluation flag
 //
 // Nonzero while this thread is evaluating an entry module (main or worker) —
-// the only window in which HttpFetchText's yield may pump the runloop:
+// the only window in which HttpFetchModule's yield may pump the runloop:
 // during entry evaluation nothing else owns the runloop yet, while pumping
 // mid-app would re-enter arbitrary user code under a synchronous fetch.
 // Armed by ModuleInternal::RunModule; thread-local because the fetch and its
@@ -319,19 +319,23 @@ static void ClearAllCacheBustMarks() {
 // ============================================================================
 //
 // Two fetch primitives back the HTTP ESM loader:
-//   - `HttpFetchText` — the synchronous fetch V8's ResolveModuleCallback
-//     falls back to for anything the async module-graph walk missed
+//   - `HttpFetchModule` — the synchronous fetch V8's ResolveModuleCallback
+//     falls back to for anything the module-graph walk missed
 //     (the callback is synchronous — still true as of 14.9.207.39 — so
 //     this fallback must be native and blocking).
 //   - `FetchModuleBodyAsync` — the NSURLSession-backed primitive behind
-//     the phase-1 async graph walk (StartModuleGraphLoad),
-//     which fetches the transitive closure concurrently off the JS
-//     thread before instantiation begins.
+//     the module-graph walk (StartModuleGraphLoad), which fetches the
+//     transitive closure concurrently off the JS thread before
+//     instantiation begins.
 //
-// These two are the loader's complete fetch surface: the async graph walk
-// owns all body fetching. Concurrent per-module fetches overlap with
-// on-device compile, which measured fastest on real apps
-// (HMR_API_NECESSITY_REVIEW.md §8.3).
+// The two transports stay separate — the NSURLConnection deadlock note above
+// PerformHttpFetchOnceSync is why — but they share both halves of the
+// contract: BuildModuleFetchRequest shapes every request, and
+// ClassifyModuleResponse judges every response. Neither can drift into its
+// own idea of what a valid module response is.
+//
+// Concurrent per-module fetches overlap with on-device compile, which
+// measured fastest on real apps (HMR_API_NECESSITY_REVIEW.md §8.3).
 
 // Forward declarations — these helpers are defined below their first use,
 // matching the existing convention in this file.
@@ -339,7 +343,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
                                      std::string& contentType, int& status);
 static void MaybePumpJSThreadDuringBoot();
 // Forward decl: the pluggable HTTP-fetch yield hook is defined below
-// MaybePumpJSThreadDuringBoot (which is its default callback), but HttpFetchText
+// MaybePumpJSThreadDuringBoot (which is its default callback), but HttpFetchModule
 // calls it from earlier in the file. See the definition for the rationale on
 // the atomic indirection.
 static inline void InvokeHttpFetchYield();
@@ -361,66 +365,192 @@ static std::atomic<size_t> g_fetchSyncMedium{0};  // 10–99ms
 static std::atomic<size_t> g_fetchSyncSlow{0};    // >=100ms
 static constexpr size_t kFetchSyncSummaryEvery = 100;
 
-bool HttpFetchText(const std::string& url, std::string& out, std::string& contentType,
-                   int& status) {
-  // Security gate: check if remote module loading is allowed before any HTTP fetch.
-  // This is the single point of enforcement for all HTTP module loading.
+// ── The module response policy ───────────────────────────────────────────────
+//
+// Module scripts are strict about MIME: the HTML spec's "fetch a single module
+// script" fails the fetch outright for anything that is not a JavaScript or
+// JSON MIME type, where a classic script would sniff and run it anyway. That
+// strictness is the whole point — an SPA dev server answering an unknown path
+// with `200 text/html` should say so, not hand HTML to the parser and produce
+// `Unexpected token '<'` from somewhere deep in the graph.
+//
+// Both transports classify here, so the synchronous fallback and the async
+// walk cannot disagree about what a response means.
+
+// "text/javascript; charset=utf-8" → "text/javascript": parameters stripped,
+// trimmed, lowercased.
+static std::string MimeEssence(const std::string& contentType) {
+  size_t semi = contentType.find(';');
+  std::string essence = semi == std::string::npos ? contentType : contentType.substr(0, semi);
+  size_t begin = essence.find_first_not_of(" \t");
+  if (begin == std::string::npos) {
+    return "";
+  }
+  size_t end = essence.find_last_not_of(" \t");
+  essence = essence.substr(begin, end - begin + 1);
+  for (char& c : essence) {
+    c = (char)tolower((unsigned char)c);
+  }
+  return essence;
+}
+
+// The HTML spec's JavaScript MIME type essence list, verbatim.
+static bool IsJavaScriptMimeEssence(const std::string& essence) {
+  static const char* const kJavaScriptEssences[] = {"application/ecmascript",
+                                                    "application/javascript",
+                                                    "application/x-ecmascript",
+                                                    "application/x-javascript",
+                                                    "text/ecmascript",
+                                                    "text/javascript",
+                                                    "text/javascript1.0",
+                                                    "text/javascript1.1",
+                                                    "text/javascript1.2",
+                                                    "text/javascript1.3",
+                                                    "text/javascript1.4",
+                                                    "text/javascript1.5",
+                                                    "text/jscript",
+                                                    "text/livescript",
+                                                    "text/x-ecmascript",
+                                                    "text/x-javascript"};
+  for (const char* candidate : kJavaScriptEssences) {
+    if (essence == candidate) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// A JSON MIME type is application/json, text/json, or any `+json` subtype.
+static bool IsJsonMimeEssence(const std::string& essence) {
+  if (essence == "application/json" || essence == "text/json") {
+    return true;
+  }
+  const std::string suffix = "+json";
+  return essence.size() > suffix.size() &&
+         essence.compare(essence.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+// `transportOk` means a response arrived at all; everything else about it —
+// status, MIME, emptiness — is policy decided here. `body` is moved into the
+// result on success.
+static void ClassifyModuleResponse(const std::string& url, bool transportOk, int status,
+                                   const std::string& contentType, std::string& body,
+                                   ModuleFetchResult& result) {
+  result.status = status;
+  result.contentType = contentType;
+
+  if (!transportOk) {
+    result.failureReason = "HTTP import failed: " + url + " (network error)";
+    return;
+  }
+  if (status == 204 || status == 205) {
+    // "No content" carries no module, which the web treats as a network error
+    // for a module script rather than as an empty module.
+    result.failureReason =
+        "HTTP import failed: " + url + " (status=" + std::to_string(status) + ", no content)";
+    return;
+  }
+  if (status < 200 || status >= 300) {
+    result.failureReason =
+        "HTTP import failed: " + url + " (status=" + std::to_string(status) + ")";
+    return;
+  }
+
+  const std::string essence = MimeEssence(contentType);
+  if (essence.empty()) {
+    result.failureReason =
+        "Expected a JavaScript module but '" + url + "' responded with no MIME type";
+    return;
+  }
+
+  if (IsJsonMimeEssence(essence)) {
+    if (body.empty()) {
+      result.failureReason =
+          "Expected a JSON module but '" + url + "' responded with an empty body";
+      return;
+    }
+    result.kind = ModuleResponseKind::kJson;
+  } else if (IsJavaScriptMimeEssence(essence)) {
+    result.kind = ModuleResponseKind::kJavaScript;
+    // An empty 2xx JavaScript body is a valid module: type-only TypeScript
+    // modules transform to zero runtime code and dev servers serve them as
+    // empty 200s. Failing here would kill the whole graph with a misleading
+    // "status=200".
+    if (body.empty()) {
+      body = "export {};\n";
+      TNS_DEBUG(Esm, "[http-loader] empty 2xx body for %s — serving canonical empty module",
+                url.c_str());
+    }
+  } else {
+    result.failureReason =
+        "Expected a JavaScript module but '" + url + "' responded with MIME type '" + essence + "'";
+    return;
+  }
+
+  result.ok = true;
+  result.body = std::move(body);
+}
+
+bool HttpFetchModule(const std::string& url, ModuleFetchResult& result) {
+  result = ModuleFetchResult();
+
+  // Security gate: the single point of enforcement for all HTTP module
+  // loading, checked before any network turn.
   if (!IsRemoteUrlAllowed(url)) {
-    status = 403;  // Forbidden
+    result.status = 403;
+    result.failureReason = "HTTP import blocked: remote module loading is not allowed for " + url;
     TNS_DEBUG(Esm, "[http-esm][security][blocked] %s", url.c_str());
     return false;
   }
 
-  // Hoist the category check once per call so the success branches below
-  // share a single read.
+  // Hoist the category check once per call so the branches below share a
+  // single read.
   const bool traceFetch = tns::LogCategoryEnabled(tns::LogCategory::Fetch);
 
-  // Synchronous fetch with one retry on failure.
-  // Time the network branch end-to-end so the per-URL log can
-  // attribute milliseconds to each fetch. We measure here (not
-  // inside PerformHttpFetchOnceSync) so the retry interval gets
-  // billed to the URL too — which is what the user sees as "this
-  // URL was slow".
+  // Time the network branch end-to-end so the per-URL log can attribute
+  // milliseconds to each fetch. Measured here rather than inside
+  // PerformHttpFetchOnceSync so the retry interval is billed to the URL too —
+  // which is what the user sees as "this URL was slow".
   const uint64_t netStartUs =
       traceFetch ? (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0) : 0ull;
-  bool ok = PerformHttpFetchOnceSync(url, out, contentType, status);
-  if (!ok) {
+
+  std::string body;
+  std::string contentType;
+  int status = 0;
+  bool transportOk = PerformHttpFetchOnceSync(url, body, contentType, status);
+  if (!transportOk) {
+    // One retry, and only for a transport error: an HTTP status is an answer,
+    // not a failure to communicate, so asking again would just repeat it.
     TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
     usleep(120 * 1000);
-    ok = PerformHttpFetchOnceSync(url, out, contentType, status);
+    transportOk = PerformHttpFetchOnceSync(url, body, contentType, status);
   }
   // NOTE: no long dev-server-startup retry loop here on purpose. The CLI's
   // `compileWithWatch` gates app deploy/restart on its `vite serve`
   // readiness probe (bundler-compiler-service), so a connection-refused at
   // boot is a real failure, not a startup race — surface it immediately.
-  if (!ok || status < 200 || status >= 300) {
+
+  ClassifyModuleResponse(url, transportOk, status, contentType, body, result);
+
+  if (!result.ok) {
+    TNS_DEBUG(Esm, "[http-loader][fetch-sync][reject] %s", result.failureReason.c_str());
     return false;
   }
-  // An empty 2xx body is a VALID module response: type-only TypeScript
-  // modules legitimately transform to zero runtime code (Vite's /@fs
-  // endpoint serves them as empty 200s). Substitute the canonical empty ESM
-  // module — treating this as a fetch failure kills the entire dev-session
-  // graph with a misleading "HTTP import failed (status=200)".
-  if (out.empty()) {
-    out = "export {};\n";
-    TNS_DEBUG(Esm, "[http-loader] empty 2xx body for %s — serving canonical empty module",
-              url.c_str());
-  }
+
   if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
-    unsigned long long blen = (unsigned long long)out.size();
-    const char* ctstr = contentType.empty() ? "<none>" : contentType.c_str();
-    TNS_DEBUG(Esm, "[http-loader] fetched status=%d content-type=%s bytes=%llu", status, ctstr,
-              blen);
+    const char* ctstr = result.contentType.empty() ? "<none>" : result.contentType.c_str();
+    TNS_DEBUG(Esm, "[http-loader] fetched status=%d content-type=%s bytes=%llu", result.status,
+              ctstr, (unsigned long long)result.body.size());
   }
   if (traceFetch) {
     const uint64_t netEndUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
     const uint64_t netMs = netEndUs > netStartUs ? (netEndUs - netStartUs) / 1000ull : 0ull;
     TNS_DEBUG(Fetch, "[http-loader][fetch][network] %s bytes=%lu ms=%llu", url.c_str(),
-              (unsigned long)out.size(), (unsigned long long)netMs);
+              (unsigned long)result.body.size(), (unsigned long long)netMs);
   }
 
-  // Yield to the placeholder heartbeat after the 10–60ms sync fetch
-  // block so the bar can repaint before V8 calls us again.
+  // Yield to the placeholder heartbeat after the sync fetch so a cold-boot
+  // progress UI still repaints between modules.
   InvokeHttpFetchYield();
   return true;
 }
@@ -613,13 +743,10 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
 
     status = (int)httpStatusLocal;
     contentType = contentTypeLocal;
-    // An empty body on a 2xx with no transport error is a legitimate
-    // response (type-only TS modules transform to zero runtime code —
-    // Vite serves them as empty 200s). Only transport errors and empty
-    // non-2xx responses are fetch failures; HttpFetchText normalizes the
-    // empty-success body to the canonical empty module.
-    const bool emptyNon2xx = bodyLocal.empty() && (httpStatusLocal < 200 || httpStatusLocal >= 300);
-    if (err != nil || emptyNon2xx) {
+    // Pure transport: true means a response arrived. Whether that response is
+    // a usable module — status, MIME, emptiness — is ClassifyModuleResponse's
+    // call, so both fetch paths answer it the same way.
+    if (err != nil) {
       if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
         NSString* desc = err.localizedDescription ?: @"<no description>";
         NSString* domain = err.domain ?: @"<no domain>";
@@ -636,7 +763,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
     // been satisfied. Clear the mark so steady-state re-fetches of the
     // same URL don't keep paying the nonce (and stay exact-match for
     // routes that require it).
-    if (bustRequested) {
+    if (bustRequested && httpStatusLocal >= 200 && httpStatusLocal < 300) {
       ClearCacheBustForUrl(url);
     }
     return true;
@@ -680,12 +807,14 @@ static NSURLSession* ModuleFetchSession() {
 // single-retry policy of the synchronous path.
 static void PerformModuleFetchAsyncAttempt(
     const std::string& url, int attempt,
-    std::function<void(bool ok, int status, std::string body)>* completionHeap) {
+    std::function<void(ModuleFetchResult result)>* completionHeap) {
   @autoreleasepool {
     bool bustRequested = false;
     NSMutableURLRequest* request = BuildModuleFetchRequest(url, &bustRequested);
     if (!request) {
-      (*completionHeap)(false, 0, std::string());
+      ModuleFetchResult failed;
+      failed.failureReason = "HTTP import failed: " + url + " (malformed request URL)";
+      (*completionHeap)(std::move(failed));
       delete completionHeap;
       return;
     }
@@ -697,8 +826,15 @@ static void PerformModuleFetchAsyncAttempt(
         dataTaskWithRequest:request
           completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
             int status = 0;
+            std::string contentType;
             if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-              status = (int)[(NSHTTPURLResponse*)response statusCode];
+              NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
+              status = (int)[httpResp statusCode];
+              NSString* ct = [httpResp allHeaderFields][@"Content-Type"];
+              if (ct) {
+                const char* utf8 = [ct UTF8String];
+                if (utf8) contentType = std::string(utf8);
+              }
             }
             std::string body;
             if (data && [data length] > 0) {
@@ -706,8 +842,8 @@ static void PerformModuleFetchAsyncAttempt(
                           static_cast<size_t>([data length]));
             }
 
-            // Transport error → one retry (parity with HttpFetchText's
-            // usleep(120ms)+retry, without blocking any thread).
+            // Transport error → one retry, the same single-retry policy the
+            // sync path applies, without blocking any thread.
             if (error != nil && attempt == 0) {
               TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error: %s",
                         urlCopy.c_str(),
@@ -719,29 +855,22 @@ static void PerformModuleFetchAsyncAttempt(
               return;
             }
 
-            const bool ok = (error == nil) && status >= 200 && status < 300;
-            if (ok && body.empty()) {
-              // Empty 2xx bodies are valid module responses (type-only TS
-              // modules) — same normalization as the sync path.
-              body = "export {};\n";
-            }
-            if (ok && bust) {
+            ModuleFetchResult result;
+            ClassifyModuleResponse(urlCopy, error == nil, status, contentType, body, result);
+
+            if (result.ok && bust) {
               ClearCacheBustForUrl(urlCopy);
             }
-            if (!ok && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
-              NSString* desc =
-                  error ? (error.localizedDescription ?: @"<no description>") : @"<http status>";
-              TNS_DEBUG(Esm,
-                        "[http-loader][fetch-async][error] url=%s status=%d attempt=%d desc=%s",
-                        urlCopy.c_str(), status, attempt, desc.UTF8String);
-            }
-            if (ok && tns::LogCategoryEnabled(tns::LogCategory::Fetch)) {
+            if (!result.ok) {
+              TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] attempt=%d %s", attempt,
+                        result.failureReason.c_str());
+            } else if (tns::LogCategoryEnabled(tns::LogCategory::Fetch)) {
               const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
               const uint64_t ms = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
               TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%llu", urlCopy.c_str(),
-                        (unsigned long)body.size(), (unsigned long long)ms);
+                        (unsigned long)result.body.size(), (unsigned long long)ms);
             }
-            (*completionHeap)(ok, status, std::move(body));
+            (*completionHeap)(std::move(result));
             delete completionHeap;
           }];
     [task resume];
@@ -749,21 +878,24 @@ static void PerformModuleFetchAsyncAttempt(
 }
 
 void FetchModuleBodyAsync(const std::string& url,
-                          std::function<void(bool ok, int status, std::string body)> completion) {
-  // Security gate: single point of enforcement, same as HttpFetchText.
+                          std::function<void(ModuleFetchResult result)> completion) {
+  // Security gate: single point of enforcement, same as HttpFetchModule.
   if (!IsRemoteUrlAllowed(url)) {
     TNS_DEBUG(Esm, "[http-esm][security][blocked] %s", url.c_str());
-    completion(false, 403, std::string());
+    ModuleFetchResult blocked;
+    blocked.status = 403;
+    blocked.failureReason = "HTTP import blocked: remote module loading is not allowed for " + url;
+    completion(std::move(blocked));
     return;
   }
 
-  auto* completionHeap = new std::function<void(bool, int, std::string)>(std::move(completion));
+  auto* completionHeap = new std::function<void(ModuleFetchResult)>(std::move(completion));
   PerformModuleFetchAsyncAttempt(url, 0, completionHeap);
 }
 
 // Cold-boot JS-thread runloop pump.
 //
-// Synchronous `HttpFetchText` calls during V8's static-import walk park
+// Synchronous `HttpFetchModule` calls during V8's static-import walk park
 // the JS thread inside `+sendSynchronousRequest:`, starving the
 // `setInterval` heartbeat that drives the placeholder progress bar.
 // Between fetches we run one short CFRunLoop slice in default mode so
@@ -804,7 +936,7 @@ static void MaybePumpJSThreadDuringBoot() {
   isolate->PerformMicrotaskCheckpoint();
 }
 
-// Pluggable "yield to caller" hook used by HttpFetchText. The default
+// Pluggable "yield to caller" hook used by HttpFetchModule. The default
 // implementation pumps the JS thread runloop during dev-session cold boot
 // (see MaybePumpJSThreadDuringBoot for the gating rationale). Hosts can
 // override or null it out via RegisterHttpFetchYield to keep HTTP fetches
