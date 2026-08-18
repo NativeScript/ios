@@ -16,14 +16,12 @@ inline constexpr double kModuleEvaluateDeadlineSeconds = 60.0;
 class ModuleInternal {
  public:
   ModuleInternal(v8::Local<v8::Context> context);
-  // When `outErrorMessage` is non-null, the failure cause is written into
-  // it on a false return: `NativeScriptException::getMessage()` for
-  // thrown exceptions, the V8 exception text for require() failures, the
-  // top-level-await rejection/timeout reason for ES modules, or a
-  // directional hint when the module returned an empty namespace without
-  // throwing.
-  bool RunModule(v8::Isolate* isolate, std::string path,
-                 std::string* outErrorMessage = nullptr);
+  // Runs the entry module at `path` (main "./" or a worker entry). Throws
+  // NativeScriptException on failure — the exception carries the cause
+  // (compile/require error text, top-level-await rejection reason, or a
+  // directional hint for an empty namespace); callers translate at their
+  // boundary (workers re-arm it on the isolate for worker.onerror).
+  void RunModule(v8::Isolate* isolate, std::string path);
   void RunScript(v8::Isolate* isolate, std::string script);
   static v8::Local<v8::Value> LoadScript(v8::Isolate* isolate,
                                          const std::string& path);

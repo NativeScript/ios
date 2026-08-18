@@ -487,20 +487,23 @@ void Runtime::RunMainScript() {
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
-  std::string errorMessage;
-  if (!this->moduleInternal_->RunModule(isolate, "./", &errorMessage)) {
+  try {
+    this->moduleInternal_->RunModule(isolate, "./");
+  } catch (NativeScriptException& ex) {
     // A failed entry module is fatal in every build — an app whose main
-    // module did not run has no defined state to continue in.
-    throw NativeScriptException(errorMessage.empty() ? "Failed to run the main module"
-                                                     : errorMessage);
+    // module did not run has no defined state to continue in. Log the cause
+    // before unwinding so it survives even if the terminate handler doesn't
+    // print exception details.
+    Log(@"Fatal: the main module failed to run: %s", ex.getMessage().c_str());
+    throw;
   }
 }
 
-bool Runtime::RunModule(const std::string moduleName, std::string* outErrorMessage) {
+void Runtime::RunModule(const std::string moduleName) {
   Isolate* isolate = this->GetIsolate();
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
-  return this->moduleInternal_->RunModule(isolate, moduleName, outErrorMessage);
+  this->moduleInternal_->RunModule(isolate, moduleName);
 }
 
 void Runtime::RunScript(const std::string script) {

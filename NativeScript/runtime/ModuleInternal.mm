@@ -169,17 +169,7 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   }
 }
 
-// Forward `message` into the caller's optional out-param. The caller
-// is responsible for any "missing message" presentation; this helper
-// writes the raw value (which may be empty) when an out-param was
-// supplied, and is a no-op otherwise.
-static inline void SetOutErrorMessage(std::string* outErrorMessage, const std::string& message) {
-  if (outErrorMessage != nullptr) {
-    *outErrorMessage = message;
-  }
-}
-
-bool ModuleInternal::RunModule(Isolate* isolate, std::string path, std::string* outErrorMessage) {
+void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   // Entry evaluation is this thread's boot window: while it is active, the
   // yield inside synchronous HTTP fetches may pump the runloop (nothing else
   // owns it yet). Balanced on every exit path.
@@ -209,7 +199,6 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path, std::string* 
 
   // ES module fast path
   if (IsESModule(path) || isHttpModule) {
-    TryCatch tc(isolate);
     Local<Value> moduleNamespace;
     if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
       Log(@"[run-module][http-esm][begin] %s", NormalizeHttpModuleUrl(path).c_str());
@@ -217,61 +206,37 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path, std::string* 
     try {
       moduleNamespace = ModuleInternal::LoadESModule(isolate, path);
     } catch (const NativeScriptException& ex) {
-      if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-        Log(@"[run-module][http-esm][exception] %s message=%s",
-            NormalizeHttpModuleUrl(path).c_str(), ex.getMessage().c_str());
-      }
-      if (RuntimeConfig.IsDebug && !isHttpModule) {
+      if (RuntimeConfig.IsDebug) {
         Log(@"***** JavaScript exception occurred *****");
         Log(@"Error loading ES module: %s", path.c_str());
         Log(@"Exception: %s", ex.getMessage().c_str());
       }
-      // Surface the inner exception's message so callers passing
-      // `outErrorMessage` see the real cause instead of just a
-      // false return.
-      SetOutErrorMessage(outErrorMessage, ex.getMessage());
-      return false;
+      throw;
     }
     if (moduleNamespace.IsEmpty()) {
-      if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-        Log(@"[run-module][http-esm][empty] %s", NormalizeHttpModuleUrl(path).c_str());
-      }
-      {
-        // `LoadESModule` returned an empty value without throwing —
-        // typically a HTTP TLA timeout / rejection swallowed by the
-        // debug-modal path. Provide a directional hint so the JS
-        // rejection isn't empty; this is the only case where we
-        // *don't* have the actual reason text (see the rejection
-        // throw additions in `LoadESModule` to surface real causes
-        // when possible).
-        SetOutErrorMessage(outErrorMessage,
-                           std::string("ES module returned empty namespace for ") + path +
-                               " — likely top-level await timeout or rejection swallowed by "
-                               "debug error modal; check the device console for the matching "
-                               "[esm][evaluate][promise-rejected:detail] or "
-                               "[esm][evaluate][promise-timeout] entry.");
-        return false;
-      }
+      // `LoadESModule` returned an empty value without throwing. Provide a
+      // directional hint; this is the only case with no actual reason text.
+      throw NativeScriptException(
+          std::string("ES module returned empty namespace for ") + path +
+          " — likely a top-level await that never settled; check the device "
+          "console for the matching [esm][evaluate][promise-timeout] entry.");
     }
     if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
       Log(@"[run-module][http-esm][ok] %s", NormalizeHttpModuleUrl(path).c_str());
     }
-    return true;  // ES module loaded successfully
+    return;
   }
 
   // For CommonJS modules (.js), use the traditional require() approach
   Local<Value> requireObj;
   bool success = globalObject->Get(context, ToV8String(isolate, "require")).ToLocal(&requireObj);
   if (!success || !requireObj->IsFunction()) {
-    Log(@"Warning: Failed to get require function from global object");
-    SetOutErrorMessage(outErrorMessage, "require function unavailable on globalThis");
-    return false;
+    throw NativeScriptException("require function unavailable on globalThis");
   }
   Local<v8::Function> requireFunc = requireObj.As<v8::Function>();
   Local<Value> args[] = {ToV8String(isolate, path)};
   Local<Value> result;
 
-  // Add TryCatch to handle any exceptions from the require call
   TryCatch tc(isolate);
   success = requireFunc->Call(context, globalObject, 1, args).ToLocal(&result);
 
@@ -285,37 +250,13 @@ bool ModuleInternal::RunModule(Isolate* isolate, std::string path, std::string* 
         tns::LogError(isolate, tc);
       }
     }
-
-    // Best-effort extract the V8 exception text so the rejection
-    // upstream isn't empty. Leaves the out-param empty when the
-    // TryCatch has no exception to stringify; callers that need a
-    // placeholder string are expected to substitute one themselves.
-    std::string requireFailureMessage;
+    // The TryCatch form captures the V8 exception, so a worker boundary can
+    // re-arm it on the isolate (ReThrowToV8) and route it to worker.onerror.
     if (tc.HasCaught()) {
-      Local<Value> ex = tc.Exception();
-      if (!ex.IsEmpty()) {
-        v8::Local<v8::String> exStr;
-        if (ex->ToString(context).ToLocal(&exStr)) {
-          v8::String::Utf8Value utf8(isolate, exStr);
-          if (*utf8) {
-            requireFailureMessage.assign(*utf8, utf8.length());
-          }
-        }
-      }
+      throw NativeScriptException(isolate, tc, std::string("require() failed for module ") + path);
     }
-    if (requireFailureMessage.empty()) {
-      requireFailureMessage = std::string("require() failed for module ") + path;
-    }
-    SetOutErrorMessage(outErrorMessage, requireFailureMessage);
-    // For worker isolates, keep the V8 exception pending so the worker entry's
-    // TryCatch (Worker.mm) catches it and routes it to worker.onerror.
-    if (cache->isWorker && tc.HasCaught()) {
-      tc.ReThrow();
-    }
-    return false;
+    throw NativeScriptException(std::string("require() failed for module ") + path);
   }
-
-  return success;
 }
 
 Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,

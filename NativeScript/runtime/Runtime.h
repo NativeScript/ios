@@ -37,10 +37,9 @@ class Runtime {
    */
   inline std::shared_ptr<EventLoop> GetEventLoop() const { return eventLoop_; }
 
-  // Forwards `outErrorMessage` to `ModuleInternal::RunModule(...)` so
-  // callers can capture the failure cause on a false return.
-  bool RunModule(const std::string moduleName,
-                 std::string* outErrorMessage = nullptr);
+  // Runs `moduleName` as an entry module; throws NativeScriptException on
+  // failure (see ModuleInternal::RunModule).
+  void RunModule(const std::string moduleName);
 
   void RunScript(const std::string script);
 

@@ -13,6 +13,7 @@
 #include "Helpers.h"
 #include "InspectorServer.h"
 #include "JsV8InspectorClient.h"
+#include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
 #include "RuntimeConfig.h"
 #include "WorkerInspectorClient.h"
@@ -971,7 +972,13 @@ void JsV8InspectorClient::registerModules() {
       return;
     }
 
-    runtime_->RunModule(modulePath);
+    try {
+      runtime_->RunModule(modulePath);
+    } catch (tns::NativeScriptException& ex) {
+      // Inspector modules are optional tooling; a failure must not take the
+      // app down, but it must be visible.
+      Log(@"Inspector modules failed to load: %s", ex.getMessage().c_str());
+    }
     // FIXME: This triggers some DCHECK failures, due to the entered v8::Context in
     // Runtime::init().
   }

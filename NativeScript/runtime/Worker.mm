@@ -225,7 +225,16 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       //         }
       //      }
 
-      runtime->RunModule(resolvedPath);
+      try {
+        runtime->RunModule(resolvedPath);
+      } catch (NativeScriptException& ex) {
+        // Re-arm the failure as the pending V8 exception (the original JS
+        // error when one was captured) so the tc.HasCaught() path below
+        // routes it to worker.onerror with full detail.
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        ex.ReThrowToV8(isolate);
+      }
 
       // WHATWG parity: enable the implicit port's message queue once the
       // entry has finished evaluating. RunModule returns settled for classic
