@@ -46,6 +46,12 @@ class Runtime {
   // This isolate's CommonJS loader, or null before Init() has built it.
   ModuleInternal* GetModuleInternal() const { return moduleInternal_.get(); }
 
+  // Polls the main entry's evaluation promise, entering the isolate itself.
+  // kNone for a classic-script entry (it settled synchronously and needs no
+  // boot backstop). Used by the boot handoff to decide whether the process may
+  // fall off main() yet.
+  EntryEvaluationState PollMainEntryEvaluation(std::string* rejectionReason);
+
   static void Initialize();
 
   static Runtime* GetCurrentRuntime() { return currentRuntime_; }

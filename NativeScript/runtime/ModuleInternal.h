@@ -46,6 +46,16 @@ v8::MaybeLocal<v8::Promise> EvaluateModuleGraph(
     v8::Local<v8::Module> module, const std::string& canonicalPath,
     const ModuleEvaluationOptions& options);
 
+// The state of an entry module's evaluation promise. kNone means the path
+// names no registered ES module — a classic script settles synchronously and
+// never has one, so it needs no boot backstop.
+enum class EntryEvaluationState { kNone, kPending, kFulfilled, kRejected };
+
+// The app's main entry, resolved from package.json's `main` (with the usual
+// extension probing). Boot code needs the resolved path to ask about the
+// entry's evaluation.
+std::string ResolveMainEntryFromPackageJson(const std::string& baseDir);
+
 class ModuleInternal {
  public:
   ModuleInternal(v8::Local<v8::Context> context);
@@ -80,6 +90,14 @@ class ModuleInternal {
   // the promise (Evaluate() returns the same capability), not the status.
   static v8::MaybeLocal<v8::Promise> PendingEntryEvaluation(
       v8::Isolate* isolate, const std::string& path);
+  // The same probe, but reporting the promise's state rather than only
+  // "pending or not" — the boot backstop must tell a rejection from a
+  // successful settle. Cheap enough to call once per pump slice: a registry
+  // hit plus Evaluate(), which returns the existing capability promise.
+  // `rejectionReason` (when non-null) receives the reason's text on kRejected.
+  static EntryEvaluationState PollEntryEvaluation(v8::Isolate* isolate,
+                                                  const std::string& path,
+                                                  std::string* rejectionReason);
 
  private:
   static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

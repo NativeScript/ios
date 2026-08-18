@@ -1006,8 +1006,10 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
   return maybeMod;
 }
 
-MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
-                                                           const std::string& path) {
+// The shared probe behind both entry-evaluation queries: a registry hit plus
+// Evaluate(), which hands back the SAME capability promise rather than
+// re-running anything, so it is cheap enough to call from a pump loop.
+static MaybeLocal<Promise> EntryEvaluationPromise(Isolate* isolate, const std::string& path) {
   if (!IsESModule(path) && !IsHttpModulePath(path)) {
     return MaybeLocal<Promise>();
   }
@@ -1021,6 +1023,9 @@ MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
     return MaybeLocal<Promise>();
   }
   Local<Module> mod = it->second.Get(isolate);
+  // A TLA-parked module reports kEvaluated while its promise is still
+  // pending, so the status is the gate to *having* a promise, never to its
+  // state.
   if (mod.IsEmpty() || mod->GetStatus() != Module::kEvaluated) {
     return MaybeLocal<Promise>();
   }
@@ -1030,11 +1035,40 @@ MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
   if (!mod->Evaluate(context).ToLocal(&result) || !result->IsPromise()) {
     return MaybeLocal<Promise>();
   }
-  Local<Promise> promise = result.As<Promise>();
+  return MaybeLocal<Promise>(result.As<Promise>());
+}
+
+MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
+                                                           const std::string& path) {
+  Local<Promise> promise;
+  if (!EntryEvaluationPromise(isolate, path).ToLocal(&promise)) {
+    return MaybeLocal<Promise>();
+  }
   if (promise->State() != Promise::kPending) {
     return MaybeLocal<Promise>();
   }
   return MaybeLocal<Promise>(promise);
+}
+
+EntryEvaluationState ModuleInternal::PollEntryEvaluation(Isolate* isolate, const std::string& path,
+                                                         std::string* rejectionReason) {
+  Local<Promise> promise;
+  if (!EntryEvaluationPromise(isolate, path).ToLocal(&promise)) {
+    return EntryEvaluationState::kNone;
+  }
+  switch (promise->State()) {
+    case Promise::kPending:
+      return EntryEvaluationState::kPending;
+    case Promise::kFulfilled:
+      return EntryEvaluationState::kFulfilled;
+    case Promise::kRejected:
+      break;
+  }
+  if (rejectionReason != nullptr) {
+    Local<Value> reason = promise->Result();
+    *rejectionReason = reason.IsEmpty() ? "<no reason>" : tns::ToString(isolate, reason);
+  }
+  return EntryEvaluationState::kRejected;
 }
 
 // Phase diagnostics for one module's trip through the loader.

@@ -490,6 +490,25 @@ void Runtime::RunModule(const std::string moduleName) {
   this->moduleInternal_->RunModule(isolate, moduleName);
 }
 
+EntryEvaluationState Runtime::PollMainEntryEvaluation(std::string* rejectionReason) {
+  Isolate* isolate = this->GetIsolate();
+  if (isolate == nullptr || this->moduleInternal_ == nullptr) {
+    return EntryEvaluationState::kNone;
+  }
+  v8::Locker locker(isolate);
+  Isolate::Scope isolate_scope(isolate);
+  HandleScope handle_scope(isolate);
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  if (context.IsEmpty()) {
+    return EntryEvaluationState::kNone;
+  }
+  Context::Scope context_scope(context);
+
+  // RunMainScript launches "./"; the promise lives under the resolved path.
+  const std::string entryPath = ResolveMainEntryFromPackageJson(RuntimeConfig.ApplicationPath);
+  return ModuleInternal::PollEntryEvaluation(isolate, entryPath, rejectionReason);
+}
+
 void Runtime::RunScript(const std::string script) {
   Isolate* isolate = this->GetIsolate();
   v8::Locker locker(isolate);
