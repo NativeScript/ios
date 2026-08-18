@@ -6,7 +6,7 @@
 #include "Caches.h"
 #include "Console.h"
 #include "Helpers.h"
-#include "HttpLoader.h"
+#include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 
 using namespace v8;

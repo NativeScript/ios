@@ -455,8 +455,8 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
 
   // The dev primitives (configureLoader, invalidateModules, …) live in the
   // `ns:module` builtin module, materialized lazily per realm on first
-  // resolution (see `BuildNsModuleBinding` in HttpLoader.mm for the member
-  // list) — nothing to install here.
+  // resolution (see `BuildNsModuleBinding` in ModuleInternalCallbacks.mm for
+  // the member list) — nothing to install here.
 
   // URL blob support (internal/blob-url.js); failures are tolerated —
   // compile-and-run-if-possible.

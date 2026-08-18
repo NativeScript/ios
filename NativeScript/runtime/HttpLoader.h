@@ -4,18 +4,6 @@
 #include <string>
 #include <vector>
 
-// Forward declare v8 types to keep this header lightweight and avoid
-// requiring V8 headers at include sites.
-namespace v8 {
-class Isolate;
-template <class T>
-class Local;
-class Object;
-class Function;
-class Context;
-class Value;
-}  // namespace v8
-
 namespace tns {
 
 // HttpLoader: the native half of the NativeScript HTTP module-loader
@@ -37,7 +25,32 @@ namespace tns {
 
 // ─────────────────────────────────────────────────────────────
 // HTTP loader helpers (used by dev/HMR and general-purpose HTTP module loading)
+
+// Canonicalization vocabulary (client-supplied policy).
 //
+// The canonical-key *mechanism* (fragment strip, cache-buster param drop,
+// param sort) must be native because it keys the module registry inside
+// V8's synchronous resolve walk. The *vocabulary* — which query params are
+// pure cache busters, which path prefixes identify dev endpoints whose
+// queries may be normalized, and which paths must keep their query verbatim
+// because the query IS the identity — is server/framework policy, supplied
+// by the dev client via
+// ns:module `configureLoader({ canonicalization: {...} })` and consumed by
+// `CanonicalizeHttpUrlKey`.
+//
+// When unconfigured, a built-in vocabulary matching current
+// `@nativescript/vite` conventions applies.
+struct CanonicalizationConfig {
+  std::vector<std::string> stripParams;      // query param names to drop
+  std::vector<std::string> devPathPrefixes;  // StartsWith → normalize query
+  std::vector<std::string> preserveQueryPrefixes;  // contains → keep query
+};
+
+// Install the client-supplied vocabulary. Presence of the configuration
+// replaces the built-in fallback entirely — empty vectors are honored as
+// explicit policy.
+void SetCanonicalizationConfig(CanonicalizationConfig config);
+
 // Normalize an HTTP(S) URL into a stable module registry/cache key.
 // - Always strips URL fragments.
 // - For NativeScript dev endpoints, drops known cache busters (t/v/import)
@@ -124,34 +137,5 @@ bool IsRemoteModulesAllowed();
 // allow. Production requires allowRemoteModules, then an allowlist match
 // (or all URLs if the allowlist is empty).
 bool IsRemoteUrlAllowed(const std::string& url);
-
-// ─────────────────────────────────────────────────────────────
-// The `ns:module` builtin binding
-//
-// Populates the native half of the `ns:module` builtin module — the one
-// namespace carrying every JS-callable dev primitive that any tooling can
-// depend on. Called from NsBuiltinModules::BuildBinding the first time a
-// realm resolves `ns:module` (via require, static import, or import());
-// ns-module.js shapes and freezes the exports.
-//
-// `ns:module` members:
-//   - configureLoader(config)         (import map + volatile patterns +
-//                                      canonicalization vocabulary)
-//   - invalidateModules(urls)         (registry + cache eviction)
-//   - getLoadedModuleUrls()           (registry introspection)
-//   - createRequire(baseDir, pumping) (a require bound to baseDir; the JS half
-//                                      in ns-module.js validates the caller's
-//                                      filename/URL and splits the two
-//                                      exported flavors)
-//   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
-//
-// Worker teardown across HMR cycles is userland: the dev client intercepts
-// the global `Worker` constructor and terminates tracked instances
-// (worker.terminate() cascades to nested workers via Runtime::~Runtime).
-//
-// Returns false (with an exception pending or a failed Set) when the
-// binding could not be populated.
-bool BuildNsModuleBinding(v8::Local<v8::Context> context,
-                          v8::Local<v8::Object> binding);
 
 }  // namespace tns

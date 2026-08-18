@@ -2999,4 +2999,227 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
   return scope.Escape(resolver->GetPromise());
 }
+
+// ─────────────────────────────────────────────────────────────
+// The `ns:module` dev surface
+//
+// The runtime's dev surface is deliberately small: it exposes
+// *mechanism* only (resolution config, registry eviction, registry
+// introspection). All HMR *policy* — boot orchestration,
+// `import.meta.hot`, full reload, CSS apply, WebSocket protocol, worker
+// teardown — lives in the JS dev client (`@nativescript/vite`).
+// The surface is reachable exclusively through the `ns:module` builtin
+// module (require / static import / import()); there is no global.
+
+namespace {
+
+// Sets the function name on the v8 Function for nicer stack traces and
+// attaches it as a member of the `ns:module` binding object.
+void InstallDevFunction(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                        v8::Local<v8::Object> target, const char* name,
+                        v8::FunctionCallback callback) {
+  v8::Local<v8::FunctionTemplate> fnTpl = v8::FunctionTemplate::New(isolate, callback);
+  v8::Local<v8::Function> fn = fnTpl->GetFunction(context).ToLocalChecked();
+  fn->SetName(tns::ToV8String(isolate, name));
+  target->CreateDataProperty(context, tns::ToV8String(isolate, name), fn).Check();
+}
+
+void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+  v8::Isolate* isolate = info.GetIsolate();
+  v8::HandleScope scope(isolate);
+  v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+  bool traceEsm = tns::LogCategoryEnabled(tns::LogCategory::Esm);
+
+  if (info.Length() < 1 || !info[0]->IsObject()) {
+    if (traceEsm) {
+      TNS_DEBUG(Esm, "[ns:module configureLoader] expected config object argument");
+    }
+    return;
+  }
+
+  v8::Local<v8::Object> config = info[0].As<v8::Object>();
+
+  // Process importMap: can be a JSON string or an object with { imports: {...} }
+  v8::Local<v8::String> importMapKey = tns::ToV8String(isolate, "importMap");
+  v8::Local<v8::Value> importMapVal;
+  if (config->Get(ctx, importMapKey).ToLocal(&importMapVal) && !importMapVal->IsUndefined()) {
+    std::string jsonStr;
+    if (importMapVal->IsString()) {
+      v8::String::Utf8Value utf8(isolate, importMapVal);
+      if (*utf8) jsonStr = *utf8;
+    } else if (importMapVal->IsObject()) {
+      // Serialize object to JSON string
+      v8::Local<v8::Object> jsonObj = ctx->Global()
+                                          ->Get(ctx, tns::ToV8String(isolate, "JSON"))
+                                          .ToLocalChecked()
+                                          .As<v8::Object>();
+      v8::Local<v8::Function> stringify = jsonObj->Get(ctx, tns::ToV8String(isolate, "stringify"))
+                                              .ToLocalChecked()
+                                              .As<v8::Function>();
+      v8::Local<v8::Value> args[] = {importMapVal};
+      v8::Local<v8::Value> result;
+      if (stringify->Call(ctx, jsonObj, 1, args).ToLocal(&result) && result->IsString()) {
+        v8::String::Utf8Value utf8(isolate, result);
+        if (*utf8) jsonStr = *utf8;
+      }
+    }
+    if (!jsonStr.empty()) {
+      SetImportMap(jsonStr);
+      if (traceEsm) {
+        TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)", jsonStr.size());
+      }
+    }
+  }
+
+  // Reads `obj[key]` as an array of strings into `out`; non-string elements
+  // are skipped. Returns true when the property exists and is an array.
+  auto readStringArray = [&](v8::Local<v8::Object> obj, const char* key,
+                             std::vector<std::string>& out) -> bool {
+    v8::Local<v8::Value> val;
+    if (!obj->Get(ctx, tns::ToV8String(isolate, key)).ToLocal(&val) || !val->IsArray()) {
+      return false;
+    }
+    v8::Local<v8::Array> arr = val.As<v8::Array>();
+    for (uint32_t i = 0; i < arr->Length(); i++) {
+      v8::Local<v8::Value> elem;
+      if (arr->Get(ctx, i).ToLocal(&elem) && elem->IsString()) {
+        v8::String::Utf8Value utf8(isolate, elem);
+        if (*utf8) out.push_back(*utf8);
+      }
+    }
+    return true;
+  };
+
+  // Process volatilePatterns: array of strings
+  {
+    std::vector<std::string> patterns;
+    if (readStringArray(config, "volatilePatterns", patterns) && !patterns.empty()) {
+      SetVolatilePatterns(patterns);
+      if (traceEsm) {
+        TNS_DEBUG(Esm, "[ns:module configureLoader] %zu volatile patterns set", patterns.size());
+      }
+    }
+  }
+
+  // Process canonicalization: { stripParams, forPathPrefixes, preserveQueryFor }
+  // — the URL vocabulary CanonicalizeHttpUrlKey applies (see its doc block).
+  // Presence of the object marks the vocabulary as configured, replacing the
+  // built-in fallback entirely (empty arrays are honored as explicit policy).
+  {
+    v8::Local<v8::Value> canonVal;
+    if (config->Get(ctx, tns::ToV8String(isolate, "canonicalization")).ToLocal(&canonVal) &&
+        canonVal->IsObject()) {
+      v8::Local<v8::Object> canonObj = canonVal.As<v8::Object>();
+      CanonicalizationConfig canon;
+      readStringArray(canonObj, "stripParams", canon.stripParams);
+      readStringArray(canonObj, "forPathPrefixes", canon.devPathPrefixes);
+      readStringArray(canonObj, "preserveQueryFor", canon.preserveQueryPrefixes);
+      SetCanonicalizationConfig(std::move(canon));
+    }
+  }
+}
+
+void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+  v8::Isolate* isolate = info.GetIsolate();
+  v8::HandleScope scope(isolate);
+  v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+
+  if (info.Length() < 1 || !info[0]->IsArray()) {
+    Log(@"[ns:module invalidateModules] expected array of URL strings");
+    return;
+  }
+
+  v8::Local<v8::Array> urlsArray = info[0].As<v8::Array>();
+  std::vector<std::string> urls;
+  urls.reserve(urlsArray->Length());
+  for (uint32_t index = 0; index < urlsArray->Length(); index++) {
+    v8::Local<v8::Value> value;
+    if (!urlsArray->Get(ctx, index).ToLocal(&value) || !value->IsString()) {
+      continue;
+    }
+
+    v8::String::Utf8Value utf8(isolate, value);
+    if (*utf8) {
+      urls.emplace_back(*utf8);
+    }
+  }
+
+  // Permanent observability: surface every URL the runtime is asked to
+  // drop, plus a sample of currently-loaded module registry keys so we
+  // can correlate "asked to evict X" against "actually had X loaded as
+  // Y" when canonicalization differs (e.g. http://localhost vs
+  // file:// or http:// with port). Verbose-gated since per-event
+  // chatter is only useful while debugging an eviction mismatch.
+  if (tns::LogCategoryEnabled(tns::LogCategory::Registry)) {
+    TNS_DEBUG(Registry, "invalidate called urls.count=%zu", urls.size());
+    size_t shown = 0;
+    for (const auto& u : urls) {
+      if (shown >= 32) break;
+      TNS_DEBUG(Registry, "invalidate url[%zu]=%s", shown, u.c_str());
+      shown++;
+    }
+    if (urls.size() > shown) {
+      TNS_DEBUG(Registry, "invalidate (hidden %zu more URL(s))", urls.size() - shown);
+    }
+  }
+
+  tns::InvalidateModules(isolate, ctx, urls);
+}
+
+void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+  v8::Isolate* isolate = info.GetIsolate();
+  v8::HandleScope scope(isolate);
+  v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+
+  std::vector<std::string> urls = tns::GetLoadedModuleUrls();
+  v8::Local<v8::Array> result = v8::Array::New(isolate, static_cast<int>(urls.size()));
+
+  for (uint32_t index = 0; index < urls.size(); index++) {
+    result->Set(ctx, index, tns::ToV8String(isolate, urls[index].c_str())).FromMaybe(false);
+  }
+
+  info.GetReturnValue().Set(result);
+}
+
+}  // namespace
+
+bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> binding) {
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+
+  InstallDevFunction(isolate, context, binding, "configureLoader", ConfigureLoaderCallback);
+  InstallDevFunction(isolate, context, binding, "invalidateModules", InvalidateModulesCallback);
+  InstallDevFunction(isolate, context, binding, "getLoadedModuleUrls", GetLoadedModuleUrlsCallback);
+
+  if (!ModuleInternal::InstallCreateRequireBinding(context, binding)) {
+    return false;
+  }
+
+  if (RuntimeConfig.IsDebug) {
+    // Debug-only diagnostic: expose the HTTP canonical-key function to JS so
+    // the test harness can pin its identity behavior across cache-busters
+    // and dev-endpoint query normalization.
+    auto canonicalizeCb = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+      v8::Isolate* iso = info.GetIsolate();
+      if (info.Length() < 1 || !info[0]->IsString()) {
+        info.GetReturnValue().SetEmptyString();
+        return;
+      }
+      v8::String::Utf8Value u(iso, info[0]);
+      std::string key = CanonicalizeHttpUrlKey(*u ? std::string(*u) : std::string());
+      info.GetReturnValue().Set(tns::ToV8String(iso, key.c_str()));
+    };
+    v8::Local<v8::Function> fn;
+    if (v8::Function::New(context, canonicalizeCb).ToLocal(&fn)) {
+      fn->SetName(tns::ToV8String(isolate, "canonicalizeHttpUrlKey"));
+      if (!binding
+               ->CreateDataProperty(context, tns::ToV8String(isolate, "canonicalizeHttpUrlKey"), fn)
+               .FromMaybe(false)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 }  // namespace tns
