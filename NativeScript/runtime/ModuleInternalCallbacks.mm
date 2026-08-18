@@ -429,8 +429,10 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
   }
   auto& registry = moduleState->registry;
   const std::string registryKey = CanonicalizeRegistryKey(urlStr);
-  if (IsScriptLoadingLogEnabled() && ShouldTraceRegistryKey(urlStr, registryKey)) {
-    Log(@"[resolver][register-resolve-only] raw=%s key=%s", urlStr.c_str(), registryKey.c_str());
+  if (tns::LogCategoryEnabled(tns::LogCategory::Esm) &&
+      ShouldTraceRegistryKey(urlStr, registryKey)) {
+    TNS_DEBUG(Esm, "[resolver][register-resolve-only] raw=%s key=%s", urlStr.c_str(),
+              registryKey.c_str());
   }
   // Length-aware conversion (see CompileModuleFromSource) — embedded NULs
   // in module source must not truncate the compile input.
@@ -621,9 +623,10 @@ static std::string CanonicalizeRegistryKey(const std::string& key) {
     }
   }
 
-  if (IsScriptLoadingLogEnabled() && (traceEvenWithoutChange || registryKey != key)) {
-    Log(@"[resolver][registry-key][%s] raw=%s key=%s", classification, key.c_str(),
-        registryKey.c_str());
+  if (tns::LogCategoryEnabled(tns::LogCategory::Esm) &&
+      (traceEvenWithoutChange || registryKey != key)) {
+    TNS_DEBUG(Esm, "[resolver][registry-key][%s] raw=%s key=%s", classification, key.c_str(),
+              registryKey.c_str());
   }
 
   return registryKey;
@@ -639,23 +642,18 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
   auto& registry = moduleState->registry;
   const std::string registryKey = CanonicalizeHttpUrlKey(requestedUrl);
 
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[http-esm][load][begin] request=%s key=%s", requestedUrl.c_str(), registryKey.c_str());
-  }
+  TNS_DEBUG(Esm, "[http-esm][load][begin] request=%s key=%s", requestedUrl.c_str(),
+            registryKey.c_str());
 
   auto itExisting = registry.find(registryKey);
   if (itExisting != registry.end()) {
     v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
     if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[http-esm][load][cache-hit] key=%s", registryKey.c_str());
-      }
+      TNS_DEBUG(Esm, "[http-esm][load][cache-hit] key=%s", registryKey.c_str());
       return v8::MaybeLocal<v8::Module>(existing);
     }
 
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-esm][load][drop-errored] key=%s", registryKey.c_str());
-    }
+    TNS_DEBUG(Esm, "[http-esm][load][drop-errored] key=%s", registryKey.c_str());
     RemoveModuleFromRegistry(isolate, registryKey);
   }
 
@@ -663,10 +661,8 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
   std::string contentType;
   int status = 0;
   if (!HttpFetchText(requestedUrl, body, contentType, status) || body.empty()) {
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-esm][load][fetch-fail] request=%s key=%s status=%d", requestedUrl.c_str(),
-          registryKey.c_str(), status);
-    }
+    TNS_DEBUG(Esm, "[http-esm][load][fetch-fail] request=%s key=%s status=%d", requestedUrl.c_str(),
+              registryKey.c_str(), status);
     std::string msg =
         "HTTP import failed: " + requestedUrl + " (status=" + std::to_string(status) + ")";
     isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
@@ -676,19 +672,15 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
   v8::MaybeLocal<v8::Module> loaded =
       CompileModuleForResolveRegisterOnly(isolate, context, body, registryKey);
   if (loaded.IsEmpty()) {
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-esm][load][compile-fail] request=%s key=%s bytes=%zu", requestedUrl.c_str(),
-          registryKey.c_str(), body.size());
-    }
+    TNS_DEBUG(Esm, "[http-esm][load][compile-fail] request=%s key=%s bytes=%zu",
+              requestedUrl.c_str(), registryKey.c_str(), body.size());
     std::string msg = "HTTP import compile failed: " + requestedUrl;
     isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
     return v8::MaybeLocal<v8::Module>();
   }
 
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[http-esm][load][ok] request=%s key=%s type=%s bytes=%zu", requestedUrl.c_str(),
-        registryKey.c_str(), contentType.c_str(), body.size());
-  }
+  TNS_DEBUG(Esm, "[http-esm][load][ok] request=%s key=%s type=%s bytes=%zu", requestedUrl.c_str(),
+            registryKey.c_str(), contentType.c_str(), body.size());
 
   return loaded;
 }
@@ -709,9 +701,9 @@ void SetImportMap(const std::string& json) {
     NSError* err = nil;
     id parsed = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&err];
     if (parsed == nil || ![parsed isKindOfClass:[NSDictionary class]]) {
-      if (IsScriptLoadingLogEnabled()) {
+      if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
         NSString* detail = err.localizedDescription ?: @"not an object";
-        Log(@"[import-map] parse failed: %s", [detail UTF8String] ?: "unknown");
+        TNS_DEBUG(Esm, "[import-map] parse failed: %s", [detail UTF8String] ?: "unknown");
       }
       return;
     }
@@ -730,16 +722,12 @@ void SetImportMap(const std::string& json) {
       }
     }
   }
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[import-map] loaded %lu entries", (unsigned long)g_importMap.size());
-  }
+  TNS_DEBUG(Esm, "[import-map] loaded %lu entries", (unsigned long)g_importMap.size());
 }
 
 void SetVolatilePatterns(const std::vector<std::string>& patterns) {
   g_volatilePatterns = patterns;
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[import-map] volatile patterns: %lu", (unsigned long)g_volatilePatterns.size());
-  }
+  TNS_DEBUG(Esm, "[import-map] volatile patterns: %lu", (unsigned long)g_volatilePatterns.size());
 }
 
 // Check if a URL matches any volatile pattern (should bypass cache).
@@ -798,9 +786,7 @@ static std::string NormalizeViteSpecifier(const std::string& specifier) {
           }
         }
       }
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[import-map][normalize] vite-deps: %s -> %s", specifier.c_str(), id.c_str());
-      }
+      TNS_DEBUG(Esm, "[import-map][normalize] vite-deps: %s -> %s", specifier.c_str(), id.c_str());
       return id;
     }
   }
@@ -880,10 +866,8 @@ static std::string NormalizeViteSpecifier(const std::string& specifier) {
           }
         }
 
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[import-map][normalize] node_modules: %s -> %s", specifier.c_str(),
-              normalized.c_str());
-        }
+        TNS_DEBUG(Esm, "[import-map][normalize] node_modules: %s -> %s", specifier.c_str(),
+                  normalized.c_str());
         return normalized;
       }
     }
@@ -899,9 +883,7 @@ static std::string LookupImportMap(const std::string& specifier) {
   // 1. Exact match
   auto it = g_importMap.find(specifier);
   if (it != g_importMap.end()) {
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[import-map] exact: %s -> %s", specifier.c_str(), it->second.c_str());
-    }
+    TNS_DEBUG(Esm, "[import-map] exact: %s -> %s", specifier.c_str(), it->second.c_str());
     return it->second;
   }
   // 2. Prefix match (longest match wins)
@@ -921,10 +903,8 @@ static std::string LookupImportMap(const std::string& specifier) {
   if (!bestKey.empty()) {
     std::string remainder = specifier.substr(bestKey.size());
     std::string resolved = bestValue + remainder;
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[import-map] prefix: %s -> %s (via %s)", specifier.c_str(), resolved.c_str(),
-          bestKey.c_str());
-    }
+    TNS_DEBUG(Esm, "[import-map] prefix: %s -> %s (via %s)", specifier.c_str(), resolved.c_str(),
+              bestKey.c_str());
     return resolved;
   }
   return "";
@@ -1149,13 +1129,13 @@ static void AsyncGraphMaybeComplete(const std::shared_ptr<AsyncGraphLoad>& load,
     return;
   }
   load->completed = true;
-  if (IsScriptLoadingLogEnabled()) {
+  if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
     const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
     const uint64_t ms = endUs > load->startUs ? (endUs - load->startUs) / 1000ull : 0ull;
-    Log(@"[async-graph][done] root=%s urls=%lu fetched=%lu compiled=%lu ms=%llu ok=%d",
-        load->rootKey.c_str(), (unsigned long)load->visited.size(),
-        (unsigned long)load->fetchedCount, (unsigned long)load->compiledCount,
-        (unsigned long long)ms, load->failed ? 0 : 1);
+    TNS_DEBUG(Esm, "[async-graph][done] root=%s urls=%lu fetched=%lu compiled=%lu ms=%llu ok=%d",
+              load->rootKey.c_str(), (unsigned long)load->visited.size(),
+              (unsigned long)load->fetchedCount, (unsigned long)load->compiledCount,
+              (unsigned long long)ms, load->failed ? 0 : 1);
   }
   auto onComplete = std::move(load->onComplete);
   load->onComplete = nullptr;
@@ -1205,9 +1185,9 @@ static void AsyncGraphOnFetchCompleted(const std::shared_ptr<AsyncGraphLoad>& lo
         load->failed = true;
         load->failureMessage =
             "HTTP import failed: " + url + " (status=" + std::to_string(status) + ")";
-      } else if (IsScriptLoadingLogEnabled()) {
-        Log(@"[async-graph][dep-fetch-fail] %s status=%d (left to sync resolver)", url.c_str(),
-            status);
+      } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+        TNS_DEBUG(Esm, "[async-graph][dep-fetch-fail] %s status=%d (left to sync resolver)",
+                  url.c_str(), status);
       }
     } else {
       load->fetchedCount++;
@@ -1218,8 +1198,8 @@ static void AsyncGraphOnFetchCompleted(const std::shared_ptr<AsyncGraphLoad>& lo
         if (isRoot) {
           load->failed = true;
           load->failureMessage = "HTTP import compile failed: " + url;
-        } else if (IsScriptLoadingLogEnabled()) {
-          Log(@"[async-graph][dep-compile-fail] %s (left to sync resolver)", url.c_str());
+        } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+          TNS_DEBUG(Esm, "[async-graph][dep-compile-fail] %s (left to sync resolver)", url.c_str());
         }
       } else {
         load->compiledCount++;
@@ -1309,9 +1289,7 @@ void StartAsyncHttpModuleGraphLoad(
   AsyncGraphLoad::g_asyncGraphLoadsInFlightCounter().fetch_add(1, std::memory_order_acq_rel);
   RegisterAsyncGraphLoad(isolate, load);
 
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[async-graph][start] root=%s key=%s", rootUrl.c_str(), load->rootKey.c_str());
-  }
+  TNS_DEBUG(Esm, "[async-graph][start] root=%s key=%s", rootUrl.c_str(), load->rootKey.c_str());
 
   AsyncGraphEnqueueUrl(load, rootUrl);
   // Root already registered (or nothing fetchable): complete inline.
@@ -1346,9 +1324,9 @@ bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Conte
     }
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
   }
-  if (!*done && IsScriptLoadingLogEnabled()) {
-    Log(@"[async-graph][pumped][timeout] root=%s after %.1fs (sync loader takes over)",
-        rootUrl.c_str(), timeoutSeconds);
+  if (!*done && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+    TNS_DEBUG(Esm, "[async-graph][pumped][timeout] root=%s after %.1fs (sync loader takes over)",
+              rootUrl.c_str(), timeoutSeconds);
   }
   return *done;
 }
@@ -1376,9 +1354,7 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonical
     return s.find("__invalid_at__.mjs") != std::string::npos;
   };
   if (isSentinel(registryKey)) {
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[resolver][guard-v3] ignore remove for sentinel %s", registryKey.c_str());
-    }
+    TNS_DEBUG(Esm, "[resolver][guard-v3] ignore remove for sentinel %s", registryKey.c_str());
     return;
   }
 
@@ -1397,12 +1373,13 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonical
     return "path";
   };
 
-  if (IsScriptLoadingLogEnabled()) {
+  if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
     if (registryKey != canonicalPath) {
-      Log(@"[resolver][remove:pre] raw=%s key=%s class=%s", canonicalPath.c_str(),
-          registryKey.c_str(), classify(registryKey));
+      TNS_DEBUG(Esm, "[resolver][remove:pre] raw=%s key=%s class=%s", canonicalPath.c_str(),
+                registryKey.c_str(), classify(registryKey));
     } else {
-      Log(@"[resolver][remove:pre] key=%s class=%s", registryKey.c_str(), classify(registryKey));
+      TNS_DEBUG(Esm, "[resolver][remove:pre] key=%s class=%s", registryKey.c_str(),
+                classify(registryKey));
     }
   }
 
@@ -1412,9 +1389,8 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonical
   if (it != registry.end()) {
     // Only log stale removal for non-HTTP keys to avoid noisy dev HTTP churn.
     bool isHttpKey = StartsWith(registryKey, "http://") || StartsWith(registryKey, "https://");
-    if (IsScriptLoadingLogEnabled() && !isHttpKey) {
-      Log(@"[resolver] removing stale module %@",
-          [NSString stringWithUTF8String:registryKey.c_str()]);
+    if (tns::LogCategoryEnabled(tns::LogCategory::Esm) && !isHttpKey) {
+      TNS_DEBUG(Esm, "[resolver] removing stale module %s", registryKey.c_str());
     }
     v8::Local<v8::Module> doomed = it->second.Get(isolate);
     if (!doomed.IsEmpty()) {
@@ -1430,15 +1406,13 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonical
     }
     it->second.Reset();
     registry.erase(it);
-  } else if (IsScriptLoadingLogEnabled()) {
-    Log(@"[resolver][remove:miss] key not found, proceed to clear fallbacks (%s)",
-        registryKey.c_str());
+  } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+    TNS_DEBUG(Esm, "[resolver][remove:miss] key not found, proceed to clear fallbacks (%s)",
+              registryKey.c_str());
   }
 
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[resolver][remove:post] reg %lu→%lu", (unsigned long)regPre,
-        (unsigned long)registry.size());
-  }
+  TNS_DEBUG(Esm, "[resolver][remove:post] reg %lu→%lu", (unsigned long)regPre,
+            (unsigned long)registry.size());
 }
 
 std::vector<std::string> GetLoadedModuleUrls() {
@@ -1490,7 +1464,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     uniqueUrls.push_back(registryKey);
   }
 
-  const bool logScriptLoading = IsScriptLoadingLogEnabled();
+  const bool traceRegistry = tns::LogCategoryEnabled(tns::LogCategory::Registry);
   size_t hits = 0, misses = 0;
   for (const auto& url : uniqueUrls) {
     bool present = registry.find(url) != registry.end();
@@ -1499,8 +1473,8 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     } else {
       misses++;
     }
-    if (logScriptLoading) {
-      Log(@"[ns-hmr][ios-invalidate] %s key=%s", present ? "HIT " : "MISS", url.c_str());
+    if (traceRegistry) {
+      TNS_DEBUG(Registry, "invalidate %s key=%s", present ? "HIT " : "MISS", url.c_str());
     }
 
     RejectAndClearInvalidatedModuleState(isolate, context, url);
@@ -1517,10 +1491,10 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
   // canonical URL.
   MarkUrlsForCacheBust(uniqueUrls);
 
-  if (logScriptLoading) {
-    Log(@"[ns-hmr][ios-invalidate] summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
-        (unsigned long)uniqueUrls.size(), (unsigned long)hits, (unsigned long)misses,
-        (unsigned long)registry.size());
+  if (traceRegistry) {
+    TNS_DEBUG(Registry, "invalidate summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
+              (unsigned long)uniqueUrls.size(), (unsigned long)hits, (unsigned long)misses,
+              (unsigned long)registry.size());
   }
 }
 
@@ -1592,10 +1566,8 @@ static bool QueueHttpDynamicWaiterIfInFlight(v8::Isolate* isolate, const std::st
   }
 
   moduleState->httpDynamicWaiters[registryKey].emplace_back(isolate, resolver);
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[dyn-import][http-await] queued waiter for %s status=%s", registryKey.c_str(),
-        ModuleStatusToString(module->GetStatus()));
-  }
+  TNS_DEBUG(Esm, "[dyn-import][http-await] queued waiter for %s status=%s", registryKey.c_str(),
+            ModuleStatusToString(module->GetStatus()));
   return true;
 }
 
@@ -1627,9 +1599,7 @@ static v8::Local<v8::Value> BuildModuleFailureReason(v8::Isolate* isolate, v8::T
       }
     }
   }
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[dyn-import][failure] %s", message.c_str());
-  }
+  TNS_DEBUG(Esm, "[dyn-import][failure] %s", message.c_str());
   return v8::Exception::Error(tns::ToV8String(isolate, message.c_str()));
 }
 
@@ -1706,9 +1676,8 @@ static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
     RejectResolversForInvalidation(isolate, context, resolvers, registryKey);
   }
 
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[resolver][invalidate-state] cleared in-flight state for %s", registryKey.c_str());
-  }
+  TNS_DEBUG(Esm, "[resolver][invalidate-state] cleared in-flight state for %s",
+            registryKey.c_str());
 }
 
 // Bulk await state + callbacks (non-capturing for V8 function compatibility)
@@ -1878,16 +1847,12 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     normalizedSpec.insert(6, "/");  // https:/ -> https://
   }
 
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[resolver][spec] %s", normalizedSpec.c_str());
-  }
+  TNS_DEBUG(Esm, "[resolver][spec] %s", normalizedSpec.c_str());
 
   // Guard against a bare '@' spec showing up (invalid); return empty to avoid poisoning registry
   // with '@'
   if (normalizedSpec == "@") {
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[resolver][normalize] ignoring invalid '@' static spec");
-    }
+    TNS_DEBUG(Esm, "[resolver][normalize] ignoring invalid '@' static spec");
     return v8::MaybeLocal<v8::Module>();
   }
 
@@ -1915,9 +1880,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       std::string normalized = NormalizeViteSpecifier(spec);
       if (!normalized.empty()) {
         mapped = LookupImportMap(normalized);
-        if (!mapped.empty() && IsScriptLoadingLogEnabled()) {
-          Log(@"[resolver][import-map] normalized: %s -> %s -> %s", spec.c_str(),
-              normalized.c_str(), mapped.c_str());
+        if (!mapped.empty() && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+          TNS_DEBUG(Esm, "[resolver][import-map] normalized: %s -> %s -> %s", spec.c_str(),
+                    normalized.c_str(), mapped.c_str());
         }
       }
     }
@@ -1926,9 +1891,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       // Mapped to an HTTP URL or other specifier — update spec and fall
       // through to existing resolution (HTTP fast path will pick it up)
       normalizedSpec = mapped;
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[resolver][import-map] rewrite: %s -> %s", spec.c_str(), mapped.c_str());
-      }
+      TNS_DEBUG(Esm, "[resolver][import-map] rewrite: %s -> %s", spec.c_str(), mapped.c_str());
     } else {
       // Diagnostic: bare-looking specifier (no scheme, no '/' prefix, not a
       // relative path) that the import map didn't match.
@@ -1940,23 +1903,25 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       bool looksBare = !spec.empty() && spec[0] != '/' && spec[0] != '.' &&
                        spec.find("://") == std::string::npos &&
                        spec.find('\\') == std::string::npos;
-      if (looksBare && IsScriptLoadingLogEnabled()) {
+      if (looksBare && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
         // Snapshot a few entry counts so we can tell at a glance whether
         // `g_importMap` is intact (typical: 200-500 entries) or empty.
-        Log(@"[resolver][import-map][miss] bare='%s' importMap.size=%lu importMap.empty=%d",
-            spec.c_str(), (unsigned long)g_importMap.size(), g_importMap.empty() ? 1 : 0);
+        TNS_DEBUG(Esm,
+                  "[resolver][import-map][miss] bare='%s' importMap.size=%lu importMap.empty=%d",
+                  spec.c_str(), (unsigned long)g_importMap.size(), g_importMap.empty() ? 1 : 0);
       }
     }
-  } else if (IsScriptLoadingLogEnabled()) {
+  } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
     // Map was completely empty — distinct from "map populated but no entry".
     // This branch firing means `SetImportMap("")` was called or the map
     // was never populated at all. Either is a bug; surface it.
     bool looksBare = !spec.empty() && spec[0] != '/' && spec[0] != '.' &&
                      spec.find("://") == std::string::npos && spec.find('\\') == std::string::npos;
     if (looksBare) {
-      Log(@"[resolver][import-map][empty] bare='%s' — g_importMap is EMPTY (was it ever "
-          @"configured? expected ~200-500 entries)",
-          spec.c_str());
+      TNS_DEBUG(Esm,
+                "[resolver][import-map][empty] bare='%s' — g_importMap is EMPTY (was it ever "
+                "configured? expected ~200-500 entries)",
+                spec.c_str());
     }
   }
 
@@ -1971,9 +1936,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // Debug: Log all module resolution attempts, especially for @nativescript/core/globals
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   if (cache->isWorker) {
-    if (IsScriptLoadingLogEnabled()) {
-      Log("ResolveModuleCallback: Worker trying to resolve '%s'\n", spec.c_str());
-    }
+    TNS_DEBUG(Esm, "ResolveModuleCallback: Worker trying to resolve '%s'", spec.c_str());
   }
 
   // 2) Find which filepath the referrer was compiled under
@@ -2022,10 +1985,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     if (!resolvedHttp.empty() &&
         (StartsWith(resolvedHttp, "http://") || StartsWith(resolvedHttp, "https://"))) {
       // Security: HttpFetchText gates remote module access centrally.
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[resolver][http-rel] base=%s spec=%s -> %s", referrerPath.c_str(), spec.c_str(),
-            resolvedHttp.c_str());
-      }
+      TNS_DEBUG(Esm, "[resolver][http-rel] base=%s spec=%s -> %s", referrerPath.c_str(),
+                spec.c_str(), resolvedHttp.c_str());
       return LoadHttpModuleForUrl(isolate, context, resolvedHttp);
     }
   }
@@ -2056,18 +2017,14 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
           std::string candidate = std.UTF8String;
           candidate = NormalizePath(candidate);
           candidateBases.push_back(candidate);
-          if (IsScriptLoadingLogEnabled()) {
-            Log(@"[resolver][normalize-rel] %s + %s -> %s", baseDir.c_str(), cleanSpec.c_str(),
-                candidate.c_str());
-          }
+          TNS_DEBUG(Esm, "[resolver][normalize-rel] %s + %s -> %s", baseDir.c_str(),
+                    cleanSpec.c_str(), candidate.c_str());
         }
       }
     }
 
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[resolver] Relative import: '%s' + '%s' -> '%s'", baseDir.c_str(), cleanSpec.c_str(),
-          candidateBases.empty() ? "<none>" : candidateBases.back().c_str());
-    }
+    TNS_DEBUG(Esm, "[resolver] Relative import: '%s' + '%s' -> '%s'", baseDir.c_str(),
+              cleanSpec.c_str(), candidateBases.empty() ? "<none>" : candidateBases.back().c_str());
   } else if (spec.rfind("file://", 0) == 0) {
     // Absolute file URL, e.g. file:///app/path/to/chunk.mjs
     std::string tail = spec.substr(7);  // strip file://
@@ -2099,17 +2056,13 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       candidateBases.push_back(baseApp);
     }
 
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[resolver][tilde] spec=%s base=%s appBase=%s", spec.c_str(), base.c_str(),
-          baseApp.c_str());
-    }
+    TNS_DEBUG(Esm, "[resolver][tilde] spec=%s base=%s appBase=%s", spec.c_str(), base.c_str(),
+              baseApp.c_str());
 
     // Debug: Log tilde resolution for worker context
     if (cache->isWorker) {
-      if (IsScriptLoadingLogEnabled()) {
-        Log("ResolveModuleCallback: Worker resolving tilde path '%s' -> '%s'\n", spec.c_str(),
-            base.c_str());
-      }
+      TNS_DEBUG(Esm, "ResolveModuleCallback: Worker resolving tilde path '%s' -> '%s'",
+                spec.c_str(), base.c_str());
     }
   } else if (!spec.empty() && spec[0] == '/') {
     // Absolute path within the bundle (e.g., /app/..., /src/...)
@@ -2125,12 +2078,10 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       if (baseNoApp != base) {
         candidateBases.push_back(baseNoApp);
       }
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[resolver][abs] spec=%s base=%s baseNoApp=%s", spec.c_str(), base.c_str(),
-            baseNoApp.c_str());
-      }
-    } else if (IsScriptLoadingLogEnabled()) {
-      Log(@"[resolver][abs] spec=%s base=%s", spec.c_str(), base.c_str());
+      TNS_DEBUG(Esm, "[resolver][abs] spec=%s base=%s baseNoApp=%s", spec.c_str(), base.c_str(),
+                baseNoApp.c_str());
+    } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+      TNS_DEBUG(Esm, "[resolver][abs] spec=%s base=%s", spec.c_str(), base.c_str());
     }
   } else {
     // Bare specifier – resolve relative to the application root directory
@@ -2188,9 +2139,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       }
       if (!(StartsWith(tail, "http://") || StartsWith(tail, "https://"))) return false;
 
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[resolver][http-embedded] %s -> %s", p.c_str(), tail.c_str());
-      }
+      TNS_DEBUG(Esm, "[resolver][http-embedded] %s -> %s", p.c_str(), tail.c_str());
       if (moduleOut != nullptr) {
         *moduleOut = LoadHttpModuleForUrl(isolate, context, tail);
       }
@@ -2202,9 +2151,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     }
 
     bool existsNow = isFile(absPath);
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[resolver] %s -> %s", absPath.c_str(), existsNow ? "file" : "missing");
-    }
+    TNS_DEBUG(Esm, "[resolver] %s -> %s", absPath.c_str(), existsNow ? "file" : "missing");
 
     if (!existsNow) {
       // 1) Try adding .mjs, .js
@@ -2330,10 +2277,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   if (it != registry.end()) {
     v8::Local<v8::Module> existing = it->second.Get(isolate);
     if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[resolver] cache hit %s (status=%s)", absPath.c_str(),
-            ModuleStatusToString(existing->GetStatus()));
-      }
+      TNS_DEBUG(Esm, "[resolver] cache hit %s (status=%s)", absPath.c_str(),
+                ModuleStatusToString(existing->GetStatus()));
       return v8::MaybeLocal<v8::Module>(existing);
     }
     RemoveModuleFromRegistry(isolate, absPath);
@@ -2343,9 +2288,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   // instantiating the importer and continues the graph walk by resolving this
   // module's own requests next; evaluating inside the resolver would run
   // dependencies in resolver order instead of the spec's evaluation order.
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[resolver] → compile-register %s", absPath.c_str());
-  }
+  TNS_DEBUG(Esm, "[resolver] → compile-register %s", absPath.c_str());
   try {
     v8::Local<v8::Module> mod;
     if (!tns::ModuleInternal::CompileFileEsModule(isolate, absPath).ToLocal(&mod)) {
@@ -2374,12 +2317,12 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 // missed degrades to the legacy synchronous fetch inside the resolver.
 static void FinishHttpDynamicImport(v8::Isolate* isolate, v8::Local<v8::Context> context,
                                     const std::string& key, const std::string& requestUrl) {
-  if (IsScriptLoadingLogEnabled()) {
+  if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
     auto* moduleState = ModuleLoaderStateFor(isolate);
     if (moduleState != nullptr && moduleState->registry.find(key) == moduleState->registry.end()) {
       // The async walk was expected to have registered the root; falling
       // back to the synchronous loader here means the walk missed it.
-      Log(@"[async-graph][fallback-sync-load] root missed walk: %s", key.c_str());
+      TNS_DEBUG(Esm, "[async-graph][fallback-sync-load] root missed walk: %s", key.c_str());
     }
   }
   v8::MaybeLocal<v8::Module> modMaybe = LoadHttpModuleForUrl(isolate, context, requestUrl);
@@ -2399,10 +2342,8 @@ static void FinishHttpDynamicImport(v8::Isolate* isolate, v8::Local<v8::Context>
       }
 
       if (IsModuleEvaluationInProgress(mod->GetStatus())) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][http-loader] waiting on existing evaluation for %s status=%s",
-              key.c_str(), ModuleStatusToString(mod->GetStatus()));
-        }
+        TNS_DEBUG(Esm, "[dyn-import][http-loader] waiting on existing evaluation for %s status=%s",
+                  key.c_str(), ModuleStatusToString(mod->GetStatus()));
         return;
       }
 
@@ -2456,10 +2397,10 @@ static void FinishHttpDynamicImport(v8::Isolate* isolate, v8::Local<v8::Context>
                                               ? info[0]
                                               : v8::Exception::Error(tns::ToV8String(
                                                     iso, "Evaluation failed (http-loader TLA)"));
-            if (IsScriptLoadingLogEnabled()) {
+            if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
               v8::String::Utf8Value r(iso, reason);
               if (*r) {
-                Log(@"[dyn-import][http-loader][tla] rejected: %s", *r);
+                TNS_DEBUG(Esm, "[dyn-import][http-loader][tla] rejected: %s", *r);
               }
             }
             RejectHttpDynamicWaiters(iso, ctx, keyLocal, reason);
@@ -2507,14 +2448,14 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const char* cSpec = (*specUtf8) ? *specUtf8 : "<invalid>";
   NSString* specStr = [NSString stringWithUTF8String:cSpec];
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[dyn-import] → %@", specStr);
+  if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+    TNS_DEBUG(Esm, "[dyn-import] → %s", cSpec);
     // Also log the referrer resource when available to correlate origin of dynamic imports
     v8::Local<v8::Value> resName = resource_name;
     if (!resName.IsEmpty() && resName->IsString()) {
       v8::String::Utf8Value rn(isolate, resName);
       if (*rn) {
-        Log(@"[dyn-import][referrer] %s", *rn);
+        TNS_DEBUG(Esm, "[dyn-import][referrer] %s", *rn);
       }
     }
   }
@@ -2560,10 +2501,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     // Rebuild V8 string only if changed
     specifier = tns::ToV8String(isolate, normalizedSpec.c_str());
     specStr = [NSString stringWithUTF8String:normalizedSpec.c_str()];
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[dyn-import][normalize] %@ -> %@", [NSString stringWithUTF8String:rawSpec.c_str()],
-          specStr);
-    }
+    TNS_DEBUG(Esm, "[dyn-import][normalize] %s -> %s", rawSpec.c_str(), normalizedSpec.c_str());
   }
   v8::EscapableHandleScope scope(isolate);
 
@@ -2582,9 +2520,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       std::string normalized = NormalizeViteSpecifier(normalizedSpec);
       if (!normalized.empty()) {
         mapped = LookupImportMap(normalized);
-        if (!mapped.empty() && IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][import-map] normalized: %s -> %s -> %s", normalizedSpec.c_str(),
-              normalized.c_str(), mapped.c_str());
+        if (!mapped.empty() && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+          TNS_DEBUG(Esm, "[dyn-import][import-map] normalized: %s -> %s -> %s",
+                    normalizedSpec.c_str(), normalized.c_str(), mapped.c_str());
         }
       }
     }
@@ -2593,9 +2531,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       normalizedSpec = mapped;
       specifier = tns::ToV8String(isolate, normalizedSpec.c_str());
       specStr = [NSString stringWithUTF8String:normalizedSpec.c_str()];
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[dyn-import][import-map] rewrite: %s -> %s", rawSpec.c_str(), normalizedSpec.c_str());
-      }
+      TNS_DEBUG(Esm, "[dyn-import][import-map] rewrite: %s -> %s", rawSpec.c_str(),
+                normalizedSpec.c_str());
     }
   }
 
@@ -2605,9 +2542,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     // Treat it as a no-op module to avoid surfacing a hard failure while continuing with real
     // imports.
     if (!normalizedSpec.empty() && normalizedSpec == "@") {
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[dyn-import] ignoring invalid '@' spec (returning empty module)");
-      }
+      TNS_DEBUG(Esm, "[dyn-import] ignoring invalid '@' spec (returning empty module)");
       const char* kEmptySrc = "export {}\n";
       std::string url = "file:///app/__invalid_at__.mjs";
       v8::MaybeLocal<v8::Module> modMaybe =
@@ -2638,30 +2573,24 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     if (!normalizedSpec.empty() && StartsWith(normalizedSpec, "blob:nativescript/")) {
       const std::string blobRegistryKey = CanonicalizeRegistryKey(normalizedSpec);
 
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[dyn-import][blob] trying blob URL %s key=%s", normalizedSpec.c_str(),
-            blobRegistryKey.c_str());
-      }
+      TNS_DEBUG(Esm, "[dyn-import][blob] trying blob URL %s key=%s", normalizedSpec.c_str(),
+                blobRegistryKey.c_str());
 
       auto existingIt = registry.find(blobRegistryKey);
       if (existingIt != registry.end()) {
         v8::Local<v8::Module> existing = existingIt->second.Get(isolate);
         if (!existing.IsEmpty()) {
           v8::Module::Status existingStatus = existing->GetStatus();
-          if (IsScriptLoadingLogEnabled()) {
-            Log(@"[dyn-import][blob-cache] hit %s status=%s", blobRegistryKey.c_str(),
-                ModuleStatusToString(existingStatus));
-          }
+          TNS_DEBUG(Esm, "[dyn-import][blob-cache] hit %s status=%s", blobRegistryKey.c_str(),
+                    ModuleStatusToString(existingStatus));
 
           if (existingStatus == v8::Module::kErrored) {
             RemoveModuleFromRegistry(isolate, blobRegistryKey);
           } else if (IsModuleEvaluationInProgress(existingStatus)) {
             modulesInFlight.insert(blobRegistryKey);
             httpDynamicWaiters[blobRegistryKey].emplace_back(isolate, resolver);
-            if (IsScriptLoadingLogEnabled()) {
-              Log(@"[dyn-import][blob-await] queued waiter for %s status=%s",
-                  blobRegistryKey.c_str(), ModuleStatusToString(existingStatus));
-            }
+            TNS_DEBUG(Esm, "[dyn-import][blob-await] queued waiter for %s status=%s",
+                      blobRegistryKey.c_str(), ModuleStatusToString(existingStatus));
             return scope.Escape(resolver->GetPromise());
           } else {
             resolver->Resolve(context, existing->GetModuleNamespace()).FromMaybe(false);
@@ -2673,9 +2602,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
 
       if (modulesInFlight.find(blobRegistryKey) != modulesInFlight.end()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] coalesce in-flight %s", blobRegistryKey.c_str());
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] coalesce in-flight %s", blobRegistryKey.c_str());
         httpDynamicWaiters[blobRegistryKey].emplace_back(isolate, resolver);
         return scope.Escape(resolver->GetPromise());
       }
@@ -2691,9 +2618,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       v8::Local<v8::Value> urlCtorVal;
       if (!globalObj->Get(context, tns::ToV8String(isolate, "URL")).ToLocal(&urlCtorVal) ||
           !urlCtorVal->IsFunction()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] URL constructor not found");
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] URL constructor not found");
         RejectHttpDynamicWaiters(
             isolate, context, blobRegistryKey,
             v8::Exception::Error(tns::ToV8String(isolate, "URL constructor not available")));
@@ -2706,9 +2631,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       if (!urlCtor->Get(context, tns::ToV8String(isolate, "InternalAccessor"))
                .ToLocal(&internalAccessorVal) ||
           !internalAccessorVal->IsObject()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] URL.InternalAccessor not found");
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] URL.InternalAccessor not found");
         RejectHttpDynamicWaiters(
             isolate, context, blobRegistryKey,
             v8::Exception::Error(tns::ToV8String(isolate, "URL.InternalAccessor not available")));
@@ -2721,9 +2644,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       if (!internalAccessor->Get(context, tns::ToV8String(isolate, "getData"))
                .ToLocal(&getDataVal) ||
           !getDataVal->IsFunction()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] URL.InternalAccessor.getData not found");
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] URL.InternalAccessor.getData not found");
         RejectHttpDynamicWaiters(isolate, context, blobRegistryKey,
                                  v8::Exception::Error(tns::ToV8String(
                                      isolate, "URL.InternalAccessor.getData not available")));
@@ -2736,9 +2657,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       v8::Local<v8::Value> blobDataVal;
       if (!getDataFn->Call(context, internalAccessor, 1, &urlArg).ToLocal(&blobDataVal) ||
           blobDataVal->IsNullOrUndefined()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] blob not found in BLOB_STORE: %s", normalizedSpec.c_str());
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] blob not found in BLOB_STORE: %s",
+                  normalizedSpec.c_str());
         std::string msg = "Blob not found: " + normalizedSpec;
         RejectHttpDynamicWaiters(isolate, context, blobRegistryKey,
                                  v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())));
@@ -2748,9 +2668,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // blobDataVal should be {blob: Blob, type: string, ext: string}
       // We need to get the text from the Blob
       if (!blobDataVal->IsObject()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] blob data is not an object");
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] blob data is not an object");
         RejectHttpDynamicWaiters(
             isolate, context, blobRegistryKey,
             v8::Exception::Error(tns::ToV8String(isolate, "Invalid blob data")));
@@ -2762,9 +2680,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       v8::Local<v8::Value> blobVal;
       if (!blobData->Get(context, tns::ToV8String(isolate, "blob")).ToLocal(&blobVal) ||
           !blobVal->IsObject()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] blob property not found");
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] blob property not found");
         RejectHttpDynamicWaiters(
             isolate, context, blobRegistryKey,
             v8::Exception::Error(tns::ToV8String(isolate, "Blob object not found")));
@@ -2776,9 +2692,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       v8::Local<v8::Value> textFnVal;
       if (!blobObj->Get(context, tns::ToV8String(isolate, "text")).ToLocal(&textFnVal) ||
           !textFnVal->IsFunction()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] Blob.text() not available");
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] Blob.text() not available");
         RejectHttpDynamicWaiters(
             isolate, context, blobRegistryKey,
             v8::Exception::Error(tns::ToV8String(isolate, "Blob.text() not available")));
@@ -2811,9 +2725,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         textFailure = "Blob.text() did not return a thenable";
       }
       if (!textFailure.empty()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] %s", textFailure.c_str());
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] %s", textFailure.c_str());
         RejectHttpDynamicWaiters(isolate, context, blobRegistryKey,
                                  v8::Exception::Error(tns::ToV8String(isolate, textFailure)));
         return scope.Escape(resolver->GetPromise());
@@ -2851,9 +2763,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         v8::String::Utf8Value codeUtf8(iso, info[0]);
         std::string code = *codeUtf8 ? *codeUtf8 : "";
 
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][blob] compiling blob module, code length=%zu", code.size());
-        }
+        TNS_DEBUG(Esm, "[dyn-import][blob] compiling blob module, code length=%zu", code.size());
 
         v8::MaybeLocal<v8::Module> modMaybe =
             CompileModuleForResolveRegisterOnly(iso, ctx, code, d->blobUrl);
@@ -2877,10 +2787,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         }
 
         if (IsModuleEvaluationInProgress(mod->GetStatus())) {
-          if (IsScriptLoadingLogEnabled()) {
-            Log(@"[dyn-import][blob] waiting on existing evaluation for %s status=%s",
-                d->registryKey.c_str(), ModuleStatusToString(mod->GetStatus()));
-          }
+          TNS_DEBUG(Esm, "[dyn-import][blob] waiting on existing evaluation for %s status=%s",
+                    d->registryKey.c_str(), ModuleStatusToString(mod->GetStatus()));
           delete d;
           return;
         }
@@ -2992,9 +2900,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     // Security: HttpFetchText gates remote module access centrally.
     if (!normalizedSpec.empty() &&
         (StartsWith(normalizedSpec, "http://") || StartsWith(normalizedSpec, "https://"))) {
-      if (IsScriptLoadingLogEnabled()) {
-        Log(@"[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());
-      }
+      TNS_DEBUG(Esm, "[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());
       std::string key = CanonicalizeHttpUrlKey(normalizedSpec);
       // Volatile pattern check: if the URL matches any configured volatile
       // pattern, evict the cached module so we always re-fetch. The pattern
@@ -3008,18 +2914,14 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       if (isVolatile) {
         auto ex = registry.find(key);
         if (ex != registry.end()) {
-          if (IsScriptLoadingLogEnabled()) {
-            Log(@"[dyn-import][http-cache] drop volatile %s", key.c_str());
-          }
+          TNS_DEBUG(Esm, "[dyn-import][http-cache] drop volatile %s", key.c_str());
           RemoveModuleFromRegistry(isolate, key);
         }
       }
       // Coalesce concurrent dynamic imports for the same HTTP key
       auto inflight = modulesInFlight.find(key) != modulesInFlight.end();
       if (inflight) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][http] coalesce in-flight %s", key.c_str());
-        }
+        TNS_DEBUG(Esm, "[dyn-import][http] coalesce in-flight %s", key.c_str());
         httpDynamicWaiters[key].emplace_back(isolate, resolver);
         return scope.Escape(resolver->GetPromise());
       }
@@ -3032,21 +2934,20 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           // cache hit so we can verify the runtime *did* drop the entry
           // on invalidate. Filtered to angular component-shaped URLs to
           // avoid spam from vendor chunks. Verbose-gated.
-          if (IsScriptLoadingLogEnabled()) {
-            if (key.find("ns/m/") != std::string::npos ||
-                key.find(".component") != std::string::npos) {
-              Log(@"[ns-hmr][ios-dyn-cache] HIT %s status=%s", key.c_str(),
-                  ModuleStatusToString(existing->GetStatus()));
-            }
-            Log(@"[dyn-import][http-cache] hit %s", key.c_str());
-            Log(@"  ↳ status=%s", ModuleStatusToString(existing->GetStatus()));
+          if (tns::LogCategoryEnabled(tns::LogCategory::Registry) &&
+              (key.find("ns/m/") != std::string::npos ||
+               key.find(".component") != std::string::npos)) {
+            TNS_DEBUG(Registry, "dyn-cache HIT %s status=%s", key.c_str(),
+                      ModuleStatusToString(existing->GetStatus()));
+          }
+          if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+            TNS_DEBUG(Esm, "[dyn-import][http-cache] hit %s", key.c_str());
+            TNS_DEBUG(Esm, "  ↳ status=%s", ModuleStatusToString(existing->GetStatus()));
           }
           v8::Module::Status st = existing->GetStatus();
           if (st == v8::Module::kErrored) {
             // Stale/broken entry; drop and refetch
-            if (IsScriptLoadingLogEnabled()) {
-              Log(@"[dyn-import][http-cache] dropping errored module for %s", key.c_str());
-            }
+            TNS_DEBUG(Esm, "[dyn-import][http-cache] dropping errored module for %s", key.c_str());
             RemoveModuleFromRegistry(isolate, key);
             // fall through to fetch/compile path below
           } else if (IsModuleEvaluationInProgress(st)) {
@@ -3054,10 +2955,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
               return scope.Escape(resolver->GetPromise());
             }
 
-            if (IsScriptLoadingLogEnabled()) {
-              Log(@"[dyn-import][http-cache] avoiding re-entrant Evaluate for %s status=%s",
-                  key.c_str(), ModuleStatusToString(st));
-            }
+            TNS_DEBUG(Esm, "[dyn-import][http-cache] avoiding re-entrant Evaluate for %s status=%s",
+                      key.c_str(), ModuleStatusToString(st));
             resolver->Resolve(context, existing->GetModuleNamespace()).FromMaybe(false);
             return scope.Escape(resolver->GetPromise());
           } else {
@@ -3065,9 +2964,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
             if (st != v8::Module::kEvaluated) {
               // mark in-flight while we evaluate
               modulesInFlight.insert(key);
-              if (IsScriptLoadingLogEnabled()) {
-                Log(@"[dyn-import][http-cache] awaiting evaluation %s", key.c_str());
-              }
+              TNS_DEBUG(Esm, "[dyn-import][http-cache] awaiting evaluation %s", key.c_str());
               httpDynamicWaiters[key].emplace_back(isolate, resolver);
               if (st == v8::Module::kUninstantiated) {
                 v8::TryCatch tcInstantiate(isolate);
@@ -3136,10 +3033,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                       (info.Length() > 0) ? info[0]
                                           : v8::Exception::Error(tns::ToV8String(
                                                 iso, "Evaluation failed (http-cache TLA)"));
-                  if (IsScriptLoadingLogEnabled()) {
+                  if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
                     v8::String::Utf8Value r(iso, reason);
                     if (*r) {
-                      Log(@"[dyn-import][http-cache][tla] rejected: %s", *r);
+                      TNS_DEBUG(Esm, "[dyn-import][http-cache][tla] rejected: %s", *r);
                     }
                   }
                   RejectHttpDynamicWaiters(iso, ctx, keyLocal, reason);
@@ -3175,9 +3072,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // that post-invalidation, the next dynamic import does NOT re-use
       // the cache and DOES go to the network. Filtered to component
       // shapes to avoid vendor-chunk noise. Verbose-gated.
-      if (IsScriptLoadingLogEnabled() &&
+      if (tns::LogCategoryEnabled(tns::LogCategory::Registry) &&
           (key.find("ns/m/") != std::string::npos || key.find(".component") != std::string::npos)) {
-        Log(@"[ns-hmr][ios-dyn-cache] FRESH-FETCH %s", key.c_str());
+        TNS_DEBUG(Registry, "dyn-cache FRESH-FETCH %s", key.c_str());
       }
       // Async pipeline: fetch + compile the transitive closure off the JS
       // thread's critical path, then instantiate/evaluate and settle the
@@ -3217,10 +3114,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           size_t slash = refPath.find_last_of("/\\");
           std::string baseDir =
               slash == std::string::npos ? std::string() : refPath.substr(0, slash + 1);
-          if (IsScriptLoadingLogEnabled()) {
-            Log(@"[dyn-import][ref] url=%s base=%s spec=%s", refUrl.c_str(), baseDir.c_str(),
-                normalizedSpec.c_str());
-          }
+          TNS_DEBUG(Esm, "[dyn-import][ref] url=%s base=%s spec=%s", refUrl.c_str(),
+                    baseDir.c_str(), normalizedSpec.c_str());
           // Join and standardize via NSString to collapse dot-segments
           @autoreleasepool {
             NSString* nsBase = [NSString stringWithUTF8String:baseDir.c_str()];
@@ -3233,31 +3128,28 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 // Convert back to a path relative to app when applicable
                 // Prefer absolute filesystem path; ResolveModuleCallback can handle it
                 adjustedSpecifier = tns::ToV8String(isolate, fsPath.c_str());
-                if (IsScriptLoadingLogEnabled()) {
-                  Log(@"[dyn-import][normalize-rel] %s + %s -> %s", baseDir.c_str(),
-                      normalizedSpec.c_str(), fsPath.c_str());
-                }
+                TNS_DEBUG(Esm, "[dyn-import][normalize-rel] %s + %s -> %s", baseDir.c_str(),
+                          normalizedSpec.c_str(), fsPath.c_str());
               }
             }
           }
         }
       } else {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][ref] missing resource name; cannot normalize relative spec against "
-              @"referrer");
-        }
+        TNS_DEBUG(Esm,
+                  "[dyn-import][ref] missing resource name; cannot normalize relative spec against "
+                  "referrer");
       }
     }
 
     v8::TryCatch resolveTc(isolate);
     v8::MaybeLocal<v8::Module> maybeModule =
         ResolveModuleCallback(context, adjustedSpecifier, import_assertions, refMod);
-    if (IsScriptLoadingLogEnabled()) {
+    if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
       // Log the adjusted specifier we sent to the resolver
       v8::String::Utf8Value adj(isolate, adjustedSpecifier);
       const char* cAdj = (*adj) ? *adj : "<invalid>";
-      Log(@"[dyn-import][resolver-call] raw=%s normalized=%s adjusted=%s", rawSpec.c_str(),
-          normalizedSpec.c_str(), cAdj);
+      TNS_DEBUG(Esm, "[dyn-import][resolver-call] raw=%s normalized=%s adjusted=%s",
+                rawSpec.c_str(), normalizedSpec.c_str(), cAdj);
     }
     v8::String::Utf8Value adjustedSpecUtf8(isolate, adjustedSpecifier);
     std::string adjustedRegistryKey =
@@ -3284,9 +3176,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // Capture detailed V8 exception info if instantiation fails
       v8::TryCatch ictc(isolate);
       if (!module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import] ✗ instantiate failed %@", specStr);
-        }
+        TNS_DEBUG(Esm, "[dyn-import] ✗ instantiate failed %s", [specStr UTF8String]);
         // Include the spec and V8 exception message (when available) for improved diagnostics
         // upstream
         std::string msg =
@@ -3311,9 +3201,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     if (module->GetStatus() != v8::Module::kEvaluated) {
       v8::Local<v8::Value> evalResult;
       if (!module->Evaluate(context).ToLocal(&evalResult)) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import] ✗ evaluation failed %@", specStr);
-        }
+        TNS_DEBUG(Esm, "[dyn-import] ✗ evaluation failed %s", [specStr UTF8String]);
         // Include the spec in the error message for improved diagnostics upstream
         std::string msg =
             std::string("Evaluation failed for module: ") + std::string([specStr UTF8String]);
@@ -3341,9 +3229,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           v8::Local<v8::Context> ctx = d->ctx.Get(iso);
           v8::Local<v8::Module> modLocal = d->mod.Get(iso);
           v8::Local<v8::Promise::Resolver> res = d->res.Get(iso);
-          if (IsScriptLoadingLogEnabled()) {
-            Log(@"[dyn-import][tla] fulfilled, resolving namespace");
-          }
+          TNS_DEBUG(Esm, "[dyn-import][tla] fulfilled, resolving namespace");
           if (!res.IsEmpty()) res->Resolve(ctx, modLocal->GetModuleNamespace()).FromMaybe(false);
           delete d;
         };
@@ -3359,10 +3245,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
               (info.Length() > 0)
                   ? info[0]
                   : v8::Exception::Error(tns::ToV8String(iso, "Evaluation failed (TLA)"));
-          if (IsScriptLoadingLogEnabled()) {
+          if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
             v8::String::Utf8Value r(iso, reason);
             if (*r) {
-              Log(@"[dyn-import][tla] rejected: %s", *r);
+              TNS_DEBUG(Esm, "[dyn-import][tla] rejected: %s", *r);
             }
           }
           if (!res.IsEmpty()) res->Reject(ctx, reason).FromMaybe(false);
@@ -3389,9 +3275,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       v8::Local<v8::String> webpackIdsKey = tns::ToV8String(isolate, "__webpack_ids__");
       v8::Local<v8::Value> webpackIds;
       if (nsObj->Get(context, webpackIdsKey).ToLocal(&webpackIds) && !webpackIds->IsUndefined()) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import] Detected webpack chunk %@", specStr);
-        }
+        TNS_DEBUG(Esm, "[dyn-import] Detected webpack chunk %s", [specStr UTF8String]);
         // This is a webpack chunk, get the webpack runtime from the runtime module
         try {
           // Import the runtime module to get __webpack_require__
@@ -3412,16 +3296,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
               if (runtimeObj->Get(context, defaultKey).ToLocal(&webpackRequire) &&
                   webpackRequire->IsObject()) {
-                if (IsScriptLoadingLogEnabled()) {
-                  Log(@"[dyn-import] Found runtime module default export");
-                }
+                TNS_DEBUG(Esm, "[dyn-import] Found runtime module default export");
                 v8::Local<v8::String> installKey = tns::ToV8String(isolate, "C");
                 v8::Local<v8::Value> installFn;
                 if (webpackRequire.As<v8::Object>()->Get(context, installKey).ToLocal(&installFn) &&
                     installFn->IsFunction()) {
-                  if (IsScriptLoadingLogEnabled()) {
-                    Log(@"[dyn-import] Calling webpack installChunk function");
-                  }
+                  TNS_DEBUG(Esm, "[dyn-import] Calling webpack installChunk function");
                   // Call webpack's installChunk function with the module namespace
                   v8::Local<v8::Value> args[] = {namespaceObj};
                   v8::Local<v8::Value> result;
@@ -3430,34 +3310,22 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                            .ToLocal(&result)) {
                     // If the call fails, we can ignore it since this is just a helper for webpack
                     // chunks
-                    if (IsScriptLoadingLogEnabled()) {
-                      Log(@"[dyn-import] ✗ webpack installChunk call failed");
-                    }
+                    TNS_DEBUG(Esm, "[dyn-import] ✗ webpack installChunk call failed");
                   } else {
-                    if (IsScriptLoadingLogEnabled()) {
-                      Log(@"[dyn-import] ✓ webpack installChunk call succeeded");
-                    }
+                    TNS_DEBUG(Esm, "[dyn-import] ✓ webpack installChunk call succeeded");
                   }
                 } else {
-                  if (IsScriptLoadingLogEnabled()) {
-                    Log(@"[dyn-import] ✗ webpack installChunk function not found");
-                  }
+                  TNS_DEBUG(Esm, "[dyn-import] ✗ webpack installChunk function not found");
                 }
               } else {
-                if (IsScriptLoadingLogEnabled()) {
-                  Log(@"[dyn-import] ✗ runtime module default export not found");
-                }
+                TNS_DEBUG(Esm, "[dyn-import] ✗ runtime module default export not found");
               }
             }
           } else {
-            if (IsScriptLoadingLogEnabled()) {
-              Log(@"[dyn-import] ✗ runtime module not found");
-            }
+            TNS_DEBUG(Esm, "[dyn-import] ✗ runtime module not found");
           }
         } catch (...) {
-          if (IsScriptLoadingLogEnabled()) {
-            Log(@"[dyn-import] ✗ exception while accessing runtime module");
-          }
+          TNS_DEBUG(Esm, "[dyn-import] ✗ exception while accessing runtime module");
         }
       }
     }
@@ -3469,9 +3337,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       v8::TryCatch tc3(isolate);
       v8::Local<v8::Value> defVal;
       if (!o->Get(context, tns::ToV8String(isolate, "default")).ToLocal(&defVal)) {
-        if (IsScriptLoadingLogEnabled()) {
-          Log(@"[dyn-import][verify] ns.default threw after eval (generic) %s", specStr);
-        }
+        TNS_DEBUG(Esm, "[dyn-import][verify] ns.default threw after eval (generic) %s",
+                  [specStr UTF8String]);
         resolver
             ->Reject(context, v8::Exception::Error(
                                   tns::ToV8String(isolate, "TDZ on default after eval (generic)")))
@@ -3480,14 +3347,10 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
     }
     resolver->Resolve(context, module->GetModuleNamespace()).Check();
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[dyn-import] ✓ resolved %@", specStr);
-    }
+    TNS_DEBUG(Esm, "[dyn-import] ✓ resolved %s", [specStr UTF8String]);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[dyn-import] ✗ native failed %@", specStr);
-    }
+    TNS_DEBUG(Esm, "[dyn-import] ✗ native failed %s", [specStr UTF8String]);
     resolver
         ->Reject(context, v8::Exception::Error(
                               tns::ToV8String(isolate, "Native error during dynamic import")))

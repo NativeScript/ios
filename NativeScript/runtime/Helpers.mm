@@ -6,6 +6,7 @@
 #include <execinfo.h>
 #include <objc/runtime.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <atomic>
 #include <fstream>
@@ -298,51 +299,154 @@ void tns::SetReleasedObjectPolicy(ReleasedObjectPolicy policy) {
 
 namespace {
 
-std::atomic<bool> scriptLoadingLog_{false};
-std::atomic<bool> httpFetchUrlLog_{false};
-std::once_flag logFlagsInitFlag_;
+// Index-aligned with tns::LogCategory; the only place a category name lives.
+constexpr const char* kLogCategoryNames[] = {"esm", "fetch", "registry"};
+constexpr size_t kLogCategoryCount = static_cast<size_t>(tns::LogCategory::kCount);
+static_assert(sizeof(kLogCategoryNames) / sizeof(kLogCategoryNames[0]) == kLogCategoryCount,
+              "every LogCategory needs exactly one name");
 
-bool BoolFromAppConfig(const char* key) {
-  id value = tns::Runtime::GetAppConfigValue(key);
-  if (value && [value respondsToSelector:@selector(boolValue)]) {
-    return [value boolValue];
-  }
-  return false;
-}
-
-void EnsureLogFlagsInitialized() {
-  std::call_once(logFlagsInitFlag_, []() {
-    @autoreleasepool {
-      scriptLoadingLog_.store(BoolFromAppConfig("logScriptLoading"), std::memory_order_relaxed);
-      httpFetchUrlLog_.store(BoolFromAppConfig("httpFetchUrlLog"), std::memory_order_relaxed);
-    }
-    if (scriptLoadingLog_.load(std::memory_order_relaxed)) {
-      Log(@"[http-loader] fetch-url-log=%s",
-          httpFetchUrlLog_.load(std::memory_order_relaxed) ? "enabled" : "disabled");
+#if TNS_HAVE_OS_LOG
+// One os_log_t per category, created once: Console.app and `log stream` can
+// then filter by subsystem/category without parsing message text.
+os_log_t LogHandleFor(tns::LogCategory category) {
+  static os_log_t handles[kLogCategoryCount];
+  static std::once_flag handlesInit;
+  std::call_once(handlesInit, []() {
+    for (size_t i = 0; i < kLogCategoryCount; ++i) {
+      handles[i] = os_log_create("org.nativescript.runtime", kLogCategoryNames[i]);
     }
   });
+  return handles[static_cast<size_t>(category)];
+}
+#endif
+
+void WriteDebugLine(tns::LogCategory category, const char* message) {
+  const char* name = tns::LogCategoryName(category);
+#if TNS_HAVE_OS_LOG
+  os_log(LogHandleFor(category), "[%{public}s] %{public}s", name, message);
+#else
+  Log("[%s] %s", name, message);
+#endif
+}
+
+std::string TrimAsciiSpace(const std::string& value) {
+  size_t begin = value.find_first_not_of(" \t");
+  if (begin == std::string::npos) {
+    return std::string();
+  }
+  size_t end = value.find_last_not_of(" \t");
+  return value.substr(begin, end - begin + 1);
 }
 
 }  // namespace
 
-bool tns::IsScriptLoadingLogEnabled() {
-  EnsureLogFlagsInitialized();
-  return scriptLoadingLog_.load(std::memory_order_relaxed);
+const char* tns::LogCategoryName(LogCategory category) {
+  size_t index = static_cast<size_t>(category);
+  return index < kLogCategoryCount ? kLogCategoryNames[index] : "unknown";
 }
 
-void tns::SetScriptLoadingLogEnabled(bool enabled) {
-  EnsureLogFlagsInitialized();
-  scriptLoadingLog_.store(enabled, std::memory_order_relaxed);
+std::string tns::AllLogCategoryNames() {
+  std::string names;
+  for (size_t i = 0; i < kLogCategoryCount; ++i) {
+    if (!names.empty()) {
+      names += ",";
+    }
+    names += kLogCategoryNames[i];
+  }
+  return names;
 }
 
-bool tns::IsHttpFetchUrlLogEnabled() {
-  EnsureLogFlagsInitialized();
-  return httpFetchUrlLog_.load(std::memory_order_relaxed);
+uint32_t tns::ParseLogCategories(const std::string& list, bool* hadUnknown) {
+  if (hadUnknown != nullptr) {
+    *hadUnknown = false;
+  }
+
+  uint32_t mask = 0;
+  size_t start = 0;
+  while (start <= list.size()) {
+    size_t comma = list.find(',', start);
+    size_t length = comma == std::string::npos ? std::string::npos : comma - start;
+    std::string name = TrimAsciiSpace(list.substr(start, length));
+
+    if (!name.empty()) {
+      bool matched = false;
+      for (size_t i = 0; i < kLogCategoryCount; ++i) {
+        if (name == kLogCategoryNames[i]) {
+          mask |= 1u << i;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched && hadUnknown != nullptr) {
+        *hadUnknown = true;
+      }
+    }
+
+    if (comma == std::string::npos) {
+      break;
+    }
+    start = comma + 1;
+  }
+  return mask;
 }
 
-void tns::SetHttpFetchUrlLogEnabled(bool enabled) {
-  EnsureLogFlagsInitialized();
-  httpFetchUrlLog_.store(enabled, std::memory_order_relaxed);
+std::string tns::EnabledLogCategoryNames() {
+  uint32_t mask = g_enabledLogCategories.load(std::memory_order_relaxed);
+  std::string names;
+  for (size_t i = 0; i < kLogCategoryCount; ++i) {
+    if ((mask & (1u << i)) == 0) {
+      continue;
+    }
+    if (!names.empty()) {
+      names += ",";
+    }
+    names += kLogCategoryNames[i];
+  }
+  return names;
+}
+
+void tns::SetEnabledLogCategories(uint32_t mask) {
+  g_enabledLogCategories.store(mask, std::memory_order_relaxed);
+}
+
+void tns::InitializeLogCategoriesFromEnvironment() {
+  const char* value = getenv("NS_DEBUG");
+  if (value == nullptr || *value == '\0') {
+    return;
+  }
+
+  bool hadUnknown = false;
+  SetEnabledLogCategories(ParseLogCategories(value, &hadUnknown));
+  if (hadUnknown) {
+    Log("NS_DEBUG: ignoring unknown categories in '%s'; valid categories are %s", value,
+        AllLogCategoryNames().c_str());
+  }
+}
+
+void tns::EmitDebugLog(LogCategory category, const char* format, ...) {
+  va_list ap;
+  va_start(ap, format);
+
+  char stackBuffer[1024];
+  va_list apCopy;
+  va_copy(apCopy, ap);
+  int needed = vsnprintf(stackBuffer, sizeof(stackBuffer), format, apCopy);
+  va_end(apCopy);
+
+  if (needed < 0) {
+    va_end(ap);
+    return;
+  }
+
+  if (static_cast<size_t>(needed) < sizeof(stackBuffer)) {
+    WriteDebugLine(category, stackBuffer);
+  } else {
+    std::vector<char> heapBuffer(static_cast<size_t>(needed) + 1);
+    vsnprintf(heapBuffer.data(), heapBuffer.size(), format, ap);
+    WriteDebugLine(category, heapBuffer.data());
+  }
+
+  va_end(ap);
 }
 
 tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,

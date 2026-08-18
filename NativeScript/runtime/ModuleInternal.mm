@@ -236,8 +236,8 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   // ES module fast path
   if (IsESModule(path) || isHttpModule) {
     Local<Value> moduleNamespace;
-    if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-      Log(@"[run-module][http-esm][begin] %s", NormalizeHttpModuleUrl(path).c_str());
+    if (isHttpModule) {
+      TNS_DEBUG(Esm, "run-module http-esm begin %s", NormalizeHttpModuleUrl(path).c_str());
     }
     try {
       // The entry runs before this thread's event loop does, so its graph can
@@ -260,8 +260,8 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
           " — likely a top-level await that never settled; check the device "
           "console for the matching [esm][evaluate][promise-timeout] entry.");
     }
-    if (isHttpModule && RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-      Log(@"[run-module][http-esm][ok] %s", NormalizeHttpModuleUrl(path).c_str());
+    if (isHttpModule) {
+      TNS_DEBUG(Esm, "run-module http-esm ok %s", NormalizeHttpModuleUrl(path).c_str());
     }
     return;
   }
@@ -1023,24 +1023,21 @@ MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
   return MaybeLocal<Promise>(promise);
 }
 
-// Phase diagnostics – only active in debug builds when logScriptLoading is enabled.
+// Phase diagnostics for one module's trip through the loader.
 static void LogEsmPhase(const std::string& canonicalPath, const char* phase, const char* status,
                         const char* classification = "", const char* extra = "") {
-  if (!RuntimeConfig.IsDebug || !IsScriptLoadingLogEnabled()) {
-    return;
-  }
-
   if (classification && classification[0] != '\0') {
     if (extra && extra[0] != '\0') {
-      Log(@"[esm][%s][%s][%s] %s %s", phase, status, classification, canonicalPath.c_str(), extra);
+      TNS_DEBUG(Esm, "[%s][%s][%s] %s %s", phase, status, classification, canonicalPath.c_str(),
+                extra);
     } else {
-      Log(@"[esm][%s][%s][%s] %s", phase, status, classification, canonicalPath.c_str());
+      TNS_DEBUG(Esm, "[%s][%s][%s] %s", phase, status, classification, canonicalPath.c_str());
     }
   } else {
     if (extra && extra[0] != '\0') {
-      Log(@"[esm][%s][%s] %s %s", phase, status, canonicalPath.c_str(), extra);
+      TNS_DEBUG(Esm, "[%s][%s] %s %s", phase, status, canonicalPath.c_str(), extra);
     } else {
-      Log(@"[esm][%s][%s] %s", phase, status, canonicalPath.c_str());
+      TNS_DEBUG(Esm, "[%s][%s] %s", phase, status, canonicalPath.c_str());
     }
   }
 }
@@ -1117,11 +1114,11 @@ static void LogEsmPhase(const std::string& canonicalPath, const char* phase, con
       stackTrace = tns::RemapStackTraceIfAvailable(isolate, stackTrace);
     }
 
-    if (IsScriptLoadingLogEnabled()) {
+    if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
       std::string stackPreview =
           stackTrace.size() > 240 ? stackTrace.substr(0, 240) + "…" : stackTrace;
-      Log(@"[esm][evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
-          canonicalPath.c_str(), errorMessage.c_str(), stackPreview.c_str());
+      TNS_DEBUG(Esm, "[evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
+                canonicalPath.c_str(), errorMessage.c_str(), stackPreview.c_str());
     }
 
     NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
@@ -1337,16 +1334,12 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   if (existingIt != registry.end()) {
     Local<Module> existing = existingIt->second.Get(isolate);
     if (existing.IsEmpty()) {
-      if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-        Log(@"[esm][cache] dropping empty registry entry %s", canonicalPath.c_str());
-      }
+      TNS_DEBUG(Esm, "[cache] dropping empty registry entry %s", canonicalPath.c_str());
       RemoveModuleFromRegistry(isolate, canonicalPath);
     } else {
       Module::Status existingStatus = existing->GetStatus();
-      if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-        Log(@"[esm][cache] hit %s status=%s", canonicalPath.c_str(),
-            describeModuleStatus(existingStatus));
-      }
+      TNS_DEBUG(Esm, "[cache] hit %s status=%s", canonicalPath.c_str(),
+                describeModuleStatus(existingStatus));
       if (existingStatus == Module::kErrored) {
         RemoveModuleFromRegistry(isolate, canonicalPath);
       } else if (existingStatus == Module::kEvaluated) {
@@ -1434,10 +1427,9 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 
     // Register for resolution callback
     auto it = registry.find(canonicalPath);
-    if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled() &&
-        (requestPath != canonicalPath || path != canonicalPath)) {
-      Log(@"[esm][register] raw=%s request=%s canonical=%s existing=%s", path.c_str(),
-          requestPath.c_str(), canonicalPath.c_str(), it != registry.end() ? "yes" : "no");
+    if (requestPath != canonicalPath || path != canonicalPath) {
+      TNS_DEBUG(Esm, "[register] raw=%s request=%s canonical=%s existing=%s", path.c_str(),
+                requestPath.c_str(), canonicalPath.c_str(), it != registry.end() ? "yes" : "no");
     }
     registry[canonicalPath].Reset(isolate, module);
     IndexModuleForIsolate(isolate, canonicalPath, module);

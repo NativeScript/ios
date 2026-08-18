@@ -168,13 +168,12 @@ static bool g_canonConfigured = false;
 static void SetCanonicalizationConfig(CanonicalizationConfig config) {
   g_canonConfig = std::move(config);
   g_canonConfigured = true;
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[ns:module configureLoader] canonicalization set (strip=%lu devPrefixes=%lu "
-        @"preserve=%lu)",
-        (unsigned long)g_canonConfig.stripParams.size(),
-        (unsigned long)g_canonConfig.devPathPrefixes.size(),
-        (unsigned long)g_canonConfig.preserveQueryPrefixes.size());
-  }
+  TNS_DEBUG(Esm,
+            "[ns:module configureLoader] canonicalization set (strip=%lu devPrefixes=%lu "
+            "preserve=%lu)",
+            (unsigned long)g_canonConfig.stripParams.size(),
+            (unsigned long)g_canonConfig.devPathPrefixes.size(),
+            (unsigned long)g_canonConfig.preserveQueryPrefixes.size());
 }
 
 static void ResetCanonicalizationConfig() {
@@ -399,15 +398,13 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   // This is the single point of enforcement for all HTTP module loading.
   if (!IsRemoteUrlAllowed(url)) {
     status = 403;  // Forbidden
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-esm][security][blocked] %s", url.c_str());
-    }
+    TNS_DEBUG(Esm, "[http-esm][security][blocked] %s", url.c_str());
     return false;
   }
 
-  // Hoist the URL-log flag once per call so the success branches below pay
-  // one TLS read instead of two.
-  const bool urlLogEnabled = IsHttpFetchUrlLogEnabled();
+  // Hoist the category check once per call so the success branches below
+  // share a single read.
+  const bool traceFetch = tns::LogCategoryEnabled(tns::LogCategory::Fetch);
 
   // Synchronous fetch with one retry on failure.
   // Time the network branch end-to-end so the per-URL log can
@@ -416,12 +413,10 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   // billed to the URL too — which is what the user sees as "this
   // URL was slow".
   const uint64_t netStartUs =
-      urlLogEnabled ? (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0) : 0ull;
+      traceFetch ? (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0) : 0ull;
   bool ok = PerformHttpFetchOnceSync(url, out, contentType, status);
   if (!ok) {
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-loader] retrying %s after initial fetch error", url.c_str());
-    }
+    TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
     usleep(120 * 1000);
     ok = PerformHttpFetchOnceSync(url, out, contentType, status);
   }
@@ -439,20 +434,20 @@ bool HttpFetchText(const std::string& url, std::string& out, std::string& conten
   // graph with a misleading "HTTP import failed (status=200)".
   if (out.empty()) {
     out = "export {};\n";
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-loader] empty 2xx body for %s — serving canonical empty module", url.c_str());
-    }
+    TNS_DEBUG(Esm, "[http-loader] empty 2xx body for %s — serving canonical empty module",
+              url.c_str());
   }
-  if (IsScriptLoadingLogEnabled()) {
+  if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
     unsigned long long blen = (unsigned long long)out.size();
     const char* ctstr = contentType.empty() ? "<none>" : contentType.c_str();
-    Log(@"[http-loader] fetched status=%d content-type=%s bytes=%llu", status, ctstr, blen);
+    TNS_DEBUG(Esm, "[http-loader] fetched status=%d content-type=%s bytes=%llu", status, ctstr,
+              blen);
   }
-  if (urlLogEnabled) {
+  if (traceFetch) {
     const uint64_t netEndUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
     const uint64_t netMs = netEndUs > netStartUs ? (netEndUs - netStartUs) / 1000ull : 0ull;
-    Log(@"[http-loader][fetch][network] %s bytes=%lu ms=%llu", url.c_str(),
-        (unsigned long)out.size(), (unsigned long long)netMs);
+    TNS_DEBUG(Fetch, "[http-loader][fetch][network] %s bytes=%lu ms=%llu", url.c_str(),
+              (unsigned long)out.size(), (unsigned long long)netMs);
   }
 
   // Yield to the placeholder heartbeat after the 10–60ms sync fetch
@@ -633,16 +628,18 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
       g_fetchSyncSlow.fetch_add(1, std::memory_order_relaxed);
     }
     const size_t syncCount = g_fetchSyncCount.fetch_add(1, std::memory_order_relaxed) + 1;
-    if (syncCount > 0 && syncCount % kFetchSyncSummaryEvery == 0 && IsScriptLoadingLogEnabled()) {
+    if (syncCount > 0 && syncCount % kFetchSyncSummaryEvery == 0 &&
+        tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
       const size_t fast = g_fetchSyncFast.load(std::memory_order_relaxed);
       const size_t medium = g_fetchSyncMedium.load(std::memory_order_relaxed);
       const size_t slow = g_fetchSyncSlow.load(std::memory_order_relaxed);
       const uint64_t totalMs = g_fetchSyncTotalMs.load(std::memory_order_relaxed);
       const uint64_t avgMs = syncCount ? totalMs / (uint64_t)syncCount : 0;
-      Log(@"[http-loader][fetch-sync][summary] count=%lu avg=%llums fast(<10ms)=%lu medium=%lu "
-          @"slow(>=100ms)=%lu",
-          (unsigned long)syncCount, (unsigned long long)avgMs, (unsigned long)fast,
-          (unsigned long)medium, (unsigned long)slow);
+      TNS_DEBUG(Esm,
+                "[http-loader][fetch-sync][summary] count=%lu avg=%llums fast(<10ms)=%lu "
+                "medium=%lu slow(>=100ms)=%lu",
+                (unsigned long)syncCount, (unsigned long long)avgMs, (unsigned long)fast,
+                (unsigned long)medium, (unsigned long)slow);
     }
 
     status = (int)httpStatusLocal;
@@ -654,13 +651,14 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
     // empty-success body to the canonical empty module.
     const bool emptyNon2xx = bodyLocal.empty() && (httpStatusLocal < 200 || httpStatusLocal >= 300);
     if (err != nil || emptyNon2xx) {
-      if (IsScriptLoadingLogEnabled()) {
+      if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
         NSString* desc = err.localizedDescription ?: @"<no description>";
         NSString* domain = err.domain ?: @"<no domain>";
-        Log(@"[http-loader][fetch-error] url=%s domain=%@ code=%ld desc=%@ status=%ld bodyEmpty=%d "
-            @"ms=%llu",
-            url.c_str(), domain, (long)err.code, desc, (long)httpStatusLocal,
-            bodyLocal.empty() ? 1 : 0, (unsigned long long)fetchMs);
+        TNS_DEBUG(Esm,
+                  "[http-loader][fetch-error] url=%s domain=%s code=%ld desc=%s status=%ld "
+                  "bodyEmpty=%d ms=%llu",
+                  url.c_str(), domain.UTF8String, (long)err.code, desc.UTF8String,
+                  (long)httpStatusLocal, bodyLocal.empty() ? 1 : 0, (unsigned long long)fetchMs);
       }
       return false;
     }
@@ -742,10 +740,9 @@ static void PerformModuleFetchAsyncAttempt(
             // Transport error → one retry (parity with HttpFetchText's
             // usleep(120ms)+retry, without blocking any thread).
             if (error != nil && attempt == 0) {
-              if (IsScriptLoadingLogEnabled()) {
-                Log(@"[http-loader][fetch-async] retrying %s after transport error: %@",
-                    urlCopy.c_str(), error.localizedDescription ?: @"<no description>");
-              }
+              TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error: %s",
+                        urlCopy.c_str(),
+                        (error.localizedDescription ?: @"<no description>").UTF8String);
               dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_MSEC)),
                              dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
                                PerformModuleFetchAsyncAttempt(urlCopy, 1, completionHeap);
@@ -762,17 +759,18 @@ static void PerformModuleFetchAsyncAttempt(
             if (ok && bust) {
               ClearCacheBustForUrl(urlCopy);
             }
-            if (!ok && IsScriptLoadingLogEnabled()) {
+            if (!ok && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
               NSString* desc =
                   error ? (error.localizedDescription ?: @"<no description>") : @"<http status>";
-              Log(@"[http-loader][fetch-async][error] url=%s status=%d attempt=%d desc=%@",
-                  urlCopy.c_str(), status, attempt, desc);
+              TNS_DEBUG(Esm,
+                        "[http-loader][fetch-async][error] url=%s status=%d attempt=%d desc=%s",
+                        urlCopy.c_str(), status, attempt, desc.UTF8String);
             }
-            if (ok && IsHttpFetchUrlLogEnabled()) {
+            if (ok && tns::LogCategoryEnabled(tns::LogCategory::Fetch)) {
               const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
               const uint64_t ms = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
-              Log(@"[http-loader][fetch][async] %s bytes=%lu ms=%llu", urlCopy.c_str(),
-                  (unsigned long)body.size(), (unsigned long long)ms);
+              TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%llu", urlCopy.c_str(),
+                        (unsigned long)body.size(), (unsigned long long)ms);
             }
             (*completionHeap)(ok, status, std::move(body));
             delete completionHeap;
@@ -785,9 +783,7 @@ void FetchModuleBodyAsync(const std::string& url,
                           std::function<void(bool ok, int status, std::string body)> completion) {
   // Security gate: single point of enforcement, same as HttpFetchText.
   if (!IsRemoteUrlAllowed(url)) {
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[http-esm][security][blocked] %s", url.c_str());
-    }
+    TNS_DEBUG(Esm, "[http-esm][security][blocked] %s", url.c_str());
     completion(false, 403, std::string());
     return;
   }
@@ -898,11 +894,11 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
   v8::HandleScope scope(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
-  bool logScriptLoading = tns::IsScriptLoadingLogEnabled();
+  bool traceEsm = tns::LogCategoryEnabled(tns::LogCategory::Esm);
 
   if (info.Length() < 1 || !info[0]->IsObject()) {
-    if (logScriptLoading) {
-      Log(@"[ns:module configureLoader] expected config object argument");
+    if (traceEsm) {
+      TNS_DEBUG(Esm, "[ns:module configureLoader] expected config object argument");
     }
     return;
   }
@@ -935,8 +931,8 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
     if (!jsonStr.empty()) {
       SetImportMap(jsonStr);
-      if (logScriptLoading) {
-        Log(@"[ns:module configureLoader] import map set (%zu bytes)", jsonStr.size());
+      if (traceEsm) {
+        TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)", jsonStr.size());
       }
     }
   }
@@ -965,8 +961,8 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::vector<std::string> patterns;
     if (readStringArray(config, "volatilePatterns", patterns) && !patterns.empty()) {
       SetVolatilePatterns(patterns);
-      if (logScriptLoading) {
-        Log(@"[ns:module configureLoader] %zu volatile patterns set", patterns.size());
+      if (traceEsm) {
+        TNS_DEBUG(Esm, "[ns:module configureLoader] %zu volatile patterns set", patterns.size());
       }
     }
   }
@@ -1020,16 +1016,16 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
   // Y" when canonicalization differs (e.g. http://localhost vs
   // file:// or http:// with port). Verbose-gated since per-event
   // chatter is only useful while debugging an eviction mismatch.
-  if (tns::IsScriptLoadingLogEnabled()) {
-    Log(@"[ns-hmr][ios-invalidate] called urls.count=%zu", urls.size());
+  if (tns::LogCategoryEnabled(tns::LogCategory::Registry)) {
+    TNS_DEBUG(Registry, "invalidate called urls.count=%zu", urls.size());
     size_t shown = 0;
     for (const auto& u : urls) {
       if (shown >= 32) break;
-      Log(@"[ns-hmr][ios-invalidate] url[%zu]=%s", shown, u.c_str());
+      TNS_DEBUG(Registry, "invalidate url[%zu]=%s", shown, u.c_str());
       shown++;
     }
     if (urls.size() > shown) {
-      Log(@"[ns-hmr][ios-invalidate] (hidden %zu more URL(s))", urls.size() - shown);
+      TNS_DEBUG(Registry, "invalidate (hidden %zu more URL(s))", urls.size() - shown);
     }
   }
 

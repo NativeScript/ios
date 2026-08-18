@@ -22,17 +22,15 @@ declare module "ns:runtime" {
   export interface RuntimeConfig {
     releasedObjectPolicy: ReleasedObjectPolicy;
     /**
-     * Verbose script/module-loading diagnostics. Boot default is the
-     * `logScriptLoading` value from nativescript.config / package.json
-     * (`false` when absent). Process-wide; main-isolate writes only.
+     * The enabled debug-trace categories, as a comma-separated list — the
+     * whole set is replaced on every write, so `""` disables tracing.
+     * `getConfig` returns the canonical list of what is currently on.
+     * Unknown names are ignored with one warning line.
+     *
+     * Also settable before boot through the `NS_DEBUG` environment variable.
+     * Available in release builds too. Process-wide; main-isolate writes only.
      */
-    logScriptLoading: boolean;
-    /**
-     * One log line per HTTP fetch URL (high volume). Boot default is the
-     * `httpFetchUrlLog` value from nativescript.config / package.json
-     * (`false` when absent). Process-wide; main-isolate writes only.
-     */
-    httpFetchUrlLog: boolean;
+    debug: string;
   }
 
   /**

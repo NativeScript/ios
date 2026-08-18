@@ -42,32 +42,57 @@ describe("ns:runtime", function () {
         expect(runtime.getConfig("releasedObjectPolicy")).toBe("report");
     });
 
-    it("defaults logScriptLoading and httpFetchUrlLog from app config", function () {
-        expect(runtime.getConfig("logScriptLoading")).toBe(false);
-        expect(runtime.getConfig("httpFetchUrlLog")).toBe(false);
+    describe("debug categories", function () {
+        afterEach(function () {
+            runtime.setConfig("debug", "");
+        });
+
+        it("starts disabled when NS_DEBUG is unset", function () {
+            expect(runtime.getConfig("debug")).toBe("");
+        });
+
+        it("round-trips a category list canonically", function () {
+            runtime.setConfig("debug", "esm,fetch");
+            expect(runtime.getConfig("debug")).toBe("esm,fetch");
+        });
+
+        it("canonicalizes order and whitespace", function () {
+            runtime.setConfig("debug", " fetch , esm ");
+            expect(runtime.getConfig("debug")).toBe("esm,fetch");
+        });
+
+        it("replaces the whole set rather than adding to it", function () {
+            runtime.setConfig("debug", "esm,fetch");
+            runtime.setConfig("debug", "registry");
+            expect(runtime.getConfig("debug")).toBe("registry");
+        });
+
+        it("ignores unknown categories but keeps the known ones", function () {
+            runtime.setConfig("debug", "esm,nosuchcategory");
+            expect(runtime.getConfig("debug")).toBe("esm");
+        });
+
+        it("disables everything on an empty string", function () {
+            runtime.setConfig("debug", "esm,fetch,registry");
+            runtime.setConfig("debug", "");
+            expect(runtime.getConfig("debug")).toBe("");
+        });
+
+        it("rejects a non-string value and keeps the current set", function () {
+            runtime.setConfig("debug", "esm");
+            expect(function () {
+                runtime.setConfig("debug", true);
+            }).toThrowError(TypeError, /comma-separated category string/);
+            expect(runtime.getConfig("debug")).toBe("esm");
+        });
     });
 
-    it("round-trips logScriptLoading and httpFetchUrlLog", function () {
-        runtime.setConfig("logScriptLoading", true);
-        expect(runtime.getConfig("logScriptLoading")).toBe(true);
-        runtime.setConfig("logScriptLoading", false);
-        expect(runtime.getConfig("logScriptLoading")).toBe(false);
-
-        runtime.setConfig("httpFetchUrlLog", true);
-        expect(runtime.getConfig("httpFetchUrlLog")).toBe(true);
-        runtime.setConfig("httpFetchUrlLog", false);
-        expect(runtime.getConfig("httpFetchUrlLog")).toBe(false);
-    });
-
-    it("rejects non-boolean log flag values and keeps the current one", function () {
-        expect(function () {
-            runtime.setConfig("logScriptLoading", "yes");
-        }).toThrowError(TypeError, /must be a boolean/);
-        expect(runtime.getConfig("logScriptLoading")).toBe(false);
-        expect(function () {
-            runtime.setConfig("httpFetchUrlLog", 1);
-        }).toThrowError(TypeError, /must be a boolean/);
-        expect(runtime.getConfig("httpFetchUrlLog")).toBe(false);
+    it("no longer registers the removed log flags", function () {
+        ["logScriptLoading", "httpFetchUrlLog"].forEach(function (key) {
+            expect(function () {
+                runtime.getConfig(key);
+            }).toThrowError(TypeError, /Unknown runtime config key/);
+        });
     });
 
     it("does not expose remote-module security through getConfig or setConfig", function () {

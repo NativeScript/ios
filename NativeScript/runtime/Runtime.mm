@@ -202,7 +202,11 @@ void DisposeIsolateWhenPossible(Isolate* isolate) {
   }
 }
 
-void Runtime::Initialize() { MetaFile::setInstance(RuntimeConfig.MetadataPtr); }
+void Runtime::Initialize() {
+  // Before anything worth tracing runs, so NS_DEBUG covers boot itself.
+  tns::InitializeLogCategoriesFromEnvironment();
+  MetaFile::setInstance(RuntimeConfig.MetadataPtr);
+}
 
 Runtime::Runtime() {
   currentRuntime_ = this;

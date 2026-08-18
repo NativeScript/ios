@@ -41,8 +41,7 @@ constexpr Registration kRegistry[] = {
 // (`security.allowRemoteModules`, `security.remoteModuleAllowlist`) is
 // deliberately not registered — it is boot-time nativescript.config only.
 constexpr const char* kReleasedObjectPolicyKey = "releasedObjectPolicy";
-constexpr const char* kLogScriptLoadingKey = "logScriptLoading";
-constexpr const char* kHttpFetchUrlLogKey = "httpFetchUrlLog";
+constexpr const char* kDebugKey = "debug";
 
 void ThrowTypeError(Isolate* isolate, const std::string& message) {
   isolate->ThrowException(
@@ -56,16 +55,6 @@ bool EnsureMainIsolateWrite(Isolate* isolate, const std::string& key) {
                                 "isolate");
     return false;
   }
-  return true;
-}
-
-bool ParseBooleanValue(Isolate* isolate, const FunctionCallbackInfo<Value>& info,
-                       const std::string& key, bool* out) {
-  if (!info[1]->IsBoolean()) {
-    ThrowTypeError(isolate, "'" + key + "' must be a boolean");
-    return false;
-  }
-  *out = info[1].As<v8::Boolean>()->Value();
   return true;
 }
 
@@ -91,26 +80,29 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     }
     return;
   }
-  if (key == kLogScriptLoadingKey) {
+  if (key == kDebugKey) {
     if (!EnsureMainIsolateWrite(isolate, key)) {
       return;
     }
-    bool value = false;
-    if (!ParseBooleanValue(isolate, info, key, &value)) {
+    if (!info[1]->IsString()) {
+      ThrowTypeError(
+          isolate, "'" + key + "' must be a comma-separated category string (" +
+                       tns::AllLogCategoryNames() +
+                       "), or '' to disable tracing");
       return;
     }
-    tns::SetScriptLoadingLogEnabled(value);
-    return;
-  }
-  if (key == kHttpFetchUrlLogKey) {
-    if (!EnsureMainIsolateWrite(isolate, key)) {
-      return;
+    // The list replaces the whole mask, so a caller never has to know what was
+    // already on to turn something off.
+    std::string value = tns::ToString(isolate, info[1]);
+    bool hadUnknown = false;
+    uint32_t mask = tns::ParseLogCategories(value, &hadUnknown);
+    tns::SetEnabledLogCategories(mask);
+    if (hadUnknown) {
+      Log("ns:runtime setConfig('debug', '%s'): ignoring unknown categories; "
+          "valid "
+          "categories are %s",
+          value.c_str(), tns::AllLogCategoryNames().c_str());
     }
-    bool value = false;
-    if (!ParseBooleanValue(isolate, info, key, &value)) {
-      return;
-    }
-    tns::SetHttpFetchUrlLogEnabled(value);
     return;
   }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
@@ -131,14 +123,9 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(tns::ToV8String(isolate, value));
     return;
   }
-  if (key == kLogScriptLoadingKey) {
+  if (key == kDebugKey) {
     info.GetReturnValue().Set(
-        v8::Boolean::New(isolate, tns::IsScriptLoadingLogEnabled()));
-    return;
-  }
-  if (key == kHttpFetchUrlLogKey) {
-    info.GetReturnValue().Set(
-        v8::Boolean::New(isolate, tns::IsHttpFetchUrlLogEnabled()));
+        tns::ToV8String(isolate, tns::EnabledLogCategoryNames()));
     return;
   }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
