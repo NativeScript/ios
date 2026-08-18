@@ -308,25 +308,45 @@ describe("HTTP ESM Loader", function() {
                 import(url).then(function (first) {
                     expect(first.default.kind).toBe("json-module");
                     expect(first.default.n).toBe(41);
-                    // The re-import is scheduled as its own task rather than
-                    // issued from inside this handler — re-importing the same
-                    // HTTP JSON URL from within its own resolution never
-                    // settles (see the open finding); everything else about
-                    // JSON identity holds.
-                    __ns__setTimeout(function () {
-                        import(url).then(function (second) {
-                            expect(second).toBe(first);
-                            expect(second.default).toBe(first.default);
-                            done();
-                        }).catch(function (error) {
-                            expect("re-import rejected: " + formatError(error)).toBe("resolved");
-                            done();
-                        });
-                    }, 0);
+                    return import(url).then(function (second) {
+                        expect(second).toBe(first);
+                        expect(second.default).toBe(first.default);
+                        done();
+                    });
                 }).catch(function (error) {
                     expect("rejected: " + formatError(error)).toBe("resolved");
                     done();
                 });
+            });
+
+            // Re-importing from inside the first import's own resolution is
+            // the case that exposed stale waiter routing: the reaction runs
+            // while the first settle is still unwinding, so the loader must
+            // already have cleared the state that would park this import on a
+            // waiter list nothing will flush.
+            it("settles a re-entrant re-import issued from the first import's handler",
+               function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var url = origin + "/esm/data.json?reentrant=1";
+                var settled = "never settled";
+                import(url).then(function (first) {
+                    import(url).then(function (second) {
+                        settled = second === first ? "same namespace" : "different namespace";
+                    }, function (error) {
+                        settled = "re-import rejected: " + ((error && error.message) || error);
+                    });
+                }, function (error) {
+                    settled = "first import rejected: " + ((error && error.message) || error);
+                });
+                __ns__setTimeout(function () {
+                    expect(settled).toBe("same namespace");
+                    done();
+                }, 1500);
             });
         });
 
