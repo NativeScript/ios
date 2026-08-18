@@ -101,6 +101,13 @@ static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate);
 namespace {
 struct AsyncGraphLoad;
 
+// One require(esm) exports facade and the module it wraps. Held as a pair
+// because identity hashes collide: lookups compare the target handle.
+struct RequireFacadeEntry {
+  v8::Global<v8::Module> target;
+  v8::Global<v8::Module> facade;
+};
+
 // All module-loader state owned by one isolate. v8::Global handles are bound
 // to the isolate that created them, so each isolate (main + every Worker)
 // keeps its own set. Lives in a Caches state slot (Caches::StateFor), so it is
@@ -133,6 +140,17 @@ struct ModuleLoaderState {
   // FindKeyForModule verifies each candidate against the registry and prunes
   // stale ones lazily, so staleness is tolerated, never trusted.
   robin_hood::unordered_map<int, std::vector<std::string>> keysByModuleHash;
+
+  // require(esm) facades, keyed by the TARGET module's identity hash — same
+  // bucket-plus-handle-compare shape as keysByModuleHash. Repeated require()
+  // of one ES module must hand back the identical exports object, and a facade
+  // must never outlive the module it re-exports (RemoveModuleFromRegistry
+  // drops the entry).
+  robin_hood::unordered_map<int, std::vector<RequireFacadeEntry>> requireFacadesByTargetHash;
+
+  // Holds the facade target across that facade's InstantiateModule and nothing
+  // else — the facade's resolve callback is the only reader.
+  v8::Global<v8::Module> pendingFacadeTarget;
 };
 
 // This isolate's loader state, or null once teardown has begun — callers must
@@ -190,6 +208,131 @@ std::string LookupModuleKeyForModule(v8::Isolate* isolate, v8::Local<v8::Module>
     return std::string();
   }
   return FindKeyForModule(*state, isolate, mod);
+}
+
+namespace {
+// The single module request in the facade source, and the source itself. Both
+// match Node's required_module_facade_source_string so the semantics (live
+// bindings, enumerable re-exports, overridable __esModule) stay identical.
+constexpr const char* kRequireFacadeSpecifier = "original";
+constexpr const char* kRequireFacadeSource =
+    "export * from 'original'; export { default } from 'original'; "
+    "export const __esModule = true;";
+
+// Resolves the facade's one request. Passed only to a facade's
+// InstantiateModule, so the general resolver never sees 'original' and user
+// code can never reach this slot.
+v8::MaybeLocal<v8::Module> ResolveRequireFacadeTarget(v8::Local<v8::Context> context,
+                                                      v8::Local<v8::String> specifier,
+                                                      v8::Local<v8::FixedArray> import_attributes,
+                                                      v8::Local<v8::Module> referrer) {
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  auto* state = ModuleLoaderStateFor(isolate);
+  v8::String::Utf8Value specUtf8(isolate, specifier);
+  const std::string spec = *specUtf8 ? *specUtf8 : "";
+  if (state == nullptr || state->pendingFacadeTarget.IsEmpty() || spec != kRequireFacadeSpecifier) {
+    Log(@"FATAL: require(esm) facade resolve for '%s' with no pending target", spec.c_str());
+    isolate->ThrowException(v8::Exception::Error(
+        tns::ToV8String(isolate, "require(esm) facade could not be linked to its target module")));
+    return v8::MaybeLocal<v8::Module>();
+  }
+  return v8::MaybeLocal<v8::Module>(state->pendingFacadeTarget.Get(isolate));
+}
+
+// Drop any facade wrapping `target`. Called as the target leaves the registry:
+// a facade whose re-export source is gone would serve a dead namespace.
+void DropRequireFacadesForTarget(ModuleLoaderState& state, v8::Isolate* isolate,
+                                 v8::Local<v8::Module> target) {
+  if (target.IsEmpty()) {
+    return;
+  }
+  auto bucketIt = state.requireFacadesByTargetHash.find(target->GetIdentityHash());
+  if (bucketIt == state.requireFacadesByTargetHash.end()) {
+    return;
+  }
+  auto& entries = bucketIt->second;
+  for (auto it = entries.begin(); it != entries.end();) {
+    if (it->target.Get(isolate) == target) {
+      it = entries.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  if (entries.empty()) {
+    state.requireFacadesByTargetHash.erase(bucketIt);
+  }
+}
+}  // namespace
+
+v8::MaybeLocal<v8::Module> GetOrCreateRequireFacade(v8::Isolate* isolate,
+                                                    v8::Local<v8::Context> context,
+                                                    v8::Local<v8::Module> target,
+                                                    const std::string& targetCanonicalPath) {
+  if (target.IsEmpty()) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+
+  auto bucketIt = state->requireFacadesByTargetHash.find(target->GetIdentityHash());
+  if (bucketIt != state->requireFacadesByTargetHash.end()) {
+    for (auto& entry : bucketIt->second) {
+      if (entry.target.Get(isolate) == target) {
+        return v8::MaybeLocal<v8::Module>(entry.facade.Get(isolate));
+      }
+    }
+  }
+
+  v8::EscapableHandleScope hs(isolate);
+  const std::string facadeUrl = "ns:require-facade:" + targetCanonicalPath;
+
+  v8::Local<v8::String> urlV8;
+  if (!v8::String::NewFromUtf8(isolate, facadeUrl.c_str(), v8::NewStringType::kNormal)
+           .ToLocal(&urlV8)) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  v8::ScriptOrigin origin(urlV8, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
+  v8::ScriptCompiler::Source source(tns::ToV8String(isolate, kRequireFacadeSource), origin);
+
+  v8::TryCatch tc(isolate);
+  v8::Local<v8::Module> facade;
+  if (!v8::ScriptCompiler::CompileModule(isolate, &source).ToLocal(&facade)) {
+    throw NativeScriptException(isolate, tc,
+                                "Cannot compile the require() facade for " + targetCanonicalPath);
+  }
+
+  bool linked = false;
+  {
+    // The slot must be clear again whichever way instantiation ends.
+    struct PendingTargetScope {
+      ModuleLoaderState* state;
+      ~PendingTargetScope() { state->pendingFacadeTarget.Reset(); }
+    } pendingScope{state};
+    state->pendingFacadeTarget.Reset(isolate, target);
+    linked = facade->InstantiateModule(context, &ResolveRequireFacadeTarget).FromMaybe(false);
+  }
+  if (!linked) {
+    throw NativeScriptException(isolate, tc,
+                                "Cannot link the require() facade for " + targetCanonicalPath);
+  }
+
+  // Three re-export statements over an already-evaluated module: trivially
+  // synchronous, so the strict policy's settled-promise requirement holds.
+  ModuleEvaluationOptions evalOptions;
+  evalOptions.policy = ModuleEvaluationPolicy::kSyncStrict;
+  EvaluateModuleGraph(isolate, context, facade, facadeUrl, evalOptions);
+
+  // The facade is deliberately absent from the registry and the identity-hash
+  // index: nothing resolves to it by name, and its source has no import.meta
+  // or dynamic import, so no host callback ever needs to find it.
+  RequireFacadeEntry entry;
+  entry.target.Reset(isolate, target);
+  entry.facade.Reset(isolate, facade);
+  state->requireFacadesByTargetHash[target->GetIdentityHash()].push_back(std::move(entry));
+
+  return hs.Escape(facade);
 }
 
 void IndexModuleForIsolate(v8::Isolate* isolate, const std::string& canonicalKey,
@@ -1275,6 +1418,7 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonical
     }
     v8::Local<v8::Module> doomed = it->second.Get(isolate);
     if (!doomed.IsEmpty()) {
+      DropRequireFacadesForTarget(*moduleState, isolate, doomed);
       auto bucketIt = moduleState->keysByModuleHash.find(doomed->GetIdentityHash());
       if (bucketIt != moduleState->keysByModuleHash.end()) {
         auto& keys = bucketIt->second;
