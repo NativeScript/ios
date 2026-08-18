@@ -71,16 +71,19 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
   std::string modulePath;
 
   try {
-    for (auto& kv : tns::ModuleRegistryFor(isolate)) {
-      // Check if Global handle is empty before accessing
-      if (kv.second.IsEmpty()) {
-        continue;
-      }
+    auto* registry = tns::ModuleRegistryFor(isolate);
+    if (registry != nullptr) {
+      for (auto& kv : *registry) {
+        // Check if Global handle is empty before accessing
+        if (kv.second.IsEmpty()) {
+          continue;
+        }
 
-      Local<Module> registered = kv.second.Get(isolate);
-      if (!registered.IsEmpty() && registered == module) {
-        modulePath = kv.first;
-        break;
+        Local<Module> registered = kv.second.Get(isolate);
+        if (!registered.IsEmpty() && registered == module) {
+          modulePath = kv.first;
+          break;
+        }
       }
     }
   } catch (...) {
@@ -275,12 +278,13 @@ Runtime::~Runtime() {
       eventLoop_->Shutdown();
     }
 
-    // Tear down this isolate's module maps (registry / fallback /
-    // fallbackByRelative / vendor) before disposing other handles. The maps are
-    // keyed by v8::Isolate* (see ModuleInternalCallbacks.mm), so this resets and
-    // drops only the handles this isolate created — while it is still alive,
-    // under the Locker above. Worker isolates' maps are freed the same way.
-    tns::DestroyModuleStateForIsolate(isolate_);
+    // Flag this isolate's in-flight async graph loads dead and Reset their
+    // context Globals — while the isolate is still alive, under the Locker
+    // above — so fetch completions still queued on background NSURLSession
+    // queues become no-ops. The rest of the loader state (registry / fallback
+    // maps / waiters) lives in a Caches state slot and is destroyed with the
+    // isolate's Caches below. Worker isolates quiesce the same way.
+    tns::QuiesceModuleLoadsForIsolate(isolate_);
 
     // Clear the remaining dev-loader + import-map globals (`g_importMap`,
     // cache-bust marks, boot-complete flag) before isolate disposal.

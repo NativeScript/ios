@@ -13,6 +13,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include "Caches.h"
 #include "Helpers.h"         // for tns::Exists
 #include "HttpLoader.h"
 #include "ModuleInternal.h"  // for LoadScript(...)
@@ -91,9 +92,57 @@ static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string&
 static std::string CanonicalizeRegistryKey(const std::string& key);
 static const char* ModuleStatusToString(v8::Module::Status status);
 // Defined with the async graph pipeline below; called from
-// DestroyModuleStateForIsolate so in-flight walks can't touch a disposed
+// QuiesceModuleLoadsForIsolate so in-flight walks can't touch a disposed
 // isolate.
 static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate);
+
+namespace {
+struct AsyncGraphLoad;
+
+// All module-loader state owned by one isolate. v8::Global handles are bound
+// to the isolate that created them, so each isolate (main + every Worker)
+// keeps its own set. Lives in a Caches state slot (Caches::StateFor), so it is
+// destroyed with the isolate's Caches — under the teardown Locker, while the
+// isolate is still alive — which lets the v8::Global members Reset safely in
+// their own destructors; nothing is left to static/thread destructors (where
+// __cxa_finalize_ranges-time v8::Global resets crash). Access from the
+// isolate's thread only, per the slot contract.
+struct ModuleLoaderState {
+  ModuleHandleMap registry;            // canonical key  -> compiled module
+  ModuleHandleMap fallbackRegistry;    // canonical key  -> last good module
+  ModuleHandleMap fallbackByRelative;  // relative path  -> last good module
+
+  // In-flight async graph walks; entries are weak so a finished load frees
+  // itself. A pending NSURLSession completion can hold the load's shared_ptr
+  // past teardown, so QuiesceModuleLoadsForIsolate must flag these dead and
+  // Reset their context Globals while the isolate is still alive — the slot
+  // destructor alone is not enough for them.
+  std::vector<std::weak_ptr<AsyncGraphLoad>> asyncGraphLoads;
+
+  // Active resolution stack, used to detect and short-circuit self-recursive
+  // module loads, plus the re-entry bookkeeping keyed by registry key.
+  std::vector<std::string> resolutionStack;
+  robin_hood::unordered_map<std::string, size_t> reentryCounts;
+  robin_hood::unordered_map<std::string, robin_hood::unordered_set<std::string>> reentryParents;
+  robin_hood::unordered_map<std::string, std::string> primaryImporters;
+  robin_hood::unordered_set<std::string> modulesInFlight;
+  robin_hood::unordered_set<std::string> modulesPendingReset;
+
+  // Waiters: registry key -> Promise resolvers settled when the module
+  // finishes (instantiated/evaluated) or errors.
+  robin_hood::unordered_map<std::string, std::vector<v8::Global<v8::Promise::Resolver>>>
+      moduleWaiters;
+  // Dynamic HTTP import waiters: resolve to the module namespace.
+  robin_hood::unordered_map<std::string, std::vector<v8::Global<v8::Promise::Resolver>>>
+      httpDynamicWaiters;
+};
+
+// This isolate's loader state, or null once teardown has begun — callers must
+// bail, not recreate state.
+ModuleLoaderState* ModuleLoaderStateFor(v8::Isolate* isolate) {
+  return Caches::StateFor<ModuleLoaderState>(isolate);
+}
+}  // namespace
 
 // Turn a value JS handed us into a real v8::Promise.
 //
@@ -174,7 +223,11 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
     v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& code,
     const std::string& urlStr) {
   v8::EscapableHandleScope hs(isolate);
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
   const std::string registryKey = CanonicalizeRegistryKey(urlStr);
   if (IsScriptLoadingLogEnabled() && ShouldTraceRegistryKey(urlStr, registryKey)) {
     Log(@"[resolver][register-resolve-only] raw=%s key=%s", urlStr.c_str(), registryKey.c_str());
@@ -272,44 +325,6 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
   return hs.Escape(mod);
 }
 
-namespace {
-// The three module-handle maps for a single isolate. v8::Global<Module> handles
-// are bound to the isolate that created them, so each isolate (main + every
-// Worker) keeps its own set; they are looked up by v8::Isolate* below.
-struct PerIsolateModuleState {
-  ModuleHandleMap registry;            // canonical key  -> compiled module
-  ModuleHandleMap fallbackRegistry;    // canonical key  -> last good module
-  ModuleHandleMap fallbackByRelative;  // relative path  -> last good module
-};
-
-std::mutex& ModuleStateTableMutex() {
-  // Leaked-on-purpose process singletons (never destructed) so we never run a
-  // static destructor that would touch v8 handles after isolate disposal.
-  static std::mutex* mutex = new std::mutex();
-  return *mutex;
-}
-
-robin_hood::unordered_map<v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>&
-ModuleStateTable() {
-  static auto* table =
-      new robin_hood::unordered_map<v8::Isolate*, std::unique_ptr<PerIsolateModuleState>>();
-  return *table;
-}
-
-// Fetch (creating on first use) the module maps owned by `isolate`. Keyed by
-// the isolate itself rather than the calling thread, so the maps follow the
-// isolate even if it is ever entered from another thread under v8::Locker.
-PerIsolateModuleState& ModuleStateFor(v8::Isolate* isolate) {
-  std::lock_guard<std::mutex> lock(ModuleStateTableMutex());
-  auto& table = ModuleStateTable();
-  auto it = table.find(isolate);
-  if (it == table.end()) {
-    it = table.emplace(isolate, std::make_unique<PerIsolateModuleState>()).first;
-  }
-  return *it->second;
-}
-}  // namespace
-
 // ────────────────────────────────────────────────────────────────────────────
 // Per-isolate module registries: map absolute file paths / canonical URLs →
 // compiled v8::Module handles, keyed by the owning v8::Isolate*.
@@ -327,52 +342,27 @@ PerIsolateModuleState& ModuleStateFor(v8::Isolate* isolate) {
 // pinned to a single thread; keying explicitly by v8::Isolate* stays correct
 // even if an isolate is ever entered from another thread under v8::Locker.
 //
-// Lifetime: the per-isolate state is created lazily on first access and torn
-// down by DestroyModuleStateForIsolate(), which the Runtime destructor
-// (Runtime.mm) calls while the isolate is still alive (under v8::Locker) and
-// before disposal — so every v8::Global is Reset() at a safe time, and nothing
-// is left to static/thread destructors (where __cxa_finalize_ranges-time
-// v8::Global resets crash).
+// Lifetime: the state is created lazily on first access and destroyed with the
+// isolate's Caches (Runtime::~Runtime → Caches::Remove, under v8::Locker,
+// before isolate disposal). The Runtime destructor additionally calls
+// QuiesceModuleLoadsForIsolate() first, so in-flight async graph loads whose
+// completions are still queued on background NSURLSession queues observe the
+// dead flag before they hop to the JS runloop.
 //
 // Each access site binds a local reference (e.g.
-// `auto& g_moduleRegistry = ModuleRegistryFor(isolate);`) so existing bodies
-// stay byte-for-byte the same while becoming isolate-correct.
-ModuleHandleMap& ModuleRegistryFor(v8::Isolate* isolate) {
-  return ModuleStateFor(isolate).registry;
+// `auto& g_moduleRegistry = moduleState->registry;`) so existing bodies stay
+// byte-for-byte the same while becoming isolate-correct. Accessors return null
+// once teardown has begun.
+ModuleHandleMap* ModuleRegistryFor(v8::Isolate* isolate) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  return state == nullptr ? nullptr : &state->registry;
 }
 
-static ModuleHandleMap& ModuleFallbackRegistryFor(v8::Isolate* isolate) {
-  return ModuleStateFor(isolate).fallbackRegistry;
-}
-
-static ModuleHandleMap& ModuleFallbackByRelativeFor(v8::Isolate* isolate) {
-  return ModuleStateFor(isolate).fallbackByRelative;
-}
-
-// Reset and drop every module handle owned by `isolate`. Must run while the
-// isolate is still alive (the Runtime destructor calls this under v8::Locker,
-// before isolate disposal).
-void DestroyModuleStateForIsolate(v8::Isolate* isolate) {
-  // First: neutralize any in-flight async graph loads for this isolate.
-  // Their fetch completions check the dead flag before touching V8, and
-  // their context Globals are Reset here, while the isolate is still alive.
-  KillAsyncGraphLoadsForIsolate(isolate);
-
-  std::unique_ptr<PerIsolateModuleState> state;
-  {
-    std::lock_guard<std::mutex> lock(ModuleStateTableMutex());
-    auto& table = ModuleStateTable();
-    auto it = table.find(isolate);
-    if (it == table.end()) {
-      return;
-    }
-    state = std::move(it->second);
-    table.erase(it);
-  }
-  for (auto& kv : state->registry) kv.second.Reset();
-  for (auto& kv : state->fallbackRegistry) kv.second.Reset();
-  for (auto& kv : state->fallbackByRelative) kv.second.Reset();
-}
+// Neutralize any in-flight async graph loads for `isolate`: their fetch
+// completions check the dead flag before touching V8, and their context
+// Globals are Reset here, while the isolate is still alive. The rest of the
+// loader state is destroyed with the isolate's Caches.
+void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate) { KillAsyncGraphLoadsForIsolate(isolate); }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Import map: bare specifier → resolved URL (populated by ns:module configureLoader)
@@ -441,7 +431,11 @@ static std::string CanonicalizeRegistryKey(const std::string& key) {
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
                                                 v8::Local<v8::Context> context,
                                                 const std::string& requestedUrl) {
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
   const std::string registryKey = CanonicalizeHttpUrlKey(requestedUrl);
 
   if (IsScriptLoadingLogEnabled()) {
@@ -740,10 +734,9 @@ static std::string LookupImportMap(const std::string& specifier) {
 }
 
 void CleanupImportMapGlobals() {
-  // Process-global import-map state (not isolate-bound). The per-isolate module
-  // handle maps (registry / fallback / fallbackByRelative) are torn down
-  // separately by DestroyModuleStateForIsolate(), which ~Runtime calls for
-  // every isolate before disposal.
+  // Process-global import-map state (not isolate-bound). The per-isolate
+  // loader state lives in a Caches state slot and is destroyed with each
+  // isolate's Caches (after QuiesceModuleLoadsForIsolate in ~Runtime).
   g_importMap.clear();
   g_volatilePatterns.clear();
 }
@@ -809,22 +802,15 @@ struct AsyncGraphLoad {
   }
 };
 
-std::mutex& AsyncGraphLoadsMutex() {
-  // Leaked-on-purpose (see ModuleStateTableMutex rationale above).
-  static std::mutex* mutex = new std::mutex();
-  return *mutex;
-}
-
-robin_hood::unordered_map<v8::Isolate*, std::vector<std::weak_ptr<AsyncGraphLoad>>>&
-AsyncGraphLoadsByIsolate() {
-  static auto* table =
-      new robin_hood::unordered_map<v8::Isolate*, std::vector<std::weak_ptr<AsyncGraphLoad>>>();
-  return *table;
-}
-
+// Registration and quiesce both run on the isolate's thread (the slot
+// contract); background fetch completions only ever touch the AsyncGraphLoad
+// they retain, never this list, so no lock is needed.
 void RegisterAsyncGraphLoad(v8::Isolate* isolate, const std::shared_ptr<AsyncGraphLoad>& load) {
-  std::lock_guard<std::mutex> lock(AsyncGraphLoadsMutex());
-  auto& loads = AsyncGraphLoadsByIsolate()[isolate];
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  auto& loads = state->asyncGraphLoads;
   // Prune expired entries opportunistically so the vector stays small.
   loads.erase(std::remove_if(loads.begin(), loads.end(),
                              [](const std::weak_ptr<AsyncGraphLoad>& w) { return w.expired(); }),
@@ -840,27 +826,21 @@ bool HasPendingAsyncModuleGraphWork() {
 // Isolate-teardown hook: mark every in-flight load owned by `isolate` dead
 // (pending fetch completions become no-ops) and Reset their context Globals
 // NOW, while the isolate is still alive — nothing may destroy a v8::Global
-// after isolate disposal. Called from DestroyModuleStateForIsolate.
+// after isolate disposal, and a pending NSURLSession completion can hold a
+// load's shared_ptr past teardown, so the slot destructor alone cannot cover
+// these. Called from QuiesceModuleLoadsForIsolate.
 static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate) {
-  std::vector<std::shared_ptr<AsyncGraphLoad>> doomed;
-  {
-    std::lock_guard<std::mutex> lock(AsyncGraphLoadsMutex());
-    auto& table = AsyncGraphLoadsByIsolate();
-    auto it = table.find(isolate);
-    if (it == table.end()) {
-      return;
-    }
-    for (auto& weak : it->second) {
-      if (auto load = weak.lock()) {
-        doomed.push_back(std::move(load));
-      }
-    }
-    table.erase(it);
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) {
+    return;
   }
-  for (auto& load : doomed) {
-    load->dead.store(true, std::memory_order_release);
-    load->context.Reset();
+  for (auto& weak : state->asyncGraphLoads) {
+    if (auto load = weak.lock()) {
+      load->dead.store(true, std::memory_order_release);
+      load->context.Reset();
+    }
   }
+  state->asyncGraphLoads.clear();
 }
 
 // Resolve one static module request to an absolute HTTP(S) URL using the
@@ -1059,7 +1039,11 @@ static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
   }
 
   v8::Isolate* isolate = load->isolate;
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+  auto& g_moduleRegistry = moduleState->registry;
   auto it = g_moduleRegistry.find(key);
   if (it != g_moduleRegistry.end()) {
     v8::Local<v8::Module> existing = it->second.Get(isolate);
@@ -1151,9 +1135,6 @@ bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Conte
   return *done;
 }
 
-// g_modulesInFlight is defined later in this translation unit (thread_local static); no extern
-// needed here.
-
 static bool IsDocumentsPath(const std::string& path);
 static std::vector<std::string> DocumentsPathAliases(const std::string& path);
 static std::string ExtractRelativePath(const std::string& path);
@@ -1190,9 +1171,13 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
   if (isolate == nullptr) {
     return;
   }
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
-  auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate);
-  auto& g_moduleFallbackByRelative = ModuleFallbackByRelativeFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+  auto& g_moduleRegistry = moduleState->registry;
+  auto& g_moduleFallbackRegistry = moduleState->fallbackRegistry;
+  auto& g_moduleFallbackByRelative = moduleState->fallbackByRelative;
   const std::string registryKey = CanonicalizeRegistryKey(canonicalPath);
   // Defensive: never operate on an anomalous/sentinel key.
   // This covers the bare "@" anomaly and the special invalid-at stub module used by the dev HTTP
@@ -1284,7 +1269,11 @@ std::vector<std::string> GetLoadedModuleUrls() {
   if (isolate == nullptr) {
     return urls;
   }
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return urls;
+  }
+  auto& g_moduleRegistry = moduleState->registry;
   urls.reserve(g_moduleRegistry.size());
 
   for (const auto& entry : g_moduleRegistry) {
@@ -1302,7 +1291,11 @@ std::vector<std::string> GetLoadedModuleUrls() {
 
 void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
                        const std::vector<std::string>& urls) {
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+  auto& g_moduleRegistry = moduleState->registry;
   if (urls.empty()) return;
 
   robin_hood::unordered_set<std::string> seen;
@@ -1353,8 +1346,12 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
 
 void UpdateModuleFallback(v8::Isolate* isolate, const std::string& canonicalPath,
                           v8::Local<v8::Module> module) {
-  auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate);
-  auto& g_moduleFallbackByRelative = ModuleFallbackByRelativeFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+  auto& g_moduleFallbackRegistry = moduleState->fallbackRegistry;
+  auto& g_moduleFallbackByRelative = moduleState->fallbackByRelative;
   auto fallbackIt = g_moduleFallbackRegistry.find(canonicalPath);
   if (fallbackIt != g_moduleFallbackRegistry.end()) {
     fallbackIt->second.Reset();
@@ -1406,29 +1403,14 @@ void UpdateModuleFallback(v8::Isolate* isolate, const std::string& canonicalPath
   }
 }
 
-// Track active resolution stack to detect and short-circuit self-recursive module loads
-static thread_local std::vector<std::string> g_moduleResolutionStack;
-static thread_local robin_hood::unordered_map<std::string, size_t> g_moduleReentryCounts;
-static thread_local robin_hood::unordered_map<std::string, robin_hood::unordered_set<std::string>>
-    g_moduleReentryParents;
-static thread_local robin_hood::unordered_map<std::string, std::string> g_modulePrimaryImporters;
-static thread_local robin_hood::unordered_set<std::string> g_modulesInFlight;
-static thread_local robin_hood::unordered_set<std::string> g_modulesPendingReset;
+// The resolution stack, re-entry bookkeeping, and waiter lists live in
+// ModuleLoaderState (per isolate, in a Caches state slot).
 // The threshold for detecting circular dependencies during module resolution.
 // 256 was chosen as a high enough value to allow deep but legitimate module graphs,
 // but low enough to catch runaway recursion or infinite circular imports.
 // If a module is re-entered more than this limit, module loading is aborted and
 // an error is reported to prevent stack overflow or infinite loops.
 static constexpr size_t kMaxModuleReentryCount = 256;
-// Waiters: module path -> list of Promise resolvers waiting for completion (instantiated/evaluated
-// or errored)
-static robin_hood::unordered_map<std::string, std::vector<v8::Global<v8::Promise::Resolver>>>
-    g_moduleWaiters;
-// Dynamic HTTP import waiters: resolve to module namespace when available.
-static thread_local robin_hood::unordered_map<std::string,
-                                              std::vector<v8::Global<v8::Promise::Resolver>>>
-    g_httpDynamicWaiters;
-
 static bool IsModuleEvaluationInProgress(v8::Module::Status status) {
   return status == v8::Module::kInstantiating || status == v8::Module::kEvaluating;
 }
@@ -1485,13 +1467,18 @@ static void RejectResolversWithReason(v8::Isolate* isolate, v8::Local<v8::Contex
 static bool QueueModuleWaiterIfInFlight(v8::Isolate* isolate, const std::string& registryKey,
                                         v8::Local<v8::Module> module,
                                         v8::Local<v8::Promise::Resolver> resolver) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return false;
+  }
+  auto& g_modulesInFlight = moduleState->modulesInFlight;
   if (registryKey.empty() || module.IsEmpty() ||
       !IsModuleEvaluationInProgress(module->GetStatus()) ||
       g_modulesInFlight.find(registryKey) == g_modulesInFlight.end()) {
     return false;
   }
 
-  g_moduleWaiters[registryKey].emplace_back(isolate, resolver);
+  moduleState->moduleWaiters[registryKey].emplace_back(isolate, resolver);
   if (IsScriptLoadingLogEnabled()) {
     Log(@"[dyn-import][await] queued module waiter for %s status=%s", registryKey.c_str(),
         ModuleStatusToString(module->GetStatus()));
@@ -1502,13 +1489,18 @@ static bool QueueModuleWaiterIfInFlight(v8::Isolate* isolate, const std::string&
 static bool QueueHttpDynamicWaiterIfInFlight(v8::Isolate* isolate, const std::string& registryKey,
                                              v8::Local<v8::Module> module,
                                              v8::Local<v8::Promise::Resolver> resolver) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return false;
+  }
+  auto& g_modulesInFlight = moduleState->modulesInFlight;
   if (registryKey.empty() || module.IsEmpty() ||
       !IsModuleEvaluationInProgress(module->GetStatus()) ||
       g_modulesInFlight.find(registryKey) == g_modulesInFlight.end()) {
     return false;
   }
 
-  g_httpDynamicWaiters[registryKey].emplace_back(isolate, resolver);
+  moduleState->httpDynamicWaiters[registryKey].emplace_back(isolate, resolver);
   if (IsScriptLoadingLogEnabled()) {
     Log(@"[dyn-import][http-await] queued waiter for %s status=%s", registryKey.c_str(),
         ModuleStatusToString(module->GetStatus()));
@@ -1552,6 +1544,11 @@ static v8::Local<v8::Value> BuildModuleFailureReason(v8::Isolate* isolate, v8::T
 
 static void ResolveModuleWaiters(v8::Isolate* isolate, v8::Local<v8::Context> context,
                                  const std::string& registryKey, v8::Local<v8::Module> module) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+  auto& g_moduleWaiters = moduleState->moduleWaiters;
   auto waitIt = g_moduleWaiters.find(registryKey);
   if (waitIt == g_moduleWaiters.end()) {
     return;
@@ -1565,6 +1562,11 @@ static void ResolveModuleWaiters(v8::Isolate* isolate, v8::Local<v8::Context> co
 
 static void RejectModuleWaiters(v8::Isolate* isolate, v8::Local<v8::Context> context,
                                 const std::string& registryKey, v8::Local<v8::Value> reason) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+  auto& g_moduleWaiters = moduleState->moduleWaiters;
   auto waitIt = g_moduleWaiters.find(registryKey);
   if (waitIt == g_moduleWaiters.end()) {
     return;
@@ -1579,6 +1581,11 @@ static void RejectModuleWaiters(v8::Isolate* isolate, v8::Local<v8::Context> con
 static void ResolveHttpDynamicWaiters(v8::Isolate* isolate, v8::Local<v8::Context> context,
                                       const std::string& registryKey,
                                       v8::Local<v8::Module> module) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
   auto waitIt = g_httpDynamicWaiters.find(registryKey);
   if (waitIt != g_httpDynamicWaiters.end()) {
     std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
@@ -1587,11 +1594,16 @@ static void ResolveHttpDynamicWaiters(v8::Isolate* isolate, v8::Local<v8::Contex
     ResolveResolversWithModuleNamespace(isolate, context, resolvers, module, registryKey);
   }
 
-  g_modulesInFlight.erase(registryKey);
+  moduleState->modulesInFlight.erase(registryKey);
 }
 
 static void RejectHttpDynamicWaiters(v8::Isolate* isolate, v8::Local<v8::Context> context,
                                      const std::string& registryKey, v8::Local<v8::Value> reason) {
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
   auto waitIt = g_httpDynamicWaiters.find(registryKey);
   if (waitIt != g_httpDynamicWaiters.end()) {
     std::vector<v8::Global<v8::Promise::Resolver>> resolvers;
@@ -1600,7 +1612,7 @@ static void RejectHttpDynamicWaiters(v8::Isolate* isolate, v8::Local<v8::Context
     RejectResolversWithReason(isolate, context, resolvers, reason);
   }
 
-  g_modulesInFlight.erase(registryKey);
+  moduleState->modulesInFlight.erase(registryKey);
 }
 
 static void RejectResolversForInvalidation(
@@ -1624,11 +1636,17 @@ static void RejectResolversForInvalidation(
 static void RejectAndClearInvalidatedModuleState(v8::Isolate* isolate,
                                                  v8::Local<v8::Context> context,
                                                  const std::string& registryKey) {
-  g_moduleReentryCounts.erase(registryKey);
-  g_moduleReentryParents.erase(registryKey);
-  g_modulePrimaryImporters.erase(registryKey);
-  g_modulesInFlight.erase(registryKey);
-  g_modulesPendingReset.erase(registryKey);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+  auto& g_moduleWaiters = moduleState->moduleWaiters;
+  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
+  moduleState->reentryCounts.erase(registryKey);
+  moduleState->reentryParents.erase(registryKey);
+  moduleState->primaryImporters.erase(registryKey);
+  moduleState->modulesInFlight.erase(registryKey);
+  moduleState->modulesPendingReset.erase(registryKey);
 
   auto waitIt = g_moduleWaiters.find(registryKey);
   if (waitIt != g_moduleWaiters.end()) {
@@ -1751,19 +1769,22 @@ static const char* ModuleStatusToString(v8::Module::Status status) {
 namespace {
 
 struct ResolutionStackGuard {
-  ResolutionStackGuard(v8::Isolate* isolate, std::vector<std::string>& stack,
-                       const std::string& entry)
-      : isolate_(isolate), stack_(stack), entry_(entry), active_(true) {
+  ResolutionStackGuard(v8::Isolate* isolate, ModuleLoaderState& state, const std::string& entry)
+      : isolate_(isolate),
+        state_(state),
+        stack_(state.resolutionStack),
+        entry_(entry),
+        active_(true) {
     stack_.push_back(entry_);
-    g_moduleReentryCounts[entry_] = 0;
-    g_moduleReentryParents.erase(entry_);
+    state_.reentryCounts[entry_] = 0;
+    state_.reentryParents.erase(entry_);
     if (stack_.size() > 1) {
-      g_modulePrimaryImporters[entry_] = stack_[stack_.size() - 2];
+      state_.primaryImporters[entry_] = stack_[stack_.size() - 2];
     } else {
-      g_modulePrimaryImporters.erase(entry_);
+      state_.primaryImporters.erase(entry_);
     }
-    g_modulesInFlight.insert(entry_);
-    g_modulesPendingReset.erase(entry_);
+    state_.modulesInFlight.insert(entry_);
+    state_.modulesPendingReset.erase(entry_);
     if (IsScriptLoadingLogEnabled()) {
       Log(@"[resolver][stack] push (%lu) %s", static_cast<unsigned long>(stack_.size()),
           entry_.c_str());
@@ -1775,16 +1796,18 @@ struct ResolutionStackGuard {
 
   ~ResolutionStackGuard() {
     if (active_ && !stack_.empty()) {
-      auto& g_moduleRegistry = ModuleRegistryFor(isolate_);
-      auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate_);
+      auto& g_moduleRegistry = state_.registry;
+      auto& g_moduleFallbackRegistry = state_.fallbackRegistry;
+      auto& g_moduleWaiters = state_.moduleWaiters;
+      auto& g_modulesPendingReset = state_.modulesPendingReset;
       if (IsScriptLoadingLogEnabled()) {
         Log(@"[resolver][stack] pop (%lu) %s", static_cast<unsigned long>(stack_.size()),
             entry_.c_str());
       }
-      g_moduleReentryCounts.erase(entry_);
-      g_moduleReentryParents.erase(entry_);
-      g_modulePrimaryImporters.erase(entry_);
-      g_modulesInFlight.erase(entry_);
+      state_.reentryCounts.erase(entry_);
+      state_.reentryParents.erase(entry_);
+      state_.primaryImporters.erase(entry_);
+      state_.modulesInFlight.erase(entry_);
       // Determine final status for waiter resolution / rejection
       v8::Module::Status finalStatus = v8::Module::kErrored;
       auto regIt = g_moduleRegistry.find(entry_);
@@ -1885,6 +1908,7 @@ struct ResolutionStackGuard {
 
  private:
   v8::Isolate* isolate_;
+  ModuleLoaderState& state_;
   std::vector<std::string>& stack_;
   std::string entry_;
   bool active_;
@@ -1906,7 +1930,11 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(v8::Isolate* isolate,
                                                         const std::string& absPath,
                                                         const std::string& registryAbsPath,
                                                         bool isWorker) {
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
   // Debug: Log JSON module handling for worker context
   if (isWorker) {
     printf("ResolveModuleCallback: Worker handling JSON module '%s'\n", absPath.c_str());
@@ -1986,9 +2014,19 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                                                  v8::Local<v8::FixedArray> import_assertions,
                                                  v8::Local<v8::Module> referrer) {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
-  auto& g_moduleFallbackRegistry = ModuleFallbackRegistryFor(isolate);
-  auto& g_moduleFallbackByRelative = ModuleFallbackByRelativeFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Module>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
+  auto& g_moduleFallbackRegistry = moduleState->fallbackRegistry;
+  auto& g_moduleFallbackByRelative = moduleState->fallbackByRelative;
+  auto& g_moduleResolutionStack = moduleState->resolutionStack;
+  auto& g_moduleReentryCounts = moduleState->reentryCounts;
+  auto& g_moduleReentryParents = moduleState->reentryParents;
+  auto& g_modulePrimaryImporters = moduleState->primaryImporters;
+  auto& g_modulesInFlight = moduleState->modulesInFlight;
+  auto& g_modulesPendingReset = moduleState->modulesPendingReset;
 
   // 1) Turn the specifier literal into a std::string:
   v8::String::Utf8Value specUtf8(isolate, specifier);
@@ -2859,7 +2897,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     return v8::MaybeLocal<v8::Module>();
   }
 
-  ResolutionStackGuard stackGuard(isolate, g_moduleResolutionStack, registryAbsPath);
+  ResolutionStackGuard stackGuard(isolate, *moduleState, registryAbsPath);
   if (IsScriptLoadingLogEnabled()) {
     Log(@"[resolver] → LoadScript %s", absPath.c_str());
   }
@@ -2895,8 +2933,8 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 static void FinishHttpDynamicImport(v8::Isolate* isolate, v8::Local<v8::Context> context,
                                     const std::string& key, const std::string& requestUrl) {
   if (IsScriptLoadingLogEnabled()) {
-    auto& g_moduleRegistry = ModuleRegistryFor(isolate);
-    if (g_moduleRegistry.find(key) == g_moduleRegistry.end()) {
+    auto* moduleState = ModuleLoaderStateFor(isolate);
+    if (moduleState != nullptr && moduleState->registry.find(key) == moduleState->registry.end()) {
       // The async walk was expected to have registered the root; falling
       // back to the synchronous loader here means the walk missed it.
       Log(@"[async-graph][fallback-sync-load] root missed walk: %s", key.c_str());
@@ -3016,7 +3054,13 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::Local<v8::Value> resource_name, v8::Local<v8::String> specifier,
     v8::Local<v8::FixedArray> import_assertions) {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return v8::MaybeLocal<v8::Promise>();
+  }
+  auto& g_moduleRegistry = moduleState->registry;
+  auto& g_modulesInFlight = moduleState->modulesInFlight;
+  auto& g_httpDynamicWaiters = moduleState->httpDynamicWaiters;
   // Diagnostic: log every dynamic import attempt.
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const char* cSpec = (*specUtf8) ? *specUtf8 : "<invalid>";

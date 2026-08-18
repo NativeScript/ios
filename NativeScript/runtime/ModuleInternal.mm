@@ -962,7 +962,11 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   std::string canonicalPath = CanonicalizeModulePath(path);
   std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
   auto context = isolate->GetCurrentContext();
-  auto& g_moduleRegistry = ModuleRegistryFor(isolate);
+  auto* registryPtr = ModuleRegistryFor(isolate);
+  if (registryPtr == nullptr) {
+    return Local<Value>();
+  }
+  auto& g_moduleRegistry = *registryPtr;
 
   auto describeModuleStatus = [](Module::Status status) -> const char* {
     switch (status) {

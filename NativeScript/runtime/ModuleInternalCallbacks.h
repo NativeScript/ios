@@ -19,13 +19,15 @@ using ModuleHandleMap =
 // v8::Module handles for `isolate`. Keyed by v8::Isolate* (not thread) because
 // v8::Global<Module> handles are isolate-bound; see the long-form comment above
 // the definition in ModuleInternalCallbacks.mm for the cross-isolate-handle bug
-// this prevents. Callers bind a local alias, e.g.
-// `auto& g_moduleRegistry = tns::ModuleRegistryFor(isolate);`.
-ModuleHandleMap& ModuleRegistryFor(v8::Isolate* isolate);
+// this prevents. The map lives in a Caches state slot, so this returns null
+// once the isolate's teardown has begun — callers must bail.
+ModuleHandleMap* ModuleRegistryFor(v8::Isolate* isolate);
 
-// Reset + drop every module handle owned by `isolate`. Must be called while the
-// isolate is still alive (the Runtime destructor calls this before disposal).
-void DestroyModuleStateForIsolate(v8::Isolate* isolate);
+// Mark every in-flight async graph load owned by `isolate` dead and Reset
+// their context Globals. Must be called while the isolate is still alive (the
+// Runtime destructor calls this before disposal); the rest of the loader state
+// is destroyed with the isolate's Caches.
+void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate);
 
 // Utility to drop modules from the registry when compilation/instantiation
 // fails. Operates on the *current* isolate's maps (resolved internally); only
