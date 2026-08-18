@@ -204,7 +204,10 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
       Log(@"[run-module][http-esm][begin] %s", NormalizeHttpModuleUrl(path).c_str());
     }
     try {
-      moduleNamespace = ModuleInternal::LoadESModule(isolate, path);
+      // The entry runs before this thread's event loop does, so its graph can
+      // only make progress from the pump inside LoadESModule.
+      moduleNamespace =
+          ModuleInternal::LoadESModule(isolate, path, ModuleEvaluationPolicy::kSyncPumping);
     } catch (const NativeScriptException& ex) {
       if (RuntimeConfig.IsDebug) {
         Log(@"***** JavaScript exception occurred *****");
@@ -711,8 +714,10 @@ Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& pat
   std::string canonicalPath = NormalizePath(path);
 
   if (IsESModule(canonicalPath)) {
-    // Treat all .mjs files as standard ES modules.
-    return ModuleInternal::LoadESModule(isolate, canonicalPath);
+    // Treat all .mjs files as standard ES modules. This is require()'s route,
+    // which cannot wait: an async graph is refused rather than pumped.
+    return ModuleInternal::LoadESModule(isolate, canonicalPath,
+                                        ModuleEvaluationPolicy::kSyncStrict);
   }
 
   Local<Script> script = ModuleInternal::LoadClassicScript(isolate, canonicalPath);
@@ -876,7 +881,304 @@ MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
   return MaybeLocal<Promise>(promise);
 }
 
-Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
+// Phase diagnostics – only active in debug builds when logScriptLoading is enabled.
+static void LogEsmPhase(const std::string& canonicalPath, const char* phase, const char* status,
+                        const char* classification = "", const char* extra = "") {
+  if (!RuntimeConfig.IsDebug || !IsScriptLoadingLogEnabled()) {
+    return;
+  }
+
+  if (classification && classification[0] != '\0') {
+    if (extra && extra[0] != '\0') {
+      Log(@"[esm][%s][%s][%s] %s %s", phase, status, classification, canonicalPath.c_str(), extra);
+    } else {
+      Log(@"[esm][%s][%s][%s] %s", phase, status, classification, canonicalPath.c_str());
+    }
+  } else {
+    if (extra && extra[0] != '\0') {
+      Log(@"[esm][%s][%s] %s %s", phase, status, canonicalPath.c_str(), extra);
+    } else {
+      Log(@"[esm][%s][%s] %s", phase, status, canonicalPath.c_str());
+    }
+  }
+}
+
+struct ModuleEvaluationOptions {
+  enum class TimeoutBehavior { kReturnPending, kThrow };
+
+  ModuleEvaluationPolicy policy = ModuleEvaluationPolicy::kSyncStrict;
+  // kSyncPumping only: how long the graph gets to settle in-pump.
+  double deadlineSeconds = 0.0;
+  // kSyncPumping only: what an expired window means.
+  TimeoutBehavior timeoutBehavior = TimeoutBehavior::kReturnPending;
+  // kSyncPumping only: also give the Cocoa runloop a slice per iteration, for
+  // graphs whose progress depends on native transports rather than V8 tasks.
+  bool pumpRunLoop = false;
+};
+
+// `require()` cannot wait, so an async graph is refused rather than evaluated.
+// Never evicts: the module is perfectly loadable through import().
+[[noreturn]] static void ThrowAsyncGraphRefusal(const std::string& canonicalPath) {
+  LogEsmPhase(canonicalPath, "evaluate", "refused", "async-graph");
+  throw NativeScriptException("require() cannot load ES module '" + canonicalPath +
+                              "': the module graph contains top-level await. Use import() "
+                              "instead.");
+}
+
+// Evicts the module and surfaces the rejection reason. Always throws — debug
+// adds the modal and the detailed log, never recovery.
+[[noreturn]] static void ThrowModuleEvaluationRejection(Isolate* isolate, Local<Promise> promise,
+                                                        TryCatch& tc,
+                                                        const std::string& canonicalPath) {
+  RemoveModuleFromRegistry(isolate, canonicalPath);
+  LogEsmPhase(canonicalPath, "evaluate", "promise-rejected");
+
+  if (RuntimeConfig.IsDebug) {
+    std::string errorTitle = "Uncaught JavaScript Exception";
+    std::string errorMessage = "Module evaluation promise rejected";
+    std::string stackTrace = "";
+
+    Local<Value> reason = promise->Result();
+    if (!reason.IsEmpty()) {
+      Local<Context> context = isolate->GetCurrentContext();
+      if (reason->IsObject()) {
+        Local<Object> errorObj = reason.As<Object>();
+
+        auto messageKey = tns::ToV8String(isolate, "message");
+        Local<Value> messageVal;
+        if (errorObj->Get(context, messageKey).ToLocal(&messageVal) && messageVal->IsString()) {
+          v8::String::Utf8Value messageUtf8(isolate, messageVal);
+          if (*messageUtf8) errorMessage = std::string(*messageUtf8);
+        }
+
+        auto stackKey = tns::ToV8String(isolate, "stack");
+        Local<Value> stackVal;
+        if (errorObj->Get(context, stackKey).ToLocal(&stackVal) && stackVal->IsString()) {
+          v8::String::Utf8Value stackUtf8(isolate, stackVal);
+          if (*stackUtf8) {
+            stackTrace = std::string(*stackUtf8);
+            stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
+          }
+        }
+      } else {
+        auto maybeReasonStr = reason->ToString(context);
+        if (!maybeReasonStr.IsEmpty()) {
+          v8::String::Utf8Value reasonUtf8(isolate, maybeReasonStr.ToLocalChecked());
+          if (*reasonUtf8) {
+            errorMessage = std::string(*reasonUtf8);
+          }
+        }
+      }
+
+      Log(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
+      if (!stackTrace.empty()) {
+        Log(@"JavaScript stack trace:\n%s", stackTrace.c_str());
+      }
+    }
+
+    if (tc.HasCaught()) {
+      tns::LogError(isolate, tc);
+    }
+
+    Log(@"***** End stack trace - Fix to continue *****");
+
+    if (stackTrace.empty()) {
+      stackTrace = tns::GetSmartStackTrace(isolate);
+    } else {
+      stackTrace = tns::RemapStackTraceIfAvailable(isolate, stackTrace);
+    }
+
+    if (IsScriptLoadingLogEnabled()) {
+      std::string stackPreview =
+          stackTrace.size() > 240 ? stackTrace.substr(0, 240) + "…" : stackTrace;
+      Log(@"[esm][evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
+          canonicalPath.c_str(), errorMessage.c_str(), stackPreview.c_str());
+    }
+
+    NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
+    LogEsmPhase(canonicalPath, "evaluate", "promise-rejected-handled");
+
+    // The throw must carry the rejection detail so the boundary handlers
+    // (RunMainScript, worker onerror, the dev client) see the reason; debug
+    // adds the modal above, never recovery.
+    std::string detail = std::string("Module evaluation promise rejected: ") + canonicalPath;
+    if (!errorMessage.empty()) {
+      detail += " — ";
+      detail += errorMessage;
+    }
+    throw NativeScriptException(detail);
+  }
+
+  if (!tc.HasCaught()) {
+    Local<Value> reason = promise->Result();
+    isolate->ThrowException(reason);
+  }
+  throw NativeScriptException(isolate, tc, "Module evaluation promise rejected");
+}
+
+// Evaluates an instantiated graph under `options`. Returns the capability
+// promise for kAsync and an empty handle otherwise; the namespace always comes
+// from the module itself. Throws NativeScriptException on failure, in every
+// build.
+static MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context,
+                                               Local<Module> module,
+                                               const std::string& canonicalPath,
+                                               const ModuleEvaluationOptions& options) {
+  if (options.policy == ModuleEvaluationPolicy::kSyncStrict) {
+    if (module->IsGraphAsync()) {
+      // Refusing before evaluation leaves the graph at kInstantiated, so a
+      // later import() can still evaluate it, and keeps this diagnosis ahead
+      // of whatever runtime error the graph would have produced first.
+      ThrowAsyncGraphRefusal(canonicalPath);
+    }
+    if (module->GetStatus() == Module::kEvaluating) {
+      // Re-entered through a cycle while the graph is still on the stack; its
+      // namespace holds whatever has been initialized so far.
+      return MaybeLocal<Promise>();
+    }
+  }
+
+  LogEsmPhase(canonicalPath, "evaluate", "begin");
+  TryCatch tcEval(isolate);
+  Local<Value> result;
+  if (!module->Evaluate(context).ToLocal(&result)) {
+    RemoveModuleFromRegistry(isolate, canonicalPath);
+    const char* classification = "unknown";
+    if (tcEval.HasCaught()) {
+      Local<Message> msg = tcEval.Message();
+      if (!msg.IsEmpty()) {
+        v8::String::Utf8Value w(isolate, msg->Get());
+        if (*w) {
+          std::string m(*w);
+          if (m.find("is not defined") != std::string::npos)
+            classification = "reference";
+          else if (m.find("TypeError") != std::string::npos)
+            classification = "type";
+          else if (m.find("Cannot read properties") != std::string::npos)
+            classification = "type-nullish";
+        }
+      }
+    }
+    LogEsmPhase(canonicalPath, "evaluate", "fail", classification);
+    if (RuntimeConfig.IsDebug) {
+      Log(@"***** JavaScript exception occurred *****");
+      Log(@"Error evaluating ES module: %s", canonicalPath.c_str());
+      if (tcEval.HasCaught()) {
+        tns::LogError(isolate, tcEval);
+      }
+    }
+    throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + canonicalPath);
+  }
+  LogEsmPhase(canonicalPath, "evaluate", "ok");
+
+  if (!result->IsPromise()) {
+    return MaybeLocal<Promise>();
+  }
+  LogEsmPhase(canonicalPath, "evaluate", "promise");
+  Local<Promise> promise = result.As<Promise>();
+
+  if (options.policy == ModuleEvaluationPolicy::kAsync) {
+    return promise;
+  }
+
+  TryCatch promiseTc(isolate);
+
+  if (options.policy == ModuleEvaluationPolicy::kSyncStrict) {
+    Promise::PromiseState state = promise->State();
+    if (state == Promise::kRejected) {
+      ThrowModuleEvaluationRejection(isolate, promise, promiseTc, canonicalPath);
+    }
+    if (state == Promise::kPending) {
+      // V8 guarantees a settled capability for a graph that reported
+      // !IsGraphAsync, so reaching here means the graph classification and the
+      // evaluation disagree — never paper over it with a half-initialized
+      // namespace.
+      throw NativeScriptException("ES module " + canonicalPath +
+                                  " left its evaluation promise pending on a graph reported as "
+                                  "synchronous");
+    }
+    LogEsmPhase(canonicalPath, "evaluate", "promise-resolved");
+    return MaybeLocal<Promise>();
+  }
+
+  // Top-level await can depend on native async work such as fetch(), which requires
+  // both V8 microtasks and the Cocoa run loop to advance. Returning early here would
+  // let dynamic-import callers continue before the module finished evaluating.
+  // An await whose resolution arrives as a v8 foreground task (e.g.
+  // Atomics.waitAsync, streaming compilation) never settles from
+  // checkpoints alone; JS frames are on the stack, so like the inspector
+  // pause loops only nestable tasks may run here.
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+
+  auto pumpAsyncProgress = [&]() {
+    if (eventLoop != nullptr) {
+      eventLoop->RunNestableV8Tasks();
+    }
+    isolate->PerformMicrotaskCheckpoint();
+    if (options.pumpRunLoop) {
+      @autoreleasepool {
+        NSRunLoop* runLoop =
+            [NSThread isMainThread] ? [NSRunLoop mainRunLoop] : [NSRunLoop currentRunLoop];
+        NSDate* sliceDeadline = [NSDate dateWithTimeIntervalSinceNow:0.01];
+        [runLoop runMode:NSDefaultRunLoopMode beforeDate:sliceDeadline];
+      }
+      isolate->PerformMicrotaskCheckpoint();
+    }
+  };
+
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:options.deadlineSeconds];
+  bool settled = false;
+
+  // State is checked before the first pump: a synchronous graph's
+  // evaluation promise is already settled when Evaluate() returns, so it
+  // exits here without paying for a runloop slice.
+  while (!promiseTc.HasCaught()) {
+    Promise::PromiseState state = promise->State();
+    if (state != Promise::kPending) {
+      settled = true;
+      if (state == Promise::kRejected) {
+        ThrowModuleEvaluationRejection(isolate, promise, promiseTc, canonicalPath);
+      }
+      LogEsmPhase(canonicalPath, "evaluate", "promise-resolved");
+      break;
+    }
+
+    if ([deadline timeIntervalSinceNow] <= 0) {
+      break;
+    }
+
+    pumpAsyncProgress();
+    if (!options.pumpRunLoop) {
+      usleep(1000);  // 1ms delay for non-HTTP top-level await polling
+    }
+  }
+
+  if (!settled && promise->State() == Promise::kPending) {
+    LogEsmPhase(canonicalPath, "evaluate", "promise-timeout");
+    if (options.timeoutBehavior == ModuleEvaluationOptions::TimeoutBehavior::kThrow) {
+      RemoveModuleFromRegistry(isolate, canonicalPath);
+      // Throw even in debug so the TLA timeout reason flows
+      // through `ModuleInternal::RunModule`'s catch handler and
+      // into the rejected promise the JS dev client observes —
+      // a silent empty namespace here would surface only as a
+      // generic "failed to import" with no clue that TLA had
+      // timed out.
+      if (RuntimeConfig.IsDebug) {
+        Log(@"***** JavaScript exception occurred *****");
+        Log(@"Top-level await timed out for ES module: %s", canonicalPath.c_str());
+        Log(@"***** Debug mode - surfacing as exception so HMR dev session sees the reason *****");
+      }
+
+      throw NativeScriptException("Top-level await timed out for ES module " + canonicalPath);
+    }
+  }
+
+  return MaybeLocal<Promise>();
+}
+
+Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path,
+                                          ModuleEvaluationPolicy policy) {
   bool isHttpModule = IsHttpModulePath(path);
   std::string canonicalPath = CanonicalizeModulePath(path);
   std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
@@ -924,6 +1226,12 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       if (existingStatus == Module::kErrored) {
         RemoveModuleFromRegistry(isolate, canonicalPath);
       } else if (existingStatus == Module::kEvaluated) {
+        // A top-level-await graph reports kEvaluated while its capability
+        // promise is still pending, so the namespace here may be in its TDZ;
+        // require() refuses the graph whatever the load order, matching Node.
+        if (policy == ModuleEvaluationPolicy::kSyncStrict && existing->IsGraphAsync()) {
+          ThrowAsyncGraphRefusal(canonicalPath);
+        }
         return existing->GetModuleNamespace();
       } else if (existingStatus == Module::kUninstantiated ||
                  existingStatus == Module::kInstantiated) {
@@ -935,26 +1243,9 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     }
   }
 
-  // Phase diagnostics helper (local lambda) – only active in debug builds when logScriptLoading is
-  // enabled
-  auto logPhase = [&](const char* phase, const char* status, const char* classification = "",
-                      const char* extra = "") {
-    if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
-      if (classification && classification[0] != '\0') {
-        if (extra && extra[0] != '\0') {
-          Log(@"[esm][%s][%s][%s] %s %s", phase, status, classification, canonicalPath.c_str(),
-              extra);
-        } else {
-          Log(@"[esm][%s][%s][%s] %s", phase, status, classification, canonicalPath.c_str());
-        }
-      } else {
-        if (extra && extra[0] != '\0') {
-          Log(@"[esm][%s][%s] %s %s", phase, status, canonicalPath.c_str(), extra);
-        } else {
-          Log(@"[esm][%s][%s] %s", phase, status, canonicalPath.c_str());
-        }
-      }
-    }
+  auto logPhase = [&canonicalPath](const char* phase, const char* status,
+                                   const char* classification = "", const char* extra = "") {
+    LogEsmPhase(canonicalPath, phase, status, classification, extra);
   };
   Local<Module> module;
   if (!reusedModule.IsEmpty()) {
@@ -1068,231 +1359,24 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   }
   logPhase("instantiate", "ok");
 
-  // 6) Evaluate with its own TryCatch
-  logPhase("evaluate", "begin");
-  Local<Value> result;
-  {
-    TryCatch tcEval(isolate);
-    // Keep existing debug print minimal; phase logger already outputs
-    if (!module->Evaluate(context).ToLocal(&result)) {
-      RemoveModuleFromRegistry(isolate, canonicalPath);
-      const char* classification = "unknown";
-      if (tcEval.HasCaught()) {
-        Local<Message> msg = tcEval.Message();
-        if (!msg.IsEmpty()) {
-          v8::String::Utf8Value w(isolate, msg->Get());
-          if (*w) {
-            std::string m(*w);
-            if (m.find("is not defined") != std::string::npos)
-              classification = "reference";
-            else if (m.find("TypeError") != std::string::npos)
-              classification = "type";
-            else if (m.find("Cannot read properties") != std::string::npos)
-              classification = "type-nullish";
-          }
-        }
-      }
-      logPhase("evaluate", "fail", classification);
-      if (RuntimeConfig.IsDebug) {
-        Log(@"***** JavaScript exception occurred *****");
-        Log(@"Error evaluating ES module: %s", canonicalPath.c_str());
-        if (tcEval.HasCaught()) {
-          tns::LogError(isolate, tcEval);
-        }
-      }
-      throw NativeScriptException(isolate, tcEval, "Cannot evaluate module " + canonicalPath);
-    }
-    logPhase("evaluate", "ok");
-
-    // Handle the case where evaluation returns a Promise (for top-level await)
-    if (result->IsPromise()) {
-      logPhase("evaluate", "promise");
-
-      TryCatch promiseTc(isolate);
-      Local<Promise> promise = result.As<Promise>();
-
-      // Top-level await can depend on native async work such as fetch(), which requires
-      // both V8 microtasks and the Cocoa run loop to advance. Returning early here would
-      // let dynamic-import callers continue before the module finished evaluating.
-      // An await whose resolution arrives as a v8 foreground task (e.g.
-      // Atomics.waitAsync, streaming compilation) never settles from
-      // checkpoints alone; JS frames are on the stack, so like the inspector
-      // pause loops only nestable tasks may run here.
-      Runtime* runtime = Runtime::GetRuntime(isolate);
-      std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
-
-      auto pumpAsyncProgress = [&]() {
-        if (eventLoop != nullptr) {
-          eventLoop->RunNestableV8Tasks();
-        }
-        isolate->PerformMicrotaskCheckpoint();
-        if (isHttpModule) {
-          @autoreleasepool {
-            NSRunLoop* runLoop =
-                [NSThread isMainThread] ? [NSRunLoop mainRunLoop] : [NSRunLoop currentRunLoop];
-            NSDate* sliceDeadline = [NSDate dateWithTimeIntervalSinceNow:0.01];
-            [runLoop runMode:NSDefaultRunLoopMode beforeDate:sliceDeadline];
-          }
-          isolate->PerformMicrotaskCheckpoint();
-        }
-      };
-
-      // For local modules the bound is a yield, not a timeout: only nestable
-      // V8 tasks can run while these JS frames are on the stack, so a TLA
-      // parked on a non-nestable foreground task can never settle in-pump —
-      // give it one short window, then return and let the real event loop
-      // finish it after the turn (the Node shape; EventLoopTests pins this).
-      // HTTP entries must settle in-pump — the dev client needs the
-      // rejection reason synchronously — so they get the full deadline.
-      const NSTimeInterval settleWindowSeconds =
-          isHttpModule ? kModuleEvaluateDeadlineSeconds : 1.0;
-      NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:settleWindowSeconds];
-      bool settled = false;
-
-      // State is checked before the first pump: a synchronous graph's
-      // evaluation promise is already settled when Evaluate() returns, so it
-      // exits here without paying for a runloop slice.
-      while (!promiseTc.HasCaught()) {
-        Promise::PromiseState state = promise->State();
-        if (state != Promise::kPending) {
-          settled = true;
-          if (state == Promise::kRejected) {
-            RemoveModuleFromRegistry(isolate, canonicalPath);
-            logPhase("evaluate", "promise-rejected");
-            if (RuntimeConfig.IsDebug) {
-              // In debug mode, show modal and continue without throwing
-              std::string errorTitle = "Uncaught JavaScript Exception";
-              std::string errorMessage = "Module evaluation promise rejected";
-              std::string stackTrace = "";
-
-              // Try to get the promise result (the actual error)
-              Local<Value> reason = promise->Result();
-              if (!reason.IsEmpty()) {
-                if (reason->IsObject()) {
-                  Local<Context> context = isolate->GetCurrentContext();
-                  Local<Object> errorObj = reason.As<Object>();
-
-                  auto messageKey = tns::ToV8String(isolate, "message");
-                  Local<Value> messageVal;
-                  if (errorObj->Get(context, messageKey).ToLocal(&messageVal) &&
-                      messageVal->IsString()) {
-                    v8::String::Utf8Value messageUtf8(isolate, messageVal);
-                    if (*messageUtf8) errorMessage = std::string(*messageUtf8);
-                  }
-
-                  // get stack trace
-                  auto stackKey = tns::ToV8String(isolate, "stack");
-                  Local<Value> stackVal;
-                  if (errorObj->Get(context, stackKey).ToLocal(&stackVal) && stackVal->IsString()) {
-                    v8::String::Utf8Value stackUtf8(isolate, stackVal);
-                    if (*stackUtf8) {
-                      stackTrace = std::string(*stackUtf8);
-                      stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
-                    }
-                  }
-                } else {
-                  // If reason is not an object, convert it to string
-                  Local<Context> context = isolate->GetCurrentContext();
-                  auto maybeReasonStr = reason->ToString(context);
-                  if (!maybeReasonStr.IsEmpty()) {
-                    v8::String::Utf8Value reasonUtf8(isolate, maybeReasonStr.ToLocalChecked());
-                    if (*reasonUtf8) {
-                      errorMessage = std::string(*reasonUtf8);
-                    }
-                  }
-                }
-
-                // Log the extracted error information
-                Log(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
-                if (!stackTrace.empty()) {
-                  Log(@"JavaScript stack trace:\n%s", stackTrace.c_str());
-                }
-              }
-
-              // Also check if TryCatch caught anything
-              if (promiseTc.HasCaught()) {
-                tns::LogError(isolate, promiseTc);
-              }
-
-              Log(@"***** End stack trace - Fix to continue *****");
-
-              // Ensure we have a stack for the modal
-              if (stackTrace.empty()) {
-                stackTrace = tns::GetSmartStackTrace(isolate);
-              } else {
-                stackTrace = tns::RemapStackTraceIfAvailable(isolate, stackTrace);
-              }
-
-              if (IsScriptLoadingLogEnabled()) {
-                // Emit a concise summary of the rejection for diagnostics
-                std::string stackPreview =
-                    stackTrace.size() > 240 ? stackTrace.substr(0, 240) + "…" : stackTrace;
-                Log(@"[esm][evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
-                    canonicalPath.c_str(), errorMessage.c_str(), stackPreview.c_str());
-              }
-
-              NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
-              logPhase("evaluate", "promise-rejected-handled");
-
-              // Throw with the rejection detail so it propagates through
-              // `ModuleInternal::RunModule`'s catch handler into the caller's
-              // `outErrorMessage` — debug adds the modal above, never
-              // recovery.
-              std::string detail =
-                  std::string("Module evaluation promise rejected: ") + canonicalPath;
-              if (!errorMessage.empty()) {
-                detail += " — ";
-                detail += errorMessage;
-              }
-              throw NativeScriptException(detail);
-            } else {
-              if (!promiseTc.HasCaught()) {
-                Local<Value> reason = promise->Result();
-                isolate->ThrowException(reason);
-              }
-              throw NativeScriptException(isolate, promiseTc, "Module evaluation promise rejected");
-            }
-          }
-          if (IsScriptLoadingLogEnabled()) {
-            logPhase("evaluate", "promise-resolved");
-          }
-          break;
-        }
-
-        if ([deadline timeIntervalSinceNow] <= 0) {
-          break;
-        }
-
-        pumpAsyncProgress();
-        if (!isHttpModule) {
-          usleep(1000);  // 1ms delay for non-HTTP top-level await polling
-        }
-      }
-
-      if (!settled && promise->State() == Promise::kPending) {
-        logPhase("evaluate", "promise-timeout");
-        if (isHttpModule) {
-          RemoveModuleFromRegistry(isolate, canonicalPath);
-          // Throw even in debug so the TLA timeout reason flows
-          // through `ModuleInternal::RunModule`'s catch handler and
-          // into the rejected promise the JS dev client observes —
-          // a silent empty namespace here would surface only as a
-          // generic "failed to import" with no clue that TLA had
-          // timed out.
-          if (RuntimeConfig.IsDebug) {
-            Log(@"***** JavaScript exception occurred *****");
-            Log(@"Top-level await timed out for HTTP ES module: %s", canonicalPath.c_str());
-            Log(@"***** Debug mode - surfacing as exception so HMR dev session sees the reason "
-                @"*****");
-          }
-
-          std::string timeoutMessage = "Top-level await timed out for HTTP ES module ";
-          timeoutMessage += canonicalPath;
-          throw NativeScriptException(timeoutMessage);
-        }
-      }
-    }
+  // 6) Evaluate the graph under the caller's policy.
+  ModuleEvaluationOptions evalOptions;
+  evalOptions.policy = policy;
+  if (policy == ModuleEvaluationPolicy::kSyncPumping) {
+    // For local modules the bound is a yield, not a timeout: only nestable
+    // V8 tasks can run while these JS frames are on the stack, so a TLA
+    // parked on a non-nestable foreground task can never settle in-pump —
+    // give it one short window, then return and let the real event loop
+    // finish it after the turn (the Node shape; EventLoopTests pins this).
+    // HTTP entries must settle in-pump — the dev client needs the
+    // rejection reason synchronously — so they get the full deadline.
+    evalOptions.deadlineSeconds = isHttpModule ? kModuleEvaluateDeadlineSeconds : 1.0;
+    evalOptions.timeoutBehavior = isHttpModule
+                                      ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
+                                      : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
+    evalOptions.pumpRunLoop = isHttpModule;
   }
+  EvaluateModuleGraph(isolate, context, module, canonicalPath, evalOptions);
   // 7) Return the namespace
   return module->GetModuleNamespace();
 }

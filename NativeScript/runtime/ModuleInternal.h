@@ -13,6 +13,16 @@ namespace tns {
 // < this < the boot backstop.
 inline constexpr double kModuleEvaluateDeadlineSeconds = 60.0;
 
+// How a module graph's evaluation promise is settled.
+//   kSyncStrict  - Node's `require(esm)`: an async graph is refused before it
+//                  ever evaluates, and the capability promise must already be
+//                  settled when Evaluate() returns.
+//   kSyncPumping - drive this thread in place until the promise settles or the
+//                  window closes. Only legal while nothing else owns the loop
+//                  (entry evaluation), and only nestable V8 tasks can run.
+//   kAsync       - evaluate and hand the caller the capability promise.
+enum class ModuleEvaluationPolicy { kSyncStrict, kSyncPumping, kAsync };
+
 class ModuleInternal {
  public:
   ModuleInternal(v8::Local<v8::Context> context);
@@ -55,7 +65,8 @@ class ModuleInternal {
 
   // Compile/link/evaluate an ES module; returns its namespace object.
   static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate,
-                                           const std::string& path);
+                                           const std::string& path,
+                                           ModuleEvaluationPolicy policy);
   static v8::Local<v8::String> WrapModuleContent(v8::Isolate* isolate,
                                                  const std::string& path);
   v8::Local<v8::Object> LoadModule(v8::Isolate* isolate,
