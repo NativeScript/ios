@@ -53,7 +53,7 @@ WorkerWrapper::WorkerWrapper(
       isTerminating_(false),
       isDisposed_(false),
       isWeak_(false),
-      drainRetryPending_(false),
+      messagesEnabled_(false),
       onMessage_(onMessage) {}
 
 const WrapperType WorkerWrapper::Type() { return WrapperType::Worker; }
@@ -109,42 +109,14 @@ void WorkerWrapper::DrainPendingTasks() {
   Local<Context> context = Caches::Get(this->workerIsolate_)->GetContext();
   Local<Object> global = context->Global();
 
-  // WHATWG parity: a worker buffers inbound messages until its entry script
-  // has installed a handler. With synchronous classic-script entries that
-  // held for free (the entry fully evaluated inside the creation func before
-  // the first drain). Async ESM entries (HTTP dev sessions, top-level await in
-  // the graph) finish evaluating after the wrapper starts draining, and
-  // OnMessageCallback silently drops messages with no `onmessage` — the
-  // sender then waits forever (observed: a worker's second request can post
-  // while the fresh worker was still fetching its module graph). Leave the
-  // queue intact and re-poke the drain shortly; the retry stops as soon as
-  // the handler exists, the queue empties, or the worker terminates.
-  if (!this->isTerminating_ && !this->isClosing_ && !this->queue_.IsEmpty()) {
-    Local<Value> onMessageValue;
-    bool gotHandler = global->Get(context, tns::ToV8String(this->workerIsolate_, "onmessage"))
-                          .ToLocal(&onMessageValue);
-    if (!gotHandler || !onMessageValue->IsFunction()) {
-      bool expected = false;
-      if (this->drainRetryPending_.compare_exchange_strong(expected, true)) {
-        const int workerId = this->workerId_;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(50 * NSEC_PER_MSEC)),
-                       dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-                         // Resolve the wrapper by id — never capture `this`
-                         // across the delay; the worker may be gone by now.
-                         bool found = false;
-                         int lookupId = workerId;  // Get() wants a mutable ref
-                         auto state = Caches::Workers->Get(lookupId, found);
-                         if (found && state != nullptr) {
-                           WorkerWrapper* w = static_cast<WorkerWrapper*>(state->UserData());
-                           if (w != nullptr) {
-                             w->drainRetryPending_ = false;
-                             w->SignalMessageDrain();
-                           }
-                         }
-                       });
-      }
-      return;
-    }
+  // WHATWG parity: the implicit port's message queue starts disabled and is
+  // enabled by Worker.mm once the entry script has finished evaluating
+  // (including after a pending top-level await settles). Until then messages
+  // stay buffered here; afterwards every message dispatches whether or not a
+  // handler exists — a handler installed later misses earlier messages,
+  // exactly as on the web.
+  if (!this->messagesEnabled_.load(std::memory_order_acquire)) {
+    return;
   }
 
   std::vector<std::shared_ptr<worker::Message>> messages = this->queue_.PopAll();
@@ -211,7 +183,10 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
   }
 }
 
-void WorkerWrapper::SignalMessageDrain() { this->queue_.Signal(); }
+void WorkerWrapper::EnableMessageQueue() {
+  this->messagesEnabled_.store(true, std::memory_order_release);
+  this->queue_.Signal();
+}
 
 void WorkerWrapper::Close() { this->isClosing_ = true; }
 

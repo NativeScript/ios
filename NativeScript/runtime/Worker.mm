@@ -227,6 +227,44 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
       runtime->RunModule(resolvedPath);
 
+      // WHATWG parity: enable the implicit port's message queue once the
+      // entry has finished evaluating. RunModule returns settled for classic
+      // scripts and pumped HTTP entries; a local top-level-await entry that
+      // outlived the settle window enables when its evaluation promise
+      // settles (fulfilled or rejected — a broken worker just dispatches
+      // into a listenerless global, as on the web).
+      {
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        Local<Context> context = Caches::Get(isolate)->GetContext();
+        Context::Scope context_scope(context);
+        Local<Promise> pendingEntry;
+        if (!ModuleInternal::PendingEntryEvaluation(isolate, resolvedPath).ToLocal(&pendingEntry)) {
+          worker->EnableMessageQueue();
+        } else {
+          auto enable = [](const FunctionCallbackInfo<Value>& info) {
+            // Resolve the wrapper by id — never capture it across the
+            // settle; the worker may be gone by the time this runs.
+            bool found = false;
+            int lookupId = info.Data().As<v8::Int32>()->Value();
+            auto state = Caches::Workers->Get(lookupId, found);
+            if (found && state != nullptr) {
+              WorkerWrapper* w = static_cast<WorkerWrapper*>(state->UserData());
+              if (w != nullptr) {
+                w->EnableMessageQueue();
+              }
+            }
+          };
+          Local<v8::Function> onSettled;
+          if (v8::Function::New(context, enable, v8::Integer::New(isolate, worker->WorkerId()))
+                  .ToLocal(&onSettled)) {
+            pendingEntry->Then(context, onSettled, onSettled).FromMaybe(Local<Promise>());
+          } else {
+            worker->EnableMessageQueue();
+          }
+        }
+      }
+
       if (tc.HasCaught()) {
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);

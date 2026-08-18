@@ -35,6 +35,14 @@ class ModuleInternal {
   // hand V8 a compiled module — evaluation order belongs to V8.
   static v8::MaybeLocal<v8::Module> CompileFileEsModule(
       v8::Isolate* isolate, const std::string& path);
+  // The entry module's still-pending evaluation promise, or empty when
+  // evaluation has settled (classic scripts settle synchronously and always
+  // return empty). Callers use this after RunModule to observe a top-level
+  // await that outlived the settle window. Note a TLA-parked module reports
+  // kEvaluated while its capability promise is still pending, so this probes
+  // the promise (Evaluate() returns the same capability), not the status.
+  static v8::MaybeLocal<v8::Promise> PendingEntryEvaluation(
+      v8::Isolate* isolate, const std::string& path);
 
  private:
   static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

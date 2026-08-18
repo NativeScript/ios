@@ -554,9 +554,13 @@ class WorkerWrapper : public BaseDataWrapper {
                                    const std::string& stackTrace,
                                    int lineNumber, bool async = true);
   void PostMessage(std::shared_ptr<worker::Message> message);
-  // Re-arm the message drain without enqueueing — used by the deferred-drain
-  // retry when the worker's entry script hasn't installed `onmessage` yet.
-  void SignalMessageDrain();
+  // WHATWG parity: the worker's implicit port message queue starts disabled;
+  // Worker.mm calls this once the entry script has finished evaluating
+  // (including after a pending top-level await settles). From then on every
+  // buffered and future message dispatches whether or not a handler exists —
+  // a handler installed later (e.g. from a timer) misses earlier messages,
+  // exactly as on the web.
+  void EnableMessageQueue();
   void Close();
   void Terminate();
 
@@ -579,9 +583,9 @@ class WorkerWrapper : public BaseDataWrapper {
   std::atomic<bool> isTerminating_;
   std::atomic<bool> isDisposed_;
   std::atomic<bool> isWeak_;
-  // True while a deferred drain retry is in flight (see DrainPendingTasks) —
-  // prevents stacking one retry per drain attempt.
-  std::atomic<bool> drainRetryPending_;
+  // False until the entry script has finished evaluating (EnableMessageQueue);
+  // DrainPendingTasks leaves the queue untouched while disabled.
+  std::atomic<bool> messagesEnabled_;
   std::function<void(v8::Isolate*, v8::Local<v8::Object> thiz,
                      std::shared_ptr<worker::Message>)>
       onMessage_;

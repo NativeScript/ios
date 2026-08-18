@@ -340,6 +340,28 @@ describe("event loop workers", function () {
         worker.postMessage(3);
     });
 
+    // WHATWG parity: the worker's message queue is enabled when its entry
+    // script finishes evaluating, and from then on messages dispatch whether
+    // or not a handler exists. A handler registered later (from a timer)
+    // misses messages delivered in between — exactly as on the web.
+    it("drops messages dispatched before a late-registered onmessage, like the web", function (done) {
+        const worker = new Worker("./lateHandlerWorker.js");
+        const received = [];
+        worker.onmessage = function (msg) {
+            received.push(msg.data);
+            if (msg.data === "ready") {
+                worker.postMessage("second");
+            } else {
+                expect(received).toEqual(["ready", "late:second"]);
+                worker.terminate();
+                done();
+            }
+        };
+        // Posted before the entry finishes evaluating: buffered, then
+        // dispatched into a global with no handler yet — dropped.
+        worker.postMessage("early");
+    });
+
     it("resolves Atomics.waitAsync inside a worker's own loop", function (done) {
         const worker = new Worker("./EventLoopWaitAsyncWorker.js");
         worker.onmessage = function (msg) {

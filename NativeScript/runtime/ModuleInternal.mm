@@ -1007,6 +1007,37 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
   return maybeMod;
 }
 
+MaybeLocal<Promise> ModuleInternal::PendingEntryEvaluation(Isolate* isolate,
+                                                           const std::string& path) {
+  if (!IsESModule(path) && !IsHttpModulePath(path)) {
+    return MaybeLocal<Promise>();
+  }
+  auto* registryPtr = ModuleRegistryFor(isolate);
+  if (registryPtr == nullptr) {
+    return MaybeLocal<Promise>();
+  }
+  std::string canonicalPath = CanonicalizeModulePath(path);
+  auto it = registryPtr->find(canonicalPath);
+  if (it == registryPtr->end()) {
+    return MaybeLocal<Promise>();
+  }
+  Local<Module> mod = it->second.Get(isolate);
+  if (mod.IsEmpty() || mod->GetStatus() != Module::kEvaluated) {
+    return MaybeLocal<Promise>();
+  }
+  TryCatch tc(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Value> result;
+  if (!mod->Evaluate(context).ToLocal(&result) || !result->IsPromise()) {
+    return MaybeLocal<Promise>();
+  }
+  Local<Promise> promise = result.As<Promise>();
+  if (promise->State() != Promise::kPending) {
+    return MaybeLocal<Promise>();
+  }
+  return MaybeLocal<Promise>(promise);
+}
+
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
   bool isHttpModule = IsHttpModulePath(path);
   std::string canonicalPath = CanonicalizeModulePath(path);
