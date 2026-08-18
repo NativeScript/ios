@@ -1,11 +1,44 @@
 const {
     ArrayPrototypeConcat,
+    ArrayPrototypeSlice,
     FunctionPrototypeApply,
     ObjectAssign,
     ObjectDefineProperty,
     ObjectGetOwnPropertyDescriptor,
     ObjectKeys,
 } = primordials;
+
+function applyNativeClassOptions(target, options) {
+    // Workers must not mint or rename process-global native classes.
+    if (global.__ns__worker) {
+        return target;
+    }
+    var ios = options && options.ios;
+    var protocols = (ios && ios.protocols) || (options && options.protocols);
+    var methods = (ios && ios.methods) || (options && options.methods);
+    var name = ios && ios.name;
+
+    if (protocols && protocols.length > 0) {
+        target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, protocols) : ArrayPrototypeSlice(protocols));
+    }
+    if (methods) {
+        if (!target.ObjCExposedMethods) {
+            target.ObjCExposedMethods = {};
+        }
+        var methodKeys = ObjectKeys(methods);
+        for (var mi = 0; mi < methodKeys.length; mi++) {
+            var selector = methodKeys[mi];
+            target.ObjCExposedMethods[selector] = methods[selector];
+        }
+    }
+    if (name) {
+        target.ObjCClassName = name;
+        if (typeof target.class === 'function') {
+            target.class();
+        }
+    }
+    return target;
+}
 
 ObjectAssign(global, {
     CGPointMake(x, y) {
@@ -46,6 +79,15 @@ ObjectAssign(global, {
             if (protocols.length > 0) {
                 target.ObjCProtocols = (target.ObjCProtocols && target.ObjCProtocols instanceof Array ? ArrayPrototypeConcat(target.ObjCProtocols, protocols) : protocols);
             }
+        }
+    },
+    NativeClass(arg) {
+        if (typeof arg === 'function') {
+            return applyNativeClassOptions(arg, {});
+        }
+        var options = arg || {};
+        return function (target) {
+            return applyNativeClassOptions(target, options);
         }
     },
     ObjCMethod() {
