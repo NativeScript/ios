@@ -1511,8 +1511,7 @@ namespace {}  // namespace
 static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(v8::Isolate* isolate,
                                                         v8::Local<v8::Context> context,
                                                         const std::string& absPath,
-                                                        const std::string& registryAbsPath,
-                                                        bool isWorker) {
+                                                        const std::string& registryAbsPath) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) {
     return v8::MaybeLocal<v8::Module>();
@@ -1531,19 +1530,10 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(v8::Isolate* isolate,
     registry.erase(existingIt);
   }
 
-  // Debug: Log JSON module handling for worker context
-  if (isWorker) {
-    printf("ResolveModuleCallback: Worker handling JSON module '%s'\n", absPath.c_str());
-  }
+  TNS_DEBUG(Esm, "[resolver][json] wrapping %s", absPath.c_str());
 
   // Read file contents
   std::string jsonText = tns::ReadText(absPath);
-
-  // Debug: Log JSON content preview for worker context
-  if (isWorker) {
-    std::string preview = jsonText.length() > 200 ? jsonText.substr(0, 200) + "..." : jsonText;
-    printf("ResolveModuleCallback: Worker JSON content preview: %s\n", preview.c_str());
-  }
 
   // Build a small ES module that just exports the parsed JSON as default
   std::string moduleSource = "export default " + jsonText + ";";
@@ -1699,11 +1689,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     return LoadHttpModuleForUrl(isolate, context, spec);
   }
 
-  // Debug: Log all module resolution attempts, especially for @nativescript/core/globals
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  if (cache->isWorker) {
-    TNS_DEBUG(Esm, "ResolveModuleCallback: Worker trying to resolve '%s'", spec.c_str());
-  }
+  TNS_DEBUG(Esm, "[resolver] resolving '%s'", spec.c_str());
 
   // 2) Find which filepath the referrer was compiled under
   std::string referrerPath = FindKeyForModule(*moduleState, isolate, referrer);
@@ -1718,8 +1704,10 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   size_t slash = referrerPath.find_last_of("/\\");
   std::string baseDir = slash == std::string::npos ? "" : referrerPath.substr(0, slash + 1);
   if (referrerPath.empty() && specIsRelative) {
-    Log(@"[resolver] no registered referrer for relative import '%s'; resolving against app root",
-        spec.c_str());
+    TNS_DEBUG(Esm,
+              "[resolver] no registered referrer for relative import '%s'; resolving "
+              "against app root",
+              spec.c_str());
     baseDir = RuntimeConfig.ApplicationPath + "/";
   }
 
@@ -1824,12 +1812,6 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
     TNS_DEBUG(Esm, "[resolver][tilde] spec=%s base=%s appBase=%s", spec.c_str(), base.c_str(),
               baseApp.c_str());
-
-    // Debug: Log tilde resolution for worker context
-    if (cache->isWorker) {
-      TNS_DEBUG(Esm, "ResolveModuleCallback: Worker resolving tilde path '%s' -> '%s'",
-                spec.c_str(), base.c_str());
-    }
   } else if (!spec.empty() && spec[0] == '/') {
     // Absolute path within the bundle (e.g., /app/..., /src/...)
     // Resolve against the application directory and try both with and without the '/app' prefix.
@@ -1960,12 +1942,6 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   const std::string registryAbsPath = CanonicalizeRegistryKey(absPath);
 
   if (!isFile(absPath)) {
-    // Debug: Log resolution failure for worker context
-    if (cache->isWorker) {
-      printf("ResolveModuleCallback: Worker failed to resolve '%s' -> '%s'\n", spec.c_str(),
-             absPath.c_str());
-    }
-
     // Check if this is a Node.js built-in module (e.g., node:url)
     if (IsNodeBuiltinModule(spec)) {
       // Strip the "node:" prefix and create an in-memory polyfill module.
@@ -2037,7 +2013,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
   // Special handling for JSON imports (e.g. import data from './foo.json' assert {type:'json'})
   if (absPath.size() >= 5 && absPath.compare(absPath.size() - 5, 5, ".json") == 0) {
-    return CompileJsonAsEsModule(isolate, context, absPath, registryAbsPath, cache->isWorker);
+    return CompileJsonAsEsModule(isolate, context, absPath, registryAbsPath);
   }
 
   // 5) Reuse any live, non-errored registry entry. The resolver never

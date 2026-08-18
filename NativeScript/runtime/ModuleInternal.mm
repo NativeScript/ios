@@ -709,7 +709,6 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
 
   // Check if this is an ES module
   bool isESM = IsESModule(modulePath);
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
 
   if (isESM) {
     // For ES modules, the returned value is the namespace object
@@ -720,25 +719,6 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
 
     if (!scriptValue->IsObject()) {
       throw NativeScriptException(isolate, "Failed to load ES module " + modulePath);
-    }
-
-    // Debug: Check if we're in a worker context and if self.onmessage is set
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
-    if (cache->isWorker) {
-      Local<Context> context = isolate->GetCurrentContext();
-      Local<Object> global = context->Global();
-
-      // Check if self exists
-      Local<Value> selfValue;
-      if (global->Get(context, ToV8String(isolate, "self")).ToLocal(&selfValue)) {
-        if (selfValue->IsObject()) {
-          Local<Object> selfObj = selfValue.As<Object>();
-          Local<Value> onmessageValue;
-          if (selfObj->Get(context, ToV8String(isolate, "onmessage")).ToLocal(&onmessageValue)) {
-            // onmessage exists
-          }
-        }
-      }
     }
 
     Local<Value> esmExports = RequireExportsForNamespace(isolate, context, scriptValue.As<Object>(),

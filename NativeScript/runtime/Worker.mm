@@ -209,22 +209,6 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         }
       }
 
-      // Debug: Log worker execution
-      // printf("Worker: About to run module: %s\n", resolvedPath.c_str());
-
-      // Debug: Check if console exists in worker context
-      //      {
-      //        HandleScope debugScope(isolate);
-      //        Local<Context> workerContext = Caches::Get(isolate)->GetContext();
-      //        Local<Object> global = workerContext->Global();
-      //         if (global->Has(workerContext, tns::ToV8String(isolate,
-      //         "console")).FromMaybe(false)) {
-      //           printf("Worker: console object exists in worker context\n");
-      //         } else {
-      //           printf("Worker: console object NOT found in worker context\n");
-      //         }
-      //      }
-
       try {
         runtime->RunModule(resolvedPath);
       } catch (NativeScriptException& ex) {
@@ -278,14 +262,6 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
         Local<Context> context = Caches::Get(isolate)->GetContext();
-
-        // Debug: Log the error
-        // printf("Worker: Error occurred while running module\n");
-        Local<Value> exception = tc.Exception();
-        if (!exception.IsEmpty()) {
-          v8::String::Utf8Value error_str(isolate, exception);
-          // printf("Worker: Exception: %s\n", *error_str);
-        }
 
         // Ensure we dispatch the error asynchronously to the main thread so
         // the caller has a chance to attach `worker.onerror` immediately
