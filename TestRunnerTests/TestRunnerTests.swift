@@ -70,6 +70,15 @@ class TestRunnerTests: XCTestCase {
                     return
                 }
 
+                if path == "/esm/syntax-error.mjs" {
+                    // Deliberately unparseable: pins that the loader surfaces
+                    // V8's real compile error instead of a generic failure.
+                    let body = "export const ok = ;\n"
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
                 if path == "/esm/timeout.mjs" {
                     // Delay the response without blocking request handling.
                     // The loader still hits its client-side timeout when

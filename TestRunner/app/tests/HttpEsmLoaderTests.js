@@ -275,6 +275,32 @@ describe("HTTP ESM Loader", function() {
             });
         });
         
+        it("surfaces the real compile error for a served module with a syntax error", function(done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+
+            var url = origin + "/esm/syntax-error.mjs";
+            withTimeout(import(url), 5000, "import " + url)
+                .then(function() {
+                    expect("resolved").toBe("rejected");
+                    done();
+                })
+                .catch(function(error) {
+                    // The parse error itself, not a generic "compile failed" /
+                    // instantiation failure that names no cause.
+                    var message = String((error && error.message) || error);
+                    expect(message.indexOf("Unexpected token") >= 0 ? "names the parse error" : message)
+                        .toBe("names the parse error");
+                    expect(message.indexOf("syntax-error.mjs") >= 0 ? "names the module" : message)
+                        .toBe("names the module");
+                    done();
+                });
+        });
+
         describe("network timeouts", function() {
             // The async loader's NSURLSession request timeout is 10s, so the
             // rejection lands ~10s after the import — beyond jasmine's default
