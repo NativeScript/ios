@@ -4,9 +4,25 @@ declare module "ns:module" {
    * absolute URL. Consulted inside the engine's synchronous module resolver,
    * which is why it must be handed to the runtime ahead of time rather than
    * resolved on demand.
+   *
+   * A key ending in `/` maps a whole subtree and its target must end in `/`
+   * too; longest match wins. The map is validated in full before it is
+   * installed — an invalid map throws a `TypeError` out of
+   * {@link configureLoader} and leaves the previously installed map in place.
    */
   export interface ImportMap {
-    imports: Record<string, string>;
+    imports?: Record<string, string>;
+    /**
+     * Per-referrer overrides. Each key is matched as a plain prefix of the
+     * importing module's canonical registry key — an absolute `http(s)` URL
+     * for a served module, or a canonical absolute path for a file — which is
+     * this runtime's analogue of the web's resolved referrer URL. End a scope
+     * key with `/` to keep it on a directory boundary.
+     *
+     * Resolution consults the most specific matching scope first, then less
+     * specific ones, then {@link ImportMap.imports}.
+     */
+    scopes?: Record<string, Record<string, string>>;
   }
 
   /**
@@ -39,6 +55,10 @@ declare module "ns:module" {
    * wholesale.
    */
   export interface LoaderConfig {
+    /**
+     * Replaces the whole map. Throws `TypeError` if invalid, in which case
+     * the previously installed map keeps resolving.
+     */
     importMap?: ImportMap;
     /** URL substrings identifying modules that are always re-fetched, never cached. */
     volatilePatterns?: string[];

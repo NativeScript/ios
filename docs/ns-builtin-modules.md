@@ -120,7 +120,7 @@ the full contract rationale.
 
 | export | description |
 |---|---|
-| `configureLoader(config)` | Install loader policy before the session imports anything: `importMap` (bare specifier → URL, consulted inside the synchronous resolver), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (`stripParams`/`forPathPrefixes`/`preserveQueryFor` vocabulary for registry keying). Each present section replaces its state wholesale. |
+| `configureLoader(config)` | Install loader policy before the session imports anything: `importMap` (`imports` + `scopes`, consulted inside the synchronous resolver — see below), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (`stripParams`/`forPathPrefixes`/`preserveQueryFor` vocabulary for registry keying). Each present section replaces its state wholesale. An invalid `importMap` throws a `TypeError` and leaves the previously installed map untouched. |
 | `invalidateModules(urls)` | Evict the given URLs (canonicalized) from the module registry and mark them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. |
 | `getLoadedModuleUrls()` | URL-like keys currently in the module registry (used to compute full-reload eviction sets). |
 | `createRequire(filenameOrURL)` | A `require` resolving against `filenameOrURL`'s directory (a trailing slash names the directory itself). Accepts an absolute path string, a `file:` URL string, or a URL object; anything else throws a `TypeError`, and an `http(s)` base is refused outright because `require()` of a dev-served module is not supported — import those. ES module graphs load under Node's `require(esm)` rule: a graph containing top-level await is refused before it evaluates. |
@@ -136,6 +136,39 @@ instantiated so `import()` can still load it. Call it from a task context
 instead — a native boundary, an event handler, a timer callback, or module
 evaluation itself. A **synchronous** graph needs no pumping and stays legal
 from anywhere, microtask turns included.
+
+### Import maps and scopes
+
+`importMap` takes the WHATWG shape:
+
+```js
+configureLoader({
+  importMap: {
+    imports: { "lodash": "http://host/vendor/lodash.mjs", "@scope/pkg/": "http://host/pkg/" },
+    scopes: { "http://host/legacy/": { "lodash": "http://host/vendor/lodash-3.mjs" } },
+  },
+});
+```
+
+Within any one section, a specifier matches exactly first, then against the
+longest trailing-slash key, whose remainder is appended to the target. A key
+ending in `/` must have a target ending in `/`.
+
+A **scope key is matched as a plain prefix of the importing module's canonical
+registry key** — an absolute `http(s)` URL for a served module, or a canonical
+absolute path for a file on disk. That key is this runtime's analogue of the
+web's resolved referrer URL, which is what scope prefixes match in a browser.
+End a scope key with `/` to keep it on a directory boundary. Resolution
+consults the most specific matching scope first, then progressively less
+specific ones, then `imports` — so a scope can override a global mapping for
+one subtree and fall through to it everywhere else. The resolver, the graph
+walk, and `import()` all resolve through the same cascade.
+
+The whole map is parsed and validated before any of it is installed. A
+malformed map, a non-string target, an unknown top-level section, or a
+trailing-slash key with a non-trailing-slash target throws a `TypeError`
+naming the offending key or section, and the previously installed map keeps
+resolving — a typo in an update cannot empty a live session's vocabulary.
 
 Not implemented on either require: `require.resolve`, `require.cache`, and
 `require.main`. They are absent rather than throwing, so a feature check

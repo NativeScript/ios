@@ -227,6 +227,117 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        // The import map is process-wide, so every spec here installs its own
+        // and restores the empty map afterwards.
+        describe("import map", function () {
+            var nsModule = require("ns:module");
+
+            function setMap(map) {
+                nsModule.configureLoader({ importMap: map });
+            }
+
+            afterEach(function () {
+                setMap({ imports: {} });
+            });
+
+            it("rejects an unknown top-level section by name", function () {
+                expect(function () {
+                    setMap({ imports: {}, integrity: {} });
+                }).toThrowError(TypeError, /unsupported import-map section 'integrity'/);
+            });
+
+            it("rejects a trailing-slash key whose target does not end in '/'", function () {
+                expect(function () {
+                    setMap({ imports: { "pkg/": "http://example.com/pkg" } });
+                }).toThrowError(TypeError, /must end with '\/'/);
+            });
+
+            it("rejects a trailing-slash key inside a scope map too", function () {
+                expect(function () {
+                    setMap({ scopes: { "/a/": { "pkg/": "http://example.com/pkg" } } });
+                }).toThrowError(TypeError, /must end with '\/'/);
+            });
+
+            it("rejects a null or non-string target", function () {
+                expect(function () {
+                    setMap({ imports: { "pkg": null } });
+                }).toThrowError(TypeError, /must be a string/);
+                expect(function () {
+                    setMap({ imports: { "pkg": 42 } });
+                }).toThrowError(TypeError, /must be a string/);
+            });
+
+            it("rejects a non-object scope map", function () {
+                expect(function () {
+                    setMap({ scopes: { "/a/": "not-an-object" } });
+                }).toThrowError(TypeError, /must be an object/);
+            });
+
+            it("keeps the previous map when an update is rejected", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                setMap({ imports: { "ns-survivor": origin + "/esm/graph-leaf.mjs?k=surv" } });
+
+                expect(function () {
+                    nsModule.configureLoader({ importMap: "{ this is not json" });
+                }).toThrowError(TypeError, /valid JSON/);
+
+                // The rejected update changed nothing, so the module installed
+                // by the previous map still resolves.
+                import("~/tests/esm/scoped/survivor.mjs").then(function (mod) {
+                    expect(mod.leaf).toBe("surv");
+                    done();
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+
+            it("resolves through the scope cascade for every referrer", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var insideScope = __dirname + "/esm/scoped/inside/";
+                var deepScope = __dirname + "/esm/scoped/inside/deep/";
+                var scopes = {};
+                scopes[insideScope] = { "ns-scoped-leaf": origin + "/esm/graph-leaf.mjs?k=in" };
+                scopes[deepScope] = { "ns-scoped-leaf": origin + "/esm/graph-leaf.mjs?k=deep" };
+                setMap({
+                    imports: {
+                        "ns-scoped-leaf": origin + "/esm/graph-leaf.mjs?k=top",
+                        "ns-scoped-fallthrough": origin + "/esm/graph-leaf.mjs?k=fall",
+                    },
+                    scopes: scopes,
+                });
+
+                Promise.all([
+                    import("~/tests/esm/scoped/inside/mid.mjs"),
+                    import("~/tests/esm/scoped/inside/deep/mid.mjs"),
+                    import("~/tests/esm/scoped/outside/mid.mjs"),
+                ]).then(function (mods) {
+                    // A scope wins over the top-level entry for a referrer inside it.
+                    expect(mods[0].leaf).toBe("in");
+                    // ...and a specifier the scope does not define falls through.
+                    expect(mods[0].fallthrough).toBe("fall");
+                    // Two scopes match; the more specific one wins.
+                    expect(mods[1].leaf).toBe("deep");
+                    // No scope matches this referrer.
+                    expect(mods[2].leaf).toBe("top");
+                    done();
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+        });
+
         // Module scripts are strict about MIME on the web, and so is the
         // loader: the response policy lives in one classifier shared by the
         // synchronous fallback and the graph walk.

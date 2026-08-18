@@ -140,10 +140,16 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     v8::Local<v8::Value> resource_name, v8::Local<v8::String> specifier,
     v8::Local<v8::FixedArray> import_assertions);
 
-// Import map support
-// Parse and store an import map from JSON. Expected shape: {"imports": {"key":
-// "value", ...}}
-void SetImportMap(const std::string& json);
+// Import map support.
+//
+// Shape: {"imports": {"specifier": "target", ...},
+//         "scopes": {"<referrer-key-prefix>": {imports-shaped map}, ...}}
+//
+// Parsed and validated in full before anything is installed: on any invalid
+// input this returns false with `error` explaining which key or section is
+// wrong, and the currently installed map is left untouched. Process-wide by
+// design — worker isolates resolve through the main isolate's map.
+bool SetImportMap(const std::string& json, std::string* error);
 
 // Set URL patterns that should bypass module cache (e.g. "?v=", "/hot/")
 void SetVolatilePatterns(const std::vector<std::string>& patterns);

@@ -503,7 +503,21 @@ void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate) { KillAsyncGraphLoadsFor
 // Instead of rewriting import statements in source code on the Vite side, the runtime
 // resolves bare specifiers through this map to HTTP module URLs. Source code
 // is served as Vite transformed it.
-static robin_hood::unordered_map<std::string, std::string> g_importMap;
+// One import-map section: specifier key → target. Lookup within a section is
+// exact-then-trailing-slash-prefix with longest match, per the import-maps
+// spec.
+using ImportMapEntries = robin_hood::unordered_map<std::string, std::string>;
+
+// A parsed import map. `scopes` is kept ordered most-specific-first so the
+// resolution cascade walks it without re-sorting on every lookup.
+struct ParsedImportMap {
+  ImportMapEntries imports;
+  std::vector<std::pair<std::string, ImportMapEntries>> scopes;
+
+  bool empty() const { return imports.empty() && scopes.empty(); }
+};
+
+static ParsedImportMap g_importMap;
 
 // Volatile URL patterns: URLs matching these substrings are always re-fetched
 // (cache is evicted before loading). Configured by Vite at boot — the
@@ -638,42 +652,158 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
 
 // ── Import map helpers ──────────────────────────────────────────────────────
 
-void SetImportMap(const std::string& json) {
-  g_importMap.clear();
-  // The import map is a small, flat {"imports": {"specifier": "target", ...}}
-  // object. Parse it with Foundation's JSON reader rather than a hand-rolled
-  // scanner so escapes, nesting, and malformed input are handled correctly and
-  // can't desync key/value pairing.
+// Read one imports-shaped section. Every rejection names the offending key so
+// a bad map is fixable from the message alone.
+static bool ParseImportMapEntries(NSDictionary* source, const std::string& sectionLabel,
+                                  ImportMapEntries* out, std::string* error) {
+  for (id key in source) {
+    if (![key isKindOfClass:[NSString class]]) {
+      *error = sectionLabel + ": every key must be a string";
+      return false;
+    }
+    const char* keyUtf8 = [(NSString*)key UTF8String];
+    if (keyUtf8 == nullptr) {
+      *error = sectionLabel + ": every key must be a string";
+      return false;
+    }
+    const std::string specifier(keyUtf8);
+    if (specifier.empty()) {
+      *error = sectionLabel + ": a specifier key must not be empty";
+      return false;
+    }
+
+    id value = [source objectForKey:key];
+    if (![value isKindOfClass:[NSString class]]) {
+      *error = sectionLabel + ": the target for '" + specifier + "' must be a string";
+      return false;
+    }
+    const char* valueUtf8 = [(NSString*)value UTF8String];
+    if (valueUtf8 == nullptr) {
+      *error = sectionLabel + ": the target for '" + specifier + "' must be a string";
+      return false;
+    }
+    const std::string target(valueUtf8);
+    if (target.empty()) {
+      *error = sectionLabel + ": the target for '" + specifier + "' must not be empty";
+      return false;
+    }
+
+    // A trailing-slash key maps a whole subtree, so its target must name one
+    // too — otherwise the remainder would be pasted onto a file path.
+    if (specifier.back() == '/' && target.back() != '/') {
+      *error = sectionLabel + ": the target for '" + specifier +
+               "' must end with '/' because the specifier key does";
+      return false;
+    }
+
+    (*out)[specifier] = target;
+  }
+  return true;
+}
+
+// Parse without touching the live map. On any failure `error` explains what is
+// wrong and `out` is meaningless — the caller keeps whatever it already had.
+static bool ParseImportMap(const std::string& json, ParsedImportMap* out, std::string* error) {
   @autoreleasepool {
     NSData* data = [NSData dataWithBytes:json.data() length:json.size()];
     if (data == nil || data.length == 0) {
-      return;
+      *error = "an import map must be a non-empty JSON object";
+      return false;
     }
-    NSError* err = nil;
-    id parsed = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&err];
-    if (parsed == nil || ![parsed isKindOfClass:[NSDictionary class]]) {
-      if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
-        NSString* detail = err.localizedDescription ?: @"not an object";
-        TNS_DEBUG(Esm, "[import-map] parse failed: %s", [detail UTF8String] ?: "unknown");
+    NSError* parseError = nil;
+    id parsed = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&parseError];
+    if (parsed == nil) {
+      NSString* detail = parseError.localizedDescription ?: @"invalid JSON";
+      *error = std::string("an import map must be valid JSON: ") + ([detail UTF8String] ?: "");
+      return false;
+    }
+    if (![parsed isKindOfClass:[NSDictionary class]]) {
+      *error = "an import map must be a JSON object";
+      return false;
+    }
+
+    NSDictionary* top = (NSDictionary*)parsed;
+    for (id section in top) {
+      if (![section isKindOfClass:[NSString class]] ||
+          (![(NSString*)section isEqualToString:@"imports"] &&
+           ![(NSString*)section isEqualToString:@"scopes"])) {
+        const char* name =
+            [section isKindOfClass:[NSString class]] ? [(NSString*)section UTF8String] : "";
+        *error = std::string("unsupported import-map section '") + (name ? name : "") +
+                 "'; only \"imports\" and \"scopes\" are supported";
+        return false;
       }
-      return;
     }
-    id imports = [(NSDictionary*)parsed objectForKey:@"imports"];
-    if (![imports isKindOfClass:[NSDictionary class]]) {
-      return;  // no "imports" object → empty map, same as the prior parser
+
+    id imports = [top objectForKey:@"imports"];
+    if (imports != nil) {
+      if (![imports isKindOfClass:[NSDictionary class]]) {
+        *error = "the \"imports\" section must be an object";
+        return false;
+      }
+      if (!ParseImportMapEntries((NSDictionary*)imports, "imports", &out->imports, error)) {
+        return false;
+      }
     }
-    for (id key in (NSDictionary*)imports) {
-      if (![key isKindOfClass:[NSString class]]) continue;
-      id value = [(NSDictionary*)imports objectForKey:key];
-      if (![value isKindOfClass:[NSString class]]) continue;  // skip non-string targets
-      const char* k = [(NSString*)key UTF8String];
-      const char* v = [(NSString*)value UTF8String];
-      if (k != nullptr && v != nullptr) {
-        g_importMap[std::string(k)] = std::string(v);
+
+    id scopes = [top objectForKey:@"scopes"];
+    if (scopes != nil) {
+      if (![scopes isKindOfClass:[NSDictionary class]]) {
+        *error = "the \"scopes\" section must be an object";
+        return false;
+      }
+      for (id scopeKey in (NSDictionary*)scopes) {
+        if (![scopeKey isKindOfClass:[NSString class]]) {
+          *error = "scopes: every scope key must be a string";
+          return false;
+        }
+        const char* scopeUtf8 = [(NSString*)scopeKey UTF8String];
+        const std::string scopePrefix(scopeUtf8 ? scopeUtf8 : "");
+        if (scopePrefix.empty()) {
+          *error = "scopes: a scope key must not be empty";
+          return false;
+        }
+        id scopeMap = [(NSDictionary*)scopes objectForKey:scopeKey];
+        if (![scopeMap isKindOfClass:[NSDictionary class]]) {
+          *error = "scopes: the map for scope '" + scopePrefix + "' must be an object";
+          return false;
+        }
+        ImportMapEntries entries;
+        if (!ParseImportMapEntries((NSDictionary*)scopeMap, "scope '" + scopePrefix + "'", &entries,
+                                   error)) {
+          return false;
+        }
+        out->scopes.emplace_back(scopePrefix, std::move(entries));
       }
     }
   }
-  TNS_DEBUG(Esm, "[import-map] loaded %lu entries", (unsigned long)g_importMap.size());
+
+  // Most specific first: a longer prefix is the more specific scope, and the
+  // key comparison keeps the order deterministic for equal-length prefixes.
+  std::sort(out->scopes.begin(), out->scopes.end(),
+            [](const std::pair<std::string, ImportMapEntries>& a,
+               const std::pair<std::string, ImportMapEntries>& b) {
+              if (a.first.size() != b.first.size()) {
+                return a.first.size() > b.first.size();
+              }
+              return a.first > b.first;
+            });
+  return true;
+}
+
+bool SetImportMap(const std::string& json, std::string* error) {
+  // Parse-validate-swap: the live vocabulary is replaced only once a complete
+  // map has been built, so a rejected update leaves resolution exactly as it
+  // was rather than silently emptying it.
+  ParsedImportMap parsedMap;
+  std::string localError;
+  if (!ParseImportMap(json, &parsedMap, error != nullptr ? error : &localError)) {
+    return false;
+  }
+  g_importMap = std::move(parsedMap);
+  TNS_DEBUG(Esm, "[import-map] loaded %lu entries, %lu scopes",
+            (unsigned long)g_importMap.imports.size(), (unsigned long)g_importMap.scopes.size());
+  return true;
 }
 
 void SetVolatilePatterns(const std::vector<std::string>& patterns) {
@@ -689,23 +819,23 @@ static bool IsVolatileUrl(const std::string& url) {
   return false;
 }
 
-// Look up a specifier in the import map. Supports both exact matches and
-// prefix matches (trailing-slash entries like "solid-js/" that map subpaths).
-// Returns the mapped URL or empty string if no match.
-static std::string LookupImportMap(const std::string& specifier) {
-  // 1. Exact match
-  auto it = g_importMap.find(specifier);
-  if (it != g_importMap.end()) {
+// Look up a specifier in ONE import-map section: exact match first, then the
+// longest trailing-slash prefix entry, whose remainder is appended to the
+// target. Returns empty when the section has no answer.
+static std::string LookupInEntries(const ImportMapEntries& entries, const std::string& specifier) {
+  auto it = entries.find(specifier);
+  if (it != entries.end()) {
     TNS_DEBUG(Esm, "[import-map] exact: %s -> %s", specifier.c_str(), it->second.c_str());
     return it->second;
   }
-  // 2. Prefix match (longest match wins)
+
   std::string bestKey;
   std::string bestValue;
-  for (const auto& kv : g_importMap) {
+  for (const auto& kv : entries) {
     const std::string& key = kv.first;
-    // Prefix entries must end with '/'
-    if (key.back() != '/') continue;
+    if (key.back() != '/') {
+      continue;  // only trailing-slash entries map subtrees
+    }
     if (specifier.size() > key.size() && specifier.compare(0, key.size(), key) == 0) {
       if (key.size() > bestKey.size()) {
         bestKey = key;
@@ -713,21 +843,46 @@ static std::string LookupImportMap(const std::string& specifier) {
       }
     }
   }
-  if (!bestKey.empty()) {
-    std::string remainder = specifier.substr(bestKey.size());
-    std::string resolved = bestValue + remainder;
-    TNS_DEBUG(Esm, "[import-map] prefix: %s -> %s (via %s)", specifier.c_str(), resolved.c_str(),
-              bestKey.c_str());
-    return resolved;
+  if (bestKey.empty()) {
+    return "";
   }
-  return "";
+  std::string resolved = bestValue + specifier.substr(bestKey.size());
+  TNS_DEBUG(Esm, "[import-map] prefix: %s -> %s (via %s)", specifier.c_str(), resolved.c_str(),
+            bestKey.c_str());
+  return resolved;
+}
+
+// The import-map resolution cascade: the most specific applicable scope first,
+// then progressively less specific ones, then the top-level imports — each
+// consulted with the same per-section lookup.
+//
+// A scope key matches as a plain prefix of `referrerKey`, the importing
+// module's canonical registry key: an absolute http(s) URL for a served
+// module, or a canonical absolute path for a file. That key is this runtime's
+// analogue of the web's resolved referrer URL, which is what scope prefixes
+// match there. Ending a scope key with '/' keeps it on a directory boundary,
+// exactly as on the web.
+static std::string LookupImportMap(const std::string& specifier, const std::string& referrerKey) {
+  for (const auto& scope : g_importMap.scopes) {
+    const std::string& prefix = scope.first;
+    if (referrerKey.size() < prefix.size() || referrerKey.compare(0, prefix.size(), prefix) != 0) {
+      continue;
+    }
+    std::string mapped = LookupInEntries(scope.second, specifier);
+    if (!mapped.empty()) {
+      TNS_DEBUG(Esm, "[import-map] scope '%s' matched referrer %s", prefix.c_str(),
+                referrerKey.c_str());
+      return mapped;
+    }
+  }
+  return LookupInEntries(g_importMap.imports, specifier);
 }
 
 void CleanupImportMapGlobals() {
   // Process-global import-map state (not isolate-bound). The per-isolate
   // loader state lives in a Caches state slot and is destroyed with each
   // isolate's Caches (after QuiesceModuleLoadsForIsolate in ~Runtime).
-  g_importMap.clear();
+  g_importMap = ParsedImportMap();
   g_volatilePatterns.clear();
 }
 
@@ -926,7 +1081,7 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   // resolve through it to vendor or HTTP URLs. A client that rewrites
   // specifiers must map every form it emits — keys are matched literally.
   if (!g_importMap.empty()) {
-    std::string mapped = LookupImportMap(spec);
+    std::string mapped = LookupImportMap(spec, referrerKey);
     if (!mapped.empty()) {
       TNS_DEBUG(Esm, "[resolver][import-map] rewrite: %s -> %s", spec.c_str(), mapped.c_str());
       spec = mapped;
@@ -937,9 +1092,9 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
       bool looksBare = spec[0] != '/' && spec[0] != '.' && spec.find("://") == std::string::npos &&
                        spec.find('\\') == std::string::npos;
       if (looksBare) {
-        TNS_DEBUG(Esm,
-                  "[resolver][import-map][miss] bare='%s' importMap.size=%lu importMap.empty=%d",
-                  spec.c_str(), (unsigned long)g_importMap.size(), g_importMap.empty() ? 1 : 0);
+        TNS_DEBUG(
+            Esm, "[resolver][import-map][miss] bare='%s' importMap.size=%lu importMap.empty=%d",
+            spec.c_str(), (unsigned long)g_importMap.imports.size(), g_importMap.empty() ? 1 : 0);
       }
     }
   } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
@@ -2259,8 +2414,19 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   }
 
   // ── Import map resolution for dynamic import() ────────────────
+  // Same scoped lookup the resolver and the walk use. The referrer key comes
+  // from the host-supplied resource name, canonicalized the way the registry
+  // keys it, so a scope matches an import() exactly as it matches a static
+  // import from the same module.
   if (!g_importMap.empty() && !normalizedSpec.empty()) {
-    std::string mapped = LookupImportMap(normalizedSpec);
+    std::string dynamicReferrerKey;
+    if (!resource_name.IsEmpty() && resource_name->IsString()) {
+      v8::String::Utf8Value resourceUtf8(isolate, resource_name);
+      if (*resourceUtf8) {
+        dynamicReferrerKey = CanonicalizeRegistryKey(*resourceUtf8);
+      }
+    }
+    std::string mapped = LookupImportMap(normalizedSpec, dynamicReferrerKey);
     if (!mapped.empty()) {
       // Mapped to an HTTP URL or other specifier
       normalizedSpec = mapped;
@@ -3145,11 +3311,21 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         if (*utf8) jsonStr = *utf8;
       }
     }
-    if (!jsonStr.empty()) {
-      SetImportMap(jsonStr);
-      if (traceEsm) {
-        TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)", jsonStr.size());
-      }
+    std::string importMapError;
+    if (jsonStr.empty()) {
+      isolate->ThrowException(v8::Exception::TypeError(tns::ToV8String(
+          isolate, "configureLoader: importMap must be an object or a JSON string")));
+      return;
+    }
+    if (!SetImportMap(jsonStr, &importMapError)) {
+      // The previous map is still installed: a rejected update changes
+      // nothing, so a typo cannot empty a live session's vocabulary.
+      isolate->ThrowException(
+          v8::Exception::TypeError(tns::ToV8String(isolate, "configureLoader: " + importMapError)));
+      return;
+    }
+    if (traceEsm) {
+      TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)", jsonStr.size());
     }
   }
 
