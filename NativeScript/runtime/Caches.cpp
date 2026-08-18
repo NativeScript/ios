@@ -1,5 +1,7 @@
 #include "Caches.h"
 
+#include <atomic>
+
 #include "Constants.h"
 #include "NativeScriptException.h"
 
@@ -13,6 +15,10 @@ Caches::Caches(Isolate* isolate, const int& isolateId)
       isolateId_(isolateId) {}
 
 Caches::~Caches() {
+  // Subsystem state may hold v8 handles and reference the core caches below;
+  // destroy it first, while both are still intact.
+  this->stateSlots_.clear();
+
   this->Prototypes.clear();
   this->ClassPrototypes.clear();
   this->CtorFuncTemplates.clear();
@@ -26,6 +32,11 @@ Caches::~Caches() {
   this->StructInstances.clear();
   this->PointerInstances.clear();
   this->cacheBoundObjects_.clear();
+}
+
+size_t Caches::NextStateSlotIndex() {
+  static std::atomic<size_t> nextIndex{0};
+  return nextIndex.fetch_add(1, std::memory_order_relaxed);
 }
 
 void Caches::Remove(v8::Isolate* isolate) {

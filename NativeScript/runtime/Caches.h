@@ -1,6 +1,7 @@
 #ifndef Caches_h
 #define Caches_h
 
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -92,6 +93,28 @@ class Caches {
   }
   static void Remove(v8::Isolate* isolate);
 
+  // Per-isolate storage for subsystem state, so a subsystem can declare its
+  // state struct in its own .cpp instead of adding members here (and instead
+  // of a process-wide map keyed by v8::Isolate*, whose container is shared
+  // across runtimes tearing down on their own threads). The first call
+  // default-constructs T; it is destroyed with this Caches, under the teardown
+  // Locker while the isolate is still alive, so T may hold v8::Persistent
+  // members. Returns null once teardown has begun (InvalidateIsolate) or the
+  // isolate's Caches is gone — callers must bail, not recreate state. Access
+  // from the isolate's thread only, like every other member.
+  template <typename T>
+  static T* StateFor(v8::Isolate* isolate) {
+    auto raw = isolate->GetData(0);
+    if (raw == nullptr) {
+      return nullptr;
+    }
+    Caches* cache = reinterpret_cast<std::shared_ptr<Caches>*>(raw)->get();
+    if (!cache->IsValid()) {
+      return nullptr;
+    }
+    return cache->GetOrCreateState<T>();
+  }
+
   inline int getIsolateId() { return isolateId_; }
 
   inline void InvalidateIsolate() { isolateId_ = -1; }
@@ -163,7 +186,6 @@ class Caches {
       ObjectCtorInitializer;
   std::function<v8::Local<v8::Function>(v8::Local<v8::Context>, StructInfo)>
       StructCtorInitializer;
-  robin_hood::unordered_map<std::string, double> Timers;
   robin_hood::unordered_map<const InterfaceMeta*,
                             std::vector<const MethodMeta*>>
       Initializers;
@@ -263,6 +285,34 @@ class Caches {
   }
 
  private:
+  // One slot index per state type, handed out process-wide on first use.
+  static size_t NextStateSlotIndex();
+
+  template <typename T>
+  static size_t StateSlotIndexFor() {
+    static const size_t index = NextStateSlotIndex();
+    return index;
+  }
+
+  // Type-erased so Caches need not know any subsystem's state type; the
+  // deleter restores the type at destruction.
+  using StateSlot = std::unique_ptr<void, void (*)(void*)>;
+
+  template <typename T>
+  T* GetOrCreateState() {
+    size_t index = StateSlotIndexFor<T>();
+    while (this->stateSlots_.size() <= index) {
+      this->stateSlots_.emplace_back(nullptr, [](void*) {});
+    }
+    StateSlot& slot = this->stateSlots_[index];
+    if (slot == nullptr) {
+      slot = StateSlot(new T(),
+                       [](void* value) { delete static_cast<T*>(value); });
+    }
+    return static_cast<T*>(slot.get());
+  }
+
+  std::vector<StateSlot> stateSlots_;
   v8::Isolate* isolate_;
   std::shared_ptr<v8::Persistent<v8::Context>> context_;
   int isolateId_;

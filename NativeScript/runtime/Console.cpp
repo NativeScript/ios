@@ -20,6 +20,13 @@ using namespace v8;
 
 namespace tns {
 
+namespace {
+// console.time labels -> start timestamps (µs), per isolate.
+struct ConsoleTimersState {
+  robin_hood::unordered_map<std::string, double> startedAt;
+};
+}  // namespace
+
 void Console::Init(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Context::Scope context_scope(context);
@@ -197,13 +204,16 @@ void Console::TimeCallback(const FunctionCallbackInfo<Value>& args) {
     label = tns::ToString(isolate, labelString);
   }
 
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  auto* timers = Caches::StateFor<ConsoleTimersState>(isolate);
+  if (timers == nullptr) {
+    return;
+  }
 
   auto nano = std::chrono::time_point_cast<std::chrono::microseconds>(
       std::chrono::system_clock::now());
   double timeStamp = nano.time_since_epoch().count();
 
-  cache->Timers.emplace(label, timeStamp);
+  timers->startedAt.emplace(label, timeStamp);
 }
 
 void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
@@ -220,9 +230,12 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
     label = tns::ToString(isolate, labelString);
   }
 
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  auto itTimersMap = cache->Timers.find(label);
-  if (itTimersMap == cache->Timers.end()) {
+  auto* timers = Caches::StateFor<ConsoleTimersState>(isolate);
+  if (timers == nullptr) {
+    return;
+  }
+  auto itTimersMap = timers->startedAt.find(label);
+  if (itTimersMap == timers->startedAt.end()) {
     std::string warning =
         std::string("No such label '" + label + "' for console.timeEnd()");
     Log("%s", warning.c_str());
@@ -234,7 +247,7 @@ void Console::TimeEndCallback(const FunctionCallbackInfo<Value>& args) {
   double endTimeStamp = nano.time_since_epoch().count();
   double startTimeStamp = itTimersMap->second;
 
-  cache->Timers.erase(label);
+  timers->startedAt.erase(itTimersMap);
 
   double diffMicroseconds = endTimeStamp - startTimeStamp;
   double diffMilliseconds = diffMicroseconds / 1000.0;
