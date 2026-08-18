@@ -422,6 +422,7 @@ std::string GetSmartStackTrace(v8::Isolate* isolate, v8::TryCatch* tryCatch = nu
                                v8::Local<v8::Value> exception = v8::Local<v8::Value>());
 
 bool LiveSync(v8::Isolate* isolate);
+bool InvokeApplicationReload(v8::Isolate* isolate);
 
 void Assert(bool condition, v8::Isolate* isolate = nullptr,
             std::string const& reason = std::string());

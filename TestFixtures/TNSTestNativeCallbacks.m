@@ -415,4 +415,49 @@
   return [object valueForKey:key];
 }
 
++ (void)invokeApplicationDelegateLifecycle:(id)delegate {
+  NSAssert([delegate conformsToProtocol:@protocol(UIApplicationDelegate)],
+           @"expected UIApplicationDelegate");
+
+  id<UIApplicationDelegate> appDelegate = delegate;
+  if ([appDelegate respondsToSelector:@selector(window)]) {
+    UNUSED(appDelegate.window);
+  }
+  if ([appDelegate respondsToSelector:@selector(application:didFinishLaunchingWithOptions:)]) {
+    UNUSED([appDelegate application:nil didFinishLaunchingWithOptions:nil]);
+  }
+  if ([appDelegate respondsToSelector:@selector(applicationDidBecomeActive:)]) {
+    [appDelegate applicationDidBecomeActive:nil];
+  }
+  if ([appDelegate
+          respondsToSelector:@selector(
+                                 application:configurationForConnectingSceneSession:options:)]) {
+    UNUSED([appDelegate application:nil configurationForConnectingSceneSession:nil options:nil]);
+  }
+}
+
++ (void)invokeSceneDelegateLifecycle:(id)delegate {
+  NSAssert([delegate conformsToProtocol:@protocol(UIWindowSceneDelegate)] ||
+               [delegate conformsToProtocol:@protocol(UISceneDelegate)],
+           @"expected UIWindowSceneDelegate");
+
+  id<UIWindowSceneDelegate> sceneDelegate = delegate;
+  if ([sceneDelegate respondsToSelector:@selector(window)]) {
+    UNUSED(sceneDelegate.window);
+  }
+  if ([sceneDelegate respondsToSelector:@selector(scene:willConnectToSession:options:)]) {
+    [sceneDelegate scene:nil willConnectToSession:nil options:nil];
+  }
+  if ([sceneDelegate respondsToSelector:@selector(sceneDidBecomeActive:)]) {
+    [sceneDelegate sceneDidBecomeActive:nil];
+  }
+}
+
++ (id)invokeDelegateWindow:(id)delegate {
+  if ([delegate respondsToSelector:@selector(window)]) {
+    return ((id<UIApplicationDelegate>)delegate).window;
+  }
+  return nil;
+}
+
 @end

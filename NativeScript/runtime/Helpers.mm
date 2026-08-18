@@ -736,6 +736,34 @@ const std::string tns::BuildStacktraceFrameMessage(Isolate* isolate, Local<Stack
   return stringResult;
 }
 
+bool tns::InvokeApplicationReload(Isolate* isolate) {
+  v8::Locker locker(isolate);
+  Isolate::Scope isolate_scope(isolate);
+  HandleScope handle_scope(isolate);
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  Local<Context> context = cache->GetContext();
+  Local<Object> global = context->Global();
+  Local<Value> value;
+  bool success =
+      global->Get(context, tns::ToV8String(isolate, "__onApplicationReload")).ToLocal(&value);
+  if (!success || value.IsEmpty() || !value->IsFunction()) {
+    return false;
+  }
+
+  Local<v8::Function> reloadFunc = value.As<v8::Function>();
+  Local<Value> result;
+  TryCatch tc(isolate);
+  success = reloadFunc->Call(context, v8::Undefined(isolate), 0, nullptr).ToLocal(&result);
+  if (!success || tc.HasCaught()) {
+    if (tc.HasCaught()) {
+      tns::LogError(isolate, tc);
+    }
+    return false;
+  }
+
+  return true;
+}
+
 bool tns::LiveSync(Isolate* isolate) {
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);

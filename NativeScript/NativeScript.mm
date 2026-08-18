@@ -21,6 +21,36 @@ namespace tns {}
 
 @end
 
+static Config* CopyConfig(Config* config) {
+  Config* copy = [[Config alloc] init];
+  copy.BaseDir = config.BaseDir;
+  copy.ApplicationPath = config.ApplicationPath;
+  copy.MetadataPtr = config.MetadataPtr;
+  copy.IsDebug = config.IsDebug;
+  copy.LogToSystemConsole = config.LogToSystemConsole;
+  copy.ArgumentsCount = config.ArgumentsCount;
+  copy.Arguments = config.Arguments;
+  return copy;
+}
+
+static void ApplyRuntimeConfigPaths(Config* config) {
+  RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
+  if (config.ApplicationPath != nil) {
+    RuntimeConfig.ApplicationPath =
+        [[config.BaseDir stringByAppendingPathComponent:config.ApplicationPath] UTF8String];
+  } else {
+    RuntimeConfig.ApplicationPath =
+        [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
+  }
+}
+
+static NativeScript* currentNativeScript;
+static Config* currentConfig;
+
+@interface NativeScript ()
+- (void)reloadJsApplication;
+@end
+
 @implementation NativeScript
 
 extern char defaultStartOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
@@ -66,14 +96,10 @@ std::unique_ptr<Runtime> runtime_;
 
 - (instancetype)initializeWithConfig:(Config*)config {
   if (self = [super init]) {
-    RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
-    if (config.ApplicationPath != nil) {
-      RuntimeConfig.ApplicationPath =
-          [[config.BaseDir stringByAppendingPathComponent:config.ApplicationPath] UTF8String];
-    } else {
-      RuntimeConfig.ApplicationPath =
-          [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
-    }
+    currentNativeScript = self;
+    currentConfig = CopyConfig(config);
+
+    ApplyRuntimeConfigPaths(config);
     if (config.MetadataPtr != nil) {
       RuntimeConfig.MetadataPtr = [config MetadataPtr];
     } else {
@@ -81,6 +107,15 @@ std::unique_ptr<Runtime> runtime_;
     }
     RuntimeConfig.IsDebug = [config IsDebug];
     RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
+
+    // Connect the JS-exposed `NativeScriptRuntime.reloadApplication(baseDir?)`
+    // global (registered by the runtime) to the Objective-C implementation below.
+    tns::SetReloadApplicationHook([](const std::string& baseDir) -> bool {
+      NSString* dir = baseDir.empty()
+                          ? nil
+                          : [NSString stringWithUTF8String:baseDir.c_str()];
+      return [NativeScriptRuntime reloadApplication:dir] == YES;
+    });
 
     Runtime::Initialize();
     runtime_ = nullptr;
@@ -114,8 +149,49 @@ std::unique_ptr<Runtime> runtime_;
 }
 
 - (void)restartWithConfig:(Config*)config {
+  // Embedder-only isolate replacement. JS-bootstrapped apps must use
+  // reloadApplication, which keeps the one main isolate alive.
+  tns::IncrementRuntimeReloadCount();
   [self shutdownRuntime];
   [self initializeWithConfig:config];
+}
+
+- (void)reloadJsApplication {
+  if (runtime_ == nullptr) {
+    return;
+  }
+  runtime_->ReloadJsApplication();
+}
+
+@end
+
+@implementation NativeScriptRuntime
+
++ (BOOL)reloadApplication {
+  return [self reloadApplication:nil];
+}
+
++ (BOOL)reloadApplication:(NSString*)baseDir {
+  if (currentNativeScript == nil || currentConfig == nil) {
+    return NO;
+  }
+
+  if (baseDir != nil && [baseDir length] > 0) {
+    currentConfig.BaseDir = baseDir;
+    ApplyRuntimeConfigPaths(currentConfig);
+  }
+
+  void (^work)(void) = ^{
+    [currentNativeScript reloadJsApplication];
+  };
+
+  if ([NSThread isMainThread]) {
+    work();
+  } else {
+    dispatch_async(dispatch_get_main_queue(), work);
+  }
+
+  return YES;
 }
 
 @end

@@ -9,11 +9,22 @@
 #include "SpinLock.h"
 #include "libplatform/libplatform.h"
 
+#include <functional>
+#include <string>
+
 // Declared rather than included: js_native_api_types.h pins NAPI_VERSION for
 // the whole translation unit, and Runtime.h reaches nearly all of them.
 typedef struct napi_env__* napi_env;
 
 namespace tns {
+
+using ReloadApplicationHook = std::function<bool(const std::string& baseDir)>;
+void SetReloadApplicationHook(ReloadApplicationHook hook);
+bool InvokeReloadApplicationHook(const std::string& baseDir);
+
+// Soft-reboot count for this process. 0 on first boot.
+void IncrementRuntimeReloadCount();
+int GetRuntimeReloadCount();
 
 class Runtime {
  public:
@@ -22,6 +33,8 @@ class Runtime {
   v8::Isolate* CreateIsolate();
   void Init(v8::Isolate* isolate, bool isWorker = false);
   void RunMainScript();
+  // Isolate-preserving JS application reset. Does not dispose this isolate.
+  void ReloadJsApplication();
   v8::Isolate* GetIsolate();
 
   const int WorkerId();
@@ -107,6 +120,8 @@ class Runtime {
   void DefineCollectFunction(v8::Local<v8::Context> context);
   void DefineNativeScriptVersion(v8::Isolate* isolate,
                                  v8::Local<v8::ObjectTemplate> globalTemplate);
+  void DefineNativeScriptRuntime(v8::Isolate* isolate,
+                                 v8::Local<v8::ObjectTemplate> globalTemplate);
   void DefineTimeMethod(v8::Isolate* isolate,
                         v8::Local<v8::ObjectTemplate> globalTemplate);
   void DefineDrainMicrotaskMethod(v8::Isolate* isolate,
@@ -115,6 +130,7 @@ class Runtime {
                                   v8::Local<v8::ObjectTemplate> globalTemplate);
   void DefineDateTimeConfigurationChangeNotificationMethod(
       v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+  void TerminateChildWorkers();
 
   static void DrainRejectionsObserver(CFRunLoopObserverRef observer,
                                       CFRunLoopActivity activity, void* info);

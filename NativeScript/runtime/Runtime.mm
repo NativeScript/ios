@@ -6,6 +6,7 @@
 #include "Caches.h"
 #include "Console.h"
 #include "Constants.h"
+#include "DataWrapper.h"
 #include "ErrorEvents.h"
 #include "Events.h"
 #include "Helpers.h"
@@ -22,6 +23,7 @@
 #include "SpinLock.h"
 #include "StructuredClone.h"
 #include "TSHelpers.h"
+#include "Tasks.h"
 #include "WeakRef.h"
 #include "Worker.h"
 
@@ -213,14 +215,7 @@ Runtime::~Runtime() {
     Caches::Get(isolate_)->InvalidateIsolate();
   }
   this->isolate_->TerminateExecution();
-
-  Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
-    auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
-    if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
-      childWorkerWrapper->Terminate();
-    }
-    return false;
-  });
+  this->TerminateChildWorkers();
 
   {
     v8::Locker lock(isolate_);
@@ -233,12 +228,7 @@ Runtime::~Runtime() {
     }
 
     // Clear module registry before disposing other handles
-    // This prevents crashes during g_moduleRegistry cleanup
-    extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
-    for (auto& kv : g_moduleRegistry) {
-      kv.second.Reset();
-    }
-    g_moduleRegistry.clear();
+    ClearModuleRegistry();
 
     // Before DisposeAllRegistered: the env's reference lists hold v8::Globals,
     // so its teardown needs the isolate alive and locked.
@@ -343,6 +333,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   tns::binding::CreateInternalBindingTemplates(isolate, globalTemplateFunction);
   Local<ObjectTemplate> globalTemplate = ObjectTemplate::New(isolate, globalTemplateFunction);
   DefineNativeScriptVersion(isolate, globalTemplate);
+  DefineNativeScriptRuntime(isolate, globalTemplate);
 
   // Worker::Init(isolate, globalTemplate, isWorker);
   DefineTimeMethod(isolate, globalTemplate);
@@ -436,6 +427,40 @@ void Runtime::RunMainScript() {
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
   this->moduleInternal_->RunModule(isolate, "./");
+}
+
+void Runtime::TerminateChildWorkers() {
+  auto currentIsolate = this->isolate_;
+  if (currentIsolate == nullptr || Caches::Workers == nullptr) {
+    return;
+  }
+  Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
+    auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
+    if (childWorkerWrapper != nullptr && childWorkerWrapper->GetMainIsolate() == currentIsolate) {
+      childWorkerWrapper->Terminate();
+    }
+    return false;
+  });
+}
+
+void Runtime::ReloadJsApplication() {
+  Isolate* isolate = this->GetIsolate();
+  if (isolate == nullptr) {
+    return;
+  }
+
+  IncrementRuntimeReloadCount();
+  this->TerminateChildWorkers();
+  tns::Tasks::ClearTasks();
+
+  v8::Locker locker(isolate);
+  Isolate::Scope isolate_scope(isolate);
+  HandleScope handle_scope(isolate);
+  if (this->moduleInternal_) {
+    this->moduleInternal_->ClearLoadedModules();
+  }
+  ClearModuleRegistryForApplicationReload();
+  tns::InvokeApplicationReload(isolate);
 }
 
 void Runtime::RunModule(const std::string moduleName) {
@@ -560,6 +585,58 @@ void Runtime::DefineNativeScriptVersion(Isolate* isolate, Local<ObjectTemplate> 
       static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
   globalTemplate->Set(ToV8String(isolate, "__runtimeVersion"),
                       ToV8String(isolate, STRINGIZE_VALUE_OF(NATIVESCRIPT_VERSION)), readOnlyFlags);
+}
+
+static ReloadApplicationHook reloadApplicationHook_;
+static std::mutex reloadApplicationHookMutex_;
+
+void SetReloadApplicationHook(ReloadApplicationHook hook) {
+  std::lock_guard<std::mutex> lock(reloadApplicationHookMutex_);
+  reloadApplicationHook_ = std::move(hook);
+}
+
+bool InvokeReloadApplicationHook(const std::string& baseDir) {
+  ReloadApplicationHook hook;
+  {
+    std::lock_guard<std::mutex> lock(reloadApplicationHookMutex_);
+    hook = reloadApplicationHook_;
+  }
+  if (!hook) {
+    return false;
+  }
+  return hook(baseDir);
+}
+
+static std::atomic<int> runtimeReloadCount_{0};
+
+void IncrementRuntimeReloadCount() { runtimeReloadCount_++; }
+
+int GetRuntimeReloadCount() { return runtimeReloadCount_.load(); }
+
+static void ReloadCountGetter(v8::Local<v8::Name> /*property*/,
+                              const v8::PropertyCallbackInfo<v8::Value>& info) {
+  info.GetReturnValue().Set(tns::GetRuntimeReloadCount());
+}
+
+// Isolate-preserving JS application reset. Does not dispose the isolate.
+// `NativeScriptRuntime` is excluded from metadata generation.
+void Runtime::DefineNativeScriptRuntime(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+  Local<ObjectTemplate> runtimeTemplate = ObjectTemplate::New(isolate);
+
+  Local<FunctionTemplate> reloadTemplate =
+      FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        std::string baseDir;
+        if (info.Length() > 0 && info[0]->IsString()) {
+          baseDir = tns::ToString(isolate, info[0]);
+        }
+        info.GetReturnValue().Set(tns::InvokeReloadApplicationHook(baseDir));
+      });
+  runtimeTemplate->Set(ToV8String(isolate, "reloadApplication"), reloadTemplate);
+
+  runtimeTemplate->SetNativeDataProperty(ToV8String(isolate, "reloadCount"), ReloadCountGetter);
+
+  globalTemplate->Set(ToV8String(isolate, "NativeScriptRuntime"), runtimeTemplate);
 }
 
 void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate) {

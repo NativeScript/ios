@@ -11,6 +11,7 @@ class ModuleInternal {
   ModuleInternal(v8::Local<v8::Context> context);
   bool RunModule(v8::Isolate* isolate, std::string path);
   void RunScript(v8::Isolate* isolate, std::string script);
+  void ClearLoadedModules();
   static v8::Local<v8::Value> LoadScript(v8::Isolate* isolate,
                                          const std::string& path);
 

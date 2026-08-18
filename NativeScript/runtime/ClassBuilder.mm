@@ -903,6 +903,10 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+        if (!context->isolateWrapper_.IsValid()) {
+          memset(retValue, 0, cif->rtype->size);
+          return;
+        }
         Isolate* isolate = context->isolate_;
         // Scopes-before-@throw: a branded escape is captured and @thrown only
         // after every V8 scope in the inner block has destructed.
@@ -953,6 +957,9 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
+        if (!context->isolateWrapper_.IsValid()) {
+          return;
+        }
         Isolate* isolate = context->isolate_;
         NSException* __strong pendingThrow = nil;
         {
