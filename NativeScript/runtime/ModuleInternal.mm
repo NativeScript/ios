@@ -180,6 +180,14 @@ static inline void SetOutErrorMessage(std::string* outErrorMessage, const std::s
 }
 
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path, std::string* outErrorMessage) {
+  // Entry evaluation is this thread's boot window: while it is active, the
+  // yield inside synchronous HTTP fetches may pump the runloop (nothing else
+  // owns it yet). Balanced on every exit path.
+  struct BootEvalScope {
+    BootEvalScope() { SetBootEvaluationActive(true); }
+    ~BootEvalScope() { SetBootEvaluationActive(false); }
+  } bootEvalScope;
+
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   Local<Context> context = cache->GetContext();
   Local<Object> globalObject = context->Global();
@@ -1091,7 +1099,8 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     // boot handoff for static HTTP entries). Afterwards the load below is a
     // registry hit and instantiation resolves as pure lookup. On timeout or
     // partial coverage the legacy synchronous path still owns correctness.
-    RunAsyncHttpModuleGraphLoadPumped(isolate, context, requestPath, 60.0);
+    RunAsyncHttpModuleGraphLoadPumped(isolate, context, requestPath,
+                                      kModuleEvaluateDeadlineSeconds);
     MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
     if (!maybeMod.ToLocal(&module)) {
       logPhase("compile", "fail", "http-loader");
@@ -1281,17 +1290,22 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         }
       };
 
-      const NSTimeInterval timeoutSeconds = isHttpModule ? 10.0 : 1.0;
-      NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:timeoutSeconds];
+      // For local modules the bound is a yield, not a timeout: only nestable
+      // V8 tasks can run while these JS frames are on the stack, so a TLA
+      // parked on a non-nestable foreground task can never settle in-pump —
+      // give it one short window, then return and let the real event loop
+      // finish it after the turn (the Node shape; EventLoopTests pins this).
+      // HTTP entries must settle in-pump — the dev client needs the
+      // rejection reason synchronously — so they get the full deadline.
+      const NSTimeInterval settleWindowSeconds =
+          isHttpModule ? kModuleEvaluateDeadlineSeconds : 1.0;
+      NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:settleWindowSeconds];
       bool settled = false;
 
+      // State is checked before the first pump: a synchronous graph's
+      // evaluation promise is already settled when Evaluate() returns, so it
+      // exits here without paying for a runloop slice.
       while (!promiseTc.HasCaught()) {
-        pumpAsyncProgress();
-
-        if (promiseTc.HasCaught()) {
-          break;
-        }
-
         Promise::PromiseState state = promise->State();
         if (state != Promise::kPending) {
           settled = true;
@@ -1412,6 +1426,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
           break;
         }
 
+        pumpAsyncProgress();
         if (!isHttpModule) {
           usleep(1000);  // 1ms delay for non-HTTP top-level await polling
         }

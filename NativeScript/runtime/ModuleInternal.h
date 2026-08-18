@@ -6,6 +6,13 @@
 
 namespace tns {
 
+// The single deadline for every module-graph settle wait: the entry
+// top-level-await pump in LoadESModule, the pumped async graph walk, and
+// (doubled, as the outermost backstop) the app-boot handoff in
+// NativeScript.mm. One knob, so the waits stay ordered: transport timeouts
+// < this < the boot backstop.
+inline constexpr double kModuleEvaluateDeadlineSeconds = 60.0;
+
 class ModuleInternal {
  public:
   ModuleInternal(v8::Local<v8::Context> context);

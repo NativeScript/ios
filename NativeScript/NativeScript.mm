@@ -3,6 +3,7 @@
 #include "inspector/JsV8InspectorClient.h"
 #include "runtime/Console.h"
 #include "runtime/Helpers.h"
+#include "runtime/ModuleInternal.h"
 #include "runtime/ModuleInternalCallbacks.h"
 #include "runtime/Runtime.h"
 #include "runtime/RuntimeConfig.h"
@@ -54,7 +55,8 @@ std::unique_ptr<Runtime> runtime_;
   // UIApplicationMain task, so drain after each slice; if that drain calls
   // UIApplicationMain, it takes over from here and never returns.
   if (tns::HasPendingAsyncModuleGraphWork()) {
-    const CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + 120.0;
+    const CFAbsoluteTime deadline =
+        CFAbsoluteTimeGetCurrent() + 2 * tns::kModuleEvaluateDeadlineSeconds;
     while (tns::HasPendingAsyncModuleGraphWork() && CFAbsoluteTimeGetCurrent() < deadline) {
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
       tns::Tasks::Drain();

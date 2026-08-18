@@ -16,7 +16,6 @@ const surface = {
   configureLoader: binding.configureLoader,
   invalidateModules: binding.invalidateModules,
   getLoadedModuleUrls: binding.getLoadedModuleUrls,
-  setDevBootComplete: binding.setDevBootComplete,
 };
 if (binding.canonicalizeHttpUrlKey !== undefined) {
   surface.canonicalizeHttpUrlKey = binding.canonicalizeHttpUrlKey;

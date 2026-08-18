@@ -64,12 +64,6 @@ declare module "ns:module" {
    */
   export function getLoadedModuleUrls(): string[];
 
-  /**
-   * Flips the dev-boot-complete signal (defaults to `true`); disarms
-   * cold-boot-only behaviors.
-   */
-  export function setDevBootComplete(value?: boolean): void;
-
   // Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure
   // test diagnostic; release builds omit the member entirely. It is
   // deliberately not declared here: it is not public API, and declaring it

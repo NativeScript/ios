@@ -117,35 +117,21 @@ bool IsRemoteUrlAllowed(const std::string& url) {
   return false;
 }
 
-static void SetBooleanGlobal(v8::Isolate* isolate, v8::Local<v8::Context> context, const char* key,
-                             bool value) {
-  context->Global()
-      ->Set(context, tns::ToV8String(isolate, key), v8::Boolean::New(isolate, value))
-      .FromMaybe(false);
-}
-
 // ─────────────────────────────────────────────────────────────
-// Dev-boot completion flag
+// Boot-evaluation flag
 //
-// Native-side mirror of `__NS_HMR_BOOT_COMPLETE__`. Read by the
-// runloop pump in `MaybePumpJSThreadDuringBoot` so its gate is a
-// single relaxed atomic load on the HMR-time hot path. The JS dev
-// client flips this via ns:module
-// `setDevBootComplete(bool)` once the real app root view
-// commits; boot orchestration itself is entirely userland.
-static std::atomic<bool> g_devSessionBootComplete{false};
+// Nonzero while this thread is evaluating an entry module (main or worker) —
+// the only window in which HttpFetchText's yield may pump the runloop:
+// during entry evaluation nothing else owns the runloop yet, while pumping
+// mid-app would re-enter arbitrary user code under a synchronous fetch.
+// Armed by ModuleInternal::RunModule; thread-local because the fetch and its
+// entry evaluation always share a thread, so a worker booting never arms the
+// main thread's pump. The runtime derives this itself — no client signal.
+static thread_local int t_bootEvaluationDepth = 0;
 
-static inline bool IsDevSessionBootComplete() {
-  return g_devSessionBootComplete.load(std::memory_order_relaxed);
-}
+void SetBootEvaluationActive(bool active) { t_bootEvaluationDepth += active ? 1 : -1; }
 
-void SetDevBootComplete(v8::Isolate* isolate, v8::Local<v8::Context> context, bool value) {
-  SetBooleanGlobal(isolate, context, "__NS_HMR_BOOT_COMPLETE__", value);
-  g_devSessionBootComplete.store(value, std::memory_order_relaxed);
-  if (IsScriptLoadingLogEnabled()) {
-    Log(@"[dev-boot] __NS_HMR_BOOT_COMPLETE__=%s", value ? "true" : "false");
-  }
-}
+static inline bool IsBootEvaluationActive() { return t_bootEvaluationDepth > 0; }
 
 // ─────────────────────────────────────────────────────────────
 // HTTP loader helpers
@@ -820,19 +806,19 @@ void FetchModuleBodyAsync(const std::string& url,
 // either side of the timer callback. v8::Locker is recursive, so nested
 // acquisition by the timer callback is safe.
 //
-// Gated to JS-thread + cold-boot only:
+// Gated to JS-thread + entry-evaluation only:
 //   - `Runtime::GetCurrentRuntime()` is thread_local; null on GCD
 //     background threads, so they never pump someone else's runloop.
-//   - `IsDevSessionBootComplete()` short-circuits once the dev client
-//     has committed its first stable view (it calls
-//     ns:module `setDevBootComplete(true)`) — no placeholder to repaint, and
-//     HMR-time fetches must not pay the pump cost.
+//   - `IsBootEvaluationActive()` limits pumping to the window in which
+//     ModuleInternal::RunModule is evaluating this thread's entry module —
+//     HMR-time fetches must not pay the pump cost, and pumping mid-app would
+//     re-enter user code under a synchronous fetch.
 //   - The runloop identity check survives any future change that
 //     decouples the runtime's captured runloop from the current thread.
 static void MaybePumpJSThreadDuringBoot() {
   Runtime* runtime = Runtime::GetCurrentRuntime();
   if (runtime == nullptr) return;
-  if (IsDevSessionBootComplete()) return;
+  if (!IsBootEvaluationActive()) return;
 
   v8::Isolate* isolate = runtime->GetIsolate();
   if (isolate == nullptr) return;
@@ -875,9 +861,8 @@ static inline void InvokeHttpFetchYield() {
 
 void CleanupHttpLoaderGlobals() {
   ClearAllCacheBustMarks();
-  // Reset the boot-complete flag so a re-launched runtime in the same
-  // process starts in "cold boot" mode again (runloop pump armed).
-  g_devSessionBootComplete.store(false, std::memory_order_relaxed);
+  // The boot-evaluation flag is thread-local and RAII-balanced by
+  // ModuleInternal::RunModule, so it needs no reset here.
   // Drop the client-supplied canonicalization vocabulary so a re-launched
   // runtime starts from the built-in fallback until its own client
   // configures it.
@@ -889,10 +874,9 @@ void CleanupHttpLoaderGlobals() {
 //
 // The runtime's dev surface is deliberately small: it exposes
 // *mechanism* only (resolution config, registry eviction, registry
-// introspection, boot-complete signal). All HMR *policy* — boot
-// orchestration, `import.meta.hot`, full reload, CSS apply, WebSocket
-// protocol, worker teardown — lives in the JS dev client
-// (`@nativescript/vite`).
+// introspection). All HMR *policy* — boot orchestration,
+// `import.meta.hot`, full reload, CSS apply, WebSocket protocol, worker
+// teardown — lives in the JS dev client (`@nativescript/vite`).
 // The surface is reachable exclusively through the `ns:module` builtin
 // module (require / static import / import()); there is no global.
 
@@ -1066,25 +1050,6 @@ void GetLoadedModuleUrlsCallback(const v8::FunctionCallbackInfo<v8::Value>& info
   info.GetReturnValue().Set(result);
 }
 
-// ns:module `setDevBootComplete(value?: boolean)` — the JS dev client calls
-// this (with `true`, or no argument) once the real app root view has
-// committed. It flips both the JS-visible `__NS_HMR_BOOT_COMPLETE__`
-// global and the native atomic that disarms the cold-boot runloop pump.
-// The client may also pass `false` before a full JS-realm reload to
-// re-arm the boot-time behaviors.
-void SetDevBootCompleteCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
-  v8::Isolate* isolate = info.GetIsolate();
-  v8::HandleScope scope(isolate);
-  v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
-
-  bool value = true;
-  if (info.Length() >= 1 && !info[0]->IsUndefined() && !info[0]->IsNull()) {
-    value = info[0]->BooleanValue(isolate);
-  }
-
-  tns::SetDevBootComplete(isolate, ctx, value);
-}
-
 }  // namespace
 
 bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> binding) {
@@ -1093,7 +1058,6 @@ bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> 
   InstallDevFunction(isolate, context, binding, "configureLoader", ConfigureLoaderCallback);
   InstallDevFunction(isolate, context, binding, "invalidateModules", InvalidateModulesCallback);
   InstallDevFunction(isolate, context, binding, "getLoadedModuleUrls", GetLoadedModuleUrlsCallback);
-  InstallDevFunction(isolate, context, binding, "setDevBootComplete", SetDevBootCompleteCallback);
 
   if (RuntimeConfig.IsDebug) {
     // Debug-only diagnostic: expose the HTTP canonical-key function to JS so

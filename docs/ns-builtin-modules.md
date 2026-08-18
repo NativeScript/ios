@@ -104,7 +104,6 @@ the full contract rationale.
 | `configureLoader(config)` | Install loader policy before the session imports anything: `importMap` (bare specifier → URL, consulted inside the synchronous resolver), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (`stripParams`/`forPathPrefixes`/`preserveQueryFor` vocabulary for registry keying). Each present section replaces its state wholesale. |
 | `invalidateModules(urls)` | Evict the given URLs (canonicalized) from the module registry and mark them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. |
 | `getLoadedModuleUrls()` | URL-like keys currently in the module registry (used to compute full-reload eviction sets). |
-| `setDevBootComplete(value?)` | Flip the dev-boot-complete signal (defaults to `true`); disarms cold-boot-only behaviors. |
 
 Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure test
 diagnostic; release builds omit it. Missing members are simply absent —

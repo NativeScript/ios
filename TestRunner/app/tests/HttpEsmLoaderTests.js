@@ -290,7 +290,9 @@ describe("HTTP ESM Loader", function() {
             expect(typeof nsModule.configureLoader).toBe("function");
             expect(typeof nsModule.invalidateModules).toBe("function");
             expect(typeof nsModule.getLoadedModuleUrls).toBe("function");
-            expect(typeof nsModule.setDevBootComplete).toBe("function");
+            // Boot state is derived by the runtime (the pump is armed only
+            // while an entry module evaluates); there is no client signal.
+            expect(nsModule.setDevBootComplete).toBeUndefined();
             // Worker teardown is userland (the dev client intercepts the
             // Worker constructor); the runtime deliberately exposes no
             // terminateAllWorkers member.
@@ -303,7 +305,7 @@ describe("HTTP ESM Loader", function() {
         // .d.ts and from release builds), so the expected set varies by build.
         it("exposes exactly the declared surface", function () {
             var nsModule = require("ns:module");
-            var expected = ["configureLoader", "getLoadedModuleUrls", "invalidateModules", "setDevBootComplete"];
+            var expected = ["configureLoader", "getLoadedModuleUrls", "invalidateModules"];
             if (typeof nsModule.canonicalizeHttpUrlKey === "function") {
                 expected.push("canonicalizeHttpUrlKey");
             }
