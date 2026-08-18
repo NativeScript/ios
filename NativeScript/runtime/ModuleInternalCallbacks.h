@@ -133,7 +133,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 // "value", ...}}
 void SetImportMap(const std::string& json);
 
-// Set URL patterns that should bypass module cache (e.g. "/@ns/sfc/", "?v=")
+// Set URL patterns that should bypass module cache (e.g. "?v=", "/hot/")
 void SetVolatilePatterns(const std::vector<std::string>& patterns);
 
 // Clear import map state and vendor module cache. Must be called before isolate

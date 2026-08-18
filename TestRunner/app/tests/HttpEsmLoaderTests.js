@@ -412,56 +412,78 @@ describe("HTTP ESM Loader", function() {
                 });
         });
 
-        it("drops t/v/import for NativeScript dev endpoints", function (done) {
-            var origin = getHostOrigin();
-            if (!origin) {
-                pending("REPORT_BASEURL not set; skipping host HTTP tests");
-                done();
-                return;
-            }
+        // Collapsing cache-busters onto one registry key needs a vocabulary;
+        // the runtime ships none, so these specs install one. Canonicalization
+        // config is process-wide, hence the restore. (Jasmine 2.0.1 has no
+        // beforeAll/afterAll.)
+        describe("with a dev-endpoint vocabulary configured", function () {
+            beforeEach(function () {
+                require("ns:module").configureLoader({
+                    canonicalization: {
+                        stripParams: ["t", "v", "import"],
+                        forPathPrefixes: ["/ns/"],
+                        preserveQueryFor: [],
+                    },
+                });
+            });
 
-            var u1 = origin + "/ns/m/query.mjs?v=1";
-            var u2 = origin + "/ns/m/query.mjs?v=2";
+            afterEach(function () {
+                require("ns:module").configureLoader({
+                    canonicalization: { stripParams: [], forPathPrefixes: [], preserveQueryFor: [] },
+                });
+            });
 
-            withTimeout(import(u1), 5000, "import " + u1)
-                .then(function (m1) {
-                    return withTimeout(import(u2), 5000, "import " + u2).then(function (m2) {
-                        // With cache-buster normalization, both imports should map to the same cache key.
-                        // The second import should reuse the first evaluated module.
-                        expect(m2.evaluatedAt).toBe(m1.evaluatedAt);
-                        expect(m2.query).toBe(m1.query);
+            it("drops the configured cache-busters for dev endpoints", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+
+                var u1 = origin + "/ns/m/query.mjs?v=1";
+                var u2 = origin + "/ns/m/query.mjs?v=2";
+
+                withTimeout(import(u1), 5000, "import " + u1)
+                    .then(function (m1) {
+                        return withTimeout(import(u2), 5000, "import " + u2).then(function (m2) {
+                            // Both URLs map to one cache key, so the second
+                            // import reuses the first evaluated module.
+                            expect(m2.evaluatedAt).toBe(m1.evaluatedAt);
+                            expect(m2.query).toBe(m1.query);
+                            done();
+                        });
+                    })
+                    .catch(function (error) {
+                        expect("rejected: " + formatError(error)).toBe("resolved");
                         done();
                     });
-                })
-                .catch(function (error) {
-                    fail("Expected dev-endpoint HTTP module imports to succeed: " + formatError(error));
+            });
+
+            it("sorts query params for dev endpoints", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
                     done();
-                });
-        });
+                    return;
+                }
 
-        it("sorts query params for NativeScript dev endpoints", function (done) {
-            var origin = getHostOrigin();
-            if (!origin) {
-                pending("REPORT_BASEURL not set; skipping host HTTP tests");
-                done();
-                return;
-            }
+                var u1 = origin + "/ns/m/query.mjs?b=2&a=1";
+                var u2 = origin + "/ns/m/query.mjs?a=1&b=2";
 
-            var u1 = origin + "/ns/m/query.mjs?b=2&a=1";
-            var u2 = origin + "/ns/m/query.mjs?a=1&b=2";
-
-            withTimeout(import(u1), 5000, "import " + u1)
-                .then(function (m1) {
-                    return withTimeout(import(u2), 5000, "import " + u2).then(function (m2) {
-                        expect(m2.evaluatedAt).toBe(m1.evaluatedAt);
-                        expect(m2.query).toBe(m1.query);
+                withTimeout(import(u1), 5000, "import " + u1)
+                    .then(function (m1) {
+                        return withTimeout(import(u2), 5000, "import " + u2).then(function (m2) {
+                            expect(m2.evaluatedAt).toBe(m1.evaluatedAt);
+                            expect(m2.query).toBe(m1.query);
+                            done();
+                        });
+                    })
+                    .catch(function (error) {
+                        expect("rejected: " + formatError(error)).toBe("resolved");
                         done();
                     });
-                })
-                .catch(function (error) {
-                    fail("Expected dev-endpoint HTTP module imports to succeed: " + formatError(error));
-                    done();
-                });
+            });
         });
 
         it("ignores URL fragments for cache identity", function (done) {
@@ -518,50 +540,91 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
         expect(typeof canon).toBe("function");
     });
 
-    it("drops dev cache-busters (t/v/import) but keeps real query params", function () {
-        checkKey("http://h/ns/core?p=x&t=123&v=9&import=1", "http://h/ns/core?p=x");
-    });
-
-    it("leaves public (non-dev, non-volatile) URLs untouched", function () {
-        checkKey("https://cdn.example.com/lib.js?token=abc", "https://cdn.example.com/lib.js?token=abc");
-    });
-
-    it("treats module identity as literally the URL — no path-tag collapses", function () {
-        // There is no path-tag vocabulary and no versioned /ns/rt|core
-        // collapsing: the server emits exactly one canonical URL per module
-        // and freshness is handled by eviction + the eviction-driven fetch
-        // nonce, never by URL variation.
-        checkKey("http://h/ns/m/foo.js", "http://h/ns/m/foo.js");
-        checkKey("http://h/ns/rt", "http://h/ns/rt");
-        checkKey("http://h/ns/core", "http://h/ns/core");
-    });
-
-    it("ignores URL fragments for dev endpoints", function () {
-        checkKey("http://h/ns/m/foo.js#frag", "http://h/ns/m/foo.js");
-    });
-
-    it("honors a client-supplied canonicalization vocabulary via configureLoader", function () {
-        var canon = getCanon();
-        if (typeof canon !== "function") {
-            pending("ns:module.canonicalizeHttpUrlKey not exposed (release build)");
-            return;
-        }
-        // The vocabulary below matches the built-in fallback exactly, so this
-        // spec exercises the configured code path without changing the
-        // process-wide canonicalization behavior other specs rely on.
-        require("ns:module").configureLoader({
-            canonicalization: {
-                stripParams: ["t", "v", "import"],
-                forPathPrefixes: ["/ns/", "/node_modules/.vite/", "/@id/", "/@fs/"],
-                preserveQueryFor: ["/@ng/component"],
-            },
+    // Unconfigured, the runtime knows no client vocabulary: it strips the
+    // fragment and nothing else. Which params are cache-busters and which
+    // paths are dev endpoints arrives through configureLoader.
+    describe("unconfigured (mechanical only)", function () {
+        it("keeps every query param, cache-buster-looking or not", function () {
+            checkKey("http://h/ns/core?p=x&t=123&v=9&import=1",
+                     "http://h/ns/core?p=x&t=123&v=9&import=1");
         });
-        // Dev endpoint: configured cache-busters stripped, real params kept.
-        expect(canon("http://h/ns/core?p=x&t=123&v=9&import=1")).toBe("http://h/ns/core?p=x");
-        // preserveQueryFor wins even under a dev-endpoint prefix.
-        expect(canon("http://h/ns/m/comp/@ng/component?c=a&t=42")).toBe("http://h/ns/m/comp/@ng/component?c=a&t=42");
-        // Non-dev URLs keep their query verbatim.
-        expect(canon("https://cdn.example.com/lib.js?token=abc")).toBe("https://cdn.example.com/lib.js?token=abc");
+
+        it("leaves public URLs untouched", function () {
+            checkKey("https://cdn.example.com/lib.js?token=abc",
+                     "https://cdn.example.com/lib.js?token=abc");
+        });
+
+        it("treats module identity as literally the URL — no path-tag collapses", function () {
+            checkKey("http://h/ns/m/foo.js", "http://h/ns/m/foo.js");
+            checkKey("http://h/ns/rt", "http://h/ns/rt");
+            checkKey("http://h/ns/core", "http://h/ns/core");
+        });
+
+        it("still drops the fragment", function () {
+            checkKey("http://h/ns/m/foo.js#frag", "http://h/ns/m/foo.js");
+            checkKey("https://cdn.example.com/lib.js?token=abc#frag",
+                     "https://cdn.example.com/lib.js?token=abc");
+        });
+    });
+
+    // Canonicalization config is process-wide, so each spec here installs its
+    // vocabulary and restores the unconfigured state afterwards. (Jasmine
+    // 2.0.1 has no beforeAll/afterAll.)
+    describe("with a client-supplied vocabulary", function () {
+        beforeEach(function () {
+            var nsModule = require("ns:module");
+            if (typeof nsModule.canonicalizeHttpUrlKey !== "function") {
+                return;
+            }
+            nsModule.configureLoader({
+                canonicalization: {
+                    stripParams: ["t", "v", "import"],
+                    forPathPrefixes: ["/dev/"],
+                    preserveQueryFor: ["/dev/metadata"],
+                },
+            });
+        });
+
+        afterEach(function () {
+            var nsModule = require("ns:module");
+            if (typeof nsModule.canonicalizeHttpUrlKey !== "function") {
+                return;
+            }
+            nsModule.configureLoader({
+                canonicalization: { stripParams: [], forPathPrefixes: [], preserveQueryFor: [] },
+            });
+        });
+
+        it("strips the configured cache-busters under a configured prefix", function () {
+            checkKey("http://h/dev/core?p=x&t=123&v=9&import=1", "http://h/dev/core?p=x");
+        });
+
+        it("lets preserveQueryFor win under a configured prefix", function () {
+            checkKey("http://h/dev/metadata?c=a&t=42", "http://h/dev/metadata?c=a&t=42");
+        });
+
+        it("leaves paths outside the configured prefixes alone", function () {
+            checkKey("http://h/ns/core?p=x&t=123", "http://h/ns/core?p=x&t=123");
+            checkKey("https://cdn.example.com/lib.js?token=abc",
+                     "https://cdn.example.com/lib.js?token=abc");
+        });
+    });
+});
+
+// A bare `@` is not a specifier the runtime knows: it resolves through the
+// normal path and fails, naming itself, instead of being swallowed into a
+// fabricated empty module.
+describe("invalid module specifiers", function () {
+    it("rejects a dynamic import of '@' with an error naming the specifier", function (done) {
+        import("@").then(function () {
+            expect("resolved").toBe("rejected");
+            done();
+        }).catch(function (e) {
+            var message = String((e && e.message) || e);
+            expect(message.indexOf("@") >= 0 ? "names the specifier" : message)
+                .toBe("names the specifier");
+            done();
+        });
     });
 });
 

@@ -224,43 +224,37 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // variation. There is deliberately no path-tag vocabulary to collapse here.
   //
   // Why `preserveQueryFor` exists (and is checked BEFORE the dev-endpoint
-  // prefix test, so it covers nested paths like
-  // `/ns/m/<componentDir>/@ng/component`): some endpoints' query IS the
-  // identity. Angular's `/@ng/component?c=<id>&t=<ts>` is the canonical
-  // example — each `t` identifies a specific recompile of the component's
-  // metadata, and stripping it would collapse every HMR fetch to the
-  // boot-time cache key, so `ɵɵreplaceMetadata` would forever replay stale
-  // template instructions ("server logs hmr update, screen never changes").
+  // prefix test, so it covers endpoints nested under a dev prefix): for some
+  // endpoints the query IS the identity. A framework that fetches recompiled
+  // component metadata under a timestamped query is the motivating case —
+  // stripping that timestamp would collapse every HMR fetch onto the boot-time
+  // cache key, and the client would forever replay stale metadata.
+  //
+  // Until a client supplies that vocabulary, canonicalization is purely
+  // mechanical: the fragment is gone and the query stays, because which params
+  // are cache-busters and which paths are dev endpoints is knowledge only the
+  // client has. Guessing would silently collapse two distinct modules onto one
+  // registry key.
+  if (!g_canonConfigured) {
+    return noHash;
+  }
+
   {
     std::string pathOnly = originAndPath.substr(pathStart);
-    if (g_canonConfigured) {
-      for (const auto& p : g_canonConfig.preserveQueryPrefixes) {
-        if (!p.empty() && pathOnly.find(p) != std::string::npos) {
-          return noHash;  // query preserved verbatim (fragment already removed)
-        }
+    for (const auto& p : g_canonConfig.preserveQueryPrefixes) {
+      if (!p.empty() && pathOnly.find(p) != std::string::npos) {
+        return noHash;  // query preserved verbatim (fragment already removed)
       }
-      bool isDevEndpoint = false;
-      for (const auto& p : g_canonConfig.devPathPrefixes) {
-        if (!p.empty() && StartsWith(pathOnly, p.c_str())) {
-          isDevEndpoint = true;
-          break;
-        }
+    }
+    bool isDevEndpoint = false;
+    for (const auto& p : g_canonConfig.devPathPrefixes) {
+      if (!p.empty() && StartsWith(pathOnly, p.c_str())) {
+        isDevEndpoint = true;
+        break;
       }
-      if (!isDevEndpoint) {
-        return noHash;
-      }
-    } else {
-      // Unconfigured: built-in vocabulary matching `@nativescript/vite`
-      // conventions.
-      if (pathOnly.find("/@ng/component") != std::string::npos) {
-        return noHash;
-      }
-      const bool isDevEndpoint = StartsWith(pathOnly, "/ns/") ||
-                                 StartsWith(pathOnly, "/node_modules/.vite/") ||
-                                 StartsWith(pathOnly, "/@id/") || StartsWith(pathOnly, "/@fs/");
-      if (!isDevEndpoint) {
-        return noHash;
-      }
+    }
+    if (!isDevEndpoint) {
+      return noHash;
     }
   }
 
@@ -276,14 +270,8 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     if (!pair.empty()) {
       size_t eq = pair.find('=');
       std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
-      bool drop;
-      if (g_canonConfigured) {
-        drop = std::find(g_canonConfig.stripParams.begin(), g_canonConfig.stripParams.end(),
-                         name) != g_canonConfig.stripParams.end();
-      } else {
-        // Built-in fallback: Vite's import marker and t/v cache stamps.
-        drop = (name == "import" || name == "t" || name == "v");
-      }
+      bool drop = std::find(g_canonConfig.stripParams.begin(), g_canonConfig.stripParams.end(),
+                            name) != g_canonConfig.stripParams.end();
       if (!drop) kept.push_back(pair);
     }
     if (amp == std::string::npos) break;

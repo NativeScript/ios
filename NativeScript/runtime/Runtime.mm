@@ -53,7 +53,7 @@ using namespace std;
 //      The URL IS the module identity;
 //      `import.meta.url` should be the URL verbatim.
 //
-//   2. Custom scheme — `node:fs`, `blob:...`, `optional:...`.
+//   2. Custom scheme — `node:fs`, `blob:...`.
 //      Synthetic / built-in modules that aren't backed by the local
 //      filesystem. Their identity is the scheme + body itself;
 //      `import.meta.url` keeps that string unchanged.

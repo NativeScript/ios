@@ -79,12 +79,6 @@ static std::string FileURLToPath(const std::string& url) {
   return url;
 }
 
-// Simple suffix check utility
-static inline bool EndsWith(const std::string& value, const std::string& suffix) {
-  if (suffix.size() > value.size()) return false;
-  return std::equal(suffix.rbegin(), suffix.rend(), value.rbegin());
-}
-
 static inline bool StartsWith(const std::string& s, const char* prefix) {
   size_t n = strlen(prefix);
   return s.size() >= n && s.compare(0, n, prefix) == 0;
@@ -384,38 +378,6 @@ static v8::MaybeLocal<v8::Promise> AdoptThenable(v8::Isolate* isolate,
   return adopter->GetPromise();
 }
 
-static v8::MaybeLocal<v8::Module> CompileModuleFromSource(v8::Isolate* isolate,
-                                                          v8::Local<v8::Context> context,
-                                                          const std::string& code,
-                                                          const std::string& urlStr) {
-  v8::EscapableHandleScope hs(isolate);
-  // Pass the std::string (length-aware overload), NOT code.c_str(): module
-  // source may contain embedded NUL bytes and the char* path would truncate.
-  v8::Local<v8::String> sourceText = tns::ToV8String(isolate, code);
-  v8::Local<v8::String> urlV8;
-  if (!v8::String::NewFromUtf8(isolate, urlStr.c_str(), v8::NewStringType::kNormal)
-           .ToLocal(&urlV8)) {
-    return v8::MaybeLocal<v8::Module>();
-  }
-  v8::ScriptOrigin origin(urlV8, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
-  v8::ScriptCompiler::Source src(sourceText, origin);
-  v8::Local<v8::Module> mod;
-  if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
-    return v8::MaybeLocal<v8::Module>();
-  }
-  if (mod->GetStatus() == v8::Module::kUninstantiated) {
-    if (!mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
-      return v8::MaybeLocal<v8::Module>();
-    }
-  }
-  if (mod->GetStatus() != v8::Module::kEvaluated) {
-    if (mod->Evaluate(context).IsEmpty()) {
-      return v8::MaybeLocal<v8::Module>();
-    }
-  }
-  return hs.Escape(mod);
-}
-
 // Compile-only variant for use inside ResolveModuleCallback. It compiles a v8::Module and
 // registers it under urlStr but does NOT instantiate or evaluate. V8 is currently instantiating
 // the importer and will handle instantiation of this dependency.
@@ -434,8 +396,8 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
     TNS_DEBUG(Esm, "[resolver][register-resolve-only] raw=%s key=%s", urlStr.c_str(),
               registryKey.c_str());
   }
-  // Length-aware conversion (see CompileModuleFromSource) — embedded NULs
-  // in module source must not truncate the compile input.
+  // Length-aware conversion: module source may contain embedded NUL bytes,
+  // which the char* overload would truncate.
   v8::Local<v8::String> sourceText = tns::ToV8String(isolate, code);
   v8::Local<v8::String> urlV8;
   if (!v8::String::NewFromUtf8(isolate, urlStr.c_str(), v8::NewStringType::kNormal)
@@ -480,30 +442,14 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
           if (msgStr.find("Unexpected identifier") != std::string::npos ||
               msgStr.find("Unexpected token") != std::string::npos) {
             // refine unexpected token categories
-            if (msgStr.find("export") != std::string::npos &&
-                code.find("export default") == std::string::npos &&
-                code.find("__sfc__") != std::string::npos)
-              classification = "missing-export-default";
-            else
-              classification = "syntax";
+            classification = "syntax";
           } else if (msgStr.find("Cannot use import statement") != std::string::npos) {
             classification = "wrap-error";
           }
         }
-        if (classification == std::string("unknown")) {
-          if (code.find("export default") == std::string::npos &&
-              code.find("__sfc__") != std::string::npos)
-            classification = "missing-export-default";
-          else if (code.find("__sfc__") != std::string::npos &&
-                   code.find("export {") == std::string::npos &&
-                   code.find("export ") == std::string::npos)
-            classification = "no-exports";
-          else if (code.find("import ") == std::string::npos &&
-                   code.find("export ") == std::string::npos)
-            classification = "not-module";
-          else if (code.find("_openBlock") != std::string::npos &&
-                   code.find("openBlock") == std::string::npos)
-            classification = "underscore-helper-unmapped";
+        if (classification == std::string("unknown") && code.find("import ") == std::string::npos &&
+            code.find("export ") == std::string::npos) {
+          classification = "not-module";
         }
         // Trim srcLineStr
         if (srcLineStr.size() > 240) srcLineStr = srcLineStr.substr(0, 240);
@@ -585,8 +531,7 @@ static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string&
     return true;
   }
 
-  return StartsWith(registryKey, "optional:") || StartsWith(registryKey, "node:") ||
-         StartsWith(registryKey, "blob:");
+  return StartsWith(registryKey, "node:") || StartsWith(registryKey, "blob:");
 }
 
 static std::string CanonicalizeRegistryKey(const std::string& key) {
@@ -610,8 +555,8 @@ static std::string CanonicalizeRegistryKey(const std::string& key) {
     classification = "blob";
     traceEvenWithoutChange = true;
   } else {
-    // Preserve non-filesystem module namespaces such as optional: and node:
-    // so synthetic/in-memory modules keep their exact registry identity.
+    // Preserve non-filesystem module namespaces such as node: so
+    // synthetic/in-memory modules keep their exact registry identity.
     size_t schemePos = key.find(':');
     size_t slashPos = key.find('/');
     if (schemePos != std::string::npos && (slashPos == std::string::npos || schemePos < slashPos)) {
@@ -736,144 +681,6 @@ static bool IsVolatileUrl(const std::string& url) {
     if (url.find(pat) != std::string::npos) return true;
   }
   return false;
-}
-
-// Normalize a Vite-rewritten specifier into the canonical import-map key.
-// Handles two common Vite dev-server rewrite patterns:
-//   1. Prebundled deps:  "/node_modules/.vite/deps/solid-js.js?v=abc"   → "solid-js"
-//                        "/node_modules/.vite/deps/@tanstack_solid-router.js" →
-//                        "@tanstack/solid-router"
-//   2. Explicit node_modules paths:
-//        "/node_modules/@angular/core/fesm2022/core.mjs" → "@angular/core/fesm2022/core.mjs"
-//        "/node_modules/tslib/tslib.es6.mjs"             → "tslib"
-//
-// For explicit node_modules paths we preserve non-main-entry subpaths so the
-// import map's trailing-slash HTTP prefixes can keep complex package build
-// outputs on HTTP. Only bare package roots and simple root-level main entries
-// collapse back to the package id for vendor/exact import-map resolution.
-// Returns the normalized import-map key or empty string if not a node_modules path.
-static std::string NormalizeViteSpecifier(const std::string& specifier) {
-  // Pattern 1: Vite prebundled deps — /node_modules/.vite/deps/<flattened-id>.js
-  {
-    const std::string viteDepsPrefix = "/node_modules/.vite/deps/";
-    // Also handle without leading slash
-    const std::string viteDepsPrefix2 = "node_modules/.vite/deps/";
-    std::string prefix;
-    if (specifier.compare(0, viteDepsPrefix.size(), viteDepsPrefix) == 0)
-      prefix = viteDepsPrefix;
-    else if (specifier.compare(0, viteDepsPrefix2.size(), viteDepsPrefix2) == 0)
-      prefix = viteDepsPrefix2;
-
-    if (!prefix.empty()) {
-      std::string id = specifier.substr(prefix.size());
-      // Strip extension (.js, .mjs, .cjs) and query params
-      auto qpos = id.find('?');
-      if (qpos != std::string::npos) id = id.substr(0, qpos);
-      auto dotpos = id.rfind('.');
-      if (dotpos != std::string::npos) id = id.substr(0, dotpos);
-      // Reverse esbuild flattening: first _ after @ is / (scope separator),
-      // remaining __ are . and _ are / — but we only need the package root.
-      // Examples: "solid-js" → "solid-js", "@tanstack_solid-router" → "@tanstack/solid-router"
-      if (!id.empty() && id[0] == '@') {
-        // Scoped package: find first underscore → scope/name
-        auto upos = id.find('_');
-        if (upos != std::string::npos) {
-          id = id.substr(0, upos) + "/" + id.substr(upos + 1);
-          // If there are more underscores, the rest is subpath — just keep scope/name
-          auto upos2 = id.find('_', upos + 1);
-          if (upos2 != std::string::npos) {
-            id = id.substr(0, upos2);
-          }
-        }
-      }
-      TNS_DEBUG(Esm, "[import-map][normalize] vite-deps: %s -> %s", specifier.c_str(), id.c_str());
-      return id;
-    }
-  }
-
-  // Pattern 2: Resolved node_modules path — /node_modules/<pkg>/...
-  {
-    const std::string nmPrefix = "/node_modules/";
-    const std::string nmPrefix2 = "node_modules/";
-    std::string sub;
-    if (specifier.compare(0, nmPrefix.size(), nmPrefix) == 0)
-      sub = specifier.substr(nmPrefix.size());
-    else if (specifier.compare(0, nmPrefix2.size(), nmPrefix2) == 0)
-      sub = specifier.substr(nmPrefix2.size());
-
-    if (!sub.empty() && sub[0] != '.') {
-      // Skip .vite/ paths (handled above)
-      if (sub.compare(0, 6, ".vite/") == 0) return "";
-
-      std::string subNoQuery = sub;
-      std::string querySuffix;
-      auto subQueryPos = sub.find('?');
-      if (subQueryPos != std::string::npos) {
-        subNoQuery = sub.substr(0, subQueryPos);
-        querySuffix = sub.substr(subQueryPos);
-      }
-
-      // Extract package name: @scope/name or name
-      std::string pkgName;
-      if (subNoQuery[0] == '@') {
-        // Scoped: @scope/name
-        auto slash1 = subNoQuery.find('/');
-        if (slash1 != std::string::npos) {
-          auto slash2 = subNoQuery.find('/', slash1 + 1);
-          pkgName = (slash2 != std::string::npos) ? subNoQuery.substr(0, slash2) : subNoQuery;
-        }
-      } else {
-        // Unscoped: name
-        auto slash = subNoQuery.find('/');
-        pkgName = (slash != std::string::npos) ? subNoQuery.substr(0, slash) : subNoQuery;
-      }
-      if (!pkgName.empty()) {
-        std::string normalized = pkgName;
-        std::string remainder;
-        if (subNoQuery.size() > pkgName.size()) {
-          remainder = subNoQuery.substr(pkgName.size());
-          if (!remainder.empty() && remainder[0] == '/') {
-            remainder.erase(0, 1);
-          }
-        }
-
-        if (!remainder.empty()) {
-          bool preserveSubpath = remainder.find('/') != std::string::npos;
-
-          if (!preserveSubpath) {
-            const std::string pkgBaseName = pkgName.substr(pkgName.find_last_of('/') + 1);
-            std::string withoutExt = remainder;
-            auto dot = withoutExt.rfind('.');
-            if (dot != std::string::npos) {
-              withoutExt = withoutExt.substr(0, dot);
-            }
-            std::string withoutPlatform = withoutExt;
-            for (const auto& suffix :
-                 {std::string(".ios"), std::string(".android"), std::string(".visionos")}) {
-              if (EndsWith(withoutPlatform, suffix)) {
-                withoutPlatform = withoutPlatform.substr(0, withoutPlatform.size() - suffix.size());
-                break;
-              }
-            }
-            const bool isRootLevelMainEntry = withoutPlatform == "index" ||
-                                              withoutPlatform == pkgBaseName ||
-                                              withoutPlatform.rfind(pkgBaseName + ".", 0) == 0;
-            preserveSubpath = !isRootLevelMainEntry;
-          }
-
-          if (preserveSubpath) {
-            normalized = pkgName + "/" + remainder + querySuffix;
-          }
-        }
-
-        TNS_DEBUG(Esm, "[import-map][normalize] node_modules: %s -> %s", specifier.c_str(),
-                  normalized.c_str());
-        return normalized;
-      }
-    }
-  }
-
-  return "";
 }
 
 // Look up a specifier in the import map. Supports both exact matches and
@@ -1036,7 +843,7 @@ static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate) {
 // import-map entry) — those stay on the resolver's lazy synchronous path.
 static std::string ResolveModuleRequestForWalk(const std::string& rawSpec,
                                                const std::string& referrerUrl) {
-  if (rawSpec.empty() || rawSpec == "@") {
+  if (rawSpec.empty()) {
     return "";
   }
   std::string spec = rawSpec;
@@ -1048,12 +855,6 @@ static std::string ResolveModuleRequestForWalk(const std::string& rawSpec,
 
   if (!g_importMap.empty()) {
     std::string mapped = LookupImportMap(spec);
-    if (mapped.empty()) {
-      std::string normalized = NormalizeViteSpecifier(spec);
-      if (!normalized.empty()) {
-        mapped = LookupImportMap(normalized);
-      }
-    }
     if (!mapped.empty()) {
       spec = mapped;
     }
@@ -1345,29 +1146,12 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonical
   }
   auto& registry = moduleState->registry;
   const std::string registryKey = CanonicalizeRegistryKey(canonicalPath);
-  // Defensive: never operate on an anomalous/sentinel key.
-  // This covers the bare "@" anomaly and the special invalid-at stub module used by the dev HTTP
-  // loader.
-  auto isSentinel = [](const std::string& s) -> bool {
-    if (s == "@") return true;
-    // Match any path or URL that includes the invalid-at stub filename
-    return s.find("__invalid_at__.mjs") != std::string::npos;
-  };
-  if (isSentinel(registryKey)) {
-    TNS_DEBUG(Esm, "[resolver][guard-v3] ignore remove for sentinel %s", registryKey.c_str());
-    return;
-  }
 
   // Classification helper for diagnostics
   auto classify = [](const std::string& s) -> const char* {
-    if (s == "@") return "sentinel:@";
-    if (s.find("__invalid_at__.mjs") != std::string::npos) return "sentinel:invalid_at";
     bool http = StartsWith(s, "http://") || StartsWith(s, "https://");
     if (http) {
-      if (IsVolatileUrl(s)) return "http:volatile";
-      if (s.find("/@ns/sfc/") != std::string::npos) return "http:sfc";
-      if (s.find("/@ns/m/") != std::string::npos) return "http:m";
-      return "http:other";
+      return IsVolatileUrl(s) ? "http:volatile" : "http:other";
     }
     if (StartsWith(s, "file://")) return "file-url";
     return "path";
@@ -1849,43 +1633,17 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
   TNS_DEBUG(Esm, "[resolver][spec] %s", normalizedSpec.c_str());
 
-  // Guard against a bare '@' spec showing up (invalid); return empty to avoid poisoning registry
-  // with '@'
-  if (normalizedSpec == "@") {
-    TNS_DEBUG(Esm, "[resolver][normalize] ignoring invalid '@' static spec");
-    return v8::MaybeLocal<v8::Module>();
-  }
-
   const std::string& spec =
       normalizedSpec;  // use normalized spec for the rest of the resolution logic
 
   // Import map resolution
   // If the import map is populated (set by ns:module configureLoader), check it
-  // before any other resolution. This is the highest-leverage change from
-  // the HMR architecture review: bare specifiers resolve through the map
-  // to either vendor URLs or HTTP module URLs, eliminating the need for
-  // Vite-side import rewriting.
-  //
-  // Specifier normalization. Vite rewrites bare specifiers to
-  // resolved paths (e.g. "solid-js" → "/node_modules/.vite/deps/solid-js.js").
-  // We normalize these back to bare package names so the import map can match
-  // them. This ensures a SINGLE instance of every package — no matter how
-  // Vite rewrites the import, the import map resolves to the canonical source.
+  // before any other resolution: bare specifiers resolve through the map to
+  // either vendor URLs or HTTP module URLs. A client that rewrites specifiers
+  // must map every form it emits — the runtime matches map keys literally and
+  // reverse-engineers no bundler's rewriting.
   if (!g_importMap.empty()) {
     std::string mapped = LookupImportMap(spec);
-
-    // If direct lookup failed, try normalizing Vite-rewritten specifiers
-    // back to bare package names and look up again.
-    if (mapped.empty()) {
-      std::string normalized = NormalizeViteSpecifier(spec);
-      if (!normalized.empty()) {
-        mapped = LookupImportMap(normalized);
-        if (!mapped.empty() && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
-          TNS_DEBUG(Esm, "[resolver][import-map] normalized: %s -> %s -> %s", spec.c_str(),
-                    normalized.c_str(), mapped.c_str());
-        }
-      }
-    }
 
     if (!mapped.empty()) {
       // Mapped to an HTTP URL or other specifier — update spec and fall
@@ -2513,19 +2271,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   }
 
   // ── Import map resolution for dynamic import() ────────────────
-  if (!g_importMap.empty() && !normalizedSpec.empty() && normalizedSpec != "@") {
+  if (!g_importMap.empty() && !normalizedSpec.empty()) {
     std::string mapped = LookupImportMap(normalizedSpec);
-    // If direct lookup failed, try normalizing Vite-rewritten specifiers
-    if (mapped.empty()) {
-      std::string normalized = NormalizeViteSpecifier(normalizedSpec);
-      if (!normalized.empty()) {
-        mapped = LookupImportMap(normalized);
-        if (!mapped.empty() && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
-          TNS_DEBUG(Esm, "[dyn-import][import-map] normalized: %s -> %s -> %s",
-                    normalizedSpec.c_str(), normalized.c_str(), mapped.c_str());
-        }
-      }
-    }
     if (!mapped.empty()) {
       // Mapped to an HTTP URL or other specifier
       normalizedSpec = mapped;
@@ -2538,34 +2285,6 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
   // Re-use the static resolver to locate / compile the module.
   try {
-    // Defensive guard: some dev-time toolchains may emit a stray import('@') during bootstrap.
-    // Treat it as a no-op module to avoid surfacing a hard failure while continuing with real
-    // imports.
-    if (!normalizedSpec.empty() && normalizedSpec == "@") {
-      TNS_DEBUG(Esm, "[dyn-import] ignoring invalid '@' spec (returning empty module)");
-      const char* kEmptySrc = "export {}\n";
-      std::string url = "file:///app/__invalid_at__.mjs";
-      v8::MaybeLocal<v8::Module> modMaybe =
-          CompileModuleFromSource(isolate, context, kEmptySrc, url);
-      v8::Local<v8::Module> mod;
-      if (modMaybe.ToLocal(&mod)) {
-        const std::string atStubKey = CanonicalizeRegistryKey(url);
-        registry[atStubKey].Reset(isolate, mod);
-        IndexRegisteredModule(*moduleState, atStubKey, mod);
-        if (mod->GetStatus() != v8::Module::kEvaluated) {
-          if (mod->Evaluate(context).IsEmpty()) {
-            resolver
-                ->Reject(context, v8::Exception::Error(tns::ToV8String(
-                                      isolate, "Evaluation failed for empty module")))
-                .FromMaybe(false);
-            return scope.Escape(resolver->GetPromise());
-          }
-        }
-        resolver->Resolve(context, mod->GetModuleNamespace()).FromMaybe(false);
-        return scope.Escape(resolver->GetPromise());
-      }
-    }
-
     // ── Blob URL support (e.g., blob:nativescript/<uuid>) ──
     // Also useful for HMR updates where we can load a blob URL
     // We retrieve the blob content from the global BLOB_STORE via URL.InternalAccessor.getData()
@@ -2930,16 +2649,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       if (itExisting != registry.end()) {
         v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
         if (!existing.IsEmpty()) {
-          // Permanent observability: surface every HTTP dynamic-import
-          // cache hit so we can verify the runtime *did* drop the entry
-          // on invalidate. Filtered to angular component-shaped URLs to
-          // avoid spam from vendor chunks. Verbose-gated.
-          if (tns::LogCategoryEnabled(tns::LogCategory::Registry) &&
-              (key.find("ns/m/") != std::string::npos ||
-               key.find(".component") != std::string::npos)) {
-            TNS_DEBUG(Registry, "dyn-cache HIT %s status=%s", key.c_str(),
-                      ModuleStatusToString(existing->GetStatus()));
-          }
+          // Verifies that an invalidation really did drop the entry.
+          TNS_DEBUG(Registry, "dyn-cache HIT %s status=%s", key.c_str(),
+                    ModuleStatusToString(existing->GetStatus()));
           if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
             TNS_DEBUG(Esm, "[dyn-import][http-cache] hit %s", key.c_str());
             TNS_DEBUG(Esm, "  ↳ status=%s", ModuleStatusToString(existing->GetStatus()));
@@ -3068,14 +2780,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // mark in-flight before starting the async graph load
       modulesInFlight.insert(key);
       httpDynamicWaiters[key].emplace_back(isolate, resolver);
-      // Permanent observability: surface fresh fetches so we can confirm
-      // that post-invalidation, the next dynamic import does NOT re-use
-      // the cache and DOES go to the network. Filtered to component
-      // shapes to avoid vendor-chunk noise. Verbose-gated.
-      if (tns::LogCategoryEnabled(tns::LogCategory::Registry) &&
-          (key.find("ns/m/") != std::string::npos || key.find(".component") != std::string::npos)) {
-        TNS_DEBUG(Registry, "dyn-cache FRESH-FETCH %s", key.c_str());
-      }
+      // Confirms that after an invalidation the next dynamic import does NOT
+      // reuse the cache and DOES go to the network.
+      TNS_DEBUG(Registry, "dyn-cache FRESH-FETCH %s", key.c_str());
       // Async pipeline: fetch + compile the transitive closure off the JS
       // thread's critical path, then instantiate/evaluate and settle the
       // queued waiters from the walk's completion. The promise returns to JS
