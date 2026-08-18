@@ -297,6 +297,52 @@ describe("HTTP ESM Loader", function() {
                 });
             });
 
+            // The vocabulary is per-isolate; a worker gets a copy taken on the
+            // parent's thread as it spawns.
+            it("gives a worker spawned after configureLoader the parent's map", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                setMap({ imports: { "ns-worker-leaf": origin + "/esm/graph-leaf.mjs?k=wa" } });
+
+                var worker = new Worker("./importMapWorker.js");
+                worker.onmessage = function (msg) {
+                    expect(msg.data.ok ? "resolved" : "failed: " + msg.data.error).toBe("resolved");
+                    expect(msg.data.name).toBe("wa");
+                    worker.terminate();
+                    done();
+                };
+                worker.postMessage("ns-worker-leaf");
+            });
+
+            it("leaves a running worker on the map it was spawned with", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                setMap({ imports: { "ns-worker-leaf": origin + "/esm/graph-leaf.mjs?k=wb" } });
+
+                var worker = new Worker("./importMapWorker.js");
+                worker.onmessage = function (msg) {
+                    expect(msg.data.ok ? "resolved" : "failed: " + msg.data.error).toBe("resolved");
+                    // The worker still sees the map captured at its spawn, not
+                    // the one installed after it started.
+                    expect(msg.data.name).toBe("wb");
+                    worker.terminate();
+                    done();
+                };
+
+                // Reconfigure the parent only after the worker exists, then ask
+                // it to resolve. The parent's own isolate does see the update.
+                setMap({ imports: { "ns-worker-leaf": origin + "/esm/graph-leaf.mjs?k=wc" } });
+                worker.postMessage("ns-worker-leaf");
+            });
+
             it("resolves through the scope cascade for every referrer", function (done) {
                 var origin = getHostOrigin();
                 if (!origin) {

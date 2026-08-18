@@ -4,6 +4,7 @@
 #include "Constants.h"
 #include "Helpers.h"
 #include "ModuleBinding.hpp"
+#include "ModuleInternalCallbacks.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -171,7 +172,15 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     tns::SetValue(isolate, thiz, worker);
     std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(context, thiz);
 
-    std::function<Isolate*()> func([worker, workerPath]() {
+    // The loader vocabulary is per-isolate, so the worker gets a COPY taken
+    // here, on the parent's thread, and installed on the worker's isolate
+    // before it loads anything. Nothing is shared, so nothing needs
+    // synchronizing — and a live worker deliberately does not observe a later
+    // configureLoader on the parent (the dev client restarts workers on
+    // vocabulary updates).
+    tns::LoaderVocabulary inheritedVocabulary = tns::CaptureLoaderVocabulary(isolate);
+
+    std::function<Isolate*()> func([worker, workerPath, inheritedVocabulary]() {
       // Resolve tilde paths before creating the runtime
       std::string resolvedPath = workerPath;
       if (!workerPath.empty() && workerPath[0] == '~') {
@@ -185,6 +194,8 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       Isolate* isolate = runtime->CreateIsolate();
       v8::Locker locker(isolate);
       runtime->Init(isolate, true);
+      // Before any module load runs in this isolate.
+      tns::InstallLoaderVocabulary(isolate, inheritedVocabulary);
       runtime->SetWorkerId(worker->WorkerId());
       int workerId = worker->WorkerId();
       Worker::SetWorkerId(isolate, workerId);

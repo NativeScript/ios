@@ -53,6 +53,10 @@ declare module "ns:module" {
    * Loader policy, installed before the dev session imports anything. Every
    * section is optional; each present section replaces its native state
    * wholesale.
+   *
+   * The policy applies to the isolate that calls `configureLoader`. A worker
+   * inherits a copy of its parent's policy taken at spawn; a worker already
+   * running does not observe a later reconfiguration.
    */
   export interface LoaderConfig {
     /**

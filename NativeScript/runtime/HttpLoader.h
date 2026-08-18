@@ -36,20 +36,17 @@ namespace tns {
 // because the query IS the identity — is server/framework policy, supplied
 // by the dev client via
 // ns:module `configureLoader({ canonicalization: {...} })` and consumed by
-// `CanonicalizeHttpUrlKey`.
+// `CanonicalizeHttpUrlKey`. It is per-isolate loader vocabulary — installed
+// through SetCanonicalizationConfig in ModuleInternalCallbacks.h — so
+// CanonicalizeHttpUrlKey runs on the isolate's own thread only. The transport
+// never canonicalizes; it carries keys computed for it.
 //
-// When unconfigured, a built-in vocabulary matching current
-// `@nativescript/vite` conventions applies.
+// When unconfigured, canonicalization is purely mechanical (fragment strip).
 struct CanonicalizationConfig {
   std::vector<std::string> stripParams;      // query param names to drop
   std::vector<std::string> devPathPrefixes;  // StartsWith → normalize query
   std::vector<std::string> preserveQueryPrefixes;  // contains → keep query
 };
-
-// Install the client-supplied vocabulary. Presence of the configuration
-// replaces the built-in fallback entirely — empty vectors are honored as
-// explicit policy.
-void SetCanonicalizationConfig(CanonicalizationConfig config);
 
 // Normalize an HTTP(S) URL into a stable module registry/cache key.
 // - Always strips URL fragments.
@@ -87,7 +84,11 @@ struct ModuleFetchResult {
 // Synchronous module fetch with one retry on transport error — the fallback
 // path for anything the async module-graph walk missed. Blocks the calling
 // thread. Returns `result.ok`.
-bool HttpFetchModule(const std::string& url, ModuleFetchResult& result);
+// `canonicalKey` is the module's canonical registry key, computed by the
+// caller on its isolate's thread — the transport must never canonicalize,
+// since that reads per-isolate loader vocabulary.
+bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
+                     ModuleFetchResult& result);
 
 // Asynchronous single-URL module fetch — the I/O primitive behind the
 // module-graph walk (see StartModuleGraphLoad in ModuleInternalCallbacks.h).
@@ -98,8 +99,11 @@ bool HttpFetchModule(const std::string& url, ModuleFetchResult& result);
 //     one retry on transport error.
 // `completion(result)` is invoked exactly once, on an arbitrary thread —
 // callers must hop to their JS thread before touching V8.
+// `canonicalKey` as for HttpFetchModule: computed on the calling isolate's
+// thread and carried, because the fetch and its completion run on background
+// threads that cannot read per-isolate vocabulary.
 void FetchModuleBodyAsync(
-    const std::string& url,
+    const std::string& url, const std::string& canonicalKey,
     std::function<void(ModuleFetchResult result)> completion);
 
 // Register a "yield" callback that `HttpFetchModule` should invoke around its
@@ -121,20 +125,18 @@ void RegisterHttpFetchYield(void (*callback)());
 // and a reload-ignoring cache policy). Called by `InvalidateModules` for
 // the eviction set; marks are consumed when a fresh body arrives.
 // The nonce is transport-only and never affects module identity.
-void MarkUrlsForCacheBust(const std::vector<std::string>& urls);
+//
+// Takes canonical registry keys, already computed by the caller on its
+// isolate's thread: the mark set guards the process-global CFNetwork cache
+// and is consulted from background fetch threads, which must never
+// canonicalize (that reads per-isolate vocabulary).
+void MarkKeysForCacheBust(const std::vector<std::string>& canonicalKeys);
 
 // Arm/disarm this thread's boot-evaluation window: while nonzero, the yield
 // inside synchronous HTTP fetches may pump the JS thread's runloop (safe
 // only while the entry module is evaluating — nothing else owns the runloop
 // yet). Balanced RAII-style by ModuleInternal::RunModule.
 void SetBootEvaluationActive(bool active);
-
-// Clear process-wide HTTP-loader state (cache-bust marks,
-// canonicalization vocabulary). MUST be called inside
-// Runtime::~Runtime() before isolate disposal — and only for the MAIN
-// isolate (worker teardown must not wipe shared state the main isolate
-// still uses).
-void CleanupHttpLoaderGlobals();
 
 // ─────────────────────────────────────────────────────────────
 // Remote-module security gate

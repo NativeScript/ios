@@ -137,32 +137,13 @@ static inline bool IsBootEvaluationActive() { return t_bootEvaluationDepth > 0; 
 // ─────────────────────────────────────────────────────────────
 // HTTP loader helpers
 
-// Write-before-read contract: the client configures the canonicalization
-// vocabulary once, before the first import wave (session-bootstrap order), so
-// plain statics are safe here — the same convention as `g_volatilePatterns` /
-// `g_importMap`. URLs touched before configuration (the local trampoline's
+// URLs touched before the client configures anything (the local trampoline's
 // clean `/ns/core/*` imports) carry no query, so they canonicalize identically
 // under any vocabulary.
-static CanonicalizationConfig g_canonConfig;
-static bool g_canonConfigured = false;
-
-void SetCanonicalizationConfig(CanonicalizationConfig config) {
-  g_canonConfig = std::move(config);
-  g_canonConfigured = true;
-  TNS_DEBUG(Esm,
-            "[ns:module configureLoader] canonicalization set (strip=%lu devPrefixes=%lu "
-            "preserve=%lu)",
-            (unsigned long)g_canonConfig.stripParams.size(),
-            (unsigned long)g_canonConfig.devPathPrefixes.size(),
-            (unsigned long)g_canonConfig.preserveQueryPrefixes.size());
-}
-
-static void ResetCanonicalizationConfig() {
-  g_canonConfig = CanonicalizationConfig{};
-  g_canonConfigured = false;
-}
-
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
+  // Per-isolate vocabulary, so this runs on the isolate's own thread. Fetch
+  // threads never reach here — they carry keys computed for them.
+  const CanonicalizationConfig* canonConfig = CanonicalizationConfigForCurrentIsolate();
   // Some loaders wrap HTTP module URLs as file://http(s)://...
   std::string normalizedUrl = url;
   if (StartsWith(normalizedUrl, "file://http://") || StartsWith(normalizedUrl, "file://https://")) {
@@ -216,19 +197,19 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // are cache-busters and which paths are dev endpoints is knowledge only the
   // client has. Guessing would silently collapse two distinct modules onto one
   // registry key.
-  if (!g_canonConfigured) {
+  if (canonConfig == nullptr) {
     return noHash;
   }
 
   {
     std::string pathOnly = originAndPath.substr(pathStart);
-    for (const auto& p : g_canonConfig.preserveQueryPrefixes) {
+    for (const auto& p : canonConfig->preserveQueryPrefixes) {
       if (!p.empty() && pathOnly.find(p) != std::string::npos) {
         return noHash;  // query preserved verbatim (fragment already removed)
       }
     }
     bool isDevEndpoint = false;
-    for (const auto& p : g_canonConfig.devPathPrefixes) {
+    for (const auto& p : canonConfig->devPathPrefixes) {
       if (!p.empty() && StartsWith(pathOnly, p.c_str())) {
         isDevEndpoint = true;
         break;
@@ -251,8 +232,8 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
     if (!pair.empty()) {
       size_t eq = pair.find('=');
       std::string name = (eq == std::string::npos) ? pair : pair.substr(0, eq);
-      bool drop = std::find(g_canonConfig.stripParams.begin(), g_canonConfig.stripParams.end(),
-                            name) != g_canonConfig.stripParams.end();
+      bool drop = std::find(canonConfig->stripParams.begin(), canonConfig->stripParams.end(),
+                            name) != canonConfig->stripParams.end();
       if (!drop) kept.push_back(pair);
     }
     if (amp == std::string::npos) break;
@@ -285,33 +266,28 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
 static std::mutex g_bustNextFetchMutex;
 static robin_hood::unordered_set<std::string> g_bustNextFetchKeys;
 
-void MarkUrlsForCacheBust(const std::vector<std::string>& urls) {
-  if (urls.empty()) return;
+void MarkKeysForCacheBust(const std::vector<std::string>& canonicalKeys) {
+  if (canonicalKeys.empty()) return;
   std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
-  for (const auto& url : urls) {
-    if (url.empty()) continue;
-    if (!(StartsWith(url, "http://") || StartsWith(url, "https://"))) continue;
-    g_bustNextFetchKeys.insert(CanonicalizeHttpUrlKey(url));
+  for (const auto& key : canonicalKeys) {
+    if (key.empty()) continue;
+    if (!(StartsWith(key, "http://") || StartsWith(key, "https://"))) continue;
+    g_bustNextFetchKeys.insert(key);
   }
 }
 
 // Peek (do not consume) — the fetch may be retried on transient failure
 // and the retry must still carry a nonce. Cleared on fetch success.
-static bool IsUrlMarkedForCacheBust(const std::string& url) {
+static bool IsKeyMarkedForCacheBust(const std::string& canonicalKey) {
   std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
   if (g_bustNextFetchKeys.empty()) return false;
-  return g_bustNextFetchKeys.find(CanonicalizeHttpUrlKey(url)) != g_bustNextFetchKeys.end();
+  return g_bustNextFetchKeys.find(canonicalKey) != g_bustNextFetchKeys.end();
 }
 
-static void ClearCacheBustForUrl(const std::string& url) {
+static void ClearCacheBustForKey(const std::string& canonicalKey) {
   std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
   if (g_bustNextFetchKeys.empty()) return;
-  g_bustNextFetchKeys.erase(CanonicalizeHttpUrlKey(url));
-}
-
-static void ClearAllCacheBustMarks() {
-  std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
-  g_bustNextFetchKeys.clear();
+  g_bustNextFetchKeys.erase(canonicalKey);
 }
 
 // ============================================================================
@@ -339,8 +315,8 @@ static void ClearAllCacheBustMarks() {
 
 // Forward declarations — these helpers are defined below their first use,
 // matching the existing convention in this file.
-static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
-                                     std::string& contentType, int& status);
+static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
+                                     std::string& out, std::string& contentType, int& status);
 static void MaybePumpJSThreadDuringBoot();
 // Forward decl: the pluggable HTTP-fetch yield hook is defined below
 // MaybePumpJSThreadDuringBoot (which is its default callback), but HttpFetchModule
@@ -491,7 +467,8 @@ static void ClassifyModuleResponse(const std::string& url, bool transportOk, int
   result.body = std::move(body);
 }
 
-bool HttpFetchModule(const std::string& url, ModuleFetchResult& result) {
+bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
+                     ModuleFetchResult& result) {
   result = ModuleFetchResult();
 
   // Security gate: the single point of enforcement for all HTTP module
@@ -517,13 +494,13 @@ bool HttpFetchModule(const std::string& url, ModuleFetchResult& result) {
   std::string body;
   std::string contentType;
   int status = 0;
-  bool transportOk = PerformHttpFetchOnceSync(url, body, contentType, status);
+  bool transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
   if (!transportOk) {
     // One retry, and only for a transport error: an HTTP status is an answer,
     // not a failure to communicate, so asking again would just repeat it.
     TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
     usleep(120 * 1000);
-    transportOk = PerformHttpFetchOnceSync(url, body, contentType, status);
+    transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
   }
   // NOTE: no long dev-server-startup retry loop here on purpose. The CLI's
   // `compileWithWatch` gates app deploy/restart on its `vite serve`
@@ -595,6 +572,7 @@ bool HttpFetchModule(const std::string& url, ModuleFetchResult& result) {
 // marked for an eviction-driven cache-bust nonce (the caller clears the
 // mark once a fresh body actually arrives).
 static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
+                                                    const std::string& canonicalKey,
                                                     bool* outBustRequested) {
   // One-time: replace the shared NSURLCache with a zero-capacity one
   // so CFNetwork has no on-disk store to satisfy fetches from. Per-
@@ -610,7 +588,7 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
   });
 
   // Eviction-driven cache-bust: if this URL's canonical key was marked
-  // by `InvalidateModules` (via `MarkUrlsForCacheBust`), append a
+  // by `InvalidateModules` (via `MarkKeysForCacheBust`), append a
   // unique nonce query parameter so CFNetwork sees a different URL
   // and cannot satisfy the request from any cache layer. The dev
   // server ignores unknown query params on module routes, so the
@@ -619,7 +597,7 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
   // verbatim (some Vite virtual routes require exact-match URLs and
   // 404 on unknown query params).
   std::string fetchUrl = url;
-  const bool bustRequested = IsUrlMarkedForCacheBust(url);
+  const bool bustRequested = IsKeyMarkedForCacheBust(canonicalKey);
   if (outBustRequested) *outBustRequested = bustRequested;
   if (bustRequested) {
     static std::atomic<uint64_t> s_fetchSeq{0};
@@ -670,11 +648,11 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
   return request;
 }
 
-static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
-                                     std::string& contentType, int& status) {
+static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
+                                     std::string& out, std::string& contentType, int& status) {
   @autoreleasepool {
     bool bustRequested = false;
-    NSMutableURLRequest* request = BuildModuleFetchRequest(url, &bustRequested);
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustRequested);
     if (!request) {
       status = 0;
       return false;
@@ -764,7 +742,7 @@ static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
     // same URL don't keep paying the nonce (and stay exact-match for
     // routes that require it).
     if (bustRequested && httpStatusLocal >= 200 && httpStatusLocal < 300) {
-      ClearCacheBustForUrl(url);
+      ClearCacheBustForKey(canonicalKey);
     }
     return true;
   }
@@ -806,11 +784,11 @@ static NSURLSession* ModuleFetchSession() {
 // invocation + delete. Retries once on transport error, mirroring the
 // single-retry policy of the synchronous path.
 static void PerformModuleFetchAsyncAttempt(
-    const std::string& url, int attempt,
+    const std::string& url, const std::string& canonicalKey, int attempt,
     std::function<void(ModuleFetchResult result)>* completionHeap) {
   @autoreleasepool {
     bool bustRequested = false;
-    NSMutableURLRequest* request = BuildModuleFetchRequest(url, &bustRequested);
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustRequested);
     if (!request) {
       ModuleFetchResult failed;
       failed.failureReason = "HTTP import failed: " + url + " (malformed request URL)";
@@ -820,6 +798,7 @@ static void PerformModuleFetchAsyncAttempt(
     }
 
     const std::string urlCopy = url;
+    const std::string keyCopy = canonicalKey;
     const bool bust = bustRequested;
     const uint64_t startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
     NSURLSessionDataTask* task = [ModuleFetchSession()
@@ -850,7 +829,9 @@ static void PerformModuleFetchAsyncAttempt(
                         (error.localizedDescription ?: @"<no description>").UTF8String);
               dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_MSEC)),
                              dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-                               PerformModuleFetchAsyncAttempt(urlCopy, 1, completionHeap);
+                               // Background thread: the carried key is the
+                               // only way this attempt can consult the bust set.
+                               PerformModuleFetchAsyncAttempt(urlCopy, keyCopy, 1, completionHeap);
                              });
               return;
             }
@@ -859,7 +840,7 @@ static void PerformModuleFetchAsyncAttempt(
             ClassifyModuleResponse(urlCopy, error == nil, status, contentType, body, result);
 
             if (result.ok && bust) {
-              ClearCacheBustForUrl(urlCopy);
+              ClearCacheBustForKey(keyCopy);
             }
             if (!result.ok) {
               TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] attempt=%d %s", attempt,
@@ -877,7 +858,7 @@ static void PerformModuleFetchAsyncAttempt(
   }
 }
 
-void FetchModuleBodyAsync(const std::string& url,
+void FetchModuleBodyAsync(const std::string& url, const std::string& canonicalKey,
                           std::function<void(ModuleFetchResult result)> completion) {
   // Security gate: single point of enforcement, same as HttpFetchModule.
   if (!IsRemoteUrlAllowed(url)) {
@@ -890,7 +871,7 @@ void FetchModuleBodyAsync(const std::string& url,
   }
 
   auto* completionHeap = new std::function<void(ModuleFetchResult)>(std::move(completion));
-  PerformModuleFetchAsyncAttempt(url, 0, completionHeap);
+  PerformModuleFetchAsyncAttempt(url, canonicalKey, 0, completionHeap);
 }
 
 // Cold-boot JS-thread runloop pump.
@@ -955,16 +936,6 @@ void RegisterHttpFetchYield(void (*callback)()) {
 static inline void InvokeHttpFetchYield() {
   auto cb = g_httpFetchYield.load(std::memory_order_acquire);
   if (cb != nullptr) cb();
-}
-
-void CleanupHttpLoaderGlobals() {
-  ClearAllCacheBustMarks();
-  // The boot-evaluation flag is thread-local and RAII-balanced by
-  // ModuleInternal::RunModule, so it needs no reset here.
-  // Drop the client-supplied canonicalization vocabulary so a re-launched
-  // runtime starts from the built-in fallback until its own client
-  // configures it.
-  ResetCanonicalizationConfig();
 }
 
 }  // namespace tns

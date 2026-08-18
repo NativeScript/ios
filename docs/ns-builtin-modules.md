@@ -120,7 +120,7 @@ the full contract rationale.
 
 | export | description |
 |---|---|
-| `configureLoader(config)` | Install loader policy before the session imports anything: `importMap` (`imports` + `scopes`, consulted inside the synchronous resolver — see below), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (`stripParams`/`forPathPrefixes`/`preserveQueryFor` vocabulary for registry keying). Each present section replaces its state wholesale. An invalid `importMap` throws a `TypeError` and leaves the previously installed map untouched. |
+| `configureLoader(config)` | Install loader policy before the session imports anything: `importMap` (`imports` + `scopes`, consulted inside the synchronous resolver — see below), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (`stripParams`/`forPathPrefixes`/`preserveQueryFor` vocabulary for registry keying). Each present section replaces its state wholesale. An invalid `importMap` throws a `TypeError` and leaves the previously installed map untouched. **Configures the calling isolate.** A worker inherits a copy of its parent's vocabulary taken at spawn, so a worker started after `configureLoader` resolves through it; a worker already running does **not** see a later reconfiguration — the dev client restarts workers when the vocabulary changes. |
 | `invalidateModules(urls)` | Evict the given URLs (canonicalized) from the module registry and mark them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. |
 | `getLoadedModuleUrls()` | URL-like keys currently in the module registry (used to compute full-reload eviction sets). |
 | `createRequire(filenameOrURL)` | A `require` resolving against `filenameOrURL`'s directory (a trailing slash names the directory itself). Accepts an absolute path string, a `file:` URL string, or a URL object; anything else throws a `TypeError`, and an `http(s)` base is refused outright because `require()` of a dev-served module is not supported — import those. ES module graphs load under Node's `require(esm)` rule: a graph containing top-level await is refused before it evaluates. |
@@ -163,6 +163,13 @@ consults the most specific matching scope first, then progressively less
 specific ones, then `imports` — so a scope can override a global mapping for
 one subtree and fall through to it everywhere else. The resolver, the graph
 walk, and `import()` all resolve through the same cascade.
+
+The vocabulary is per-isolate: `configureLoader` writes the isolate that
+calls it, and nothing is shared between isolates, so no lock guards it. A
+worker receives a copy captured on the parent's thread while it spawns and
+installed before the worker loads its first module. That copy is a snapshot —
+reconfiguring the parent afterwards leaves running workers on the vocabulary
+they started with, which is why the dev client restarts workers on an update.
 
 The whole map is parsed and validated before any of it is installed. A
 malformed map, a non-string target, an unknown top-level section, or a

@@ -271,26 +271,6 @@ Runtime::~Runtime() {
       eventLoop_->Shutdown();
     }
 
-    // Clear the remaining dev-loader + import-map globals (`g_importMap`,
-    // cache-bust marks, boot-complete flag) before isolate disposal.
-    //
-    // CRITICAL: unlike the per-isolate module maps above, these globals are
-    // PROCESS-WIDE. They live in the main isolate's address space but every
-    // Runtime destructor would clear them. That's wrong for worker-isolate
-    // teardown: when a worker dies (e.g. terminated by the dev client's
-    // worker sweep during an
-    // HMR cycle), its Runtime destructor MUST NOT wipe the main isolate's import
-    // map — doing so silently breaks the next HMR cycle's bare-specifier
-    // resolution (vendor packages fall back to filesystem and fail with
-    // `Cannot find module @scope/pkg`). So we gate this cleanup on "this is
-    // the main isolate"; worker teardown leaves the shared globals intact and
-    // the main isolate keeps serving HMR cycles. Real process-teardown still
-    // routes through the main isolate's destructor, so the cleanup fires.
-    if (!IsRuntimeWorker()) {
-      tns::CleanupHttpLoaderGlobals();
-      tns::CleanupImportMapGlobals();
-    }
-
     // Before DisposeAllRegistered: the env's reference lists hold v8::Globals,
     // so its teardown needs the isolate alive and locked.
     NapiEnv::Destroy(static_cast<NapiEnv*>(this->napiEnv_));

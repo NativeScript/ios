@@ -113,6 +113,12 @@ struct RequireFacadeEntry {
 struct ModuleLoaderState {
   ModuleHandleMap registry;  // canonical key -> compiled module
 
+  // What the dev client taught THIS isolate's loader: import map + scopes,
+  // canonicalization vocabulary, volatile patterns. Plain members read and
+  // written only on the isolate's own thread, so no synchronization is needed;
+  // a worker gets a copy taken on the parent's thread at spawn.
+  LoaderVocabulary vocabulary;
+
   // In-flight async graph walks; entries are weak so a finished load frees
   // itself. A pending NSURLSession completion can hold the load's shared_ptr
   // past teardown, so QuiesceModuleLoadsForIsolate must flag these dead and
@@ -503,27 +509,11 @@ void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate) { KillAsyncGraphLoadsFor
 // Instead of rewriting import statements in source code on the Vite side, the runtime
 // resolves bare specifiers through this map to HTTP module URLs. Source code
 // is served as Vite transformed it.
-// One import-map section: specifier key → target. Lookup within a section is
-// exact-then-trailing-slash-prefix with longest match, per the import-maps
-// spec.
-using ImportMapEntries = robin_hood::unordered_map<std::string, std::string>;
-
-// A parsed import map. `scopes` is kept ordered most-specific-first so the
-// resolution cascade walks it without re-sorting on every lookup.
-struct ParsedImportMap {
-  ImportMapEntries imports;
-  std::vector<std::pair<std::string, ImportMapEntries>> scopes;
-
-  bool empty() const { return imports.empty() && scopes.empty(); }
-};
-
-static ParsedImportMap g_importMap;
-
-// Volatile URL patterns: URLs matching these substrings are always re-fetched
-// (cache is evicted before loading). Configured by Vite at boot — the
-// vocabulary is server/framework policy, so the runtime carries no
-// framework-specific URL strings here.
-static std::vector<std::string> g_volatilePatterns;
+// The calling isolate's vocabulary, or null once teardown has begun.
+static LoaderVocabulary* VocabularyForCurrentIsolate() {
+  auto* state = ModuleLoaderStateFor(v8::Isolate::GetCurrent());
+  return state != nullptr ? &state->vocabulary : nullptr;
+}
 
 static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string& registryKey) {
   if (rawKey != registryKey) {
@@ -611,7 +601,7 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
       requestedUrl.c_str());
 
   ModuleFetchResult fetched;
-  if (!HttpFetchModule(requestedUrl, fetched)) {
+  if (!HttpFetchModule(requestedUrl, registryKey, fetched)) {
     TNS_DEBUG(Esm, "[http-esm][load][fetch-fail] request=%s key=%s status=%d", requestedUrl.c_str(),
               registryKey.c_str(), fetched.status);
     // The classifier's reason names the URL and the cause (status, MIME, or
@@ -800,20 +790,35 @@ bool SetImportMap(const std::string& json, std::string* error) {
   if (!ParseImportMap(json, &parsedMap, error != nullptr ? error : &localError)) {
     return false;
   }
-  g_importMap = std::move(parsedMap);
+  LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr) {
+    *(error != nullptr ? error : &localError) = "the isolate is shutting down";
+    return false;
+  }
+  vocabulary->importMap = std::move(parsedMap);
   TNS_DEBUG(Esm, "[import-map] loaded %lu entries, %lu scopes",
-            (unsigned long)g_importMap.imports.size(), (unsigned long)g_importMap.scopes.size());
+            (unsigned long)vocabulary->importMap.imports.size(),
+            (unsigned long)vocabulary->importMap.scopes.size());
   return true;
 }
 
 void SetVolatilePatterns(const std::vector<std::string>& patterns) {
-  g_volatilePatterns = patterns;
-  TNS_DEBUG(Esm, "[import-map] volatile patterns: %lu", (unsigned long)g_volatilePatterns.size());
+  LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr) {
+    return;
+  }
+  vocabulary->volatilePatterns = patterns;
+  TNS_DEBUG(Esm, "[import-map] volatile patterns: %lu",
+            (unsigned long)vocabulary->volatilePatterns.size());
 }
 
 // Check if a URL matches any volatile pattern (should bypass cache).
 static bool IsVolatileUrl(const std::string& url) {
-  for (const auto& pat : g_volatilePatterns) {
+  const LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr) {
+    return false;
+  }
+  for (const auto& pat : vocabulary->volatilePatterns) {
     if (url.find(pat) != std::string::npos) return true;
   }
   return false;
@@ -863,7 +868,11 @@ static std::string LookupInEntries(const ImportMapEntries& entries, const std::s
 // match there. Ending a scope key with '/' keeps it on a directory boundary,
 // exactly as on the web.
 static std::string LookupImportMap(const std::string& specifier, const std::string& referrerKey) {
-  for (const auto& scope : g_importMap.scopes) {
+  const LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr) {
+    return "";
+  }
+  for (const auto& scope : vocabulary->importMap.scopes) {
     const std::string& prefix = scope.first;
     if (referrerKey.size() < prefix.size() || referrerKey.compare(0, prefix.size(), prefix) != 0) {
       continue;
@@ -875,15 +884,47 @@ static std::string LookupImportMap(const std::string& specifier, const std::stri
       return mapped;
     }
   }
-  return LookupInEntries(g_importMap.imports, specifier);
+  return LookupInEntries(vocabulary->importMap.imports, specifier);
 }
 
-void CleanupImportMapGlobals() {
-  // Process-global import-map state (not isolate-bound). The per-isolate
-  // loader state lives in a Caches state slot and is destroyed with each
-  // isolate's Caches (after QuiesceModuleLoadsForIsolate in ~Runtime).
-  g_importMap = ParsedImportMap();
-  g_volatilePatterns.clear();
+LoaderVocabulary CaptureLoaderVocabulary(v8::Isolate* isolate) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  return state != nullptr ? state->vocabulary : LoaderVocabulary();
+}
+
+void InstallLoaderVocabulary(v8::Isolate* isolate, LoaderVocabulary vocabulary) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  state->vocabulary = std::move(vocabulary);
+  TNS_DEBUG(Esm, "[import-map] inherited %lu entries, %lu scopes, %lu volatile patterns",
+            (unsigned long)state->vocabulary.importMap.imports.size(),
+            (unsigned long)state->vocabulary.importMap.scopes.size(),
+            (unsigned long)state->vocabulary.volatilePatterns.size());
+}
+
+const CanonicalizationConfig* CanonicalizationConfigForCurrentIsolate() {
+  const LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr || !vocabulary->canonicalizationConfigured) {
+    return nullptr;
+  }
+  return &vocabulary->canonicalization;
+}
+
+void SetCanonicalizationConfig(CanonicalizationConfig config) {
+  LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  if (vocabulary == nullptr) {
+    return;
+  }
+  vocabulary->canonicalization = std::move(config);
+  vocabulary->canonicalizationConfigured = true;
+  TNS_DEBUG(
+      Esm,
+      "[ns:module configureLoader] canonicalization set (strip=%lu devPrefixes=%lu preserve=%lu)",
+      (unsigned long)vocabulary->canonicalization.stripParams.size(),
+      (unsigned long)vocabulary->canonicalization.devPathPrefixes.size(),
+      (unsigned long)vocabulary->canonicalization.preserveQueryPrefixes.size());
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1080,7 +1121,9 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   // The import map is consulted before any other resolution: bare specifiers
   // resolve through it to vendor or HTTP URLs. A client that rewrites
   // specifiers must map every form it emits — keys are matched literally.
-  if (!g_importMap.empty()) {
+  const LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  const bool hasImportMap = vocabulary != nullptr && !vocabulary->importMap.empty();
+  if (hasImportMap) {
     std::string mapped = LookupImportMap(spec, referrerKey);
     if (!mapped.empty()) {
       TNS_DEBUG(Esm, "[resolver][import-map] rewrite: %s -> %s", spec.c_str(), mapped.c_str());
@@ -1092,9 +1135,10 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
       bool looksBare = spec[0] != '/' && spec[0] != '.' && spec.find("://") == std::string::npos &&
                        spec.find('\\') == std::string::npos;
       if (looksBare) {
-        TNS_DEBUG(
-            Esm, "[resolver][import-map][miss] bare='%s' importMap.size=%lu importMap.empty=%d",
-            spec.c_str(), (unsigned long)g_importMap.imports.size(), g_importMap.empty() ? 1 : 0);
+        TNS_DEBUG(Esm,
+                  "[resolver][import-map][miss] bare='%s' importMap.size=%lu importMap.empty=%d",
+                  spec.c_str(), (unsigned long)vocabulary->importMap.imports.size(),
+                  vocabulary->importMap.empty() ? 1 : 0);
       }
     }
   } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
@@ -1103,7 +1147,7 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
                      spec.find('\\') == std::string::npos;
     if (looksBare) {
       TNS_DEBUG(Esm,
-                "[resolver][import-map][empty] bare='%s' — g_importMap is EMPTY (was it ever "
+                "[resolver][import-map][empty] bare='%s' — the import map is EMPTY (was it ever "
                 "configured? expected ~200-500 entries)",
                 spec.c_str());
     }
@@ -1544,7 +1588,9 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
   load->pendingFetches++;
   std::shared_ptr<AsyncGraphLoad> loadRef = load;
   const std::string url = target;
-  FetchModuleBodyAsync(url, [loadRef, url](ModuleFetchResult result) {
+  // The canonical key is computed here, on the isolate's thread; the fetch
+  // carries it so background threads never touch per-isolate vocabulary.
+  FetchModuleBodyAsync(url, key, [loadRef, url](ModuleFetchResult result) {
     // Arbitrary thread. Hop to the isolate's home thread as a nestable v8
     // foreground task — thread-independent delivery, so an import() issued
     // from a background thread still lands on the isolate's own event loop,
@@ -1789,7 +1835,9 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
   // param — CFNetwork sees a URL it has never cached and must go to
   // origin. The nonce is transport-only; module identity stays the
   // canonical URL.
-  MarkUrlsForCacheBust(uniqueUrls);
+  // `uniqueUrls` already holds canonical registry keys, computed above on
+  // this isolate's thread — which is what the transport's mark set needs.
+  MarkKeysForCacheBust(uniqueUrls);
 
   if (traceRegistry) {
     TNS_DEBUG(Registry, "invalidate summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
@@ -2418,7 +2466,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   // from the host-supplied resource name, canonicalized the way the registry
   // keys it, so a scope matches an import() exactly as it matches a static
   // import from the same module.
-  if (!g_importMap.empty() && !normalizedSpec.empty()) {
+  const LoaderVocabulary* dynamicVocabulary = VocabularyForCurrentIsolate();
+  if (dynamicVocabulary != nullptr && !dynamicVocabulary->importMap.empty() &&
+      !normalizedSpec.empty()) {
     std::string dynamicReferrerKey;
     if (!resource_name.IsEmpty() && resource_name->IsString()) {
       v8::String::Utf8Value resourceUtf8(isolate, resource_name);
