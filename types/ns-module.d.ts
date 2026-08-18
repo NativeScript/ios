@@ -64,6 +64,35 @@ declare module "ns:module" {
    */
   export function getLoadedModuleUrls(): string[];
 
+  /**
+   * A `require` that resolves against the directory of `filenameOrURL` — a
+   * trailing slash names the directory itself. Accepts an absolute path
+   * string, a `file:` URL string, or a URL object; anything else throws a
+   * `TypeError`, and an `http(s)` base is refused because `require()` of a
+   * dev-served module is not supported (import those instead).
+   *
+   * ES module graphs load under Node's `require(esm)` rule: a graph
+   * containing top-level await is refused before it evaluates.
+   *
+   * `require.resolve`, `require.cache` and `require.main` are not
+   * implemented and are absent from the returned function.
+   */
+  export function createRequire(
+    filenameOrURL: string | URL,
+  ): (specifier: string) => any;
+
+  /**
+   * Like {@link createRequire}, except an ES module graph containing
+   * top-level await is evaluated — by driving V8's nestable tasks and
+   * microtasks until it settles — rather than refused. The Cocoa runloop is
+   * never advanced, so a graph awaiting a native transport still cannot
+   * settle here and fails on the deadline instead of returning a
+   * half-initialized namespace.
+   */
+  export function createPumpingRequire(
+    filenameOrURL: string | URL,
+  ): (specifier: string) => any;
+
   // Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure
   // test diagnostic; release builds omit the member entirely. It is
   // deliberately not declared here: it is not public API, and declaring it

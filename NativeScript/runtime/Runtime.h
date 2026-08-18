@@ -43,6 +43,9 @@ class Runtime {
 
   void RunScript(const std::string script);
 
+  // This isolate's CommonJS loader, or null before Init() has built it.
+  ModuleInternal* GetModuleInternal() const { return moduleInternal_.get(); }
+
   static void Initialize();
 
   static Runtime* GetCurrentRuntime() { return currentRuntime_; }

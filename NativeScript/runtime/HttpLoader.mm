@@ -10,6 +10,7 @@
 #include <vector>
 #include "Caches.h"
 #include "Helpers.h"
+#include "ModuleInternal.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
@@ -1058,6 +1059,10 @@ bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> 
   InstallDevFunction(isolate, context, binding, "configureLoader", ConfigureLoaderCallback);
   InstallDevFunction(isolate, context, binding, "invalidateModules", InvalidateModulesCallback);
   InstallDevFunction(isolate, context, binding, "getLoadedModuleUrls", GetLoadedModuleUrlsCallback);
+
+  if (!ModuleInternal::InstallCreateRequireBinding(context, binding)) {
+    return false;
+  }
 
   if (RuntimeConfig.IsDebug) {
     // Debug-only diagnostic: expose the HTTP canonical-key function to JS so

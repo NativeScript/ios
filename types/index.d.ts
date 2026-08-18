@@ -18,9 +18,12 @@
 // packages must reference them, not redeclare the modules — two
 // `declare module` blocks for the same specifier conflict.
 //
-// The `node:util` compatibility shim is deliberately not declared here:
-// programs that include @types/node already have a `node:util` declaration,
-// and a second one would clash with it.
+// The `node:` compatibility shims (`node:util`, `node:module`) are
+// deliberately not declared here: programs that include @types/node already
+// have declarations for those specifiers, and a second one would clash with
+// them. A shim exposing less than Node does is a runtime concern, documented
+// in docs/ns-builtin-modules.md, not something to restate in types that would
+// then conflict.
 
 /// <reference path="./ns-module.d.ts" />
 /// <reference path="./ns-runtime.d.ts" />

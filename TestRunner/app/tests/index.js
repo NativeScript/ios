@@ -158,6 +158,9 @@ require("./NodeBuiltinsAndOptionalModulesTests.mjs");
 // require(esm) exports interop (Node's populateCJSExportsFromESM cascade)
 require("./EsmInteropTests");
 
+// ns:module / node:module createRequire and the pumping require
+require("./CreateRequireTests");
+
 // Exception handling tests
 require("./ExceptionHandlingTests");
 

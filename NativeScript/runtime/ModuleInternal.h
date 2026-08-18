@@ -57,7 +57,13 @@ class ModuleInternal {
   void RunModule(v8::Isolate* isolate, std::string path);
   void RunScript(v8::Isolate* isolate, std::string script);
   static v8::Local<v8::Value> LoadScript(v8::Isolate* isolate,
-                                         const std::string& path);
+                                         const std::string& path,
+                                         ModuleEvaluationPolicy policy);
+  // Installs `createRequire` on the `ns:module` binding object. Kept here
+  // rather than with the dev-loader members because it hands out the very
+  // require the CommonJS loader builds for every module.
+  static bool InstallCreateRequireBinding(v8::Local<v8::Context> context,
+                                          v8::Local<v8::Object> binding);
   // Read + wrap + compile `path` as an ES module (consuming/producing the
   // on-disk code cache) WITHOUT registering, instantiating, or evaluating it.
   // On compile failure the exception is left pending on the isolate (or a
@@ -77,24 +83,32 @@ class ModuleInternal {
 
  private:
   static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+  static void CreateRequireCallback(
+      const v8::FunctionCallbackInfo<v8::Value>& info);
+  // A require bound to `dirName`, whose ES module loads evaluate under
+  // `policy`. The policy rides along as a third argument to the require
+  // factory, so nothing about it is ambient.
   v8::Local<v8::Function> GetRequireFunction(v8::Isolate* isolate,
-                                             const std::string& dirName);
+                                             const std::string& dirName,
+                                             ModuleEvaluationPolicy policy);
   v8::Local<v8::Object> LoadImpl(v8::Isolate* isolate,
                                  const std::string& moduleName,
-                                 const std::string& baseDir, bool& isData);
+                                 const std::string& baseDir, bool& isData,
+                                 ModuleEvaluationPolicy policy);
   // Compile (and cache) a classic script; returns the compiled Script handle.
   static v8::Local<v8::Script> LoadClassicScript(v8::Isolate* isolate,
                                                  const std::string& path);
 
   // Compile/link/evaluate an ES module; returns its namespace object.
-  static v8::Local<v8::Value> LoadESModule(v8::Isolate* isolate,
-                                           const std::string& path,
-                                           ModuleEvaluationPolicy policy);
+  static v8::Local<v8::Value> LoadESModule(
+      v8::Isolate* isolate, const std::string& path,
+      const ModuleEvaluationOptions& options);
   static v8::Local<v8::String> WrapModuleContent(v8::Isolate* isolate,
                                                  const std::string& path);
   v8::Local<v8::Object> LoadModule(v8::Isolate* isolate,
                                    const std::string& modulePath,
-                                   const std::string& cacheKey);
+                                   const std::string& cacheKey,
+                                   ModuleEvaluationPolicy policy);
   v8::Local<v8::Object> LoadData(v8::Isolate* isolate,
                                  const std::string& modulePath);
   std::string ResolvePath(v8::Isolate* isolate, const std::string& baseDir,

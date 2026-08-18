@@ -104,6 +104,12 @@ the full contract rationale.
 | `configureLoader(config)` | Install loader policy before the session imports anything: `importMap` (bare specifier → URL, consulted inside the synchronous resolver), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (`stripParams`/`forPathPrefixes`/`preserveQueryFor` vocabulary for registry keying). Each present section replaces its state wholesale. |
 | `invalidateModules(urls)` | Evict the given URLs (canonicalized) from the module registry and mark them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. |
 | `getLoadedModuleUrls()` | URL-like keys currently in the module registry (used to compute full-reload eviction sets). |
+| `createRequire(filenameOrURL)` | A `require` resolving against `filenameOrURL`'s directory (a trailing slash names the directory itself). Accepts an absolute path string, a `file:` URL string, or a URL object; anything else throws a `TypeError`, and an `http(s)` base is refused outright because `require()` of a dev-served module is not supported — import those. ES module graphs load under Node's `require(esm)` rule: a graph containing top-level await is refused before it evaluates. |
+| `createPumpingRequire(filenameOrURL)` | Same argument contract and same resolution, but an ES module graph with top-level await is evaluated by driving V8's nestable tasks and microtasks until it settles, instead of being refused. It never advances the Cocoa runloop, so a graph awaiting a native transport still cannot settle here and fails on the deadline rather than returning a half-initialized namespace. Reach for it only where a synchronous boundary must consume an async module. |
+
+Not implemented on either require: `require.resolve`, `require.cache`, and
+`require.main`. They are absent rather than throwing, so a feature check
+works; adding them is a spec change here first.
 
 Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure test
 diagnostic; release builds omit it. Missing members are simply absent —
@@ -155,6 +161,7 @@ unmodified where a shim exists:
 | module | exports | notes |
 |---|---|---|
 | `node:util` | `inspect`, `format` | Re-exports `ns:util`'s members unchanged (`nodeUtil.inspect === nsUtil.inspect`) from a **distinct, separately frozen module object**. Documented as partial. |
+| `node:module` | `createRequire` | Re-exports `ns:module`'s `createRequire` unchanged from a **distinct, separately frozen module object**. `createPumpingRequire` is deliberately absent: it has no Node counterpart, so code written against this shim keeps running on Node. `require.resolve`/`.cache`/`.main` are not implemented, and neither is any other `node:module` member (`Module`, `builtinModules`, `isBuiltin`, `register`, `syncBuiltinESMExports`). Documented as partial. |
 
 Candidates for future shims, in rough order of ecosystem demand:
 `node:events` (EventEmitter), `node:path` (pure JS), `node:buffer`,

@@ -40,6 +40,41 @@ static bool IsBareSpecifier(const std::string& specifier) {
 
 static std::string NormalizePath(const std::string& path);
 
+// How an entry module's graph settles. For local modules the bound is a yield,
+// not a timeout: only nestable V8 tasks can run while these JS frames are on
+// the stack, so a TLA parked on a non-nestable foreground task can never settle
+// in-pump — give it one short window, then return and let the real event loop
+// finish it after the turn (the Node shape; EventLoopTests pins this). HTTP
+// entries must settle in-pump — the dev client needs the rejection reason
+// synchronously — so they get the full deadline and the runloop slices their
+// transport needs.
+static ModuleEvaluationOptions BootEntryEvaluationOptions(bool isHttpModule) {
+  ModuleEvaluationOptions options;
+  options.policy = ModuleEvaluationPolicy::kSyncPumping;
+  options.deadlineSeconds = isHttpModule ? kModuleEvaluateDeadlineSeconds : 1.0;
+  options.timeoutBehavior = isHttpModule ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
+                                         : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
+  options.pumpRunLoop = isHttpModule;
+  return options;
+}
+
+// How a graph reached through require() settles. A pumping require must settle
+// or throw — handing back a half-initialized namespace is what the strict
+// policy exists to prevent — so it gets the full deadline. It never slices the
+// Cocoa runloop: outside boot the loop belongs to the app, and re-entering
+// arbitrary runloop sources from the middle of a require would run UI callbacks
+// underneath JS frames.
+static ModuleEvaluationOptions RequireEvaluationOptions(ModuleEvaluationPolicy policy) {
+  ModuleEvaluationOptions options;
+  options.policy = policy;
+  if (policy == ModuleEvaluationPolicy::kSyncPumping) {
+    options.deadlineSeconds = kModuleEvaluateDeadlineSeconds;
+    options.timeoutBehavior = ModuleEvaluationOptions::TimeoutBehavior::kThrow;
+    options.pumpRunLoop = false;
+  }
+  return options;
+}
+
 static inline bool StartsWith(const std::string& value, const char* prefix) {
   size_t n = strlen(prefix);
   return value.size() >= n && value.compare(0, n, prefix) == 0;
@@ -161,7 +196,8 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   // Use shortened path for global require function to avoid V8 parsing issues
   std::string globalRequirePath = "/app";
 
-  Local<v8::Function> globalRequire = GetRequireFunction(isolate, globalRequirePath);
+  Local<v8::Function> globalRequire =
+      GetRequireFunction(isolate, globalRequirePath, ModuleEvaluationPolicy::kSyncStrict);
   bool success =
       global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
   if (!success) {
@@ -207,7 +243,7 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
       // The entry runs before this thread's event loop does, so its graph can
       // only make progress from the pump inside LoadESModule.
       moduleNamespace =
-          ModuleInternal::LoadESModule(isolate, path, ModuleEvaluationPolicy::kSyncPumping);
+          ModuleInternal::LoadESModule(isolate, path, BootEntryEvaluationOptions(isHttpModule));
     } catch (const NativeScriptException& ex) {
       if (RuntimeConfig.IsDebug) {
         Log(@"***** JavaScript exception occurred *****");
@@ -262,18 +298,53 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   }
 }
 
-Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate,
-                                                       const std::string& dirName) {
+void ModuleInternal::CreateRequireCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() < 1 || !info[0]->IsString()) {
+    isolate->ThrowException(Exception::TypeError(
+        tns::ToV8String(isolate, "createRequire expects a base directory string")));
+    return;
+  }
+
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  ModuleInternal* moduleInternal = runtime != nullptr ? runtime->GetModuleInternal() : nullptr;
+  if (moduleInternal == nullptr) {
+    isolate->ThrowException(Exception::Error(tns::ToV8String(
+        isolate, "createRequire is unavailable: this isolate has no module loader")));
+    return;
+  }
+
+  std::string dirName = tns::ToString(isolate, info[0].As<v8::String>());
+  ModuleEvaluationPolicy policy = info.Length() > 1 && info[1]->BooleanValue(isolate)
+                                      ? ModuleEvaluationPolicy::kSyncPumping
+                                      : ModuleEvaluationPolicy::kSyncStrict;
+  info.GetReturnValue().Set(moduleInternal->GetRequireFunction(isolate, dirName, policy));
+}
+
+bool ModuleInternal::InstallCreateRequireBinding(Local<Context> context, Local<Object> binding) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<v8::Function> fn;
+  if (!v8::Function::New(context, ModuleInternal::CreateRequireCallback).ToLocal(&fn)) {
+    return false;
+  }
+  fn->SetName(tns::ToV8String(isolate, "createRequire"));
+  return binding->CreateDataProperty(context, tns::ToV8String(isolate, "createRequire"), fn)
+      .FromMaybe(false);
+}
+
+Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const std::string& dirName,
+                                                       ModuleEvaluationPolicy policy) {
   Local<v8::Function> requireFuncFactory = requireFactoryFunction_->Get(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   Local<v8::Function> requireInternalFunc = this->requireFunction_->Get(isolate);
-  Local<Value> args[2]{requireInternalFunc, tns::ToV8String(isolate, dirName.c_str())};
+  Local<Value> args[3]{requireInternalFunc, tns::ToV8String(isolate, dirName.c_str()),
+                       Integer::New(isolate, static_cast<int>(policy))};
 
   Local<Value> result;
   Local<Object> thiz = Object::New(isolate);
 
   TryCatch tc(isolate);
-  bool success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
+  bool success = requireFuncFactory->Call(context, thiz, 3, args).ToLocal(&result);
   if (!success || tc.HasCaught()) {
     if (tc.HasCaught()) {
       tns::LogError(isolate, tc);
@@ -354,6 +425,13 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
 
     moduleName = tns::ToString(isolate, info[0].As<v8::String>());
     callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
+    // The require factory forwards the policy its require was built with; an
+    // absent one is the strict default every ordinary require uses.
+    ModuleEvaluationPolicy policy = ModuleEvaluationPolicy::kSyncStrict;
+    if (info.Length() > 2 && info[2]->IsInt32() &&
+        info[2].As<Int32>()->Value() == static_cast<int>(ModuleEvaluationPolicy::kSyncPumping)) {
+      policy = ModuleEvaluationPolicy::kSyncPumping;
+    }
 
     // Expand shortened paths back to full paths for file resolution
     if (callingModuleDirName.length() > 0 && callingModuleDirName.substr(0, 4) == "/app") {
@@ -372,9 +450,14 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
         fullPath =
             [[callingDirNS stringByAppendingPathComponent:moduleNameNS] stringByStandardizingPath];
       } else if (moduleName[0] == '~') {
-        moduleName = moduleName.substr(2);
+        // `~` is the app-root alias, so what follows it is a path relative to
+        // the app root whether or not the caller wrote the separator.
+        std::string relative = moduleName.substr(1);
+        size_t firstSegment = relative.find_first_not_of('/');
+        relative =
+            firstSegment == std::string::npos ? std::string() : relative.substr(firstSegment);
         fullPath = [[NSString stringWithUTF8String:RuntimeConfig.ApplicationPath.c_str()]
-            stringByAppendingPathComponent:[NSString stringWithUTF8String:moduleName.c_str()]];
+            stringByAppendingPathComponent:[NSString stringWithUTF8String:relative.c_str()]];
       } else {
         // Default: resolve in tns_modules (shared folder override removed)
         NSString* tnsModulesPath =
@@ -403,8 +486,8 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
     NSString* pathOnly = [fullPath stringByDeletingLastPathComponent];
 
     bool isData = false;
-    Local<Object> moduleObj =
-        moduleInternal->LoadImpl(isolate, [fileNameOnly UTF8String], [pathOnly UTF8String], isData);
+    Local<Object> moduleObj = moduleInternal->LoadImpl(isolate, [fileNameOnly UTF8String],
+                                                       [pathOnly UTF8String], isData, policy);
 
     if (moduleObj.IsEmpty()) {
       return;
@@ -473,7 +556,8 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
 }
 
 Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& moduleName,
-                                       const std::string& baseDir, bool& isData) {
+                                       const std::string& baseDir, bool& isData,
+                                       ModuleEvaluationPolicy policy) {
   size_t lastIndex = moduleName.find_last_of(".");
   std::string moduleNameWithoutExtension =
       (lastIndex == std::string::npos) ? moduleName : moduleName.substr(0, lastIndex);
@@ -516,7 +600,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
   }
 
   if ([extension isEqualToString:@"mjs"] || [extension isEqualToString:@"js"]) {
-    moduleObj = this->LoadModule(isolate, path, cacheKey);
+    moduleObj = this->LoadModule(isolate, path, cacheKey, policy);
   } else if ([extension isEqualToString:@"json"]) {
     moduleObj = this->LoadData(isolate, path);
   } else {
@@ -590,7 +674,8 @@ static Local<Value> RequireExportsForNamespace(Isolate* isolate, Local<Context> 
 }
 
 Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& modulePath,
-                                         const std::string& cacheKey) {
+                                         const std::string& cacheKey,
+                                         ModuleEvaluationPolicy policy) {
   Local<Object> moduleObj = Object::New(isolate);
   Local<Object> exportsObj = Object::New(isolate);
   Local<Context> context = isolate->GetCurrentContext();
@@ -616,7 +701,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   TempModule tempModule(this, modulePath, cacheKey, poModuleObj);
 
   // Compile/load the JavaScript/ESM source
-  Local<Value> scriptValue = LoadScript(isolate, modulePath);
+  Local<Value> scriptValue = LoadScript(isolate, modulePath, policy);
 
   if (scriptValue.IsEmpty()) {
     throw NativeScriptException(isolate, "Script loading failed for " + modulePath);
@@ -709,7 +794,9 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     shortParentDir = parentDir;
   }
 
-  Local<v8::Function> require = GetRequireFunction(isolate, shortParentDir);
+  // A module's own require inherits the policy it was loaded under, so a
+  // pumping require stays pumping all the way down its dependency tree.
+  Local<v8::Function> require = GetRequireFunction(isolate, shortParentDir, policy);
   // Use full paths for __filename and __dirname to match module.id
   Local<Value> requireArgs[5]{moduleObj, exportsObj, require,
                               tns::ToV8String(isolate, modulePath.c_str()),
@@ -765,14 +852,14 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
   return json;
 }
 
-Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& path) {
+Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& path,
+                                        ModuleEvaluationPolicy policy) {
   std::string canonicalPath = NormalizePath(path);
 
   if (IsESModule(canonicalPath)) {
-    // Treat all .mjs files as standard ES modules. This is require()'s route,
-    // which cannot wait: an async graph is refused rather than pumped.
-    return ModuleInternal::LoadESModule(isolate, canonicalPath,
-                                        ModuleEvaluationPolicy::kSyncStrict);
+    // Treat all .mjs files as standard ES modules. require()'s default route
+    // cannot wait: an async graph is refused rather than pumped.
+    return ModuleInternal::LoadESModule(isolate, canonicalPath, RequireEvaluationOptions(policy));
   }
 
   Local<Script> script = ModuleInternal::LoadClassicScript(isolate, canonicalPath);
@@ -963,8 +1050,8 @@ static void LogEsmPhase(const std::string& canonicalPath, const char* phase, con
 [[noreturn]] static void ThrowAsyncGraphRefusal(const std::string& canonicalPath) {
   LogEsmPhase(canonicalPath, "evaluate", "refused", "async-graph");
   throw NativeScriptException("require() cannot load ES module '" + canonicalPath +
-                              "': the module graph contains top-level await. Use import() "
-                              "instead.");
+                              "': the module graph contains top-level await. Use import() or "
+                              "createPumpingRequire from ns:module instead.");
 }
 
 // Evicts the module and surfaces the rejection reason. Always throws — debug
@@ -1215,7 +1302,7 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
 }
 
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path,
-                                          ModuleEvaluationPolicy policy) {
+                                          const ModuleEvaluationOptions& options) {
   bool isHttpModule = IsHttpModulePath(path);
   std::string canonicalPath = CanonicalizeModulePath(path);
   std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
@@ -1266,7 +1353,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         // A top-level-await graph reports kEvaluated while its capability
         // promise is still pending, so the namespace here may be in its TDZ;
         // require() refuses the graph whatever the load order, matching Node.
-        if (policy == ModuleEvaluationPolicy::kSyncStrict && existing->IsGraphAsync()) {
+        if (options.policy == ModuleEvaluationPolicy::kSyncStrict && existing->IsGraphAsync()) {
           ThrowAsyncGraphRefusal(canonicalPath);
         }
         return existing->GetModuleNamespace();
@@ -1397,23 +1484,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   logPhase("instantiate", "ok");
 
   // 6) Evaluate the graph under the caller's policy.
-  ModuleEvaluationOptions evalOptions;
-  evalOptions.policy = policy;
-  if (policy == ModuleEvaluationPolicy::kSyncPumping) {
-    // For local modules the bound is a yield, not a timeout: only nestable
-    // V8 tasks can run while these JS frames are on the stack, so a TLA
-    // parked on a non-nestable foreground task can never settle in-pump —
-    // give it one short window, then return and let the real event loop
-    // finish it after the turn (the Node shape; EventLoopTests pins this).
-    // HTTP entries must settle in-pump — the dev client needs the
-    // rejection reason synchronously — so they get the full deadline.
-    evalOptions.deadlineSeconds = isHttpModule ? kModuleEvaluateDeadlineSeconds : 1.0;
-    evalOptions.timeoutBehavior = isHttpModule
-                                      ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
-                                      : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
-    evalOptions.pumpRunLoop = isHttpModule;
-  }
-  EvaluateModuleGraph(isolate, context, module, canonicalPath, evalOptions);
+  EvaluateModuleGraph(isolate, context, module, canonicalPath, options);
   // 7) Return the namespace
   return module->GetModuleNamespace();
 }

@@ -17,7 +17,7 @@
 #include "EventLoop.h"
 #include "Helpers.h"  // for tns::Exists
 #include "HttpLoader.h"
-#include "ModuleInternal.h"  // for LoadScript(...)
+#include "ModuleInternal.h"  // for CompileFileEsModule / EvaluateModuleGraph
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
 #include "NsBuiltinModules.h"

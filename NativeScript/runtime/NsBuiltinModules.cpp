@@ -31,6 +31,7 @@ constexpr Registration kRegistry[] = {
     {"ns:module", BuiltinId::kNsModule},
     {"ns:runtime", BuiltinId::kNsRuntime},
     {"ns:util", BuiltinId::kNsUtil},
+    {"node:module", BuiltinId::kNodeModule},
     {"node:util", BuiltinId::kNodeUtil},
 };
 

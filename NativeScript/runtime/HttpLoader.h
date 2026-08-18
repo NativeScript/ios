@@ -139,6 +139,10 @@ bool IsRemoteUrlAllowed(const std::string& url);
 //                                      canonicalization vocabulary)
 //   - invalidateModules(urls)         (registry + cache eviction)
 //   - getLoadedModuleUrls()           (registry introspection)
+//   - createRequire(baseDir, pumping) (a require bound to baseDir; the JS half
+//                                      in ns-module.js validates the caller's
+//                                      filename/URL and splits the two
+//                                      exported flavors)
 //   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
 //
 // Worker teardown across HMR cycles is userland: the dev client intercepts

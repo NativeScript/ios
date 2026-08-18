@@ -6,6 +6,7 @@ $(SRCROOT)/NativeScript/runtime/js/events.js
 $(SRCROOT)/NativeScript/runtime/js/inline-functions.js
 $(SRCROOT)/NativeScript/runtime/js/primordials.js
 $(SRCROOT)/NativeScript/runtime/js/inspect.js
+$(SRCROOT)/NativeScript/runtime/js/node-module.js
 $(SRCROOT)/NativeScript/runtime/js/node-util.js
 $(SRCROOT)/NativeScript/runtime/js/ns-module.js
 $(SRCROOT)/NativeScript/runtime/js/ns-runtime.js
