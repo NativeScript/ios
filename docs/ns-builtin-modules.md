@@ -191,6 +191,7 @@ unmodified where a shim exists:
 | module | exports | notes |
 |---|---|---|
 | `node:util` | `inspect`, `format` | Re-exports `ns:util`'s members unchanged (`nodeUtil.inspect === nsUtil.inspect`) from a **distinct, separately frozen module object**. Documented as partial. |
+| `node:url` | `fileURLToPath`, `pathToFileURL` | Node-strict converters between `file:` URLs and paths. Parsing goes through the URL intrinsic, so `file://localhost/x` is accepted (the URL spec folds a `localhost` authority to none) while any other host throws, and the query and fragment are not part of the path. `fileURLToPath` rejects a non-`file:` scheme and rejects `%2F` in the path rather than decoding a separator into it. `pathToFileURL` returns a real `URL` and requires an **absolute** path: Node resolves a relative one against the process working directory, and there is no such thing here. Documented as partial — no `URL`/`URLSearchParams` re-exports (both are globals), no legacy `url.parse`/`format`/`resolve`. |
 | `node:module` | `createRequire` | Re-exports `ns:module`'s `createRequire` unchanged from a **distinct, separately frozen module object**. `createPumpingRequire` is deliberately absent: it has no Node counterpart, so code written against this shim keeps running on Node. `require.resolve`/`.cache`/`.main` are not implemented, and neither is any other `node:module` member (`Module`, `builtinModules`, `isBuiltin`, `register`, `syncBuiltinESMExports`). Documented as partial. |
 
 Candidates for future shims, in rough order of ecosystem demand:
@@ -243,8 +244,3 @@ module resolve/dynamic-import callbacks; ESM consumption is served by a
 synthetic module whose exports are populated from the same per-realm exports
 object. The internal require is a fixed parameter of the builtin function
 wrapper (`exports`, `require`, `module`, `binding`, `primordials`).
-
-iOS also keeps a pre-registry `node:url` polyfill (`fileURLToPath`,
-`pathToFileURL`) that predates this document. It is compiled from module
-source inside the ES module resolver and is therefore reachable through
-`import` only, not through `require()`.

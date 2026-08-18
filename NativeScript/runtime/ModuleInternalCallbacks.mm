@@ -30,11 +30,6 @@
 
 namespace tns {
 
-// Helper function to check if a module name is a Node.js built-in module
-static bool IsNodeBuiltinModule(const std::string& moduleName) {
-  return moduleName.rfind("node:", 0) == 0;
-}
-
 // Normalize absolute paths so we avoid duplicate registry entries caused by
 // differing path representations (e.g. duplicate slashes, "./" segments).
 static std::string NormalizePath(const std::string& path) {
@@ -1606,7 +1601,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
 
   // Builtin modules resolve before any path handling. Unshimmed "node:" names
   // fall through to the legacy node:url polyfill below.
-  if (NsBuiltinModules::IsRegistered(rawSpec) || NsBuiltinModules::IsNsScheme(rawSpec)) {
+  if (NsBuiltinModules::IsBuiltinScheme(rawSpec)) {
     v8::Local<v8::Module> builtin;
     if (NsBuiltinModules::GetModule(context, rawSpec).ToLocal(&builtin)) {
       return v8::MaybeLocal<v8::Module>(builtin);
@@ -1942,73 +1937,9 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   const std::string registryAbsPath = CanonicalizeRegistryKey(absPath);
 
   if (!isFile(absPath)) {
-    // Check if this is a Node.js built-in module (e.g., node:url)
-    if (IsNodeBuiltinModule(spec)) {
-      // Strip the "node:" prefix and create an in-memory polyfill module.
-      std::string builtinName = spec.substr(5);  // Remove "node:" prefix
-
-      // Use a virtual key for registry
-      std::string key = std::string("node:") + builtinName;
-
-      auto itExisting = registry.find(key);
-      if (itExisting != registry.end()) {
-        v8::Local<v8::Module> existing = itExisting->second.Get(isolate);
-        if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
-          return v8::MaybeLocal<v8::Module>(existing);
-        }
-        RemoveModuleFromRegistry(isolate, key);
-      }
-
-      std::string polyfillContent;
-      if (builtinName == "url") {
-        // Polyfill for node:url with fileURLToPath/pathToFileURL
-        polyfillContent = "// In-memory polyfill for node:url\n"
-                          "export function fileURLToPath(url) {\n"
-                          "  if (typeof url === 'string') {\n"
-                          "    if (url.startsWith('file://')) {\n"
-                          "      return decodeURIComponent(url.slice(7));\n"
-                          "    }\n"
-                          "    return url;\n"
-                          "  }\n"
-                          "  if (url && typeof url.href === 'string') {\n"
-                          "    return fileURLToPath(url.href);\n"
-                          "  }\n"
-                          "  throw new Error('Invalid URL');\n"
-                          "}\n"
-                          "\n"
-                          "export function pathToFileURL(path) {\n"
-                          "  const encoded = encodeURIComponent(path).replace(/%2F/g, '/');\n"
-                          "  return new URL('file://' + encoded);\n"
-                          "}\n";
-      } else {
-        isolate->ThrowException(v8::Exception::Error(
-            tns::ToV8String(isolate, NsBuiltinModules::NotFoundMessage(spec))));
-        return v8::MaybeLocal<v8::Module>();
-      }
-
-      v8::Local<v8::Module> polyfillModule;
-      {
-        v8::TryCatch tcCompile(isolate);
-        if (CompileModuleForResolveRegisterOnly(isolate, context, polyfillContent, key)
-                .ToLocal(&polyfillModule)) {
-          return v8::MaybeLocal<v8::Module>(polyfillModule);
-        }
-        if (tcCompile.HasCaught()) {
-          // The polyfill source is the runtime's own, so a compile failure here
-          // is a runtime bug: keep the parse error rather than masking it.
-          tcCompile.ReThrow();
-          return v8::MaybeLocal<v8::Module>();
-        }
-      }
-
-      std::string msg = "Cannot find module '" + spec + "' (failed to create in-memory polyfill)";
-      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-      return v8::MaybeLocal<v8::Module>();
-    } else {
-      std::string msg = "Cannot find module '" + spec + "' (tried " + absPath + ")";
-      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-      return v8::MaybeLocal<v8::Module>();
-    }
+    std::string msg = "Cannot find module '" + spec + "' (tried " + absPath + ")";
+    isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+    return v8::MaybeLocal<v8::Module>();
   }
 
   // Special handling for JSON imports (e.g. import data from './foo.json' assert {type:'json'})
@@ -2213,7 +2144,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
   // Builtin modules never reach the loader below; the namespace comes straight
   // from the realm's synthetic module.
-  if (NsBuiltinModules::IsRegistered(rawSpec) || NsBuiltinModules::IsNsScheme(rawSpec)) {
+  if (NsBuiltinModules::IsBuiltinScheme(rawSpec)) {
     v8::EscapableHandleScope builtinScope(isolate);
     v8::Local<v8::Promise::Resolver> builtinResolver;
     if (!v8::Promise::Resolver::New(context).ToLocal(&builtinResolver)) {

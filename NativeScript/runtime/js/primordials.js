@@ -28,6 +28,7 @@ const intrinsics = {
   Set,
   String,
   TypeError,
+  URL,
   SymbolHasInstance: Symbol.hasInstance,
   SymbolIterator: Symbol.iterator,
   SymbolToStringTag: Symbol.toStringTag,

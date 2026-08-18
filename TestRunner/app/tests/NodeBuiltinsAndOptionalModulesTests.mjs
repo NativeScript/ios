@@ -1,20 +1,85 @@
 describe("Node built-in and optional module resolution", function () {
-  it("provides an in-memory polyfill for node:url", async function () {
-    // Dynamic import to exercise ResolveModuleCallback ESM path.
-    const mod = await import("node:url");
-    const modAgain = await import("node:url");
+  it("resolves node:url through both require and import", async function () {
+    // Dynamic import exercises the ESM resolve path; require exercises the
+    // CommonJS one. The registered builtin serves both from one frozen object.
+    const ns = await import("node:url");
+    const nsAgain = await import("node:url");
+    const required = globalThis.require("node:url");
 
-    expect(mod).toBeDefined();
-    expect(modAgain).toBe(mod);
-    expect(typeof mod.fileURLToPath).toBe("function");
-    expect(typeof mod.pathToFileURL).toBe("function");
+    expect(nsAgain).toBe(ns);
+    expect(ns.default).toBe(required);
+    expect(ns.fileURLToPath).toBe(required.fileURLToPath);
+    expect(Object.isFrozen(required)).toBe(true);
+    expect(Object.keys(required).sort()).toEqual(["fileURLToPath", "pathToFileURL"]);
+  });
 
-    const p = mod.fileURLToPath("file:///foo/bar.txt");
-    expect(p === "/foo/bar.txt" || p === "foo/bar.txt").toBe(true);
+  it("converts file URLs to paths the way Node does", function () {
+    const { fileURLToPath } = globalThis.require("node:url");
 
-    const u = mod.pathToFileURL("/foo/bar.txt");
-    expect(u instanceof URL).toBe(true);
-    expect(u.protocol).toBe("file:");
+    expect(fileURLToPath("file:///foo/bar.txt")).toBe("/foo/bar.txt");
+    expect(fileURLToPath(new URL("file:///foo/bar.txt"))).toBe("/foo/bar.txt");
+    // The URL spec folds a "localhost" authority to no host at all.
+    expect(fileURLToPath("file://localhost/foo/bar.txt")).toBe("/foo/bar.txt");
+    // Query and fragment are URL syntax, never part of the path.
+    expect(fileURLToPath("file:///foo/bar.txt?x=1#frag")).toBe("/foo/bar.txt");
+    // Percent-encoding is decoded.
+    expect(fileURLToPath("file:///foo/a%20b.txt")).toBe("/foo/a b.txt");
+    expect(fileURLToPath("file:///foo/100%25.txt")).toBe("/foo/100%.txt");
+  });
+
+  it("rejects file URLs it cannot honestly convert", function () {
+    const { fileURLToPath } = globalThis.require("node:url");
+
+    expect(function () { fileURLToPath("http://example.com/x.js"); })
+      .toThrowError(TypeError, /scheme file/);
+    expect(function () { fileURLToPath("file://otherhost/foo.txt"); })
+      .toThrowError(TypeError, /host must be/);
+    // %2F would decode into a separator and change the path's shape.
+    expect(function () { fileURLToPath("file:///foo%2Fbar.txt"); })
+      .toThrowError(TypeError, /encoded \/ characters/);
+    expect(function () { fileURLToPath(42); }).toThrowError(TypeError);
+    expect(function () { fileURLToPath("not a url"); }).toThrowError(TypeError);
+  });
+
+  it("converts paths to file URLs and round-trips them", function () {
+    const { fileURLToPath, pathToFileURL } = globalThis.require("node:url");
+
+    const url = pathToFileURL("/foo/bar.txt");
+    expect(url instanceof URL).toBe(true);
+    expect(url.protocol).toBe("file:");
+    expect(url.pathname).toBe("/foo/bar.txt");
+
+    // The characters that would otherwise be read as URL syntax.
+    for (const path of ["/foo/bar.txt", "/foo/a b.txt", "/foo/100%.txt",
+                        "/foo/q?x.txt", "/foo/h#x.txt", "/foo/dir/"]) {
+      expect(fileURLToPath(pathToFileURL(path))).toBe(path);
+    }
+
+    // No process working directory here, so a relative path has no answer.
+    expect(function () { pathToFileURL("foo/bar.txt"); })
+      .toThrowError(TypeError, /absolute path/);
+    expect(function () { pathToFileURL(42); }).toThrowError(TypeError);
+  });
+
+  it("reports an unregistered node: builtin the same way for require and import",
+     async function () {
+    let importError = null;
+    try {
+      await import("node:fs");
+    } catch (e) {
+      importError = e;
+    }
+    expect(importError).not.toBe(null);
+    expect(String(importError)).toContain("No such built-in module: node:fs");
+
+    let requireError = null;
+    try {
+      globalThis.require("node:fs");
+    } catch (e) {
+      requireError = e;
+    }
+    expect(requireError).not.toBe(null);
+    expect(String(requireError)).toContain("No such built-in module: node:fs");
   });
 
   // Missing bare specifiers fail at the request site on both require() and

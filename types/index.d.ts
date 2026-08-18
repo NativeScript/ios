@@ -18,7 +18,7 @@
 // packages must reference them, not redeclare the modules — two
 // `declare module` blocks for the same specifier conflict.
 //
-// The `node:` compatibility shims (`node:util`, `node:module`) are
+// The `node:` compatibility shims (`node:util`, `node:module`, `node:url`) are
 // deliberately not declared here: programs that include @types/node already
 // have declarations for those specifiers, and a second one would clash with
 // them. A shim exposing less than Node does is a runtime concern, documented
