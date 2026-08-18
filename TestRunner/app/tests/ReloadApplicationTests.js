@@ -55,6 +55,24 @@ describe("reloadApplication", function () {
         expect(second.n).toBe(first.n + 1);
     });
 
+    it("preserves webpack vendor.mjs across reload so the Angular realm stays", function (done) {
+        global.__onApplicationReload = function () {};
+
+        import("~/vendor.mjs")
+            .then(function (first) {
+                expect(NativeScriptRuntime.reloadApplication()).toBe(true);
+                return import("~/vendor.mjs").then(function (second) {
+                    expect(second).toBe(first);
+                    expect(second.n).toBe(first.n);
+                    done();
+                });
+            })
+            .catch(function (error) {
+                fail("vendor.mjs should resolve before and after reload: " + error);
+                done();
+            });
+    });
+
     it("keeps JS UIApplicationDelegate IMPs callable from native after reload", function () {
         var AppDelegate = UIResponder.extend({
             get window() {

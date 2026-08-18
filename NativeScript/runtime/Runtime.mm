@@ -459,7 +459,7 @@ void Runtime::ReloadJsApplication() {
   if (this->moduleInternal_) {
     this->moduleInternal_->ClearLoadedModules();
   }
-  ClearModuleRegistry();
+  ClearModuleRegistryForApplicationReload();
   tns::InvokeApplicationReload(isolate);
 }
 

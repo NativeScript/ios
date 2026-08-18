@@ -316,6 +316,47 @@ void ClearModuleRegistry() {
   g_moduleFallbackByRelative.clear();
 }
 
+static std::string ModuleRegistryBasename(const std::string& key) {
+  auto pos = key.find_last_of("/\\");
+  std::string base = pos == std::string::npos ? key : key.substr(pos + 1);
+  auto query = base.find('?');
+  if (query != std::string::npos) {
+    base = base.substr(0, query);
+  }
+  return base;
+}
+
+static bool ShouldPreserveModuleOnApplicationReload(const std::string& key) {
+  if (key.rfind("node:", 0) == 0 || key.rfind("optional:", 0) == 0 || key.rfind("blob:", 0) == 0) {
+    return true;
+  }
+  if (key.find("/node_modules/") != std::string::npos ||
+      key.find("\\node_modules\\") != std::string::npos) {
+    return true;
+  }
+  const std::string base = ModuleRegistryBasename(key);
+  return base == "vendor.mjs" || base == "vendor.js" || base == "runtime.mjs" ||
+         base == "runtime.js";
+}
+
+static void ClearRegistryMapForApplicationReload(
+    std::unordered_map<std::string, v8::Global<v8::Module>>& registry) {
+  for (auto it = registry.begin(); it != registry.end();) {
+    if (ShouldPreserveModuleOnApplicationReload(it->first)) {
+      ++it;
+      continue;
+    }
+    it->second.Reset();
+    it = registry.erase(it);
+  }
+}
+
+void ClearModuleRegistryForApplicationReload() {
+  ClearRegistryMapForApplicationReload(g_moduleRegistry);
+  ClearRegistryMapForApplicationReload(g_moduleFallbackRegistry);
+  ClearRegistryMapForApplicationReload(g_moduleFallbackByRelative);
+}
+
 void RemoveModuleFromRegistry(const std::string& canonicalPath) {
   // Defensive: never operate on an anomalous/sentinel key.
   // This covers the bare "@" anomaly and the special invalid-at stub module used by the dev HTTP

@@ -14,6 +14,10 @@ extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
 // fails
 void RemoveModuleFromRegistry(const std::string& canonicalPath);
 void ClearModuleRegistry();
+// Isolate reload must evict app ESM (bundle.mjs, lazy chunks) so OTA JS
+// re-evaluates, but keep webpack vendor/runtime (and node_modules) so
+// @angular/core is not minted into a second realm.
+void ClearModuleRegistryForApplicationReload();
 
 // Keep a fallback copy of the last evaluated module so could be served while
 // reloading if needed
