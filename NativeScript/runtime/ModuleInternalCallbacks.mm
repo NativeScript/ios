@@ -14,10 +14,12 @@
 #include <string>
 #include <vector>
 #include "Caches.h"
-#include "Helpers.h"         // for tns::Exists
+#include "EventLoop.h"
+#include "Helpers.h"  // for tns::Exists
 #include "HttpLoader.h"
 #include "ModuleInternal.h"  // for LoadScript(...)
 #include "NativeScriptException.h"
+#include "NativeScriptPlatform.h"
 #include "NsBuiltinModules.h"
 #include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
@@ -827,7 +829,6 @@ namespace {
 struct AsyncGraphLoad {
   v8::Isolate* isolate = nullptr;
   v8::Global<v8::Context> context;
-  CFRunLoopRef jsLoop = nullptr;                   // CFRetain'd for the load's lifetime
   std::string rootKey;                             // canonical registry key of the root URL
   robin_hood::unordered_set<std::string> visited;  // canonical keys (JS thread only)
   int pendingFetches = 0;                          // JS thread only
@@ -843,19 +844,27 @@ struct AsyncGraphLoad {
 
   ~AsyncGraphLoad() {
     // Runs on the JS thread on the normal path (the last reference is the
-    // completion block executed there). On the teardown path the context
+    // completion task executed there). On the teardown path the context
     // Global has already been Reset by KillAsyncGraphLoadsForIsolate, so
     // destroying it from a background thread is a no-op.
     g_asyncGraphLoadsInFlightCounter().fetch_sub(1, std::memory_order_acq_rel);
-    if (jsLoop != nullptr) {
-      CFRelease(jsLoop);
-    }
   }
 
   static std::atomic<int>& g_asyncGraphLoadsInFlightCounter() {
     static std::atomic<int> counter{0};
     return counter;
   }
+};
+
+// Adapter so fetch completions ride the isolate's foreground task queue
+// (EventLoop::PostV8Task) like any other v8 platform task.
+class FetchCompletionTask : public v8::Task {
+ public:
+  explicit FetchCompletionTask(std::function<void()> fn) : fn_(std::move(fn)) {}
+  void Run() override { fn_(); }
+
+ private:
+  std::function<void()> fn_;
 };
 
 // Registration and quiesce both run on the isolate's thread (the slot
@@ -1120,19 +1129,30 @@ static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
   }
 
   load->pendingFetches++;
-  CFRunLoopRef jsLoop = load->jsLoop;
   std::shared_ptr<AsyncGraphLoad> loadRef = load;
-  FetchModuleBodyAsync(url, [loadRef, url, jsLoop](bool ok, int status, std::string body) {
-    // Arbitrary thread. Hop to the isolate's JS thread before touching any
-    // walk state or V8. If the isolate died in between, drop everything —
-    // the context Global was already Reset by the teardown hook.
-    if (loadRef->dead.load(std::memory_order_acquire) || jsLoop == nullptr) {
+  FetchModuleBodyAsync(url, [loadRef, url](bool ok, int status, std::string body) {
+    // Arbitrary thread. Hop to the isolate's home thread as a nestable v8
+    // foreground task — thread-independent delivery, so an import() issued
+    // from a background thread still lands on the isolate's own event loop,
+    // and the boot pump's RunNestableV8Tasks can drain it with JS frames on
+    // the stack. If the isolate died in between, drop everything — the
+    // context Global was already Reset by the teardown hook, which runs
+    // before the event loop shuts down, so a post dropped on this thread
+    // destroys only inert state.
+    if (loadRef->dead.load(std::memory_order_acquire)) {
+      return;
+    }
+    auto* platform = NativeScriptPlatform::Instance();
+    std::shared_ptr<EventLoop> loop =
+        platform != nullptr ? platform->LookupEventLoop(loadRef->isolate) : nullptr;
+    if (loop == nullptr) {
       return;
     }
     auto bodyPtr = std::make_shared<std::string>(std::move(body));
-    tns::ExecuteOnRunLoop(jsLoop, ^{
-      AsyncGraphOnFetchCompleted(loadRef, url, ok, status, bodyPtr);
-    });
+    loop->PostV8Task(std::make_unique<FetchCompletionTask>([loadRef, url, ok, status, bodyPtr]() {
+                       AsyncGraphOnFetchCompleted(loadRef, url, ok, status, bodyPtr);
+                     }),
+                     /*nestable=*/true, /*delaySeconds=*/0);
   });
 }
 
@@ -1146,13 +1166,6 @@ void StartAsyncHttpModuleGraphLoad(
   load->rootKey = CanonicalizeHttpUrlKey(rootUrl);
   load->startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
   load->onComplete = std::move(onComplete);
-
-  Runtime* runtime = Runtime::GetCurrentRuntime();
-  CFRunLoopRef loop = runtime != nullptr ? runtime->RuntimeLoop() : CFRunLoopGetCurrent();
-  if (loop != nullptr) {
-    CFRetain(loop);
-  }
-  load->jsLoop = loop;
 
   AsyncGraphLoad::g_asyncGraphLoadsInFlightCounter().fetch_add(1, std::memory_order_acq_rel);
   RegisterAsyncGraphLoad(isolate, load);
@@ -1176,12 +1189,22 @@ bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Conte
                                 [done](bool /*ok*/, const std::string& /*errorMessage*/,
                                        v8::Local<v8::Context>) { *done = true; });
 
-  // Manual runloop pump ("until either all is settled or UIApplicationMain
-  // is called"): the walk's completion blocks are queued on this thread's
-  // runloop, so slicing RunInMode services them. If UIApplicationMain takes
-  // over later, its runloop services any remaining work instead.
+  // Manual pump ("until either all is settled or UIApplicationMain is
+  // called"). Fetch completions are nestable v8 foreground tasks on the
+  // isolate's event loop, drained directly; the short RunInMode slice stays
+  // as the idle-wait and still services any other runloop-delivered work the
+  // walk indirectly depends on. If UIApplicationMain takes over later, its
+  // runloop services the remainder instead.
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
   const CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + timeoutSeconds;
   while (!*done && CFAbsoluteTimeGetCurrent() < deadline) {
+    if (eventLoop != nullptr) {
+      eventLoop->RunNestableV8Tasks();
+    }
+    if (*done) {
+      break;
+    }
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
   }
   if (!*done && IsScriptLoadingLogEnabled()) {

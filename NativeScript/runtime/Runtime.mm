@@ -249,20 +249,23 @@ Runtime::~Runtime() {
   {
     v8::Locker lock(isolate_);
 
+    // Flag this isolate's in-flight async graph loads dead and Reset their
+    // context Globals — while the isolate is still alive, under the Locker
+    // above — so fetch completions still queued on background NSURLSession
+    // queues become no-ops. This MUST precede the event-loop Shutdown: a
+    // post the loop drops is destroyed on the POSTING (background) thread,
+    // and quiescing first guarantees such a task holds only already-Reset
+    // Globals by then. The rest of the loader state (registry / waiters)
+    // lives in a Caches state slot and is destroyed with the isolate's
+    // Caches below. Worker isolates quiesce the same way.
+    tns::QuiesceModuleLoadsForIsolate(isolate_);
+
     // Stop the event loop before any handle disposal: queued entries touch
     // caches and persistents that go away below, and posts from other threads
     // must start dropping now.
     if (eventLoop_ != nullptr) {
       eventLoop_->Shutdown();
     }
-
-    // Flag this isolate's in-flight async graph loads dead and Reset their
-    // context Globals — while the isolate is still alive, under the Locker
-    // above — so fetch completions still queued on background NSURLSession
-    // queues become no-ops. The rest of the loader state (registry / fallback
-    // maps / waiters) lives in a Caches state slot and is destroyed with the
-    // isolate's Caches below. Worker isolates quiesce the same way.
-    tns::QuiesceModuleLoadsForIsolate(isolate_);
 
     // Clear the remaining dev-loader + import-map globals (`g_importMap`,
     // cache-bust marks, boot-complete flag) before isolate disposal.

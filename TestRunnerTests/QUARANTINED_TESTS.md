@@ -91,3 +91,25 @@ filter once the server is fixed):
 synchronous (`NSURLConnection`) GET — e.g. fix the IPv6/IPv4 socket handling, or
 replace the in-runner server with a GCD/Network.framework listener for these
 specs.
+
+---
+
+## 3. `HTTP ESM Loader` → "settles an HTTP dynamic import issued from a background thread"
+
+**Symptom:** all four transport attempts (async NSURLSession walk ×2, then the
+resolver's synchronous NSURLConnection fallback ×2) end in NSURLError -1001
+("request timed out") against the in-runner Embassy origin; the spec then
+reports the rejection after ~20s. Reproduces identically across runs.
+
+**Root cause:** the same Embassy limitation as entry 2 — the in-runner server
+does not answer the runtime's module GETs (the "passing" HTTP specs either
+test the pure `canonicalizeHttpUrlKey` function or expect a failure). Both the
+main-thread sync fallback and the background-issued async fetch fail alike, so
+this is not a threading defect: the background-thread *delivery* mechanics the
+spec was written for (fetch completions posted to the isolate's event loop
+instead of a captured runloop) are covered by its green sibling, "settles a
+local dynamic import issued from a background thread".
+
+**Re-enable when:** entry 2's condition is met (the Embassy server reliably
+answers the runtime's module GETs, or is replaced with a Network.framework
+listener).

@@ -102,14 +102,70 @@ describe("HTTP ESM Loader", function() {
             });
         });
         
+        it("settles a local dynamic import issued from a background thread", function(done) {
+            var bgQueue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+            dispatch_async(bgQueue, function() {
+                import("~/tests/esm/graph/bg-solo.mjs").then(function(module) {
+                    expect(module.name).toBe("bg-solo");
+                    done();
+                }).catch(function(error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+        });
+
+        describe("from a background thread over HTTP", function() {
+            var originalTimeout;
+            beforeEach(function() {
+                originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
+            });
+            afterEach(function() {
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+            });
+
+            it("settles an HTTP dynamic import issued from a background thread", function(done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    done();
+                    return;
+                }
+                // Completion delivery must not depend on the calling thread
+                // having a runloop of its own. Live-network neighbors
+                // (blackhole-host specs) can slow connection setup, so allow
+                // one retry and a generous budget like the other live-network
+                // specs here. Each attempt uses a distinct URL so an errored
+                // registry entry cannot poison the retry.
+                var bgQueue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+                dispatch_async(bgQueue, function() {
+                    function attempt(remaining) {
+                        return withTimeout(import(origin + "/esm/query.mjs?v=bg" + remaining), 25000, "bg http import").catch(function(error) {
+                            if (remaining > 0) {
+                                return attempt(remaining - 1);
+                            }
+                            throw error;
+                        });
+                    }
+                    attempt(1).then(function(module) {
+                        expect(module).toBeDefined();
+                        expect(module.query).toContain("v=bg");
+                        done();
+                    }).catch(function(error) {
+                        expect("rejected: " + formatError(error)).toBe("resolved");
+                        done();
+                    });
+                });
+            });
+        });
+
         it("evaluates a disk diamond graph in spec order, each module once", function(done) {
-            delete globalThis.__nsGraphOrder;
             import("~/tests/esm/graph/diamond-entry.mjs").then(function(module) {
                 expect(module.order).toEqual(["shared", "left", "right", "entry"]);
                 expect(module.names).toEqual(["left", "right"]);
                 done();
             }).catch(function(error) {
-                fail("diamond graph import should have succeeded: " + formatError(error));
+                expect("rejected: " + formatError(error)).toBe("resolved");
                 done();
             });
         });
@@ -121,7 +177,7 @@ describe("HTTP ESM Loader", function() {
                 expect(module.describeB()).toBe("a-saw-b");
                 done();
             }).catch(function(error) {
-                fail("cyclic import should have succeeded: " + formatError(error));
+                expect("rejected: " + formatError(error)).toBe("resolved");
                 done();
             });
         });
@@ -136,7 +192,7 @@ describe("HTTP ESM Loader", function() {
                 expect(module.metaDirname).not.toContain("meta.mjs");
                 done();
             }).catch(function(error) {
-                fail("meta fixture import should have succeeded: " + formatError(error));
+                expect("rejected: " + formatError(error)).toBe("resolved");
                 done();
             });
         });
@@ -153,7 +209,7 @@ describe("HTTP ESM Loader", function() {
                     done();
                 });
             }).catch(function(error) {
-                fail("JSON import should have succeeded: " + formatError(error));
+                expect("rejected: " + formatError(error)).toBe("resolved");
                 done();
             });
         });
