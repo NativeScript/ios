@@ -170,6 +170,63 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        // A local root whose graph reaches an HTTP leaf. Discovery is
+        // scheme-agnostic, so the walk compiles the whole closure up front and
+        // the resolver never takes a blocking synchronous fetch.
+        describe("mixed local/http graphs", function () {
+            function configureLeaves(origin) {
+                // configureLoader takes a whole import map, so the entries
+                // live under the standard "imports" key.
+                require("ns:module").configureLoader({
+                    importMap: {
+                        imports: {
+                            "ns-test-leaf-a": origin + "/esm/graph-leaf.mjs?k=a",
+                            "ns-test-leaf-b": origin + "/esm/graph-leaf.mjs?k=b",
+                        },
+                    },
+                });
+            }
+
+            afterEach(function () {
+                require("ns:module").configureLoader({ importMap: { imports: {} } });
+            });
+
+            it("resolves a local->local->http graph through require()", function () {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    return;
+                }
+                configureLeaves(origin);
+
+                var req = require("ns:module").createRequire(__dirname + "/anything.js");
+                var mod = req("./esm/mixed/a-entry.mjs");
+                expect(mod.leaf).toBe("a");
+                // Spec evaluation order, deepest first — the walk changes only
+                // when modules are compiled, never when they run.
+                expect(mod.order).toEqual(["leaf", "mid", "entry"]);
+            });
+
+            it("resolves a local->local->http graph through import()", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                configureLeaves(origin);
+
+                import("~/tests/esm/mixed/b-entry.mjs").then(function (mod) {
+                    expect(mod.leaf).toBe("b");
+                    expect(mod.order).toEqual(["leaf", "mid", "entry"]);
+                    done();
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+        });
+
         it("links and evaluates cyclic disk imports", function(done) {
             import("~/tests/esm/graph/cycle-a.mjs").then(function(module) {
                 expect(module.aValue).toBe("a");

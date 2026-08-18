@@ -582,6 +582,15 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
     RemoveModuleFromRegistry(isolate, registryKey);
   }
 
+  // Reaching this point means the graph walk did not discover this URL, so the
+  // module is about to be fetched synchronously, blocking the JS thread for a
+  // whole round trip. That is an invariant violation, not a mode — always
+  // visible, in every build, so it cannot hide behind a disabled trace
+  // category. The fallback itself stays: correctness first, diagnosis loud.
+  Log(@"NativeScript: module graph walk missed %s — falling back to a blocking "
+      @"synchronous fetch. This should not happen; please report it.",
+      requestedUrl.c_str());
+
   std::string body;
   std::string contentType;
   int status = 0;
@@ -725,7 +734,7 @@ void CleanupImportMapGlobals() {
 //     → hop to the isolate's JS thread (ExecuteOnRunLoop on the runtime loop)
 //     → CompileModuleForResolveRegisterOnly (registers under the canonical
 //       URL key — the exact entry ResolveModuleCallback will look up)
-//     → GetModuleRequests() → ResolveModuleRequestForWalk → EnqueueUrl(…)
+//     → GetModuleRequests() → ResolveSpecifierToPath → EnqueueUrl(…)
 //     → when pendingFetches drains, onComplete fires on the JS thread.
 //
 // Thread discipline: `visited`, `pendingFetches`, `failed`, `completed` are
@@ -823,44 +832,150 @@ static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate) {
   state->asyncGraphLoads.clear();
 }
 
-// Resolve one static module request to an absolute HTTP(S) URL using the
-// SAME logic ResolveModuleCallback applies, in the same order: malformed
-// scheme repair → import map (direct, then Vite-normalized) → absolute
-// HTTP passthrough → relative/root-absolute resolution against an HTTP
-// referrer. Returns empty for everything the walk should NOT touch (local
-// files, tilde paths, unmapped bare specifiers, node: builtins without an
-// import-map entry) — those stay on the resolver's lazy synchronous path.
-static std::string ResolveModuleRequestForWalk(const std::string& rawSpec,
-                                               const std::string& referrerUrl) {
-  if (rawSpec.empty()) {
+// ── The shared resolution seam ───────────────────────────────────────────────
+//
+// One module specifier resolved to something the loader can act on. Both
+// ResolveModuleCallback and the graph walk go through this, so a module gets
+// the same registry key whichever of them reaches it first — a divergence here
+// mints two identities for one file.
+//
+// Pure computation: it consults the import map and the filesystem, but never
+// compiles, registers, fetches, or throws.
+struct ModuleResolution {
+  enum class Kind {
+    kUnresolved,  // nothing locatable; the caller decides how to report it
+    kBuiltin,     // ns:/node: — served from the builtin registry
+    kHttp,        // absolute http(s) URL
+    kFile,        // absolute filesystem path, confirmed to be a regular file
+  };
+
+  Kind kind = Kind::kUnresolved;
+  std::string url;        // kHttp
+  std::string path;       // kFile
+  std::string specifier;  // the specifier after import-map rewriting
+  std::string attempted;  // kUnresolved: the last candidate tried
+};
+
+static bool IsRegularFile(const std::string& p) {
+  std::string normalized = NormalizePath(p);
+  struct stat st;
+  if (stat(normalized.c_str(), &st) != 0) {
+    return false;
+  }
+  return (st.st_mode & S_IFMT) == S_IFREG;
+}
+
+// Rebuild an HTTP URL a path join swallowed ('/app/http:/host/x' →
+// 'http://host/x'), or empty when the path embeds none.
+static std::string HttpUrlEmbeddedInPath(const std::string& p) {
+  size_t pos1 = p.find("/http:/");
+  size_t pos2 = p.find("/https:/");
+  size_t pos = std::min(pos1 == std::string::npos ? SIZE_MAX : pos1,
+                        pos2 == std::string::npos ? SIZE_MAX : pos2);
+  if (pos == SIZE_MAX) {
     return "";
   }
+  std::string tail = p.substr(pos + 1);
+  if (StartsWith(tail, "http:/") && !StartsWith(tail, "http://")) {
+    tail.insert(5, "/");
+  } else if (StartsWith(tail, "https:/") && !StartsWith(tail, "https://")) {
+    tail.insert(6, "/");
+  }
+  if (!(StartsWith(tail, "http://") || StartsWith(tail, "https://"))) {
+    return "";
+  }
+  return tail;
+}
+
+// `referrerKey` is the registry key of the importing module — empty when the
+// importer is unknown (a dynamic import with no compiled referrer).
+static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
+                                               const std::string& referrerKey) {
+  ModuleResolution result;
+  if (rawSpec.empty()) {
+    return result;
+  }
+
+  // Builtins resolve before any path handling, so a file can never shadow one.
+  if (NsBuiltinModules::IsBuiltinScheme(rawSpec)) {
+    result.kind = ModuleResolution::Kind::kBuiltin;
+    result.specifier = rawSpec;
+    return result;
+  }
+
   std::string spec = rawSpec;
+  // Repair 'http:/host' (single slash) left by upstream path joins, so the URL
+  // takes the HTTP path instead of becoming '/app/http:/host'.
   if (spec.rfind("http:/", 0) == 0 && spec.rfind("http://", 0) != 0) {
     spec.insert(5, "/");
   } else if (spec.rfind("https:/", 0) == 0 && spec.rfind("https://", 0) != 0) {
     spec.insert(6, "/");
   }
 
+  TNS_DEBUG(Esm, "[resolver][spec] %s", spec.c_str());
+
+  // The import map is consulted before any other resolution: bare specifiers
+  // resolve through it to vendor or HTTP URLs. A client that rewrites
+  // specifiers must map every form it emits — keys are matched literally.
   if (!g_importMap.empty()) {
     std::string mapped = LookupImportMap(spec);
     if (!mapped.empty()) {
+      TNS_DEBUG(Esm, "[resolver][import-map] rewrite: %s -> %s", spec.c_str(), mapped.c_str());
       spec = mapped;
+    } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+      // A bare-looking specifier the map didn't match is about to fall back to
+      // filesystem resolution and almost certainly fail; surface the missing
+      // entry before the more cryptic `Cannot find module` follow-on.
+      bool looksBare = spec[0] != '/' && spec[0] != '.' && spec.find("://") == std::string::npos &&
+                       spec.find('\\') == std::string::npos;
+      if (looksBare) {
+        TNS_DEBUG(Esm,
+                  "[resolver][import-map][miss] bare='%s' importMap.size=%lu importMap.empty=%d",
+                  spec.c_str(), (unsigned long)g_importMap.size(), g_importMap.empty() ? 1 : 0);
+      }
+    }
+  } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+    // Map completely empty — distinct from "populated but no entry".
+    bool looksBare = spec[0] != '/' && spec[0] != '.' && spec.find("://") == std::string::npos &&
+                     spec.find('\\') == std::string::npos;
+    if (looksBare) {
+      TNS_DEBUG(Esm,
+                "[resolver][import-map][empty] bare='%s' — g_importMap is EMPTY (was it ever "
+                "configured? expected ~200-500 entries)",
+                spec.c_str());
     }
   }
 
+  result.specifier = spec;
+
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
-    return spec;
+    result.kind = ModuleResolution::Kind::kHttp;
+    result.url = spec;
+    return result;
   }
 
-  const bool specIsRelative = !spec.empty() && spec[0] == '.';
-  const bool specIsRootAbs = !spec.empty() && spec[0] == '/';
+  TNS_DEBUG(Esm, "[resolver] resolving '%s'", spec.c_str());
+
+  const bool specIsRelative = spec[0] == '.';
+  const bool specIsRootAbs = spec[0] == '/';
+  size_t slash = referrerKey.find_last_of("/\\");
+  std::string baseDir = slash == std::string::npos ? "" : referrerKey.substr(0, slash + 1);
+  if (referrerKey.empty() && specIsRelative) {
+    TNS_DEBUG(Esm,
+              "[resolver] no registered referrer for relative import '%s'; resolving "
+              "against app root",
+              spec.c_str());
+    baseDir = RuntimeConfig.ApplicationPath + "/";
+  }
+
+  // A referrer fetched over HTTP makes its relative and root-absolute imports
+  // HTTP too, the way a browser resolves them.
   const bool referrerIsHttp =
-      StartsWith(referrerUrl, "http://") || StartsWith(referrerUrl, "https://");
-  if ((specIsRelative || specIsRootAbs) && referrerIsHttp) {
-    std::string resolved;
+      StartsWith(referrerKey, "http://") || StartsWith(referrerKey, "https://");
+  if (referrerIsHttp && (specIsRelative || specIsRootAbs)) {
+    std::string resolvedHttp;
     @autoreleasepool {
-      NSString* baseStr = [NSString stringWithUTF8String:referrerUrl.c_str()];
+      NSString* baseStr = [NSString stringWithUTF8String:referrerKey.c_str()];
       NSString* specStr = [NSString stringWithUTF8String:spec.c_str()];
       if (baseStr && specStr) {
         NSURL* baseURL = [NSURL URLWithString:baseStr];
@@ -869,28 +984,156 @@ static std::string ResolveModuleRequestForWalk(const std::string& rawSpec,
         if (absURL) {
           NSString* absStr = [absURL absoluteString];
           if (absStr) {
-            resolved = std::string([absStr UTF8String] ?: "");
+            resolvedHttp = std::string([absStr UTF8String] ?: "");
           }
         }
       }
     }
-    if (StartsWith(resolved, "http://") || StartsWith(resolved, "https://")) {
-      return resolved;
+    if (StartsWith(resolvedHttp, "http://") || StartsWith(resolvedHttp, "https://")) {
+      TNS_DEBUG(Esm, "[resolver][http-rel] base=%s spec=%s -> %s", referrerKey.c_str(),
+                spec.c_str(), resolvedHttp.c_str());
+      result.kind = ModuleResolution::Kind::kHttp;
+      result.url = resolvedHttp;
+      return result;
     }
   }
 
-  return "";
+  // Build the filesystem candidates for this specifier shape. The specifier may
+  // omit its extension or name a directory, so each candidate is probed with
+  // Node-style extension and index fallbacks below.
+  std::vector<std::string> candidateBases;
+
+  if (specIsRelative) {
+    std::string cleanSpec = spec.rfind("./", 0) == 0 ? spec.substr(2) : spec;
+    @autoreleasepool {
+      NSString* nsBase = [NSString stringWithUTF8String:baseDir.c_str()];
+      NSString* nsRel = [NSString stringWithUTF8String:cleanSpec.c_str()];
+      if (nsBase && nsRel) {
+        NSString* joined = [nsBase stringByAppendingPathComponent:nsRel];
+        NSString* standardized = [joined stringByStandardizingPath];
+        if (standardized) {
+          std::string candidate = NormalizePath(standardized.UTF8String);
+          candidateBases.push_back(candidate);
+          TNS_DEBUG(Esm, "[resolver][normalize-rel] %s + %s -> %s", baseDir.c_str(),
+                    cleanSpec.c_str(), candidate.c_str());
+        }
+      }
+    }
+    TNS_DEBUG(Esm, "[resolver] Relative import: '%s' + '%s' -> '%s'", baseDir.c_str(),
+              cleanSpec.c_str(), candidateBases.empty() ? "<none>" : candidateBases.back().c_str());
+  } else if (spec.rfind("file://", 0) == 0) {
+    std::string tail = spec.substr(7);
+    if (tail.rfind("/", 0) != 0) {
+      tail = "/" + tail;
+    }
+    const std::string appPrefix = "/app/";
+    std::string tailNoApp = tail;
+    if (tail.rfind(appPrefix, 0) == 0) {
+      tailNoApp = tail.substr(appPrefix.size());
+    }
+    candidateBases.push_back(NormalizePath(RuntimeConfig.ApplicationPath + "/" + tailNoApp));
+    candidateBases.push_back(NormalizePath(RuntimeConfig.ApplicationPath + tail));
+  } else if (spec[0] == '~') {
+    std::string tail = spec.size() >= 2 && spec[1] == '/' ? spec.substr(2) : spec.substr(1);
+    std::string base = NormalizePath(RuntimeConfig.ApplicationPath + "/" + tail);
+    candidateBases.push_back(base);
+
+    // Projects that bundle JS under an app folder.
+    std::string baseApp = NormalizePath(RuntimeConfig.ApplicationPath + "/app/" + tail);
+    if (baseApp != base) {
+      candidateBases.push_back(baseApp);
+    }
+    TNS_DEBUG(Esm, "[resolver][tilde] spec=%s base=%s appBase=%s", spec.c_str(), base.c_str(),
+              baseApp.c_str());
+  } else if (specIsRootAbs) {
+    std::string base = NormalizePath(RuntimeConfig.ApplicationPath + spec);
+    candidateBases.push_back(base);
+
+    const std::string appPrefix = "/app/";
+    if (spec.rfind(appPrefix, 0) == 0) {
+      std::string tailNoApp = spec.substr(appPrefix.size() - 1);  // keeps the leading '/'
+      std::string baseNoApp = NormalizePath(RuntimeConfig.ApplicationPath + tailNoApp);
+      if (baseNoApp != base) {
+        candidateBases.push_back(baseNoApp);
+      }
+      TNS_DEBUG(Esm, "[resolver][abs] spec=%s base=%s baseNoApp=%s", spec.c_str(), base.c_str(),
+                baseNoApp.c_str());
+    } else {
+      TNS_DEBUG(Esm, "[resolver][abs] spec=%s base=%s", spec.c_str(), base.c_str());
+    }
+  } else {
+    candidateBases.push_back(NormalizePath(RuntimeConfig.ApplicationPath + "/" + spec));
+  }
+
+  auto withExt = [](const std::string& p, const std::string& ext) -> std::string {
+    if (p.size() >= ext.size() && p.compare(p.size() - ext.size(), ext.size(), ext) == 0) {
+      return p;
+    }
+    return p + ext;
+  };
+
+  std::string absPath;
+  for (const std::string& baseCandidate : candidateBases) {
+    absPath = NormalizePath(baseCandidate);
+
+    std::string embedded = HttpUrlEmbeddedInPath(absPath);
+    if (!embedded.empty()) {
+      TNS_DEBUG(Esm, "[resolver][http-embedded] %s -> %s", absPath.c_str(), embedded.c_str());
+      result.kind = ModuleResolution::Kind::kHttp;
+      result.url = embedded;
+      return result;
+    }
+
+    bool existsNow = IsRegularFile(absPath);
+    TNS_DEBUG(Esm, "[resolver] %s -> %s", absPath.c_str(), existsNow ? "file" : "missing");
+
+    if (!existsNow) {
+      bool found = false;
+      for (const char* ext : {".mjs", ".js"}) {
+        std::string cand = NormalizePath(withExt(absPath, ext));
+        if (IsRegularFile(cand)) {
+          absPath = cand;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        for (const char* idx : {"/index.mjs", "/index.js"}) {
+          std::string cand = NormalizePath(absPath + idx);
+          if (IsRegularFile(cand)) {
+            absPath = cand;
+            found = true;
+            break;
+          }
+        }
+      }
+      if (found) {
+        break;
+      }
+    }
+    if (IsRegularFile(absPath)) {
+      break;
+    }
+  }
+
+  absPath = NormalizePath(absPath);
+  result.attempted = absPath;
+  if (IsRegularFile(absPath)) {
+    result.kind = ModuleResolution::Kind::kFile;
+    result.path = absPath;
+  }
+  return result;
 }
 
-static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
-                                 const std::string& url);
+static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
+                              const ModuleResolution& resolution);
 
-// Walk `mod`'s static module requests and enqueue every HTTP-resolvable
-// dependency. JS thread only; `moduleUrl` is the canonical URL the module
-// was registered under (the referrer for relative resolution).
+// Walk `mod`'s static module requests and enqueue every edge the walk can
+// resolve. JS thread only; `moduleKey` is the registry key the module was
+// registered under, which is also the referrer for relative resolution.
 static void AsyncGraphWalkModuleRequests(const std::shared_ptr<AsyncGraphLoad>& load,
                                          v8::Local<v8::Context> context, v8::Local<v8::Module> mod,
-                                         const std::string& moduleUrl) {
+                                         const std::string& moduleKey) {
   v8::Isolate* isolate = load->isolate;
   v8::Local<v8::FixedArray> requests = mod->GetModuleRequests();
   const int length = requests->Length();
@@ -904,11 +1147,18 @@ static void AsyncGraphWalkModuleRequests(const std::shared_ptr<AsyncGraphLoad>& 
     if (!*specUtf8) {
       continue;
     }
-    std::string resolved = ResolveModuleRequestForWalk(*specUtf8, moduleUrl);
-    if (resolved.empty()) {
+    // Builtins are served by the resolver from the builtin registry, and an
+    // unresolved specifier (typically a bare name with no import-map entry)
+    // stays on the resolver's lazy path — where it either resolves later or
+    // fails with the resolver's own message. An unmapped bare specifier's
+    // subtree is therefore not discovered here; any HTTP edge inside it is
+    // pathological and lands on the synchronous anomaly guard.
+    const ModuleResolution resolution = ResolveSpecifierToPath(*specUtf8, moduleKey);
+    if (resolution.kind == ModuleResolution::Kind::kBuiltin ||
+        resolution.kind == ModuleResolution::Kind::kUnresolved) {
       continue;
     }
-    AsyncGraphEnqueueUrl(load, resolved);
+    AsyncGraphEnqueue(load, resolution);
   }
 }
 
@@ -1018,10 +1268,54 @@ static void AsyncGraphOnFetchCompleted(const std::shared_ptr<AsyncGraphLoad>& lo
   isolate->PerformMicrotaskCheckpoint();
 }
 
-// Enqueue one URL into the walk frontier. JS thread only.
-static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
-                                 const std::string& url) {
-  const std::string key = CanonicalizeHttpUrlKey(url);
+// A local edge: read + compile + register it inline, then keep walking. No
+// thread hop — the bytes are already on disk, and a hop would only reorder
+// discovery. A compile failure is deliberately swallowed here: the walk is a
+// discovery optimization, and the resolver (or LoadESModule, for the root)
+// owns the error message for a module that will not compile. Leaving it
+// unregistered is exactly what makes those paths run and report.
+static void AsyncGraphCompileLocalModule(const std::shared_ptr<AsyncGraphLoad>& load,
+                                         v8::Local<v8::Context> context, const std::string& path,
+                                         const std::string& key) {
+  v8::Isolate* isolate = load->isolate;
+  auto* moduleState = ModuleLoaderStateFor(isolate);
+  if (moduleState == nullptr) {
+    return;
+  }
+
+  v8::Local<v8::Module> mod;
+  {
+    v8::TryCatch tcCompile(isolate);
+    bool compiled = false;
+    try {
+      compiled = tns::ModuleInternal::CompileFileEsModule(isolate, path).ToLocal(&mod);
+    } catch (NativeScriptException& ex) {
+      TNS_DEBUG(Esm, "[graph][local-compile-fail] %s %s (left to the resolver)", path.c_str(),
+                ex.getMessage().c_str());
+      return;
+    }
+    if (!compiled) {
+      TNS_DEBUG(Esm, "[graph][local-compile-fail] %s %s (left to the resolver)", path.c_str(),
+                DescribeCaughtError(isolate, context, tcCompile).c_str());
+      return;
+    }
+  }
+
+  moduleState->registry[key].Reset(isolate, mod);
+  IndexRegisteredModule(*moduleState, key, mod);
+  load->compiledCount++;
+  AsyncGraphWalkModuleRequests(load, context, mod, key);
+}
+
+// Enqueue one resolved edge into the walk frontier. JS thread only.
+static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
+                              const ModuleResolution& resolution) {
+  const bool isHttp = resolution.kind == ModuleResolution::Kind::kHttp;
+  const std::string& target = isHttp ? resolution.url : resolution.path;
+  // One keying function for both schemes: it dispatches to the HTTP canonical
+  // key for URLs and to the normalized path otherwise, so the walk registers
+  // every module under the exact key the resolver will look up.
+  const std::string key = CanonicalizeRegistryKey(target);
   if (!load->visited.insert(key).second) {
     return;
   }
@@ -1047,12 +1341,26 @@ static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
       }
       return;  // instantiated/evaluated → its closure is already resolved
     }
-    // Errored entry: drop and refetch, mirroring LoadHttpModuleForUrl.
+    // Errored entry: drop and reload, mirroring LoadHttpModuleForUrl.
     RemoveModuleFromRegistry(isolate, key);
+  }
+
+  if (!isHttp) {
+    // JSON carries no module requests, and it compiles through a different
+    // path; there is nothing for the walk to discover in it.
+    if (target.size() >= 5 && target.compare(target.size() - 5, 5, ".json") == 0) {
+      return;
+    }
+    v8::Local<v8::Context> context = load->context.Get(isolate);
+    if (!context.IsEmpty()) {
+      AsyncGraphCompileLocalModule(load, context, target, key);
+    }
+    return;
   }
 
   load->pendingFetches++;
   std::shared_ptr<AsyncGraphLoad> loadRef = load;
+  const std::string url = target;
   FetchModuleBodyAsync(url, [loadRef, url](bool ok, int status, std::string body) {
     // Arbitrary thread. Hop to the isolate's home thread as a nestable v8
     // foreground task — thread-independent delivery, so an import() issued
@@ -1079,36 +1387,58 @@ static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
   });
 }
 
-void StartAsyncHttpModuleGraphLoad(
-    v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& rootUrl,
+// Classify a walk root. The root arrives already resolved — an absolute URL
+// from the HTTP loader, or a canonical path from LoadESModule — so it needs
+// only scheme dispatch, not the full specifier resolution.
+static ModuleResolution ResolutionForRoot(const std::string& root) {
+  ModuleResolution resolution;
+  resolution.specifier = root;
+  if (StartsWith(root, "http://") || StartsWith(root, "https://")) {
+    resolution.kind = ModuleResolution::Kind::kHttp;
+    resolution.url = root;
+  } else if (IsRegularFile(root)) {
+    resolution.kind = ModuleResolution::Kind::kFile;
+    resolution.path = root;
+  }
+  // Anything else stays kUnresolved: there is nothing to walk, and the
+  // caller's own load path reports why.
+  return resolution;
+}
+
+void StartModuleGraphLoad(
+    v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& root,
     std::function<void(bool ok, const std::string& errorMessage, v8::Local<v8::Context> context)>
         onComplete) {
   auto load = std::make_shared<AsyncGraphLoad>();
   load->isolate = isolate;
   load->context.Reset(isolate, context);
-  load->rootKey = CanonicalizeHttpUrlKey(rootUrl);
+  load->rootKey = CanonicalizeRegistryKey(root);
   load->startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
   load->onComplete = std::move(onComplete);
 
   AsyncGraphLoad::g_asyncGraphLoadsInFlightCounter().fetch_add(1, std::memory_order_acq_rel);
   RegisterAsyncGraphLoad(isolate, load);
 
-  TNS_DEBUG(Esm, "[async-graph][start] root=%s key=%s", rootUrl.c_str(), load->rootKey.c_str());
+  TNS_DEBUG(Esm, "[graph][start] root=%s key=%s", root.c_str(), load->rootKey.c_str());
 
-  AsyncGraphEnqueueUrl(load, rootUrl);
-  // Root already registered (or nothing fetchable): complete inline.
+  const ModuleResolution rootResolution = ResolutionForRoot(root);
+  if (rootResolution.kind != ModuleResolution::Kind::kUnresolved) {
+    AsyncGraphEnqueue(load, rootResolution);
+  }
+  // Nothing left pending (a disk-only graph finishes entirely here): complete
+  // inline, so the pumped runner below never enters its wait loop.
   AsyncGraphMaybeComplete(load, context);
 }
 
-bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Context> context,
-                                       const std::string& rootUrl, double timeoutSeconds) {
+bool RunModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Context> context,
+                              const std::string& root, double timeoutSeconds) {
   if (timeoutSeconds <= 0.0) {
     timeoutSeconds = 60.0;
   }
   auto done = std::make_shared<bool>(false);
-  StartAsyncHttpModuleGraphLoad(isolate, context, rootUrl,
-                                [done](bool /*ok*/, const std::string& /*errorMessage*/,
-                                       v8::Local<v8::Context>) { *done = true; });
+  StartModuleGraphLoad(isolate, context, root,
+                       [done](bool /*ok*/, const std::string& /*errorMessage*/,
+                              v8::Local<v8::Context>) { *done = true; });
 
   // Manual pump ("until either all is settled or UIApplicationMain is
   // called"). Fetch completions are nestable v8 foreground tasks on the
@@ -1128,9 +1458,9 @@ bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Conte
     }
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
   }
-  if (!*done && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
-    TNS_DEBUG(Esm, "[async-graph][pumped][timeout] root=%s after %.1fs (sync loader takes over)",
-              rootUrl.c_str(), timeoutSeconds);
+  if (!*done) {
+    TNS_DEBUG(Esm, "[graph][pumped][timeout] root=%s after %.1fs (sync loader takes over)",
+              root.c_str(), timeoutSeconds);
   }
   return *done;
 }
@@ -1592,366 +1922,55 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   }
   auto& registry = moduleState->registry;
 
-  // 1) Turn the specifier literal into a std::string:
   v8::String::Utf8Value specUtf8(isolate, specifier);
   const std::string rawSpec = *specUtf8 ? *specUtf8 : "";
   if (rawSpec.empty()) {
     return v8::MaybeLocal<v8::Module>();
   }
 
-  // Builtin modules resolve before any path handling. Unshimmed "node:" names
-  // fall through to the legacy node:url polyfill below.
-  if (NsBuiltinModules::IsBuiltinScheme(rawSpec)) {
-    v8::Local<v8::Module> builtin;
-    if (NsBuiltinModules::GetModule(context, rawSpec).ToLocal(&builtin)) {
-      return v8::MaybeLocal<v8::Module>(builtin);
-    }
-    if (!NsBuiltinModules::IsRegistered(rawSpec)) {
-      isolate->ThrowException(v8::Exception::Error(
-          tns::ToV8String(isolate, NsBuiltinModules::NotFoundMessage(rawSpec))));
-    }
-    return v8::MaybeLocal<v8::Module>();
-  }
+  const std::string referrerPath = FindKeyForModule(*moduleState, isolate, referrer);
+  const ModuleResolution resolution = ResolveSpecifierToPath(rawSpec, referrerPath);
 
-  std::string normalizedSpec = rawSpec;
-
-  // Normalize malformed HTTP(S) schemes that sometimes appear as 'http:/host' (single slash)
-  // due to upstream path joins or standardization. This ensures our HTTP loader fast-path
-  // is used and avoids filesystem fallback attempts like '/app/http:/host'.
-  if (normalizedSpec.rfind("http:/", 0) == 0 && normalizedSpec.rfind("http://", 0) != 0) {
-    normalizedSpec.insert(5, "/");  // http:/ -> http://
-  } else if (normalizedSpec.rfind("https:/", 0) == 0 && normalizedSpec.rfind("https://", 0) != 0) {
-    normalizedSpec.insert(6, "/");  // https:/ -> https://
-  }
-
-  TNS_DEBUG(Esm, "[resolver][spec] %s", normalizedSpec.c_str());
-
-  const std::string& spec =
-      normalizedSpec;  // use normalized spec for the rest of the resolution logic
-
-  // Import map resolution
-  // If the import map is populated (set by ns:module configureLoader), check it
-  // before any other resolution: bare specifiers resolve through the map to
-  // either vendor URLs or HTTP module URLs. A client that rewrites specifiers
-  // must map every form it emits — the runtime matches map keys literally and
-  // reverse-engineers no bundler's rewriting.
-  if (!g_importMap.empty()) {
-    std::string mapped = LookupImportMap(spec);
-
-    if (!mapped.empty()) {
-      // Mapped to an HTTP URL or other specifier — update spec and fall
-      // through to existing resolution (HTTP fast path will pick it up)
-      normalizedSpec = mapped;
-      TNS_DEBUG(Esm, "[resolver][import-map] rewrite: %s -> %s", spec.c_str(), mapped.c_str());
-    } else {
-      // Diagnostic: bare-looking specifier (no scheme, no '/' prefix, not a
-      // relative path) that the import map didn't match.
-      // If we hit this path, the runtime is about to fall back
-      // to filesystem resolution and almost certainly fail with
-      // `Cannot find module ...` for vendor packages — surface it loudly
-      // so a missing import map entry shows up in the dev terminal
-      // BEFORE the more cryptic `Cannot find module` follow-on.
-      bool looksBare = !spec.empty() && spec[0] != '/' && spec[0] != '.' &&
-                       spec.find("://") == std::string::npos &&
-                       spec.find('\\') == std::string::npos;
-      if (looksBare && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
-        // Snapshot a few entry counts so we can tell at a glance whether
-        // `g_importMap` is intact (typical: 200-500 entries) or empty.
-        TNS_DEBUG(Esm,
-                  "[resolver][import-map][miss] bare='%s' importMap.size=%lu importMap.empty=%d",
-                  spec.c_str(), (unsigned long)g_importMap.size(), g_importMap.empty() ? 1 : 0);
+  switch (resolution.kind) {
+    case ModuleResolution::Kind::kBuiltin: {
+      v8::Local<v8::Module> builtin;
+      if (NsBuiltinModules::GetModule(context, rawSpec).ToLocal(&builtin)) {
+        return v8::MaybeLocal<v8::Module>(builtin);
       }
-    }
-  } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
-    // Map was completely empty — distinct from "map populated but no entry".
-    // This branch firing means `SetImportMap("")` was called or the map
-    // was never populated at all. Either is a bug; surface it.
-    bool looksBare = !spec.empty() && spec[0] != '/' && spec[0] != '.' &&
-                     spec.find("://") == std::string::npos && spec.find('\\') == std::string::npos;
-    if (looksBare) {
-      TNS_DEBUG(Esm,
-                "[resolver][import-map][empty] bare='%s' — g_importMap is EMPTY (was it ever "
-                "configured? expected ~200-500 entries)",
-                spec.c_str());
-    }
-  }
-
-  // ── Early absolute-HTTP fast path ─────────────────────────────
-  // If the specifier itself is an absolute HTTP(S) URL, resolve it immediately via
-  // the HTTP loader and return before any filesystem candidate logic runs.
-  // Security: HttpFetchText gates remote module access centrally.
-  if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
-    return LoadHttpModuleForUrl(isolate, context, spec);
-  }
-
-  TNS_DEBUG(Esm, "[resolver] resolving '%s'", spec.c_str());
-
-  // 2) Find which filepath the referrer was compiled under
-  std::string referrerPath = FindKeyForModule(*moduleState, isolate, referrer);
-  // If we couldn't identify the referrer (e.g. coming from a dynamic import
-  // where the embedder did not pass the compiled Module), we can still proceed
-  // for absolute and application-rooted specifiers. A clearly relative
-  // specifier ("./" or "../") needs the referrer's directory; without one,
-  // resolve against the application root — every registered module is in the
-  // identity-hash index, so hitting this means the referrer was never
-  // registered.
-  bool specIsRelative = !spec.empty() && spec[0] == '.';
-  size_t slash = referrerPath.find_last_of("/\\");
-  std::string baseDir = slash == std::string::npos ? "" : referrerPath.substr(0, slash + 1);
-  if (referrerPath.empty() && specIsRelative) {
-    TNS_DEBUG(Esm,
-              "[resolver] no registered referrer for relative import '%s'; resolving "
-              "against app root",
-              spec.c_str());
-    baseDir = RuntimeConfig.ApplicationPath + "/";
-  }
-
-  // If the referrer itself was compiled from an HTTP(S) URL, then any relative
-  // ("./" or "../") or root-absolute ("/") specifiers should resolve against the
-  // referrer's URL, not the local filesystem. Mirror browser behavior by using NSURL
-  // to construct the absolute URL, then return an HTTP-loaded module immediately.
-  // Security: HttpFetchText gates remote module access centrally.
-  bool referrerIsHttp = (!referrerPath.empty() && (StartsWith(referrerPath, "http://") ||
-                                                   StartsWith(referrerPath, "https://")));
-  bool specIsRootAbs = !spec.empty() && spec[0] == '/';
-  if (referrerIsHttp && (specIsRelative || specIsRootAbs)) {
-    std::string resolvedHttp;
-    @autoreleasepool {
-      NSString* baseStr = [NSString stringWithUTF8String:referrerPath.c_str()];
-      NSString* specStr = [NSString stringWithUTF8String:spec.c_str()];
-      if (baseStr && specStr) {
-        NSURL* baseURL = [NSURL URLWithString:baseStr];
-        NSURL* rel = [NSURL URLWithString:specStr relativeToURL:baseURL];
-        NSURL* absURL = [rel absoluteURL];
-        if (absURL) {
-          NSString* absStr = [absURL absoluteString];
-          if (absStr) {
-            resolvedHttp = std::string([absStr UTF8String] ?: "");
-          }
-        }
+      if (!NsBuiltinModules::IsRegistered(rawSpec)) {
+        isolate->ThrowException(v8::Exception::Error(
+            tns::ToV8String(isolate, NsBuiltinModules::NotFoundMessage(rawSpec))));
       }
+      return v8::MaybeLocal<v8::Module>();
     }
-    if (!resolvedHttp.empty() &&
-        (StartsWith(resolvedHttp, "http://") || StartsWith(resolvedHttp, "https://"))) {
+    case ModuleResolution::Kind::kHttp:
       // Security: HttpFetchText gates remote module access centrally.
-      TNS_DEBUG(Esm, "[resolver][http-rel] base=%s spec=%s -> %s", referrerPath.c_str(),
-                spec.c_str(), resolvedHttp.c_str());
-      return LoadHttpModuleForUrl(isolate, context, resolvedHttp);
+      return LoadHttpModuleForUrl(isolate, context, resolution.url);
+    case ModuleResolution::Kind::kUnresolved: {
+      // Surfaced as an exception rather than left to ReadModule(), which would
+      // abort the process trying to open a directory.
+      std::string msg =
+          "Cannot find module '" + resolution.specifier + "' (tried " + resolution.attempted + ")";
+      isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
+      return v8::MaybeLocal<v8::Module>();
     }
+    case ModuleResolution::Kind::kFile:
+      break;
   }
 
-  // 4) Resolve the import specifier relative to that directory.
-  //    The incoming specifier may omit the file extension (e.g. "./foo") or
-  //    point to a directory.  Try to follow Node-style resolution rules for
-  //    the most common cases so that we locate the actual .mjs file on disk
-  //    before handing the path to LoadScript.
-
-  // ────────────────────────────────────────────────
-  // Build initial absolute path candidates
-  // ────────────────────────────────────────────────
-
-  std::vector<std::string> candidateBases;
-
-  if (!spec.empty() && spec[0] == '.') {
-    // Relative import (./ or ../)
-    std::string cleanSpec = spec.rfind("./", 0) == 0 ? spec.substr(2) : spec;
-    // Join baseDir and spec using NSString to collapse dot segments reliably
-    @autoreleasepool {
-      NSString* nsBase = [NSString stringWithUTF8String:baseDir.c_str()];
-      NSString* nsRel = [NSString stringWithUTF8String:cleanSpec.c_str()];
-      if (nsBase && nsRel) {
-        NSString* joined = [nsBase stringByAppendingPathComponent:nsRel];
-        NSString* std = [joined stringByStandardizingPath];
-        if (std) {
-          std::string candidate = std.UTF8String;
-          candidate = NormalizePath(candidate);
-          candidateBases.push_back(candidate);
-          TNS_DEBUG(Esm, "[resolver][normalize-rel] %s + %s -> %s", baseDir.c_str(),
-                    cleanSpec.c_str(), candidate.c_str());
-        }
-      }
-    }
-
-    TNS_DEBUG(Esm, "[resolver] Relative import: '%s' + '%s' -> '%s'", baseDir.c_str(),
-              cleanSpec.c_str(), candidateBases.empty() ? "<none>" : candidateBases.back().c_str());
-  } else if (spec.rfind("file://", 0) == 0) {
-    // Absolute file URL, e.g. file:///app/path/to/chunk.mjs
-    std::string tail = spec.substr(7);  // strip file://
-    if (tail.rfind("/", 0) != 0) {
-      tail = "/" + tail;
-    }
-    // If starts with /app/... drop the leading /app
-    const std::string appPrefix = "/app/";
-    std::string tailNoApp = tail;
-    if (tail.rfind(appPrefix, 0) == 0) {
-      tailNoApp = tail.substr(appPrefix.size());
-    }
-    // Candidate that keeps /app/ prefix stripped
-    std::string baseNoApp = NormalizePath(RuntimeConfig.ApplicationPath + "/" + tailNoApp);
-    candidateBases.push_back(baseNoApp);
-
-    // Also try path with original tail (includes /app/...) directly under application dir
-    std::string baseWithApp = NormalizePath(RuntimeConfig.ApplicationPath + tail);
-    candidateBases.push_back(baseWithApp);
-  } else if (!spec.empty() && spec[0] == '~') {
-    // Alias to application root using ~/path
-    std::string tail = spec.size() >= 2 && spec[1] == '/' ? spec.substr(2) : spec.substr(1);
-    std::string base = NormalizePath(RuntimeConfig.ApplicationPath + "/" + tail);
-    candidateBases.push_back(base);
-
-    // Also try ApplicationPath/app for projects that bundle JS under an app folder
-    std::string baseApp = NormalizePath(RuntimeConfig.ApplicationPath + "/app/" + tail);
-    if (baseApp != base) {
-      candidateBases.push_back(baseApp);
-    }
-
-    TNS_DEBUG(Esm, "[resolver][tilde] spec=%s base=%s appBase=%s", spec.c_str(), base.c_str(),
-              baseApp.c_str());
-  } else if (!spec.empty() && spec[0] == '/') {
-    // Absolute path within the bundle (e.g., /app/..., /src/...)
-    // Resolve against the application directory and try both with and without the '/app' prefix.
-    std::string base = NormalizePath(RuntimeConfig.ApplicationPath + spec);
-    candidateBases.push_back(base);
-
-    const std::string appPrefix = "/app/";
-    if (spec.rfind(appPrefix, 0) == 0) {
-      std::string tailNoApp = spec.substr(appPrefix.size() - 1);  // keep leading '/'
-      // spec starts with '/app/...', so tailNoApp becomes '/...'
-      std::string baseNoApp = NormalizePath(RuntimeConfig.ApplicationPath + tailNoApp);
-      if (baseNoApp != base) {
-        candidateBases.push_back(baseNoApp);
-      }
-      TNS_DEBUG(Esm, "[resolver][abs] spec=%s base=%s baseNoApp=%s", spec.c_str(), base.c_str(),
-                baseNoApp.c_str());
-    } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
-      TNS_DEBUG(Esm, "[resolver][abs] spec=%s base=%s", spec.c_str(), base.c_str());
-    }
-  } else {
-    // Bare specifier – resolve relative to the application root directory
-    std::string base = NormalizePath(RuntimeConfig.ApplicationPath + "/" + spec);
-    candidateBases.push_back(base);
-  }
-
-  // We'll iterate these bases and attempt to resolve to an actual file
-  std::string absPath;
-
-  // If the specifier is an HTTP(S) URL, fetch via HTTP loader and return
-  // Security: HttpFetchText gates remote module access centrally.
-  if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
-    return LoadHttpModuleForUrl(isolate, context, spec);
-  }
-
-  // Utility: returns true iff `p` exists AND is a regular file (not directory)
-  auto isFile = [](const std::string& p) -> bool {
-    std::string normalized = NormalizePath(p);
-    struct stat st;
-    if (stat(normalized.c_str(), &st) != 0) {
-      return false;
-    }
-    return (st.st_mode & S_IFMT) == S_IFREG;
-  };
-
-  // Helper to append extension if missing
-  auto withExt = [](const std::string& p, const std::string& ext) -> std::string {
-    if (p.size() >= ext.size() && p.compare(p.size() - ext.size(), ext.size(), ext) == 0) {
-      return p;
-    }
-    return p + ext;
-  };
-
-  //  ── Resolution attempts ───────────────────────────────────────
-  // Iterate base candidates until we find a file match
-  for (const std::string& baseCandidate : candidateBases) {
-    absPath = NormalizePath(baseCandidate);
-
-    // If a candidate accidentally embeds a collapsed HTTP URL like '/app/http:/host/...',
-    // reconstruct the HTTP URL and resolve via the HTTP loader instead of touching the filesystem.
-    // Security: HttpFetchText gates remote module access centrally.
-    auto rerouteHttpIfEmbedded = [&](const std::string& p,
-                                     v8::MaybeLocal<v8::Module>* moduleOut) -> bool {
-      size_t pos1 = p.find("/http:/");
-      size_t pos2 = p.find("/https:/");
-      size_t pos = std::min(pos1 == std::string::npos ? SIZE_MAX : pos1,
-                            pos2 == std::string::npos ? SIZE_MAX : pos2);
-      if (pos == SIZE_MAX) return false;
-      std::string tail = p.substr(pos + 1);  // 'http:/...' or 'https:/...'
-      if (StartsWith(tail, "http:/") && !StartsWith(tail, "http://")) {
-        tail.insert(5, "/");
-      } else if (StartsWith(tail, "https:/") && !StartsWith(tail, "https://")) {
-        tail.insert(6, "/");
-      }
-      if (!(StartsWith(tail, "http://") || StartsWith(tail, "https://"))) return false;
-
-      TNS_DEBUG(Esm, "[resolver][http-embedded] %s -> %s", p.c_str(), tail.c_str());
-      if (moduleOut != nullptr) {
-        *moduleOut = LoadHttpModuleForUrl(isolate, context, tail);
-      }
-      return true;
-    };
-    v8::MaybeLocal<v8::Module> embeddedHttpModule;
-    if (rerouteHttpIfEmbedded(absPath, &embeddedHttpModule)) {
-      return embeddedHttpModule;
-    }
-
-    bool existsNow = isFile(absPath);
-    TNS_DEBUG(Esm, "[resolver] %s -> %s", absPath.c_str(), existsNow ? "file" : "missing");
-
-    if (!existsNow) {
-      // 1) Try adding .mjs, .js
-      const char* exts[] = {".mjs", ".js"};
-      bool found = false;
-      for (const char* e : exts) {
-        std::string cand = NormalizePath(withExt(absPath, e));
-        if (isFile(cand)) {
-          absPath = cand;
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        // 2) If absPath is directory, look for index files
-        const char* idxExts[] = {"/index.mjs", "/index.js"};
-        for (const char* idx : idxExts) {
-          std::string cand = NormalizePath(absPath + idx);
-          if (isFile(cand)) {
-            absPath = cand;
-            found = true;
-            break;
-          }
-        }
-      }
-      if (found) {
-        break;
-      }
-    }
-    if (isFile(absPath)) {
-      break;  // stop at first hit
-    }
-  }
-
-  // At this point, absPath is either a valid file or last attempted candidate.
-
-  // If we still didn't resolve to an actual file, surface an exception instead
-  // of letting ReadModule() assert while trying to open a directory.
-  absPath = NormalizePath(absPath);
+  const std::string& absPath = resolution.path;
   const std::string registryAbsPath = CanonicalizeRegistryKey(absPath);
 
-  if (!isFile(absPath)) {
-    std::string msg = "Cannot find module '" + spec + "' (tried " + absPath + ")";
-    isolate->ThrowException(v8::Exception::Error(tns::ToV8String(isolate, msg)));
-    return v8::MaybeLocal<v8::Module>();
-  }
-
-  // Special handling for JSON imports (e.g. import data from './foo.json' assert {type:'json'})
+  // JSON imports (import data from './foo.json' with { type: 'json' }).
   if (absPath.size() >= 5 && absPath.compare(absPath.size() - 5, 5, ".json") == 0) {
     return CompileJsonAsEsModule(isolate, context, absPath, registryAbsPath);
   }
 
-  // 5) Reuse any live, non-errored registry entry. The resolver never
-  // evaluates, so an unfinished entry (kUninstantiated / kInstantiating /
-  // kEvaluating) simply rejoins the graph V8 is currently linking — that is
-  // how import cycles terminate, the same way Node/Blink break them with the
-  // module-map self-insert.
+  // Reuse any live, non-errored registry entry. The resolver never evaluates,
+  // so an unfinished entry (kUninstantiated / kInstantiating / kEvaluating)
+  // simply rejoins the graph V8 is currently linking — that is how import
+  // cycles terminate, the same way Node/Blink break them with the module-map
+  // self-insert.
   auto it = registry.find(registryAbsPath);
   if (it != registry.end()) {
     v8::Local<v8::Module> existing = it->second.Get(isolate);
@@ -1963,7 +1982,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
     RemoveModuleFromRegistry(isolate, absPath);
   }
 
-  // 6) Compile + register only — never instantiate or evaluate here. V8 is
+  // Compile + register only — never instantiate or evaluate here. V8 is
   // instantiating the importer and continues the graph walk by resolving this
   // module's own requests next; evaluating inside the resolver would run
   // dependencies in resolver order instead of the spec's evaluation order.
@@ -2721,7 +2740,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // queued waiters from the walk's completion. The promise returns to JS
       // immediately — no synchronous fetch, no runloop pump.
       const std::string requestUrl = normalizedSpec;
-      StartAsyncHttpModuleGraphLoad(
+      StartModuleGraphLoad(
           isolate, context, requestUrl,
           [key, requestUrl, isolate](bool ok, const std::string& errorMessage,
                                      v8::Local<v8::Context> completionContext) {
@@ -2778,6 +2797,21 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         TNS_DEBUG(Esm,
                   "[dyn-import][ref] missing resource name; cannot normalize relative spec against "
                   "referrer");
+      }
+    }
+
+    // Discovery pre-pass, the same one the static path runs: a local graph can
+    // reach HTTP edges, and without the walk those meet the resolver cold and
+    // fetch serially, one blocking round trip each. A graph with no HTTP edges
+    // settles inside the call, so a local-only dynamic import is unchanged —
+    // it neither waits nor touches the runloop.
+    {
+      v8::String::Utf8Value adjustedUtf8(isolate, adjustedSpecifier);
+      const ModuleResolution rootResolution =
+          ResolveSpecifierToPath(*adjustedUtf8 ? *adjustedUtf8 : "", std::string());
+      if (rootResolution.kind == ModuleResolution::Kind::kFile) {
+        RunModuleGraphLoadPumped(isolate, context, rootResolution.path,
+                                 tns::kModuleEvaluateDeadlineSeconds);
       }
     }
 

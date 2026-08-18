@@ -70,6 +70,25 @@ class TestRunnerTests: XCTestCase {
                     return
                 }
 
+                if path == "/esm/graph-leaf.mjs" {
+                    // Leaf of a mixed local->local->http graph. The `k` param
+                    // gives each importer its own module identity (the query is
+                    // part of the key when no canonicalization vocabulary is
+                    // configured), so two specs can use one route.
+                    var key = "x"
+                    if let pair = query.split(separator: "&").first(where: { $0.hasPrefix("k=") }) {
+                        key = String(pair.dropFirst(2))
+                    }
+                    let body = """
+                    const bucket = "__nsMixedOrder" + "\(key)";
+                    (globalThis[bucket] = globalThis[bucket] || []).push("leaf");
+                    export const name = "\(key)";
+                    """
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
                 if path == "/esm/syntax-error.mjs" {
                     // Deliberately unparseable: pins that the loader surfaces
                     // V8's real compile error instead of a generic failure.

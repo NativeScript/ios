@@ -14,7 +14,7 @@ namespace tns {
 //     fallback path (V8's ResolveModuleCallback is synchronous — still
 //     true as of 14.9.207.39 — so the fallback must be native),
 //   - the async NSURLSession fetch behind the phase-1 module-graph walk
-//     (StartAsyncHttpModuleGraphLoad), which is how module bodies
+//     (StartModuleGraphLoad), which is how module bodies
 //     normally arrive,
 //   - eviction plumbing (an eviction-driven fetch nonce that defeats
 //     CFNetwork's HTTP cache),
@@ -73,7 +73,7 @@ bool HttpFetchText(const std::string& url, std::string& out,
                    std::string& contentType, int& status);
 
 // Asynchronous single-URL module body fetch — the I/O primitive behind the
-// phase-1 module-graph walk (see StartAsyncHttpModuleGraphLoad in
+// phase-1 module-graph walk (see StartModuleGraphLoad in
 // ModuleInternalCallbacks.h). Same semantics as HttpFetchText, minus the
 // JS-thread block:
 //   - security gate (IsRemoteUrlAllowed) checked up front,

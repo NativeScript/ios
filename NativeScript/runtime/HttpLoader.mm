@@ -324,7 +324,7 @@ static void ClearAllCacheBustMarks() {
 //     (the callback is synchronous — still true as of 14.9.207.39 — so
 //     this fallback must be native and blocking).
 //   - `FetchModuleBodyAsync` — the NSURLSession-backed primitive behind
-//     the phase-1 async graph walk (StartAsyncHttpModuleGraphLoad),
+//     the phase-1 async graph walk (StartModuleGraphLoad),
 //     which fetches the transitive closure concurrently off the JS
 //     thread before instantiation begins.
 //

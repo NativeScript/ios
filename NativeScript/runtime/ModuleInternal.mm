@@ -1378,8 +1378,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     // boot handoff for static HTTP entries). Afterwards the load below is a
     // registry hit and instantiation resolves as pure lookup. On timeout or
     // partial coverage the legacy synchronous path still owns correctness.
-    RunAsyncHttpModuleGraphLoadPumped(isolate, context, requestPath,
-                                      kModuleEvaluateDeadlineSeconds);
+    RunModuleGraphLoadPumped(isolate, context, requestPath, kModuleEvaluateDeadlineSeconds);
     MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
     if (!maybeMod.ToLocal(&module)) {
       logPhase("compile", "fail", "http-loader");
@@ -1392,7 +1391,26 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     }
   } else {
     logPhase("compile", "begin");
-    {
+    // Discovery pre-pass for local roots too: a local graph can reach HTTP
+    // edges, and without this they hit the resolver cold and fetch serially,
+    // one blocking request at a time. The walk compiles and registers the
+    // whole closure up front, so instantiation resolves as pure lookup. A
+    // graph with no HTTP edges settles inside the call and pays no wait.
+    //
+    // The deadline is the FETCH bound, independent of the evaluation policy's
+    // settle window: a strict require refuses an async EVALUATION, not an
+    // async fetch, so it legitimately waits here and then evaluates
+    // synchronously.
+    RunModuleGraphLoadPumped(isolate, context, canonicalPath, kModuleEvaluateDeadlineSeconds);
+    auto walkedIt = registry.find(canonicalPath);
+    if (walkedIt != registry.end()) {
+      Local<Module> walked = walkedIt->second.Get(isolate);
+      if (!walked.IsEmpty() && walked->GetStatus() != Module::kErrored) {
+        module = walked;
+      }
+    }
+
+    if (module.IsEmpty()) {
       TryCatch tcCompile(isolate);
       MaybeLocal<Module> maybeMod = ModuleInternal::CompileFileEsModule(isolate, canonicalPath);
 
