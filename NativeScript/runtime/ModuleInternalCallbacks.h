@@ -96,12 +96,6 @@ bool RunAsyncHttpModuleGraphLoadPumped(v8::Isolate* isolate,
 // returned without UIApplicationMain having been invoked.
 bool HasPendingAsyncModuleGraphWork();
 
-// Keep a fallback copy of the last evaluated module so could be served while
-// reloading if needed
-void UpdateModuleFallback(v8::Isolate* isolate,
-                          const std::string& canonicalPath,
-                          v8::Local<v8::Module> module);
-
 // Drop exact URL-keyed modules from the registry and clear any in-flight
 // invalidation bookkeeping tied to those canonical keys.
 void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,

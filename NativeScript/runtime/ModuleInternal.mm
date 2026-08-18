@@ -78,7 +78,7 @@ static std::string CanonicalizeModulePath(const std::string& path) {
 }
 
 // Normalize file system paths to a canonical representation so lookups in
-// g_moduleRegistry remain consistent regardless of how the path was provided.
+// registry remain consistent regardless of how the path was provided.
 static std::string NormalizePath(const std::string& path) {
   if (path.empty()) {
     return path;
@@ -957,6 +957,48 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
   return script;
 }
 
+MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const std::string& path) {
+  std::string canonicalPath = NormalizePath(path);
+
+  struct stat st;
+  if (stat(canonicalPath.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+    throw NativeScriptException("Cannot find module " + canonicalPath);
+  }
+
+  std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
+  std::string url = "file://" + base;
+
+  Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
+  auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
+
+  Local<v8::String> urlString;
+  if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
+    throw NativeScriptException(isolate,
+                                "Failed to create URL string for ES module " + canonicalPath);
+  }
+
+  ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
+                      true  // ← is_module
+  );
+  ScriptCompiler::Source source(sourceText, origin, cacheData);
+
+  Local<Module> module;
+  MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
+      isolate, &source,
+      cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
+  if (!maybeMod.ToLocal(&module)) {
+    return MaybeLocal<Module>();
+  }
+
+  if (cacheData == nullptr) {
+    Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
+    auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
+    ModuleInternal::SaveScriptCache(generatedCache, canonicalPath);
+  }
+
+  return maybeMod;
+}
+
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path) {
   bool isHttpModule = IsHttpModulePath(path);
   std::string canonicalPath = CanonicalizeModulePath(path);
@@ -966,7 +1008,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   if (registryPtr == nullptr) {
     return Local<Value>();
   }
-  auto& g_moduleRegistry = *registryPtr;
+  auto& registry = *registryPtr;
 
   auto describeModuleStatus = [](Module::Status status) -> const char* {
     switch (status) {
@@ -988,8 +1030,8 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   };
 
   Local<Module> reusedModule;
-  auto existingIt = g_moduleRegistry.find(canonicalPath);
-  if (existingIt != g_moduleRegistry.end()) {
+  auto existingIt = registry.find(canonicalPath);
+  if (existingIt != registry.end()) {
     Local<Module> existing = existingIt->second.Get(isolate);
     if (existing.IsEmpty()) {
       if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
@@ -1005,7 +1047,6 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       if (existingStatus == Module::kErrored) {
         RemoveModuleFromRegistry(isolate, canonicalPath);
       } else if (existingStatus == Module::kEvaluated) {
-        UpdateModuleFallback(isolate, canonicalPath, existing);
         return existing->GetModuleNamespace();
       } else if (existingStatus == Module::kUninstantiated ||
                  existingStatus == Module::kInstantiated) {
@@ -1039,7 +1080,6 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     }
   };
   Local<Module> module;
-  ScriptCompiler::CachedData* cacheData = nullptr;
   if (!reusedModule.IsEmpty()) {
     logPhase("compile", "reuse-registry");
     module = reusedModule;
@@ -1063,34 +1103,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     logPhase("compile", "ok", "http-loader");
 
     if (module->GetStatus() == Module::kEvaluated) {
-      UpdateModuleFallback(isolate, canonicalPath, module);
       return module->GetModuleNamespace();
     }
   } else {
-    std::string url;
-    std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
-    url = "file://" + base;
-    v8::Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
-    cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
-
-    Local<v8::String> urlString;
-    if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal)
-             .ToLocal(&urlString)) {
-      throw NativeScriptException(isolate,
-                                  "Failed to create URL string for ES module " + canonicalPath);
-    }
-
-    ScriptOrigin origin(urlString, 0, 0, false, -1, Local<Value>(), false, false,
-                        true  // ← is_module
-    );
-    ScriptCompiler::Source source(sourceText, origin, cacheData);
-
     logPhase("compile", "begin");
     {
       TryCatch tcCompile(isolate);
-      MaybeLocal<Module> maybeMod = ScriptCompiler::CompileModule(
-          isolate, &source,
-          cacheData ? ScriptCompiler::kConsumeCodeCache : ScriptCompiler::kNoCompileOptions);
+      MaybeLocal<Module> maybeMod = ModuleInternal::CompileFileEsModule(isolate, canonicalPath);
 
       if (!maybeMod.ToLocal(&module)) {
         // Attempt classification heuristics
@@ -1131,24 +1150,14 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     logPhase("compile", "ok");
 
     // Register for resolution callback
-    auto it = g_moduleRegistry.find(canonicalPath);
+    auto it = registry.find(canonicalPath);
     if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled() &&
         (requestPath != canonicalPath || path != canonicalPath)) {
-      Log(@"[esm][register] raw=%s request=%s canonical=%s url=%s existing=%s", path.c_str(),
-          requestPath.c_str(), canonicalPath.c_str(), url.c_str(),
-          it != g_moduleRegistry.end() ? "yes" : "no");
+      Log(@"[esm][register] raw=%s request=%s canonical=%s existing=%s", path.c_str(),
+          requestPath.c_str(), canonicalPath.c_str(), it != registry.end() ? "yes" : "no");
     }
-    if (it != g_moduleRegistry.end()) {
-      it->second.Reset();
-    }
-    g_moduleRegistry[canonicalPath].Reset(isolate, module);
+    registry[canonicalPath].Reset(isolate, module);
     IndexModuleForIsolate(isolate, canonicalPath, module);
-
-    if (cacheData == nullptr) {
-      Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
-      auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
-      ModuleInternal::SaveScriptCache(generatedCache, canonicalPath);
-    }
   }
 
   // 5) Instantiate (link) with its own TryCatch
@@ -1432,8 +1441,6 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       }
     }
   }
-  tns::UpdateModuleFallback(isolate, canonicalPath, module);
-
   // 7) Return the namespace
   return module->GetModuleNamespace();
 }

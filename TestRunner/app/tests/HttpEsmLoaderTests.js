@@ -102,6 +102,30 @@ describe("HTTP ESM Loader", function() {
             });
         });
         
+        it("evaluates a disk diamond graph in spec order, each module once", function(done) {
+            delete globalThis.__nsGraphOrder;
+            import("~/tests/esm/graph/diamond-entry.mjs").then(function(module) {
+                expect(module.order).toEqual(["shared", "left", "right", "entry"]);
+                expect(module.names).toEqual(["left", "right"]);
+                done();
+            }).catch(function(error) {
+                fail("diamond graph import should have succeeded: " + formatError(error));
+                done();
+            });
+        });
+
+        it("links and evaluates cyclic disk imports", function(done) {
+            import("~/tests/esm/graph/cycle-a.mjs").then(function(module) {
+                expect(module.aValue).toBe("a");
+                expect(module.roundTrip).toBe("b-saw-a");
+                expect(module.describeB()).toBe("a-saw-b");
+                done();
+            }).catch(function(error) {
+                fail("cyclic import should have succeeded: " + formatError(error));
+                done();
+            });
+        });
+
         it("gives nested disk modules a correct import.meta", function(done) {
             import("~/tests/esm/relative/meta.mjs").then(function(module) {
                 expect(typeof module.metaUrl).toBe("string");

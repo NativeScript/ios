@@ -20,6 +20,14 @@ class ModuleInternal {
   void RunScript(v8::Isolate* isolate, std::string script);
   static v8::Local<v8::Value> LoadScript(v8::Isolate* isolate,
                                          const std::string& path);
+  // Read + wrap + compile `path` as an ES module (consuming/producing the
+  // on-disk code cache) WITHOUT registering, instantiating, or evaluating it.
+  // On compile failure the exception is left pending on the isolate (or a
+  // NativeScriptException is thrown for setup failures) and the result is
+  // empty. This is the resolver's file loader: the resolver must only ever
+  // hand V8 a compiled module — evaluation order belongs to V8.
+  static v8::MaybeLocal<v8::Module> CompileFileEsModule(
+      v8::Isolate* isolate, const std::string& path);
 
  private:
   static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
