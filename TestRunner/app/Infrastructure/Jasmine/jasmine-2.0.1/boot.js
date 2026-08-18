@@ -216,20 +216,7 @@ var TerminalReporter = require('../jasmine-reporters/terminal_reporter').Termina
   // https://github.com/NativeScript/ios/issues/397
   // See TestRunnerTests/QUARANTINED_TESTS.md for the full rationale + how to
   // re-enable each of these.
-  var QUARANTINED_SPEC_SUBSTRINGS = [
-    // Worker-teardown stress spec: AB-BA cross-isolate lock deadlock on
-    // constrained CI cores (github.com/NativeScript/ios/issues/397).
-    "no crash during or after runtime teardown",
-    // HTTP-ESM identity specs: require the in-runner Embassy test server to
-    // answer the runtime's synchronous (NSURLConnection) GET, which it can't
-    // (getPeerName EINVAL / no response). The loader itself works; this is a
-    // test-harness limitation. See QUARANTINED_TESTS.md.
-    "URL Key Canonicalization",
-    // Same Embassy limitation, async NSURLSession flavor: all four transport
-    // attempts get no response. The bg-thread DELIVERY mechanics this spec
-    // guards are covered by its local sibling. See QUARANTINED_TESTS.md.
-    "settles an HTTP dynamic import issued from a background thread",
-  ];
+  var QUARANTINED_SPEC_SUBSTRINGS = [];
   env.specFilter = function(spec) {
     var fullName = spec.getFullName();
     for (var i = 0; i < QUARANTINED_SPEC_SUBSTRINGS.length; i++) {

@@ -79,35 +79,7 @@
 		C22C092322CA3F370080D176 /* Worker.h in Headers */ = {isa = PBXBuildFile; fileRef = C22C092122CA3F370080D176 /* Worker.h */; };
 		C22EF68B2379412100D67CBF /* TNSSwiftLike.m in Sources */ = {isa = PBXBuildFile; fileRef = C22EF68A2379412100D67CBF /* TNSSwiftLike.m */; };
 		C23992CA236C2D6E00D2F720 /* TestRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */; };
-		C23992F8236C364B00D2F720 /* Transport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DA236C364B00D2F720 /* Transport.swift */; };
-		C23992F9236C364B00D2F720 /* FileLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DB236C364B00D2F720 /* FileLogHandler.swift */; };
-		C23992FA236C364B00D2F720 /* HTTPHeaderParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DC236C364B00D2F720 /* HTTPHeaderParser.swift */; };
-		C23992FB236C364B00D2F720 /* TransformLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DD236C364B00D2F720 /* TransformLogHandler.swift */; };
-		C23992FC236C364B00D2F720 /* SystemLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992DE236C364B00D2F720 /* SystemLibrary.swift */; };
-		C23992FD236C364B00D2F720 /* HeapSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E0236C364B00D2F720 /* HeapSort.swift */; };
-		C23992FE236C364B00D2F720 /* KqueueSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E1236C364B00D2F720 /* KqueueSelector.swift */; };
-		C23992FF236C364B00D2F720 /* TCPSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E2236C364B00D2F720 /* TCPSocket.swift */; };
-		C2399300236C364B00D2F720 /* LogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E3236C364B00D2F720 /* LogHandler.swift */; };
-		C2399301236C364B00D2F720 /* DefaultLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E4236C364B00D2F720 /* DefaultLogger.swift */; };
-		C2399302236C364B00D2F720 /* DefaultLogFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E5236C364B00D2F720 /* DefaultLogFormatter.swift */; };
-		C2399303236C364B00D2F720 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E6236C364B00D2F720 /* Logger.swift */; };
-		C2399304236C364B00D2F720 /* Selector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E7236C364B00D2F720 /* Selector.swift */; };
-		C2399305236C364B00D2F720 /* SelectSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E8236C364B00D2F720 /* SelectSelector.swift */; };
-		C2399306236C364B00D2F720 /* HTTPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992E9236C364B00D2F720 /* HTTPRequest.swift */; };
-		C2399307236C364B00D2F720 /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EA236C364B00D2F720 /* HTTPServer.swift */; };
-		C2399308236C364B00D2F720 /* EventLoop.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EB236C364B00D2F720 /* EventLoop.swift */; };
-		C2399309236C364B00D2F720 /* SWSGI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EC236C364B00D2F720 /* SWSGI.swift */; };
-		C239930A236C364B00D2F720 /* LogFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992ED236C364B00D2F720 /* LogFormatter.swift */; };
-		C239930B236C364B00D2F720 /* MultiDictionary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EE236C364B00D2F720 /* MultiDictionary.swift */; };
-		C239930C236C364B00D2F720 /* SelectorEventLoop.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992EF236C364B00D2F720 /* SelectorEventLoop.swift */; };
-		C239930D236C364B00D2F720 /* Atomic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F0236C364B00D2F720 /* Atomic.swift */; };
-		C239930E236C364B00D2F720 /* IOUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F1236C364B00D2F720 /* IOUtils.swift */; };
-		C239930F236C364B00D2F720 /* PropagateLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F2236C364B00D2F720 /* PropagateLogHandler.swift */; };
-		C2399310236C364B00D2F720 /* PrintLogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F3236C364B00D2F720 /* PrintLogHandler.swift */; };
-		C2399311236C364B00D2F720 /* Errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F4236C364B00D2F720 /* Errors.swift */; };
-		C2399312236C364B00D2F720 /* DefaultHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F5236C364B00D2F720 /* DefaultHTTPServer.swift */; };
-		C2399313236C364B00D2F720 /* HTTPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F6236C364B00D2F720 /* HTTPConnection.swift */; };
-		C2399314236C364B00D2F720 /* SWSGIUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23992F7236C364B00D2F720 /* SWSGIUtils.swift */; };
+		AB5713E00000000000000002 /* ModuleTestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB5713E00000000000000001 /* ModuleTestServer.swift */; };
 		C23E8F7322CB386F0078FD4C /* ConcurrentQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */; };
 		C23E8F7622CDE88D0078FD4C /* WorkerWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = C23E8F7422CDE88D0078FD4C /* WorkerWrapper.mm */; };
 		C247C16522F82842001D2CA2 /* v8-platform.h in Headers */ = {isa = PBXBuildFile; fileRef = C247C14D22F82842001D2CA2 /* v8-platform.h */; };
@@ -553,37 +525,8 @@
 		C22EF68C2379414300D67CBF /* TNSSwiftLike.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSSwiftLike.h; sourceTree = "<group>"; };
 		C23992C7236C2D6E00D2F720 /* TestRunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TestRunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestRunnerTests.swift; sourceTree = "<group>"; };
+		AB5713E00000000000000001 /* ModuleTestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleTestServer.swift; sourceTree = "<group>"; };
 		C23992CB236C2D6E00D2F720 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C23992DA236C364B00D2F720 /* Transport.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Transport.swift; sourceTree = "<group>"; };
-		C23992DB236C364B00D2F720 /* FileLogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FileLogHandler.swift; sourceTree = "<group>"; };
-		C23992DC236C364B00D2F720 /* HTTPHeaderParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPHeaderParser.swift; sourceTree = "<group>"; };
-		C23992DD236C364B00D2F720 /* TransformLogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TransformLogHandler.swift; sourceTree = "<group>"; };
-		C23992DE236C364B00D2F720 /* SystemLibrary.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SystemLibrary.swift; sourceTree = "<group>"; };
-		C23992DF236C364B00D2F720 /* Embassy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Embassy.h; sourceTree = "<group>"; };
-		C23992E0236C364B00D2F720 /* HeapSort.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HeapSort.swift; sourceTree = "<group>"; };
-		C23992E1236C364B00D2F720 /* KqueueSelector.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KqueueSelector.swift; sourceTree = "<group>"; };
-		C23992E2236C364B00D2F720 /* TCPSocket.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TCPSocket.swift; sourceTree = "<group>"; };
-		C23992E3236C364B00D2F720 /* LogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogHandler.swift; sourceTree = "<group>"; };
-		C23992E4236C364B00D2F720 /* DefaultLogger.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DefaultLogger.swift; sourceTree = "<group>"; };
-		C23992E5236C364B00D2F720 /* DefaultLogFormatter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DefaultLogFormatter.swift; sourceTree = "<group>"; };
-		C23992E6236C364B00D2F720 /* Logger.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
-		C23992E7236C364B00D2F720 /* Selector.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Selector.swift; sourceTree = "<group>"; };
-		C23992E8236C364B00D2F720 /* SelectSelector.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SelectSelector.swift; sourceTree = "<group>"; };
-		C23992E9236C364B00D2F720 /* HTTPRequest.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPRequest.swift; sourceTree = "<group>"; };
-		C23992EA236C364B00D2F720 /* HTTPServer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
-		C23992EB236C364B00D2F720 /* EventLoop.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EventLoop.swift; sourceTree = "<group>"; };
-		C23992EC236C364B00D2F720 /* SWSGI.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SWSGI.swift; sourceTree = "<group>"; };
-		C23992ED236C364B00D2F720 /* LogFormatter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogFormatter.swift; sourceTree = "<group>"; };
-		C23992EE236C364B00D2F720 /* MultiDictionary.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MultiDictionary.swift; sourceTree = "<group>"; };
-		C23992EF236C364B00D2F720 /* SelectorEventLoop.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SelectorEventLoop.swift; sourceTree = "<group>"; };
-		C23992F0236C364B00D2F720 /* Atomic.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Atomic.swift; sourceTree = "<group>"; };
-		C23992F1236C364B00D2F720 /* IOUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IOUtils.swift; sourceTree = "<group>"; };
-		C23992F2236C364B00D2F720 /* PropagateLogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PropagateLogHandler.swift; sourceTree = "<group>"; };
-		C23992F3236C364B00D2F720 /* PrintLogHandler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PrintLogHandler.swift; sourceTree = "<group>"; };
-		C23992F4236C364B00D2F720 /* Errors.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Errors.swift; sourceTree = "<group>"; };
-		C23992F5236C364B00D2F720 /* DefaultHTTPServer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DefaultHTTPServer.swift; sourceTree = "<group>"; };
-		C23992F6236C364B00D2F720 /* HTTPConnection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPConnection.swift; sourceTree = "<group>"; };
-		C23992F7236C364B00D2F720 /* SWSGIUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SWSGIUtils.swift; sourceTree = "<group>"; };
 		C23E8F7122CB386F0078FD4C /* ConcurrentQueue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConcurrentQueue.h; sourceTree = "<group>"; };
 		C23E8F7422CDE88D0078FD4C /* WorkerWrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = WorkerWrapper.mm; sourceTree = "<group>"; };
 		C247C14D22F82842001D2CA2 /* v8-platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "v8-platform.h"; sourceTree = "<group>"; };
@@ -1090,48 +1033,11 @@
 		C23992C8236C2D6E00D2F720 /* TestRunnerTests */ = {
 			isa = PBXGroup;
 			children = (
-				C23992D9236C364B00D2F720 /* Embassy */,
 				C23992C9236C2D6E00D2F720 /* TestRunnerTests.swift */,
+				AB5713E00000000000000001 /* ModuleTestServer.swift */,
 				C23992CB236C2D6E00D2F720 /* Info.plist */,
 			);
 			path = TestRunnerTests;
-			sourceTree = "<group>";
-		};
-		C23992D9236C364B00D2F720 /* Embassy */ = {
-			isa = PBXGroup;
-			children = (
-				C23992DA236C364B00D2F720 /* Transport.swift */,
-				C23992DB236C364B00D2F720 /* FileLogHandler.swift */,
-				C23992DC236C364B00D2F720 /* HTTPHeaderParser.swift */,
-				C23992DD236C364B00D2F720 /* TransformLogHandler.swift */,
-				C23992DE236C364B00D2F720 /* SystemLibrary.swift */,
-				C23992DF236C364B00D2F720 /* Embassy.h */,
-				C23992E0236C364B00D2F720 /* HeapSort.swift */,
-				C23992E1236C364B00D2F720 /* KqueueSelector.swift */,
-				C23992E2236C364B00D2F720 /* TCPSocket.swift */,
-				C23992E3236C364B00D2F720 /* LogHandler.swift */,
-				C23992E4236C364B00D2F720 /* DefaultLogger.swift */,
-				C23992E5236C364B00D2F720 /* DefaultLogFormatter.swift */,
-				C23992E6236C364B00D2F720 /* Logger.swift */,
-				C23992E7236C364B00D2F720 /* Selector.swift */,
-				C23992E8236C364B00D2F720 /* SelectSelector.swift */,
-				C23992E9236C364B00D2F720 /* HTTPRequest.swift */,
-				C23992EA236C364B00D2F720 /* HTTPServer.swift */,
-				C23992EB236C364B00D2F720 /* EventLoop.swift */,
-				C23992EC236C364B00D2F720 /* SWSGI.swift */,
-				C23992ED236C364B00D2F720 /* LogFormatter.swift */,
-				C23992EE236C364B00D2F720 /* MultiDictionary.swift */,
-				C23992EF236C364B00D2F720 /* SelectorEventLoop.swift */,
-				C23992F0236C364B00D2F720 /* Atomic.swift */,
-				C23992F1236C364B00D2F720 /* IOUtils.swift */,
-				C23992F2236C364B00D2F720 /* PropagateLogHandler.swift */,
-				C23992F3236C364B00D2F720 /* PrintLogHandler.swift */,
-				C23992F4236C364B00D2F720 /* Errors.swift */,
-				C23992F5236C364B00D2F720 /* DefaultHTTPServer.swift */,
-				C23992F6236C364B00D2F720 /* HTTPConnection.swift */,
-				C23992F7236C364B00D2F720 /* SWSGIUtils.swift */,
-			);
-			path = Embassy;
 			sourceTree = "<group>";
 		};
 		C247C14C22F82842001D2CA2 /* include */ = {
@@ -2285,36 +2191,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C2399313236C364B00D2F720 /* HTTPConnection.swift in Sources */,
-				C2399308236C364B00D2F720 /* EventLoop.swift in Sources */,
-				C23992FE236C364B00D2F720 /* KqueueSelector.swift in Sources */,
-				C2399305236C364B00D2F720 /* SelectSelector.swift in Sources */,
-				C2399307236C364B00D2F720 /* HTTPServer.swift in Sources */,
-				C239930B236C364B00D2F720 /* MultiDictionary.swift in Sources */,
-				C2399300236C364B00D2F720 /* LogHandler.swift in Sources */,
-				C2399301236C364B00D2F720 /* DefaultLogger.swift in Sources */,
-				C2399311236C364B00D2F720 /* Errors.swift in Sources */,
-				C2399302236C364B00D2F720 /* DefaultLogFormatter.swift in Sources */,
-				C239930F236C364B00D2F720 /* PropagateLogHandler.swift in Sources */,
-				C2399314236C364B00D2F720 /* SWSGIUtils.swift in Sources */,
-				C2399312236C364B00D2F720 /* DefaultHTTPServer.swift in Sources */,
-				C2399306236C364B00D2F720 /* HTTPRequest.swift in Sources */,
-				C239930E236C364B00D2F720 /* IOUtils.swift in Sources */,
-				C23992FC236C364B00D2F720 /* SystemLibrary.swift in Sources */,
-				C23992FB236C364B00D2F720 /* TransformLogHandler.swift in Sources */,
-				C239930C236C364B00D2F720 /* SelectorEventLoop.swift in Sources */,
-				C2399309236C364B00D2F720 /* SWSGI.swift in Sources */,
-				C239930A236C364B00D2F720 /* LogFormatter.swift in Sources */,
-				C2399304236C364B00D2F720 /* Selector.swift in Sources */,
-				C2399310236C364B00D2F720 /* PrintLogHandler.swift in Sources */,
-				C23992F9236C364B00D2F720 /* FileLogHandler.swift in Sources */,
-				C23992FD236C364B00D2F720 /* HeapSort.swift in Sources */,
 				C23992CA236C2D6E00D2F720 /* TestRunnerTests.swift in Sources */,
-				C2399303236C364B00D2F720 /* Logger.swift in Sources */,
-				C23992F8236C364B00D2F720 /* Transport.swift in Sources */,
-				C23992FF236C364B00D2F720 /* TCPSocket.swift in Sources */,
-				C23992FA236C364B00D2F720 /* HTTPHeaderParser.swift in Sources */,
-				C239930D236C364B00D2F720 /* Atomic.swift in Sources */,
+				AB5713E00000000000000002 /* ModuleTestServer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

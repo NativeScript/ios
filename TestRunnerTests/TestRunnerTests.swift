@@ -2,8 +2,7 @@ import XCTest
 
 class TestRunnerTests: XCTestCase {
     private let port = 63846
-    private var loop: EventLoop!
-    private var server: HTTPServer!
+    private var server: ModuleTestServer!
     private var runtimeUnitTestsExpectation: XCTestExpectation!
     private var reportDeliveryFailureReason: String?
 
@@ -21,8 +20,7 @@ class TestRunnerTests: XCTestCase {
         // XCTestCase "must waitForExpectations" rule.
         runtimeUnitTestsExpectation = XCTestExpectation(description: "Jasmine tests")
 
-        loop = try! SelectorEventLoop(selector: try! KqueueSelector())
-        self.server = DefaultHTTPServer(eventLoop: loop!, interface: "127.0.0.1", port: port) {
+        self.server = try! ModuleTestServer(port: UInt16(port)) {
             (
                 environ: [String: Any],
                 startResponse: @escaping ((String, [(String, String)]) -> Void),
@@ -73,16 +71,11 @@ class TestRunnerTests: XCTestCase {
                 }
 
                 if path == "/esm/timeout.mjs" {
-                    // Delay the response WITHOUT blocking the event loop. A
-                    // Thread.sleep here runs on the server's single event-loop
-                    // thread and WEDGES it: the loader's client timeout fires
-                    // first, the client resets the connection, and the blocked
-                    // loop never recovers — so every later module fetch fails with
-                    // "could not connect" and the whole HTTP-ESM suite times out.
-                    // Schedule the response on the loop instead; the loader still
-                    // hits its client-side timeout when delayMs exceeds the async
-                    // loader's 10s request timeout (HttpEsmLoaderTests passes
-                    // delayMs=12000), and the server stays responsive.
+                    // Delay the response without blocking request handling.
+                    // The loader still hits its client-side timeout when
+                    // delayMs exceeds the async loader's request timeout
+                    // (HttpEsmLoaderTests passes delayMs=12000), and the
+                    // server keeps serving other connections meanwhile.
                     var delayMs = 12000
                     if let pair = query
                         .split(separator: "&")
@@ -90,7 +83,9 @@ class TestRunnerTests: XCTestCase {
                        let v = Int(pair.split(separator: "=").last ?? "") {
                         delayMs = v
                     }
-                    self.loop.call(withDelay: Double(delayMs) / 1000.0) {
+                    DispatchQueue.global(qos: .utility).asyncAfter(
+                        deadline: .now() + Double(delayMs) / 1000.0
+                    ) {
                         let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
                         let body = "export const evaluatedAt = \(nowMs); export default { evaluatedAt };"
                         startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
@@ -111,7 +106,7 @@ class TestRunnerTests: XCTestCase {
             if method == "POST" && path.hasPrefix("/junit_report") {
                 let isDeliveryFailure = path.hasSuffix("/delivery_failed")
                 var buffer = Data()
-                let input = environ["swsgi.input"] as! SWSGIInput
+                let input = environ["swsgi.input"] as! ModuleTestServerInput
                 var finished = false
                 input { data in
                     buffer.append(data)
@@ -138,19 +133,11 @@ class TestRunnerTests: XCTestCase {
             sendBody(Data("Not Found".utf8))
         }
 
-        try! server.start()
-
-        // Not .background: CI VMs throttle background-QoS threads hard enough
-        // to starve this accept loop, and it is the only channel through which
-        // results ever arrive.
-        DispatchQueue.global(qos: .userInitiated).async {
-            self.loop.runForever()
-        }
+        server.start()
     }
 
     override func tearDown() {
-        server.stopAndWait()
-        loop.stop()
+        server.stop()
     }
 
     func testRuntime() {
