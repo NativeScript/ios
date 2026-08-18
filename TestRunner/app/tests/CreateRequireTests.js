@@ -105,18 +105,47 @@ describe("createRequire", function () {
     });
 
     describe("evaluation policy", function () {
-        // One fixture, one spec: the strict refusal must be observed while the
-        // graph is still unevaluated, and the pumping evaluate is what leaves
-        // it evaluated.
-        it("refuses a top-level-await graph strictly but evaluates it when pumping", function () {
+        it("refuses a top-level-await graph strictly", function () {
             var strictRequire = nsModule.createRequire(fixtureDir + "/anything.js");
-            var pumpingRequire = nsModule.createPumpingRequire(fixtureDir + "/anything.js");
 
             var refusal = messageOf(function () { strictRequire("./microtask-tla.mjs"); });
             expect(refusal).toContain("top-level await");
             expect(refusal).toContain("createPumpingRequire");
+        });
 
-            expect(pumpingRequire("./microtask-tla.mjs").value).toBe("ok");
+        it("evaluates the same graph when pumping", function (done) {
+            // Hop to a fresh task first: Jasmine may deliver this spec from the
+            // previous spec's promise continuation, and the pump cannot drain
+            // microtasks while the isolate is already inside a microtask turn.
+            __ns__setTimeout(function () {
+                var pumpingRequire = nsModule.createPumpingRequire(fixtureDir + "/anything.js");
+                var result = "";
+                try {
+                    result = String(pumpingRequire("./microtask-tla.mjs").value);
+                } catch (e) {
+                    result = "threw: " + ((e && e.message) || e);
+                }
+                expect(result).toBe("ok");
+                done();
+            }, 0);
+        });
+
+        it("refuses to pump a top-level-await graph from inside a microtask", function (done) {
+            var pumpingRequire = nsModule.createPumpingRequire(fixtureDir + "/anything.js");
+            Promise.resolve().then(function () {
+                expect(messageOf(function () {
+                    pumpingRequire("./microtask-tla-guarded.mjs");
+                })).toContain("cannot be pumped re-entrantly");
+                done();
+            });
+        });
+
+        it("still loads a synchronous graph from inside a microtask", function (done) {
+            var pumpingRequire = nsModule.createPumpingRequire(fixtureDir + "/anything.js");
+            Promise.resolve().then(function () {
+                expect(pumpingRequire("./target.js").tag).toBe("createrequire-target");
+                done();
+            });
         });
 
         it("refuses a foreground-task top-level await through createRequire", function () {

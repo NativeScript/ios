@@ -1051,6 +1051,20 @@ static void LogEsmPhase(const std::string& canonicalPath, const char* phase, con
                               "createPumpingRequire from ns:module instead.");
 }
 
+// The pump advances the loop by running tasks and draining microtasks, and
+// neither can happen re-entrantly: V8 ignores a microtask checkpoint while the
+// isolate is already draining the queue, so a graph whose top-level await
+// resumes through a promise reaction can never settle from here. Refused
+// before evaluation, like the strict refusal, so the graph stays instantiated
+// and import() can still load it.
+[[noreturn]] static void ThrowMicrotaskPumpRefusal(const std::string& canonicalPath) {
+  LogEsmPhase(canonicalPath, "evaluate", "refused", "microtask-context");
+  throw NativeScriptException(
+      "createPumpingRequire cannot settle module graph '" + canonicalPath +
+      "' from inside a microtask (after an await or inside a promise callback): the event loop "
+      "cannot be pumped re-entrantly. Call it from a task context, or use import().");
+}
+
 // Evicts the module and surfaces the rejection reason. Always throws — debug
 // adds the modal and the detailed log, never recovery.
 [[noreturn]] static void ThrowModuleEvaluationRejection(Isolate* isolate, Local<Promise> promise,
@@ -1157,6 +1171,14 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
       // namespace holds whatever has been initialized so far.
       return MaybeLocal<Promise>();
     }
+  }
+
+  if (options.policy == ModuleEvaluationPolicy::kSyncPumping && module->IsGraphAsync() &&
+      MicrotasksScope::IsRunningMicrotasks(isolate)) {
+    // Only an async graph needs the pump; a synchronous one settles on its own
+    // and stays legal from anywhere. Entry modules also arrive here, but from
+    // native at task level, so they never trip this.
+    ThrowMicrotaskPumpRefusal(canonicalPath);
   }
 
   LogEsmPhase(canonicalPath, "evaluate", "begin");

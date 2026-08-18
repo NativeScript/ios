@@ -88,6 +88,14 @@ declare module "ns:module" {
    * never advanced, so a graph awaiting a native transport still cannot
    * settle here and fails on the deadline instead of returning a
    * half-initialized namespace.
+   *
+   * Callable only from a task context. The loop cannot be pumped
+   * re-entrantly — V8 ignores a microtask checkpoint while the isolate is
+   * already draining the microtask queue — and a top-level await resumes
+   * through a promise reaction, which is a microtask. Requiring such a graph
+   * from after an `await` or inside a `.then` callback throws immediately,
+   * before evaluation, so `import()` can still load it. A synchronous graph
+   * needs no pumping and stays legal from anywhere.
    */
   export function createPumpingRequire(
     filenameOrURL: string | URL,

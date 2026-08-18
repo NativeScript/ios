@@ -124,7 +124,18 @@ the full contract rationale.
 | `invalidateModules(urls)` | Evict the given URLs (canonicalized) from the module registry and mark them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. |
 | `getLoadedModuleUrls()` | URL-like keys currently in the module registry (used to compute full-reload eviction sets). |
 | `createRequire(filenameOrURL)` | A `require` resolving against `filenameOrURL`'s directory (a trailing slash names the directory itself). Accepts an absolute path string, a `file:` URL string, or a URL object; anything else throws a `TypeError`, and an `http(s)` base is refused outright because `require()` of a dev-served module is not supported — import those. ES module graphs load under Node's `require(esm)` rule: a graph containing top-level await is refused before it evaluates. |
-| `createPumpingRequire(filenameOrURL)` | Same argument contract and same resolution, but an ES module graph with top-level await is evaluated by driving V8's nestable tasks and microtasks until it settles, instead of being refused. It never advances the Cocoa runloop, so a graph awaiting a native transport still cannot settle here and fails on the deadline rather than returning a half-initialized namespace. Reach for it only where a synchronous boundary must consume an async module. |
+| `createPumpingRequire(filenameOrURL)` | Same argument contract and same resolution, but an ES module graph with top-level await is evaluated by driving V8's nestable tasks and microtasks until it settles, instead of being refused. **Callable only from a task context** — see below. It never advances the Cocoa runloop, so a graph awaiting a native transport still cannot settle here and fails on the deadline rather than returning a half-initialized namespace. Reach for it only where a synchronous boundary must consume an async module. |
+
+`createPumpingRequire` pumps the loop, and the loop cannot be pumped
+re-entrantly: V8 ignores a microtask checkpoint while the isolate is already
+draining the microtask queue. A top-level await resumes through a promise
+reaction — a microtask — so such a graph can never settle from inside a
+microtask turn. Requiring one from after an `await` or inside a `.then`
+callback therefore throws immediately, before evaluation, leaving the graph
+instantiated so `import()` can still load it. Call it from a task context
+instead — a native boundary, an event handler, a timer callback, or module
+evaluation itself. A **synchronous** graph needs no pumping and stays legal
+from anywhere, microtask turns included.
 
 Not implemented on either require: `require.resolve`, `require.cache`, and
 `require.main`. They are absent rather than throwing, so a feature check
