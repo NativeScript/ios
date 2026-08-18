@@ -30,9 +30,22 @@ ModuleHandleMap* ModuleRegistryFor(v8::Isolate* isolate);
 void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate);
 
 // Utility to drop modules from the registry when compilation/instantiation
-// fails. Operates on the *current* isolate's maps (resolved internally); only
-// ever called on the isolate's own JS thread during module resolution/loading.
-void RemoveModuleFromRegistry(const std::string& canonicalPath);
+// fails. Only ever called on the isolate's own JS thread during module
+// resolution/loading.
+void RemoveModuleFromRegistry(v8::Isolate* isolate,
+                              const std::string& canonicalPath);
+
+// The canonical registry key whose live entry is `mod`, or empty when the
+// module is not registered for `isolate`. O(1) via the loader state's
+// identity-hash index.
+std::string LookupModuleKeyForModule(v8::Isolate* isolate,
+                                     v8::Local<v8::Module> mod);
+
+// Record `mod` in the identity-hash index under `canonicalKey`. Call alongside
+// every registry insert performed outside ModuleInternalCallbacks.mm.
+void IndexModuleForIsolate(v8::Isolate* isolate,
+                           const std::string& canonicalKey,
+                           v8::Local<v8::Module> mod);
 
 // Authoritative HTTP URL loader for dev-served ESM. This compiles and
 // registers the module under its canonical URL key without evaluating it.

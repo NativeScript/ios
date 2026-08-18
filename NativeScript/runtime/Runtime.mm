@@ -67,29 +67,7 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
                                        Local<Object> meta) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
-  // Look up the module path in the global module registry (with safety checks)
-  std::string modulePath;
-
-  try {
-    auto* registry = tns::ModuleRegistryFor(isolate);
-    if (registry != nullptr) {
-      for (auto& kv : *registry) {
-        // Check if Global handle is empty before accessing
-        if (kv.second.IsEmpty()) {
-          continue;
-        }
-
-        Local<Module> registered = kv.second.Get(isolate);
-        if (!registered.IsEmpty() && registered == module) {
-          modulePath = kv.first;
-          break;
-        }
-      }
-    }
-  } catch (...) {
-    // NSLog(@"[import.meta] Exception during module registry lookup, using fallback");
-    modulePath = "";  // Will use fallback path
-  }
+  std::string modulePath = tns::LookupModuleKeyForModule(isolate, module);
 
   auto hasUrlScheme = [](const std::string& s) -> bool {
     if (s.empty()) return false;

@@ -995,7 +995,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
         Log(@"[esm][cache] dropping empty registry entry %s", canonicalPath.c_str());
       }
-      RemoveModuleFromRegistry(canonicalPath);
+      RemoveModuleFromRegistry(isolate, canonicalPath);
     } else {
       Module::Status existingStatus = existing->GetStatus();
       if (RuntimeConfig.IsDebug && IsScriptLoadingLogEnabled()) {
@@ -1003,7 +1003,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
             describeModuleStatus(existingStatus));
       }
       if (existingStatus == Module::kErrored) {
-        RemoveModuleFromRegistry(canonicalPath);
+        RemoveModuleFromRegistry(isolate, canonicalPath);
       } else if (existingStatus == Module::kEvaluated) {
         UpdateModuleFallback(isolate, canonicalPath, existing);
         return existing->GetModuleNamespace();
@@ -1142,6 +1142,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       it->second.Reset();
     }
     g_moduleRegistry[canonicalPath].Reset(isolate, module);
+    IndexModuleForIsolate(isolate, canonicalPath, module);
 
     if (cacheData == nullptr) {
       Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
@@ -1157,7 +1158,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     bool linked = module->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false);
 
     if (!linked) {
-      RemoveModuleFromRegistry(canonicalPath);
+      RemoveModuleFromRegistry(isolate, canonicalPath);
       const char* classification = "unknown";
       if (tcLink.HasCaught()) {
         Local<Message> msg = tcLink.Message();
@@ -1204,7 +1205,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     TryCatch tcEval(isolate);
     // Keep existing debug print minimal; phase logger already outputs
     if (!module->Evaluate(context).ToLocal(&result)) {
-      RemoveModuleFromRegistry(canonicalPath);
+      RemoveModuleFromRegistry(isolate, canonicalPath);
       const char* classification = "unknown";
       if (tcEval.HasCaught()) {
         Local<Message> msg = tcEval.Message();
@@ -1286,7 +1287,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
         if (state != Promise::kPending) {
           settled = true;
           if (state == Promise::kRejected) {
-            RemoveModuleFromRegistry(canonicalPath);
+            RemoveModuleFromRegistry(isolate, canonicalPath);
             logPhase("evaluate", "promise-rejected");
             if (RuntimeConfig.IsDebug) {
               // In debug mode, show modal and continue without throwing
@@ -1410,7 +1411,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       if (!settled && promise->State() == Promise::kPending) {
         logPhase("evaluate", "promise-timeout");
         if (isHttpModule) {
-          RemoveModuleFromRegistry(canonicalPath);
+          RemoveModuleFromRegistry(isolate, canonicalPath);
           // Throw even in debug so the TLA timeout reason flows
           // through `ModuleInternal::RunModule`'s catch handler and
           // into the rejected promise the JS dev client observes —

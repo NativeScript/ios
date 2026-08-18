@@ -102,6 +102,21 @@ describe("HTTP ESM Loader", function() {
             });
         });
         
+        it("gives nested disk modules a correct import.meta", function(done) {
+            import("~/tests/esm/relative/meta.mjs").then(function(module) {
+                expect(typeof module.metaUrl).toBe("string");
+                expect(module.metaUrl.indexOf("file://")).toBe(0);
+                expect(module.metaUrl).toContain("tests/esm/relative/meta.mjs");
+                expect(typeof module.metaDirname).toBe("string");
+                expect(module.metaDirname).toContain("tests/esm/relative");
+                expect(module.metaDirname).not.toContain("meta.mjs");
+                done();
+            }).catch(function(error) {
+                fail("meta fixture import should have succeeded: " + formatError(error));
+                done();
+            });
+        });
+
         it("returns one module identity for repeated JSON imports", function(done) {
             var spec = "~/tests/esm/identity.json";
             Promise.all([import(spec), import(spec)]).then(function(results) {

@@ -135,6 +135,14 @@ struct ModuleLoaderState {
   // Dynamic HTTP import waiters: resolve to the module namespace.
   robin_hood::unordered_map<std::string, std::vector<v8::Global<v8::Promise::Resolver>>>
       httpDynamicWaiters;
+
+  // Reverse index: v8::Module::GetIdentityHash() -> registry keys, so
+  // module→key lookups (resolver referrer discovery, import.meta) are O(1)
+  // instead of a scan of the whole registry. Entries can go stale when a
+  // registry slot is dropped or overwritten without a hash at hand;
+  // FindKeyForModule verifies each candidate against the registry and prunes
+  // stale ones lazily, so staleness is tolerated, never trusted.
+  robin_hood::unordered_map<int, std::vector<std::string>> keysByModuleHash;
 };
 
 // This isolate's loader state, or null once teardown has begun — callers must
@@ -142,7 +150,66 @@ struct ModuleLoaderState {
 ModuleLoaderState* ModuleLoaderStateFor(v8::Isolate* isolate) {
   return Caches::StateFor<ModuleLoaderState>(isolate);
 }
+
+// Record `key` as a candidate for `mod`'s identity hash. Call alongside every
+// registry insert.
+void IndexRegisteredModule(ModuleLoaderState& state, const std::string& key,
+                           v8::Local<v8::Module> mod) {
+  if (mod.IsEmpty()) {
+    return;
+  }
+  auto& keys = state.keysByModuleHash[mod->GetIdentityHash()];
+  if (std::find(keys.begin(), keys.end(), key) == keys.end()) {
+    keys.push_back(key);
+  }
+}
+
+// The registry key whose live entry is `mod`, or empty. Prunes candidates the
+// registry no longer confirms.
+std::string FindKeyForModule(ModuleLoaderState& state, v8::Isolate* isolate,
+                             v8::Local<v8::Module> mod) {
+  if (mod.IsEmpty()) {
+    return std::string();
+  }
+  auto bucketIt = state.keysByModuleHash.find(mod->GetIdentityHash());
+  if (bucketIt == state.keysByModuleHash.end()) {
+    return std::string();
+  }
+  auto& keys = bucketIt->second;
+  for (auto it = keys.begin(); it != keys.end();) {
+    auto regIt = state.registry.find(*it);
+    if (regIt == state.registry.end() || regIt->second.IsEmpty()) {
+      it = keys.erase(it);
+      continue;
+    }
+    if (regIt->second.Get(isolate) == mod) {
+      return *it;
+    }
+    ++it;
+  }
+  if (keys.empty()) {
+    state.keysByModuleHash.erase(bucketIt);
+  }
+  return std::string();
+}
 }  // namespace
+
+std::string LookupModuleKeyForModule(v8::Isolate* isolate, v8::Local<v8::Module> mod) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) {
+    return std::string();
+  }
+  return FindKeyForModule(*state, isolate, mod);
+}
+
+void IndexModuleForIsolate(v8::Isolate* isolate, const std::string& canonicalKey,
+                           v8::Local<v8::Module> mod) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  IndexRegisteredModule(*state, canonicalKey, mod);
+}
 
 // Turn a value JS handed us into a real v8::Promise.
 //
@@ -322,6 +389,7 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
     }
   }
   g_moduleRegistry[registryKey].Reset(isolate, mod);
+  IndexRegisteredModule(*moduleState, registryKey, mod);
   return hs.Escape(mod);
 }
 
@@ -455,7 +523,7 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
     if (IsScriptLoadingLogEnabled()) {
       Log(@"[http-esm][load][drop-errored] key=%s", registryKey.c_str());
     }
-    RemoveModuleFromRegistry(registryKey);
+    RemoveModuleFromRegistry(isolate, registryKey);
   }
 
   std::string body;
@@ -1060,7 +1128,7 @@ static void AsyncGraphEnqueueUrl(const std::shared_ptr<AsyncGraphLoad>& load,
       return;  // instantiated/evaluated → its closure is already resolved
     }
     // Errored entry: drop and refetch, mirroring LoadHttpModuleForUrl.
-    RemoveModuleFromRegistry(key);
+    RemoveModuleFromRegistry(isolate, key);
   }
 
   load->pendingFetches++;
@@ -1164,10 +1232,7 @@ static const std::string& GetDocumentsDirectory() {
   return s_docsDir;
 }
 
-void RemoveModuleFromRegistry(const std::string& canonicalPath) {
-  // Only ever called on an isolate's own JS thread during module
-  // resolution/loading, so the entered isolate owns the maps to mutate.
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonicalPath) {
   if (isolate == nullptr) {
     return;
   }
@@ -1229,6 +1294,17 @@ void RemoveModuleFromRegistry(const std::string& canonicalPath) {
     if (IsScriptLoadingLogEnabled() && !isHttpKey) {
       Log(@"[resolver] removing stale module %@",
           [NSString stringWithUTF8String:registryKey.c_str()]);
+    }
+    v8::Local<v8::Module> doomed = it->second.Get(isolate);
+    if (!doomed.IsEmpty()) {
+      auto bucketIt = moduleState->keysByModuleHash.find(doomed->GetIdentityHash());
+      if (bucketIt != moduleState->keysByModuleHash.end()) {
+        auto& keys = bucketIt->second;
+        keys.erase(std::remove(keys.begin(), keys.end(), registryKey), keys.end());
+        if (keys.empty()) {
+          moduleState->keysByModuleHash.erase(bucketIt);
+        }
+      }
     }
     it->second.Reset();
     g_moduleRegistry.erase(it);
@@ -1324,7 +1400,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     }
 
     RejectAndClearInvalidatedModuleState(isolate, context, url);
-    RemoveModuleFromRegistry(url);
+    RemoveModuleFromRegistry(isolate, url);
   }
 
   // Second layer: the OS/CFNetwork HTTP cache is outside the runtime's
@@ -1847,7 +1923,7 @@ struct ResolutionStackGuard {
               Log(@"[resolver] dropping incomplete module after unwind %s (status=%s)",
                   entry_.c_str(), ModuleStatusToString(status));
             }
-            RemoveModuleFromRegistry(entry_);
+            RemoveModuleFromRegistry(isolate_, entry_);
             removedFromRegistry = true;
           } else if (IsScriptLoadingLogEnabled()) {
             Log(@"[resolver] module %s marked for reset completed evaluation (status=%s) – keeping "
@@ -1892,7 +1968,9 @@ struct ResolutionStackGuard {
       } else if (fallbackIt != g_moduleFallbackRegistry.end()) {
         v8::Local<v8::Module> fallback = fallbackIt->second.Get(isolate_);
         if (!fallback.IsEmpty()) {
-          g_moduleRegistry[CanonicalizeRegistryKey(entry_)].Reset(isolate_, fallback);
+          const std::string restoredKey = CanonicalizeRegistryKey(entry_);
+          g_moduleRegistry[restoredKey].Reset(isolate_, fallback);
+          IndexRegisteredModule(state_, restoredKey, fallback);
           if (IsScriptLoadingLogEnabled()) {
             Log(@"[resolver] restored fallback module for %s after in-flight reload failed",
                 entry_.c_str());
@@ -2018,6 +2096,7 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(v8::Isolate* isolate,
     it->second.Reset();
   }
   g_moduleRegistry[registryAbsPath].Reset(isolate, jsonModule);
+  IndexRegisteredModule(*moduleState, registryAbsPath, jsonModule);
   return v8::MaybeLocal<v8::Module>(jsonModule);
 }
 
@@ -2172,35 +2251,22 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
   }
 
   // 2) Find which filepath the referrer was compiled under
-  std::string referrerPath;
-  for (auto& kv : g_moduleRegistry) {
-    v8::Local<v8::Module> registered = kv.second.Get(isolate);
-    if (registered == referrer) {
-      referrerPath = kv.first;
-      break;
-    }
-  }
+  std::string referrerPath = FindKeyForModule(*moduleState, isolate, referrer);
   // If we couldn't identify the referrer (e.g. coming from a dynamic import
   // where the embedder did not pass the compiled Module), we can still proceed
-  // for absolute and application-rooted specifiers. Only bail out early when
-  // the specifier is clearly relative (starts with "./" or "../") and we
-  // would need the referrer's directory to resolve it.
+  // for absolute and application-rooted specifiers. A clearly relative
+  // specifier ("./" or "../") needs the referrer's directory; without one,
+  // resolve against the application root — every registered module is in the
+  // identity-hash index, so hitting this means the referrer was never
+  // registered.
   bool specIsRelative = !spec.empty() && spec[0] == '.';
-  if (referrerPath.empty() && specIsRelative) {
-    // For dynamic imports, assume the base directory is the application root
-    // This handles cases where runtime.mjs calls import("./chunk.mjs")
-    // but the referrer module isn't properly registered
-    if (IsScriptLoadingLogEnabled()) {
-      Log(@"[resolver] No referrer found for relative import '%s', assuming app root",
-          spec.c_str());
-    }
-    referrerPath =
-        RuntimeConfig.ApplicationPath + "/runtime.mjs";  // Default to runtime.mjs as referrer
-  }
-
-  // 3) Compute its directory
   size_t slash = referrerPath.find_last_of("/\\");
   std::string baseDir = slash == std::string::npos ? "" : referrerPath.substr(0, slash + 1);
+  if (referrerPath.empty() && specIsRelative) {
+    Log(@"[resolver] no registered referrer for relative import '%s'; resolving against app root",
+        spec.c_str());
+    baseDir = RuntimeConfig.ApplicationPath + "/";
+  }
 
   // If the referrer itself was compiled from an HTTP(S) URL, then any relative
   // ("./" or "../") or root-absolute ("/") specifiers should resolve against the
@@ -2537,7 +2603,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
         if (!existing.IsEmpty() && existing->GetStatus() != v8::Module::kErrored) {
           return v8::MaybeLocal<v8::Module>(existing);
         }
-        RemoveModuleFromRegistry(key);
+        RemoveModuleFromRegistry(isolate, key);
       }
 
       std::string polyfillContent;
@@ -2791,7 +2857,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
                 absPath.c_str(), static_cast<unsigned long>(reentryCount),
                 ModuleStatusToString(status));
           }
-          RemoveModuleFromRegistry(absPath);
+          RemoveModuleFromRegistry(isolate, absPath);
           isolate->ThrowException(v8::Exception::Error(tns::ToV8String(
               isolate, ("Detected circular module dependency while loading " + absPath).c_str())));
           return v8::MaybeLocal<v8::Module>();
@@ -2874,7 +2940,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       }
     }
 
-    RemoveModuleFromRegistry(absPath);
+    RemoveModuleFromRegistry(isolate, absPath);
   }
 
   // 6) Otherwise, compile & register it
@@ -2960,7 +3026,7 @@ static void FinishHttpDynamicImport(v8::Isolate* isolate, v8::Local<v8::Context>
       if (mod->GetStatus() == v8::Module::kUninstantiated) {
         v8::TryCatch tcInstantiate(isolate);
         if (!mod->InstantiateModule(context, &ResolveModuleCallback).FromMaybe(false)) {
-          RemoveModuleFromRegistry(key);
+          RemoveModuleFromRegistry(isolate, key);
           RejectHttpDynamicWaiters(
               isolate, context, key,
               BuildModuleFailureReason(isolate, tcInstantiate, "Instantiation failed (http-loader)",
@@ -2984,7 +3050,7 @@ static void FinishHttpDynamicImport(v8::Isolate* isolate, v8::Local<v8::Context>
           v8::TryCatch tcEvaluate(isolate);
           if (!mod->Evaluate(context).ToLocal(&evalResult)) {
             // Remove broken registration and reject
-            RemoveModuleFromRegistry(key);
+            RemoveModuleFromRegistry(isolate, key);
             RejectHttpDynamicWaiters(
                 isolate, context, key,
                 BuildModuleFailureReason(isolate, tcEvaluate, "Evaluation failed (http-loader)",
@@ -3185,7 +3251,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           CompileModuleFromSource(isolate, context, kEmptySrc, url);
       v8::Local<v8::Module> mod;
       if (modMaybe.ToLocal(&mod)) {
-        g_moduleRegistry[CanonicalizeRegistryKey(url)].Reset(isolate, mod);
+        const std::string atStubKey = CanonicalizeRegistryKey(url);
+        g_moduleRegistry[atStubKey].Reset(isolate, mod);
+        IndexRegisteredModule(*moduleState, atStubKey, mod);
         if (mod->GetStatus() != v8::Module::kEvaluated) {
           if (mod->Evaluate(context).IsEmpty()) {
             resolver
@@ -3223,7 +3291,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           }
 
           if (existingStatus == v8::Module::kErrored) {
-            RemoveModuleFromRegistry(blobRegistryKey);
+            RemoveModuleFromRegistry(isolate, blobRegistryKey);
           } else if (IsModuleEvaluationInProgress(existingStatus)) {
             g_modulesInFlight.insert(blobRegistryKey);
             g_httpDynamicWaiters[blobRegistryKey].emplace_back(isolate, resolver);
@@ -3237,7 +3305,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
             return scope.Escape(resolver->GetPromise());
           }
         } else {
-          RemoveModuleFromRegistry(blobRegistryKey);
+          RemoveModuleFromRegistry(isolate, blobRegistryKey);
         }
       }
 
@@ -3437,7 +3505,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
         if (mod->GetStatus() == v8::Module::kUninstantiated &&
             !mod->InstantiateModule(ctx, &ResolveModuleCallback).FromMaybe(false)) {
-          RemoveModuleFromRegistry(d->registryKey);
+          RemoveModuleFromRegistry(iso, d->registryKey);
           RejectHttpDynamicWaiters(
               iso, ctx, d->registryKey,
               v8::Exception::Error(tns::ToV8String(iso, "Failed to instantiate blob module")));
@@ -3457,7 +3525,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         if (mod->GetStatus() != v8::Module::kEvaluated) {
           v8::Local<v8::Value> evalResult;
           if (!mod->Evaluate(ctx).ToLocal(&evalResult)) {
-            RemoveModuleFromRegistry(d->registryKey);
+            RemoveModuleFromRegistry(iso, d->registryKey);
             RejectHttpDynamicWaiters(
                 iso, ctx, d->registryKey,
                 v8::Exception::Error(tns::ToV8String(iso, "Failed to evaluate blob module")));
@@ -3501,7 +3569,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                   info.Length() > 0
                       ? info[0]
                       : v8::Exception::Error(tns::ToV8String(iso, "Blob module evaluation failed"));
-              RemoveModuleFromRegistry(d->registryKey);
+              RemoveModuleFromRegistry(iso, d->registryKey);
               RejectHttpDynamicWaiters(iso, ctx, d->registryKey, reason);
               delete d;
             };
@@ -3580,7 +3648,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           if (IsScriptLoadingLogEnabled()) {
             Log(@"[dyn-import][http-cache] drop volatile %s", key.c_str());
           }
-          RemoveModuleFromRegistry(key);
+          RemoveModuleFromRegistry(isolate, key);
         }
       }
       // Coalesce concurrent dynamic imports for the same HTTP key
@@ -3616,7 +3684,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
             if (IsScriptLoadingLogEnabled()) {
               Log(@"[dyn-import][http-cache] dropping errored module for %s", key.c_str());
             }
-            RemoveModuleFromRegistry(key);
+            RemoveModuleFromRegistry(isolate, key);
             // fall through to fetch/compile path below
           } else if (IsModuleEvaluationInProgress(st)) {
             if (QueueHttpDynamicWaiterIfInFlight(isolate, key, existing, resolver)) {
@@ -3642,7 +3710,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 v8::TryCatch tcInstantiate(isolate);
                 if (!existing->InstantiateModule(context, &ResolveModuleCallback)
                          .FromMaybe(false)) {
-                  RemoveModuleFromRegistry(key);
+                  RemoveModuleFromRegistry(isolate, key);
                   RejectHttpDynamicWaiters(
                       isolate, context, key,
                       BuildModuleFailureReason(isolate, tcInstantiate,
@@ -3662,7 +3730,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
                 v8::TryCatch tcEvaluate(isolate);
                 if (!existing->Evaluate(context).ToLocal(&evalResult)) {
                   // Failed evaluation: reject all waiters and drop entry
-                  RemoveModuleFromRegistry(key);
+                  RemoveModuleFromRegistry(isolate, key);
                   RejectHttpDynamicWaiters(
                       isolate, context, key,
                       BuildModuleFailureReason(isolate, tcEvaluate,
