@@ -1935,6 +1935,19 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(v8::Isolate* isolate,
     return v8::MaybeLocal<v8::Module>();
   }
   auto& g_moduleRegistry = moduleState->registry;
+
+  // JSON modules are compiled eagerly to kEvaluated, so a registered entry is
+  // complete and must be reused — recompiling would mint a second module
+  // identity (and namespace) for the same file on every resolve.
+  auto existingIt = g_moduleRegistry.find(registryAbsPath);
+  if (existingIt != g_moduleRegistry.end()) {
+    v8::Local<v8::Module> existing = existingIt->second.Get(isolate);
+    if (!existing.IsEmpty() && existing->GetStatus() == v8::Module::kEvaluated) {
+      return v8::MaybeLocal<v8::Module>(existing);
+    }
+    g_moduleRegistry.erase(existingIt);
+  }
+
   // Debug: Log JSON module handling for worker context
   if (isWorker) {
     printf("ResolveModuleCallback: Worker handling JSON module '%s'\n", absPath.c_str());

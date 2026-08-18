@@ -102,6 +102,23 @@ describe("HTTP ESM Loader", function() {
             });
         });
         
+        it("returns one module identity for repeated JSON imports", function(done) {
+            var spec = "~/tests/esm/identity.json";
+            Promise.all([import(spec), import(spec)]).then(function(results) {
+                expect(results[0]).toBe(results[1]);
+                expect(results[0].default.name).toBe("esm-identity-fixture");
+                expect(results[0].default.value).toBe(42);
+                return import(spec).then(function(third) {
+                    expect(third).toBe(results[0]);
+                    expect(third.default).toBe(results[0].default);
+                    done();
+                });
+            }).catch(function(error) {
+                fail("JSON import should have succeeded: " + formatError(error));
+                done();
+            });
+        });
+
         it("should fall back to filesystem when HTTP fetch fails", function(done) {
             // Import a simple local ESM module that exists in the bundle but not on dev server
             import("~/tests/esm/fs-fallback.mjs").then(function(module) {

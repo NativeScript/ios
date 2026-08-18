@@ -987,6 +987,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     return "unknown";
   };
 
+  Local<Module> reusedModule;
   auto existingIt = g_moduleRegistry.find(canonicalPath);
   if (existingIt != g_moduleRegistry.end()) {
     Local<Module> existing = existingIt->second.Get(isolate);
@@ -1006,6 +1007,12 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
       } else if (existingStatus == Module::kEvaluated) {
         UpdateModuleFallback(isolate, canonicalPath, existing);
         return existing->GetModuleNamespace();
+      } else if (existingStatus == Module::kUninstantiated ||
+                 existingStatus == Module::kInstantiated) {
+        // Recompiling would mint a second module identity while importers
+        // still hold this one; reuse it and let InstantiateModule below
+        // no-op (kInstantiated) or link it (kUninstantiated).
+        reusedModule = existing;
       }
     }
   }
@@ -1033,7 +1040,10 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
   };
   Local<Module> module;
   ScriptCompiler::CachedData* cacheData = nullptr;
-  if (isHttpModule) {
+  if (!reusedModule.IsEmpty()) {
+    logPhase("compile", "reuse-registry");
+    module = reusedModule;
+  } else if (isHttpModule) {
     logPhase("compile", "delegate-http");
     // Async-pipeline pre-pass: fetch + compile the entry's transitive
     // closure with concurrent background fetches, pumping this thread's
