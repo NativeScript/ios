@@ -105,6 +105,28 @@ declare module "ns:module" {
     filenameOrURL: string | URL,
   ): (specifier: string) => any;
 
+  /** Evaluation-settle options for {@link createPumpingRequire}. */
+  export interface PumpingRequireOptions {
+    /**
+     * How long the graph may take to settle, in seconds. Positive and finite.
+     * Defaults to 60. Governs the evaluation-settle phase only — the graph
+     * walk's fetch deadline is separate and unaffected.
+     */
+    deadlineSeconds?: number;
+    /**
+     * What an expired deadline means. `"throw"` (default) fails the require;
+     * `"return-pending"` returns the namespace with evaluation still in
+     * flight, which a caller must discard rather than read.
+     */
+    onTimeout?: "throw" | "return-pending";
+    /**
+     * Also give the Cocoa runloop a slice per pump iteration. Only sane while
+     * boot owns the runloop — mid-app it re-enters arbitrary runloop sources
+     * underneath JS frames. Defaults to `false`.
+     */
+    pumpRunLoop?: boolean;
+  }
+
   /**
    * Like {@link createRequire}, except an ES module graph containing
    * top-level await is evaluated — by driving V8's nestable tasks and
@@ -123,6 +145,7 @@ declare module "ns:module" {
    */
   export function createPumpingRequire(
     filenameOrURL: string | URL,
+    options?: PumpingRequireOptions,
   ): (specifier: string) => any;
 
   // Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure

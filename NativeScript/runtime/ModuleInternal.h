@@ -56,9 +56,9 @@ class ModuleInternal {
   // boundary (workers re-arm it on the isolate for worker.onerror).
   void RunModule(v8::Isolate* isolate, std::string path);
   void RunScript(v8::Isolate* isolate, std::string script);
-  static v8::Local<v8::Value> LoadScript(v8::Isolate* isolate,
-                                         const std::string& path,
-                                         ModuleEvaluationPolicy policy);
+  static v8::Local<v8::Value> LoadScript(
+      v8::Isolate* isolate, const std::string& path,
+      const ModuleEvaluationOptions& options);
   // Installs `createRequire` on the `ns:module` binding object. Kept here
   // rather than with the dev-loader members because it hands out the very
   // require the CommonJS loader builds for every module.
@@ -86,15 +86,16 @@ class ModuleInternal {
   static void CreateRequireCallback(
       const v8::FunctionCallbackInfo<v8::Value>& info);
   // A require bound to `dirName`, whose ES module loads evaluate under
-  // `policy`. The policy rides along as a third argument to the require
-  // factory, so nothing about it is ambient.
-  v8::Local<v8::Function> GetRequireFunction(v8::Isolate* isolate,
-                                             const std::string& dirName,
-                                             ModuleEvaluationPolicy policy);
+  // `options`. The options ride along as trailing arguments to the require
+  // factory, so nothing about them is ambient — and they are resolved once at
+  // mint time, never per require() call.
+  v8::Local<v8::Function> GetRequireFunction(
+      v8::Isolate* isolate, const std::string& dirName,
+      const ModuleEvaluationOptions& options);
   v8::Local<v8::Object> LoadImpl(v8::Isolate* isolate,
                                  const std::string& moduleName,
                                  const std::string& baseDir, bool& isData,
-                                 ModuleEvaluationPolicy policy);
+                                 const ModuleEvaluationOptions& options);
   // Compile (and cache) a classic script; returns the compiled Script handle.
   static v8::Local<v8::Script> LoadClassicScript(v8::Isolate* isolate,
                                                  const std::string& path);
@@ -108,7 +109,7 @@ class ModuleInternal {
   v8::Local<v8::Object> LoadModule(v8::Isolate* isolate,
                                    const std::string& modulePath,
                                    const std::string& cacheKey,
-                                   ModuleEvaluationPolicy policy);
+                                   const ModuleEvaluationOptions& options);
   v8::Local<v8::Object> LoadData(v8::Isolate* isolate,
                                  const std::string& modulePath);
   std::string ResolvePath(v8::Isolate* isolate, const std::string& baseDir,

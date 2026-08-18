@@ -148,6 +148,92 @@ describe("createRequire", function () {
             });
         });
 
+        describe("pumping options", function () {
+            it("rejects a non-object options bag", function () {
+                expect(function () {
+                    nsModule.createPumpingRequire(fixtureDir + "/x.js", 42);
+                }).toThrowError(TypeError, /options must be an object/);
+            });
+
+            it("rejects an unknown option key by name", function () {
+                expect(function () {
+                    nsModule.createPumpingRequire(fixtureDir + "/x.js", { deadline: 1 });
+                }).toThrowError(TypeError, /unknown option 'deadline'/);
+            });
+
+            it("rejects bad option values", function () {
+                expect(function () {
+                    nsModule.createPumpingRequire(fixtureDir + "/x.js", { deadlineSeconds: 0 });
+                }).toThrowError(TypeError, /positive finite number/);
+                expect(function () {
+                    nsModule.createPumpingRequire(fixtureDir + "/x.js", { deadlineSeconds: Infinity });
+                }).toThrowError(TypeError, /positive finite number/);
+                expect(function () {
+                    nsModule.createPumpingRequire(fixtureDir + "/x.js", { onTimeout: "wait" });
+                }).toThrowError(TypeError, /'throw' or 'return-pending'/);
+                expect(function () {
+                    nsModule.createPumpingRequire(fixtureDir + "/x.js", { pumpRunLoop: "yes" });
+                }).toThrowError(TypeError, /must be a boolean/);
+            });
+
+            it("refuses options on the strict createRequire", function () {
+                expect(function () {
+                    nsModule.createRequire(fixtureDir + "/x.js", { deadlineSeconds: 1 });
+                }).toThrowError(TypeError, /options are not supported on createRequire/);
+            });
+
+            // These reach the deadline, so they must run from a task context —
+            // from a microtask the guard would refuse before evaluating.
+            it("returns without throwing at the deadline under onTimeout return-pending",
+               function (done) {
+                __ns__setTimeout(function () {
+                    // The graph parks on a non-nestable foreground task, so the
+                    // pump can never settle it and the deadline is reached.
+                    var req = nsModule.createPumpingRequire(fixtureDir + "/anything.js", {
+                        deadlineSeconds: 0.25,
+                        onTimeout: "return-pending",
+                    });
+                    var outcome = "<returned nothing>";
+                    try {
+                        var mod = req("./tla-return-pending.mjs");
+                        outcome = typeof mod === "object" ? "returned a namespace"
+                                                          : "returned " + typeof mod;
+                    } catch (e) {
+                        outcome = "threw: " + ((e && e.message) || e);
+                    }
+                    expect(outcome).toBe("returned a namespace");
+                    done();
+                }, 0);
+            });
+
+            it("honors a short deadlineSeconds with the default onTimeout throw", function (done) {
+                __ns__setTimeout(function () {
+                    var req = nsModule.createPumpingRequire(fixtureDir + "/anything.js", {
+                        deadlineSeconds: 0.25,
+                    });
+                    var started = Date.now();
+                    expect(messageOf(function () { req("./tla-deadline.mjs"); }))
+                        .toContain("Top-level await timed out");
+                    // The configured deadline governed, not the 60s default.
+                    expect(Date.now() - started < 5000 ? "within the short deadline"
+                                                       : "took too long")
+                        .toBe("within the short deadline");
+                    done();
+                }, 0);
+            });
+
+            it("keeps the microtask guard unconditional even with pumpRunLoop", function (done) {
+                var req = nsModule.createPumpingRequire(fixtureDir + "/anything.js", {
+                    pumpRunLoop: true,
+                });
+                Promise.resolve().then(function () {
+                    expect(messageOf(function () { req("./microtask-tla-guarded.mjs"); }))
+                        .toContain("cannot be pumped re-entrantly");
+                    done();
+                });
+            });
+        });
+
         it("refuses a foreground-task top-level await through createRequire", function () {
             var req = nsModule.createRequire(__dirname + "/anything.js");
             expect(messageOf(function () { req("./esm/tla-foreground-task.mjs"); }))

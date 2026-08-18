@@ -196,8 +196,8 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   // Use shortened path for global require function to avoid V8 parsing issues
   std::string globalRequirePath = "/app";
 
-  Local<v8::Function> globalRequire =
-      GetRequireFunction(isolate, globalRequirePath, ModuleEvaluationPolicy::kSyncStrict);
+  Local<v8::Function> globalRequire = GetRequireFunction(
+      isolate, globalRequirePath, RequireEvaluationOptions(ModuleEvaluationPolicy::kSyncStrict));
   bool success =
       global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
   if (!success) {
@@ -315,10 +315,25 @@ void ModuleInternal::CreateRequireCallback(const FunctionCallbackInfo<Value>& in
   }
 
   std::string dirName = tns::ToString(isolate, info[0].As<v8::String>());
-  ModuleEvaluationPolicy policy = info.Length() > 1 && info[1]->BooleanValue(isolate)
-                                      ? ModuleEvaluationPolicy::kSyncPumping
-                                      : ModuleEvaluationPolicy::kSyncStrict;
-  info.GetReturnValue().Set(moduleInternal->GetRequireFunction(isolate, dirName, policy));
+  const bool pumping = info.Length() > 1 && info[1]->BooleanValue(isolate);
+  ModuleEvaluationOptions options = RequireEvaluationOptions(
+      pumping ? ModuleEvaluationPolicy::kSyncPumping : ModuleEvaluationPolicy::kSyncStrict);
+
+  // ns-module.js has already validated these and passes undefined for anything
+  // the caller left out, so each present value simply overrides its default.
+  if (info.Length() > 2 && info[2]->IsNumber()) {
+    options.deadlineSeconds = info[2].As<v8::Number>()->Value();
+  }
+  if (info.Length() > 3 && info[3]->IsBoolean()) {
+    options.timeoutBehavior = info[3]->BooleanValue(isolate)
+                                  ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
+                                  : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
+  }
+  if (info.Length() > 4 && info[4]->IsBoolean()) {
+    options.pumpRunLoop = info[4]->BooleanValue(isolate);
+  }
+
+  info.GetReturnValue().Set(moduleInternal->GetRequireFunction(isolate, dirName, options));
 }
 
 bool ModuleInternal::InstallCreateRequireBinding(Local<Context> context, Local<Object> binding) {
@@ -333,18 +348,24 @@ bool ModuleInternal::InstallCreateRequireBinding(Local<Context> context, Local<O
 }
 
 Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const std::string& dirName,
-                                                       ModuleEvaluationPolicy policy) {
+                                                       const ModuleEvaluationOptions& options) {
   Local<v8::Function> requireFuncFactory = requireFactoryFunction_->Get(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   Local<v8::Function> requireInternalFunc = this->requireFunction_->Get(isolate);
-  Local<Value> args[3]{requireInternalFunc, tns::ToV8String(isolate, dirName.c_str()),
-                       Integer::New(isolate, static_cast<int>(policy))};
+  Local<Value> args[6]{
+      requireInternalFunc,
+      tns::ToV8String(isolate, dirName.c_str()),
+      Integer::New(isolate, static_cast<int>(options.policy)),
+      v8::Number::New(isolate, options.deadlineSeconds),
+      v8::Boolean::New(isolate,
+                       options.timeoutBehavior == ModuleEvaluationOptions::TimeoutBehavior::kThrow),
+      v8::Boolean::New(isolate, options.pumpRunLoop)};
 
   Local<Value> result;
   Local<Object> thiz = Object::New(isolate);
 
   TryCatch tc(isolate);
-  bool success = requireFuncFactory->Call(context, thiz, 3, args).ToLocal(&result);
+  bool success = requireFuncFactory->Call(context, thiz, 6, args).ToLocal(&result);
   if (!success || tc.HasCaught()) {
     if (tc.HasCaught()) {
       tns::LogError(isolate, tc);
@@ -425,12 +446,24 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
 
     moduleName = tns::ToString(isolate, info[0].As<v8::String>());
     callingModuleDirName = tns::ToString(isolate, info[1].As<v8::String>());
-    // The require factory forwards the policy its require was built with; an
-    // absent one is the strict default every ordinary require uses.
+    // The require factory forwards the options its require was minted with;
+    // an absent policy is the strict default every ordinary require uses.
     ModuleEvaluationPolicy policy = ModuleEvaluationPolicy::kSyncStrict;
     if (info.Length() > 2 && info[2]->IsInt32() &&
         info[2].As<Int32>()->Value() == static_cast<int>(ModuleEvaluationPolicy::kSyncPumping)) {
       policy = ModuleEvaluationPolicy::kSyncPumping;
+    }
+    ModuleEvaluationOptions evaluationOptions = RequireEvaluationOptions(policy);
+    if (info.Length() > 3 && info[3]->IsNumber()) {
+      evaluationOptions.deadlineSeconds = info[3].As<v8::Number>()->Value();
+    }
+    if (info.Length() > 4 && info[4]->IsBoolean()) {
+      evaluationOptions.timeoutBehavior =
+          info[4]->BooleanValue(isolate) ? ModuleEvaluationOptions::TimeoutBehavior::kThrow
+                                         : ModuleEvaluationOptions::TimeoutBehavior::kReturnPending;
+    }
+    if (info.Length() > 5 && info[5]->IsBoolean()) {
+      evaluationOptions.pumpRunLoop = info[5]->BooleanValue(isolate);
     }
 
     // Expand shortened paths back to full paths for file resolution
@@ -486,8 +519,8 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
     NSString* pathOnly = [fullPath stringByDeletingLastPathComponent];
 
     bool isData = false;
-    Local<Object> moduleObj = moduleInternal->LoadImpl(isolate, [fileNameOnly UTF8String],
-                                                       [pathOnly UTF8String], isData, policy);
+    Local<Object> moduleObj = moduleInternal->LoadImpl(
+        isolate, [fileNameOnly UTF8String], [pathOnly UTF8String], isData, evaluationOptions);
 
     if (moduleObj.IsEmpty()) {
       return;
@@ -557,7 +590,7 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
 
 Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& moduleName,
                                        const std::string& baseDir, bool& isData,
-                                       ModuleEvaluationPolicy policy) {
+                                       const ModuleEvaluationOptions& options) {
   size_t lastIndex = moduleName.find_last_of(".");
   std::string moduleNameWithoutExtension =
       (lastIndex == std::string::npos) ? moduleName : moduleName.substr(0, lastIndex);
@@ -600,7 +633,7 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& modu
   }
 
   if ([extension isEqualToString:@"mjs"] || [extension isEqualToString:@"js"]) {
-    moduleObj = this->LoadModule(isolate, path, cacheKey, policy);
+    moduleObj = this->LoadModule(isolate, path, cacheKey, options);
   } else if ([extension isEqualToString:@"json"]) {
     moduleObj = this->LoadData(isolate, path);
   } else {
@@ -675,7 +708,7 @@ static Local<Value> RequireExportsForNamespace(Isolate* isolate, Local<Context> 
 
 Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& modulePath,
                                          const std::string& cacheKey,
-                                         ModuleEvaluationPolicy policy) {
+                                         const ModuleEvaluationOptions& options) {
   Local<Object> moduleObj = Object::New(isolate);
   Local<Object> exportsObj = Object::New(isolate);
   Local<Context> context = isolate->GetCurrentContext();
@@ -701,7 +734,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
   TempModule tempModule(this, modulePath, cacheKey, poModuleObj);
 
   // Compile/load the JavaScript/ESM source
-  Local<Value> scriptValue = LoadScript(isolate, modulePath, policy);
+  Local<Value> scriptValue = LoadScript(isolate, modulePath, options);
 
   if (scriptValue.IsEmpty()) {
     throw NativeScriptException(isolate, "Script loading failed for " + modulePath);
@@ -774,9 +807,10 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
     shortParentDir = parentDir;
   }
 
-  // A module's own require inherits the policy it was loaded under, so a
-  // pumping require stays pumping all the way down its dependency tree.
-  Local<v8::Function> require = GetRequireFunction(isolate, shortParentDir, policy);
+  // A module's own require inherits the options it was loaded under, so a
+  // pumping require stays pumping — with the same deadline and timeout
+  // behavior — all the way down its dependency tree.
+  Local<v8::Function> require = GetRequireFunction(isolate, shortParentDir, options);
   // Use full paths for __filename and __dirname to match module.id
   Local<Value> requireArgs[5]{moduleObj, exportsObj, require,
                               tns::ToV8String(isolate, modulePath.c_str()),
@@ -833,13 +867,13 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const std::string& modu
 }
 
 Local<Value> ModuleInternal::LoadScript(Isolate* isolate, const std::string& path,
-                                        ModuleEvaluationPolicy policy) {
+                                        const ModuleEvaluationOptions& options) {
   std::string canonicalPath = NormalizePath(path);
 
   if (IsESModule(canonicalPath)) {
     // Treat all .mjs files as standard ES modules. require()'s default route
     // cannot wait: an async graph is refused rather than pumped.
-    return ModuleInternal::LoadESModule(isolate, canonicalPath, RequireEvaluationOptions(policy));
+    return ModuleInternal::LoadESModule(isolate, canonicalPath, options);
   }
 
   Local<Script> script = ModuleInternal::LoadClassicScript(isolate, canonicalPath);

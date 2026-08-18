@@ -11,8 +11,11 @@
 // feature checks work.
 
 const {
+  ArrayPrototypeIndexOf,
   decodeURIComponent,
+  NumberIsFinite,
   ObjectFreeze,
+  ObjectKeys,
   StringPrototypeEndsWith,
   StringPrototypeIndexOf,
   StringPrototypeLastIndexOf,
@@ -106,12 +109,64 @@ function urlStringToPath(value) {
   throw new TypeError(CREATE_REQUIRE_ERROR);
 }
 
-function createRequire(filenameOrURL) {
+// Every option a pumping require accepts, so an unknown key is a typo the
+// caller hears about rather than a setting that silently does nothing.
+const kPumpingOptionKeys = ["deadlineSeconds", "onTimeout", "pumpRunLoop"];
+
+// Validated once, when the require is minted — a require() call itself does no
+// option work at all. Returns the three values the native mint expects, with
+// `undefined` standing for "leave the default alone".
+function validatePumpingOptions(options) {
+  if (options === undefined) {
+    return { deadlineSeconds: undefined, throwOnTimeout: undefined, pumpRunLoop: undefined };
+  }
+  if (typeof options !== "object" || options === null) {
+    throw new TypeError("createPumpingRequire: options must be an object");
+  }
+
+  const keys = ObjectKeys(options);
+  for (let i = 0; i < keys.length; i++) {
+    if (ArrayPrototypeIndexOf(kPumpingOptionKeys, keys[i]) < 0) {
+      throw new TypeError("createPumpingRequire: unknown option '" + keys[i] + "'");
+    }
+  }
+
+  const deadlineSeconds = options.deadlineSeconds;
+  if (deadlineSeconds !== undefined &&
+      (typeof deadlineSeconds !== "number" || !NumberIsFinite(deadlineSeconds) ||
+       deadlineSeconds <= 0)) {
+    throw new TypeError(
+      "createPumpingRequire: 'deadlineSeconds' must be a positive finite number");
+  }
+
+  const onTimeout = options.onTimeout;
+  if (onTimeout !== undefined && onTimeout !== "throw" && onTimeout !== "return-pending") {
+    throw new TypeError("createPumpingRequire: 'onTimeout' must be 'throw' or 'return-pending'");
+  }
+
+  const pumpRunLoop = options.pumpRunLoop;
+  if (pumpRunLoop !== undefined && typeof pumpRunLoop !== "boolean") {
+    throw new TypeError("createPumpingRequire: 'pumpRunLoop' must be a boolean");
+  }
+
+  return {
+    deadlineSeconds,
+    throwOnTimeout: onTimeout === undefined ? undefined : onTimeout === "throw",
+    pumpRunLoop,
+  };
+}
+
+function createRequire(filenameOrURL, options) {
+  if (options !== undefined) {
+    throw new TypeError("options are not supported on createRequire");
+  }
   return binding.createRequire(requireBaseDir(filenameOrURL), false);
 }
 
-function createPumpingRequire(filenameOrURL) {
-  return binding.createRequire(requireBaseDir(filenameOrURL), true);
+function createPumpingRequire(filenameOrURL, options) {
+  const resolved = validatePumpingOptions(options);
+  return binding.createRequire(requireBaseDir(filenameOrURL), true, resolved.deadlineSeconds,
+                               resolved.throwOnTimeout, resolved.pumpRunLoop);
 }
 
 const surface = {

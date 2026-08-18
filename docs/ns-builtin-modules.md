@@ -124,7 +124,7 @@ the full contract rationale.
 | `invalidateModules(urls)` | Evict the given URLs (canonicalized) from the module registry and mark them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. |
 | `getLoadedModuleUrls()` | URL-like keys currently in the module registry (used to compute full-reload eviction sets). |
 | `createRequire(filenameOrURL)` | A `require` resolving against `filenameOrURL`'s directory (a trailing slash names the directory itself). Accepts an absolute path string, a `file:` URL string, or a URL object; anything else throws a `TypeError`, and an `http(s)` base is refused outright because `require()` of a dev-served module is not supported — import those. ES module graphs load under Node's `require(esm)` rule: a graph containing top-level await is refused before it evaluates. |
-| `createPumpingRequire(filenameOrURL)` | Same argument contract and same resolution, but an ES module graph with top-level await is evaluated by driving V8's nestable tasks and microtasks until it settles, instead of being refused. **Callable only from a task context** — see below. It never advances the Cocoa runloop, so a graph awaiting a native transport still cannot settle here and fails on the deadline rather than returning a half-initialized namespace. Reach for it only where a synchronous boundary must consume an async module. |
+| `createPumpingRequire(filenameOrURL, options?)` | Same argument contract and same resolution, but an ES module graph with top-level await is evaluated by driving V8's nestable tasks and microtasks until it settles, instead of being refused. **Callable only from a task context** — see below. `options` (validated at mint time; unknown keys throw `TypeError`): `deadlineSeconds` (positive finite, default 60), `onTimeout` (`"throw"` default, or `"return-pending"`), `pumpRunLoop` (default `false`). They govern the evaluation-settle phase only — the graph walk's fetch deadline is separate. Passing `options` to `createRequire` throws. |
 
 `createPumpingRequire` pumps the loop, and the loop cannot be pumped
 re-entrantly: V8 ignores a microtask checkpoint while the isolate is already
@@ -176,6 +176,38 @@ malformed map, a non-string target, an unknown top-level section, or a
 trailing-slash key with a non-trailing-slash target throws a `TypeError`
 naming the offending key or section, and the previously installed map keeps
 resolving — a typo in an update cannot empty a live session's vocabulary.
+
+#### Booting an ESM entry from a CJS bootstrap
+
+The supported way to give an ESM app its loader vocabulary before any ESM
+traffic — which closes the pre-configure window described in the
+canonicalization notes — is a small CommonJS bootstrap as the app entry:
+
+```js
+const { configureLoader, createPumpingRequire } = require("ns:module");
+
+configureLoader({ importMap: { imports: { /* … */ } } });
+
+createPumpingRequire(__filename, {
+  pumpRunLoop: true,
+  onTimeout: "return-pending",
+  deadlineSeconds: 1,
+})("./entry.mjs");
+```
+
+Two warnings, both load-bearing:
+
+- `pumpRunLoop: true` is sane **only while boot owns the runloop**. After boot
+  the runloop belongs to the app, and slicing it from inside a require
+  re-enters arbitrary runloop sources — including UI callbacks — underneath JS
+  frames.
+- With `onTimeout: "return-pending"` the returned namespace may still be
+  evaluating. A bootstrap must **discard it** and never read a binding off it;
+  reading one is a TDZ error at best.
+
+An entry whose top-level code reaches `UIApplicationMain` before its first
+`await` needs none of this: `Evaluate()` never returns, so no deadline ever
+arms.
 
 Not implemented on either require: `require.resolve`, `require.cache`, and
 `require.main`. They are absent rather than throwing, so a feature check
