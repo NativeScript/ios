@@ -16,6 +16,11 @@
 
 - (instancetype)initWithConfig:(Config*)config;
 - (void)runScriptString: (NSString*) script runLoop: (BOOL) runLoop;
+
+/**
+ Embedder-only: dispose the isolate and construct a new Runtime.
+ JS-bootstrapped apps must not use this — it kills JS-backed delegates.
+ */
 - (void)restartWithConfig:(Config*)config;
 - (void)shutdownRuntime;
 
@@ -29,6 +34,13 @@
 
 @interface NativeScriptRuntime : NSObject
 
+/**
+ Reset the JS application on the existing main isolate.
+ Does not dispose the isolate, create a second Runtime, or re-enter
+ UIApplicationMain. JS-backed AppDelegate / UIScene delegates stay alive.
+ Optional baseDir points later module loads at an OTA bundle. After flushing
+ module caches, invokes global.__onApplicationReload if present.
+ */
 + (BOOL)reloadApplication;
 + (BOOL)reloadApplication:(NSString*)baseDir;
 

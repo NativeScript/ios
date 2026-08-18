@@ -301,6 +301,21 @@ static const std::string& GetDocumentsDirectory() {
   return s_docsDir;
 }
 
+void ClearModuleRegistry() {
+  for (auto& kv : g_moduleRegistry) {
+    kv.second.Reset();
+  }
+  g_moduleRegistry.clear();
+  for (auto& kv : g_moduleFallbackRegistry) {
+    kv.second.Reset();
+  }
+  g_moduleFallbackRegistry.clear();
+  for (auto& kv : g_moduleFallbackByRelative) {
+    kv.second.Reset();
+  }
+  g_moduleFallbackByRelative.clear();
+}
+
 void RemoveModuleFromRegistry(const std::string& canonicalPath) {
   // Defensive: never operate on an anomalous/sentinel key.
   // This covers the bare "@" anomaly and the special invalid-at stub module used by the dev HTTP

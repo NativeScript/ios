@@ -129,6 +129,8 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   }
 }
 
+void ModuleInternal::ClearLoadedModules() { this->loadedModules_.clear(); }
+
 bool ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   Local<Context> context = cache->GetContext();

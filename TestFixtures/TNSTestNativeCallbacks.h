@@ -92,4 +92,10 @@
 // accessor boundary).
 + (id)objectValueForKey:(id)object key:(NSString*)key;
 
+// UIKit-style msgSend into JS-backed application / scene delegates. Used to
+// prove isolate-preserving reload keeps those IMPs alive (native → JS).
++ (void)invokeApplicationDelegateLifecycle:(id)delegate;
++ (void)invokeSceneDelegateLifecycle:(id)delegate;
++ (id)invokeDelegateWindow:(id)delegate;
+
 @end

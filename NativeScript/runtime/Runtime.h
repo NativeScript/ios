@@ -22,6 +22,10 @@ using ReloadApplicationHook = std::function<bool(const std::string& baseDir)>;
 void SetReloadApplicationHook(ReloadApplicationHook hook);
 bool InvokeReloadApplicationHook(const std::string& baseDir);
 
+// Soft-reboot count for this process. 0 on first boot.
+void IncrementRuntimeReloadCount();
+int GetRuntimeReloadCount();
+
 class Runtime {
  public:
   Runtime();
@@ -29,6 +33,8 @@ class Runtime {
   v8::Isolate* CreateIsolate();
   void Init(v8::Isolate* isolate, bool isWorker = false);
   void RunMainScript();
+  // Isolate-preserving JS application reset. Does not dispose this isolate.
+  void ReloadJsApplication();
   v8::Isolate* GetIsolate();
 
   const int WorkerId();
@@ -124,6 +130,7 @@ class Runtime {
                                   v8::Local<v8::ObjectTemplate> globalTemplate);
   void DefineDateTimeConfigurationChangeNotificationMethod(
       v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate);
+  void TerminateChildWorkers();
 
   static void DrainRejectionsObserver(CFRunLoopObserverRef observer,
                                       CFRunLoopActivity activity, void* info);

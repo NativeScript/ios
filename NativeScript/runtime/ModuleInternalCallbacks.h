@@ -13,6 +13,7 @@ extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
 // Utility to drop modules from the registry when compilation/instantiation
 // fails
 void RemoveModuleFromRegistry(const std::string& canonicalPath);
+void ClearModuleRegistry();
 
 // Keep a fallback copy of the last evaluated module so could be served while
 // reloading if needed

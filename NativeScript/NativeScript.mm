@@ -33,8 +33,23 @@ static Config* CopyConfig(Config* config) {
   return copy;
 }
 
+static void ApplyRuntimeConfigPaths(Config* config) {
+  RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
+  if (config.ApplicationPath != nil) {
+    RuntimeConfig.ApplicationPath =
+        [[config.BaseDir stringByAppendingPathComponent:config.ApplicationPath] UTF8String];
+  } else {
+    RuntimeConfig.ApplicationPath =
+        [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
+  }
+}
+
 static NativeScript* currentNativeScript;
 static Config* currentConfig;
+
+@interface NativeScript ()
+- (void)reloadJsApplication;
+@end
 
 @implementation NativeScript
 
@@ -84,14 +99,7 @@ std::unique_ptr<Runtime> runtime_;
     currentNativeScript = self;
     currentConfig = CopyConfig(config);
 
-    RuntimeConfig.BaseDir = [config.BaseDir UTF8String];
-    if (config.ApplicationPath != nil) {
-      RuntimeConfig.ApplicationPath =
-          [[config.BaseDir stringByAppendingPathComponent:config.ApplicationPath] UTF8String];
-    } else {
-      RuntimeConfig.ApplicationPath =
-          [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
-    }
+    ApplyRuntimeConfigPaths(config);
     if (config.MetadataPtr != nil) {
       RuntimeConfig.MetadataPtr = [config MetadataPtr];
     } else {
@@ -141,8 +149,18 @@ std::unique_ptr<Runtime> runtime_;
 }
 
 - (void)restartWithConfig:(Config*)config {
+  // Embedder-only isolate replacement. JS-bootstrapped apps must use
+  // reloadApplication, which keeps the one main isolate alive.
+  tns::IncrementRuntimeReloadCount();
   [self shutdownRuntime];
   [self initializeWithConfig:config];
+}
+
+- (void)reloadJsApplication {
+  if (runtime_ == nullptr) {
+    return;
+  }
+  runtime_->ReloadJsApplication();
 }
 
 @end
@@ -158,15 +176,20 @@ std::unique_ptr<Runtime> runtime_;
     return NO;
   }
 
-  Config* config = CopyConfig(currentConfig);
   if (baseDir != nil && [baseDir length] > 0) {
-    config.BaseDir = baseDir;
+    currentConfig.BaseDir = baseDir;
+    ApplyRuntimeConfigPaths(currentConfig);
   }
 
-  dispatch_async(dispatch_get_main_queue(), ^{
-    [currentNativeScript restartWithConfig:config];
-    [currentNativeScript runMainApplication];
-  });
+  void (^work)(void) = ^{
+    [currentNativeScript reloadJsApplication];
+  };
+
+  if ([NSThread isMainThread]) {
+    work();
+  } else {
+    dispatch_async(dispatch_get_main_queue(), work);
+  }
 
   return YES;
 }
